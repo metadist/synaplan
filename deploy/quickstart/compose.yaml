@@ -26,7 +26,9 @@ x-app-environment: &app-environment
   APP_VERSION: ${SYNAPLAN_VERSION:-5.2.1}
   APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
-  REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
+  # Space-separated. Without SYNAPLAN_URL both local spellings keep live chat
+  # connected, since people type either one.
+  REALTIME_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000} http://localhost:${SYNAPLAN_HTTP_PORT:-8000}}
   BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
   BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
   REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-}
@@ -352,7 +354,11 @@ services:
       - uploads:/var/www/backend/var/uploads
       - secrets-app:/run/synaplan-secrets:ro
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       backend:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/usr/local/bin/container-healthcheck"]
@@ -373,7 +379,11 @@ services:
       - uploads:/var/www/backend/var/uploads
       - secrets-app:/run/synaplan-secrets:ro
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       backend:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/usr/local/bin/container-healthcheck"]
@@ -448,7 +458,7 @@ services:
       CENTRIFUGO_PROMETHEUS_ENABLED: "true"
       CENTRIFUGO_HEALTH_ENABLED: "true"
       CENTRIFUGO_CHANNEL_NAMESPACES: '[{"name":"widget","presence":false,"history_size":100,"history_ttl":"10m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"widgettyping","presence":false,"history_size":0,"history_ttl":"0s","force_recovery":false,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":true,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"user","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"admin","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"system","presence":false,"history_size":10,"history_ttl":"1m","force_recovery":false,"allow_subscribe_for_anonymous":true,"allow_subscribe_for_client":true,"allow_publish_for_subscriber":false}]'
-      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000} http://localhost:${SYNAPLAN_HTTP_PORT:-8000}}
     volumes:
       - secrets-realtime:/run/synaplan-secrets:ro
     depends_on:

@@ -49,7 +49,7 @@ described in [Backup and restore](../deploy/README.md#backup-and-restore).
 
 ## Quickstart volumes
 
-The two-file quickstart (`deploy/quickstart/compose.yaml`) keeps its data in
+The quickstart (`deploy/quickstart/compose.yaml`) keeps its data in
 named Docker volumes instead of `deploy/data`. The commands below run in a
 terminal on the Docker host and need no `compose.yaml` there, so they work the
 same for a CLI install and for a stack created in Portainer, Dockge or Synology
@@ -62,11 +62,12 @@ project=synaplan   # the name from the list above
 ```
 
 1. **Back up** every volume of the project, the generated secrets included.
-   Synaplan is unavailable for the few seconds this takes:
+   Synaplan is unavailable for the few seconds this takes. The archives hold
+   the database and every password, so only your user may read the folder:
 
 ```bash
 docker compose -p "$project" stop
-mkdir -p backup
+mkdir -p backup && chmod 700 backup
 for v in $(docker volume ls -q --filter "label=com.docker.compose.project=$project"); do
   docker run --rm -v "$v:/v:ro" -v "$PWD/backup:/b" alpine tar czf "/b/$v.tgz" -C /v .
 done

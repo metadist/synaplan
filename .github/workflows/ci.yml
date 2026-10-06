@@ -2176,7 +2176,7 @@ jobs:
             (version, \`APP_VERSION\`, and the published image digest
             \`${DIGEST}\`)
           - \`deploy/aws/packer/synaplan.pkr.hcl\` for the AWS Marketplace AMI
-          - \`deploy/quickstart/compose.yaml\` for the two-file quickstart
+          - \`deploy/quickstart/compose.yaml\` for the one-file quickstart
 
           Existing deployments are unaffected. They keep the version their operator
           pinned and change it only by following the update guide, so a redeploy never

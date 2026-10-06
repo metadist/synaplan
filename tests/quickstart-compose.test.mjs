@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-// deploy/quickstart/compose.yaml is the "two files" install: a person (or a
+// deploy/quickstart/compose.yaml is the one-file install: a person (or a
 // Docker GUI such as Portainer or Dockge) gets this one file and, optionally, a
 // .env — no git clone. Everything that would need the repository next to it, or
 // a value the operator has to type first, breaks that promise.

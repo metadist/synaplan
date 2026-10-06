@@ -3,7 +3,7 @@
 // Writes a published release version into the files that decide which version a
 // NEW deployment installs: the Elestio manifest, the self-hosting example
 // configuration, the Umbrel App Store package, the AWS Packer build, and the
-// two-file quickstart compose.
+// one-file quickstart compose.
 //
 // Existing deployments are untouched by design. They keep the version their
 // operator pinned, and change it only by following docs/UPDATE_ELESTIO.md,
@@ -262,7 +262,7 @@ export const applyPackerVersion = (text, version) => {
   return result.join('\n')
 }
 
-// The quickstart compose is the "two files" path: it runs without any .env, so
+// The quickstart compose is the one-file path: it runs without any .env, so
 // the release lives in the `${SYNAPLAN_VERSION:-…}` default of the image line
 // and of APP_VERSION. Both must move together, or the About page would report a
 // different release than the image that runs.

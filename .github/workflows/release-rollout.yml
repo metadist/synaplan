@@ -314,7 +314,7 @@ jobs:
             echo "- \`deploy/selfhost.env.example\` for self-hosting"
             echo "- \`deploy/umbrel/synaplan/\` for the Umbrel App Store package"
             echo "- \`deploy/aws/packer/synaplan.pkr.hcl\` for the AWS Marketplace AMI"
-            echo "- \`deploy/quickstart/compose.yaml\` for the two-file quickstart"
+            echo "- \`deploy/quickstart/compose.yaml\` for the one-file quickstart"
             echo ""
             echo "Elestio instances that track the default branch are redeploying now."
             echo "Running installations keep the version their operator pinned."
