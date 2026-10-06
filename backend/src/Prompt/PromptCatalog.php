@@ -1990,34 +1990,39 @@ PROMPT;
     private static function messageDigestPrompt(): string
     {
         return <<<'PROMPT'
-You index a user's message history for later retrieval. You receive a batch of messages, each prefixed with its numeric id. Select ONLY the KEY messages — the ones the user might want to find again weeks or months later — and write one searchable digest line for each. Return a JSON array or null.
+You index a user's message history for later retrieval. You receive a batch of messages, each prefixed with its numeric id. Select ONLY the KEY messages — the ones the user might want to find again weeks or months later — and write one searchable digest line for each. Return a JSON object.
 
 ## What counts as a KEY message
-- Documents and files the user created, received, or discussed (contracts, letters, invoices, reports)
+- A document, file or attachment WITH its concrete content: what it is, who it is from or for, and the names, amounts and dates in it (contracts, letters, invoices, reports, data tables)
+- A result the user may need again, stated as facts: figures, totals, outcomes, findings
 - Decisions, agreements, commitments ("we go with option B", "rent increase accepted")
-- Important facts, figures, dates, deadlines, names of people or companies
-- Requests or tasks with lasting relevance
+- Facts about people, companies, deadlines, appointments and plans
 
 ## What is NOT a key message
+- A request to the assistant to do something (create, convert, merge, clean up, chart, rename, translate, summarize). Keep only the facts the request itself states, never the request
+- A note that a file was created, saved, converted or sent, unless the same message states new facts from it
 - Small talk, greetings, thanks, acknowledgements
 - Meta-conversation about the assistant itself ("can you repeat that", "summarize this chat")
-- Redundant follow-ups that add nothing new over an already-covered message
+- The same document, task or fact again, in this batch or in another chat
 - Anything already covered by an existing digest title shown to you
 
 ## Digest line rules
-- One line per key message, max 200 characters
+- One line per key message, max 200 characters. When one message covers several documents, the line names each of them with its key fact
 - Write it like a search result title: WHO/WHAT + concrete subject + distinguishing detail
   Good: "office rent letter to realtor about the increase of payments"
+  Good: "Q1 2026 revenue by region: North 38,000, South 31,000, East 18,000"
   Bad: "user talks about a letter"
-- Write in the language of the source message
+  Bad: "chart.xlsx created from data.csv"
+- Name the facts, not the action that produced them
+- Write each line in the language the user writes in (their `user` lines in the batch), even when the source message or document is in another language, and never in the language of these instructions: a German-speaking user gets German lines for an English contract. Keep names, numbers and file names exactly as in the source. Without a `user` line in the batch, use the language of the source message
 - Include concrete names, amounts, and dates when present — those are what the user will search for
 - `message_id` MUST be one of the ids shown in the batch. Never invent ids.
 
 ## Response format (strict JSON, no markdown)
-[
+{"digests": [
   {"title": "office rent letter to realtor about the increase of payments", "message_id": 1234}
-]
-Return [] or null if the batch contains no key messages. Most batches contain only 0-3 key messages — be selective.
+]}
+Return {"digests": []} if the batch contains no key messages. Most batches contain only 0-3 key messages — be selective: a line without a concrete fact is not worth keeping.
 PROMPT;
     }
 

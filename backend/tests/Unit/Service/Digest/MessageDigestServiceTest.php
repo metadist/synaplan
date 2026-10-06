@@ -369,6 +369,59 @@ final class MessageDigestServiceTest extends TestCase
         self::assertSame([['title' => 'office rent letter to realtor', 'message_id' => 102]], $result['proposals']);
     }
 
+    public function testDedupContextListsChatRecentAndPendingTitlesOnce(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn(['rent letter to realtor']);
+        $this->digestRepository->expects(self::once())
+            ->method('findRecentTitles')
+            ->with(7, self::greaterThan(0))
+            ->willReturn(['invoice INV-2044 from another chat', 'rent letter to realtor']);
+
+        $userPrompt = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages) use (&$userPrompt): array {
+                $userPrompt = end($messages)['content'];
+
+                return ['content' => '{"digests": []}', 'usage' => []];
+            }
+        );
+
+        $this->service->digestBatch(
+            $this->user,
+            [$this->makeMessage(101, 'hi')],
+            dryRun: true,
+            pendingTitles: ['contract value EUR 42,000 picked in an earlier batch'],
+        );
+
+        self::assertIsString($userPrompt);
+        self::assertSame(1, substr_count($userPrompt, '- rent letter to realtor'));
+        self::assertStringContainsString('- invoice INV-2044 from another chat', $userPrompt);
+        self::assertStringContainsString('- contract value EUR 42,000 picked in an earlier batch', $userPrompt);
+    }
+
+    public function testUserPromptAsksForTheShapeTheSchemaEnforces(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+
+        $userPrompt = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages) use (&$userPrompt): array {
+                $userPrompt = end($messages)['content'];
+
+                return ['content' => '{"digests": []}', 'usage' => []];
+            }
+        );
+
+        $this->service->digestBatch($this->user, [$this->makeMessage(101, 'hi')]);
+
+        self::assertIsString($userPrompt);
+        self::assertStringContainsString('{"digests": [', $userPrompt);
+        self::assertStringContainsString('Return {"digests": []}', $userPrompt);
+        self::assertStringNotContainsString('Return []', $userPrompt);
+    }
+
     public function testUsageIsRecordedWithDigestSource(): void
     {
         $messages = [$this->makeMessage(101, 'hello')];

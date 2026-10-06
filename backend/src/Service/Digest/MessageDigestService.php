@@ -38,6 +38,8 @@ final readonly class MessageDigestService
     private const MAX_TITLE_CHARS = 200;
     private const MESSAGE_CLIP_CHARS = 1500;
     private const FILE_TEXT_CLIP_CHARS = 1000;
+    /** Titles from the user's other chats, so a task repeated elsewhere is not indexed twice. */
+    private const RECENT_TITLES_FOR_DEDUP = 30;
 
     /** The model answered, but the body was not a JSON list or null. */
     public const FAILURE_UNPARSABLE = 'unparsable';
@@ -79,11 +81,15 @@ final readonly class MessageDigestService
      * is a successful scan. A thrown provider error or an unparsable answer
      * sets `failed` and `failureReason` and leaves `scanned` at 0.
      *
+     * `$pendingTitles` are titles a dry run has proposed in earlier batches;
+     * they count as existing because a real run would have stored them.
+     *
      * @param list<Message> $messages
+     * @param list<string>  $pendingTitles
      *
      * @return array{scanned: int, created: int, proposals: list<array{title: string, message_id: int}>, failed: bool, failureReason: ?string}
      */
-    public function digestBatch(User $user, array $messages, bool $dryRun = false): array
+    public function digestBatch(User $user, array $messages, bool $dryRun = false, array $pendingTitles = []): array
     {
         $messages = array_values(array_filter(
             $messages,
@@ -109,7 +115,11 @@ final readonly class MessageDigestService
             static fn (Message $m): int => (int) $m->getChatId(),
             $pending
         ))));
-        $existingTitles = $this->digestRepository->findTitlesForChats($user->getId(), $chatIds);
+        $existingTitles = array_values(array_unique([
+            ...$this->digestRepository->findTitlesForChats($user->getId(), $chatIds),
+            ...$this->digestRepository->findRecentTitles($user->getId(), self::RECENT_TITLES_FOR_DEDUP),
+            ...$pendingTitles,
+        ]));
 
         $extraction = $this->extractDigestsViaAi($user, $pending, $existingTitles);
         if ($extraction['failed']) {
@@ -148,7 +158,7 @@ final readonly class MessageDigestService
 
         $existingBlock = '';
         if ([] !== $existingTitles) {
-            $existingBlock = "\nExisting digest titles from these conversations (do NOT duplicate):\n";
+            $existingBlock = "\nExisting digest titles from these and the user's recent conversations (do NOT duplicate):\n";
             foreach ($existingTitles as $title) {
                 $existingBlock .= '- '.$title."\n";
             }
@@ -158,10 +168,10 @@ final readonly class MessageDigestService
 Message batch (each line starts with [#id direction channel date]):
 {$batchText}{$existingBlock}
 RESPONSE FORMAT (strict JSON, no markdown):
-[
+{"digests": [
   {"title": "office rent letter to realtor about the increase of payments", "message_id": 1234}
-]
-Return [] or null if no message in this batch is worth indexing.
+]}
+Return {"digests": []} if no message in this batch is worth indexing.
 PROMPT;
 
         try {
@@ -532,13 +542,13 @@ PROMPT;
         $this->logger->warning('Message digest prompt not found in DB, using fallback');
 
         return <<<'PROMPT'
-You index a user's message history. Select ONLY the KEY messages of the batch (documents, decisions, important facts/dates/names — never small talk) and write one searchable title per message, in the language of the source message, max 200 characters.
+You index a user's message history. Select ONLY the KEY messages of the batch (documents with their content, decisions, important facts/dates/names — never small talk, requests to the assistant or notes that a file was created) and write one searchable title per message, in the language the user writes in (keep names and numbers as in the source), max 200 characters.
 
 RESPONSE FORMAT (strict JSON, no markdown):
-[
+{"digests": [
   {"title": "office rent letter to realtor about the increase of payments", "message_id": 1234}
-]
-message_id MUST be an id from the batch. Return [] or null if nothing is worth indexing.
+]}
+message_id MUST be an id from the batch. Return {"digests": []} if nothing is worth indexing.
 PROMPT;
     }
 }
