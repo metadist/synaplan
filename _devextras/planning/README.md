@@ -30,7 +30,7 @@ paths were renamed on 2026-09-17.
 | [`20260919-meta-muse/`](./20260919-meta-muse/00_master_plan.md) | Meta Model API (Muse Spark) + per-model thinking levels (§0 unticked, research only) |
 | [`20261003-decision-routing/`](./20261003-decision-routing/00_master_plan.md) | Decision models (Ollama System One): routing layer before the LLM sorter, `/v1/systemone` + `/api/v1/decisions` API, decision mode in chat; D1–D2 spike + go / no-go first |
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts: apps like SISmass create Synaplan accounts for their customers, with a token trial and purchase without a Synaplan login (AA1–AA8, not started) |
-| [`20261007-mcp-tool-errors/`](./20261007-mcp-tool-errors/issue-mcp-tool-error-fallback.md) | Partner report (Backblaze B2 MCP): a tool error drops the plan to legacy chat or skips the answer step; root cause and fix plan, not started |
+| [`20261007-mcp-tool-errors/`](./20261007-mcp-tool-errors/issue-mcp-tool-error-fallback.md) | Partner report (Backblaze B2 MCP): a tool error drops the plan to legacy chat or skips the answer step. Fix plan reviewed, not started |
 | [`20260929-synaplan-federation/`](./20260929-synaplan-federation/00_master_plan.md) | Synaplan Federation v1.0, reviewed and queued: next sprint is the opt-in knowledge link ([`01_review.md`](./20260929-synaplan-federation/01_review.md)); data model + 15k storage math in [`02_federation_data_model.md`](./20260929-synaplan-federation/02_federation_data_model.md) |
 
 ## Archive

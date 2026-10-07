@@ -1,146 +1,70 @@
 Title: fix(multitask): an MCP tool error drops the plan or skips the answer step, and the reply hides the failure
 
-**Kind:** Ready to implement. Steps 1–4 fix the reported behaviour; steps 5–6 harden it.
+**Kind:** Ready to implement. No open decisions. Do the five steps below and stop.
 
 **Reported by:** partner hoster running the Backblaze B2 MCP server
-**Version:** 5.2.0 (upgraded from 5.0.6). Code paths below are unchanged on `main` / 5.3.0.
-**Follow-up to:** [#2327](https://github.com/metadist/synaplan/pull/2327) (fix(multitask): hand connected-system results to the answer step reliably)
-**Release impact:** `fix:` → patch. Mobile classification: **backend-only** (`backend/**` plus one prompt migration).
-
-Permalinks point to `e00af5ffb7c13a973647738494b16a795ea36b01` (current `main`).
+**Version:** 5.2.0 (upgraded from 5.0.6). These code paths are unchanged on current `main`.
+**Follow-up to:** [#2327](https://github.com/metadist/synaplan/pull/2327)
+**Release:** commit subject starts with `fix:` (patch). Backend only. No frontend, no new `NodeStatus`, no prompt migration.
 
 ---
 
-## Summary
+## What the partner saw
 
-Read-only MCP lookups now work: the bucket reachability check passed 6 of 6 runs, and listing buckets and objects works too. When the MCP **tool itself returns an error**, though, the turn breaks in two ways, and neither is logged:
+Read-only lookups work (bucket reachability 6/6, listing buckets and objects works). Message sorting is Luna. The planner is the default PLAN model, which falls back to that same Luna, reached as `~openai/gpt-luna-latest` through OpenRouter.
 
-1. **A single failing MCP step**, for example a bucket that does not exist, where B2 returns `404 NotFound`. The plan is discarded and the **legacy chat router** answers. It cannot see connected systems, so it says *"there is no Backblaze connection available"*. That is false: the connection exists and B2 answered. Reproduced 5 of 5 times across two different prompts.
-2. **A mixed request** asking about one real bucket and one missing bucket. The first check succeeds and the second fails with the 404. The **answer step is skipped** because one of its dependencies failed, and the reply is the raw output of the step that succeeded. The failure only shows on the task card. The reply never says that the second bucket was not found.
+1. **A bucket that does not exist.** B2 returns `404 NotFound`. This happened 5/5 times, on two different prompts. The plan is dropped and the legacy chat answers that there is no Backblaze connection. That is false: the connection exists and B2 answered. Nothing is logged about the error itself.
+2. **One real bucket and one missing bucket in the same message.** The real check succeeds, the missing one fails with the 404, and the answer step is skipped. The reply only mentions the bucket that exists. The failure shows only on the task card.
+3. **Every successful run** logs `ChatRunner: plan did not hand over upstream step output, appending it to the prompt`. The answers are still correct. This is not the bug to fix here — see the last section.
 
-There are two more findings from the same test run:
-
-3. **The tool error is never logged.** The `isError: true` path in `McpFetchRunner` returns a failed node and writes nothing to the log.
-4. **The planner never wires the upstream result into the answer step.** The planner runs on the default PLAN model, which for this hoster is Luna via OpenRouter (`~openai/gpt-luna-latest`). On every successful run the log shows `ChatRunner: plan did not hand over upstream step output, appending it to the prompt`. The safety net from #2327 does the work every time, which means the planner prompt does not teach the wiring for `mcp_fetch`.
-
-The partner asked whether MCP steps could skip the chat fallback the way `code_run` plans already do. **Yes, and that is part of the fix.** On its own, though, it would only replace a false answer with a generic *"I couldn't fully complete that request."* The complete fix also lets the answer step run when a data source reports an error, so the AI can explain what failed: *"The bucket `foo` does not exist in your Backblaze account."*
+They asked whether MCP steps should skip the chat fallback the way `code_run` already does. Yes. That alone is step 4. It is not enough on its own: the user would then get "I couldn't fully complete that request." and still not be told the bucket was not found. Steps 1–3 make the answer step explain the error.
 
 ---
 
-## Reporter setup
+## What the code does
 
-| Setting | Value |
-| ------- | ----- |
-| Synaplan | 5.2.0 (upgraded from 5.0.6) |
-| MCP server | Backblaze B2 MCP (`s3_head_bucket`, `s3_get_bucket_location`, list buckets/objects) |
-| Message sorting (SORT) | Luna, switched to match our setup |
-| Planner (PLAN) | default (falls back to SORT → Luna), via OpenRouter `~openai/gpt-luna-latest` |
+This is the path for "is bucket `does-not-exist-123` reachable?":
 
----
+1. B2's 404 comes back as a normal MCP tool result with `isError: true`. `McpClient::callTool()` returns it. It does not throw, so the JSON-RPC error log in `McpClient::decodeRpcResult()` never runs. This matches "nothing in the logs". A transport failure throws `McpClientException` and is already logged; that is a different case.
+2. `McpFetchRunner::run()` turns `isError` into `NodeResult::failed(...)` and does not log. `McpActionRunner::run()` has the same gap.
+3. The answer step lists the fetch in `depends_on`. `DagExecutor::failedDependency()` treats any failed dependency as fatal, so the answer step is stored as `skipped` and never runs. Same rule in the parallel scheduler.
+4. `ResultAssembler` sets `all_failed` when nothing succeeded and nothing is still running. Skipped steps do not count as in progress, so one failed fetch plus a skipped answer is a dead plan.
+5. `TaskPlanExecutor::execute()` and `executeStream()` then discard the plan (`plan_discarded`, which removes the task card) and re-run the turn through `InferenceRouter`. The only exception is an authored Saved Task or a plan that contains `code_run` (`planRunsCode()`). The legacy router cannot see MCP connections, so it answers that none exists.
+6. **Mixed request:** the successful fetch keeps `all_failed` false, so there is no legacy fallback. The answer step is still skipped. `ResultAssembler::bestEffort()` returns the last successful text, which is the raw output of the fetch that worked, and adds no sentence about the one that failed. Its class comment promises that sentence. The sentence does not exist.
 
-## Bug 1: a single failing MCP step falls back to legacy chat, which says no connection exists
+`$nX.text` on a failed step resolves to empty (`NodeContext::resolveNodeRef()` reads `NodeResult::$text`, and `failed()` sets no text). `UpstreamHandover::missing()` also skips any step that is not successful. So even if the answer step did run, it would not see the 404.
 
-### Steps to reproduce
+The canonical plan shape (already in the planner prompt, `PromptCatalog::planPrompt()`, heading "Pull data from a connected system") is:
 
-1. Connect the Backblaze B2 MCP server (Manage → Connections → MCP Servers). `tool_mcp` is on for the `general` topic, which is the seeded default.
-2. Ask: *"Is my Backblaze bucket `does-not-exist-123` reachable?"*
+```text
+n1 mcp_fetch
+n2 chat        depends_on n1, inputs.text contains $n1.text
+n3 compose_reply   depends_on n1 and n2, inputs.text = $n2.text, reply_node = n3
+```
 
-### Observed
-
-- A task card appears briefly, then the plan is retracted (`plan_discarded`).
-- The reply says there is no Backblaze connection available.
-- The backend log has no line about the B2 error. It only shows `TaskPlanExecutor: DAG produced no successful node, falling back to legacy router`.
-
-### Expected
-
-- The reply says that B2 reported the bucket as not found and names the bucket, for example *"Backblaze reports that the bucket `does-not-exist-123` does not exist (NotFound). Check the name in your B2 account."*
-- The task card stays and shows the same error.
-- The log has a warning with the server, tool and error text.
-
-### Root cause (code path)
-
-1. **The tool answers with `isError: true`.** `McpClient::callTool()` passes `result.isError` through without throwing ([`McpClient.php` L98–119](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Mcp/McpClient.php#L98-L119)). A JSON-RPC-level error *would* be logged at L304–308, but B2 reports the 404 as a tool result. That fits the "nothing in the logs" observation.
-2. **`McpFetchRunner` fails the node silently** ([`McpFetchRunner.php` L131–134](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/Execution/Runner/McpFetchRunner.php#L131-L134)):
-   ```php
-   $text = $this->formatContent($result['content']);
-   if ($result['isError']) {
-       return NodeResult::failed('the data source reported an error: '.mb_substr($text, 0, 300));
-   }
-   ```
-   Only the transport-exception branch (L121–128) logs anything.
-3. **The answer node is skipped.** The plan is `n1 mcp_fetch` → `n2 chat (depends_on n1)`. `DagExecutor::executeSequential()` skips every node whose dependency failed ([`DagExecutor.php` L112–118](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/Execution/DagExecutor.php#L112-L118)). The parallel scheduler does the same at L153–164, and both go through `failedDependency()` at L517–527.
-4. **The plan counts as dead.** With `n1 = failed` and `n2 = skipped`, `ResultAssembler::assemble()` sets `all_failed = true` ([`ResultAssembler.php` L81](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/Execution/ResultAssembler.php#L81)).
-5. **Only `code_run` is protected from the chat fallback.** `TaskPlanExecutor::executeStream()` ([L154–183](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/TaskPlanExecutor.php#L154-L183)) and `execute()` ([L231–252](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/TaskPlanExecutor.php#L231-L252)) skip the fallback only when `$plan->authored || $this->planRunsCode($plan->plan)`. `planRunsCode()` ([L296–305](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/TaskPlanExecutor.php#L296-L305)) checks for `Capability::CodeRun` only. Every other plan calls `discardPlan()`, which removes the card, and then re-runs the turn through `InferenceRouter`.
-6. **The legacy chat router has no access to the connected system,** so it answers from its own knowledge and denies a capability the product has. This is the same failure mode the `planRunsCode()` docblock describes for code ("I can't execute code…"), now for MCP. It breaks U8 (honest outcome copy).
+`compose_reply` is hidden and copies text. It does not call a model. The explanation has to be written by `chat` (or `summarize` / `translate` / `rag_query`).
 
 ---
 
-## Bug 2: in a mixed request (one good bucket, one missing), the answer step is skipped and the reply hides the failure
+## Done when
 
-### Steps to reproduce
-
-Ask: *"Check whether my buckets `real-bucket` and `does-not-exist-123` are reachable."*
-
-### Observed
-
-- `n1 mcp_fetch(real-bucket)` succeeds, `n2 mcp_fetch(does-not-exist-123)` fails with the 404, and `n3 chat (depends_on n1, n2)` is **skipped**.
-- The reply only covers `real-bucket`, and it is the raw text of the `n1` tool output. The failure for the second bucket appears only on its task card.
-
-### Expected
-
-One answer that covers both buckets: *"`real-bucket` is reachable (region …). `does-not-exist-123` was not found in your Backblaze account."*
-
-### Root cause (code path)
-
-1. **Skipping on a failed dependency is all-or-nothing.** Point 3 of Bug 1 applies: one failed input skips the answer node, even though the answer node could explain the failure.
-2. **There is no fallback to the chat router here.** `n1` succeeded, so `all_failed = false` and `TaskPlanExecutor` streams the assembled content directly.
-3. **`ResultAssembler::bestEffort()` returns the last successful text node, which here is the raw MCP output, with no note about the failure** ([`ResultAssembler.php` L90–97 and L292–320](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/Execution/ResultAssembler.php#L292-L320)). The class docblock (L16–17) promises *"a best-effort answer (any successful text) with a short error note"*. No note is ever added. This breaks U8: the reply has to say what did **and did not** happen.
-4. **`UpstreamHandover::missing()` drops failed dependencies** ([`UpstreamHandover.php` L44–54](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/Execution/UpstreamHandover.php#L44-L54), the `!$result->isSuccessful()` → `continue` check). If the answer node did run, it would still never learn that `n2` failed or why.
+- A missing bucket: the reply names the bucket and says the connected system reported it was not found. The fetch card stays, in the failed state, with the same reason. The reply does not say that no connection exists.
+- Two buckets, one missing: one reply covers both. One card done, one card failed.
+- The log contains `McpFetchRunner: tool reported an error` with server id, tool name and the error text.
+- A fetch that fails Synaplan's own checks (feature off, unknown tool, topic not allowed) still does not fall back to legacy chat. The reply is the existing "couldn't fully complete" sentence plus one sentence naming the failed step and its error.
+- A successful lookup answers as it does today.
 
 ---
 
-## Bug 3: the tool error is not logged
+## Step 1 — Mark "the remote system answered with an error"
 
-- `McpFetchRunner` has no log line on the `isError` path ([L131–134](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/Execution/Runner/McpFetchRunner.php#L131-L134)).
-- `McpActionRunner` has the same gap for write actions ([L148–151](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/Execution/Runner/McpActionRunner.php#L148-L151)). For an external write, this is also an audit gap.
-- The fallback line `TaskPlanExecutor: DAG produced no successful node, falling back to legacy router` (L165) logs only `message_id`. It does not say which node failed or why. The per-node errors are already in `$assembled['metadata']['task_plan_render']['cards'][*]['error']`.
+**File:** `backend/src/Service/Multitask/Execution/NodeResult.php`
 
----
-
-## Finding 4: the planner never wires `$nX.text` from an `mcp_fetch` node
-
-On every successful run, `ChatRunner` logs `plan did not hand over upstream step output, appending it to the prompt` ([`ChatRunner.php` L121–128](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/Execution/Runner/ChatRunner.php#L121-L128)). The safety net works as designed, but it should be the exception, not the rule.
-
-Likely cause: rule **9c** in the `tools:plan` prompt ([`PromptCatalog.php` L931–939](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Prompt/PromptCatalog.php#L931-L939)) only says *"feed `$nX.text` into the answering node"*. The **"Canonical multi-step examples (MEMORIZE these patterns)"** section (from L971) has examples for media, documents and email, but **none for `mcp_fetch`**. Models copy the examples far more reliably than they follow rule text. The answer node then gets `"$message.text"` or the data under an unknown key, and `UpstreamHandover` has to fix it.
-
-We cannot see the exact shape Luna emits, because the handover log line records only the node ids it appended, not the node's raw `inputs`.
-
----
-
-## Minor: the French degraded-path text is missing
-
-`ResultAssembler::FALLBACK_TEXT` ([L28–33](https://github.com/metadist/synaplan/blob/e00af5ffb7c13a973647738494b16a795ea36b01/backend/src/Service/Multitask/Execution/ResultAssembler.php#L28-L33)) has `en`, `de`, `es` and `tr`, but not `fr`, which is one of the five supported locales. French users get the English sentence.
-
----
-
-## Proposed fix
-
-The steps are ordered by impact. Steps 1–4 fix the reported behaviour (step 4 is the missing log line), and steps 5–6 harden it.
-
-### 1. Let the answer step run when a data source reports an error (fixes Bugs 1 and 2)
-
-A tool that *answered* with an error is information the user asked for: "that bucket does not exist" is the answer to "is that bucket reachable?". Treat it as a **reportable failure**: the card still shows `failed`, but answer-type dependents still run and get the error as input.
-
-**`NodeResult`**: add a named constructor and a predicate, so runners and the executor do not have to pass around a magic metadata key:
+Add a constructor and a predicate. Do not add a `NodeStatus` case. The card state stays `failed`, which the UI already renders.
 
 ```php
 public const META_REPORTABLE = 'reportable_failure';
 
-/**
- * The step failed, but its error is something the answering step should
- * explain to the user (a connected system answered with an error), so
- * answer-type dependents still run.
- */
 public static function reportableFailure(string $error, array $metadata = []): self
 {
     return new self(NodeStatus::Failed, error: $error, metadata: [self::META_REPORTABLE => true] + $metadata);
@@ -152,158 +76,174 @@ public function isReportableFailure(): bool
 }
 ```
 
-**`McpFetchRunner::run()`**: use it for errors the remote system reported, after the gate checks:
+**Files:** `McpFetchRunner::run()` and `McpActionRunner::run()`
 
-- `isError: true`: `NodeResult::reportableFailure(...)` with the server name and tool, and `query` metadata so the card summary still reads `Backblaze · s3_head_bucket`.
-- `McpClientException` (unreachable, HTTP error, expired sign-in): also reportable, so the AI can say *"Backblaze could not be reached"* instead of the legacy router claiming there is no connection.
-- Gate failures stay hard `NodeResult::failed()`: flags off, topic not entitled, hallucinated tool, mutating tool, missing params. These are planning or configuration errors, and the user should not get an AI paraphrase of them. Step 2 covers what they show instead.
+Use `reportableFailure` only after the tool was actually called:
 
-**`DagExecutor`**: an answer node tolerates reportable failures. All three dependency checks must agree, or the sequential loop stalls on `blockedByIncompleteDependency()`:
+- `isError: true`
+- `catch (McpClientException)` — the server was unreachable, returned HTTP 4xx/5xx, or the sign-in failed
+
+Pass the same metadata the success path already passes for the card: `query` = server name + ` · ` + tool name. Put the server name in the error string, for example `Backblaze reported an error: ` plus the tool text, capped at 300 characters. An empty tool text still produces a sentence (`Backblaze reported an error and gave no details.`).
+
+Log a warning before returning:
+
+- `McpFetchRunner: tool reported an error` with `server_id`, `tool`, `error`
+- `McpActionRunner: write action reported an error` with `user_id`, `server_id`, `tool`, `argument_keys`, `error`
+
+Leave these as hard `NodeResult::failed()` with no new log line: flags off, missing params, server not owned or disabled, topic not allowed, tool not in the catalog, tool declares itself mutating. Those are our refusals, not an answer from the remote system.
+
+---
+
+## Step 2 — Let the answer step run anyway
+
+**File:** `backend/src/Service/Multitask/Execution/DagExecutor.php`
+
+An answer step may run when a dependency is a reportable failure. Every other capability keeps today's skip. A reportable failure is not permission to send an email, save a file, or call another tool.
+
+Answer capabilities: `chat`, `summarize`, `translate`, `rag_query`, `compose_reply`.
+
+`compose_reply` is on the list because the canonical reply node depends on the fetch and on the chat. If it stays skipped, the reply node is skipped even though the chat already wrote the explanation.
+
+Add one private method and use it from all three existing checks: `failedDependency()`, `blockedByIncompleteDependency()`, and `dependenciesSatisfied()`. Do not patch only one of them.
 
 ```php
-/** Capabilities that turn upstream output into the user's answer. */
-private const ANSWER_CAPABILITIES = [
-    Capability::Chat, Capability::Summarize, Capability::Translate,
-    Capability::RagQuery, Capability::ComposeReply,
-];
-
-private function toleratesFailureOf(TaskNode $node, NodeResult $dep): bool
+/** 'ready' | 'failed' | 'pending' */
+private function dependencyState(NodeContext $context, TaskNode $node, string $depId): string
 {
-    return $dep->isReportableFailure() && in_array($node->capability, self::ANSWER_CAPABILITIES, true);
+    $result = $context->getResult($depId);
+    if (null === $result || $result->isRunning() || $result->isWaitingApproval()) {
+        return 'pending';
+    }
+    if ($result->isSuccessful()) {
+        return 'ready';
+    }
+    if ($result->isReportableFailure() && $this->isAnswerNode($node)) {
+        return 'ready';
+    }
+
+    return 'failed'; // Failed, Skipped, and Stopped (a condition that was not met)
 }
 ```
 
-- `failedDependency()` (L517): a dependency that is settled and unsuccessful does not count when `toleratesFailureOf($node, $r)`.
-- `blockedByIncompleteDependency()` (L533) and `dependenciesSatisfied()` (L496): treat a tolerated reportable failure as satisfied.
-- Media, email, save and other action nodes keep today's skip. A step that *needs* the data must never run on an error string.
+- `failedDependency()` returns the first dependency whose state is `failed`.
+- `blockedByIncompleteDependency()` is true when any dependency is `pending`. It is not true for `ready` or `failed` (`failed` is already handled by the skip above it).
+- `dependenciesSatisfied()` is true only when every dependency is `ready`.
 
-**`UpstreamHandover::missing()` / `render()`**: hand over reportable failures, labelled as failures. This has to happen even when the plan wired `$n2.text` correctly, because a failed node has no text and the reference resolves to empty:
+Trap, sequential mode: `executeSequential()` walks the plan once. A node it does not run and does not skip stays `pending` forever. `ResultAssembler` treats pending as "still running", so `all_failed` stays false and the legacy fallback does not run either. The user then gets whatever text another step produced, with no explanation. A reportable failure must be `ready` for an answer node, never `pending`.
+
+Trap, parallel mode: the loop exits when a pass starts nothing and nothing is in flight. A node that is neither ready nor skipped is dropped the same way. The same helper prevents that.
+
+Do not treat `NodeStatus::Stopped` as reportable. A condition that evaluated false must still skip its dependents.
+
+In `failureMetadata()`, when the result metadata has a non-empty string `query`, copy it onto the `task_update` the same way `successMetadata()` does. Otherwise the live card has the error but not the "Backblaze · s3_head_bucket" line that the reloaded card gets from `ResultAssembler`.
+
+---
+
+## Step 3 — Put the error in the prompt
+
+**File:** `backend/src/Service/Multitask/Execution/UpstreamHandover.php`
+
+`missing()` currently skips unsuccessful steps. Also collect reportable failures. Do not collect hard failures or skipped steps.
+
+A reportable failure has no `$nX.text`, so the "already in the prompt" check cannot see it. Always include it, labelled `{nodeId} · {query} · FAILED`, value = the error string. Add one line to `render()`, after the existing "never claim it was not provided" line:
 
 ```text
----
-Data returned by the previous steps of this request.
-Use it as the source of truth for your answer and never claim it was not provided.
-A step marked FAILED did run: tell the user plainly what failed and why, and never claim the connection or data source does not exist.
-
-[n1 · Backblaze · s3_head_bucket]
-{ "bucket": "real-bucket", "region": "eu-central-003" }
-
-[n2 · Backblaze · s3_head_bucket · FAILED]
-the data source reported an error: NotFound: bucket does-not-exist-123 does not exist
+A step marked FAILED did run. Say what failed and why, in the user's language. Do not say that the connection or the data source does not exist.
 ```
 
-`ComposeReplyRunner` needs nothing new: it depends on the chat node, and the chat node now succeeds.
+`ChatRunner` already calls `UpstreamHandover`. Do not change `ChatRunner`.
 
-**Result:**
-- **Bug 1**: `n2 chat` runs and succeeds, so `all_failed = false` and there is no legacy fallback. The answer explains the 404, and the card stays with the error.
-- **Bug 2**: `n3 chat` runs with `n1`'s data and `n2`'s error, so one answer covers both buckets.
+**File:** `backend/src/Service/Multitask/Execution/Runner/ComposeReplyRunner.php`
 
-### 2. Never fall back to legacy chat after a failed MCP plan (the partner's suggestion, for what step 1 does not cover)
+`compose_reply` does not call a model. After resolving `inputs.text`, append `UpstreamHandover::render(UpstreamHandover::missing(...))`. When the chat step already quoted the error, `missing()` finds it in the text and appends nothing. When the reply node copies only the successful fetch, the failed step is still in the reply.
 
-Step 1 removes the fallback for tool errors. A plan can still fail completely for other reasons, for example a stale plan that names a tool the server no longer has. The legacy router cannot reach connected systems either, so the same false "no connection" answer would come back. Generalise `planRunsCode()` in `TaskPlanExecutor`:
+---
+
+## Step 4 — Do not fall back to legacy chat
+
+**File:** `backend/src/Service/Multitask/TaskPlanExecutor.php`
+
+Replace `planRunsCode()` with one check used at both `all_failed` branches (`executeStream` and `execute`):
 
 ```php
-/**
- * Capabilities the legacy chat router cannot perform. Falling back to it
- * after such a plan failed produces an answer that denies the capability
- * ("I can't execute code", "there is no Backblaze connection") and hides
- * the real error (U8). Surface the node's own failure instead.
- */
-private const NO_CHAT_FALLBACK_CAPABILITIES = [
+private const NO_CHAT_FALLBACK = [
     Capability::CodeRun,
     Capability::McpFetch,
     Capability::McpAction,
 ];
-
-private function planNeedsCapabilityChatCannotPerform(TaskPlan $plan): bool
-{
-    foreach ($plan->nodes as $node) {
-        if (in_array($node->capability, self::NO_CHAT_FALLBACK_CAPABILITIES, true)) {
-            return true;
-        }
-    }
-
-    return false;
-}
 ```
 
-Replace both `$this->planRunsCode($plan->plan)` call sites (L155 and L232) with it. `EmailSearch` and `ToolCall` belong to the same class, because the legacy router cannot search a mailbox or call a custom tool either. Add them in the same change if their degraded answers show the same symptom; otherwise, leave a follow-up note.
+True when any node uses one of those. Keep the authored-plan exception as it is.
 
-When this path triggers, the content is `ResultAssembler::bestEffort()`'s text, so step 3 has to make that text honest.
+Do not add `EmailSearch` or `ToolCall` in this change.
 
-### 3. Make the degraded reply say what did not happen (Bug 2 safety net and U8)
+On both "DAG produced no successful node" log lines, add `node_errors`: node id → error string, taken from `task_plan_render.cards`.
 
-`ResultAssembler::bestEffort()` should do what its docblock promises. When a reply is assembled without the reply node, add one plain sentence per failed **visible** step, built from `Capability::uiKind()` and the card summary. The raw error stays on the card:
-
-- `en`: *"One step could not be completed: Backblaze · s3_head_bucket — see its card for the reason."*
-- The same sentence in `de`, `es`, `fr` and `tr`, in the same constant map as `FALLBACK_TEXT`, plus the missing `fr` entry for `FALLBACK_TEXT` itself.
-
-When nothing succeeded, the reply is the localized fallback sentence plus those lines. It is never empty, and it never claims that something did not exist.
-
-### 4. Log the tool error (Bug 3)
-
-- `McpFetchRunner`, `isError` branch:
-  ```php
-  $this->logger->warning('McpFetchRunner: tool reported an error', [
-      'server_id' => $serverId,
-      'tool' => $tool,
-      'error' => mb_substr($text, 0, 300),
-  ]);
-  ```
-- The same in `McpActionRunner` (`'McpActionRunner: write action reported an error'`, plus `user_id` and `argument_keys`, matching the success audit line).
-- `TaskPlanExecutor`: add `'node_errors' => [nodeId => error]` (from the render cards) to both `DAG produced no successful node …` log lines.
-
-### 5. Teach the planner the `mcp_fetch` wiring (Finding 4)
-
-- Add two canonical examples under *"Canonical multi-step examples"* in `PromptCatalog::planPrompt()`: one lookup, and two lookups answered together.
-  ```json
-  {
-    "version": 1, "language": "en", "reply_node": "n3",
-    "tasks": [
-      { "id": "n1", "capability": "mcp_fetch", "inputs": { "arguments": { "bucket": "real-bucket" } }, "params": { "server_id": 7, "tool": "s3_head_bucket" } },
-      { "id": "n2", "capability": "mcp_fetch", "inputs": { "arguments": { "bucket": "other-bucket" } }, "params": { "server_id": 7, "tool": "s3_head_bucket" } },
-      { "id": "n3", "capability": "chat", "depends_on": ["n1","n2"], "inputs": { "text": "Answer the user's question about both buckets based on:\n$n1.text\n\n$n2.text" } }
-    ]
-  }
-  ```
-  Mark the `server_id` and tool as placeholders ("use ids from the capability list, never these").
-- Roll the change out to existing installs with an **idempotent, anchor-guarded migration** in the same style as `Version20260921010000`: global row only, skip it if a marker is present or the anchor is missing (operator-customised prompt), single-row `UPDATE`, no Schema API (Galera-safe).
-- Extend the `ChatRunner` handover log line with `'raw_inputs' => $node->inputs` (truncated). The next report will then show the exact shape the planner emitted.
-- Add an `mcp_fetch` case to the `app:multitask:plan-eval` corpus, so the wiring rate can be measured per planner model, Luna included (`--filter mcp --repeat 5`).
-
-### 6. Card copy (small, optional)
-
-The card error is `the data source reported an error: <raw tool text>`: lowercase, and the server is not named. Prefix it with the server name (`Backblaze reported an error: NotFound …`) so the card reads as one sentence a non-technical user can follow (U8).
+This path is what a hard failure still hits (unknown tool, feature off). The text it shows is step 5.
 
 ---
 
-## Tests to add or update
+## Step 5 — Say which step failed when no answer was written
 
-| File | Test |
-| ---- | ---- |
-| `tests/Unit/Service/Multitask/Execution/Runner/McpFetchRunnerTest.php` | `testToolErrorIsAReportableFailureAndIsLogged`: `tools/call` returns `isError: true` with NotFound text, so the result is `isReportableFailure()`, the error contains the text, and a logger `warning` is expected once. `testGateFailuresStayHardFailures`: a hallucinated tool or disabled flag gives `isReportableFailure() === false`. |
-| `tests/Unit/Service/Multitask/Execution/DagExecutorTest.php` | `testAnswerNodeRunsWhenDataNodeReportsAnError`: `n1 mcp_fetch` (reportable failure) → `n2 chat`, so `n2` runs and `all_failed === false`. `testActionNodeStillSkipsOnReportableFailure`: `n1` reportable failure → `n2 email_me` is skipped. `testMixedLookupAnswersBoth`: `n1 ok`, `n2` reportable failure, `n3 chat(n1, n2)` runs. Cover both the sequential and the parallel scheduler. |
-| `tests/Unit/Service/Multitask/Execution/UpstreamHandoverTest.php` (or the existing `ChatRunnerHandoverTest.php`) | A failed reportable dependency is rendered as a `· FAILED` block even when `$n2.text` was wired; a hard-failed dependency is not rendered. |
-| `tests/Unit/Service/Multitask/TaskPlanExecutorTest.php` | `testFailedMcpPlanDoesNotFallBackToLegacyRouter`, mirroring `testFailedCodeRunDoesNotFallBackToLegacyRouter`, for `mcp_fetch` and `mcp_action`; `router->expects(never())->method('routeStream')`, and no `plan_discarded` event. |
-| `tests/Unit/Service/Multitask/Execution/ResultAssemblerTest.php` | `testBestEffortNamesFailedSteps`: the reply contains the "could not be completed" line; `fr` gets French text. |
-| `tests/Unit/PromptCatalogTest.php` + a migration test | The planner prompt contains the `mcp_fetch` example; the migration is idempotent (run twice → one insert) and leaves a customised prompt alone. |
+**File:** `backend/src/Service/Multitask/Execution/ResultAssembler.php`
 
-Then run the full gate: `make ci-local`. Playwright is not required, because this changes no UI contract. The `plan` / `task_update` SSE shapes stay the same.
+`bestEffort()` runs only when the reply node produced nothing. That is the hard-failure case. When the chat step ran, its text is the reply and this method is not used.
 
----
+Append one sentence per failed visible step (skip `uiKind() === 'hidden'`). Use the `query` metadata when it is set, otherwise the capability name. Then the error string. The raw error is the sentence. Do not write "see the card".
 
-## Acceptance criteria (journey to walk in the browser against a B2 MCP mock)
+```text
+en: One step could not be completed: {label}. {error}
+de: Ein Schritt konnte nicht abgeschlossen werden: {label}. {error}
+es: No se pudo completar un paso: {label}. {error}
+fr: Une étape n'a pas pu être terminée : {label}. {error}
+tr: Bir adım tamamlanamadı: {label}. {error}
+```
 
-1. *"Is my Backblaze bucket `does-not-exist-123` reachable?"* The reply names the bucket and says B2 reports it does not exist. The task card stays, in the failed state, with the same reason. The reply never says that no connection is available. The log has `McpFetchRunner: tool reported an error`.
-2. *"Check `real-bucket` and `does-not-exist-123`."* One reply covers both buckets: the first is reachable, the second was not found. Two cards appear: one done, one failed.
-3. Correct bucket only: unchanged. On a planner that wires correctly, the reply arrives **without** `plan did not hand over upstream step output` in the log after step 5.
-4. B2 unreachable (stop the mock): the reply says Backblaze could not be reached, and the card shows the transport error. The turn does not fall back to legacy chat.
-5. A stale plan with a tool that does not exist: no legacy fallback. The reply is the localized "could not fully complete" sentence plus the failed step line, and the card shows the reason.
-6. Check all five locales for the new degraded-path sentences (`en`, `de`, `es`, `fr`, `tr`).
+Put them in a constant map next to `FALLBACK_TEXT`. Add the missing French `FALLBACK_TEXT` entry: `Je n'ai pas pu terminer cette demande entièrement.`
+
+These strings live in PHP on purpose. `ResultAssembler` has no translator. Do not add vue-i18n keys.
 
 ---
 
-## Notes for the reporter
+## Do not
 
-- The `plan did not hand over upstream step output` line on successful runs is the #2327 safety net doing its job. Answers are correct, and step 5 makes it the exception again.
-- The PLAN model: Luna through OpenRouter (`~openai/gpt-luna-latest`) can differ from the Luna version we tested with. With the extended log line from step 5, one successful run is enough to show us the exact plan shape it produces.
+- Do not add a `NodeStatus` value. Persistence, the task card and the API all switch on the current set.
+- Do not change Vue, OpenAPI, or the five locale JSON files. The card already shows `error`.
+- Do not add a planner example or a migration. `PromptCatalog::planPrompt()` already contains "Pull data from a connected system, then answer (mcp_fetch)", and it already wires `$n1.text`. It has been there since v3.9.0. `tests/Eval/plan_eval_corpus.json` already has `mcp_knowledge_base_query`, which expects an `mcp_fetch` → `chat` edge.
+- Do not change `EmailSearch` or `ToolCall` fallback behaviour.
+- Playwright is not required. `plan` and `task_update` stay the same shape.
+
+---
+
+## Tests
+
+| File | What to assert |
+| ---- | -------------- |
+| `tests/Unit/Service/Multitask/Execution/Runner/McpFetchRunnerTest.php` | `isError: true` with a NotFound body → `isReportableFailure()`, error contains the body, one warning logged. A hallucinated tool and a disabled flag → `isReportableFailure()` is false. |
+| `tests/Unit/Service/Multitask/Execution/Runner/McpActionRunnerTest.php` | Same for `isError: true`: reportable, and a warning is logged. |
+| `tests/Unit/Service/Multitask/Execution/DagExecutorTest.php` | Fetch reportable-failure → chat runs, `all_failed` is false. Fetch reportable-failure → `email_me` is skipped. One fetch ok, one reportable-failure, chat depends on both → chat runs. A `Stopped` dependency still skips its chat dependent. Cover `execute()` sequential. If a test already drives the parallel scheduler, add the same chat case there; do not add a parallel test from scratch if the file has no parallel fixture. |
+| `tests/Unit/Service/Multitask/Execution/Runner/ChatRunnerHandoverTest.php` | A reportable failure is appended as a `FAILED` block even when `inputs.text` is `$n1.text`. A hard failure is not appended. |
+| `tests/Unit/Service/Multitask/Execution/Runner/ComposeReplyRunnerTest.php` (new; there is no compose-reply test file today) | Reply text is the successful step, and the failed step's error is appended. |
+| `tests/Unit/Service/Multitask/TaskPlanExecutorTest.php` | Mirror `testFailedCodeRunDoesNotFallBackToLegacyRouter` for a one-node `mcp_fetch` plan and a one-node `mcp_action` plan: `routeStream` is never called, `plan_discarded` is not emitted, the streamed text is the assembled error. |
+| `tests/Unit/Service/Multitask/Execution/ResultAssemblerTest.php` | Reply node produced nothing, one visible step failed → the reply contains the English "could not be completed" sentence and the error. Language `fr` → the French fallback, not the English one. |
+
+Then `make ci-local`. Backend-only: frontend lint, `vue-tsc` and Vitest may be skipped. PHPUnit must be the unfiltered `make -C backend test`, not a `--filter` run.
+
+---
+
+## Check by hand
+
+Against a B2 MCP mock, as the demo user:
+
+1. Ask whether a bucket that does not exist is reachable. The reply names it and says it was not found. The card stays failed. The log has the new warning.
+2. Ask about one real bucket and one missing bucket. The reply mentions both.
+3. Ask about a real bucket only. The answer matches today's behaviour.
+4. Stop the mock and ask again. The reply says the system could not be reached. No legacy chat fallback.
+
+---
+
+## Not this bug
+
+On every successful run the partner sees `plan did not hand over upstream step output`. That line is `ChatRunner` appending the fetch output because the resolved chat prompt did not already contain it verbatim. The #2327 safety net is doing its job, and the answers are correct.
+
+The planner prompt already shows the right shape (`inputs.text` containing `$n1.text`). This model still lists the dependency and leaves the text unwired; the corpus checks the edge, not the `$n1.text` splice. Do not try to fix that here. A prompt change would not be verifiable without their OpenRouter model, and it is not what makes the 404 case wrong.
