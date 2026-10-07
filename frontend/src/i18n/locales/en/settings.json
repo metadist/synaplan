@@ -207,7 +207,11 @@
     "download": "Download",
     "exporting": "Exporting...",
     "selectedChats": "{count} chats selected",
-    "selectedChatsHint": "Only these selected chats will be exported"
+    "selectedChatsHint": "Only these selected chats will be exported",
+    "timezoneLoading": "Loading your time zone…",
+    "timezoneProfile": "Times in this file use {tz} from Language & appearance.",
+    "timezoneBrowser": "Times in this file use this computer's time zone ({tz}). Your profile was not changed.",
+    "timezoneUnavailable": "Times in this file use this computer's time zone ({tz}), because the time zone from Language & appearance could not be loaded."
   },
   "profile": {
     "title": "Profile Settings",
@@ -259,9 +263,11 @@
       "language": "Language",
       "languageHint": "Interface language",
       "timezone": "Timezone",
-      "timezoneHint": "Every place includes its current offset from UTC, in hours and minutes.",
+      "timezoneHint": "Type a city or an offset such as +02:00. Matching places appear below. Enter chooses the highlighted place. Then save to keep it.",
       "timezoneSearch": "Search by city or offset",
       "timezonePlaceholder": "Choose a timezone",
+      "timezoneCurrent": "Chosen: {label}",
+      "timezoneMatchCount": "{count} place | {count} places",
       "timezoneNoMatch": "No timezone matches that search.",
       "timezoneInvalid": "Choose a timezone from the list. Nothing was saved.",
       "invoiceEmail": "Invoice Email",

@@ -1,6 +1,6 @@
 <template>
   <MainLayout data-testid="view-people">
-    <div class="container mx-auto px-6 py-8 max-w-7xl overflow-x-hidden">
+    <div class="container mx-auto px-6 py-8 max-w-[100rem] overflow-x-hidden">
       <button
         type="button"
         class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"

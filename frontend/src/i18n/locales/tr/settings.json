@@ -15,6 +15,12 @@
     "allStatistics": "Tüm istatistikler",
     "lessThanCent": "< 0,01 $"
   },
+  "export": {
+    "timezoneLoading": "Saat dilimin yükleniyor…",
+    "timezoneProfile": "Bu dosyadaki saatler, Dil ve görünüm bölümündeki {tz} dilimini kullanır.",
+    "timezoneBrowser": "Bu dosyadaki saatler bu bilgisayarın saat dilimini ({tz}) kullanır. Profilin değişmedi.",
+    "timezoneUnavailable": "Bu dosyadaki saatler bu bilgisayarın saat dilimini ({tz}) kullanır, çünkü Dil ve görünüm bölümündeki saat dilimi yüklenemedi."
+  },
   "profile": {
     "title": "Profil Ayarları",
     "subtitle": "Kişisel bilgilerinizi ve hesap ayarlarınızı yönetin",
@@ -65,9 +71,11 @@
       "language": "Dil",
       "languageHint": "Arayüz dili",
       "timezone": "Saat Dilimi",
-      "timezoneHint": "Her yer, UTC’ye göre güncel saat ve dakika farkını gösterir.",
+      "timezoneHint": "Bir şehir veya +02:00 gibi bir saat farkı yazın. Eşleşen yerler altta görünür. Enter vurgulanan yeri seçer. Kalması için ardından kaydedin.",
       "timezoneSearch": "Şehre veya saat farkına göre ara",
       "timezonePlaceholder": "Bir saat dilimi seçin",
+      "timezoneCurrent": "Seçilen: {label}",
+      "timezoneMatchCount": "{count} yer",
       "timezoneNoMatch": "Bu aramayla eşleşen saat dilimi yok.",
       "timezoneInvalid": "Listeden bir saat dilimi seçin. Hiçbir şey kaydedilmedi.",
       "invoiceEmail": "Fatura E-postası",

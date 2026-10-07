@@ -2,7 +2,7 @@
   <MainLayout>
     <div class="min-h-full bg-chat px-4 py-6 md:px-8 md:py-8" data-testid="page-settings">
       <div
-        class="@container mx-auto w-full max-w-3xl space-y-6"
+        class="@container mx-auto w-full max-w-[60rem] space-y-6"
         data-testid="section-settings-column"
       >
         <PageHeader

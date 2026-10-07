@@ -4,7 +4,7 @@
       class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-test"
     >
-      <div class="max-w-7xl mx-auto space-y-6">
+      <div class="max-w-[100rem] mx-auto space-y-6">
         <div class="surface-card p-6" data-testid="section-header">
           <h1 class="text-3xl font-bold txt-primary mb-2">Testing Ground</h1>
           <p class="txt-secondary text-sm">Test notifications and other functionalities</p>

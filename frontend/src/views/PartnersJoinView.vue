@@ -1,6 +1,6 @@
 <template>
   <MainLayout>
-    <div class="container mx-auto px-4 sm:px-6 py-8 max-w-xl">
+    <div class="container mx-auto px-4 sm:px-6 py-8 max-w-[45rem]">
       <section class="surface-card p-6 space-y-3" data-testid="partners-join">
         <h1 class="text-2xl font-semibold txt-primary">{{ $t('partners.joinTitle') }}</h1>
         <p v-if="preview" class="txt-primary text-sm">

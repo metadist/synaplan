@@ -4,7 +4,7 @@
       class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin overscroll-contain"
       data-testid="page-tools"
     >
-      <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
+      <div class="max-w-[1750px] mx-auto w-full px-6 py-8">
         <PageHeader
           v-if="currentPage !== 'mail-handler'"
           :title="getPageTitle()"
@@ -148,18 +148,18 @@
             @cancel="cancelMailHandlerEdit"
           />
         </div>
+
+        <UnsavedChangesBar
+          v-if="showWidgetEditor && currentPage === 'chat-widget'"
+          :show="hasWidgetChanges"
+          :show-preview="!!currentWidgetId"
+          data-testid="bar-widget-unsaved"
+          @save="saveWidget"
+          @discard="discardChanges"
+          @preview="togglePreview"
+        />
       </div>
     </div>
-
-    <UnsavedChangesBar
-      v-if="showWidgetEditor && currentPage === 'chat-widget'"
-      :show="hasWidgetChanges"
-      :show-preview="!!currentWidgetId"
-      data-testid="bar-widget-unsaved"
-      @save="saveWidget"
-      @discard="discardChanges"
-      @preview="togglePreview"
-    />
   </MainLayout>
 </template>
 

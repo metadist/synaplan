@@ -184,13 +184,13 @@ onBeforeUnmount(() => {
 }
 
 /* The ring gives way to the full bar exactly where ConsumptionBar.vue shows
-   it: 1440px with the docked panel, 1160px with the rail alone. */
-@media (min-width: 1440px) {
+   it: 1664px with the docked panel, 1384px with the rail alone. */
+@media (min-width: 1664px) {
   .usage-ring {
     display: none;
   }
 }
-@media (min-width: 1160px) {
+@media (min-width: 1384px) {
   .usage-ring.usage-ring--roomy {
     display: none;
   }

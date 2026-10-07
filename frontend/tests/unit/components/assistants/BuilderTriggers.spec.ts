@@ -1,13 +1,18 @@
-import { describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import BuilderTriggers from '@/components/assistants/BuilderTriggers.vue'
+import { resetAccountTimezone } from '@/composables/useAccountTimezone'
 import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
 import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
 
 const en = loadAllMessages('en')
+
+const { mockGetProfile } = vi.hoisted(() => ({
+  mockGetProfile: vi.fn(),
+}))
 
 vi.mock('@/services/api/agentsApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/api/agentsApi')>()
@@ -25,7 +30,17 @@ vi.mock('@/services/api/agentsApi', async (importOriginal) => {
 })
 
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ user: { id: 4 } }),
+  useAuthStore: () => ({
+    user: { id: 4 },
+    isImpersonating: false,
+  }),
+}))
+
+vi.mock('@/services/api/profileApi', () => ({
+  profileApi: {
+    getProfile: (...args: unknown[]) => mockGetProfile(...args),
+    updateProfile: vi.fn(),
+  },
 }))
 
 vi.mock('@/services/api/widgetsApi', () => ({
@@ -61,6 +76,15 @@ function mountTriggers() {
 }
 
 describe('BuilderTriggers', () => {
+  beforeEach(() => {
+    resetAccountTimezone()
+    mockGetProfile.mockReset()
+    mockGetProfile.mockResolvedValue({
+      success: true,
+      profile: { timezone: 'Europe/Berlin' },
+    })
+  })
+
   it('shows the empty state without the word cron', () => {
     const { wrapper } = mountTriggers()
     expect(wrapper.get('[data-testid="state-triggers-empty"]').text()).toContain(
@@ -72,11 +96,13 @@ describe('BuilderTriggers', () => {
   it('adds a weekly schedule from the form', async () => {
     const { wrapper, store } = mountTriggers()
     await wrapper.get('[data-testid="btn-add-schedule-empty"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-testid="input-schedule-instruction"]').setValue('Summarise contracts')
     await wrapper.get('[data-testid="btn-save-schedule"]').trigger('click')
     expect(store.current?.draft?.triggers.schedules).toHaveLength(1)
     expect(store.current?.draft?.triggers.schedules[0]).toMatchObject({
       instruction: 'Summarise contracts',
+      tz: 'Europe/Berlin',
     })
     expect(wrapper.text().toLowerCase()).not.toContain('cron')
   })

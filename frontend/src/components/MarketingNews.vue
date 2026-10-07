@@ -1,5 +1,9 @@
 <template>
-  <section v-if="items.length > 0" class="w-full max-w-4xl mx-auto" data-testid="marketing-news">
+  <section
+    v-if="items.length > 0"
+    class="w-full max-w-[70rem] mx-auto"
+    data-testid="marketing-news"
+  >
     <h3 class="text-sm font-semibold txt-secondary uppercase tracking-wide mb-4 text-center">
       {{ $t('marketingNews.heading') }}
     </h3>

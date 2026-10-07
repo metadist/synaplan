@@ -1,6 +1,7 @@
 <template>
   <div
-    class="flex-shrink-0 border-t border-black/[0.06] dark:border-white/[0.06] px-4 pt-3 pb-3 flex flex-col gap-2"
+    class="sidebar-panel-footer flex-shrink-0 border-t border-black/[0.06] dark:border-white/[0.06] px-4 pt-3 pb-3 flex flex-col gap-2"
+    :class="contentClipped && 'is-clipped'"
     data-testid="section-sidebar-footer"
   >
     <button
@@ -41,7 +42,7 @@
       @click="toggleUserMenu"
     >
       <span
-        class="w-8 h-8 flex-shrink-0 rounded-full surface-chip flex items-center justify-center text-[13px] font-semibold txt-primary"
+        class="sidebar-avatar w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-[13px] font-semibold"
       >
         {{ initials }}
       </span>
@@ -151,6 +152,11 @@ import { paletteShortcutLabel } from '@/composables/search/shortcut'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 
+defineProps<{
+  /** The list above still continues past this edge. */
+  contentClipped?: boolean
+}>()
+
 const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -220,3 +226,58 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
 })
 </script>
+
+<style scoped>
+/* Sits on the scroll edge, above the separator. Chats stay readable through
+   it; it only says that the list continues. Gone once the last row is fully
+   in view, so the final chat is never dimmed. */
+.sidebar-panel-footer {
+  position: relative;
+  z-index: 2;
+}
+
+.sidebar-panel-footer.is-clipped::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 28px;
+  pointer-events: none;
+  /* The list fades into the panel color, with a darker band at the line so
+     the footer reads as sitting on top of the chats. */
+  background:
+    linear-gradient(to top, rgba(41, 49, 65, 0.2), transparent 70%),
+    linear-gradient(
+      to top,
+      var(--bg-sidebar-solid) 0%,
+      color-mix(in srgb, var(--bg-sidebar-solid) 72%, transparent) 42%,
+      transparent 100%
+    );
+}
+
+.dark .sidebar-panel-footer.is-clipped::before {
+  background:
+    linear-gradient(to top, rgba(0, 0, 0, 0.45), transparent 70%),
+    linear-gradient(
+      to top,
+      var(--bg-sidebar-solid) 0%,
+      color-mix(in srgb, var(--bg-sidebar-solid) 80%, transparent) 42%,
+      transparent 100%
+    );
+}
+
+/* White on the light end of the gradient (#3b6fe0) is 4.6:1. The dark theme
+   uses the light brand blue, so it takes dark ink (#0b1220 on #6d9ae0 is 6.5:1). */
+.sidebar-avatar {
+  color: #fff;
+  background: linear-gradient(135deg, #003fc7, #3b6fe0);
+  box-shadow: 0 2px 8px rgba(0, 63, 199, 0.25);
+}
+
+.dark .sidebar-avatar {
+  color: #0b1220;
+  background: linear-gradient(135deg, #6d9ae0, #93b8e8);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+</style>

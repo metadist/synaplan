@@ -22,6 +22,10 @@
         <IncognitoToggle />
       </div>
 
+      <!-- Soft top edge so messages fade instead of being cut off. Sits under
+           the floating chrome (z-30) and never takes taps. -->
+      <div class="chat-top-edge" aria-hidden="true" />
+
       <!-- Drag & Drop Overlay - covers entire chat area -->
       <Transition name="fade">
         <div
@@ -47,7 +51,7 @@
         class="flex-1 min-h-0 flex flex-col"
         data-testid="state-provider-setup"
       >
-        <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+        <LocalAiDownloadCard class="mx-auto max-w-[70rem] w-full px-4 pt-4" />
         <ProviderSetupBanner />
       </div>
 
@@ -59,7 +63,7 @@
         data-testid="section-messages"
         @scroll="handleScroll"
       >
-        <div class="max-w-4xl mx-auto py-6 px-4" :class="{ 'my-auto w-full': isEmptyLanding }">
+        <div class="max-w-[70rem] mx-auto py-6 px-4" :class="{ 'my-auto w-full': isEmptyLanding }">
           <!-- Loading indicator for infinite scroll -->
           <div
             v-if="historyStore.isLoadingMessages"
@@ -338,21 +342,19 @@
           @always-allow="onChatApprovalAlwaysAllow"
         />
       </div>
-      <!-- Boxed to the composer width (max-w-4xl mx-auto) so the paperclip
-           aligns with the chat box instead of sitting in a full-width stripe. -->
-      <!-- The shared chat stays selected during incognito, so its files must
-           not become attachable or deletable from this session. -->
+      <!-- Read-only viewers of a shared chat get no composer, but still see
+           the chat's files (open only, no attach or delete). -->
       <div
-        v-if="!needsProviderSetup && !incognitoStore.active && conversationFiles.length > 0"
-        class="max-w-4xl mx-auto w-full px-3 md:px-4"
+        v-if="
+          !needsProviderSetup &&
+          !canComposeSharedChat &&
+          !incognitoStore.active &&
+          conversationFiles.length > 0
+        "
+        class="flex max-w-[70rem] mx-auto w-full px-4 mb-3"
+        data-testid="section-conversation-files-readonly"
       >
-        <ConversationFilesBar
-          :files="conversationFiles"
-          :can-attach="canComposeSharedChat"
-          :can-delete="canComposeSharedChat && !isGuestMode"
-          @attach="attachConversationFile"
-          @delete="deleteConversationFile"
-        />
+        <ConversationFilesBar :files="conversationFiles" :can-attach="false" :can-delete="false" />
       </div>
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
@@ -371,6 +373,18 @@
         @guest-feature-gate="handleGuestFeatureGate"
         @clear-quote="quoting.clearPendingQuote"
       >
+        <!-- The shared chat stays selected during incognito, so its files must
+             not become attachable or deletable from this session. -->
+        <template #beside-plus>
+          <ConversationFilesBar
+            v-if="!incognitoStore.active"
+            :files="conversationFiles"
+            :can-attach="canComposeSharedChat"
+            :can-delete="canComposeSharedChat && !isGuestMode"
+            @attach="attachConversationFile"
+            @delete="deleteConversationFile"
+          />
+        </template>
         <!-- Native onboarding: a signed-out store purchase waiting to be
              linked to an account outranks the guest quota banner. -->
         <template #banner>

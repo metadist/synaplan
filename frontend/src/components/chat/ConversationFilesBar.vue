@@ -2,18 +2,17 @@
   <div
     v-if="files.length > 0"
     ref="root"
-    class="relative mb-2 inline-block"
+    class="relative shrink-0"
     data-testid="conversation-files-bar"
     @mouseenter="openPopover"
     @mouseleave="onMouseLeave"
     @keydown.escape="closePopover"
   >
-    <!-- Compact trigger: a circular file icon with a count badge. The full
-         list used to sit open above the composer and crowded it; now it only
-         appears on hover/click. -->
+    <!-- Same 44px control as the plus button beside it. The file list only
+         opens on hover or click, so the composer row stays one button wide. -->
     <button
       type="button"
-      class="relative inline-flex items-center justify-center w-9 h-9 rounded-full surface-chip border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+      class="surface-chip icon-ghost relative h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl touch-manipulation focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
       :aria-label="$t('chat.conversationFiles.count', files.length)"
       :title="$t('chat.conversationFiles.count', files.length)"
       :aria-expanded="open"
@@ -21,7 +20,7 @@
       data-testid="conversation-files-toggle"
       @click="toggle"
     >
-      <Icon icon="mdi:paperclip" class="w-4 h-4" />
+      <Icon icon="mdi:paperclip" class="w-5 h-5" />
       <span
         class="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-[var(--brand)] text-[color:var(--on-brand)] text-[10px] font-semibold inline-flex items-center justify-center"
       >
@@ -40,7 +39,7 @@
       data-testid="conversation-files-popover"
     >
       <div
-        class="w-72 max-w-[80vw] surface-card border border-light-border/30 dark:border-dark-border/20 rounded-xl shadow-lg p-3"
+        class="w-[min(18rem,calc(100vw-5.5rem))] surface-card border border-light-border/30 dark:border-dark-border/20 rounded-xl shadow-lg p-3"
         role="dialog"
         :aria-label="$t('chat.conversationFiles.title')"
       >

@@ -103,4 +103,48 @@ describe('UnsavedChangesBar', () => {
     await buttons[1].trigger('click')
     expect(wrapper.emitted('preview')).toBeTruthy()
   })
+
+  it('matches the content column instead of the viewport', async () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+
+    const wrapper = mount(UnsavedChangesBar, {
+      props: { show: true },
+      attachTo: host,
+    })
+    await flushPromises()
+
+    const bar = wrapper.get('[data-testid="section-unsaved-bar"]')
+    const parent = bar.element.parentElement
+    if (!parent) throw new Error('bar has no parent')
+    parent.style.paddingLeft = '16px'
+    parent.style.paddingRight = '16px'
+    vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue({
+      x: 320,
+      y: 0,
+      top: 0,
+      left: 320,
+      right: 1312,
+      bottom: 400,
+      width: 992,
+      height: 400,
+      toJSON: () => ({}),
+    })
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
+
+    expect(bar.classes()).not.toContain('left-0')
+    expect(bar.classes()).not.toContain('right-0')
+    expect(bar.attributes('style')).toContain('left: 336px')
+    expect(bar.attributes('style')).toContain('width: 960px')
+
+    wrapper.unmount()
+    host.remove()
+    vi.unstubAllGlobals()
+  })
 })

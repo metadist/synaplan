@@ -13,9 +13,9 @@ import {
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { type UserProfile } from '@/mocks/profile'
-import { listTimezones, timezoneGroupsForSelect } from '@/utils/timezones'
 import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
+import { setAccountTimezone } from '@/composables/useAccountTimezone'
 import { profileApi } from '@/services/api'
 import { ApiError } from '@/services/api/httpClient'
 import { useAuthStore } from '@/stores/auth'
@@ -75,7 +75,6 @@ export function useProfileSettings() {
   const authProvider = ref<string>('Email/Password')
   const isExternalAuth = ref(false)
   const emailPassword = ref('')
-  const timezoneQuery = ref('')
   const saveSuccessMessage = ref('')
   const externalAuthLastLogin = ref<string | null>(null)
   const showDeleteModal = ref(false)
@@ -119,15 +118,6 @@ export function useProfileSettings() {
     }
     return t('profile.personalInfo.emailLockedHint')
   })
-
-  const timezoneOptions = computed(() => listTimezones(new Date(), formData.value.timezone))
-  const timezoneSelect = computed(() =>
-    timezoneGroupsForSelect(timezoneOptions.value, timezoneQuery.value, formData.value.timezone)
-  )
-  const timezoneGroups = computed(() => timezoneSelect.value.groups)
-  const timezoneSearchMiss = computed(
-    () => timezoneQuery.value.trim().length > 0 && timezoneSelect.value.matchedCount === 0
-  )
 
   const { hasUnsavedChanges, saveChanges, discardChanges, setupNavigationGuard } =
     useUnsavedChanges(formData, originalData, {
@@ -331,6 +321,7 @@ export function useProfileSettings() {
         })
       }
       profileSaved = true
+      setAccountTimezone(formData.value.timezone ?? '')
 
       await authStore.refreshUser()
 
@@ -412,7 +403,6 @@ export function useProfileSettings() {
     authProvider,
     isExternalAuth,
     emailPassword,
-    timezoneQuery,
     externalAuthLastLogin,
     showDeleteModal,
     deleteConfirmPassword,
@@ -423,8 +413,6 @@ export function useProfileSettings() {
     emailChanged,
     emailFieldHint,
     emailInputClass: EMAIL_INPUT_CLASS,
-    timezoneGroups,
-    timezoneSearchMiss,
     hasUnsavedChanges,
     shouldHighlight,
     showBiometricSection,

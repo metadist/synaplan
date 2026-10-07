@@ -1,7 +1,7 @@
 <template>
   <MainLayout>
     <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
-      <div class="max-w-4xl mx-auto space-y-5">
+      <div class="max-w-[70rem] mx-auto space-y-5">
         <!-- Header -->
         <PageHeader
           :title="$t('feedback.list.title')"

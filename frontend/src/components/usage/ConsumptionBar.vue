@@ -180,26 +180,26 @@ onBeforeUnmount(() => {
 .usage-bar {
   position: absolute;
   top: 50%;
-  /* Align to the right edge of the centered chat column (max-w-4xl = 56rem),
+  /* Align to the right edge of the centered chat column (70rem),
      nudged ~20px further right so the rail sits just past the user avatar
      rather than at the far window edge. Clamped so it never leaves the
      viewport on narrow windows. */
-  left: min(calc(50% + 28rem + 10px), calc(100% - 4.5rem));
+  left: min(calc(50% + 35rem + 10px), calc(100% - 4.5rem));
   transform: translateY(-50%);
   z-index: 20;
   display: none;
 }
 
-/* The bar needs a content pane of ~67rem: the 56rem chat column plus its own
+/* The bar needs a content pane of ~81rem: the 70rem chat column plus its own
    width on the right. With the docked panel (rail 56px + panel 280px) that is
-   a 1440px window; with the rail alone (panel folded, or below 1024px) 1160px.
+   a 1664px window; with the rail alone (panel folded, or below 1024px) 1384px.
    Below that the ring shows instead. Mirrored in ConsumptionRing.vue. */
-@media (min-width: 1440px) {
+@media (min-width: 1664px) {
   .usage-bar {
     display: block;
   }
 }
-@media (min-width: 1160px) {
+@media (min-width: 1384px) {
   .usage-bar.usage-bar--roomy {
     display: block;
   }

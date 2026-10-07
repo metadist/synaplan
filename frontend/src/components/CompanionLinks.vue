@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full max-w-3xl mx-auto" data-testid="comp-companion-links">
+  <div class="w-full max-w-[60rem] mx-auto" data-testid="comp-companion-links">
     <div
       class="flex sm:grid sm:grid-cols-3 gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory"
     >
