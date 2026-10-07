@@ -34,41 +34,53 @@
         data-testid="form-add-user"
         @submit.prevent="submitAddUser"
       >
-        <input
-          v-model="newUser.email"
-          type="email"
-          required
-          :placeholder="$t('admin.users.email')"
-          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          data-testid="input-add-user-email"
-        />
-        <input
-          v-model="newUser.displayName"
-          type="text"
-          :placeholder="$t('admin.users.displayName')"
-          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          data-testid="input-add-user-name"
-        />
-        <input
-          v-model="newUser.password"
-          type="password"
-          required
-          minlength="8"
-          autocomplete="new-password"
-          :placeholder="$t('admin.users.password')"
-          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          data-testid="input-add-user-password"
-        />
-        <select
-          v-model="newUser.level"
-          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          data-testid="select-add-user-level"
-        >
+        <label class="block text-sm txt-secondary">
+          {{ $t('admin.users.email') }}
+          <input
+            v-model="newUser.email"
+            type="email"
+            required
+            autocomplete="off"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-add-user-email"
+          />
+        </label>
+        <label class="block text-sm txt-secondary">
+          {{ $t('admin.users.displayName') }}
+          <input
+            v-model="newUser.displayName"
+            type="text"
+            autocomplete="off"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-add-user-name"
+          />
+        </label>
+        <label class="block text-sm txt-secondary">
+          {{ $t('admin.users.password') }}
+          <input
+            v-model="newUser.password"
+            type="password"
+            required
+            minlength="8"
+            maxlength="64"
+            autocomplete="new-password"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-add-user-password"
+          />
+        </label>
+        <label class="block text-sm txt-secondary">
+          {{ $t('admin.users.level') }}
+          <select
+            v-model="newUser.level"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-add-user-level"
+          >
           <option value="NEW">NEW</option>
           <option value="PRO">PRO</option>
           <option value="TEAM">TEAM</option>
           <option value="BUSINESS">BUSINESS</option>
-        </select>
+          </select>
+        </label>
         <button
           type="submit"
           class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium sm:col-span-2"

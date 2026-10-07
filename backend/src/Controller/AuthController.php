@@ -201,12 +201,14 @@ class AuthController extends AbstractController
         )
     )]
     #[OA\Response(
-        response: 201,
-        description: 'User registered successfully',
+        response: 200,
+        description: 'Registration accepted. The same body is returned when the email already exists.',
         content: new OA\JsonContent(
+            required: ['success', 'message', 'mailDelivered'],
             properties: [
-                new OA\Property(property: 'message', type: 'string', example: 'User registered successfully'),
-                new OA\Property(property: 'user_id', type: 'integer', example: 123),
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'mailDelivered', type: 'boolean', description: 'False when this install cannot send mail. Does not reveal whether the address was new.'),
             ]
         )
     )]
@@ -284,19 +286,19 @@ class AuthController extends AbstractController
 
         $this->logger->info('User registered', ['user_id' => $user->getId(), 'mail_delivered' => $delivered]);
 
-        return $this->json($this->registrationAccepted($delivered), Response::HTTP_OK);
+        return $this->json($this->registrationAccepted(), Response::HTTP_OK);
     }
 
     /**
-     * Same shape for a new account and an address that already exists, so
-     * registration does not reveal which emails are taken. `mailDelivered`
-     * is false for every response when this install cannot send mail.
+     * Same shape for a new account, an address that already exists, and a
+     * send that failed. `mailDelivered` follows only whether this install
+     * can send mail, so a delivery error cannot reveal that the address was new.
      *
      * @return array{success: true, message: string, mailDelivered: bool}
      */
-    private function registrationAccepted(?bool $delivered = null): array
+    private function registrationAccepted(): array
     {
-        $mailDelivered = $this->mailerConfig->isConfigured() && (null === $delivered || $delivered);
+        $mailDelivered = $this->mailerConfig->isConfigured();
 
         return [
             'success' => true,

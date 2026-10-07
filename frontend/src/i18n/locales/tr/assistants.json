@@ -48,6 +48,8 @@
     "libraryFiles": "Kitaplık dosyaları",
     "libraryFilesHint": "Bu dosyalar kitaplıkta kalır. Asistan kopyalamadan onları arar.",
     "addLibraryFile": "Kitaplıktan dosya ekle",
+    "searchLibraryFile": "Kitaplıkta ara",
+    "removeLibraryFile": "Dosyayı kaldır",
     "chooseLibraryFile": "Dosya seç",
     "libraryFilesEmpty": "Henüz aranabilir dosya yok. Önce kitaplığa bir dosya yükle.",
     "noFiles": "Henüz dosya yok",

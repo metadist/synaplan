@@ -349,6 +349,30 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *
      * @return list<RagScope>|null
      */
+    /**
+     * A profile's own folder is not an explicit search request. Passing it as
+     * "already searching" would skip the greeting check on every assistant turn.
+     *
+     * @param list<RagScope>|null  $agentScopes
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     */
+    private function assistantShouldSearchKnowledge(
+        ?array $agentScopes,
+        string $text,
+        array $classification,
+        array $options,
+        bool $isRagQuery,
+    ): bool {
+        $explicit = $options['rag_group_key'] ?? $classification['rag_group_key'] ?? null;
+
+        return \App\Service\Agent\AgentKnowledgeSearchGate::shouldSearch(
+            $agentScopes,
+            $text,
+            (is_string($explicit) && '' !== $explicit) || $isRagQuery,
+        );
+    }
+
     private function agentRagScopes(?RuntimeProfile $profile, int $viewerId): ?array
     {
         if (!$profile instanceof RuntimeProfile || null === $profile->agentId) {
@@ -624,20 +648,25 @@ final readonly class ChatHandler implements MessageHandlerInterface
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
         $isRagQuery = Capability::RagQuery->value === ($classification['intent'] ?? '');
         $agentScopes = $this->agentRagScopes($profile, $message->getUserId());
-        $searchKnowledge = \App\Service\Agent\AgentKnowledgeSearchGate::shouldSearch(
+        $searchKnowledge = $this->assistantShouldSearchKnowledge(
             $agentScopes,
             (string) $message->getText(),
-            null !== $ragGroupKey || $isRagQuery,
+            $classification,
+            $options,
+            $isRagQuery,
         );
-        $ragContext = $this->loadRagContext(
-            $message,
-            $topic,
-            $ragGroupKey,
-            $ragLimit,
-            $ragMinScore,
-            $agentScopes,
-            $searchKnowledge,
-        );
+        $ragContext = '';
+        if ($searchKnowledge) {
+            $ragContext = $this->loadRagContext(
+                $message,
+                $topic,
+                $ragGroupKey,
+                $ragLimit,
+                $ragMinScore,
+                $agentScopes,
+                true,
+            );
+        }
 
         if ($isRagQuery && '' === $ragContext) {
             $empty = $this->docsNotFoundReply($classification);
@@ -1314,17 +1343,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $agentScopes = $this->agentRagScopes($profile, $message->getUserId());
         $isRagQuery = Capability::RagQuery->value === ($classification['intent'] ?? '');
 
-        if (!$ragGroupKey && 'general' !== $topic && !$isRagQuery) {
+        $searchKnowledge = $this->assistantShouldSearchKnowledge(
+            $agentScopes,
+            (string) $message->getText(),
+            $classification,
+            $options,
+            $isRagQuery,
+        );
+
+        if (!$ragGroupKey && 'general' !== $topic && $searchKnowledge) {
             $ragGroupKey = "TASKPROMPT:{$topic}";
         }
 
         $ragResults = [];
-
-        $searchKnowledge = \App\Service\Agent\AgentKnowledgeSearchGate::shouldSearch(
-            $agentScopes,
-            (string) $message->getText(),
-            null !== $ragGroupKey || $isRagQuery,
-        );
 
         if (!empty($message->getText()) && $searchKnowledge) {
             try {

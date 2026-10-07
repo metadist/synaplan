@@ -123,7 +123,7 @@
     "fidelityContinue": "Continuer",
     "removeFile": "Retirer le fichier",
     "cancelUpload": "Annuler l'envoi",
-    "uploadCancelled": "L'envoi s'est arrêté. Un fichier seulement en partie enregistré a été retiré.",
+    "uploadCancelled": "L'envoi s'est arrêté.",
     "dropFiles": "Déposez les fichiers ici pour les téléverser",
     "dropFilesHint": "Relâchez pour ajouter les fichiers à la file d’envoi",
     "filesAddedToQueue": "{count} fichier ajouté — prêt à téléverser | {count} fichiers ajoutés — prêts à téléverser",

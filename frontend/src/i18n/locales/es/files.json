@@ -176,7 +176,7 @@
     "fidelityContinue": "Continuar",
     "removeFile": "Eliminar archivo",
     "cancelUpload": "Cancelar la subida",
-    "uploadCancelled": "La subida se detuvo. Se eliminó un archivo que solo se había guardado en parte.",
+    "uploadCancelled": "La subida se detuvo.",
     "dropFiles": "Suelta archivos aquí para subir",
     "dropFilesHint": "Suelta para agregar archivos a la cola de subida",
     "filesAddedToQueue": "{count} archivo agregado - listo para subir | {count} archivos agregados - listos para subir",

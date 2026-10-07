@@ -19,6 +19,9 @@ vi.mock('@/services/api/promptsApi', () => ({
 
 vi.mock('@/services/filesService', () => ({
   getFileGroups: vi.fn().mockResolvedValue([{ name: 'legal', count: 2 }]),
+  listFiles: vi.fn().mockResolvedValue({
+    files: [{ id: 15, filename: 'invoice.pdf', display_name: 'Invoice', status: 'vectorized' }],
+  }),
 }))
 
 vi.mock('@/services/api/iamApi', () => ({
@@ -85,6 +88,18 @@ describe('BuilderKnowledge', () => {
     await wrapper.get('[data-testid="chk-include-user-files"]').setValue(true)
     expect(store.current?.draft?.knowledge.includeUserFiles).toBe(true)
     expect(store.dirty).toBe(true)
+  })
+
+  it('adds and removes a Library file on the draft without copying it', async () => {
+    const { wrapper, store } = mountKnowledge()
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    const select = wrapper.get('[data-testid="select-library-file"]')
+    await select.setValue('15')
+    expect(store.current?.draft?.knowledge.fileIds).toEqual([15])
+    await wrapper.get('[data-testid="btn-remove-library-file-15"]').trigger('click')
+    expect(store.current?.draft?.knowledge.fileIds).toEqual([])
   })
 
   it('hides the file input and keeps a keyboard-focusable upload button', () => {

@@ -48,6 +48,8 @@
     "libraryFiles": "Bibliotheksdateien",
     "libraryFilesHint": "Diese Dateien bleiben in der Bibliothek. Der Assistent durchsucht sie, ohne eine Kopie anzulegen.",
     "addLibraryFile": "Datei aus der Bibliothek hinzufügen",
+    "searchLibraryFile": "Bibliotheksdateien suchen",
+    "removeLibraryFile": "Datei entfernen",
     "chooseLibraryFile": "Datei wählen",
     "libraryFilesEmpty": "Noch keine durchsuchbaren Dateien. Lade zuerst eine in der Bibliothek hoch.",
     "noFiles": "Noch keine Dateien",

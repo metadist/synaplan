@@ -48,6 +48,8 @@
     "libraryFiles": "Library files",
     "libraryFilesHint": "These files stay in the Library. The assistant searches them without making a copy.",
     "addLibraryFile": "Add a file from the Library",
+    "searchLibraryFile": "Search Library files",
+    "removeLibraryFile": "Remove file",
     "chooseLibraryFile": "Choose a file",
     "libraryFilesEmpty": "No searchable files yet. Upload one in the Library first.",
     "noFiles": "No files yet",

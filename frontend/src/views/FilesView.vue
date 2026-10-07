@@ -2327,8 +2327,6 @@ const uploadFiles = async () => {
   }
 
   const groupKey = activeUploadFolder.value
-  const names = new Set(selectedFiles.value.map((file) => file.name))
-  const beforeIds = new Set(files.value.map((file) => file.id))
   const controller = new AbortController()
   uploadAbortController.value = controller
 
@@ -2375,15 +2373,6 @@ const uploadFiles = async () => {
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       await loadFiles()
-      const appeared = files.value.filter(
-        (file) => !beforeIds.has(file.id) && (names.has(file.filename) || names.has(file.display_name ?? ''))
-      )
-      for (const file of appeared) {
-        await filesService.deleteFile(file.id)
-      }
-      if (appeared.length > 0) {
-        await loadFiles()
-      }
       showSuccess(t('files.uploadCancelled'))
       return
     }

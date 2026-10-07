@@ -176,7 +176,7 @@
     "fidelityContinue": "Devam et",
     "removeFile": "Dosyayı kaldır",
     "cancelUpload": "Yüklemeyi iptal et",
-    "uploadCancelled": "Yükleme durdu. Yalnızca kısmen kaydedilen dosya kaldırıldı.",
+    "uploadCancelled": "Yükleme durdu.",
     "dropFiles": "Yüklemek için dosyaları buraya bırakın",
     "dropFilesHint": "Yükleme kuyruğuna dosya eklemek için bırakın",
     "filesAddedToQueue": "{count} dosya eklendi - yüklemeye hazır",

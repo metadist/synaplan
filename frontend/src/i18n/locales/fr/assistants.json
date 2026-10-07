@@ -48,6 +48,8 @@
     "libraryFiles": "Fichiers de la bibliothèque",
     "libraryFilesHint": "Ces fichiers restent dans la bibliothèque. L'assistant les consulte sans en faire une copie.",
     "addLibraryFile": "Ajouter un fichier de la bibliothèque",
+    "searchLibraryFile": "Chercher dans la bibliothèque",
+    "removeLibraryFile": "Retirer le fichier",
     "chooseLibraryFile": "Choisir un fichier",
     "libraryFilesEmpty": "Aucun fichier consultable pour l'instant. Ajoutez-en un dans la bibliothèque.",
     "noFiles": "Aucun fichier pour le moment",

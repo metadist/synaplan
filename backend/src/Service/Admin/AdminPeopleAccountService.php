@@ -43,8 +43,8 @@ final readonly class AdminPeopleAccountService
         if (!in_array($level, self::ASSIGNABLE_LEVELS, true)) {
             throw new \InvalidArgumentException('level must be one of: '.implode(', ', self::ASSIGNABLE_LEVELS));
         }
-        if (strlen($password) < 8) {
-            throw new \InvalidArgumentException('password must be at least 8 characters');
+        if (strlen($password) < 8 || strlen($password) > 64 || 1 !== preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/', $password)) {
+            throw new \InvalidArgumentException('Password must be 8-64 characters and contain an uppercase letter, a lowercase letter, and a number');
         }
         if (null !== $this->users->findOneBy(['mail' => $email])) {
             throw new \InvalidArgumentException('An account with this email already exists');

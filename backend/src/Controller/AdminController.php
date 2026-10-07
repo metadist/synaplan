@@ -413,9 +413,30 @@ class AdminController extends AbstractController
             ]
         )
     )]
-    #[OA\Response(response: 201, description: 'Account created')]
-    #[OA\Response(response: 400, description: 'Invalid input')]
-    #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(
+        response: 201,
+        description: 'Account created',
+        content: new OA\JsonContent(
+            required: ['success', 'user'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'user',
+                    required: ['id', 'email', 'level', 'emailVerified', 'providerId'],
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 12),
+                        new OA\Property(property: 'email', type: 'string', example: 'ada@example.com'),
+                        new OA\Property(property: 'level', type: 'string', example: 'NEW'),
+                        new OA\Property(property: 'emailVerified', type: 'boolean', example: true),
+                        new OA\Property(property: 'providerId', type: 'string', example: 'local'),
+                    ],
+                    type: 'object',
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid input', content: new OA\JsonContent(properties: [new OA\Property(property: 'error', type: 'string')]))]
+    #[OA\Response(response: 403, description: 'Admin access required', content: new OA\JsonContent(properties: [new OA\Property(property: 'error', type: 'string')]))]
     public function createUserAccount(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {
@@ -449,9 +470,30 @@ class AdminController extends AbstractController
         tags: ['Admin']
     )]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
-    #[OA\Response(response: 200, description: 'Account verified')]
-    #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 404, description: 'User not found')]
+    #[OA\Response(
+        response: 200,
+        description: 'Account verified',
+        content: new OA\JsonContent(
+            required: ['success', 'user'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'user',
+                    required: ['id', 'email', 'level', 'emailVerified', 'providerId'],
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer'),
+                        new OA\Property(property: 'email', type: 'string'),
+                        new OA\Property(property: 'level', type: 'string'),
+                        new OA\Property(property: 'emailVerified', type: 'boolean', example: true),
+                        new OA\Property(property: 'providerId', type: 'string'),
+                    ],
+                    type: 'object',
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 403, description: 'Admin access required', content: new OA\JsonContent(properties: [new OA\Property(property: 'error', type: 'string')]))]
+    #[OA\Response(response: 404, description: 'User not found', content: new OA\JsonContent(properties: [new OA\Property(property: 'error', type: 'string')]))]
     public function verifyUser(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {
@@ -474,10 +516,10 @@ class AdminController extends AbstractController
         tags: ['Admin']
     )]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
-    #[OA\Response(response: 200, description: 'Email sent')]
-    #[OA\Response(response: 409, description: 'Mail is not configured')]
-    #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 404, description: 'User not found')]
+    #[OA\Response(response: 200, description: 'Email sent', content: new OA\JsonContent(required: ['success'], properties: [new OA\Property(property: 'success', type: 'boolean', example: true)]))]
+    #[OA\Response(response: 409, description: 'Mail is not configured', content: new OA\JsonContent(properties: [new OA\Property(property: 'error', type: 'string')]))]
+    #[OA\Response(response: 403, description: 'Admin access required', content: new OA\JsonContent(properties: [new OA\Property(property: 'error', type: 'string')]))]
+    #[OA\Response(response: 404, description: 'User not found', content: new OA\JsonContent(properties: [new OA\Property(property: 'error', type: 'string')]))]
     public function resendUserVerification(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user || !$user->isAdmin()) {

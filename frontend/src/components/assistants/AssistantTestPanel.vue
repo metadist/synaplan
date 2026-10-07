@@ -88,6 +88,7 @@ function send(): void {
   replySmoother?.cancel()
   let reply = ''
   let insideThink = false
+  let pendingThink = ''
   const smoother = createSmoothStream({
     onRender: (text) => {
       liveReply.value = text
@@ -103,8 +104,9 @@ function send(): void {
     history: [],
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
-        const visible = consumeVisibleAnswer(data.chunk, insideThink)
+        const visible = consumeVisibleAnswer(data.chunk, insideThink, pendingThink)
         insideThink = visible.insideThink
+        pendingThink = visible.pending
         reply += visible.text
         smoother.push(reply)
       }

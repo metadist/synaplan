@@ -57,10 +57,20 @@
             :data-testid="`btn-remove-library-file-${file.id}`"
             @click="removeLibraryFile(file.id)"
           >
-            {{ $t('assistants.removeFolder') }}
+            {{ $t('assistants.removeLibraryFile') }}
           </button>
         </li>
       </ul>
+      <label class="block">
+        <span class="txt-secondary text-sm">{{ $t('assistants.searchLibraryFile') }}</span>
+        <input
+          v-model="libraryQuery"
+          type="search"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          data-testid="input-library-file-search"
+          @change="loadLibraryFiles"
+        />
+      </label>
       <label class="block">
         <span class="txt-secondary text-sm">{{ $t('assistants.addLibraryFile') }}</span>
         <select
@@ -183,6 +193,7 @@ const { error, success } = useNotification()
 const files = ref<PromptFile[]>([])
 const allFolders = ref<FolderOption[]>([])
 const libraryCatalog = ref<FileItem[]>([])
+const libraryQuery = ref('')
 const libraryFilesLoading = ref(false)
 const libraryFilesLoaded = ref(false)
 const knowledgeFileInput = ref<HTMLInputElement | null>(null)
@@ -312,7 +323,12 @@ function removeLibraryFile(id: number): void {
 async function loadLibraryFiles(): Promise<void> {
   libraryFilesLoading.value = true
   try {
-    const page = await listFiles({ limit: 100, vectorState: 'vectorized' })
+    const query = libraryQuery.value.trim()
+    const page = await listFiles({
+      limit: 100,
+      vectorState: 'vectorized',
+      ...(query ? { search: query } : {}),
+    })
     libraryCatalog.value = page.files
   } catch {
     libraryCatalog.value = []
