@@ -4,7 +4,7 @@
       class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-vector-storage"
     >
-      <div class="max-w-7xl mx-auto space-y-6">
+      <div class="max-w-[100rem] mx-auto space-y-6">
         <FilesTabs />
 
         <p class="text-sm txt-secondary">{{ $t('vectorStorage.intro') }}</p>

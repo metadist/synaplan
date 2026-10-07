@@ -21,7 +21,7 @@
     <!-- Wrapper for thinking blocks + bubble -->
     <div
       :class="[
-        'flex flex-col flex-1 min-w-0 md:flex-none md:max-w-3xl gap-2',
+        'flex flex-col flex-1 min-w-0 md:flex-none md:max-w-[60rem] gap-2',
         role === 'user' ? 'items-end' : '',
       ]"
     >

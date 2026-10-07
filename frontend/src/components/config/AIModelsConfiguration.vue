@@ -867,21 +867,22 @@ const defaultSources = ref<Partial<Record<Capability, 'admin' | 'group' | 'user'
 
 const DEFAULTS_SCOPE_KEY = 'ai-models-defaults-scope'
 
-/** Admins start on the instance defaults: that is what guests and new members get. */
+/** Admins start on their own defaults. Everyone is an explicit choice, so a
+ *  visit does not change the models guests and other members get. */
 const readDefaultsScope = (): DefaultsScope => {
   if (!authStore.isAdmin) return 'user'
   try {
-    return localStorage.getItem(DEFAULTS_SCOPE_KEY) === 'user' ? 'user' : 'instance'
+    return localStorage.getItem(DEFAULTS_SCOPE_KEY) === 'instance' ? 'instance' : 'user'
   } catch {
-    return 'instance'
+    return 'user'
   }
 }
 
 const defaultsScope = ref<DefaultsScope>(readDefaultsScope())
 
 const scopeOptions = computed<{ value: DefaultsScope; label: string }[]>(() => [
-  { value: 'instance', label: t('config.aiModels.scope.instance') },
   { value: 'user', label: t('config.aiModels.scope.user') },
+  { value: 'instance', label: t('config.aiModels.scope.instance') },
 ])
 
 const setDefaultsScope = (scope: DefaultsScope) => {

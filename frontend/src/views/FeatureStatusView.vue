@@ -4,7 +4,7 @@
       class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-feature-status"
     >
-      <div class="max-w-6xl mx-auto space-y-6">
+      <div class="max-w-[90rem] mx-auto space-y-6">
         <!-- Header -->
         <PageHeader
           :title="$t('settings.features.title')"

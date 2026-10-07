@@ -1,6 +1,6 @@
 <template>
   <MainLayout data-testid="view-partners">
-    <div class="container mx-auto px-4 sm:px-6 py-8 max-w-3xl">
+    <div class="container mx-auto px-4 sm:px-6 py-8 max-w-[60rem]">
       <button
         type="button"
         class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"

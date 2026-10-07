@@ -222,7 +222,7 @@ onBeforeUnmount(() => {
 <template>
   <MainLayout data-testid="view-admin-config">
     <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
-      <div class="container mx-auto max-w-6xl">
+      <div class="container mx-auto max-w-[90rem]">
         <RestartRequiredBanner
           :visible="systemConfig.restartRequired.value"
           @dismiss="systemConfig.dismissRestart"

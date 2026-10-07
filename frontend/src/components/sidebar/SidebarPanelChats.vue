@@ -44,6 +44,7 @@
           :title="$t('iam.incoming.purpose')"
           @click="incomingExpanded = !incomingExpanded"
         >
+          <InboxArrowDownIcon :class="sectionIconClass" aria-hidden="true" />
           <span class="truncate">{{ $t('iam.incoming.menu') }}</span>
           <span
             v-if="incomingStore.hasNew"
@@ -100,6 +101,7 @@
           data-testid="btn-sidebar-v2-pinned-toggle"
           @click="pinnedExpanded = !pinnedExpanded"
         >
+          <Icon icon="ph:push-pin" :class="sectionIconClass" aria-hidden="true" />
           {{ $t('nav.pinned') }}
           <ChevronDownIcon :class="chevronClass(pinnedExpanded)" aria-hidden="true" />
         </button>
@@ -132,6 +134,7 @@
           data-testid="btn-sidebar-v2-chats-toggle"
           @click="chatsExpanded = !chatsExpanded"
         >
+          <ClockIcon :class="sectionIconClass" aria-hidden="true" />
           {{ $t('nav.chatHistory') }}
           <ChevronDownIcon :class="chevronClass(chatsExpanded)" aria-hidden="true" />
         </button>
@@ -181,6 +184,8 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import {
   ArrowUpRightIcon,
   ChevronDownIcon,
+  ClockIcon,
+  InboxArrowDownIcon,
   PlusIcon,
   UserGroupIcon,
 } from '@heroicons/vue/24/outline'
@@ -238,6 +243,8 @@ const rememberExpanded = (key: string, open: boolean) => {
 
 const sectionToggleClass =
   'sidebar-section-label mb-0.5 flex w-full items-center gap-1.5 bg-transparent px-4 py-1 text-left text-[15px] font-semibold hover:bg-transparent focus:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]'
+
+const sectionIconClass = 'h-4 w-4 flex-shrink-0 txt-secondary'
 
 const sectionChevronBase =
   'h-3.5 w-3.5 flex-shrink-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none'

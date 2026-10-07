@@ -1,15 +1,19 @@
 <template>
-  <div class="relative" data-testid="file-office-actions">
+  <div class="relative shrink-0" data-testid="file-office-actions">
     <button
       ref="triggerRef"
       type="button"
-      class="shrink-0 px-2 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
+      :class="
+        tile
+          ? 'btn-secondary shrink-0 w-8 h-8 flex items-center justify-center'
+          : 'shrink-0 px-2 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1'
+      "
       :aria-expanded="open"
       :aria-label="$t('files.download')"
       data-testid="file-office-actions-trigger"
       @click.stop="toggle"
     >
-      <Icon icon="mdi:dots-vertical" class="w-3.5 h-3.5" />
+      <Icon icon="mdi:dots-vertical" :class="tile ? 'w-4 h-4' : 'w-3.5 h-3.5'" />
     </button>
     <!--
       Teleport out of the chat bubble / card. The bubble uses overflow-x-auto,
@@ -27,6 +31,7 @@
         @click.stop
       >
         <button
+          v-if="!tile"
           type="button"
           class="w-full flex items-center gap-2 px-3 py-2 text-xs txt-primary hover:bg-[var(--brand)]/10 transition-colors text-left"
           data-testid="file-office-actions-download"
@@ -119,8 +124,9 @@ const props = withDefaults(
     guestSessionId?: string | null
     showPreview?: boolean
     siblingFileIds?: number[]
+    tile?: boolean
   }>(),
-  { guestSessionId: null, showPreview: true, siblingFileIds: () => [] }
+  { guestSessionId: null, showPreview: true, siblingFileIds: () => [], tile: false }
 )
 
 const emit = defineEmits<{ preview: [] }>()

@@ -1,5 +1,5 @@
 <template>
-  <div v-if="targets.length > 0" class="relative" data-testid="file-push-menu">
+  <div v-if="targets.length > 0" class="relative shrink-0" data-testid="file-push-menu">
     <button
       ref="triggerRef"
       type="button"
@@ -93,10 +93,10 @@ const menuStyle = ref<Record<string, string>>({})
 
 const triggerClass = computed(() =>
   props.size === 'tile'
-    ? 'shrink-0 px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed'
+    ? 'btn-secondary shrink-0 w-8 h-8 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed'
     : 'icon-ghost inline-flex items-center justify-center w-11 h-11 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed'
 )
-const iconClass = computed(() => (props.size === 'tile' ? 'w-3.5 h-3.5' : 'w-5 h-5'))
+const iconClass = computed(() => (props.size === 'tile' ? 'w-4 h-4' : 'w-5 h-5'))
 
 const keyboardInsetPx = (): number =>
   parseCssPx(getComputedStyle(document.documentElement).getPropertyValue('--keyboard-inset-height'))

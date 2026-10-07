@@ -1,6 +1,6 @@
 <template>
   <MainLayout data-testid="view-my-groups">
-    <div class="container mx-auto px-6 py-8 max-w-3xl overflow-x-hidden">
+    <div class="container mx-auto px-6 py-8 max-w-[60rem] overflow-x-hidden">
       <PageHeader
         :title="$t('nav.myGroups')"
         :subtitle="$t('people.myGroups.subtitle')"

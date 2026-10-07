@@ -4,7 +4,7 @@
       class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-config"
     >
-      <div class="max-w-7xl mx-auto" data-testid="section-config">
+      <div class="max-w-[100rem] mx-auto" data-testid="section-config">
         <div v-if="currentPage === 'inbound'" data-testid="section-inbound">
           <InboundConfiguration />
         </div>

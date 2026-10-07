@@ -23,7 +23,7 @@
     <!-- On mobile the horizontal padding matches the drawer toggle's left
          offset (left-3 = 12px) so the composer aligns with the menu button and
          uses the full width; md+ keeps the roomier px-4. -->
-    <div class="max-w-4xl mx-auto px-3 py-2 md:px-4 md:py-4">
+    <div class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4">
       <!-- File and Quote Display (above input) -->
       <div
         v-if="uploadedFiles.length > 0 || quote || pastedBlocks.length > 0"
@@ -381,6 +381,9 @@
                 @change="handleFileSelect"
               />
             </div>
+
+            <!-- Files already in this chat, same size and row as the plus button. -->
+            <slot name="beside-plus" />
 
             <!-- (`.tool-badge` sets display unlayered and would beat a `hidden`
                  utility, so we gate visibility with v-if, not CSS.) -->

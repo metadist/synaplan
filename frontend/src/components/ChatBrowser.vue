@@ -8,7 +8,7 @@
         data-testid="bulk-actions-bar"
       >
         <div
-          class="max-w-7xl mx-auto flex items-center justify-between gap-2 md:gap-4 flex-wrap md:flex-nowrap"
+          class="max-w-[100rem] mx-auto flex items-center justify-between gap-2 md:gap-4 flex-wrap md:flex-nowrap"
         >
           <div class="flex items-center gap-2 md:gap-3">
             <div

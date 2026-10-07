@@ -475,6 +475,48 @@
     padding-bottom: var(--keyboard-inset-height, 0px);
   }
 
+  /* Shadow along the top of the chat. A fade in the chat colour itself
+     disappears into the background, so this is a real darkening that stays
+     visible on message cards in both themes. The notch stop is covered by
+     the status-bar band; the visible part stays short so the first line is
+     still readable. pointer-events stay off: the phone menu button and the
+     tap-to-top band must keep working. */
+  .chat-top-edge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 20;
+    height: calc(env(safe-area-inset-top, 0px) + 3rem);
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(15, 23, 42, 0.22) 0,
+      rgba(15, 23, 42, 0.22) env(safe-area-inset-top, 0px),
+      rgba(15, 23, 42, 0.1) calc(env(safe-area-inset-top, 0px) + 1.15rem),
+      transparent 100%
+    );
+  }
+
+  .dark .chat-top-edge {
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.62) 0,
+      rgba(0, 0, 0, 0.62) env(safe-area-inset-top, 0px),
+      rgba(0, 0, 0, 0.34) calc(env(safe-area-inset-top, 0px) + 1.25rem),
+      transparent 100%
+    );
+  }
+
+  /* Phones: a little taller so a line under the status bar fades before it
+     runs through the floating header buttons. The buttons sit above this
+     layer and stay tappable. */
+  @media (max-width: 767px), (max-height: 519px) {
+    .chat-top-edge {
+      height: calc(env(safe-area-inset-top, 0px) + 3.5rem);
+    }
+  }
+
   /* Surface Tokens (einheitlicher Card-Look) */
   .surface-card {
     background-color: var(--bg-card);

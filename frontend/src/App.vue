@@ -43,6 +43,7 @@ import AmbientBackground from '@/components/AmbientBackground.vue'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import SmartSearchPalette from '@/components/search/SmartSearchPalette.vue'
+import { ensureAccountTimezone } from '@/composables/useAccountTimezone'
 import { clearSearchRecents } from '@/composables/search/useSearchRecents'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import AnnouncementModal from '@/components/AnnouncementModal.vue'
@@ -125,6 +126,17 @@ watch(
       clearSearchRecents(previous)
     }
   }
+)
+
+// Fill an empty profile time zone from this device once per signed-in user.
+// Fire-and-forget: a failure must not block the page, and the next action retries.
+watch(
+  () => authStore.user?.id,
+  (current) => {
+    if (current == null) return
+    void ensureAccountTimezone()
+  },
+  { immediate: true }
 )
 
 // Native shell only: on resume from background, re-validate the session and

@@ -8,7 +8,11 @@
     leave-from-class="opacity-100 translate-y-0 scale-100"
     leave-to-class="opacity-0 translate-y-2 scale-[0.98]"
   >
-    <div v-if="tip && !expanded" class="mx-auto max-w-4xl px-4 pb-2" data-testid="comp-promo-tip">
+    <div
+      v-if="tip && !expanded"
+      class="mx-auto max-w-[70rem] px-4 pb-2"
+      data-testid="comp-promo-tip"
+    >
       <div
         :class="[
           'relative overflow-hidden rounded-xl border transition-all duration-200',

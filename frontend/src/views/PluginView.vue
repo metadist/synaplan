@@ -1,7 +1,7 @@
 <template>
   <MainLayout>
     <div class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin" data-testid="page-tools">
-      <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
+      <div class="max-w-[1750px] mx-auto w-full px-6 py-8">
         <PageHeader
           :title="
             plugin?.name

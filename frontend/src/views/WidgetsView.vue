@@ -1,7 +1,7 @@
 <template>
   <MainLayout>
     <div class="min-h-screen bg-chat p-4 md:p-8" data-testid="page-widgets">
-      <div class="max-w-7xl mx-auto">
+      <div class="max-w-[100rem] mx-auto">
         <PageHeader
           :title="$t('widgets.title')"
           :subtitle="$t('widgets.subtitle')"

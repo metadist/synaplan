@@ -93,6 +93,22 @@ describe('FileOfficeActions', () => {
 
   it('shows PDF export and preview for office files when the engine is on', async () => {
     await openMenu('brief.docx')
+    expect(document.querySelector('[data-testid="file-office-actions-download"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="file-office-actions-pdf"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="file-office-actions-preview"]')).not.toBeNull()
+  })
+
+  it('hides the plain download item on a generated card that already has a download button', async () => {
+    const mounted = mount(FileOfficeActions, {
+      props: { fileId: 7, filename: 'brief.docx', tile: true },
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { Icon: { template: '<i />' } } },
+    })
+    wrappers.push(mounted)
+    await mounted.find('[data-testid="file-office-actions-trigger"]').trigger('click')
+    await nextTick()
+    await nextTick()
+    expect(document.querySelector('[data-testid="file-office-actions-download"]')).toBeNull()
     expect(document.querySelector('[data-testid="file-office-actions-pdf"]')).not.toBeNull()
     expect(document.querySelector('[data-testid="file-office-actions-preview"]')).not.toBeNull()
   })

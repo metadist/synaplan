@@ -6,7 +6,7 @@
         class="sticky top-0 z-10 backdrop-blur-lg bg-surface/80 border-b border-light-border dark:border-dark-border"
         data-testid="section-header"
       >
-        <div class="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+        <div class="max-w-[70rem] mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <!-- Mobile: Two-row layout, Desktop: Single-row layout -->
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <!-- Logo & Title -->
@@ -76,7 +76,7 @@
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="max-w-4xl mx-auto px-4 py-20" data-testid="state-error">
+      <div v-else-if="error" class="max-w-[70rem] mx-auto px-4 py-20" data-testid="state-error">
         <div class="text-center">
           <svg
             class="w-16 h-16 text-red-500 mx-auto mb-4"
@@ -103,7 +103,7 @@
       </div>
 
       <!-- Chat Content -->
-      <main v-else class="max-w-4xl mx-auto px-4 py-8" data-testid="section-chat-content">
+      <main v-else class="max-w-[70rem] mx-auto px-4 py-8" data-testid="section-chat-content">
         <!-- Chat Info Banner -->
         <div
           class="mb-8 p-6 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/20"
@@ -335,7 +335,7 @@
 
       <!-- Footer -->
       <footer class="mt-20 border-t border-light-border dark:border-dark-border py-8">
-        <div class="max-w-4xl mx-auto px-4 text-center txt-secondary text-sm">
+        <div class="max-w-[70rem] mx-auto px-4 text-center txt-secondary text-sm">
           <p>
             <BrandAttribution link-class="text-[var(--brand)] hover:underline font-medium" />
             ·

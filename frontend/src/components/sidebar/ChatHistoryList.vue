@@ -26,7 +26,7 @@
           class="group/chat relative overflow-hidden rounded-lg"
           :class="
             chat.id === activeChatId
-              ? 'bg-[var(--brand)]/[0.08]'
+              ? 'bg-[var(--brand)]/[0.12]'
               : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
           "
           data-testid="row-chat-v2"

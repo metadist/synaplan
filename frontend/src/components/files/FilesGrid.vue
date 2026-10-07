@@ -77,28 +77,34 @@
           />
         </div>
         <div class="p-2">
-          <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
-            {{ fileDisplayName(file, translate, locale) }}
-          </p>
-          <p class="text-[10px] txt-secondary truncate">{{ file.uploaded_date }}</p>
-          <div class="mt-1">
+          <!--
+            The searchable mark sits directly after the filename. The name
+            shrinks first, so a long name truncates and the mark stays visible.
+            The date keeps the full width underneath.
+          -->
+          <div class="flex items-center gap-1.5 min-w-0">
+            <p
+              class="min-w-0 text-xs font-medium leading-4 txt-primary truncate"
+              :title="file.filename"
+            >
+              {{ fileDisplayName(file, translate, locale) }}
+            </p>
             <FileVectorPill
               :state="vectorStateOf(file)"
               :chunk-count="file.chunk_count ?? 0"
               :group-key="file.group_key ?? null"
             />
           </div>
+          <p class="text-[10px] txt-secondary truncate mt-0.5">{{ file.uploaded_date }}</p>
           <!--
-            Delete is meant to sit in the same spot on every card, but the
-            download button could not shrink below its label (German
-            "Herunterladen"), so on a narrow two-column tile it pushed the icon
-            buttons out of place — by a different amount depending on which of
-            the optional ones the file has. Now the label yields and the icons
-            hold their size, which keeps the trailing edge fixed.
+            Every control is the same height as Download, and the icon buttons
+            are squares of that height. On a phone the word takes the first
+            line and the squares sit under it, so the label stays readable.
           -->
-          <div class="flex items-center gap-1 mt-1.5 min-w-0">
+          <div class="flex flex-wrap items-stretch gap-1 mt-1.5 min-w-0">
             <FileOfficeActions
               v-if="showOfficeActions(file)"
+              tile
               :file-id="file.id"
               :filename="file.display_name || file.filename"
               @preview="openPreview(file)"
@@ -111,26 +117,29 @@
               :file-name="file.display_name || file.filename"
             />
             <button
-              class="flex-1 min-w-0 px-2 py-1 rounded-xl bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
+              type="button"
+              class="btn-primary h-8 max-sm:basis-full sm:flex-1 sm:min-w-8 max-w-full px-2 text-[11px] font-medium flex items-center justify-center gap-1"
               :title="$t('files.generated.download')"
               :data-testid="`btn-generated-download-${file.id}`"
               @click="download(file)"
             >
-              <ArrowDownTrayIcon class="w-3.5 h-3.5 shrink-0" />
+              <ArrowDownTrayIcon class="w-4 h-4 shrink-0" />
               <span class="truncate">{{ $t('files.generated.download') }}</span>
             </button>
             <button
               v-if="file.chat_id"
-              class="shrink-0 px-2 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
+              type="button"
+              class="btn-secondary shrink-0 w-8 h-8 flex items-center justify-center"
               :title="$t('files.generated.openInChat')"
               :data-testid="`btn-generated-open-${file.id}`"
               @click="openInChat(file)"
             >
-              <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
+              <ChatBubbleLeftRightIcon class="w-4 h-4" />
             </button>
             <div v-if="vectorStateOf(file) !== 'vectorized'" class="relative shrink-0">
               <button
-                class="px-2 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:text-[var(--brand)] transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+                type="button"
+                class="btn-secondary w-8 h-8 flex items-center justify-center disabled:opacity-50"
                 :title="$t('files.describeSortAction')"
                 :disabled="isIndexing(file.id)"
                 :data-testid="`btn-generated-index-${file.id}`"
@@ -138,7 +147,7 @@
               >
                 <Icon
                   :icon="isIndexing(file.id) ? 'mdi:loading' : 'mdi:text-box-search-outline'"
-                  class="w-3.5 h-3.5"
+                  class="w-4 h-4"
                   :class="isIndexing(file.id) && 'animate-spin'"
                 />
               </button>
@@ -193,13 +202,14 @@
               </Transition>
             </div>
             <button
-              class="shrink-0 px-2 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/10 text-red-400/70 hover:text-red-500 hover:bg-red-500/10 transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+              type="button"
+              class="btn-danger shrink-0 w-8 h-8 flex items-center justify-center disabled:opacity-50"
               :title="$t('files.delete')"
               :disabled="isDeleting(file.id)"
               :data-testid="`btn-generated-delete-${file.id}`"
               @click="confirmAndDelete(file)"
             >
-              <TrashIcon class="w-3.5 h-3.5" />
+              <TrashIcon class="w-4 h-4" />
             </button>
           </div>
         </div>

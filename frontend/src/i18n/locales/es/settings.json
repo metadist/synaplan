@@ -15,6 +15,12 @@
     "allStatistics": "Todas las estadísticas",
     "lessThanCent": "< 0,01 €"
   },
+  "export": {
+    "timezoneLoading": "Cargando tu zona horaria…",
+    "timezoneProfile": "Las horas de este archivo usan {tz} de Idioma y apariencia.",
+    "timezoneBrowser": "Las horas de este archivo usan la zona horaria de este ordenador ({tz}), porque Idioma y apariencia aún no tiene ninguna.",
+    "timezoneUnavailable": "Las horas de este archivo usan la zona horaria de este ordenador ({tz}), porque no se ha podido cargar la zona horaria de Idioma y apariencia."
+  },
   "profile": {
     "title": "Configuración de Perfil",
     "subtitle": "Administra tu información personal y configuración de cuenta",
@@ -65,9 +71,11 @@
       "language": "Idioma",
       "languageHint": "Idioma de la interfaz",
       "timezone": "Zona Horaria",
-      "timezoneHint": "Cada lugar incluye su diferencia actual respecto a UTC, en horas y minutos.",
+      "timezoneHint": "Escribe una ciudad o una diferencia como +02:00. Los lugares coincidentes aparecen debajo. Enter elige el lugar resaltado. Después guarda para conservarlo.",
       "timezoneSearch": "Buscar por ciudad o diferencia",
       "timezonePlaceholder": "Elige una zona horaria",
+      "timezoneCurrent": "Elegida: {label}",
+      "timezoneMatchCount": "{count} lugar | {count} lugares",
       "timezoneNoMatch": "Ninguna zona horaria coincide con esa búsqueda.",
       "timezoneInvalid": "Elige una zona horaria de la lista. No se ha guardado nada.",
       "invoiceEmail": "Correo de Facturación",

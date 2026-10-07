@@ -1,7 +1,7 @@
 <template>
   <MainLayout data-testid="page-subscription">
     <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
-      <div class="max-w-6xl mx-auto space-y-8">
+      <div class="max-w-[90rem] mx-auto space-y-8">
         <!-- Loading State -->
         <div v-if="loading" class="text-center py-12">
           <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />

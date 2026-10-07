@@ -53,7 +53,7 @@ describe('settings column', () => {
 
     const column = wrapper.get('[data-testid="section-settings-column"]')
     expect(column.classes()).toEqual(
-      expect.arrayContaining(['mx-auto', 'w-full', 'max-w-3xl', '@container'])
+      expect.arrayContaining(['mx-auto', 'w-full', 'max-w-[60rem]', '@container'])
     )
     expect(wrapper.html()).not.toContain('md:flex-row')
     expect(wrapper.html()).not.toContain('nav-settings-sections')
