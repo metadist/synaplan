@@ -408,10 +408,11 @@
             </span>
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 text-sm font-medium"
+              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
               data-testid="btn-pinned-assistant-stop"
               @click="stopPinnedAssistant"
             >
+              <XMarkIcon class="h-5 w-5" aria-hidden="true" />
               {{ $t('assistants.useDefaultModel') }}
             </button>
           </div>
@@ -552,6 +553,7 @@
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
@@ -962,6 +964,10 @@ const {
 } = usePinnedAssistant()
 
 async function stopPinnedAssistant(): Promise<void> {
+  // A thread that already names the assistant keeps that pin on its messages.
+  // Leave it for an empty chat first, then drop the address pin, so the next
+  // message goes to the default model.
+  await chatsStore.findOrCreateEmptyChat()
   await goToFreshChat(router, route)
 }
 
