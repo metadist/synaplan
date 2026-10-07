@@ -515,7 +515,7 @@ final readonly class VectorSearchService
             return null;
         }
         $result = $this->vectorStorage->findChunk($userId, $chunkId);
-        if (null === $result || '' === trim($result->text)) {
+        if (null === $result || '' === trim($result->text) || !$this->mayReadChunk($userId, $result)) {
             return null;
         }
 
@@ -528,6 +528,36 @@ final readonly class VectorSearchService
             'startLine' => $result->startLine,
             'endLine' => $result->endLine,
         ];
+    }
+
+    /**
+     * Own chunks are readable. A foreign chunk is readable only while a live
+     * share still grants this user that owner, folder, and file.
+     */
+    private function mayReadChunk(int $userId, VectorStorage\DTO\SearchResult $chunk): bool
+    {
+        $ownerId = $chunk->ownerId ?? 0;
+        if ($ownerId === $userId) {
+            return true;
+        }
+        if ($ownerId <= 0) {
+            return false;
+        }
+        foreach ($this->ragScopeResolver->resolve($userId, null) as $scope) {
+            if ($scope->ownerId !== $ownerId) {
+                continue;
+            }
+            if (null !== $scope->groupKey && $scope->groupKey !== $chunk->groupKey) {
+                continue;
+            }
+            if ([] !== $scope->fileIds && !in_array($chunk->fileId, $scope->fileIds, true)) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

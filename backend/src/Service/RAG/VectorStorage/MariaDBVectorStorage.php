@@ -416,13 +416,12 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
                 f.BFILENAME as file_name
             FROM BRAG r
             LEFT JOIN BFILES f ON r.BMID = f.BID
-            WHERE r.BID = :id AND (r.BUID = :userId OR f.BUSERID = :userId)
+            WHERE r.BID = :id
             LIMIT 1
         SQL;
 
         $row = $this->connection->fetchAssociative($sql, [
             'id' => (int) $chunkId,
-            'userId' => $userId,
         ]);
         if (!is_array($row)) {
             return null;

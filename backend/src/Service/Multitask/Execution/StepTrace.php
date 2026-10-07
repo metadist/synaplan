@@ -20,9 +20,11 @@ final class StepTrace
     private const SENSITIVE_KEY = '/token|secret|password|passwd|authorization|credential|api[_-]?key/i';
 
     /**
+     * @param array<string, mixed> $resolvedInputs values the step actually received
+     *
      * @return array{input: string, output: string, outputTruncated: bool, durationMs: int}
      */
-    public static function capture(TaskNode $node, NodeResult $result, int $durationMs): array
+    public static function capture(TaskNode $node, NodeResult $result, int $durationMs, array $resolvedInputs = []): array
     {
         $output = '';
         $trace = $result->metadata['trace_output'] ?? null;
@@ -39,8 +41,13 @@ final class StepTrace
             $output = mb_substr($output, 0, self::CAP);
         }
 
+        $recorded = $result->metadata['trace_input'] ?? null;
+        $input = is_array($recorded) && [] !== $recorded
+            ? $recorded
+            : ([] !== $resolvedInputs ? $resolvedInputs : $node->params);
+
         return [
-            'input' => self::encode(self::mask($node->params)),
+            'input' => self::encode(self::mask($input)),
             'output' => $output,
             'outputTruncated' => $truncated,
             'durationMs' => max(0, $durationMs),

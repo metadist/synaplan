@@ -264,7 +264,13 @@ final readonly class DagExecutor
             ]);
         }
 
-        $trace = StepTrace::capture($node, $result, (int) ((hrtime(true) - $started) / 1_000_000));
+        $resolvedInputs = [];
+        try {
+            $resolvedInputs = $context->resolveInputs($node);
+        } catch (\Throwable) {
+            $resolvedInputs = [];
+        }
+        $trace = StepTrace::capture($node, $result, (int) ((hrtime(true) - $started) / 1_000_000), $resolvedInputs);
         $result = new NodeResult(
             $result->status,
             $result->text,

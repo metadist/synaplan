@@ -7,9 +7,11 @@ import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import { useApprovalsStore } from '@/stores/approvals'
 import { useNotification } from '@/composables/useNotification'
 import { approvalsApi, type Approval } from '@/services/api/approvalsApi'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 
 const { t, te } = useI18n()
+const { formatDateTime } = useDateFormat()
 const route = useRoute()
 const router = useRouter()
 const store = useApprovalsStore()
@@ -97,12 +99,7 @@ const onNotifyChange = async () => {
 }
 
 const decidedLine = (row: Approval): string => {
-  const when = row.decidedAt
-    ? new Date(row.decidedAt * 1000).toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      })
-    : ''
+  const when = row.decidedAt ? formatDateTime(new Date(row.decidedAt * 1000)) : ''
   if (!row.decidedByName && !when) return ''
   return t('approvals.decidedLine', {
     status: statusLabel(row.status),

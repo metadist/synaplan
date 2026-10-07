@@ -268,9 +268,6 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
         }
         $payload = is_array($point['payload'] ?? null) ? $point['payload'] : [];
         $ownerId = (int) ($payload['user_id'] ?? 0);
-        if ($ownerId !== $userId) {
-            return null;
-        }
 
         return new SearchResult(
             chunkId: (string) ($point['id'] ?? $chunkId),

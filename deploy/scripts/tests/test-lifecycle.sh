@@ -1960,6 +1960,38 @@ assert_compute_token_follows_env_file() {
         exit 1
     }
 
+    # Compose interpolates ${STACK_PROFILES}. The raw placeholder is not a profile.
+    rm -f "$DATA_DIR/compute.token" "$root/sourced"
+    printf '%s\n' 'STACK_PROFILES=compute' 'COMPOSE_PROFILES=${STACK_PROFILES}' > "$DEPLOY_DIR/.env"
+    (
+        unset COMPOSE_PROFILES COMPUTE_TOKEN COMPUTE_URL STACK_PROFILES
+        ensure_compute_token
+    ) > "$root/interp.out"
+    [[ -f "$DATA_DIR/compute.token" ]] || {
+        echo "COMPOSE_PROFILES=\${STACK_PROFILES} was not interpolated" >&2
+        exit 1
+    }
+    [[ ! -e "$root/sourced" ]] || {
+        echo "profile interpolation executed a command" >&2
+        exit 1
+    }
+
+    # A default applies when the referenced name is absent. $(...) is not run.
+    rm -f "$DATA_DIR/compute.token"
+    printf '%s\n' "COMPOSE_PROFILES=\${MISSING_PROFILE:-compute}" "BOGUS=\$(touch '$root/sourced')" > "$DEPLOY_DIR/.env"
+    (
+        unset COMPOSE_PROFILES COMPUTE_TOKEN COMPUTE_URL MISSING_PROFILE
+        ensure_compute_token
+    ) > "$root/default.out"
+    [[ -f "$DATA_DIR/compute.token" ]] || {
+        echo "COMPOSE_PROFILES=\${MISSING_PROFILE:-compute} did not use the default" >&2
+        exit 1
+    }
+    [[ ! -e "$root/sourced" ]] || {
+        echo "a command substitution in the env file was executed" >&2
+        exit 1
+    }
+
     DEPLOY_DIR="$saved_deploy"
     DATA_DIR="$saved_data"
     rm -rf "$root"

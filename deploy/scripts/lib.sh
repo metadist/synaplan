@@ -835,6 +835,95 @@ compose_profile_list_value() {
     printf '%s' "$value"
 }
 
+# Expand ${VAR}, ${VAR:-default}, ${VAR-default} and $VAR the way Compose does.
+# $$ is a literal dollar. $(...) and backticks are left untouched and never run.
+# Host environment wins over the env file. Lookups in the file are one level
+# deep so a cycle cannot loop.
+interpolate_compose_value() {
+    local env_file="$1" value="$2" depth="${3:-0}"
+    local out="" i=0 n char name default_value looked
+    (( depth < 5 )) || {
+        printf '%s' "$value"
+        return 0
+    }
+    n=${#value}
+    while (( i < n )); do
+        char="${value:i:1}"
+        if [[ "$char" != '$' ]]; then
+            out+="$char"
+            i=$((i + 1))
+            continue
+        fi
+        if [[ "${value:i:2}" == '$$' ]]; then
+            out+='$'
+            i=$((i + 2))
+            continue
+        fi
+        if [[ "${value:i:2}" == '$(' ]]; then
+            out+="${value:i}"
+            break
+        fi
+        if [[ "${value:i:2}" == '${' ]]; then
+            local rest="${value:i+2}" close
+            close="${rest%%\}*}"
+            if [[ "$rest" == "$close" ]]; then
+                out+="${value:i}"
+                break
+            fi
+            name="${close%%[:?-]*}"
+            default_value=""
+            if [[ "$close" == *':-'* ]]; then
+                default_value="${close#*:-}"
+            elif [[ "$close" == *'-'* && "$close" != *'?'* ]]; then
+                default_value="${close#*-}"
+            fi
+            if [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && looked="$(lookup_compose_name "$env_file" "$name")"; then
+                out+="$(interpolate_compose_value "$env_file" "$looked" $((depth + 1)))"
+            else
+                out+="$(interpolate_compose_value "$env_file" "$default_value" $((depth + 1)))"
+            fi
+            i=$((i + 2 + ${#close} + 1))
+            continue
+        fi
+        if [[ "${value:i+1:1}" =~ [A-Za-z_] ]]; then
+            name=""
+            local j=$((i + 1))
+            while (( j < n )) && [[ "${value:j:1}" =~ [A-Za-z0-9_] ]]; do
+                name+="${value:j:1}"
+                j=$((j + 1))
+            done
+            if looked="$(lookup_compose_name "$env_file" "$name")"; then
+                out+="$(interpolate_compose_value "$env_file" "$looked" $((depth + 1)))"
+            fi
+            i=$j
+            continue
+        fi
+        out+="$char"
+        i=$((i + 1))
+    done
+    printf '%s' "$out"
+}
+
+lookup_compose_name() {
+    local env_file="$1" name="$2"
+    if host_environment_defines "$name"; then
+        printf '%s' "${!name-}"
+        return 0
+    fi
+    if [[ -n "$env_file" && -f "$env_file" ]]; then
+        env_file_raw_value "$env_file" "$name"
+        return $?
+    fi
+    return 1
+}
+
+# COMPOSE_PROFILES after Compose-style interpolation, without sourcing the file
+# and without invoking Compose. An extra `compose config` here would run before
+# the deployment commands the lifecycle contract records, and `config --profiles`
+# lists every declared profile rather than the enabled set.
+# An exported value wins. Otherwise ${VAR}, ${VAR:-default} and $VAR expand from
+# the host environment, then from other assignments in the file. $$ is a literal
+# dollar. $(...) and backticks are not expanded and never run.
 compose_profiles_resolved() {
     local raw="" env_file=""
     if host_environment_defines COMPOSE_PROFILES; then
@@ -843,6 +932,9 @@ compose_profiles_resolved() {
         env_file="$(resolve_compose_env_file || true)"
         if [[ -n "$env_file" && -f "$env_file" ]]; then
             raw="$(env_file_raw_value "$env_file" COMPOSE_PROFILES || true)"
+            if [[ "$raw" == *'$'* ]]; then
+                raw="$(interpolate_compose_value "$env_file" "$raw")"
+            fi
         fi
     fi
     compose_profile_list_value "$raw"

@@ -7,12 +7,13 @@ import { httpClient } from '@/services/api/httpClient'
 import { GetApiRagChunkResponseSchema } from '@/generated/api-schemas'
 import type { RagSourceRef } from '@/stores/history'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     sources: RagSourceRef[]
     showLibraryLink?: boolean
+    loadPassage?: (chunkId: string) => Promise<string>
   }>(),
-  { showLibraryLink: true }
+  { showLibraryLink: true, loadPassage: undefined }
 )
 
 const { t } = useI18n()
@@ -33,10 +34,14 @@ const toggle = async (source: RagSourceRef) => {
   failed.value = false
   loading.value = true
   try {
-    const data = await httpClient(`/api/v1/rag/chunks/${encodeURIComponent(source.chunkId)}`, {
-      schema: GetApiRagChunkResponseSchema,
-    })
-    passage.value = data.text
+    if (props.loadPassage) {
+      passage.value = await props.loadPassage(source.chunkId)
+    } else {
+      const data = await httpClient(`/api/v1/rag/chunks/${encodeURIComponent(source.chunkId)}`, {
+        schema: GetApiRagChunkResponseSchema,
+      })
+      passage.value = data.text
+    }
   } catch {
     failed.value = true
   } finally {

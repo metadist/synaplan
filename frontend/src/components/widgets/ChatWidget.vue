@@ -315,6 +315,7 @@
                   "
                   :sources="message.ragSources"
                   :show-library-link="false"
+                  :load-passage="loadWidgetPassage"
                 />
               </template>
               <div v-else-if="message.type === 'file'" class="space-y-2">
@@ -2761,6 +2762,25 @@ onBeforeUnmount(() => {
     typingDebounceTimer = null
   }
 })
+
+async function loadWidgetPassage(chunkId: string): Promise<string> {
+  const headers = buildWidgetHeaders(false)
+  if (sessionId.value) {
+    headers['X-Widget-Session'] = sessionId.value
+  }
+  const response = await fetch(
+    `${props.apiUrl}/api/v1/widget/${props.widgetId}/rag/chunks/${encodeURIComponent(chunkId)}`,
+    { headers, credentials: 'omit' }
+  )
+  if (!response.ok) {
+    throw new Error('passage')
+  }
+  const data: unknown = await response.json()
+  if (!isRecord(data) || typeof data.text !== 'string' || data.text === '') {
+    throw new Error('passage')
+  }
+  return data.text
+}
 
 function buildWidgetHeaders(includeContentType = true) {
   const headers: Record<string, string> = {}
