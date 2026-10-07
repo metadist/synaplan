@@ -7,6 +7,7 @@ import { useIncomingStore } from '../stores/incoming'
 import { useDialog } from './useDialog'
 import { useDateFormat } from './useDateFormat'
 import { isIamSharingEnabled } from './useIamFeature'
+import { goToFreshChat } from './usePinnedAssistant'
 import { displaySessionTitle } from '@/utils/displaySessionTitle'
 import { kindOfSharedItem, type ChatKind } from '@/utils/chatKind'
 
@@ -205,7 +206,7 @@ export function useChatHistory() {
     isCreatingChat.value = true
     try {
       await chatsStore.findOrCreateEmptyChat()
-      if (route.path !== '/') router.push('/')
+      await goToFreshChat(router, route)
     } finally {
       isCreatingChat.value = false
     }

@@ -13,6 +13,7 @@
     "filterPlugins": "Eklentilerden",
     "searchPlaceholder": "Asistan ara",
     "talkingTo": "{name} ile konuşuluyor",
+    "useDefaultModel": "Yeni mesajlar varsayılan modele gider",
     "emptyHint": "Bu sohbet {name} kullanıyor.",
     "suggested": "Bunlardan birini deneyin",
     "save": "Kaydet",

@@ -520,6 +520,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { goToFreshChat } from '@/composables/usePinnedAssistant'
 import {
   MagnifyingGlassIcon,
   ChatBubbleLeftRightIcon,
@@ -982,9 +983,7 @@ const goToNewChat = async () => {
   try {
     const chat = await chatsStore.findOrCreateEmptyChat()
     if (!chat) return
-    if (router.currentRoute.value.path !== '/') {
-      await router.push('/')
-    }
+    await goToFreshChat(router, router.currentRoute.value)
   } finally {
     creatingChat.value = false
   }

@@ -13,6 +13,7 @@
     "filterPlugins": "Depuis les plugins",
     "searchPlaceholder": "Rechercher des assistants",
     "talkingTo": "Discussion avec {name}",
+    "useDefaultModel": "Les nouveaux messages vont au modèle par défaut",
     "emptyHint": "Cette discussion utilise {name}.",
     "suggested": "Essayez l’une de ces suggestions",
     "save": "Enregistrer",

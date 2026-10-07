@@ -406,6 +406,14 @@
             <span class="txt-primary">
               {{ $t('assistants.talkingTo', { name: pinnedAssistantName }) }}
             </span>
+            <button
+              type="button"
+              class="btn-secondary px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-pinned-assistant-stop"
+              @click="stopPinnedAssistant"
+            >
+              {{ $t('assistants.useDefaultModel') }}
+            </button>
           </div>
         </template>
       </ChatInput>
@@ -601,6 +609,7 @@ import { useSmartSearchStore } from '@/stores/smartSearch'
 import { isAgentsEnabled } from '@/composables/useAgentsFeature'
 import {
   capturePinnedAgentForSend,
+  goToFreshChat,
   shouldOpenFreshAssistantChat,
   usePinnedAssistant,
 } from '@/composables/usePinnedAssistant'
@@ -951,6 +960,10 @@ const {
   greeting: pinnedAssistantGreeting,
   starterPrompts: pinnedStarterPrompts,
 } = usePinnedAssistant()
+
+async function stopPinnedAssistant(): Promise<void> {
+  await goToFreshChat(router, route)
+}
 
 // Start chat (?agentId=) may still be leaving the previous thread. Send stays
 // off until that empty chat is the one on screen, so the first message cannot
