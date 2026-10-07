@@ -348,7 +348,7 @@
         "summary": "{env} ortamdan, {db} arayüzde geçersiz kılındı.",
         "cta": "Sağlayıcılar ve anahtarları aç"
       },
-      "envOverridesDb": "{key} ortam değişkeni tarafından sabitlendi. Şu anda: {value}. Bu ayarı burada yönetmek için değişkeni ortamdan kaldırın.",
+      "envOverridesDb": "{key} ortam değişkeni kilitlemiş. Şu anki değer: {value}. Bu kurulumun ortamında {key} değerini ayarlayın ve sunucuyu yeniden başlatın.",
       "unsaved": "Kaydedilmemiş değişiklikler",
       "clear": "Sil",
       "clearHint": "Kayıtlı değeri kaldırır. Yeniden varsayılan kullanılır.",
@@ -510,7 +510,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Sahip oradayken (sohbet veya canlı bir API çağrısı): dosya çalışmasını otomatik çalıştır, önce sor veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
         "COMPUTE_POLICY_UNATTENDED": "Kayıtlı bir görev dosya çalışmasını kendi başına çalıştırdığında: önce sor (varsayılan), otomatik çalıştır veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Bir dosya çalışması klasörünün temizlik onu kaldırmadan önce kaç gün kullanılmadan durabileceği. Varsayılan 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Yönet → Kanallar altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Kanallar → Synaplan Desktop altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir.",
         "FEATURE_SEARCH_AI_ENABLED": "Arama paletinde AI yardımı (Ctrl/Cmd+K): Günlük dilde sorulan bir soruda araç modeli en uygun sonucu seçer ve nedenini tek cümleyle söyler. Kendi başına hiçbir şeyi değiştirmez. Her kullanım kısa bir AI çağrısıdır. Kapalıyken anahtar kelime ve anlam araması çalışmaya devam eder."
       },
       "fieldOptions": {
@@ -529,7 +529,9 @@
           "approve": "Önce sor",
           "block": "Hiç çalıştırma"
         }
-      }
+      },
+      "valueSet": "Bu ayarın kayıtlı bir değeri var.",
+      "valueEmpty": "Bu ayar hâlâ boş."
     }
   },
   "statistics": {
@@ -566,7 +568,9 @@
       "applying": "İçe aktarılıyor…",
       "applied": "{created} model satırı içe aktarıldı, {skipped} zaten mevcut olan atlandı.",
       "applyFailed": "Modeller içe aktarılamadı.",
-      "noValidTags": "Seçili her modele en az bir geçerli yetenek verin."
+      "noValidTags": "Seçili her modele en az bir geçerli yetenek verin.",
+      "filterLabel": "Modelleri süz",
+      "filterPlaceholder": "Ada veya kimliğe göre süz"
     },
     "extraction": {
       "lead": "Belgelerin nasıl metne dönüşeceğini seçin. Docling tabloları ve başlıkları korur; çalışmıyorsa Tika kullanılır ve yükleme asla başarısız olmaz.",
@@ -655,7 +659,8 @@
       "testButton": "Test sorgusu",
       "testing": "Test ediliyor…",
       "testProvider": "{provider} yanıtladı",
-      "testProviderFallback": "{provider} yanıtladı ({from} yerine)"
+      "testProviderFallback": "{provider} yanıtladı ({from} yerine)",
+      "allowUsersHint": "Bu açıkken her kişi Tercihler’den farklı bir arama sağlayıcısı seçebilir."
     },
     "rerank": {
       "title": "Yeniden sıralama",
@@ -892,7 +897,11 @@
         "widget": "Sohbet widget'ı",
         "agent": "Ajan",
         "tool": "Araç"
-      }
+      },
+      "manualHint": "Synaplan içinde elle oluşturuldu, oturumdan gelmedi.",
+      "fromLoginHint": "Şirket oturumundan oluşturuldu.",
+      "roleLabel": "Rol",
+      "roleUpdated": "Rol güncellendi."
     },
     "audit": {
       "when": "Ne zaman",

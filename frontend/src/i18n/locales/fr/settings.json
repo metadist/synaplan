@@ -5,15 +5,15 @@
   },
   "usageTaximeter": {
     "sessionLabel": "Jetons",
-    "todayTooltip": "{tokens} jetons aujourd’hui",
-    "todayLabel": "Le vôtre aujourd’hui",
+    "todayTooltip": "{tokens} jetons aujourd’hui. Les montants sont en dollars américains.",
+    "todayLabel": "Consommation du jour",
     "todayAria": "Vos dépenses aujourd’hui : {cost}",
     "openStats": "Afficher les statistiques d’utilisation",
     "usedModels": "Modèles utilisés",
     "promptsInSession": "Instructions dans cette session",
     "modelChanges": "Changements de modèle : {count}",
     "allStatistics": "Toutes les statistiques",
-    "lessThanCent": "< 0,01 €"
+    "lessThanCent": "< 0,01 $"
   },
   "limitReached": {
     "lifetime": {
@@ -370,7 +370,8 @@
       "description": "Choisissez votre palette de couleurs",
       "light": "Clair",
       "dark": "Sombre",
-      "system": "Système"
+      "system": "Système",
+      "oled": "Noir OLED"
     },
     "language": {
       "title": "Langue",

@@ -103,17 +103,36 @@
             >
               {{ member.email }}
             </div>
-            <div class="txt-secondary text-xs">
-              {{
+            <div class="mt-1 flex flex-wrap items-center gap-2">
+              <select
+                v-if="member.source !== 'directory'"
+                class="px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                :value="member.role"
+                :data-testid="`select-member-role-${member.userId}`"
+                :aria-label="$t('people.groups.roleLabel')"
+                @change="changeRole(member, ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="member">{{ $t('people.groups.roleMember') }}</option>
+                <option value="manager">{{ $t('people.groups.roleManager') }}</option>
+              </select>
+              <span v-else class="txt-secondary text-xs">{{
                 member.role === 'manager'
                   ? $t('people.groups.roleManager')
                   : $t('people.groups.roleMember')
-              }}
-              <span class="pill text-xs ml-2">{{
-                member.source === 'directory'
-                  ? $t('people.groups.fromLogin')
-                  : $t('people.groups.manual')
               }}</span>
+              <span
+                class="inline-flex items-center px-2 py-0.5 rounded-md text-xs txt-secondary bg-black/5 dark:bg-white/10"
+                :title="
+                  member.source === 'directory'
+                    ? $t('people.groups.fromLoginHint')
+                    : $t('people.groups.manualHint')
+                "
+                >{{
+                  member.source === 'directory'
+                    ? $t('people.groups.fromLogin')
+                    : $t('people.groups.manual')
+                }}</span
+              >
             </div>
           </div>
           <button
@@ -332,6 +351,19 @@ async function addMember() {
     showError(error instanceof Error ? error.message : t('people.groups.saveError'))
   } finally {
     adding.value = false
+  }
+}
+
+async function changeRole(member: IamGroupMember, role: string) {
+  if (role !== 'member' && role !== 'manager') return
+  if (role === member.role) return
+  try {
+    await iamApi.setMember(props.group.id, member.userId, role)
+    success(t('people.groups.roleUpdated'))
+    await loadMembers()
+  } catch (error) {
+    showError(error instanceof Error ? error.message : t('people.groups.saveError'))
+    await loadMembers()
   }
 }
 

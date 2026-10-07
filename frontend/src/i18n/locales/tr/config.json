@@ -374,7 +374,10 @@
           "serviceRequired": "Hizmet gereklidir",
           "providerIdRequired": "Model kimliği gereklidir",
           "nameRequired": "Görünen ad gereklidir"
-        }
+        },
+        "uniqueKey": "Sağlayıcı, model kimliği ve etiketle tanınır",
+        "uniqueKeyHint": "Aynı sağlayıcı, model kimliği ve etikete sahip iki satır aynı modeldir.",
+        "showWhenFree": "Ücretsiz olsa da göster"
       },
       "chat": "Sohbet Modeli",
       "sorting": "Sıralama Modeli",

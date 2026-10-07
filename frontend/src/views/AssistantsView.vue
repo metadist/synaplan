@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
@@ -51,7 +51,7 @@ import { useAgentsStore } from '@/stores/agents'
 import { useChatsStore } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
-import { agentsApi } from '@/services/api/agentsApi'
+import { agentsApi, type Agent } from '@/services/api/agentsApi'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -67,10 +67,41 @@ const headerTitle = computed(() =>
 )
 const currentName = computed(() => store.current?.name ?? '')
 
+const untouchedDraft = ref<{ id: number; snapshot: string } | null>(null)
+
+function editableSnapshot(agent: Agent): string {
+  return JSON.stringify({
+    name: agent.name ?? '',
+    description: agent.description ?? '',
+    icon: agent.icon ?? '',
+    routable: agent.routable ?? false,
+    draft: agent.draft ?? null,
+  })
+}
+
+async function discardUntouchedDraft(): Promise<void> {
+  const mark = untouchedDraft.value
+  const current = store.current
+  if (!mark || mark.snapshot === '' || !current || current.id !== mark.id) return
+  if (store.hasUnsavedWork || current.status !== 'draft') return
+  if (editableSnapshot(current) !== mark.snapshot) return
+  untouchedDraft.value = null
+  try {
+    await store.remove(mark.id)
+  } catch {
+    // Leave the row in place if the delete fails; the person can remove it from the list.
+  }
+}
+
 async function openBuilder(id: string): Promise<void> {
   if (id === 'new') {
     try {
       const agent = await store.create(t('assistants.untitled'))
+      if (agent.id == null) {
+        error(t('assistants.createFailed'))
+        return
+      }
+      untouchedDraft.value = { id: agent.id, snapshot: '' }
       await router.replace({ name: 'ai-assistant-builder', params: { id: String(agent.id) } })
     } catch {
       error(t('assistants.createFailed'))
@@ -83,7 +114,10 @@ async function openBuilder(id: string): Promise<void> {
     return
   }
   try {
-    await store.load(numericId)
+    const agent = await store.load(numericId)
+    if (untouchedDraft.value?.id === numericId && untouchedDraft.value.snapshot === '') {
+      untouchedDraft.value = { id: numericId, snapshot: editableSnapshot(agent) }
+    }
   } catch {
     error(t('assistants.loadFailed'))
     await router.replace({ name: 'ai-assistants' })
@@ -171,6 +205,15 @@ function setupBuilderLeaveGuard(): () => void {
       to.name === 'ai-assistant-builder' &&
       String(to.params.id) !== String(from.params.id)
     if (!hasPendingWork() || (!leavingBuilder && !switchingAssistant)) {
+      if (
+        (leavingBuilder || switchingAssistant) &&
+        String(to.params.id) !== String(untouchedDraft.value?.id ?? '')
+      ) {
+        await discardUntouchedDraft()
+      }
+      if (leavingBuilder) {
+        store.clear()
+      }
       next()
       return
     }
@@ -182,6 +225,7 @@ function setupBuilderLeaveGuard(): () => void {
       danger: true,
     })
     if (ok && leavingBuilder) {
+      await discardUntouchedDraft()
       store.clear()
     }
     next(ok)

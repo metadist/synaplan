@@ -350,7 +350,7 @@
         "summary": "{env} depuis l'environnement, {db} remplacée(s) dans l'interface.",
         "cta": "Ouvrir Fournisseurs et clés"
       },
-      "envOverridesDb": "Verrouillé par la variable d’environnement {key}. Valeur actuelle : {value}. Retirez la variable de votre environnement pour gérer ce réglage ici.",
+      "envOverridesDb": "Verrouillé par la variable d’environnement {key}. Valeur actuelle : {value}. Définissez {key} dans l’environnement de cette installation, puis redémarrez le serveur.",
       "unsaved": "Modifications non enregistrées",
       "clear": "Effacer",
       "clearHint": "Retire la valeur enregistrée. La valeur par défaut s'applique à nouveau.",
@@ -514,7 +514,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Lorsque la personne propriétaire est présente (chat ou un appel API en direct) : exécuter automatiquement, demander d’abord, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
         "COMPUTE_POLICY_UNATTENDED": "Lorsqu’une tâche enregistrée exécute un travail sur fichiers toute seule : demander d’abord (défaut), exécuter automatiquement, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Combien de jours un dossier de travail sur fichiers peut rester inutilisé avant que le nettoyage le supprime. Valeur par défaut : 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, sous Gérer → Canaux. Un ordinateur associé peut discuter dans l’app et prendre les tâches en attente. Si c’est désactivé, cette page est masquée, l’association s’arrête, l’app ne peut pas discuter et les tâches en attente ne sont pas prises tant que vous ne le réactivez pas. Il n’y a pas encore d’installateur — l’app se construit à partir du dépôt source.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, sous Canaux → Synaplan Desktop. Un ordinateur associé peut discuter dans l’app et prendre les tâches en attente. Si c’est désactivé, cette page est masquée, l’association s’arrête, l’app ne peut pas discuter et les tâches en attente ne sont pas prises tant que vous ne le réactivez pas. Il n’y a pas encore d’installateur — l’app se construit à partir du dépôt source.",
         "FEATURE_SEARCH_AI_ENABLED": "Aide IA dans la palette de recherche (Ctrl/Cmd+K) : pour une question en langage courant, le modèle d’outils choisit le résultat le plus pertinent et l’explique en une phrase. Il ne modifie jamais rien de lui-même. Chaque utilisation est un court appel à l’IA. Désactivé : la recherche par mots-clés et par sens reste disponible."
       },
       "fieldOptions": {
@@ -533,7 +533,9 @@
           "approve": "Demander d’abord",
           "block": "Ne jamais exécuter"
         }
-      }
+      },
+      "valueSet": "Ce réglage a une valeur enregistrée.",
+      "valueEmpty": "Ce réglage est encore vide."
     }
   },
   "statistics": {
@@ -570,7 +572,9 @@
       "applying": "Importation…",
       "applied": "{created} ligne(s) de modèle importée(s), {skipped} déjà présente(s) ignorée(s).",
       "applyFailed": "Les modèles n'ont pas pu être importés.",
-      "noValidTags": "Donnez à chaque modèle sélectionné au moins une capacité valide."
+      "noValidTags": "Donnez à chaque modèle sélectionné au moins une capacité valide.",
+      "filterLabel": "Filtrer les modèles",
+      "filterPlaceholder": "Filtrer par nom ou identifiant"
     },
     "extraction": {
       "lead": "Choisissez comment un document devient du texte. Docling conserve les tableaux et les titres ; s’il n’est pas lancé, Tika prend le relais et l’envoi n’échoue jamais.",
@@ -659,7 +663,8 @@
       "testButton": "Requête de test",
       "testing": "Test…",
       "testProvider": "Répondu par {provider}",
-      "testProviderFallback": "Répondu par {provider} (secours depuis {from})"
+      "testProviderFallback": "Répondu par {provider} (secours depuis {from})",
+      "allowUsersHint": "Quand c’est activé, chaque personne peut choisir un autre fournisseur de recherche dans les préférences."
     },
     "rerank": {
       "title": "Réordonnancement",
@@ -896,7 +901,11 @@
         "widget": "Widget de chat",
         "agent": "Agent",
         "tool": "Outil"
-      }
+      },
+      "manualHint": "Créé à la main dans Synaplan, pas depuis la connexion.",
+      "fromLoginHint": "Créé depuis la connexion de l'entreprise.",
+      "roleLabel": "Rôle",
+      "roleUpdated": "Rôle mis à jour."
     },
     "audit": {
       "when": "Quand",

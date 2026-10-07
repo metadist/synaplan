@@ -5,15 +5,15 @@
   },
   "usageTaximeter": {
     "sessionLabel": "Tokens",
-    "todayTooltip": "{tokens} tokens today",
-    "todayLabel": "Yours today",
+    "todayTooltip": "{tokens} tokens today. Amounts are US dollars.",
+    "todayLabel": "Today's usage",
     "todayAria": "Your spend today: {cost}",
     "openStats": "Show usage statistics",
     "usedModels": "Models used",
     "promptsInSession": "Prompts in this session",
     "modelChanges": "Model changes: {count}",
     "allStatistics": "All statistics",
-    "lessThanCent": "< 0.01 €"
+    "lessThanCent": "< $0.01"
   },
   "limitReached": {
     "lifetime": {
@@ -370,7 +370,8 @@
       "description": "Choose your color scheme",
       "light": "Light",
       "dark": "Dark",
-      "system": "System"
+      "system": "System",
+      "oled": "OLED black"
     },
     "language": {
       "title": "Language",

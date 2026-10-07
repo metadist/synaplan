@@ -44,6 +44,7 @@ export const BUNDLE_PANEL_I18N_NAMESPACES = ['assistants'] as const
 export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
   core: [
     'announcements',
+    'appearance',
     'branding',
     'common',
     'cookies',

@@ -176,7 +176,8 @@
     "liveSupport": "Soporte en vivo",
     "usage": "Uso",
     "assistants": "Asistentes",
-    "approvals": "Aprobaciones"
+    "approvals": "Aprobaciones",
+    "home": "Inicio"
   },
   "common": {
     "ok": "OK",
@@ -319,7 +320,9 @@
           "searchKeywords": "web internet google en línea investigar",
           "help": "Preguntar cómo funciona Synaplan (/help)",
           "helpKeywords": "ayuda soporte guía documentación"
-        }
+        },
+        "themeOled": "Cambiar a negro OLED",
+        "themeOledKeywords": "oled negro amoled apariencia"
       },
       "synonyms": {
         "chat": "chat conversación preguntar mensaje asistente",
@@ -539,5 +542,8 @@
       "text": "Tu compra está esperando tu cuenta",
       "cta": "Crear cuenta"
     }
+  },
+  "appearance": {
+    "cycle": "Cambiar la apariencia"
   }
 }

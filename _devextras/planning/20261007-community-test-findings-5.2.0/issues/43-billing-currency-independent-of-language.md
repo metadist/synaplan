@@ -1,6 +1,7 @@
 <!-- title: Billing: the usage meter hard-codes EUR while model prices are USD per 1M tokens and the embedding-switch dialog shows $, so one admin sees two currencies -->
 <!-- type: Bug -->
 <!-- labels: prio:3, area:billing, area:statistics -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
 
 ## Problem

@@ -5,15 +5,15 @@
   },
   "usageTaximeter": {
     "sessionLabel": "Tokenlar",
-    "todayTooltip": "Bugün {tokens} token",
-    "todayLabel": "Bugün senin",
+    "todayTooltip": "Bugün {tokens} token. Tutarlar ABD dolarıdır.",
+    "todayLabel": "Bugünkü kullanım",
     "todayAria": "Bugünkü harcaman: {cost}",
     "openStats": "Kullanım istatistiklerini göster",
     "usedModels": "Kullanılan modeller",
     "promptsInSession": "Bu oturumdaki istemler",
     "modelChanges": "Model değişiklikleri: {count}",
     "allStatistics": "Tüm istatistikler",
-    "lessThanCent": "< 0,01 €"
+    "lessThanCent": "< 0,01 $"
   },
   "profile": {
     "title": "Profil Ayarları",
@@ -347,7 +347,8 @@
       "description": "Renk şemanızı seçin",
       "light": "Açık",
       "dark": "Koyu",
-      "system": "Sistem"
+      "system": "Sistem",
+      "oled": "OLED siyah"
     },
     "language": {
       "title": "Dil",

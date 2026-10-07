@@ -1,6 +1,7 @@
 <!-- title: Admin: copy and tooltip sweep — "Manual" pills, "Free OK", "Unique key: BSERVICE + BTAG + BPROVID", "Yours today", env-locked settings, group role dropdown, Routing's "Open Task Prompts" link -->
 <!-- type: Bug -->
 <!-- labels: prio:3, area:admin -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
 
 ## Problem

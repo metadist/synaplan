@@ -297,6 +297,23 @@
     --channel-telegram: #0b5f86;
   }
 
+  /* OLED black sits on top of `.dark`: page and sidebar are pure black,
+     cards are a hairline above black so they still separate. White on #000
+     is 21:1; #c8c8c8 on #0a0a0a is about 12:1. */
+  .dark.theme-oled {
+    --bg-app: #000;
+    --bg-sidebar: #000;
+    --bg-chat: #000;
+    --bg-card: #0a0a0a;
+    --bg-chip: #141414;
+    --txt-primary: #fff;
+    --txt-secondary: #c8c8c8;
+    --txt-model-placeholder: #a3a3a3;
+    --txt-model-placeholder-hover: #d4d4d4;
+    --border-light: rgba(255, 255, 255, 0.16);
+    --divider: rgba(255, 255, 255, 0.14);
+  }
+
   .dark {
     --brand: #6d9ae0;
     --brand-light: #93b8e8;

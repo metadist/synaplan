@@ -90,6 +90,24 @@
   --usage-epoch-b: #93c5fd;
 }
 
+/* OLED black under the glass design: no navy glow, pure black page. */
+.design-v2.dark.theme-oled {
+  --bg-app: #000;
+  --bg-sidebar: #000;
+  --bg-sidebar-solid: #000;
+  --bg-sidebar-panel: #0a0a0a;
+  --bg-sidebar-panel-solid: #0a0a0a;
+  --bg-chat: #000;
+  --bg-card: rgba(10, 10, 10, 0.96);
+  --bg-chip: rgba(255, 255, 255, 0.06);
+  --txt-secondary: #c8c8c8;
+  --border-light: rgba(255, 255, 255, 0.16);
+  --v2-glow: transparent;
+  --v2-glow-strong: transparent;
+  --v2-border: rgba(255, 255, 255, 0.14);
+  --v2-border-hover: rgba(255, 255, 255, 0.28);
+}
+
 /* ----------------------------------------------------------
    2. Surface Cards — Frosted Glass
    ---------------------------------------------------------- */

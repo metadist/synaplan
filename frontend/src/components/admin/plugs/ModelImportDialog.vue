@@ -49,6 +49,17 @@
         </div>
 
         <template v-else>
+          <label class="block mb-3">
+            <span class="sr-only">{{ $t('aiInfra.modelImport.filterLabel') }}</span>
+            <input
+              v-model="filterQuery"
+              type="search"
+              autocomplete="off"
+              class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              :placeholder="$t('aiInfra.modelImport.filterPlaceholder')"
+              data-testid="input-model-import-filter"
+            />
+          </label>
           <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
             <label class="inline-flex items-center gap-2 text-sm txt-primary">
               <input
@@ -91,7 +102,7 @@
               </thead>
               <tbody>
                 <tr
-                  v-for="row in rows"
+                  v-for="row in visibleRows"
                   :key="row.providerId"
                   class="border-b border-light-border/10 dark:border-dark-border/10"
                   :data-testid="`model-import-row-${row.providerId}`"
@@ -218,6 +229,15 @@ const error = ref<string | null>(null)
 const probe = ref(false)
 const probeCostNote = ref<string | null>(null)
 const rows = ref<Row[]>([])
+const filterQuery = ref('')
+const visibleRows = computed(() => {
+  const query = filterQuery.value.trim().toLowerCase()
+  if (query === '') return rows.value
+  return rows.value.filter((row) => {
+    const haystack = `${row.name} ${row.providerId}`.toLowerCase()
+    return haystack.includes(query)
+  })
+})
 
 const selectedCount = computed(() => rows.value.filter((r) => r.selected).length)
 const allNewSelected = computed(() => {
@@ -249,7 +269,7 @@ async function loadPreview(): Promise<void> {
 }
 
 function toggleAllNew(checked: boolean): void {
-  for (const row of rows.value) {
+  for (const row of visibleRows.value) {
     if (!row.exists) row.selected = checked
   }
 }

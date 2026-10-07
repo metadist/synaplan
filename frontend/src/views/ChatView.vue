@@ -54,7 +54,7 @@
       <div
         v-else
         ref="chatContainer"
-        class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
+        class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
         :class="{ 'flex flex-col items-center': isEmptyLanding }"
         data-testid="section-messages"
         @scroll="handleScroll"

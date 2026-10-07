@@ -92,8 +92,18 @@ final readonly class ComputeArtefactStore
 
         $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', $artefact->name) ?? 'artefact';
         $ext = strtolower(pathinfo($safe, PATHINFO_EXTENSION) ?: 'bin');
-        $basename = pathinfo($safe, PATHINFO_FILENAME) ?: 'artefact';
-        $filename = $basename.'_'.$runId.'_'.bin2hex(random_bytes(4)).'.'.$ext;
+        $basename = strtolower(trim((string) (pathinfo($safe, PATHINFO_FILENAME) ?: 'file'), '._-'));
+        if ('' === $basename) {
+            $basename = 'file';
+        }
+        $basename = substr($basename, 0, 80);
+        $directory = rtrim($this->uploadDir, '/').'/'.$this->paths->buildUserBaseRelativePath($userId).'/'.date('Y').'/'.date('m');
+        $filename = $basename.'.'.$ext;
+        $suffix = 2;
+        while (is_file($directory.'/'.$filename)) {
+            $filename = $basename.'-'.$suffix.'.'.$ext;
+            ++$suffix;
+        }
         $relative = $this->paths->buildUserBaseRelativePath($userId).'/'.date('Y').'/'.date('m').'/'.$filename;
         $absolute = rtrim($this->uploadDir, '/').'/'.$relative;
         if (!FileHelper::ensureParentDirectory($absolute)) {

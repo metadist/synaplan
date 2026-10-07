@@ -87,8 +87,8 @@ final readonly class AgentKind implements ShareableResourceKindInterface
     public function assertShareable(string $resourceId): void
     {
         $agent = $this->findAgent($resourceId);
-        if (null === $agent || !$agent->hasPublishedVersion() || $agent->isArchived()) {
-            throw new ShareNotAllowedException('A draft or archived assistant cannot be shared.');
+        if (null === $agent || $agent->isArchived()) {
+            throw new ShareNotAllowedException('An archived assistant cannot be shared.');
         }
     }
 

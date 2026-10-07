@@ -1957,6 +1957,10 @@ const handleCloseEvent = (event: Event) => {
 
 const handleThemeSyncEvent = (event: Event) => {
   const theme = (event as CustomEvent).detail?.theme
+  if (theme === 'oled') {
+    widgetTheme.value = 'dark'
+    return
+  }
   if (theme === 'dark' || theme === 'light') {
     widgetTheme.value = theme
   }

@@ -219,7 +219,8 @@
       "friday": "viernes",
       "saturday": "sábado",
       "sunday": "domingo"
-    }
+    },
+    "shareDraftHint": "Esto es un borrador. Puede compartirlo para que alguien lo lea o lo pruebe en un chat privado. No está publicado, así que el enrutador no lo elegirá."
   },
   "bundle": {
     "title": "Exportar e importar",

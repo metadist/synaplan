@@ -94,8 +94,17 @@ describe('AssistantPublishSection', () => {
     expect(wrapper.get('[data-testid="btn-publish-assistant"]').text()).toBe('Publish')
     const share = wrapper.get('[data-testid="btn-share-assistant"]')
     expect(share.text()).toBe('Share')
-    expect((share.element as HTMLButtonElement).disabled).toBe(true)
+    expect((share.element as HTMLButtonElement).disabled).toBe(false)
+    expect(wrapper.get('[data-testid="hint-share-draft"]').text()).toContain('draft')
     expect(wrapper.get('[data-testid="btn-delete-assistant"]').text()).toBe('Delete')
+  })
+
+  it('disables share on an archived assistant', () => {
+    useAgentsStore().current = agent({ status: 'archived' })
+    const wrapper = mountSection()
+    expect(
+      (wrapper.get('[data-testid="btn-share-assistant"]').element as HTMLButtonElement).disabled
+    ).toBe(true)
   })
 
   it('does not toast publishFailed when saving the draft fails', async () => {

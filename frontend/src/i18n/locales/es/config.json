@@ -374,7 +374,10 @@
           "serviceRequired": "El servicio es obligatorio",
           "providerIdRequired": "El ID del modelo es obligatorio",
           "nameRequired": "El nombre visible es obligatorio"
-        }
+        },
+        "uniqueKey": "Se identifica por proveedor, id del modelo y etiqueta",
+        "uniqueKeyHint": "Dos filas con el mismo proveedor, id y etiqueta son el mismo modelo.",
+        "showWhenFree": "Mostrar aunque sea gratis"
       },
       "chat": "Modelo de Chat",
       "sorting": "Modelo de Ordenamiento",

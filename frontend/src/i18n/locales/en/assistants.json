@@ -219,7 +219,8 @@
       "friday": "Friday",
       "saturday": "Saturday",
       "sunday": "Sunday"
-    }
+    },
+    "shareDraftHint": "This is a draft. You can share it so someone can read it or try it in a private chat. It is not published, so the router will not pick it."
   },
   "bundle": {
     "title": "Export & import",

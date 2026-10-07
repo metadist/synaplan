@@ -1,6 +1,7 @@
 <!-- title: Assistants: "Create assistant" stores a draft immediately instead of on first save, and a draft cannot be shared for review before the first publish -->
 <!-- type: Bug -->
 <!-- labels: prio:2, area:admin -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
 
 ## Problem
