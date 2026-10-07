@@ -3319,9 +3319,10 @@ function recordVersionLink(
   if (!link || !createdId || createdId === link.previousId) return
   void (async () => {
     try {
+      // Do not reload the transcript here. The new answer is already on screen,
+      // and a reload that lands while the next Again is opening replaces that
+      // bubble and closes its model list.
       await chatApi.linkTurn(createdId, link.kind, link.previousId)
-      const chatId = chatsStore.activeChatId
-      if (chatId) await historyStore.loadMessages(chatId)
     } catch (err) {
       console.error('Failed to record the answer version', err)
       showErrorToast(t('chat.versionLinkFailed'))
