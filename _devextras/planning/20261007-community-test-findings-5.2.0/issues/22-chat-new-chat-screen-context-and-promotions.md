@@ -3,6 +3,8 @@
 <!-- labels: prio:2, area:chat, area:admin -->
 <!-- issue-type: Feature -->
 
+> The knowledge-folder chip shipped in #2380. The assistant pin and the banner button shipped in #2383 (issue 20). This draft still owns the empty-chat heading, the tools summary, an Assistants section on the model chip, and the promotion toggles.
+
 ## Summary
 The empty chat names the active model and assistant in its heading, shows the configured tools and the active knowledge folder as chips around the composer, and lets the admin hide the App Store / Google Play / GitHub cards and the "Embed AI Chat on Your Website" promotion.
 
@@ -20,7 +22,7 @@ A person opening a new chat knows in one glance which model and assistant will a
 
 ## Acceptance criteria
 - [ ] Heading: "<Assistant name>" when pinned, else "<Model name>"; the card that explains switching stays.
-- [ ] Composer chips: model (exists), assistant (pairs with the banner issue), tools summary ("3 tools · Web lookup on"), knowledge folder chip with × to clear (U3).
+- [ ] Composer chips: model (exists), assistant section on that chip (own + shared, "None" — the pin itself shipped in #2383), tools summary ("3 tools · Web lookup on"). The knowledge-folder chip with × shipped in #2380; do not add a second one.
 - [ ] Admin → Branding (or System configuration): "Show app and GitHub cards on the new-chat screen" and "Show the website-widget promotion" toggles, default on for the hosted product, off in open-source mode if the product owner agrees — decide in the PR.
 - [ ] Flag off ⇒ cards absent, no empty slot (U11).
 - [ ] All five locales; widget unaffected.

@@ -1,7 +1,10 @@
 <!-- title: Models: models imported from OpenRouter arrive with price 0 / 0, so they are labelled "Free" and the usage meter shows 0.00 after a day of paid chats -->
 <!-- type: Bug -->
 <!-- labels: prio:1, area:models, area:billing -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2382](https://github.com/metadist/synaplan/pull/2382) (`eb02310a4`). A published OpenRouter price is stored as USD per 1M tokens. A listing with no price stays selectable and says "Price unknown", not Free. A published 0 is still Free. `showWhenFree` stays on. Re-import does not overwrite a price an admin typed. `listModelIds()` stays id-only. Mail, WhatsApp, Telegram and the routing step keep the unknown-price flag. A turn with any unpriced step says the price is unknown instead of a partial amount. The EUR formatter is still issue 43. Do not re-implement.
 
 ## Problem
 Every OpenRouter model in Edit Models has price in 0 and price out 0, including models imported during the test. The model menu shows a "Free" badge on them, the usage meter showed 0.00 after a day of chats, and the run cost on File work cards shows 0.00. Prices had to be corrected by hand per model.
@@ -31,7 +34,7 @@ Importing from a provider that publishes prices (OpenRouter returns `pricing.pro
 - `app:sync-model-prices` (`backend/src/Command/SyncModelPricesCommand.php`) exists for catalog rows; it does not know imported OpenRouter ids.
 - Related: F5 (capability probes) and F4/F18 (import dialog) are a separate issue.
 
-Fix direction: extend discovery with the price fields (`listModelIds()` stays id-only so existing callers do not break — add a sibling that returns id, name, and optional pricing). OpenRouter `pricing.prompt` / `pricing.completion` are USD **per token** strings; store USD per 1M (`× 1_000_000`) in `BPRICEIN` / `BPRICEOUT`, same unit as the README. Show the price in the import list.
+What shipped (#2382): discovery reads a sibling catalog (`listModelIds()` stays id-only) and converts OpenRouter `pricing.prompt` / `pricing.completion` from USD per token to USD per 1M in `BPRICEIN` / `BPRICEOUT`. The import dialog shows that price. `touchLastSeen()` still ignores prices. `app:sync-model-prices` already skips a price whose history source is `admin`. Do not change the EUR formatter here (issue 43).
 
 Do not clear `showWhenFree` on imports that have no price. `ModelImportApplier::newModel()` sets it because `isHiddenBecauseFree()` would otherwise drop the row from `/config/models` (#2110). Ollama and any endpoint that does not publish prices must stay selectable. "Free" is only for a published price of 0. Unknown price is a separate label ("price unknown"), and the model stays in the menu.
 

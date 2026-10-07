@@ -1,7 +1,10 @@
 <!-- title: Chat: the "Talking to <assistant>" banner sticks to new chats opened from the home page and cannot be closed, so requests are routed to the assistant without warning -->
 <!-- type: Bug -->
 <!-- labels: prio:2, area:chat -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2383](https://github.com/metadist/synaplan/pull/2383) (`cc075dcfa`), the misrouting only. Sidebar, mobile, the command palette and All chats drop `?agentId=`, including when the person is already on the home page. The banner button opens an empty chat first, then clears the pin: deleting the query alone leaves the assistant on a thread whose messages already name it. The button carries the close icon. The model chip still lists models only. An Assistants section on that chip is issue 22. Do not re-implement the pin clear.
 
 ## Problem
 After Start chat on an assistant, the "Talking to <assistant>" banner stays on new chats opened from the home page. A later, unrelated request went to the assistant without warning; the assistant had no connected apps and answered that it could not reach them. The banner has no close button, the model chip lists only models, and only the sidebar's New Chat button clears it.
@@ -30,7 +33,7 @@ A new chat starts without an assistant unless the person chose one. The banner h
 - Frontend: the pinned assistant state lives in the chat store / route query; the home-page new-chat path does not reset it while the sidebar New Chat does. Banner component near `ChatInput.vue`.
 - This is a silent misrouting: the person believes they talk to the default model (U7 — "who am I talking to" must be answered on the surface and be changeable from it).
 
-Fix direction: reset the pinned assistant on every new-chat entry point (home, palette, keyboard shortcut, sidebar); banner gets "Switch" (opens the chip) and "×" with the consequence "New messages go to the default model" (U3); the composer chip gets an Assistants section (own + shared, "None").
+What shipped (#2383): every new-chat entry point removes `agentId` from the address and keeps other query parameters. The banner button says "New messages go to the default model", includes `XMarkIcon`, and calls `findOrCreateEmptyChat()` before `goToFreshChat()`. The Playwright case `assistant-first-message` clicks that button and expects the next stream request to omit `agentId`. What did not ship: a Switch control that opens an Assistants section on the model chip. That section is issue 22.
 
 Journey (U10): assistant → Start chat → home → new chat → no banner → ask → default model answers; → chip → Assistants → pick one → banner appears → × → banner gone.
 
