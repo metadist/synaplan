@@ -1255,10 +1255,9 @@ const usageBadge = computed<{ tokens: string; cost: string } | null>(() => {
 
   return {
     tokens: formatTokens(total.totalTokens, locale.value),
-    cost:
-      total.cost === 0 && !total.priceKnown
-        ? t('models.costTier.unknown')
-        : formatCostDisplay(total.cost, locale.value, t('usageTaximeter.lessThanCent')),
+    cost: total.priceKnown
+      ? formatCostDisplay(total.cost, locale.value, t('usageTaximeter.lessThanCent'))
+      : t('models.costTier.unknown'),
   }
 })
 

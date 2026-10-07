@@ -67,12 +67,11 @@ describe('usageTaximeter store', () => {
       expect(total?.priceKnown).toBe(true)
     })
 
-    it('marks the turn unknown when the only cost is an unpublished price', () => {
-      const total = aggregateTurnUsage(
-        { ...usage('openrouter:paid', '0', 40), priceKnown: false },
-        []
-      )
-      expect(total?.cost).toBe(0)
+    it('marks the whole turn unknown when any step has no published price', () => {
+      const total = aggregateTurnUsage(usage('openai:gpt-4o', '0.02', 80), [
+        { ...usage('openrouter:router', '0', 20), priceKnown: false },
+      ])
+      expect(total?.cost).toBeCloseTo(0.02, 6)
       expect(total?.priceKnown).toBe(false)
     })
   })

@@ -2119,17 +2119,11 @@ class StreamController extends AbstractController
                 // appear with their real cost — not only the chat LLM.
                 $usageExtra = [];
                 if (is_array($classification['sorting_usage'] ?? null)) {
-                    $usageExtra[] = [
-                        'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
-                        'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
-                        'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
-                        'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
-                        'modelKey' => RecordedUsage::modelKey(
-                            $classification['sorting_provider'] ?? null,
-                            $classification['sorting_model_name'] ?? null,
-                        ),
-                        'kind' => 'SORT',
-                    ];
+                    $usageExtra[] = RecordedUsage::fromSortingUsage(
+                        $classification['sorting_usage'],
+                        isset($classification['sorting_provider']) ? (string) $classification['sorting_provider'] : null,
+                        isset($classification['sorting_model_name']) ? (string) $classification['sorting_model_name'] : null,
+                    );
                 }
                 $usageExtra = $this->appendContextUsage($usageExtra, $response['metadata'] ?? [], $incomingMessage);
 
@@ -2900,17 +2894,11 @@ class StreamController extends AbstractController
 
             $usageExtra = [];
             if (is_array($classification['sorting_usage'] ?? null)) {
-                $usageExtra[] = [
-                    'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
-                    'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
-                    'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
-                    'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
-                    'modelKey' => RecordedUsage::modelKey(
-                        $classification['sorting_provider'] ?? null,
-                        $classification['sorting_model_name'] ?? null,
-                    ),
-                    'kind' => 'SORT',
-                ];
+                $usageExtra[] = RecordedUsage::fromSortingUsage(
+                    $classification['sorting_usage'],
+                    isset($classification['sorting_provider']) ? (string) $classification['sorting_provider'] : null,
+                    isset($classification['sorting_model_name']) ? (string) $classification['sorting_model_name'] : null,
+                );
             }
             $usageExtra = $this->appendContextUsage($usageExtra, $metadata, $message);
             $recordedMediaUsage = ($metadata['media_recorded_usage'] ?? null) instanceof RecordedUsage
@@ -3610,10 +3598,7 @@ class StreamController extends AbstractController
         // Persist the charged cost so MessageApiFormatter can rebuild the
         // session model costs after a reload. Tokens already live in the
         // ai_chat_usage meta; the model identity comes from ai_chat_model(_*).
-        $message->setMeta('ai_chat_cost', $recorded->chargedCost);
-        if (!$recorded->priceKnown) {
-            $message->setMeta('ai_chat_price_known', '0');
-        }
+        $recorded->attachChatCost($message);
 
         return $recorded->toMessageUsage($provider, $model, 'LLM');
     }
