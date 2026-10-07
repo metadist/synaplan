@@ -31,16 +31,16 @@ When the assistant opts into the person's own files, a knowledge question runs t
 - Findings: F44 (3) and (4) — community test round on 5.2.0.
 - Verified in code: the scope is built — `ChatHandler::agentRagScopes()` (`backend/src/Service/Message/Handler/ChatHandler.php`) appends `new RagScope($viewerId, null)` when `RuntimeProfile::$includeUserFiles` is true (`backend/src/Service/Agent/AgentRuntimeResolver.php` line ~161). Whether retrieval runs at all for the turn is decided upstream (classifier / fast path / `defer_routing_to_chat`); a 3 s, 625-token answer means it did not.
 - Candidate causes to test, in order: (a) the sorter never selects a knowledge path for assistant turns, (b) `RagScope($viewerId, null)` does not match files that sit in named folders, (c) the draft panel calls a different handler that skips RAG entirely.
-- `<think>` stripping exists for the normal chat path; the draft panel bypasses it.
+- The chat stream already hides `<think>` blocks (`processingTimeline`, widget session tests). Confirm the draft panel skips that path before adding a second stripper. Strip the model's reasoning channel only; do not delete `<think>` text the user pasted or that came from a file.
 
-Fix direction: route the draft panel through the same message handler as a real chat (one code path, one retrieval); make retrieval for assistant turns independent of the generic sorter when the definition declares knowledge (own folder, shared folders or own files) — the assistant said it has files, so search them; strip reasoning blocks in one place used by both surfaces. Add a characterization test: assistant with `includeUserFiles` + a user file ⇒ a RAG search is issued.
+Fix direction: log which of (a), (b), (c) happened on the failing turn, then fix that one. Do not run retrieval on every assistant turn — "hello" must stay a normal chat, or every assistant message pays for a search and characterization snapshots drift. A knowledge question (the user asks about the files the assistant was given) must search. The draft panel may share retrieval with chat; it must not gain tool side effects (approvals, file work, mail, MCP) by being wired into the full handler.
 
 Journey (U10): create assistant → own-files on → Save → Start chat → ask → the answer names the file; then Try-a-draft → same answer, no `<think>`.
 
 Verification:
-1. Message details for the assistant turn show a retrieval step and the matched file.
-2. Draft panel answer equals the chat answer in substance and shows no reasoning markup.
-3. Routing characterization snapshots re-recorded and reviewed if the sorter contract changed.
+1. A question about the uploaded file shows a retrieval step and the matched file. "Hello" on the same assistant does not.
+2. Draft panel shows no raw `<think>` markup. A user message that contains the characters `<think>` is unchanged.
+3. Routing characterization snapshots re-recorded and reviewed only if the sorter contract changed.
 
 ---
 

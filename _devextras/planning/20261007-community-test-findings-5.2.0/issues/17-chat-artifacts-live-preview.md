@@ -20,7 +20,7 @@ A request for a small HTML page returns a highlighted code block with Copy only;
 
 ## Acceptance criteria
 - [ ] Detection: a fenced block with language `html` (complete document), `svg`, or `mermaid` shows a "Preview" action (`EyeIcon`) on the block.
-- [ ] Preview renders in a sandboxed `iframe` (`sandbox=""` plus `allow-scripts` only for HTML, no `allow-same-origin`, CSP that blocks network); Mermaid renders client-side; SVG is sanitized.
+- [ ] Preview renders in a sandboxed `iframe` (`sandbox="allow-scripts"` only, never `allow-same-origin`, CSP that blocks network). Do not inject the HTML into the parent page. SVG is sanitized before display (no script, no external URLs). Mermaid, if added, is a new npm dependency and stays behind the ask-first note; without it, a mermaid block stays a code block.
 - [ ] Panel actions: Copy, Download (`ArrowDownTrayIcon`, file named from the chat title), Fullscreen, Close; versions when the answer is regenerated (pairs with the versions issue).
 - [ ] Mobile (320 px): the panel becomes a full-screen sheet.
 - [ ] Admin can turn the feature off (feature module pattern, flag off ⇒ no Preview action, U11).

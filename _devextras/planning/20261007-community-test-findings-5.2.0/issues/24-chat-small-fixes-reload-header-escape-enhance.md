@@ -4,7 +4,7 @@
 <!-- issue-type: Bug -->
 
 ## Problem
-Three small, independent chat defects from the same test round, bundled because each is a one-file fix.
+Three independent chat defects from the same test round. Land them as separate commits. "Enhance" is not a one-line copy change: it needs a backend result that says what changed.
 
 ---
 

@@ -19,7 +19,7 @@ An operator lists `mcp-filesystem:3000` (or `10.0.0.0/24`) once, with a warning 
 ---
 
 ## Acceptance criteria
-- [ ] `MCP_TRUSTED_HOSTS` (env, comma-separated host[:port] and CIDR entries) plus the same list editable under Admin → AI infrastructure when not env-locked; entries are matched after DNS resolution so a public name resolving to a listed private address is allowed and an unlisted one is still blocked.
+- [ ] `MCP_TRUSTED_HOSTS` (env, comma-separated host[:port] and CIDR entries) plus the same list editable under Admin → AI infrastructure when not env-locked. Match the IP the connection actually uses, not a lookup done earlier (a name can change between check and connect). A public name that resolves to a listed address is allowed; anything else private stays blocked. The page reader, webhooks, and web search do not read this list.
 - [ ] The MCP server config Test reports "blocked by the private-network guard — ask your administrator to allow <host>" with the resolved address (U8).
 - [ ] The allowlist applies to the MCP client only (not to the page reader or webhooks) unless a separate setting says so.
 - [ ] Follow-up (own issue when picked up): STDIO transport for sidecar MCP servers defined in compose.

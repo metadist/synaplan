@@ -4,7 +4,7 @@
 <!-- issue-type: Feature -->
 
 ## Summary
-When a person attaches a file and asks to change it, the planner offers File work (code run on the attached file) without the person having to name it, and the sandbox image carries a library that can edit a PDF in place.
+When a person attaches a file and asks to change it, the planner offers File work (code run on the attached file) without the person having to name it. A PDF-editing library in the sandbox image is a follow-up, only after routing is proven, and only with an in-place edit — not a rebuilt page.
 
 ---
 
@@ -14,13 +14,13 @@ With File work on, a 13 KB PDF was attached with "change 'Dummy PDF file' to 'PD
 ---
 
 ## Goal
-"Change X to Y in this file" on an attached PDF, DOCX or XLSX runs File work, returns the edited file as a chip in the reply, and the step shows what was done. When the sandbox genuinely cannot do it, the reply names the limit ("the sandbox cannot edit PDF text in place") instead of "the tools available in this chat".
+"Change X to Y in this attached PDF" is offered to File work. If the sandbox cannot edit PDF text in place, the reply says that, not "the tools available in this chat". DOCX and XLSX are out of this issue.
 
 ---
 
 ## Acceptance criteria
 - [ ] The planner's capability description for code run covers "modify / edit / replace in the attached file" intents; a routing characterization case exists for a PDF edit request with an attachment.
-- [ ] The sandbox Python image includes an in-place PDF editor (PyMuPDF or equivalent) and openpyxl / python-docx for Office files — dependency additions are listed in the PR for the ask-first review.
+- [ ] A PDF-editing library in the sandbox image (PyMuPDF or equivalent) is a separate change and needs the dependency ask first. Do not start it until an attached PDF is actually routed to File work. Success is an in-place edit: same page size and an embedded font still present. A rebuilt one-page file (the Open WebUI result in the comparison was 13 KB → 589 bytes, A4 → Letter) is not success. Office libraries are out of this issue.
 - [ ] The edited file is saved to Generated and shown in the reply (chip with preview and download).
 - [ ] When routing still declines, the reason is specific and names the next step (U8).
 - [ ] The "1 seconds" copy is fixed via plural rules (also covered by the task-step issue).

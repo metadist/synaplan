@@ -32,7 +32,7 @@ From Knowledge → Files, a person opens the same Library picker that the chat c
 - Findings: F44 (2) — community test round on 5.2.0.
 - Today: `frontend/src/components/assistants/BuilderKnowledge.vue` `onUpload` posts a browser `File` to `promptsApi.uploadPromptFile(topic, file)`; files live in the assistant's own folder `TASKPROMPT:agent:{slug}` (`AgentKnowledgeFolders::ownFolder`).
 - Picker to reuse: the chat composer's Library picker (search, type and status filters, thumbnails).
-- Scope model: `AgentKnowledgeFolders::scopes()` builds `{ownerId, groupKey}` pairs; a per-file reference either becomes a third scope kind or a virtual folder — decide in the PR and keep `AgentKnowledgeFolders` the single place.
+- Scope model: `AgentKnowledgeFolders::scopes()` is folder-scoped (`{ownerId, groupKey}`). A per-file reference is a new scope kind. Do not implement "reference" by copying the file into `TASKPROMPT:agent:{slug}` — that is the duplicate the testers were trying to avoid, and it drifts when the Library original changes. If a per-file scope cannot be added without a schema change, stop and say so (schema changes are ask-first).
 - Journey (U10): create assistant → Add a file → From the Library → pick two indexed PDFs → Save → Start chat → ask → answer cites one of them → remove one file → ask again → it is no longer used.
 
 ---

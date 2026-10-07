@@ -19,7 +19,7 @@ An admin can say "this group may not upload files or export chats" and the UI fo
 ---
 
 ## Acceptance criteria
-- [ ] New policy keys in the existing policy framework: `chat.upload`, `chat.read_url`, `chat.edit_rerun`, `chat.delete`, `chat.export`, `chat.share`, `folders.share`, `chat.temporary`, `chat.web_search`, `chat.image_generation`; each with instance default, inherit / on / off per group, lock.
+- [ ] New policy keys in the existing policy framework: `chat.upload`, `chat.read_url`, `chat.edit_rerun`, `chat.delete`, `chat.export`, `chat.share`, `folders.share`, `chat.temporary`, `chat.web_search`, `chat.image_generation`; each with instance default, inherit / on / off per group, lock. The default for every new key is the behavior shipping today (these actions are allowed). A missing row must not turn uploads, sharing, or search off for existing groups.
 - [ ] Frontend reads the effective policy from runtime config and hides the corresponding controls; the backend enforces the same (403 with a one-sentence reason).
 - [ ] Policies tab groups them under "Chat" and "Sharing" headings; each row shows the instance default (existing pattern).
 - [ ] A default-group-for-new-users setting if it does not exist yet (comparison notes `DEFAULT_GROUP_ID` in Open WebUI; "not found" in Synaplan).

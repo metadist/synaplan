@@ -71,10 +71,33 @@ badge on a billed model is a money-correctness bug, not a polish item; and
 **Open Terminal (their 9) is not an issue** — it is a product decision and
 a sprint of its own, recorded in §6.
 
-**Recommended first three PRs:** issue 01 (one regex, unblocks F44 for
-most folder names), issue 06 + 07 together (one admin form on an existing
-endpoint, one honest warning), issue 04 (move Library indexing to the
-existing async path and bound chunker memory).
+**Recommended first three PRs:** issue 01 (widen the folder-id check to
+the names the picker already emits; do not use an unbounded pattern),
+issues 06 + 07 together (admin form on the existing provisioning
+endpoint, plus an honest mail warning), issue 04 (bound chunker memory,
+and only then a real queue — `processFile()` is still a synchronous
+HTTP call).
+
+## 2.1 Guards for whoever implements these
+
+Corrected on review. A coding session that follows the first draft
+literally would ship one of these:
+
+| Issue | Do not |
+| ----- | ------ |
+| 01 | Replace `FOLDER_PATTERN` with `^\d+:.+$`. Reject control characters and keys longer than `BGROUPKEY` (128). Existing valid ids must still load. |
+| 02 | Run retrieval on every assistant turn. "Hello" stays a normal chat. Do not give the draft panel tool side effects. Do not strip `<think>` out of user text. |
+| 04 | Call `processFile()` and call it a background job. It runs in the request and will OOM the same way. Do not content-hash-dedupe two different files. Do not drop chunk overlap. Partial indexing stays off unless an admin opts in. |
+| 05 | Rebuild abort in the file picker; it already has an `AbortController`. Aborting the browser does not stop PHP. |
+| 08 | `source deploy/.env`. Write `COMPUTE_TOKEN` into `deploy/.env` or `secrets.env`. The token file is the source of truth so a marketplace rewrite cannot rotate it. |
+| 09 | Store chunk bodies on the message and in the SSE event. Store ids; load the passage on open. |
+| 11 | Mount every earlier file into every later sandbox run. Turn `useWorkspace` on by default — that folder is shared across chats. |
+| 15 | Clear `showWhenFree` on priceless imports. That hides Ollama rows from the model menu (#2110). Do not overwrite a price an admin typed. Do not change `listModelIds()`'s return type. |
+| 32 | Unpack zip/tar during indexing. Do not remove an extension that is allowed today. |
+| 33 | Raise `MAX_TEXT_LENGTH` for every URL mention. Leave the private-address refusal alone. |
+| 38 | Install the extra CA into the OS trust store (that covers billing, OIDC, and mail). Do not add "skip TLS verification". |
+| 41 | Default a new chat-action policy to off. Missing row = today's behavior. |
+| 45 | Apply the MCP allowlist to the page reader. Check the IP at connect time, not only at save time. |
 
 ---
 
@@ -166,7 +189,7 @@ issue repeats the pointers it needs.
 | F44 (1) | Folder ids are validated against `/^\d+:[A-Za-z0-9:_.@+-]+$/`. The frontend emits `${ownerId}:${group.name}`; a folder name with a space, umlaut or other character outside that class fails with exactly the reported message. `KnowledgeFolderKind::parseId()` itself accepts any non-empty group key. | `backend/src/Service/Agent/Definition/AgentDefinitionValidator.php` (`FOLDER_PATTERN`, `stringList()`), `frontend/src/components/assistants/BuilderKnowledge.vue` (`loadFolderOptions`) |
 | F44 (2) | `BuilderKnowledge.vue` `onUpload` posts a browser `File` to `promptsApi.uploadPromptFile`; there is no Library picker path. | `frontend/src/components/assistants/BuilderKnowledge.vue` |
 | F44 (3) | `ChatHandler::agentRagScopes()` adds `new RagScope($viewerId, null)` when `includeUserFiles` is on, so the scope is built. Whether retrieval runs at all for the turn is decided upstream (classifier / fast path); the 3 s, 625-token answer says it did not. | `backend/src/Service/Message/Handler/ChatHandler.php`, `backend/src/Service/Agent/AgentRuntimeResolver.php` |
-| F46 | `FileUploadService::uploadBatch()` runs extraction and `vectorize()` → `VectorizationService::vectorizeAndStore()` inside the request. `TextChunker::chunk()` materialises every line into `$segments` and then every chunk into `$chunks`, so memory grows with the file. An async path already exists: `FileUploadService::processFile()` is documented as "used for async processing after fast upload". | `backend/src/Service/File/FileUploadService.php`, `backend/src/Service/File/TextChunker.php`, `backend/src/Service/File/VectorizationService.php` |
+| F46 | Library uploads use `process_level=vectorize` (`frontend/src/views/FilesView.vue`), so chunking and embedding run inside that PHP request. `TextChunker::chunk()` holds every line and every chunk. `processFile()` is not a worker: `POST /api/v1/files/{id}/process` calls it in the request. The picker uses `process_level=store` and does not OOM this way. | `frontend/src/views/FilesView.vue`, `backend/src/Controller/FileController.php`, `backend/src/Service/File/FileUploadService.php`, `backend/src/Service/File/TextChunker.php` |
 | F27 | `FileStorageService::MAX_FILE_SIZE = 128 MB` and `ALLOWED_EXTENSIONS` are constants. | `backend/src/Service/File/FileStorageService.php` |
 | F13 | `MailerConfig::isConfigured()` already knows `null://null` means nothing is delivered and is used by `SetupController`, `ConfigController` and `PlatformCapabilityInventory` — but not by registration, and `InternalEmailService` logs "Verification email sent" regardless. | `backend/src/Service/MailerConfig.php`, `backend/src/Service/InternalEmailService.php`, `backend/src/Controller/AuthController.php` |
 | F14 | `POST /api/v1/admin/users` exists (`AdminUserProvisioningController`); `frontend/src/services/api/adminApi.ts` only calls search, list, level and delete. | `backend/src/Controller/AdminUserProvisioningController.php`, `frontend/src/services/api/adminApi.ts` |

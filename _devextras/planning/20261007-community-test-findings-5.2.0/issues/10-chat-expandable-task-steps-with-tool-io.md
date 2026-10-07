@@ -32,7 +32,7 @@ A person — or an admin helping them — can open any step and see what was sen
 ## Notes
 - Findings: F9, F26 (transparency half), F43 (4) and (6), F35 (label) — community test round on 5.2.0. The PDF-edit routing half of F26 is its own issue; the MCP error path is its own issue.
 - Frontend: `frontend/src/components/multitask/TaskCard.vue` (card kinds, `props.card.state`, `taskPlan.*` i18n), `ComputeRunCard.vue`. Backend: the multitask plan / execution events, `backend/src/Service/Multitask/Execution/Runner/*` (`ToolCallRunner`, `McpFetchRunner`, `McpActionRunner`, `UrlFetchRunner`, `CodeRunRunner`), `ComposeReplyRunner`.
-- Storage: step input / output must be stored sanitized (no credentials, no raw file bytes) and size-capped; decide the cap in the PR.
+- Storage: mask credentials and `Authorization` headers before the row is saved. Cap the stored preview (the cap is a product choice; 8 KB is enough to debug the 400 the testers hit). Do not store raw file bytes. A shared chat shows this expansion to everyone with the link — treat it as user-visible, not as an admin log. Do not `logger->info` the body.
 - Journey (U10): ask a question that triggers a custom tool → open the step → see method, URL, arguments, status 200 and the body preview → ask something the tool 400s on → the step says "The tool answered 400: <message>" and the reply does not claim success.
 
 ---

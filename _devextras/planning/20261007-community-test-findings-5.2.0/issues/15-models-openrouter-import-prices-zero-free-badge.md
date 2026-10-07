@@ -31,9 +31,15 @@ Importing from a provider that publishes prices (OpenRouter returns `pricing.pro
 - `app:sync-model-prices` (`backend/src/Command/SyncModelPricesCommand.php`) exists for catalog rows; it does not know imported OpenRouter ids.
 - Related: F5 (capability probes) and F4/F18 (import dialog) are a separate issue.
 
-Fix direction: `listModelIds()` returns the raw entries (id + optional `pricing`, `context_length`, `name`); `DiscoveredModel` carries `priceIn` / `priceOut` (USD per 1M, OpenRouter gives per-token strings — convert) and the import dialog shows them in the list; `ModelImportApplier` stores them and only sets `showWhenFree` when the price is genuinely 0; a `priceKnown` notion (null vs 0) so "Free" means free and unknown means "price unknown" in the badge, the cost line and the usage meter; `app:sync-model-prices` learns to refresh imported OpenRouter rows from the same listing.
+Fix direction: extend discovery with the price fields (`listModelIds()` stays id-only so existing callers do not break — add a sibling that returns id, name, and optional pricing). OpenRouter `pricing.prompt` / `pricing.completion` are USD **per token** strings; store USD per 1M (`× 1_000_000`) in `BPRICEIN` / `BPRICEOUT`, same unit as the README. Show the price in the import list.
 
-Journey (U10): import a paid OpenRouter model → Edit Models shows its prices → model menu shows the price tier, not Free → one chat → usage meter moves.
+Do not clear `showWhenFree` on imports that have no price. `ModelImportApplier::newModel()` sets it because `isHiddenBecauseFree()` would otherwise drop the row from `/config/models` (#2110). Ollama and any endpoint that does not publish prices must stay selectable. "Free" is only for a published price of 0. Unknown price is a separate label ("price unknown"), and the model stays in the menu.
+
+`touchLastSeen()` must keep ignoring prices. A sync must not overwrite a price an admin typed. Existing rows with hand-corrected prices stay as they are until the admin asks to refresh.
+
+The usage meter showing 0.00 is the symptom. Do not change the EUR formatter here (issue 43). Open-source mode does not bill; the check is the per-answer cost line once the model row has a non-zero price.
+
+Journey (U10): import a paid OpenRouter model → Edit Models shows its prices → model menu shows the price tier, not Free → one chat → the answer's cost line is not 0.00. An Ollama model imported the same day is still in the menu.
 
 Verification:
 1. Import dialog lists prices next to each model; imported row has non-zero prices.

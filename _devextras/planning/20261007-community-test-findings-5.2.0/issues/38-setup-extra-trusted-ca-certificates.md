@@ -4,7 +4,7 @@
 <!-- issue-type: Feature -->
 
 ## Summary
-A documented way to make Synaplan's outbound HTTP trust an internal certificate authority: smallest first, an `EXTRA_CA_CERTS` PEM path applied to every outbound HttpClient and to curl in the PHP containers with a compose example that mounts the file; then an admin field to paste a CA certificate; then per-endpoint TLS options for OpenAI-compatible endpoints and MCP servers.
+A documented way to make Synaplan trust an internal certificate authority for the clients that talk to internal AI servers, MCP, webhooks, and WebDAV: an `EXTRA_CA_CERTS` PEM path passed as those clients' `cafile`, then an admin field to paste a CA. Not the OS trust store, and not a "skip verification" switch.
 
 ---
 
@@ -19,9 +19,9 @@ An operator points Synaplan at an internal HTTPS service signed by their own CA 
 ---
 
 ## Acceptance criteria
-- [ ] Step 1: `EXTRA_CA_CERTS=/path/to/bundle.pem` is read at boot; the bundle is appended to the trust used by Symfony HttpClient (`cafile` default option) and by `curl` / PHP streams in the container (e.g. appended to the system store by the entrypoint); `deploy/compose.yaml` and `deploy/selfhost.env.example` carry a commented example; `docs/CONFIGURATION.md` documents it.
-- [ ] Step 2: Admin → AI infrastructure → "Trusted certificate authorities": paste PEM, stored encrypted, applied the same way, with "Test against <endpoint>".
-- [ ] Step 3: per-endpoint option on OpenAI-compatible endpoints and MCP servers: default trust, or this CA; "skip verification" only as admin-only with a red warning, never default.
+- [ ] Step 1: `EXTRA_CA_CERTS=/path/to/bundle.pem` is read at boot and passed as the HttpClient `cafile` for OpenAI-compatible endpoints, MCP, webhooks, and WebDAV/Nextcloud calls. It is **not** appended to the container's system trust store — that would also trust the CA for billing, OIDC, and mail. `deploy/compose.yaml` and `deploy/selfhost.env.example` carry a commented mount example; `docs/CONFIGURATION.md` documents it.
+- [ ] Step 2: Admin → AI infrastructure → "Trusted certificate authorities": paste PEM, stored encrypted, applied to the same clients, with "Test against <endpoint>".
+- [ ] "Skip TLS verification" is not part of this issue. Do not add it.
 - [ ] The endpoint Test error names a private root when the chain ends in one and links to the doc ("Your server's certificate is signed by an internal authority — add it under Trusted certificate authorities").
 - [ ] A unit test with a self-signed test CA proves step 1 (PHPUnit with a local TLS fixture or a mocked client option check).
 

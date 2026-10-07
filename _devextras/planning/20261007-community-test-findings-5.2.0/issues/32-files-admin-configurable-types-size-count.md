@@ -20,7 +20,7 @@ An operator decides what their people may upload, within a hard server ceiling, 
 
 ## Acceptance criteria
 - [ ] System configuration → Files: allowed extensions (chips, with "Reset to default"), maximum file size (MB, capped by the server ceiling that PHP / proxy limits allow — shown next to the field), maximum files per message.
-- [ ] Defaults extend the current list with `json xml html htm zip tar gz tgz log txt md csv` and common code extensions (`py js ts php go rs java c h cpp sh yaml yml toml ini`); archives are stored and listed, not extracted, unless the extractor supports them.
+- [ ] The default list adds `json xml html htm zip tar gz tgz log` and common code extensions (`py js ts php go rs java c h cpp sh yaml yml toml ini`). `txt md csv` are already allowed — do not drop any extension that works today. Archives are stored and listed. Indexing must not unpack them (a zip of a large tree would run the chunker on every member). Extraction of archives is a later issue.
 - [ ] Group policy override "upload files" on / off (pairs with the group-policies issue).
 - [ ] The upload hint, the chat composer and the Library read the effective list from runtime config; the backend validates with the same values.
 - [ ] A rejected file says which rule it broke and the limit (U8).

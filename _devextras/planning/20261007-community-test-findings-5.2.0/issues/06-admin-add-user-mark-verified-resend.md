@@ -19,8 +19,8 @@ An admin on an instance without mail can create accounts and unblock stuck sign-
 ---
 
 ## Acceptance criteria
-- [ ] People → Users has a primary "Add user" action: email, display name, optional initial password or "send set-password link" when mail is configured, level; submits to the existing `POST /api/v1/admin/users`; the new row appears without reload.
-- [ ] Each unverified row offers "Mark verified" (one click, consequence sentence: "The person can sign in right away.") and, only when mail is configured, "Resend verification email".
+- [ ] People → Users has a primary "Add user" action: email, display name, level, and a one-time password the admin types (shown once in the dialog, never emailed, never written to the audit log). "Send a set-password link" appears only when `mailerConfigured` is true. Submits to the existing `POST /api/v1/admin/users`. The new row appears without reload.
+- [ ] Each unverified row offers "Mark verified" behind a confirm dialog ("This person can sign in without opening the email.") and, only when mail is configured, "Resend verification email". Neither action is a silent one-click.
 - [ ] Both actions write an audit row (People → Audit) with who and when.
 - [ ] The verified / unverified mark has a tooltip and a legend (F23).
 - [ ] All five locales; light and dark; 320 px.

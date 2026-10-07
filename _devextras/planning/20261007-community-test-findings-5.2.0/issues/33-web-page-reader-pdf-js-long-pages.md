@@ -21,7 +21,7 @@ Five tests, each with a known right answer: a plain page was read correctly; a p
 ## Acceptance criteria
 - [ ] `Content-Type` of `application/pdf` or Office types → the body is handed to the Library's extraction plug (Tika / Docling) and the Markdown result is used; the step label says "Reading PDF".
 - [ ] A fetched HTML page with (almost) no body text and `<script>` content → one retry through the configured Firecrawl (or the renderer plug) when the admin has one; otherwise the honest "JavaScript rendering is required" stays.
-- [ ] Long pages: keep headings as Markdown, read up to a configurable limit (default well above 4,000 characters for a direct read), and report coverage in the step; the model is told the text is partial.
+- [ ] Long pages on an explicit "read this page" step: keep headings as Markdown, read more than today's `MAX_TEXT_LENGTH` (4000) for that step only, and report coverage ("Read 18,000 of 127,500 characters"). The model is told the text is partial. Do not raise `MAX_TEXT_LENGTH` for every URL mention in a chat — that path is also the incidental fetcher and would multiply tokens. Do not weaken the private-address refusal. A PDF fetch stays inside `MAX_RESPONSE_SIZE` (5 MB) before it is handed to Tika or Docling.
 - [ ] Private / loopback addresses stay refused with the existing clear reason; the refusal is distinguishable from a fetch failure.
 - [ ] Token use per read is shown in message details.
 

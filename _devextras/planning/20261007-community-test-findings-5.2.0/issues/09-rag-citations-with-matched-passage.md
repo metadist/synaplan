@@ -19,7 +19,7 @@ After a knowledge answer, the person sees the files used, can open each matched 
 ---
 
 ## Acceptance criteria
-- [ ] The backend emits the retrieved chunks used for the answer (file id, name, folder, score, start/end line or page, chunk text) as an SSE event alongside the existing `memories_loaded` / `complete` events, and stores them with the message so they survive a reload.
+- [ ] The backend emits the retrieved chunks used for the answer (file id, name, folder, score, start/end line or page, chunk id) as an SSE event alongside the existing `memories_loaded` / `complete` events, and stores those ids with the message so they survive a reload. The passage text is loaded when the person opens the source. Do not copy the chunk body into every message row and into the SSE stream — a long PDF would duplicate itself into the chat.
 - [ ] The frontend renders a Sources row for knowledge answers using the same component family as web search sources (numbered, consistent icon, `EyeIcon` to preview).
 - [ ] Opening a source shows the passage with layout kept (Markdown tables render as tables; the Tika/Docling Markdown output is used when present).
 - [ ] Inline numbered markers `[1]` in the answer link to the source when the model emits them; the system prompt asks for them (same convention as web search).
