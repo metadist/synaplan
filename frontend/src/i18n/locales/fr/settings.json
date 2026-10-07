@@ -210,7 +210,7 @@
     "selectedChatsHint": "Seuls ces chats sélectionnés seront exportés",
     "timezoneLoading": "Chargement de votre fuseau horaire…",
     "timezoneProfile": "Les heures de ce fichier utilisent {tz} de Langue et apparence.",
-    "timezoneBrowser": "Les heures de ce fichier utilisent le fuseau de cet ordinateur ({tz}), car Langue et apparence n’en a pas encore.",
+    "timezoneBrowser": "Les heures de ce fichier utilisent le fuseau de cet ordinateur ({tz}). Votre profil n’a pas été modifié.",
     "timezoneUnavailable": "Les heures de ce fichier utilisent le fuseau de cet ordinateur ({tz}), car le fuseau de Langue et apparence n’a pas pu être chargé."
   },
   "profile": {

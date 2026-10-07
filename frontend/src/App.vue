@@ -43,7 +43,7 @@ import AmbientBackground from '@/components/AmbientBackground.vue'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import SmartSearchPalette from '@/components/search/SmartSearchPalette.vue'
-import { ensureAccountTimezone } from '@/composables/useAccountTimezone'
+import { ensureAccountTimezone, resetAccountTimezone } from '@/composables/useAccountTimezone'
 import { clearSearchRecents } from '@/composables/search/useSearchRecents'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import AnnouncementModal from '@/components/AnnouncementModal.vue'
@@ -130,10 +130,14 @@ watch(
 
 // Fill an empty profile time zone from this device once per signed-in user.
 // Fire-and-forget: a failure must not block the page, and the next action retries.
+// Signing out drops the cached zone, so the same account reads its profile again.
 watch(
   () => authStore.user?.id,
   (current) => {
-    if (current == null) return
+    if (current == null) {
+      resetAccountTimezone()
+      return
+    }
     void ensureAccountTimezone()
   },
   { immediate: true }

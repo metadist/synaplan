@@ -35,7 +35,7 @@
     "selectedChatsHint": "Nur diese ausgewählten Chats werden exportiert",
     "timezoneLoading": "Zeitzone wird geladen…",
     "timezoneProfile": "Die Uhrzeiten in dieser Datei gelten in {tz} aus Sprache & Darstellung.",
-    "timezoneBrowser": "Die Uhrzeiten in dieser Datei gelten in der Zeitzone dieses Computers ({tz}), weil unter Sprache & Darstellung noch keine festgelegt ist.",
+    "timezoneBrowser": "Die Uhrzeiten in dieser Datei gelten in der Zeitzone dieses Computers ({tz}). Dein Profil wurde nicht geändert.",
     "timezoneUnavailable": "Die Uhrzeiten in dieser Datei gelten in der Zeitzone dieses Computers ({tz}), weil die Zeitzone aus Sprache & Darstellung nicht geladen werden konnte."
   },
   "profile": {

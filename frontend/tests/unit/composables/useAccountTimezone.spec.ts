@@ -60,6 +60,26 @@ describe('ensureAccountTimezone', () => {
     expect(mockUpdateProfile).not.toHaveBeenCalled()
   })
 
+  it('never replaces a stored zone this browser does not recognise', async () => {
+    mockGetProfile.mockResolvedValue({ profile: { timezone: 'Mars/Olympus_Mons' } })
+
+    const result = await ensureAccountTimezone()
+
+    expect(result).toEqual({ tz: browserTimezone(), source: 'device-unsaved' })
+    expect(mockUpdateProfile).not.toHaveBeenCalled()
+  })
+
+  it('reads the profile again after signing out and back in as the same user', async () => {
+    mockGetProfile.mockResolvedValueOnce({ profile: { timezone: 'Europe/Berlin' } })
+    expect((await ensureAccountTimezone())?.tz).toBe('Europe/Berlin')
+
+    resetAccountTimezone()
+    mockGetProfile.mockResolvedValueOnce({ profile: { timezone: 'Asia/Tokyo' } })
+
+    expect((await ensureAccountTimezone())?.tz).toBe('Asia/Tokyo')
+    expect(mockGetProfile).toHaveBeenCalledTimes(2)
+  })
+
   it('does not write while signed in as someone else', async () => {
     authState.impersonating = true
     mockGetProfile.mockResolvedValue({ profile: { timezone: '' } })

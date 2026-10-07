@@ -18,7 +18,7 @@
   "export": {
     "timezoneLoading": "Saat dilimin yükleniyor…",
     "timezoneProfile": "Bu dosyadaki saatler, Dil ve görünüm bölümündeki {tz} dilimini kullanır.",
-    "timezoneBrowser": "Bu dosyadaki saatler bu bilgisayarın saat dilimini ({tz}) kullanır, çünkü Dil ve görünüm bölümünde henüz bir dilim yok.",
+    "timezoneBrowser": "Bu dosyadaki saatler bu bilgisayarın saat dilimini ({tz}) kullanır. Profilin değişmedi.",
     "timezoneUnavailable": "Bu dosyadaki saatler bu bilgisayarın saat dilimini ({tz}) kullanır, çünkü Dil ve görünüm bölümündeki saat dilimi yüklenemedi."
   },
   "profile": {

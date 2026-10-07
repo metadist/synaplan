@@ -139,7 +139,7 @@
             <div v-if="vectorStateOf(file) !== 'vectorized'" class="relative shrink-0">
               <button
                 type="button"
-                class="btn-secondary w-8 h-8 flex items-center justify-center disabled:opacity-50"
+                class="btn-secondary w-8 h-8 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 :title="$t('files.describeSortAction')"
                 :disabled="isIndexing(file.id)"
                 :data-testid="`btn-generated-index-${file.id}`"
@@ -203,7 +203,7 @@
             </div>
             <button
               type="button"
-              class="btn-danger shrink-0 w-8 h-8 flex items-center justify-center disabled:opacity-50"
+              class="btn-danger shrink-0 w-8 h-8 rounded-xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               :title="$t('files.delete')"
               :disabled="isDeleting(file.id)"
               :data-testid="`btn-generated-delete-${file.id}`"

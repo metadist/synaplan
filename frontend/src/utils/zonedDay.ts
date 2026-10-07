@@ -92,20 +92,54 @@ function zoneOffsetMs(instant: Date, timeZone: string): number | null {
   return wallAsUtc - instant.getTime()
 }
 
-/** Unix seconds of local midnight for a YYYY-MM-DD day in `timeZone`. */
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function dayKey(parts: Pick<ZonedParts, 'year' | 'month' | 'day'>): number {
+  return parts.year * 10000 + parts.month * 100 + parts.day
+}
+
+/**
+ * Unix seconds of the first instant of a YYYY-MM-DD day in `timeZone`.
+ * Usually local midnight. When midnight is skipped by a clock change, the day
+ * starts at the end of that gap. A day skipped entirely starts and ends at the
+ * same instant, so it contains nothing.
+ */
 export function startOfZonedDayUnix(isoDate: string, timeZone: string): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null
   const [year, month, day] = isoDate.split('-').map(Number)
   if (!year || !month || !day) return null
   const wallMidnight = Date.UTC(year, month - 1, day, 0, 0, 0)
-  let utc = wallMidnight
-  // Two passes: the offset at the first guess can sit on the other side of a DST change.
-  for (let pass = 0; pass < 2; pass += 1) {
-    const offset = zoneOffsetMs(new Date(utc), timeZone)
-    if (offset === null) return null
-    utc = wallMidnight - offset
+  const target = dayKey({ year, month, day })
+
+  // The offsets a day before and after cover both sides of any clock change.
+  const offsetBefore = zoneOffsetMs(new Date(wallMidnight - DAY_MS), timeZone)
+  const offsetAfter = zoneOffsetMs(new Date(wallMidnight + DAY_MS), timeZone)
+  if (offsetBefore === null || offsetAfter === null) return null
+
+  const candidates = [wallMidnight - offsetBefore, wallMidnight - offsetAfter]
+  const exact = candidates.filter((utc) => {
+    const parts = zonedParts(new Date(utc), timeZone)
+    return (
+      parts !== null &&
+      dayKey(parts) === target &&
+      parts.hour === 0 &&
+      parts.minute === 0 &&
+      parts.second === 0
+    )
+  })
+  if (exact.length > 0) return Math.floor(Math.min(...exact) / 1000)
+
+  // Midnight falls into a gap: find the first second whose local day is not earlier.
+  let low = Math.min(...candidates)
+  let high = Math.max(...candidates)
+  while (high - low > 1000) {
+    const mid = low + Math.floor((high - low) / 2000) * 1000
+    const parts = zonedParts(new Date(mid), timeZone)
+    if (!parts) return null
+    if (dayKey(parts) >= target) high = mid
+    else low = mid
   }
-  return Math.floor(utc / 1000)
+  return Math.floor(high / 1000)
 }
 
 function nextIsoDate(isoDate: string): string | null {

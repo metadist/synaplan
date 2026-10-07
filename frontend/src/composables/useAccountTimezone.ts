@@ -98,7 +98,9 @@ async function readOrSave(userId: number | null): Promise<EnsuredAccountTimezone
 
   const device = browserTimezone()
   if (!isValidIanaTimezone(device)) return null
-  if (userId === null || isImpersonatingNow()) {
+  // A zone this browser does not know (a newer IANA name on an older
+  // runtime) is still the user's choice and must not be replaced.
+  if (stored !== '' || userId === null || isImpersonatingNow()) {
     return { tz: device, source: 'device-unsaved' }
   }
 
@@ -116,7 +118,8 @@ async function readOrSave(userId: number | null): Promise<EnsuredAccountTimezone
 
 /**
  * Profile time zone when one is stored. When the profile has none, save the
- * device zone once — except while impersonating, or when the save is rejected.
+ * device zone once — except while impersonating, when the save is rejected,
+ * or when the stored zone is one this browser cannot read.
  * `null` means the profile could not be read, so nothing was written.
  * Concurrent callers share one request.
  */

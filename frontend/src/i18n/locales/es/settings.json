@@ -18,7 +18,7 @@
   "export": {
     "timezoneLoading": "Cargando tu zona horaria…",
     "timezoneProfile": "Las horas de este archivo usan {tz} de Idioma y apariencia.",
-    "timezoneBrowser": "Las horas de este archivo usan la zona horaria de este ordenador ({tz}), porque Idioma y apariencia aún no tiene ninguna.",
+    "timezoneBrowser": "Las horas de este archivo usan la zona horaria de este ordenador ({tz}). Tu perfil no se ha cambiado.",
     "timezoneUnavailable": "Las horas de este archivo usan la zona horaria de este ordenador ({tz}), porque no se ha podido cargar la zona horaria de Idioma y apariencia."
   },
   "profile": {

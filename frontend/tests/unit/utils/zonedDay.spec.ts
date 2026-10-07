@@ -23,6 +23,28 @@ describe('zoned day bounds', () => {
     )
   })
 
+  it('starts the day after the gap when midnight is skipped', () => {
+    // São Paulo jumped from 00:00 to 01:00 on 2018-11-04.
+    expect(startOfZonedDayUnix('2018-11-04', 'America/Sao_Paulo')).toBe(
+      Date.parse('2018-11-04T03:00:00Z') / 1000
+    )
+    expect(endOfZonedDayUnix('2018-11-03', 'America/Sao_Paulo')).toBe(
+      Date.parse('2018-11-04T02:59:59Z') / 1000
+    )
+  })
+
+  it('treats a skipped calendar day as empty instead of the day before', () => {
+    // Samoa went from 2011-12-29 straight to 2011-12-31.
+    const start = startOfZonedDayUnix('2011-12-30', 'Pacific/Apia')
+    const end = endOfZonedDayUnix('2011-12-30', 'Pacific/Apia')
+    expect(start).toBe(Date.parse('2011-12-30T10:00:00Z') / 1000)
+    expect(end).not.toBeNull()
+    expect(end as number).toBeLessThan(start as number)
+    expect(endOfZonedDayUnix('2011-12-29', 'Pacific/Apia')).toBe(
+      Date.parse('2011-12-30T09:59:59Z') / 1000
+    )
+  })
+
   it('names today in the given zone', () => {
     const eveningInBerlin = new Date('2026-10-07T22:30:00Z')
     expect(zonedTodayIso('Europe/Berlin', eveningInBerlin)).toBe('2026-10-08')

@@ -210,7 +210,7 @@
     "selectedChatsHint": "Only these selected chats will be exported",
     "timezoneLoading": "Loading your time zone…",
     "timezoneProfile": "Times in this file use {tz} from Language & appearance.",
-    "timezoneBrowser": "Times in this file use this computer's time zone ({tz}), because Language & appearance has none yet.",
+    "timezoneBrowser": "Times in this file use this computer's time zone ({tz}). Your profile was not changed.",
     "timezoneUnavailable": "Times in this file use this computer's time zone ({tz}), because the time zone from Language & appearance could not be loaded."
   },
   "profile": {

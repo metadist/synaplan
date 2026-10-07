@@ -342,6 +342,20 @@
           @always-allow="onChatApprovalAlwaysAllow"
         />
       </div>
+      <!-- Read-only viewers of a shared chat get no composer, but still see
+           the chat's files (open only, no attach or delete). -->
+      <div
+        v-if="
+          !needsProviderSetup &&
+          !canComposeSharedChat &&
+          !incognitoStore.active &&
+          conversationFiles.length > 0
+        "
+        class="flex max-w-[70rem] mx-auto w-full px-4 mb-3"
+        data-testid="section-conversation-files-readonly"
+      >
+        <ConversationFilesBar :files="conversationFiles" :can-attach="false" :can-delete="false" />
+      </div>
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
