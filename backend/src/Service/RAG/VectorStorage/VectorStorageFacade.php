@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\RAG\VectorStorage;
 
 use App\Service\RAG\VectorStorage\DTO\SearchQuery;
+use App\Service\RAG\VectorStorage\DTO\SearchResult;
 use App\Service\RAG\VectorStorage\DTO\StorageStats;
 use App\Service\RAG\VectorStorage\DTO\VectorChunk;
 use App\Service\RAG\VectorStorage\Exception\ProviderUnavailableException;
@@ -140,6 +141,15 @@ final readonly class VectorStorageFacade implements VectorStorageInterface
         };
 
         return $storage->isAvailable();
+    }
+
+    public function findChunk(int $userId, int|string $chunkId): ?SearchResult
+    {
+        try {
+            return $this->getActiveStorage()->findChunk($userId, $chunkId);
+        } catch (ProviderUnavailableException) {
+            return null;
+        }
     }
 
     public function getProviderName(): string

@@ -40,11 +40,11 @@ export const approvalsApi = {
     return data.approval
   },
 
-  async getNotifyMode(): Promise<'instant' | 'digest'> {
+  async getNotifyMode(): Promise<{ mode: 'instant' | 'digest'; mailConfigured: boolean }> {
     const data = await httpClient('/api/v1/approvals/notify-setting', {
       schema: GetApiApprovalsNotifyGetResponseSchema,
     })
-    return data.mode
+    return { mode: data.mode, mailConfigured: data.mailConfigured !== false }
   },
 
   async setNotifyMode(mode: 'instant' | 'digest'): Promise<'instant' | 'digest'> {

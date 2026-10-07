@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution\Runner;
 
+use App\Entity\CustomTool;
 use App\Entity\User;
 use App\Repository\CustomToolRepository;
 use App\Repository\McpServerConfigRepository;
@@ -137,6 +138,8 @@ final readonly class ToolCallRunner implements TaskRunner
                 true === ($context->options['allow_unattended'] ?? false),
                 null,
                 $override,
+                false,
+                $this->resolvedRequest($userId, $toolName, $arguments),
             );
         } catch (ToolNotRegisteredException $e) {
             return NodeResult::failed($e->getMessage());
@@ -149,6 +152,7 @@ final readonly class ToolCallRunner implements TaskRunner
 
             return NodeResult::waitingApproval((int) $approval->getId(), $arguments, [
                 'tool' => $approval->getTool(),
+                'query' => $approval->getTool(),
                 'preview' => $approval->getPreview(),
                 'expires_at' => $approval->getExpiresAt(),
                 'side_effect' => $approval->getSideEffect(),
@@ -182,9 +186,36 @@ final readonly class ToolCallRunner implements TaskRunner
 
         return NodeResult::ok($result['summary'], [], [
             'tool' => $toolName,
+            'query' => $toolName,
             'fields' => $result['fields'],
             'summary' => $result['summary'],
         ]);
+    }
+
+    /**
+     * The request that will be sent, with the credential replaced. Stored on
+     * the approval so the card shows the request, not a paraphrase.
+     *
+     * @param array<string, mixed> $arguments
+     *
+     * @return array{method: string, url: string, headers: array<string, string>, body: string|null}|null
+     */
+    private function resolvedRequest(int $userId, string $toolName, array $arguments): ?array
+    {
+        $descriptor = $this->registry->get($userId, $toolName);
+        if (null === $descriptor || ToolSource::Custom !== $descriptor->source) {
+            return null;
+        }
+        $toolId = $descriptor->meta['toolId'] ?? null;
+        $tool = is_numeric($toolId) ? $this->customTools->find((int) $toolId) : null;
+        if (!$tool instanceof CustomTool) {
+            return null;
+        }
+        try {
+            return $this->httpExecutor->resolve($tool, $arguments, false);
+        } catch (InvalidToolTemplateException) {
+            return null;
+        }
     }
 
     /**

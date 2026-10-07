@@ -2034,6 +2034,8 @@ class StreamController extends AbstractController
                     ]);
                 }
 
+                $ragSources = $this->persistRagSources($outgoingMessage, $response['metadata'] ?? []);
+
                 if ($originalOutgoingMessage) {
                     $incomingMessage->setStatus('complete');
                 } else {
@@ -2225,6 +2227,7 @@ class StreamController extends AbstractController
                     'originalMediaType' => $originalMediaType,
                     'language' => $classification['language'],
                     'searchResults' => $searchResults,
+                    'ragSources' => $ragSources,
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                 ];
 
@@ -2845,6 +2848,8 @@ class StreamController extends AbstractController
                 }
             }
 
+            $ragSources = $this->persistRagSources($outgoingMessage, $metadata);
+
             $message->setTopic((string) ($classification['topic'] ?? $message->getTopic()));
             $message->setLanguage((string) ($classification['language'] ?? $message->getLanguage()));
             $message->setStatus('complete');
@@ -2949,6 +2954,7 @@ class StreamController extends AbstractController
                 'originalMediaType' => $nonStreamingOriginalMediaType,
                 'language' => $classification['language'] ?? null,
                 'searchResults' => $this->formatSearchResultsForSse($effectiveSearchResults ?? null),
+                'ragSources' => $ragSources,
                 'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
             ];
 
@@ -3208,9 +3214,49 @@ class StreamController extends AbstractController
      * Used from both the streaming `success: false` branch and the
      * non-streaming error branch in `handleNonStreamingRequest()`. See
      * issue #603.
-     *
-     * @param array<string, mixed>|null $classification
      */
+    /**
+     * Store source ids (never the passage text) so a reload can show the row.
+     *
+     * @param array<string, mixed> $metadata
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private function persistRagSources(Message $message, array $metadata): ?array
+    {
+        $sources = $metadata['rag_sources'] ?? null;
+        if (!is_array($sources) || [] === $sources) {
+            return null;
+        }
+
+        $clean = [];
+        foreach ($sources as $row) {
+            if (!is_array($row) || '' === (string) ($row['chunkId'] ?? '')) {
+                continue;
+            }
+            $clean[] = [
+                'n' => (int) ($row['n'] ?? 0),
+                'chunkId' => (string) $row['chunkId'],
+                'fileId' => (int) ($row['fileId'] ?? 0),
+                'fileName' => (string) ($row['fileName'] ?? ''),
+                'groupKey' => (string) ($row['groupKey'] ?? ''),
+                'score' => is_numeric($row['score'] ?? null) ? (float) $row['score'] : null,
+                'startLine' => (int) ($row['startLine'] ?? 0),
+                'endLine' => (int) ($row['endLine'] ?? 0),
+            ];
+        }
+        if ([] === $clean) {
+            return null;
+        }
+
+        $encoded = json_encode($clean, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
+        if (is_string($encoded)) {
+            $message->setMeta('rag_sources', $encoded);
+        }
+
+        return $clean;
+    }
+
     private function persistClassificationSortingMeta(Message $message, ?array $classification): void
     {
         if (!is_array($classification)) {

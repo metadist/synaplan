@@ -1616,6 +1616,15 @@ class WidgetPublicController extends AbstractController
                 $sender = 'ai';
             }
 
+            $ragSources = null;
+            $ragRaw = $message->getMeta('rag_sources');
+            if (is_string($ragRaw) && '' !== $ragRaw) {
+                $decoded = json_decode($ragRaw, true);
+                if (is_array($decoded) && [] !== $decoded) {
+                    $ragSources = $decoded;
+                }
+            }
+
             return [
                 'id' => $message->getId(),
                 'direction' => $message->getDirection(),
@@ -1624,6 +1633,7 @@ class WidgetPublicController extends AbstractController
                 'messageType' => $message->getMessageType(),
                 'sender' => $sender,
                 'files' => $filesData,
+                'ragSources' => $ragSources,
                 'metadata' => [
                     'topic' => $message->getTopic(),
                     'language' => $message->getLanguage(),

@@ -307,6 +307,15 @@
                   <!-- eslint-disable-next-line vue/no-v-html -- widget message markdown/linkify -->
                   <div v-html="renderMessageContent(message.content, message.role)"></div>
                 </div>
+                <KnowledgeSources
+                  v-if="
+                    message.role === 'assistant' &&
+                    message.ragSources &&
+                    message.ragSources.length > 0
+                  "
+                  :sources="message.ragSources"
+                  :show-library-link="false"
+                />
               </template>
               <div v-else-if="message.type === 'file'" class="space-y-2">
                 <!-- File attachments (clickable for download) -->
@@ -669,6 +678,8 @@ import {
   WidgetUnavailableError,
 } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
+import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
+import type { RagSourceRef } from '@/stores/history'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { parseAIResponse } from '@/utils/responseParser'
 import { createSmoothStream, type SmoothStream } from '@/utils/smoothStream'
@@ -790,6 +801,7 @@ interface Message {
   files?: MessageFile[]
   timestamp: Date
   sender?: 'user' | 'ai' | 'human' | 'system'
+  ragSources?: RagSourceRef[]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1664,6 +1676,9 @@ const sendMessage = async () => {
 
     const lastMessage = messages.value[messages.value.length - 1]
     if (lastMessage && lastMessage.id === assistantMessageId) {
+      if (result.ragSources && result.ragSources.length > 0) {
+        lastMessage.ragSources = result.ragSources
+      }
       if (!lastMessage.content || lastMessage.content.length === 0) {
         if (result.text && result.text.length > 0) {
           lastMessage.content = result.text
@@ -1993,7 +2008,27 @@ const normalizeServerMessage = (rawUnknown: unknown): Message => {
     files,
     timestamp: new Date(timestampSeconds * 1000),
     sender,
+    ragSources: parseRagSources(raw.ragSources),
   }
+}
+
+function parseRagSources(value: unknown): RagSourceRef[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const sources: RagSourceRef[] = []
+  for (const row of value) {
+    if (!isRecord(row) || typeof row.chunkId !== 'string' || row.chunkId === '') continue
+    sources.push({
+      n: typeof row.n === 'number' ? row.n : sources.length + 1,
+      chunkId: row.chunkId,
+      fileId: typeof row.fileId === 'number' ? row.fileId : 0,
+      fileName: typeof row.fileName === 'string' ? row.fileName : '',
+      groupKey: typeof row.groupKey === 'string' ? row.groupKey : '',
+      score: typeof row.score === 'number' ? row.score : null,
+      startLine: typeof row.startLine === 'number' ? row.startLine : 0,
+      endLine: typeof row.endLine === 'number' ? row.endLine : 0,
+    })
+  }
+  return sources.length > 0 ? sources : undefined
 }
 
 /**

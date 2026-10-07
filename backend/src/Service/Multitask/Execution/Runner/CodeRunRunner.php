@@ -12,6 +12,7 @@ use App\Repository\ComputeRunRepository;
 use App\Repository\FileRepository;
 use App\Repository\UserRepository;
 use App\Service\Agent\Policy\AssistantSkillGate;
+use App\Service\Compute\ChatArtefactMountList;
 use App\Service\Compute\ComputeArtefactStore;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
@@ -80,7 +81,7 @@ final readonly class CodeRunRunner implements TaskRunner
         return [
             new SkillDescriptor(
                 Capability::CodeRun,
-                'Run a short Python or Node script on the attached files and return result files',
+                'Run a short Python or Node script on the attached files — including to modify, edit, or replace text in them — and return result files',
                 dynamicNote: fn (?int $userId, array $context): ?string => $this->plannerNote($userId),
                 available: fn (): bool => $this->computeEnabled(),
             ),
@@ -98,7 +99,8 @@ final readonly class CodeRunRunner implements TaskRunner
             return null;
         }
         $lines = [
-            '  params.script (required): the COMPLETE program as multi-line text with real newlines. params.image: "python" (default) or "node". Omit params.inputFileIds: this turn\'s attached files are mounted automatically (you never see their numeric ids — never invent any).',
+            '  params.script (required): the COMPLETE program as multi-line text with real newlines. params.image: "python" (default) or "node". This turn\'s attached files are mounted automatically. To use a file this chat already saved, set params.inputFileNames to its display name from "Files available in this conversation". Never invent a numeric id. Do not set useWorkspace only because this chat already saved a file — that folder is shared across chats.',
+            '  Use this step when the user wants to modify, edit, or replace text in an attached file, including a PDF. The sandbox can read a PDF. It cannot change text inside a PDF in place. If the script cannot, it must print "cannot change text inside a PDF in place". Do not answer that the tools in this chat cannot edit files.',
             '  NEVER join statements with semicolons and NEVER emit a one-liner: a compound statement (with/for/if/def/try) after ";" is a syntax error and fails the run. print() the answer (stdout is returned) and write any result files to /out/ (e.g. open("/out/result.csv","w")) — only files under /out are saved and offered for download; the working directory is discarded.',
         ];
         if ($this->workspacesEnabled($userId)) {
@@ -168,6 +170,36 @@ final readonly class CodeRunRunner implements TaskRunner
                 }
             }
         }
+
+        $requestedNames = [];
+        foreach ($node->params['inputFileNames'] ?? [] as $name) {
+            if (is_string($name) && '' !== trim($name)) {
+                $requestedNames[] = trim($name);
+            }
+        }
+        $chatFiles = [];
+        $chatId = $context->message->getChatId();
+        if (is_int($chatId) && $chatId > 0) {
+            foreach ($this->files->findFilesByChatId($userId, $chatId, 30) as $file) {
+                $fileId = $file->getId();
+                if (null !== $fileId) {
+                    $chatFiles[] = ['id' => (int) $fileId, 'name' => (string) $file->getFileName()];
+                }
+            }
+        }
+        $mounted = (new ChatArtefactMountList())->resolve(
+            $inputIds,
+            $chatFiles,
+            $requestedNames,
+            (string) $context->message->getText(),
+        );
+        if ([] !== $mounted['missing']) {
+            return NodeResult::failed(sprintf(
+                'The run could not find %s. Attach it, or use the file this chat just saved.',
+                $mounted['missing'][0],
+            ));
+        }
+        $inputIds = $mounted['ids'];
 
         $result = $this->executeDirect(
             $user,
@@ -588,11 +620,16 @@ final readonly class CodeRunRunner implements TaskRunner
             // 'CodeRunRunner: run failed' warning) so a failed run is still
             // diagnosable; it must not reach user-facing copy (#2052).
             $message = (string) $result['error'];
+            $diagnostic = trim($result['stdout'])."\n".trim($result['stderr']);
+            if (str_contains(mb_strtolower($diagnostic), 'cannot change text inside a pdf in place')) {
+                $message = 'This sandbox cannot change text inside a PDF in place. The file was not rewritten.';
+            }
 
             return NodeResult::failed($message, [
                 'used_workspace' => true === ($result['used_workspace'] ?? false),
                 'exit_code' => $result['exit_code'],
                 'compute_run_id' => $result['compute_run_id'],
+                'trace_output' => mb_substr(trim($result['stderr']), 0, 8192),
             ]);
         }
 

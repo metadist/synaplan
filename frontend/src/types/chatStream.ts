@@ -1,6 +1,7 @@
 /**
  * SSE / streaming payloads for chat API (narrowed fields used by ChatView and widgets).
  */
+import type { RagSourceRef } from '@/stores/history'
 export interface StreamLinkItem {
   title?: string
   url: string
@@ -106,6 +107,11 @@ export interface StreamEventMetadata {
   error?: string
   prompt?: string
   media_type?: string
+  /** Sanitized step trace (task_update). */
+  step_input?: string
+  step_output?: string
+  step_output_truncated?: boolean
+  duration_ms?: number
   /** Web search (status === 'search_complete'): early sources + query. */
   results_count?: number
   query?: string
@@ -158,6 +164,7 @@ export interface StreamUpdatePayload {
   /** Voice-reply failure reason when TTS was requested but no audio was stored (#2282). */
   voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited' | null
   searchResults?: StreamSearchResult[]
+  ragSources?: RagSourceRef[] | null
   memoryIds?: number[]
   feedbackIds?: number[]
   docs?: StreamDocRef[]

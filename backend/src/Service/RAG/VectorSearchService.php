@@ -503,6 +503,34 @@ final readonly class VectorSearchService
     }
 
     /**
+     * The matched passage for one source chip. Null when the chunk is missing
+     * or the caller cannot read it.
+     *
+     * @return array{chunkId: string, fileId: int, fileName: string|null, groupKey: string, text: string, startLine: int, endLine: int}|null
+     */
+    public function passage(int $userId, string $chunkId): ?array
+    {
+        $chunkId = trim($chunkId);
+        if ('' === $chunkId) {
+            return null;
+        }
+        $result = $this->vectorStorage->findChunk($userId, $chunkId);
+        if (null === $result || '' === trim($result->text)) {
+            return null;
+        }
+
+        return [
+            'chunkId' => (string) $result->chunkId,
+            'fileId' => $result->fileId,
+            'fileName' => $result->fileName,
+            'groupKey' => $result->groupKey,
+            'text' => $result->text,
+            'startLine' => $result->startLine,
+            'endLine' => $result->endLine,
+        ];
+    }
+
+    /**
      * @param list<VectorStorage\DTO\SearchResult> $results
      *
      * @return array<int, string>

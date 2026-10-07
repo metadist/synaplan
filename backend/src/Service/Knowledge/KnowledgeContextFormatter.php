@@ -24,22 +24,8 @@ final class KnowledgeContextFormatter
             return '';
         }
 
-        // Deterministic order when ids are present (cache-safe for the gateway).
-        $hasIds = true;
-        foreach ($ragResults as $row) {
-            if (!isset($row['id']) && !isset($row['chunk_id'])) {
-                $hasIds = false;
-                break;
-            }
-        }
-        if ($hasIds) {
-            usort($ragResults, static function (array $a, array $b): int {
-                $idA = $a['id'] ?? $a['chunk_id'];
-                $idB = $b['id'] ?? $b['chunk_id'];
-
-                return $idA <=> $idB;
-            });
-        }
+        // Same order as citationRefs(), so [1] is Source 1.
+        $ragResults = $this->sortedForCitation($ragResults);
 
         $ragContext = "\n\n## Knowledge Base Context (relevant to your task):\n";
         foreach ($ragResults as $idx => $result) {
@@ -57,8 +43,68 @@ final class KnowledgeContextFormatter
             );
         }
         $ragContext .= "\nUse this context to provide accurate and specific answers.\n";
+        $ragContext .= "Cite a source as [1], [2], matching the Source numbers above. Only cite numbers from this list.\n";
 
         return $ragContext;
+    }
+
+    /**
+     * Identifiers for the sources row. The passage text stays in the vector
+     * store and is loaded when the person opens a source.
+     *
+     * Order matches {@see formatRagContext()} so [1] is Source 1.
+     *
+     * @param list<array<string, mixed>> $ragResults
+     *
+     * @return list<array{n: int, chunkId: string, fileId: int, fileName: string, groupKey: string, score: float|null, startLine: int, endLine: int}>
+     */
+    public function citationRefs(array $ragResults): array
+    {
+        $rows = $this->sortedForCitation($ragResults);
+        $refs = [];
+        $n = 0;
+        foreach ($rows as $row) {
+            ++$n;
+            $score = $row['score'] ?? null;
+            $refs[] = [
+                'n' => $n,
+                'chunkId' => isset($row['chunk_id']) ? (string) $row['chunk_id'] : '',
+                'fileId' => (int) ($row['file_id'] ?? 0),
+                'fileName' => trim((string) ($row['file_name'] ?? '')),
+                'groupKey' => trim((string) ($row['group_key'] ?? '')),
+                'score' => is_numeric($score) ? round((float) $score, 4) : null,
+                'startLine' => (int) ($row['start_line'] ?? 0),
+                'endLine' => (int) ($row['end_line'] ?? 0),
+            ];
+        }
+
+        return $refs;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $ragResults
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function sortedForCitation(array $ragResults): array
+    {
+        $hasIds = true;
+        foreach ($ragResults as $row) {
+            if (!isset($row['id']) && !isset($row['chunk_id'])) {
+                $hasIds = false;
+                break;
+            }
+        }
+        if ($hasIds) {
+            usort($ragResults, static function (array $a, array $b): int {
+                $idA = $a['id'] ?? $a['chunk_id'];
+                $idB = $b['id'] ?? $b['chunk_id'];
+
+                return $idA <=> $idB;
+            });
+        }
+
+        return $ragResults;
     }
 
     /**

@@ -16,6 +16,7 @@ const store = useApprovalsStore()
 const { success, error: showError } = useNotification()
 const tab = ref<'pending' | 'decided'>('pending')
 const notifyMode = ref<'instant' | 'digest'>('instant')
+const mailConfigured = ref(true)
 
 onMounted(async () => {
   if (!isApprovalsEnabled()) {
@@ -23,7 +24,9 @@ onMounted(async () => {
   }
   await store.load('pending')
   try {
-    notifyMode.value = await approvalsApi.getNotifyMode()
+    const setting = await approvalsApi.getNotifyMode()
+    notifyMode.value = setting.mode
+    mailConfigured.value = setting.mailConfigured
   } catch {
     // Setting is optional; inbox still works.
   }
@@ -92,6 +95,21 @@ const onNotifyChange = async () => {
     showError(t('approvals.decideFailed'))
   }
 }
+
+const decidedLine = (row: Approval): string => {
+  const when = row.decidedAt
+    ? new Date(row.decidedAt * 1000).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : ''
+  if (!row.decidedByName && !when) return ''
+  return t('approvals.decidedLine', {
+    status: statusLabel(row.status),
+    name: row.decidedByName ?? '',
+    time: when,
+  })
+}
 </script>
 
 <template>
@@ -114,6 +132,13 @@ const onNotifyChange = async () => {
         <option value="digest">{{ $t('approvals.notifyDigest') }}</option>
       </select>
     </label>
+    <p
+      v-if="!mailConfigured"
+      class="text-sm txt-secondary"
+      data-testid="approvals-mail-unconfigured"
+    >
+      {{ $t('approvals.mailNotConfigured') }}
+    </p>
 
     <div class="flex gap-2">
       <button
@@ -164,7 +189,9 @@ const onNotifyChange = async () => {
         />
         <div v-else class="surface-card p-4 space-y-2">
           <p class="txt-primary font-medium">{{ row.preview || row.tool }}</p>
-          <p class="text-xs txt-secondary">{{ statusLabel(row.status) }}</p>
+          <p class="text-xs txt-secondary" data-testid="approval-decided-line">
+            {{ decidedLine(row) || statusLabel(row.status) }}
+          </p>
           <button
             type="button"
             class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"

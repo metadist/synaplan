@@ -168,4 +168,10 @@ interface VectorStorageInterface
      * @return string Provider identifier (e.g., 'mariadb', 'qdrant')
      */
     public function getProviderName(): string;
+
+    /**
+     * Load one chunk the user is allowed to read. Null when it is missing
+     * or belongs to someone else. The text is returned only for this call.
+     */
+    public function findChunk(int $userId, int|string $chunkId): ?SearchResult;
 }

@@ -182,6 +182,7 @@ export interface Message {
     source?: string
     thumbnail?: string
   }> | null // Web search results
+  ragSources?: RagSourceRef[] | null
   aiModels?: {
     chat?: {
       provider: string
@@ -308,12 +309,29 @@ export interface TaskCard {
   jobId?: string
   /** True when this run mounted the user's persistent file-work folder. */
   usedWorkspace?: boolean
+  /** Sanitized parameters sent to the step, capped. */
+  stepInput?: string
+  /** Capped output or error text for the expanded step. */
+  stepOutput?: string
+  stepOutputTruncated?: boolean
+  durationMs?: number
   /**
    * #1229 smart collapse: the card's prose is already contained in the final
    * answer body, so the card collapses to its header (set by ResultAssembler
    * at assembly time and by markRedundantTaskPlanProse client-side).
    */
   redundant?: boolean
+}
+
+export interface RagSourceRef {
+  n: number
+  chunkId: string
+  fileId: number
+  fileName: string
+  groupKey: string
+  score?: number | null
+  startLine: number
+  endLine: number
 }
 
 export interface TaskPlanState {
