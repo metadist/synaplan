@@ -122,6 +122,8 @@
     "fidelityNotice": "Some formatting from the original file could not be kept. You can still edit the content.",
     "fidelityContinue": "Continue",
     "removeFile": "Remove file",
+    "cancelUpload": "Cancel upload",
+    "uploadCancelled": "The upload stopped.",
     "dropFiles": "Drop files here to upload",
     "dropFilesHint": "Release to add files to the upload queue",
     "filesAddedToQueue": "{count} file added - ready to upload | {count} files added - ready to upload",

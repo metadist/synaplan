@@ -150,95 +150,107 @@ final readonly class VectorizationService
                 ];
             }
 
-            $chunkTexts = array_map(fn (array $c): string => $c['content'], $chunks);
-
-            // Embed with a per-chunk fallback: if the batch call fails (e.g. a
-            // remote Ollama returns HTTP 500 because one chunk produced a NaN
-            // embedding) or returns invalid vectors, embed each chunk on its own
-            // and skip only the bad ones — so a single problematic chunk no
-            // longer drops the whole file to zero chunks.
-            $embedResult = $this->embedChunksResilient($chunkTexts, $userId, $provider, $modelName);
-            $embeddings = $embedResult['embeddings'];
-
-            if ($embedResult['failed'] > 0) {
-                $this->logger->warning('VectorizationService: some chunks could not be embedded and were skipped', [
-                    'user_id' => $userId,
-                    'message_id' => $messageId,
-                    'failed' => $embedResult['failed'],
-                    'total' => count($chunkTexts),
-                ]);
-            }
-
-            $user = $this->em->getRepository(User::class)->find($userId);
-            if ($user) {
-                $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
-                    'usage' => $embedResult['usage'],
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'model_id' => $embeddingModelId,
-                    'input_bytes' => array_sum(array_map('strlen', $chunkTexts)),
-                    'source' => 'VECTORIZATION',
-                ]);
-            }
-
+            // Embed and store one window at a time. Holding every chunk's
+            // vector at once is what exhausts the 512 MB limit on a large CSV,
+            // Each window is embedded and stored before the next one starts.
+            $usage = ['prompt_tokens' => 0, 'total_tokens' => 0];
+            $failedEmbeddings = 0;
+            $inputBytes = 0;
             $pending = [];
             $chunksCreated = 0;
+            $chunkCount = count($chunks);
 
-            foreach ($chunks as $index => $chunk) {
-                $embedding = $embeddings[$index] ?? [];
-
-                if (empty($embedding)) {
-                    $this->logger->warning('VectorizationService: Empty embedding returned', [
-                        'chunk_start' => $chunk['start_line'],
-                    ]);
-                    continue;
+            foreach (array_chunk($chunks, self::EMBED_BATCH_SIZE, true) as $window) {
+                $this->extendExecutionTime();
+                if (function_exists('connection_aborted') && connection_aborted()) {
+                    throw new \RuntimeException('Indexing was cancelled');
                 }
+                $windowTexts = [];
+                foreach ($window as $index => $chunk) {
+                    $windowTexts[$index] = $chunk['content'];
+                    $inputBytes += strlen($chunk['content']);
+                }
+                $part = $this->embedChunksResilient($windowTexts, $userId, $provider, $modelName);
+                $usage['prompt_tokens'] += $part['usage']['prompt_tokens'];
+                $usage['total_tokens'] += $part['usage']['total_tokens'];
+                $failedEmbeddings += $part['failed'];
+                unset($windowTexts);
 
-                $embeddingLength = count($embedding);
-                if (self::VECTOR_DIMENSION !== $embeddingLength) {
-                    $this->logger->warning('VectorizationService: Embedding dimension mismatch', [
-                        'expected' => self::VECTOR_DIMENSION,
-                        'actual' => $embeddingLength,
-                        'model' => $modelName,
-                        'provider' => $provider,
-                    ]);
+                foreach ($window as $index => $chunk) {
+                    $embedding = $part['embeddings'][$index] ?? [];
+                    if (empty($embedding)) {
+                        $this->logger->warning('VectorizationService: Empty embedding returned', [
+                            'chunk_start' => $chunk['start_line'],
+                        ]);
+                        continue;
+                    }
 
-                    if ($embeddingLength > self::VECTOR_DIMENSION) {
-                        $embedding = array_slice($embedding, 0, self::VECTOR_DIMENSION);
-                    } else {
-                        $embedding = array_pad($embedding, self::VECTOR_DIMENSION, 0.0);
+                    $embeddingLength = count($embedding);
+                    if (self::VECTOR_DIMENSION !== $embeddingLength) {
+                        $this->logger->warning('VectorizationService: Embedding dimension mismatch', [
+                            'expected' => self::VECTOR_DIMENSION,
+                            'actual' => $embeddingLength,
+                            'model' => $modelName,
+                            'provider' => $provider,
+                        ]);
+
+                        if ($embeddingLength > self::VECTOR_DIMENSION) {
+                            $embedding = array_slice($embedding, 0, self::VECTOR_DIMENSION);
+                        } else {
+                            $embedding = array_pad($embedding, self::VECTOR_DIMENSION, 0.0);
+                        }
+                    }
+
+                    $pending[] = new VectorChunk(
+                        userId: $userId,
+                        fileId: $messageId,
+                        groupKey: $groupKey,
+                        fileType: $fileType,
+                        chunkIndex: $index,
+                        startLine: $chunk['start_line'],
+                        endLine: $chunk['end_line'],
+                        text: $chunk['content'],
+                        vector: array_map('floatval', $embedding),
+                        embeddingModelId: $embeddingModelId,
+                        embeddingProvider: $provider,
+                        embeddingModelName: $modelName,
+                        vectorDim: self::VECTOR_DIMENSION,
+                    );
+                    ++$chunksCreated;
+                    if (\count($pending) >= self::EMBED_BATCH_SIZE) {
+                        $this->vectorStorage->storeChunkBatch($pending);
+                        $persistedAny = true;
+                        $pending = [];
                     }
                 }
-
-                $pending[] = new VectorChunk(
-                    userId: $userId,
-                    fileId: $messageId,
-                    groupKey: $groupKey,
-                    fileType: $fileType,
-                    chunkIndex: $index,
-                    startLine: $chunk['start_line'],
-                    endLine: $chunk['end_line'],
-                    text: $chunk['content'],
-                    vector: array_map('floatval', $embedding),
-                    embeddingModelId: $embeddingModelId,
-                    embeddingProvider: $provider,
-                    embeddingModelName: $modelName,
-                    vectorDim: self::VECTOR_DIMENSION,
-                );
-
-                ++$chunksCreated;
-                if (\count($pending) >= self::EMBED_BATCH_SIZE) {
-                    $this->extendExecutionTime();
-                    $this->vectorStorage->storeChunkBatch($pending);
-                    $persistedAny = true;
-                    $pending = [];
-                }
+                unset($part);
             }
 
             if ([] !== $pending) {
                 $this->extendExecutionTime();
                 $this->vectorStorage->storeChunkBatch($pending);
                 $persistedAny = true;
+            }
+
+            if ($failedEmbeddings > 0) {
+                $this->logger->warning('VectorizationService: some chunks could not be embedded and were skipped', [
+                    'user_id' => $userId,
+                    'message_id' => $messageId,
+                    'failed' => $failedEmbeddings,
+                    'total' => $chunkCount,
+                ]);
+            }
+
+            $user = $this->em->getRepository(User::class)->find($userId);
+            if ($user) {
+                $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+                    'usage' => $usage,
+                    'provider' => $provider,
+                    'model' => $modelName,
+                    'model_id' => $embeddingModelId,
+                    'input_bytes' => $inputBytes,
+                    'source' => 'VECTORIZATION',
+                ]);
             }
 
             // #1344: every chunk embedding can fail (continue above) while we still
@@ -252,7 +264,7 @@ final readonly class VectorizationService
                     'user_id' => $userId,
                     'message_id' => $messageId,
                     'chunk_count' => count($chunks),
-                    'failed_embeddings' => $embedResult['failed'],
+                    'failed_embeddings' => $failedEmbeddings,
                 ]);
 
                 return [
@@ -304,14 +316,7 @@ final readonly class VectorizationService
     }
 
     /**
-     * Embed chunk texts resiliently.
-     *
-     * Embeds in windows of {@see EMBED_BATCH_SIZE}. Each window tries one
-     * batch request first (fast path). If that throws (e.g. the remote
-     * Ollama returns HTTP 500 because a chunk produced a NaN embedding) or
-     * returns incomplete/invalid vectors, it falls back to embedding each
-     * chunk in that window individually and skips only the ones that fail —
-     * so a single bad chunk no longer fails the whole file.
+     * Embed chunk texts in windows of {@see EMBED_BATCH_SIZE}.
      *
      * @param array<int, string> $chunkTexts
      *
