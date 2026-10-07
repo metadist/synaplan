@@ -102,8 +102,9 @@ final readonly class ChatRunner implements TaskRunner
         $systemPrompt = $this->systemPrompt($node, $language, $context, $topicBinding['systemPrompt']);
         $systemPrompt = $this->decorateSelfAwareTopic($systemPrompt, $node, $context, $text, $modelId);
         $ragChunks = 0;
+        $ragSources = [];
         if (Capability::RagQuery === $node->capability) {
-            $ragContext = $this->ragContext($text, $context, $ragChunks);
+            $ragContext = $this->ragContext($text, $context, $ragChunks, $ragSources);
             if ('' === $ragContext && !empty($context->classification['slash_docs'])) {
                 $empty = $this->slashCommandCopy?->docsNotFound($language)
                     ?? 'No matching file was found in your knowledge base.';
@@ -204,6 +205,9 @@ final readonly class ChatRunner implements TaskRunner
         ];
         if (Capability::RagQuery === $node->capability) {
             $metadata['rag_chunks'] = $ragChunks;
+        }
+        if ([] !== $ragSources) {
+            $metadata['rag_sources'] = $ragSources;
         }
 
         return NodeResult::ok($full, [], $metadata);
@@ -307,7 +311,10 @@ final readonly class ChatRunner implements TaskRunner
      * (same service, same context block format); any retrieval failure is
      * logged and the node answers without context instead of failing.
      */
-    private function ragContext(string $query, NodeContext $context, int &$chunks): string
+    /**
+     * @param list<array<string, mixed>> $sources
+     */
+    private function ragContext(string $query, NodeContext $context, int &$chunks, array &$sources): string
     {
         $groupKey = $context->classification['rag_group_key']
             ?? $context->options['rag_group_key']
@@ -350,6 +357,7 @@ final readonly class ChatRunner implements TaskRunner
         }
 
         $chunks = count($results);
+        $sources = $this->knowledgeContextFormatter->citationRefs($results);
 
         return $this->knowledgeContextFormatter->formatRagContext($results);
     }

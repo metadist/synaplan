@@ -75,6 +75,7 @@
     "unpin": "Retirer l'épingle",
     "pinSaveFailed": "L'épingle n'a pas pu être enregistrée. Le chat reste où il était.",
     "stillGenerating": "Réponse en cours",
+    "answerReady": "Réponse prête",
     "listOrigin": {
       "web": "Chat",
       "whatsapp": "WhatsApp",
@@ -227,6 +228,8 @@
   },
   "chatInput": {
     "placeholder": "Saisissez votre message…",
+    "knowledgeActive": "Dossier de connaissances : {name}",
+    "knowledgeClear": "Ne plus utiliser ce dossier de connaissances",
     "placeholderShort": "Message…",
     "provider": "Fournisseur",
     "model": "Modèle",
@@ -520,6 +523,14 @@
     "scheduleThis": "Relancer ceci selon un planning",
     "download": "Télécharger",
     "failedBody": "Cette étape n’a pas pu être terminée.",
+    "details": "Ce que cette étape a fait",
+    "input": "Ce qui a été envoyé",
+    "output": "Ce qui est revenu",
+    "showMore": "Afficher plus",
+    "showLess": "Afficher moins",
+    "duration": "{seconds} seconde | {seconds} secondes",
+    "noDetails": "Cette étape n’a pas enregistré de détails.",
+    "outputTruncated": "Le reste a été laissé de côté pour rester lisible.",
     "cancelledBody": "Vous avez arrêté cette étape.",
     "stop": "Arrêter",
     "rendering": "Rendu…",
@@ -726,7 +737,7 @@
   "message": {
     "thinking": "Processus de réflexion",
     "thinkingInProgress": "Réflexion…",
-    "thoughtFor": "A réfléchi pendant {n} secondes",
+    "thoughtFor": "A réfléchi pendant {n} seconde | A réfléchi pendant {n} secondes",
     "reasoning": "Raisonnement IA",
     "downloadImage": "Télécharger l’image",
     "fileGenerated": "J’ai créé le fichier « {filename} » pour vous. Vous pouvez maintenant le télécharger.",
@@ -897,6 +908,9 @@
     "notifySaved": "Préférence de notification enregistrée.",
     "blocked": "Je ne peux pas faire cela. Un administrateur l’a désactivé.",
     "waitingForApproval": "En attente d’approbation",
+    "decidedLine": "{status} par {name} à {time}",
+    "requestHeading": "Voici la requête qui sera envoyée.",
+    "mailNotConfigured": "L’e-mail n’est pas configuré. Les nouvelles demandes apparaissent ici dans Approbations.",
     "status": {
       "pending": "En attente",
       "approved": "Approuvé",
@@ -905,5 +919,13 @@
       "executed": "Terminé",
       "failed": "Échoué"
     }
+  },
+  "knowledgeSources": {
+    "title": "Sources",
+    "showPassage": "Afficher le passage",
+    "hidePassage": "Masquer le passage",
+    "openInLibrary": "Ouvrir dans la bibliothèque",
+    "lines": "Lignes {start}–{end}",
+    "unavailable": "Ce passage n’a pas pu être ouvert."
   }
 }

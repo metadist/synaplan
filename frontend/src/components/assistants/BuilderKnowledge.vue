@@ -41,6 +41,60 @@
       data-testid="input-knowledge-file"
       @change="onUpload"
     />
+    <div class="space-y-2">
+      <p class="txt-primary text-sm font-medium">{{ $t('assistants.libraryFiles') }}</p>
+      <p class="txt-secondary text-sm">{{ $t('assistants.libraryFilesHint') }}</p>
+      <ul v-if="selectedLibraryFiles.length > 0" class="space-y-2">
+        <li
+          v-for="file in selectedLibraryFiles"
+          :key="file.id"
+          class="flex items-center justify-between gap-2 text-sm txt-primary"
+        >
+          <span class="truncate">{{ file.label }}</span>
+          <button
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+            :data-testid="`btn-remove-library-file-${file.id}`"
+            @click="removeLibraryFile(file.id)"
+          >
+            {{ $t('assistants.removeLibraryFile') }}
+          </button>
+        </li>
+      </ul>
+      <label class="block">
+        <span class="txt-secondary text-sm">{{ $t('assistants.searchLibraryFile') }}</span>
+        <input
+          v-model="libraryQuery"
+          type="search"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          data-testid="input-library-file-search"
+          @change="loadLibraryFiles"
+        />
+      </label>
+      <label class="block">
+        <span class="txt-secondary text-sm">{{ $t('assistants.addLibraryFile') }}</span>
+        <select
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
+          data-testid="select-library-file"
+          :value="''"
+          :disabled="libraryFilesLoading"
+          @change="addLibraryFile(Number(($event.target as HTMLSelectElement).value))"
+        >
+          <option value="">{{ $t('assistants.chooseLibraryFile') }}</option>
+          <option v-for="file in libraryFileOptions" :key="file.id" :value="file.id">
+            {{ file.label }}
+          </option>
+        </select>
+      </label>
+      <p
+        v-if="
+          libraryFilesLoaded && libraryFileOptions.length === 0 && selectedLibraryFiles.length === 0
+        "
+        class="txt-secondary text-sm"
+      >
+        {{ $t('assistants.libraryFilesEmpty') }}
+      </p>
+    </div>
     <label class="flex items-start gap-2">
       <input
         type="checkbox"
@@ -128,7 +182,7 @@ import { useI18n } from 'vue-i18n'
 import { promptsApi, type PromptFile } from '@/services/api/promptsApi'
 import { iamApi } from '@/services/api/iamApi'
 import { emptyAgentDraft } from '@/services/api/agentsApi'
-import { getFileGroups } from '@/services/filesService'
+import { getFileGroups, listFiles, type FileItem } from '@/services/filesService'
 import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
 import { useDialog } from '@/composables/useDialog'
@@ -143,6 +197,10 @@ const { confirm } = useDialog()
 const { error, success } = useNotification()
 const files = ref<PromptFile[]>([])
 const allFolders = ref<FolderOption[]>([])
+const libraryCatalog = ref<FileItem[]>([])
+const libraryQuery = ref('')
+const libraryFilesLoading = ref(false)
+const libraryFilesLoaded = ref(false)
 const knowledgeFileInput = ref<HTMLInputElement | null>(null)
 
 const topic = computed(() => {
@@ -154,6 +212,21 @@ const ragLimit = computed(() => store.current?.draft?.knowledge.ragLimit ?? 8)
 const ragMinScore = computed(() => store.current?.draft?.knowledge.ragMinScore ?? 0.6)
 const includeUserFiles = computed(() => store.current?.draft?.knowledge.includeUserFiles ?? false)
 const selectedFolderIds = computed(() => store.current?.draft?.knowledge.folders ?? [])
+const selectedLibraryIds = computed(() => store.current?.draft?.knowledge.fileIds ?? [])
+const libraryFileOptions = computed(() =>
+  libraryCatalog.value
+    .filter((file) => !selectedLibraryIds.value.includes(file.id))
+    .map((file) => ({ id: file.id, label: file.display_name || file.filename }))
+)
+const selectedLibraryFiles = computed(() =>
+  selectedLibraryIds.value.map((id) => ({
+    id,
+    label:
+      libraryCatalog.value.find((file) => file.id === id)?.display_name ||
+      libraryCatalog.value.find((file) => file.id === id)?.filename ||
+      `#${id}`,
+  }))
+)
 const folderOptions = computed(() =>
   allFolders.value.filter((option) => !selectedFolderIds.value.includes(option.id))
 )
@@ -210,8 +283,8 @@ async function onUpload(event: Event): Promise<void> {
 }
 
 function patchKnowledge(
-  key: 'ragLimit' | 'ragMinScore' | 'includeUserFiles' | 'folders',
-  value: number | boolean | string[]
+  key: 'ragLimit' | 'ragMinScore' | 'includeUserFiles' | 'folders' | 'fileIds',
+  value: number | boolean | string[] | number[]
 ): void {
   if (!store.current) {
     return
@@ -236,6 +309,38 @@ function removeFolder(id: string): void {
     'folders',
     selectedFolderIds.value.filter((folderId) => folderId !== id)
   )
+}
+
+function addLibraryFile(id: number): void {
+  if (!id || selectedLibraryIds.value.includes(id)) {
+    return
+  }
+  patchKnowledge('fileIds', [...selectedLibraryIds.value, id])
+}
+
+function removeLibraryFile(id: number): void {
+  patchKnowledge(
+    'fileIds',
+    selectedLibraryIds.value.filter((fileId) => fileId !== id)
+  )
+}
+
+async function loadLibraryFiles(): Promise<void> {
+  libraryFilesLoading.value = true
+  try {
+    const query = libraryQuery.value.trim()
+    const page = await listFiles({
+      limit: 100,
+      vectorState: 'vectorized',
+      ...(query ? { search: query } : {}),
+    })
+    libraryCatalog.value = page.files
+  } catch {
+    libraryCatalog.value = []
+  } finally {
+    libraryFilesLoading.value = false
+    libraryFilesLoaded.value = true
+  }
 }
 
 async function loadFolderOptions(): Promise<void> {
@@ -281,5 +386,6 @@ async function loadFolderOptions(): Promise<void> {
 onMounted(() => {
   void loadFiles()
   void loadFolderOptions()
+  void loadLibraryFiles()
 })
 </script>

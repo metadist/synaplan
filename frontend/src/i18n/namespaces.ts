@@ -91,6 +91,7 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'commands',
     'companionLinks',
     'incognito',
+    'knowledgeSources',
     'message',
     'messageRefs',
     'modelMix',

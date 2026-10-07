@@ -75,6 +75,7 @@
     "unpin": "Unpin chat",
     "pinSaveFailed": "The pin could not be saved. The chat stays where it was.",
     "stillGenerating": "Still answering",
+    "answerReady": "Answer ready",
     "listOrigin": {
       "web": "Chat",
       "whatsapp": "WhatsApp",
@@ -227,6 +228,8 @@
   },
   "chatInput": {
     "placeholder": "Type your message...",
+    "knowledgeActive": "Knowledge folder: {name}",
+    "knowledgeClear": "Stop using this knowledge folder",
     "placeholderShort": "Message...",
     "provider": "Provider",
     "model": "Model",
@@ -520,6 +523,14 @@
     "scheduleThis": "Run this again on a schedule",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
+    "details": "What this step did",
+    "input": "What was sent",
+    "output": "What came back",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "duration": "{seconds} second | {seconds} seconds",
+    "noDetails": "This step did not record details.",
+    "outputTruncated": "The rest was left out so this stays readable.",
     "cancelledBody": "You stopped this step.",
     "stop": "Stop",
     "rendering": "Rendering…",
@@ -726,7 +737,7 @@
   "message": {
     "thinking": "Thinking process",
     "thinkingInProgress": "Thinking…",
-    "thoughtFor": "Thought for {n} seconds",
+    "thoughtFor": "Thought for {n} second | Thought for {n} seconds",
     "reasoning": "AI Reasoning",
     "downloadImage": "Download image",
     "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
@@ -897,6 +908,9 @@
     "notifySaved": "Notification preference saved.",
     "blocked": "I cannot do that. An administrator has turned this off.",
     "waitingForApproval": "Waiting for approval",
+    "decidedLine": "{status} by {name} at {time}",
+    "requestHeading": "This is the request that will be sent.",
+    "mailNotConfigured": "Email is not set up. New requests show up here in Approvals.",
     "status": {
       "pending": "Waiting",
       "approved": "Approved",
@@ -905,5 +919,13 @@
       "executed": "Done",
       "failed": "Failed"
     }
+  },
+  "knowledgeSources": {
+    "title": "Sources",
+    "showPassage": "Show the passage",
+    "hidePassage": "Hide the passage",
+    "openInLibrary": "Open in Library",
+    "lines": "Lines {start}–{end}",
+    "unavailable": "This passage could not be opened."
   }
 }

@@ -328,6 +328,16 @@
                 <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" />
                 <span class="text-xs font-medium">{{ $t('chat.stillGenerating') }}</span>
               </div>
+              <div
+                v-else-if="chatsStore.readyChatIds.has(chat.id)"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--status-success-text)] dark:text-[var(--status-success)] bg-[var(--status-success-muted)]"
+                data-testid="indicator-chat-answer-ready"
+              >
+                <span
+                  class="w-1.5 h-1.5 rounded-full bg-[var(--status-success-text)] dark:bg-[var(--status-success)]"
+                />
+                <span class="text-xs font-medium">{{ $t('chat.answerReady') }}</span>
+              </div>
             </div>
 
             <!-- Chat Title -->
@@ -510,6 +520,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { goToFreshChat } from '@/composables/usePinnedAssistant'
 import {
   MagnifyingGlassIcon,
   ChatBubbleLeftRightIcon,
@@ -972,9 +983,7 @@ const goToNewChat = async () => {
   try {
     const chat = await chatsStore.findOrCreateEmptyChat()
     if (!chat) return
-    if (router.currentRoute.value.path !== '/') {
-      await router.push('/')
-    }
+    await goToFreshChat(router, router.currentRoute.value)
   } finally {
     creatingChat.value = false
   }

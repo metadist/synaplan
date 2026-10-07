@@ -1,4 +1,7 @@
-import { PostApiConfigModelsDefaultsSaveResponseSchema } from '@/generated/api-schemas'
+import {
+  GetApiConfigModelsListResponseSchema,
+  PostApiConfigModelsDefaultsSaveResponseSchema,
+} from '@/generated/api-schemas'
 import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
 import { httpClient } from './httpClient'
 import { z } from 'zod'
@@ -46,7 +49,13 @@ export interface ModelCheckResponse {
  * Get all available models grouped by capability
  */
 export const getModels = async (): Promise<ModelsResponse> => {
-  return httpClient<ModelsResponse>('/api/v1/config/models')
+  // The OpenAPI model object names the chat fields and passes the rest through.
+  // Runtime validation keeps priceKnown; the app still uses ModelsResponse
+  // because the other capability lists are not spelled out on the schema.
+  const data = await httpClient('/api/v1/config/models', {
+    schema: GetApiConfigModelsListResponseSchema,
+  })
+  return data as ModelsResponse
 }
 
 /**

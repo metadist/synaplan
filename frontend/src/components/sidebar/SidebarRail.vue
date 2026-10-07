@@ -47,7 +47,7 @@
         <component :is="section.icon" class="w-6 h-6" aria-hidden="true" />
         <span
           v-if="section.key === 'chats' && incomingStore.hasNew"
-          class="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-sidebar)]"
+          class="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-sidebar-panel)]"
           aria-hidden="true"
           data-testid="dot-sidebar-v2-incoming-new"
         />
@@ -90,33 +90,37 @@
 
     <div
       v-if="versionLabel || schedulerStore.isStale"
-      class="mb-3 flex w-full flex-shrink-0 flex-col items-center justify-center gap-1 px-1"
+      class="mb-3 flex w-full flex-shrink-0 flex-col items-center"
       data-testid="section-sidebar-v2-version"
     >
-      <a
-        v-if="showUpdateLink"
-        :href="updatesStore.guideUrl ?? undefined"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="max-w-full text-center text-[10px] font-semibold leading-tight break-all"
-        :class="
-          isSecurityUpdate ? 'text-[var(--status-error-text)]' : 'text-[var(--status-warning-text)]'
-        "
-        :title="updateHint"
-        :aria-label="updateHint"
-        data-testid="link-sidebar-v2-update"
-      >
-        {{ versionLabel }}
-      </a>
-      <span
-        v-else-if="versionLabel"
-        class="max-w-full text-center text-[10px] leading-tight txt-secondary break-all"
-        :title="$t('updates.runningVersion', { version: versionLabel })"
-        data-testid="text-sidebar-v2-version"
-      >
-        {{ versionLabel }}
-      </span>
       <SchedulerStaleHint compact />
+      <div class="flex h-11 w-full items-center justify-center px-0.5">
+        <a
+          v-if="showUpdateLink"
+          :href="updatesStore.guideUrl ?? undefined"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="max-w-full text-center text-[10px] font-semibold leading-tight break-all"
+          :class="
+            isSecurityUpdate
+              ? 'text-[var(--status-error-text)]'
+              : 'text-[var(--status-warning-text)]'
+          "
+          :title="updateHint"
+          :aria-label="updateHint"
+          data-testid="link-sidebar-v2-update"
+        >
+          {{ versionLabel }}
+        </a>
+        <span
+          v-else-if="versionLabel"
+          class="max-w-full text-center text-[10px] leading-tight txt-secondary break-all"
+          :title="$t('updates.runningVersion', { version: versionLabel })"
+          data-testid="text-sidebar-v2-version"
+        >
+          {{ versionLabel }}
+        </span>
+      </div>
     </div>
   </aside>
 </template>

@@ -298,7 +298,7 @@ export const useAuthStore = defineStore('auth', () => {
     password: string,
     recaptchaToken?: string,
     language?: string
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; mailDelivered: boolean }> {
     loading.value = true
     error.value = null
 
@@ -306,14 +306,13 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await authService.register(email, password, recaptchaToken, language)
 
       if (result.success) {
-        return true
-      } else {
-        error.value = result.error || 'Registration failed'
-        return false
+        return { success: true, mailDelivered: result.mailDelivered !== false }
       }
+      error.value = result.error || 'Registration failed'
+      return { success: false, mailDelivered: true }
     } catch {
       error.value = 'Network error'
-      return false
+      return { success: false, mailDelivered: true }
     } finally {
       loading.value = false
     }

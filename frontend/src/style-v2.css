@@ -21,6 +21,9 @@
   --bg-sidebar: rgba(208, 218, 234, 0.94);
   /* Same hue, opaque: for a sidebar surface that floats over content. */
   --bg-sidebar-solid: #d0daea;
+  /* The other sidebar column, one step toward the chat surface. */
+  --bg-sidebar-panel: #dce4ef;
+  --bg-sidebar-panel-solid: #dce4ef;
   --bg-chat: #e8edf4;
   --bg-card: rgba(255, 255, 255, 0.96);
   --bg-chip: rgba(0, 0, 0, 0.07);
@@ -62,6 +65,9 @@
   --bg-app: #02050c;
   --bg-sidebar: rgba(8, 13, 24, 0.78);
   --bg-sidebar-solid: #070b15;
+  /* The other sidebar column, lifted a step so the two columns stay distinct. */
+  --bg-sidebar-panel: #101828;
+  --bg-sidebar-panel-solid: #101828;
   --bg-chat: #02050c;
   --bg-card: rgba(20, 31, 56, 0.94);
   --bg-chip: rgba(255, 255, 255, 0.07);
@@ -574,8 +580,13 @@
      side cutout never clips the icons. */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  background: var(--bg-sidebar);
   border-right: 1px solid var(--v2-border);
+}
+.design-v2 .v2-sidebar-rail {
+  background: var(--bg-sidebar-panel);
+}
+.design-v2 .v2-sidebar-panel {
+  background: var(--bg-sidebar);
 }
 .design-v2 .v2-sidebar-panel.v2-sidebar-panel--overlay {
   background: var(--bg-sidebar-solid);
@@ -1127,10 +1138,12 @@
   /* Opaque the two translucent glass surfaces (others are already solid). */
   .design-v2 {
     --bg-sidebar: #d0daea;
+    --bg-sidebar-panel: #dce4ef;
     --bg-card: #ffffff;
   }
   .design-v2.dark {
     --bg-sidebar: #070b15;
+    --bg-sidebar-panel: #101828;
     --bg-card: #131d35;
   }
   /* Remove the frosted-glass blur the translucency relied on. */

@@ -349,6 +349,30 @@ final readonly class ChatHandler implements MessageHandlerInterface
      *
      * @return list<RagScope>|null
      */
+    /**
+     * A profile's own folder is not an explicit search request. Passing it as
+     * "already searching" would skip the greeting check on every assistant turn.
+     *
+     * @param list<RagScope>|null  $agentScopes
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     */
+    private function assistantShouldSearchKnowledge(
+        ?array $agentScopes,
+        string $text,
+        array $classification,
+        array $options,
+        bool $isRagQuery,
+    ): bool {
+        $explicit = $options['rag_group_key'] ?? $classification['rag_group_key'] ?? null;
+
+        return \App\Service\Agent\AgentKnowledgeSearchGate::shouldSearch(
+            $agentScopes,
+            $text,
+            (is_string($explicit) && '' !== $explicit) || $isRagQuery,
+        );
+    }
+
     private function agentRagScopes(?RuntimeProfile $profile, int $viewerId): ?array
     {
         if (!$profile instanceof RuntimeProfile || null === $profile->agentId) {
@@ -357,7 +381,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $scopes = [];
         foreach ($profile->ragScopes as $scope) {
-            $scopes[] = new RagScope($scope['ownerId'], $scope['groupKey']);
+            $groupKey = $scope['groupKey'];
+            $scopes[] = new RagScope(
+                $scope['ownerId'],
+                '' === $groupKey ? null : $groupKey,
+                $scope['fileIds'] ?? [],
+            );
         }
         if ($profile->includeUserFiles) {
             $scopes[] = new RagScope($viewerId, null);
@@ -618,15 +647,29 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
         $isRagQuery = Capability::RagQuery->value === ($classification['intent'] ?? '');
-        $ragContext = $this->loadRagContext(
-            $message,
-            $topic,
-            $ragGroupKey,
-            $ragLimit,
-            $ragMinScore,
-            $this->agentRagScopes($profile, $message->getUserId()),
+        $agentScopes = $this->agentRagScopes($profile, $message->getUserId());
+        $searchKnowledge = $this->assistantShouldSearchKnowledge(
+            $agentScopes,
+            (string) $message->getText(),
+            $classification,
+            $options,
             $isRagQuery,
         );
+        $ragContext = '';
+        $ragSources = [];
+        if ($searchKnowledge) {
+            $loaded = $this->loadRagContext(
+                $message,
+                $topic,
+                $ragGroupKey,
+                $ragLimit,
+                $ragMinScore,
+                $agentScopes,
+                true,
+            );
+            $ragContext = $loaded['context'];
+            $ragSources = $loaded['sources'];
+        }
 
         if ($isRagQuery && '' === $ragContext) {
             $empty = $this->docsNotFoundReply($classification);
@@ -1231,6 +1274,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'feedbacks' => $loadedFeedbacks,
                 'digests' => $loadedDigests,
                 'docs' => $docsList,
+                'rag_sources' => $ragSources,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ]),
         ];
@@ -1297,19 +1341,28 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Load RAG context for task prompt (if files are associated)
         $ragContext = '';
+        $ragSources = [];
         $ragResultsCount = 0;
 
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
         $agentScopes = $this->agentRagScopes($profile, $message->getUserId());
         $isRagQuery = Capability::RagQuery->value === ($classification['intent'] ?? '');
 
-        if (!$ragGroupKey && 'general' !== $topic && !$isRagQuery) {
+        $searchKnowledge = $this->assistantShouldSearchKnowledge(
+            $agentScopes,
+            (string) $message->getText(),
+            $classification,
+            $options,
+            $isRagQuery,
+        );
+
+        if (!$ragGroupKey && 'general' !== $topic && $searchKnowledge) {
             $ragGroupKey = "TASKPROMPT:{$topic}";
         }
 
         $ragResults = [];
 
-        if (!empty($message->getText()) && (null !== $ragGroupKey || $isRagQuery)) {
+        if (!empty($message->getText()) && $searchKnowledge) {
             try {
                 error_log('🔍 ChatHandler: Attempting to load RAG context for topic: '.$topic.' (groupKey: '.$ragGroupKey.')');
 
@@ -1380,6 +1433,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
                 if (!empty($ragResults)) {
                     $ragContext = $this->knowledgeContextFormatter->formatRagContext($ragResults);
+                    $ragSources = $this->knowledgeContextFormatter->citationRefs($ragResults);
                     $ragResultsCount = count($ragResults);
 
                     error_log('🔍 ChatHandler: RAG context loaded, total length: '.strlen($ragContext));
@@ -2016,6 +2070,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'feedbacks' => $loadedFeedbacks,
                 'digests' => $loadedDigests,
                 'docs' => $docsList,
+                'rag_sources' => $ragSources,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ],
         ];
@@ -2498,14 +2553,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
         float $minScore = 0.3,
         ?array $explicitScopes = null,
         bool $forceUserKnowledge = false,
-    ): string {
+    ): array {
         if (empty($message->getText())) {
             $this->logger->debug('ChatHandler: Skipping RAG context (empty text)', [
                 'topic' => $topic,
                 'has_text' => false,
             ]);
 
-            return '';
+            return ['context' => '', 'sources' => []];
         }
 
         if (!$groupKey) {
@@ -2514,7 +2569,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     'topic' => $topic,
                 ]);
 
-                return '';
+                return ['context' => '', 'sources' => []];
             }
 
             if (!$forceUserKnowledge) {
@@ -2558,7 +2613,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
 
             if (empty($ragResults)) {
-                return '';
+                return ['context' => '', 'sources' => []];
             }
 
             $ragContext = $this->knowledgeContextFormatter->formatRagContext($ragResults);
@@ -2570,7 +2625,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'group_key' => $groupKey,
             ]);
 
-            return $ragContext;
+            return [
+                'context' => $ragContext,
+                'sources' => $this->knowledgeContextFormatter->citationRefs($ragResults),
+            ];
         } catch (\Throwable $e) {
             error_log('❌ ChatHandler: RAG context loading failed: '.$e->getMessage());
             error_log('❌ Stack trace: '.$e->getTraceAsString());
@@ -2581,7 +2639,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'group_key' => $groupKey,
             ]);
 
-            return '';
+            return ['context' => '', 'sources' => []];
         }
     }
 

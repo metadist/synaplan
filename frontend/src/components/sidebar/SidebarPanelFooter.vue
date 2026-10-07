@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex-shrink-0 border-t border-black/[0.06] dark:border-white/[0.06] px-3 pt-3 pb-3 flex flex-col gap-2"
+    class="flex-shrink-0 border-t border-black/[0.06] dark:border-white/[0.06] px-4 pt-3 pb-3 flex flex-col gap-2"
     data-testid="section-sidebar-footer"
   >
     <button
@@ -77,11 +77,9 @@
           @click.stop
         >
           <template v-if="isGuestMode">
-            <div class="px-3 py-2 border-b border-light-border/10 dark:border-dark-border/10">
-              <p class="text-[13px] font-medium txt-secondary">
-                {{ $t('guest.banner.title') }}
-              </p>
-            </div>
+            <p class="px-3 py-2 text-[13px] font-medium txt-secondary">
+              {{ $t('guest.banner.title') }}
+            </p>
             <router-link
               v-if="configStore.auth.registrationEnabled"
               to="/register"
@@ -105,81 +103,18 @@
           </template>
 
           <template v-else>
-            <div class="px-3 py-2 border-b border-light-border/10 dark:border-dark-border/10">
-              <p class="text-[13px] font-medium txt-primary truncate">
-                {{ authStore.user?.email || '' }}
-              </p>
-            </div>
-            <button
-              v-if="isMemoryServiceAvailable"
-              type="button"
-              role="menuitem"
-              class="dropdown-item"
-              :class="{ 'opacity-60': !memoriesEnabledForUser }"
-              data-testid="btn-sidebar-v2-memories"
-              @click="openMemories"
-            >
-              <Icon icon="mdi:brain" class="w-4 h-4" />
-              <span>{{ $t('pageTitles.memories') }}</span>
-              <Icon
-                v-if="!memoriesEnabledForUser"
-                icon="mdi:lock"
-                class="w-3.5 h-3.5 ml-auto text-orange-500 dark:text-orange-400"
-              />
-            </button>
-            <div class="border-t border-light-border/10 dark:border-dark-border/10">
-              <button
-                type="button"
-                role="menuitem"
-                class="dropdown-item"
-                data-testid="btn-sidebar-v2-statistics"
-                @click="go('/statistics')"
-              >
-                <ChartBarIcon class="w-4 h-4" />
-                <span>{{ $t('nav.statistics') }}</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                class="dropdown-item"
-                data-testid="btn-sidebar-v2-feedback"
-                @click="go('/feedbacks')"
-              >
-                <Icon icon="mdi:comment-quote-outline" class="w-4 h-4" />
-                <span>{{ $t('pageTitles.feedback') }}</span>
-              </button>
-              <button
-                v-if="showSubscription"
-                type="button"
-                role="menuitem"
-                class="dropdown-item"
-                data-testid="btn-sidebar-v2-subscription"
-                @click="go('/subscription')"
-              >
-                <CreditCardIcon class="w-4 h-4" />
-                <span>{{ $t('nav.subscription') }}</span>
-              </button>
-            </div>
-          </template>
-
-          <div class="border-t border-light-border/10 dark:border-dark-border/10">
             <button
               type="button"
               role="menuitem"
               class="dropdown-item"
-              data-testid="btn-sidebar-v2-preferences"
-              @click="go('/settings')"
+              data-testid="btn-sidebar-v2-profile"
+              @click="go('/settings/profile')"
             >
-              <Cog6ToothIcon class="w-4 h-4" />
-              <span>{{ $t('nav.preferences') }}</span>
+              <UserCircleIcon class="w-4 h-4" />
+              <span>{{ $t('nav.profile') }}</span>
             </button>
-          </div>
-
-          <div
-            v-if="!isGuestMode && !isImpersonating"
-            class="border-t border-light-border/10 dark:border-dark-border/10"
-          >
             <button
+              v-if="!isImpersonating"
               type="button"
               role="menuitem"
               class="dropdown-item text-red-500 dark:text-red-400"
@@ -189,7 +124,7 @@
               <ArrowRightOnRectangleIcon class="w-4 h-4" />
               <span>{{ $t('settings.logout') }}</span>
             </button>
-          </div>
+          </template>
         </div>
       </div>
     </Transition>
@@ -201,12 +136,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRightOnRectangleIcon,
-  ChartBarIcon,
   ChevronUpIcon,
-  Cog6ToothIcon,
-  CreditCardIcon,
   MagnifyingGlassIcon,
   RocketLaunchIcon,
+  UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -230,9 +163,6 @@ const purchaseAllowed = isPurchaseAllowed()
 const searchShortcut = computed(() => paletteShortcutLabel(t('search.palette.modifier')))
 const searchHint = computed(() => t('search.palette.openHint', { shortcut: searchShortcut.value }))
 
-const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
-const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
-
 const showUpgrade = computed(
   () =>
     !isGuestMode.value &&
@@ -241,10 +171,6 @@ const showUpgrade = computed(
     purchaseAllowed &&
     !authStore.isPro
 )
-const showSubscription = computed(
-  () => !authStore.isAdmin && configStore.billing.enabled && purchaseAllowed && authStore.isPro
-)
-
 const initials = computed(() => (authStore.user?.email || 'G').charAt(0).toUpperCase())
 
 const userMenuOpen = ref(false)
@@ -268,10 +194,6 @@ const toggleUserMenu = () => {
 const go = (path: string) => {
   userMenuOpen.value = false
   router.push(path)
-}
-
-const openMemories = () => {
-  go(memoriesEnabledForUser.value ? '/memories' : '/settings#memories')
 }
 
 const handleLogout = async () => {

@@ -1874,7 +1874,7 @@ final class WhatsAppService
         }
         $recordedChatUsage = $aiMetadata['recorded_chat_usage'] ?? null;
         if ($recordedChatUsage instanceof RecordedUsage) {
-            $outgoingMessage->setMeta('ai_chat_cost', $recordedChatUsage->chargedCost);
+            $recordedChatUsage->attachChatCost($outgoingMessage);
         }
         if (!empty($classification['sorting_provider'])) {
             $outgoingMessage->setMeta('ai_sorting_provider', (string) $classification['sorting_provider']);
@@ -1888,17 +1888,11 @@ final class WhatsAppService
 
         $usageExtra = [];
         if (is_array($classification['sorting_usage'] ?? null)) {
-            $usageExtra[] = [
-                'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
-                'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
-                'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
-                'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
-                'modelKey' => RecordedUsage::modelKey(
-                    $classification['sorting_provider'] ?? null,
-                    $classification['sorting_model_name'] ?? null,
-                ),
-                'kind' => 'SORT',
-            ];
+            $usageExtra[] = RecordedUsage::fromSortingUsage(
+                $classification['sorting_usage'],
+                isset($classification['sorting_provider']) ? (string) $classification['sorting_provider'] : null,
+                isset($classification['sorting_model_name']) ? (string) $classification['sorting_model_name'] : null,
+            );
         }
         foreach (['planning_usage', 'transcription_usage'] as $usageKey) {
             if (is_array($aiMetadata[$usageKey] ?? null)) {

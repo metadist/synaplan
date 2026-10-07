@@ -203,6 +203,7 @@ final readonly class MessageApiFormatter
             'aiModels' => !empty($aiModels) ? $aiModels : null, // AI model metadata
             'webSearch' => $webSearchData, // Web search metadata
             'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
+            'ragSources' => $this->decodeRagSources($m),
             'usage' => $usage, // Per-message token/cost usage (taximeter); null when absent
             'usageExtra' => $usageExtra, // Auxiliary usage of this turn (sorting/planning/transcription/media/TTS); null when absent
             'multitask' => $wasMultitask, // True when the turn ran the multi-task DAG
@@ -265,14 +266,16 @@ final readonly class MessageApiFormatter
      * Rebuild the per-message usage object for the taximeter from message meta.
      *
      * Shape mirrors the SSE `complete` `usage` payload:
-     *   { promptTokens, completionTokens, totalTokens, cost, modelKey, kind }
+     *   { promptTokens, completionTokens, totalTokens, cost, modelKey, kind, priceKnown }
      *
      * Returns null when no token usage was recorded (ai_chat_usage meta absent),
      * so the field is simply omitted rather than shipping a null-filled object.
      * `cost` is null when ai_chat_cost is absent (e.g. non-web channels that
      * never went through the taximeter write path).
+     * `priceKnown` is false when the answer's model was imported without a
+     * published price, so the cost line says "price unknown" instead of 0.00.
      *
-     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string|null, modelKey: string, kind: string}|null
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string|null, modelKey: string, kind: string, priceKnown: bool}|null
      */
     private function buildUsage(Message $m): ?array
     {
@@ -307,6 +310,7 @@ final readonly class MessageApiFormatter
             'cost' => (null !== $cost && '' !== $cost) ? $cost : null,
             'modelKey' => $modelKey,
             'kind' => 'LLM',
+            'priceKnown' => '0' !== (string) ($m->getMeta('ai_chat_price_known') ?? '1'),
         ];
     }
 
@@ -315,7 +319,7 @@ final readonly class MessageApiFormatter
      * sorting, planning, transcription, media renders, TTS) back into the API list shape.
      * Null when absent or malformed — the field is simply omitted.
      *
-     * @return list<array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}>|null
+     * @return list<array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string, priceKnown: bool}>|null
      */
     private function buildUsageExtra(Message $m): ?array
     {
@@ -341,6 +345,7 @@ final readonly class MessageApiFormatter
                 'cost' => (string) ($entry['cost'] ?? '0'),
                 'modelKey' => (string) ($entry['modelKey'] ?? 'unknown'),
                 'kind' => (string) ($entry['kind'] ?? 'LLM'),
+                'priceKnown' => !array_key_exists('priceKnown', $entry) || false !== $entry['priceKnown'],
             ];
         }
 
@@ -356,6 +361,23 @@ final readonly class MessageApiFormatter
      *
      * @return array<string, mixed>|null
      */
+    /**
+     * @return list<array<string, mixed>>|null
+     */
+    private function decodeRagSources(Message $m): ?array
+    {
+        $raw = $m->getMeta('rag_sources');
+        if (!is_string($raw) || '' === $raw) {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || [] === $decoded) {
+            return null;
+        }
+
+        return $decoded;
+    }
+
     private function decodeTaskPlanMeta(Message $m): ?array
     {
         $raw = $m->getMeta('task_plan');

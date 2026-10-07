@@ -422,6 +422,22 @@ describe('consumeVisibleAnswer', () => {
     const third = consumeVisibleAnswer('The answer', second.insideThink)
     expect(third.text.trim()).toBe('The answer')
   })
+
+  it('holds a think tag that arrives split across chunks', () => {
+    const first = consumeVisibleAnswer('Before <thi', false, '')
+    expect(first.text).toBe('Before ')
+    expect(first.insideThink).toBe(false)
+    expect(first.pending).toBe('<thi')
+
+    const second = consumeVisibleAnswer('nk>secret</thi', first.insideThink, first.pending)
+    expect(second.text).toBe('')
+    expect(second.insideThink).toBe(true)
+
+    const third = consumeVisibleAnswer('nk>After', second.insideThink, second.pending)
+    expect(third.text).toBe('After')
+    expect(third.insideThink).toBe(false)
+    expect(third.pending).toBe('')
+  })
 })
 
 describe('formatDurationSeconds', () => {

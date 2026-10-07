@@ -253,6 +253,25 @@
             </div>
           </div>
 
+          <div
+            v-if="selectedGroupLabel"
+            class="flex items-center gap-2 px-3 pb-1"
+            data-testid="chip-knowledge-folder"
+          >
+            <span class="text-xs txt-secondary">
+              {{ $t('chatInput.knowledgeActive', { name: selectedGroupLabel }) }}
+            </span>
+            <button
+              type="button"
+              class="btn-secondary inline-flex items-center px-3 py-2 rounded-xl text-xs font-medium"
+              :aria-label="$t('chatInput.knowledgeClear')"
+              data-testid="btn-knowledge-folder-clear"
+              @click="selectedGroupKey = ''"
+            >
+              {{ $t('chatInput.knowledgeClear') }}
+            </button>
+          </div>
+
           <!-- Control bar. Plus and the tool badge on the left; the model chip,
                microphone and send on the right. Enhance lives on the text row. -->
           <div
@@ -657,6 +676,11 @@ let dictationUnmounted = false
 // Knowledge-base folder ("group key") to scope this chat's RAG retrieval to.
 const knowledgeGroups = ref<Array<{ name: string; count: number }>>([])
 const selectedGroupKey = ref<string>('')
+const selectedGroupLabel = computed(() => {
+  const key = selectedGroupKey.value
+  if (!key) return ''
+  return knowledgeGroups.value.find((group) => group.name === key)?.name ?? key
+})
 
 const SILENCE_TIMEOUT_MS = 4000
 const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)

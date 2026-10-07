@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\DTO\Tool\ApprovalResponse;
 use App\Entity\User;
 use App\Message\ResumeApprovalCommand;
+use App\Service\MailerConfig;
 use App\Service\Tool\ApprovalNotFoundException;
 use App\Service\Tool\ApprovalService;
 use App\Service\Tool\ToolsConfig;
@@ -28,6 +29,7 @@ final class ApprovalController extends AbstractController
         private ApprovalService $approvals,
         private ToolsConfig $toolsConfig,
         private MessageBusInterface $bus,
+        private MailerConfig $mailerConfig,
     ) {
     }
 
@@ -178,6 +180,7 @@ final class ApprovalController extends AbstractController
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'mode', type: 'string', enum: ['instant', 'digest']),
+                        new OA\Property(property: 'mailConfigured', type: 'boolean'),
                     ]
                 )
             ),
@@ -194,6 +197,7 @@ final class ApprovalController extends AbstractController
         return $this->json([
             'success' => true,
             'mode' => $this->toolsConfig->notifyMode((int) $user->getId()),
+            'mailConfigured' => $this->mailerConfig->isConfigured(),
         ]);
     }
 

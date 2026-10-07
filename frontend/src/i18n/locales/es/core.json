@@ -124,7 +124,7 @@
     "collapseSidebar": "Contraer barra lateral",
     "expandSidebar": "Expandir barra lateral",
     "pinned": "Fijados",
-    "chatsEmpty": "Tus chats aparecen aquí.",
+    "chatsEmpty": "No hay chats",
     "tools": "Herramientas",
     "toolsChatWidget": "Widgets de chat",
     "toolsMailHandler": "Gestor de correo",
@@ -503,7 +503,8 @@
       "free": "Gratis",
       "low": "Low Cost",
       "mid": "Mid Cost",
-      "high": "High Cost"
+      "high": "High Cost",
+      "unknown": "Precio desconocido"
     }
   },
   "realtime": {

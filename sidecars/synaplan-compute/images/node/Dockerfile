@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+FROM node:24-bookworm-slim@sha256:eae779f20e0cdf264247f6f3b4e62510d91f168a615117ed38430ba295f55590
 # Production pins this image by digest in internal/images/map.go (A3).
 RUN useradd --uid 65534 --gid 65534 --no-create-home --shell /usr/sbin/nologin nobody || true
 # Libraries live outside /work: the run bind-mounts /work over whatever the

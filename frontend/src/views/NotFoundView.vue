@@ -104,7 +104,7 @@
             <span class="text-sm txt-primary">{{ $t('nav.files') }}</span>
           </router-link>
           <router-link
-            to="/settings#profile"
+            to="/settings/profile"
             class="p-4 rounded-lg hover-surface transition-colors group"
           >
             <Cog6ToothIcon

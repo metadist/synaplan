@@ -175,6 +175,8 @@
     "fidelityNotice": "Parte del formato del archivo original no se pudo conservar. Aun así puedes editar el contenido.",
     "fidelityContinue": "Continuar",
     "removeFile": "Eliminar archivo",
+    "cancelUpload": "Cancelar la subida",
+    "uploadCancelled": "La subida se detuvo.",
     "dropFiles": "Suelta archivos aquí para subir",
     "dropFilesHint": "Suelta para agregar archivos a la cola de subida",
     "filesAddedToQueue": "{count} archivo agregado - listo para subir | {count} archivos agregados - listos para subir",

@@ -35,6 +35,8 @@ export interface AIModel {
   rating: number
   priceIn: number
   priceOut: number
+  /** False when the model was imported without a published price. Absent means the price is known (including a real zero). */
+  priceKnown?: boolean
   selectable?: boolean // Not returned by backend getModels
   description: string | null
   isSystemModel: boolean

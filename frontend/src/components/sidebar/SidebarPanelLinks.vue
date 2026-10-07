@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col gap-4 px-2 py-2">
+  <div class="flex flex-col gap-4 px-3 py-2">
     <section
       v-for="group in groups"
       :key="group.key ?? 'flat'"

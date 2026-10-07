@@ -124,7 +124,7 @@
     "collapseSidebar": "Kenar çubuğunu daralt",
     "expandSidebar": "Kenar çubuğunu genişlet",
     "pinned": "Sabitlenenler",
-    "chatsEmpty": "Sohbetleriniz burada görünür.",
+    "chatsEmpty": "Sohbet yok",
     "tools": "Araçlar",
     "toolsChatWidget": "Sohbet widget'ları",
     "toolsMailHandler": "E-posta işleyici",
@@ -503,7 +503,8 @@
       "free": "Ücretsiz",
       "low": "Low Cost",
       "mid": "Mid Cost",
-      "high": "High Cost"
+      "high": "High Cost",
+      "unknown": "Fiyat bilinmiyor"
     }
   },
   "realtime": {

@@ -109,6 +109,48 @@ final class AgentDefinitionValidatorTest extends TestCase
         }
     }
 
+    public function testFolderNamesWithSpacesAndNonAsciiAreAccepted(): void
+    {
+        $validated = $this->validator->validate([
+            'schema' => 'agent.v1',
+            'knowledge' => [
+                'folders' => ['4:Test KB files', '9:Rechnungen 2026 — Müller'],
+                'fileIds' => [12, 12, 40],
+            ],
+        ]);
+
+        self::assertSame(
+            ['4:Test KB files', '9:Rechnungen 2026 — Müller'],
+            $validated->toArray()['knowledge']['folders'],
+        );
+        self::assertSame([12, 40], $validated->knowledgeFileIds());
+    }
+
+    public function testFolderKeyRejectsControlCharactersAndOverlongNames(): void
+    {
+        try {
+            $this->validator->validate([
+                'schema' => 'agent.v1',
+                'knowledge' => ['folders' => ["4:bad\nname"]],
+            ]);
+            self::fail('A newline in a folder name must be rejected');
+        } catch (AgentDefinitionException $e) {
+            self::assertSame('knowledge.folders.0', $e->path);
+            self::assertStringContainsString('control character', $e->getMessage());
+        }
+
+        try {
+            $this->validator->validate([
+                'schema' => 'agent.v1',
+                'knowledge' => ['folders' => ['4:'.str_repeat('a', 129)]],
+            ]);
+            self::fail('A folder key longer than 128 characters must be rejected');
+        } catch (AgentDefinitionException $e) {
+            self::assertSame('knowledge.folders.0', $e->path);
+            self::assertStringContainsString('longer than 128', $e->getMessage());
+        }
+    }
+
     public function testRealCatalogKeysAndContactFoldersAreAccepted(): void
     {
         $validated = $this->validator->validate([

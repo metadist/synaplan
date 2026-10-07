@@ -9,8 +9,10 @@ use App\Entity\User;
 use App\Repository\ApprovalRepository;
 use App\Repository\MessageRepository;
 use App\Repository\SavedTaskRunRepository;
+use App\Repository\UserRepository;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\InternalEmailService;
+use App\Service\MailerConfig;
 
 final readonly class ApprovalService
 {
@@ -24,13 +26,30 @@ final readonly class ApprovalService
         private ?SavedTaskRunRepository $savedTaskRuns = null,
         private ?InternalEmailService $mail = null,
         private ?ChatApprovalContinuationService $continuation = null,
+        private ?MailerConfig $mailerConfig = null,
+        private ?UserRepository $users = null,
     ) {
     }
 
     /**
-     * @param array<string, mixed> $args
+     * Arguments the tool will actually receive. The stored row may also carry
+     * the masked request shown on the card.
+     *
+     * @return array<string, mixed>
      */
-    public function request(ToolDescriptor $tool, array $args, string $requestedBy, User $owner): Approval
+    public static function executionArgs(Approval $approval): array
+    {
+        $args = $approval->getArgs() ?? [];
+        unset($args['resolvedRequest']);
+
+        return $args;
+    }
+
+    /**
+     * @param array<string, mixed>      $args
+     * @param array<string, mixed>|null $resolvedRequest method, url, masked headers, body
+     */
+    public function request(ToolDescriptor $tool, array $args, string $requestedBy, User $owner, ?array $resolvedRequest = null): Approval
     {
         $expiresAt = time() + ($this->toolsConfig->approvalExpiryHours((int) $owner->getId()) * 3600);
         $approval = new Approval(
@@ -41,8 +60,12 @@ final readonly class ApprovalService
             $expiresAt,
         );
         $redacted = $this->redactor->redact($args);
+        $maskedRequest = $this->maskResolvedRequest($resolvedRequest);
+        if (null !== $maskedRequest) {
+            $redacted['resolvedRequest'] = $maskedRequest;
+        }
         $approval->setArgs($redacted);
-        $approval->setPreview($this->redactor->preview($tool->title, $redacted));
+        $approval->setPreview($this->redactor->preview($tool->title, $this->redactor->redact($args)));
         $this->approvals->save($approval);
         $this->realtime->pending($approval);
         $this->auditLogWriter->record(
@@ -103,6 +126,9 @@ final readonly class ApprovalService
         if (null === $this->mail) {
             return;
         }
+        if (null !== $this->mailerConfig && !$this->mailerConfig->isConfigured()) {
+            return;
+        }
         if (ToolsConfig::NOTIFY_INSTANT !== $this->toolsConfig->notifyMode((int) $owner->getId())) {
             return;
         }
@@ -114,7 +140,7 @@ final readonly class ApprovalService
         try {
             $this->mail->sendApprovalRequestEmail(
                 $address,
-                (string) $approval->getPreview(),
+                $approval->getTool(),
                 rtrim($frontendUrl, '/').'/channels/approvals',
             );
         } catch (\Throwable) {
@@ -157,9 +183,71 @@ final readonly class ApprovalService
             'expiresAt' => $approval->getExpiresAt(),
             'created' => $approval->getCreated(),
             'decidedAt' => $approval->getDecidedAt(),
+            'decidedBy' => $approval->getDecidedBy(),
+            'decidedByName' => $this->deciderName($approval),
+            'resolvedRequest' => $this->resolvedRequest($approval),
             'requestedBy' => $reference->toArray(),
             'canAlwaysAllow' => $approval->isPending() && $this->canAlwaysAllow($approval),
         ];
+    }
+
+    /**
+     * @param array<string, mixed>|null $request
+     *
+     * @return array{method: string, url: string, headers: array<string, string>, body: string|null}|null
+     */
+    private function maskResolvedRequest(?array $request): ?array
+    {
+        if (null === $request) {
+            return null;
+        }
+        $method = strtoupper(trim((string) ($request['method'] ?? '')));
+        $url = trim((string) ($request['url'] ?? ''));
+        if ('' === $method || '' === $url) {
+            return null;
+        }
+        $headers = [];
+        $rawHeaders = is_array($request['headers'] ?? null) ? $request['headers'] : [];
+        foreach ($rawHeaders as $name => $value) {
+            $header = (string) $name;
+            $text = is_scalar($value) ? (string) $value : '';
+            if (1 === preg_match('/authorization|token|secret|password|api[_-]?key|credential/i', $header)) {
+                $text = '[redacted]';
+            }
+            $headers[$header] = $text;
+        }
+        $body = isset($request['body']) && is_string($request['body']) ? $request['body'] : null;
+        if (null !== $body && mb_strlen($body) > 8192) {
+            $body = mb_substr($body, 0, 8192);
+        }
+
+        return [
+            'method' => $method,
+            'url' => $url,
+            'headers' => $headers,
+            'body' => $body,
+        ];
+    }
+
+    /**
+     * @return array{method: string, url: string, headers: array<string, string>, body: string|null}|null
+     */
+    private function resolvedRequest(Approval $approval): ?array
+    {
+        $stored = $approval->getArgs()['resolvedRequest'] ?? null;
+
+        return is_array($stored) ? $this->maskResolvedRequest($stored) : null;
+    }
+
+    private function deciderName(Approval $approval): ?string
+    {
+        $id = $approval->getDecidedBy();
+        if (null === $id || null === $this->users) {
+            return null;
+        }
+        $user = $this->users->find($id);
+
+        return $user instanceof User ? $user->getDisplayName() : null;
     }
 
     /**

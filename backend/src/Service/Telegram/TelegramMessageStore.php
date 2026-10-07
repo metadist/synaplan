@@ -182,7 +182,7 @@ final readonly class TelegramMessageStore
             $outbound->setMeta('ai_chat_usage', (string) json_encode($metadata['usage']));
         }
         if (null !== $recorded) {
-            $outbound->setMeta('ai_chat_cost', $recorded->chargedCost);
+            $recorded->attachChatCost($outbound);
         }
         foreach (['sorting_provider' => 'ai_sorting_provider', 'sorting_model_name' => 'ai_sorting_model', 'sorting_model_id' => 'ai_sorting_model_id'] as $source => $key) {
             $value = $classification[$source] ?? null;

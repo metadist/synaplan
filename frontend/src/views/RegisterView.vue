@@ -105,7 +105,11 @@
                 {{ $t('auth.registrationSuccess') }}
               </h3>
               <p class="txt-secondary text-sm leading-relaxed mb-6 max-w-xs mx-auto">
-                {{ $t('auth.registrationSuccessDesc') }}
+                {{
+                  registrationNeedsAdmin
+                    ? $t('auth.registrationNoMailDesc')
+                    : $t('auth.registrationSuccessDesc')
+                }}
               </p>
               <button
                 class="auth-submit-btn btn-primary"
@@ -492,6 +496,7 @@ const { register, error: authError, loading, clearError } = useAuth()
 const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
+const registrationNeedsAdmin = ref(false)
 // Native OAuth errors surface through the same banner as registration errors.
 // Provider catalogue + the provider round trip live in the shared composable.
 const {
@@ -530,8 +535,11 @@ const handleRegister = async () => {
   if (password.value !== confirmPassword.value) return
 
   const recaptchaToken = await getReCaptchaToken('register')
-  const success = await register(email.value, password.value, recaptchaToken, String(locale.value))
-  if (success) registrationSuccess.value = true
+  const result = await register(email.value, password.value, recaptchaToken, String(locale.value))
+  if (result.success) {
+    registrationNeedsAdmin.value = !result.mailDelivered
+    registrationSuccess.value = true
+  }
 }
 
 const handleSocialLogin = async (provider: string) => {

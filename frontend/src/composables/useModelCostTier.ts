@@ -1,6 +1,6 @@
 import type { AIModel } from '@/types/ai-models'
 
-export type CostTier = 'low' | 'mid' | 'high' | 'free'
+export type CostTier = 'low' | 'mid' | 'high' | 'free' | 'unknown'
 
 export interface CostTierInfo {
   tier: CostTier
@@ -11,6 +11,10 @@ export interface CostTierInfo {
 const TIER_CONFIG: Record<CostTier, { label: string; class: string }> = {
   free: {
     label: 'models.costTier.free',
+    class: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  },
+  unknown: {
+    label: 'models.costTier.unknown',
     class: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
   },
   low: {
@@ -62,6 +66,10 @@ function getMedianForPeers(peers: readonly AIModel[]): number {
  */
 export function getCostTier(model: AIModel, peers: readonly AIModel[]): CostTierInfo {
   const avgCost = getAverageCost(model)
+
+  if (model.priceKnown === false && avgCost <= 0) {
+    return { ...TIER_CONFIG.unknown, tier: 'unknown' }
+  }
 
   if (avgCost <= 0) return { ...TIER_CONFIG.free, tier: 'free' }
 

@@ -72,6 +72,8 @@ export interface TimelineState {
   nextId: number
   /** True while a `<think>` block is still open across SSE data chunks. */
   insideThink?: boolean
+  /** Trailing characters that may be the start of a `<think>` tag split across chunks. */
+  pendingThink?: string
 }
 
 const STEP_BY_STATUS: Record<string, TimelineStepKey> = {
@@ -216,33 +218,40 @@ function rememberModel(state: TimelineState, metadata: StreamEventMetadata | und
  */
 export function consumeVisibleAnswer(
   chunk: string,
-  insideThink = false
-): { text: string; insideThink: boolean } {
-  let rest = chunk
+  insideThink = false,
+  pending = ''
+): { text: string; insideThink: boolean; pending: string } {
+  let rest = pending + chunk
   let out = ''
   let inside = insideThink
 
   while (rest.length > 0) {
-    if (inside) {
-      const close = /<\/think>/i.exec(rest)
-      if (!close || close.index === undefined) {
-        return { text: out, insideThink: true }
-      }
-      rest = rest.slice(close.index + close[0].length)
-      inside = false
-      continue
+    const tag = inside ? '</think>' : '<think>'
+    const at = rest.toLowerCase().indexOf(tag)
+    if (at === -1) {
+      const hold = thinkTagPrefix(rest, tag)
+      const visible = inside ? '' : rest.slice(0, rest.length - hold.length)
+      return { text: out + visible, insideThink: inside, pending: hold }
     }
-    const open = /<think>/i.exec(rest)
-    if (!open || open.index === undefined) {
-      out += rest
-      return { text: out, insideThink: false }
+    if (!inside) {
+      out += rest.slice(0, at)
     }
-    out += rest.slice(0, open.index)
-    rest = rest.slice(open.index + open[0].length)
-    inside = true
+    rest = rest.slice(at + tag.length)
+    inside = !inside
   }
 
-  return { text: out, insideThink: inside }
+  return { text: out, insideThink: inside, pending: '' }
+}
+
+function thinkTagPrefix(text: string, tag: string): string {
+  const lower = text.toLowerCase()
+  const max = Math.min(lower.length, tag.length - 1)
+  for (let len = max; len > 0; len--) {
+    if (tag.startsWith(lower.slice(lower.length - len))) {
+      return text.slice(text.length - len)
+    }
+  }
+  return ''
 }
 
 /** Visible answer text after stripping buffered `<think>` blocks. */
@@ -298,8 +307,13 @@ export function ingestTimelineEvent(
   }
 
   if (status === 'data' && typeof payload.chunk === 'string' && payload.chunk !== '') {
-    const visible = consumeVisibleAnswer(payload.chunk, state.insideThink ?? false)
+    const visible = consumeVisibleAnswer(
+      payload.chunk,
+      state.insideThink ?? false,
+      state.pendingThink ?? ''
+    )
     state.insideThink = visible.insideThink
+    state.pendingThink = visible.pending
     if (visible.text.trim() === '') {
       return state
     }

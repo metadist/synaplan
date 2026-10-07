@@ -21,7 +21,19 @@ final class ModelDiscoveryServiceTest extends TestCase
 
         $endpoints = $this->createMock(OpenAiCompatibleEndpointRegistry::class);
         $endpoints->method('getEndpoint')->willReturn($this->endpointRow());
-        $endpoints->method('listModelIds')->willReturn(['ok' => true, 'ids' => $ids]);
+        $endpoints->method('listModelCatalog')->willReturn([
+            'ok' => true,
+            'models' => array_map(
+                static fn (string $id): array => [
+                    'id' => $id,
+                    'name' => null,
+                    'priceInPerMillion' => null,
+                    'priceOutPerMillion' => null,
+                    'priceKnown' => false,
+                ],
+                $ids,
+            ),
+        ]);
 
         $models = $this->createMock(ModelRepository::class);
         $models->method('findByServiceIndexedByProviderId')
@@ -47,13 +59,38 @@ final class ModelDiscoveryServiceTest extends TestCase
 
         self::assertSame(['rerank'], $byId['BAAI/bge-reranker-v2-m3']->guessedTags);
         self::assertSame(['chat', 'pic2text'], $byId['mistralai/Pixtral-12B-2409']->guessedTags);
+        self::assertFalse($byId['Qwen/Qwen3-32B']->priceKnown);
+    }
+
+    public function testOpenRouterPricesAreKeptAsUsdPerMillion(): void
+    {
+        $endpoints = $this->createMock(OpenAiCompatibleEndpointRegistry::class);
+        $endpoints->method('getEndpoint')->willReturn($this->endpointRow());
+        $endpoints->method('listModelCatalog')->willReturn([
+            'ok' => true,
+            'models' => [[
+                'id' => 'openai/gpt-4o',
+                'name' => 'GPT-4o',
+                'priceInPerMillion' => 2.5,
+                'priceOutPerMillion' => 10.0,
+                'priceKnown' => true,
+            ]],
+        ]);
+
+        $result = $this->service($endpoints, $this->createMock(OllamaModelInventory::class), $this->createMock(ModelRepository::class))
+            ->discover('openai_compatible:vllm-lab');
+
+        self::assertTrue($result->models[0]->priceKnown);
+        self::assertSame(2.5, $result->models[0]->priceInPerMillion);
+        self::assertSame(10.0, $result->models[0]->priceOutPerMillion);
+        self::assertSame('GPT-4o', $result->models[0]->name);
     }
 
     public function testUnreachableEndpointReturnsNotOkWithoutThrowing(): void
     {
         $endpoints = $this->createMock(OpenAiCompatibleEndpointRegistry::class);
         $endpoints->method('getEndpoint')->willReturn($this->endpointRow());
-        $endpoints->method('listModelIds')->willReturn(['ok' => false, 'ids' => [], 'error' => 'timeout']);
+        $endpoints->method('listModelCatalog')->willReturn(['ok' => false, 'models' => [], 'error' => 'timeout']);
 
         $result = $this->service($endpoints, $this->createMock(OllamaModelInventory::class), $this->createMock(ModelRepository::class))
             ->discover('openai_compatible:vllm-lab');

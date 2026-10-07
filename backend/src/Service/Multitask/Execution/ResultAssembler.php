@@ -29,7 +29,32 @@ final class ResultAssembler
         'en' => "I couldn't fully complete that request.",
         'de' => 'Ich konnte diese Anfrage leider nicht vollständig abschließen.',
         'es' => 'No pude completar esa solicitud por completo.',
+        'fr' => "Je n'ai pas pu terminer cette demande entièrement.",
         'tr' => 'Bu isteği tamamen tamamlayamadım.',
+    ];
+
+    /**
+     * Shown while a step is waiting for a decision. The tool has not run.
+     */
+    private const WAITING_TEXT = [
+        'en' => 'Waiting for your approval. Nothing has been sent yet.',
+        'de' => 'Warte auf deine Freigabe. Es wurde noch nichts gesendet.',
+        'es' => 'Esperando tu aprobación. Todavía no se ha enviado nada.',
+        'fr' => 'En attente de votre approbation. Rien n’a encore été envoyé.',
+        'tr' => 'Onayın bekleniyor. Henüz bir şey gönderilmedi.',
+    ];
+
+    /**
+     * Appended by {@see bestEffort()} for each failed visible step when the
+     * reply node produced nothing. `{label}` and `{error}` stay in this order
+     * in every language so the sentence does not depend on grammar around them.
+     */
+    private const FAILED_STEP_TEXT = [
+        'en' => 'One step could not be completed: {label}. {error}',
+        'de' => 'Ein Schritt konnte nicht abgeschlossen werden: {label}. {error}',
+        'es' => 'No se pudo completar un paso: {label}. {error}',
+        'fr' => "Une étape n'a pas pu être terminée : {label}. {error}",
+        'tr' => 'Bir adım tamamlanamadı: {label}. {error}',
     ];
 
     /**
@@ -168,6 +193,20 @@ final class ResultAssembler
         // The replyNode is typically chat/summarize/compose_reply and does NOT
         // carry search_results in its own metadata, which is why DAG turns were
         // missing the Sources dropdown (issue: QA feedback PR #1076).
+        if (!isset($metadata['rag_sources'])) {
+            foreach ($plan->nodes as $node) {
+                $ragNodeResult = $context->getResult($node->id);
+                if (null === $ragNodeResult || !$ragNodeResult->isSuccessful()) {
+                    continue;
+                }
+                $refs = $ragNodeResult->metadata['rag_sources'] ?? null;
+                if (is_array($refs) && [] !== $refs) {
+                    $metadata['rag_sources'] = $refs;
+                    break;
+                }
+            }
+        }
+
         if (!isset($metadata['search_results'])) {
             foreach ($plan->nodes as $node) {
                 if (Capability::WebSearch !== $node->capability) {
@@ -243,6 +282,25 @@ final class ResultAssembler
                 if (true === ($nodeResult->metadata['used_workspace'] ?? false)) {
                     $card['used_workspace'] = true;
                 }
+                $stepInput = $nodeResult->metadata['step_input'] ?? null;
+                if (is_string($stepInput) && '' !== $stepInput) {
+                    $card['step_input'] = $stepInput;
+                }
+                $stepOutput = $nodeResult->metadata['step_output'] ?? null;
+                if (is_string($stepOutput) && '' !== $stepOutput) {
+                    $card['step_output'] = $stepOutput;
+                }
+                if (true === ($nodeResult->metadata['step_output_truncated'] ?? false)) {
+                    $card['step_output_truncated'] = true;
+                }
+                $durationMs = $nodeResult->metadata['duration_ms'] ?? null;
+                if (is_int($durationMs)) {
+                    $card['duration_ms'] = $durationMs;
+                }
+                $query = $nodeResult->metadata['query'] ?? null;
+                if (is_string($query) && '' !== $query && !isset($card['query'])) {
+                    $card['query'] = $query;
+                }
                 $mediaJob = $nodeResult->metadata['media_job'] ?? null;
                 if (is_array($mediaJob) && is_string($mediaJob['job_id'] ?? null) && '' !== $mediaJob['job_id']) {
                     $card['job_id'] = $mediaJob['job_id'];
@@ -273,6 +331,18 @@ final class ResultAssembler
      * compose_reply that wraps the card text in a connector sentence still
      * marks the card redundant.
      */
+    private function isWaitingForApproval(TaskPlan $plan, NodeContext $context): bool
+    {
+        foreach ($plan->nodes as $node) {
+            $result = $context->getResult($node->id);
+            if (null !== $result && $result->isWaitingApproval()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function isRedundantText(string $cardText, string $finalText): bool
     {
         $normalize = static fn (string $s): string => trim((string) preg_replace('/\s+/u', ' ', $s));
@@ -309,13 +379,55 @@ final class ResultAssembler
             $metadata = array_merge($metadata, $result->metadata);
         }
 
+        $language = is_string($context->classification['language'] ?? null)
+            ? $context->classification['language']
+            : ($context->message->getLanguage() ?: 'en');
+        if ('' === $text && $this->isWaitingForApproval($plan, $context)) {
+            $text = self::WAITING_TEXT[$language] ?? self::WAITING_TEXT['en'];
+
+            return [$text, $files, $metadata];
+        }
         if ('' === $text) {
-            $language = is_string($context->classification['language'] ?? null)
-                ? $context->classification['language']
-                : ($context->message->getLanguage() ?: 'en');
             $text = self::FALLBACK_TEXT[$language] ?? self::FALLBACK_TEXT['en'];
+            // Only when nothing else wrote an answer. A recovered summary or
+            // tool result stays as it is — the failed step is already on its
+            // card, and appending "provider 500" would rewrite that reply.
+            $notes = $this->failedStepNotes($plan, $context, $language);
+            if ([] !== $notes) {
+                $text = rtrim($text)."\n".implode("\n", $notes);
+            }
         }
 
         return [$text, $files, $metadata];
+    }
+
+    /**
+     * One plain sentence per failed visible step. Hidden nodes (compose_reply)
+     * are the assembler and have no card, so they are not named here.
+     *
+     * @return list<string>
+     */
+    private function failedStepNotes(TaskPlan $plan, NodeContext $context, string $language): array
+    {
+        $template = self::FAILED_STEP_TEXT[$language] ?? self::FAILED_STEP_TEXT['en'];
+        $notes = [];
+        foreach ($plan->nodes as $node) {
+            if ('hidden' === $node->capability->uiKind()) {
+                continue;
+            }
+            $result = $context->getResult($node->id);
+            if (null === $result || NodeStatus::Failed !== $result->status) {
+                continue;
+            }
+            $error = trim((string) $result->error);
+            if ('' === $error) {
+                continue;
+            }
+            $query = $result->metadata['query'] ?? null;
+            $label = is_string($query) && '' !== trim($query) ? trim($query) : $node->capability->value;
+            $notes[] = str_replace(['{label}', '{error}'], [$label, $error], $template);
+        }
+
+        return $notes;
     }
 }

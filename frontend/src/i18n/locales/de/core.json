@@ -124,7 +124,7 @@
     "collapseSidebar": "Seitenleiste einklappen",
     "expandSidebar": "Seitenleiste ausklappen",
     "pinned": "Angeheftet",
-    "chatsEmpty": "Deine Chats erscheinen hier.",
+    "chatsEmpty": "Keine Chats",
     "profile": "Profil",
     "tools": "Tools",
     "toolsChatWidget": "Chat-Widgets",
@@ -515,7 +515,8 @@
       "free": "Kostenlos",
       "low": "Low Cost",
       "mid": "Mid Cost",
-      "high": "High Cost"
+      "high": "High Cost",
+      "unknown": "Preis unbekannt"
     }
   },
   "realtime": {

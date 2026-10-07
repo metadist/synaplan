@@ -397,4 +397,49 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
     {
         return 'mariadb';
     }
+
+    public function findChunk(int $userId, int|string $chunkId): ?SearchResult
+    {
+        if (!is_numeric($chunkId)) {
+            return null;
+        }
+
+        $sql = <<<'SQL'
+            SELECT
+                r.BID as chunk_id,
+                r.BMID as file_id,
+                r.BGROUPKEY as group_key,
+                r.BTEXT as text,
+                r.BSTART as start_line,
+                r.BEND as end_line,
+                r.BUID as owner_id,
+                f.BFILENAME as file_name
+            FROM BRAG r
+            LEFT JOIN BFILES f ON r.BMID = f.BID
+            WHERE r.BID = :id
+            LIMIT 1
+        SQL;
+
+        $row = $this->connection->fetchAssociative($sql, [
+            'id' => (int) $chunkId,
+        ]);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        $ownerId = (int) $row['owner_id'];
+
+        return new SearchResult(
+            chunkId: (int) $row['chunk_id'],
+            fileId: (int) $row['file_id'],
+            groupKey: (string) $row['group_key'],
+            text: (string) $row['text'],
+            score: 0.0,
+            startLine: (int) $row['start_line'],
+            endLine: (int) $row['end_line'],
+            fileName: is_string($row['file_name'] ?? null) ? $row['file_name'] : null,
+            ownerId: $ownerId,
+            shared: $ownerId !== $userId,
+        );
+    }
 }

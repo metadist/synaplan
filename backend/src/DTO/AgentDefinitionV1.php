@@ -40,6 +40,7 @@ use OpenApi\Attributes as OA;
             properties: [
                 new OA\Property(property: 'ownFolder', type: 'boolean', description: 'Search the assistant\'s own TASKPROMPT folder.'),
                 new OA\Property(property: 'folders', type: 'array', items: new OA\Items(type: 'string', example: '4:contracts'), description: 'Additional knowledge folders as "ownerId:groupKey".'),
+                new OA\Property(property: 'fileIds', type: 'array', items: new OA\Items(type: 'integer', example: 42), description: 'Library files searched by id. The file is not copied.'),
                 new OA\Property(property: 'includeUserFiles', type: 'boolean', description: 'Also search the talking user\'s own files (default false).'),
                 new OA\Property(property: 'ragLimit', type: 'integer', minimum: 1, maximum: 50),
                 new OA\Property(property: 'ragMinScore', type: 'number', format: 'float', minimum: 0, maximum: 1),

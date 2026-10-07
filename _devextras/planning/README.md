@@ -11,6 +11,7 @@ paths were renamed on 2026-09-17.
 | Path | Why it stays here |
 | ---- | ----------------- |
 | [`20260925_roadmap.md`](./20260925_roadmap.md) | Current roadmap (UX close-out, in-app transcription, Telegram, openDesk meeting notes, Wave 6) |
+| [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | Triage of the external 5.2.0 test round (F1–F49 vs Open WebUI 0.11.4): six fixing waves, finding → issue map, 50 ready-to-create issue drafts in `issues/` + `create-issues.sh` |
 | [`20260927-early-intake/`](./20260927-early-intake/README.md) | Sprint files for transcription, the easy issues, and Telegram |
 | [`20260917-backend-integrations/`](./20260917-backend-integrations/README.md) | Wave 6: catalog, Connect UI, editor / office clients. Jitsi meeting notes moved to the synaScriber repository |
 | [metadist/synaScriber](https://github.com/metadist/synaScriber) | Plan of record for openDesk meeting notes (Jitsi plugin). Replaces the September `opendesk_stt` sketch |
@@ -30,6 +31,7 @@ paths were renamed on 2026-09-17.
 | [`20260919-meta-muse/`](./20260919-meta-muse/00_master_plan.md) | Meta Model API (Muse Spark) + per-model thinking levels (§0 unticked, research only) |
 | [`20261003-decision-routing/`](./20261003-decision-routing/00_master_plan.md) | Decision models (Ollama System One): routing layer before the LLM sorter, `/v1/systemone` + `/api/v1/decisions` API, decision mode in chat; D1–D2 spike + go / no-go first |
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts: apps like SISmass create Synaplan accounts for their customers, with a token trial and purchase without a Synaplan login (AA1–AA8, not started) |
+| [`20261007-mcp-tool-errors/`](./20261007-mcp-tool-errors/issue-mcp-tool-error-fallback.md) | Partner report (Backblaze B2 MCP): a tool error drops the plan to legacy chat or skips the answer step. Implemented on this branch, pending merge |
 | [`20260929-synaplan-federation/`](./20260929-synaplan-federation/00_master_plan.md) | Synaplan Federation v1.0, reviewed and queued: next sprint is the opt-in knowledge link ([`01_review.md`](./20260929-synaplan-federation/01_review.md)); data model + 15k storage math in [`02_federation_data_model.md`](./20260929-synaplan-federation/02_federation_data_model.md) |
 
 ## Archive

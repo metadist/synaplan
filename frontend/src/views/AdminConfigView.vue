@@ -16,6 +16,7 @@ import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { useAuthStore } from '@/stores/auth'
 import { useUpdatesStore } from '@/stores/updates'
 import { systemConfigRedirect } from '@/router/operateRedirects'
+import { isMailerConfigured } from '@/utils/mailerConfigured'
 import {
   AI_INFRA_PATH,
   AI_TAB_SECTIONS,
@@ -149,6 +150,12 @@ const currentTab = computed<ConfigTabView | null>(
   () => allTabs.value.find((tab) => tab.id === requestedTab.value) ?? allTabs.value[0] ?? null
 )
 const activeTab = computed(() => currentTab.value?.id ?? '')
+const showNullMailWarning = computed(() => {
+  if (activeTab.value !== 'auth' || isMailerConfigured()) return false
+  const raw = systemConfig.values.value.REGISTRATION_ENABLED
+  const value = raw?.effectiveValue ?? raw?.value ?? ''
+  return value === 'true' || value === '1'
+})
 
 const hiddenFields = computed(() => {
   if (activeTab.value !== 'branding') return []
@@ -406,6 +413,13 @@ onBeforeUnmount(() => {
                   {{ $t(`admin.config.panelSettings.${currentTab.id}.hint`) }}
                 </p>
               </div>
+              <p
+                v-if="showNullMailWarning"
+                class="text-sm bg-[var(--status-warning-muted)] text-[var(--status-warning-text)] rounded-xl px-3 py-2"
+                data-testid="admin-registration-mail-warning"
+              >
+                {{ $t('admin.users.registrationNoMail') }}
+              </p>
               <ConfigSectionStack
                 :key="currentTab.id"
                 :config="systemConfig"

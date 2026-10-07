@@ -30,36 +30,28 @@ export function expectWebhookSuccess(result: WebhookResult, label: string): void
 }
 
 /**
- * Navigate to the subscription page via the sidebar, taking the correct UI path
- * for the current plan state:
- *   - FREE user → dedicated `btn-sidebar-v2-upgrade` (the dropdown does NOT contain
- *     a subscription item per `v-if="...isPro"` in SidebarV2.vue).
- *   - PRO+ user → user-menu dropdown → `btn-sidebar-v2-subscription`.
+ * Navigate to the subscription page via the sidebar.
  *
- * The account button is not that signal: it renders even while billing config
- * is still loading, and neither control exists yet. A one-shot `isVisible()`
- * on Upgrade therefore took the PRO path for a FREE user and then waited out
- * a menu item that user never gets. Open the menu and wait for whichever
- * control the plan actually offers.
+ * FREE accounts get Upgrade in the sidebar footer. PRO accounts get
+ * Subscription in the profile panel, after Profile in the account menu.
+ * Neither control exists until billing config has loaded, and the account
+ * button itself is not that signal — it renders immediately. A one-shot
+ * check on Upgrade therefore took the PRO path for a FREE user. Open Profile
+ * first, then wait for whichever control this plan actually offers.
  */
 export async function navigateToSubscriptionViaUI(page: Page): Promise<void> {
   const userBtn = page.locator(selectors.userMenu.button)
   await expect(userBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
   await userBtn.click()
+  await page.locator(selectors.userMenu.profileBtn).click()
 
   const upgradeBtn = page.locator(selectors.userMenu.upgradeBtn)
-  const subscriptionBtn = page.locator(selectors.userMenu.subscriptionBtn)
-  await expect(upgradeBtn.or(subscriptionBtn)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  const subscriptionLink = page.locator(selectors.userMenu.subscriptionLink)
+  await expect(upgradeBtn.or(subscriptionLink)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 
-  if (await subscriptionBtn.isVisible()) {
-    await subscriptionBtn.click()
+  if (await subscriptionLink.isVisible()) {
+    await subscriptionLink.click()
   } else {
-    // Upgrade lives on the rail, behind the menu overlay — close it first or
-    // the click has no hit target.
-    await page.locator(selectors.userMenu.overlay).click({ position: { x: 8, y: 8 } })
-    await expect(page.locator(selectors.userMenu.dropdown)).toBeHidden({
-      timeout: TIMEOUTS.SHORT,
-    })
     await upgradeBtn.click()
   }
   await page.waitForSelector(selectors.subscription.page, { timeout: TIMEOUTS.STANDARD })
