@@ -2,6 +2,9 @@
 import { httpClient } from './httpClient'
 import {
   GetAdminGetUsersResponseSchema,
+  PostAdminCreateUserAccountResponseSchema,
+  PostAdminResendUserVerificationResponseSchema,
+  PostAdminVerifyUserResponseSchema,
   SearchAdminUsersResponseSchema,
 } from '@/generated/api-schemas'
 import { z } from 'zod'
@@ -122,6 +125,38 @@ export const adminApi = {
         body: JSON.stringify({ level }),
       }
     )
+  },
+
+  async createUserAccount(input: {
+    email: string
+    displayName: string
+    level: string
+    password: string
+  }) {
+    return httpClient('/api/v1/admin/users/accounts', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: input.email,
+        display_name: input.displayName,
+        level: input.level,
+        password: input.password,
+      }),
+      schema: PostAdminCreateUserAccountResponseSchema,
+    })
+  },
+
+  async markUserVerified(userId: number) {
+    return httpClient(`/api/v1/admin/users/${userId}/verify`, {
+      method: 'POST',
+      schema: PostAdminVerifyUserResponseSchema,
+    })
+  },
+
+  async resendUserVerification(userId: number) {
+    return httpClient(`/api/v1/admin/users/${userId}/resend-verification`, {
+      method: 'POST',
+      schema: PostAdminResendUserVerificationResponseSchema,
+    })
   },
 
   async deleteUser(userId: number): Promise<{ success: boolean; message: string }> {

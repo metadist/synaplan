@@ -159,6 +159,15 @@ final readonly class AdminModelsService
         if (array_key_exists('showWhenFree', $data)) {
             $model->setShowWhenFree((int) $data['showWhenFree']);
         }
+        if ($priceChanged) {
+            $json = $model->getJson();
+            $meta = is_array($json['meta'] ?? null) ? $json['meta'] : [];
+            $import = is_array($meta['import'] ?? null) ? $meta['import'] : [];
+            $import['priceKnown'] = true;
+            $meta['import'] = $import;
+            $json['meta'] = $meta;
+            $model->setJson($json);
+        }
 
         $this->em->flush();
 

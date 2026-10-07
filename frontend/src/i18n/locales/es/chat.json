@@ -222,6 +222,8 @@
   },
   "chatInput": {
     "placeholder": "Escribe tu mensaje...",
+    "knowledgeActive": "Carpeta de conocimiento: {name}",
+    "knowledgeClear": "Dejar de usar esta carpeta de conocimiento",
     "placeholderShort": "Mensaje...",
     "provider": "Proveedor",
     "model": "Modelo",
@@ -529,6 +531,14 @@
     "scheduleThis": "Repetir esto más tarde según un horario",
     "download": "Descargar",
     "failedBody": "Este paso no se pudo completar.",
+    "details": "Qué hizo este paso",
+    "input": "Qué se envió",
+    "output": "Qué volvió",
+    "showMore": "Mostrar más",
+    "showLess": "Mostrar menos",
+    "duration": "{seconds} segundo | {seconds} segundos",
+    "noDetails": "Este paso no guardó detalles.",
+    "outputTruncated": "El resto se omitió para que se pueda leer.",
     "cancelledBody": "Has detenido este paso.",
     "stop": "Detener",
     "rendering": "Renderizando…",
@@ -726,7 +736,7 @@
   "message": {
     "thinking": "Proceso de pensamiento",
     "thinkingInProgress": "Pensando…",
-    "thoughtFor": "Pensó durante {n} segundos",
+    "thoughtFor": "Pensó durante {n} segundo | Pensó durante {n} segundos",
     "reasoning": "Razonamiento de IA",
     "downloadImage": "Descargar imagen",
     "fileGenerated": "He creado el archivo '{filename}' para ti. Ahora puedes descargarlo.",
@@ -833,6 +843,9 @@
     "notifySaved": "Preferencia de avisos guardada.",
     "blocked": "No puedo hacer eso. Un administrador lo ha desactivado.",
     "waitingForApproval": "Esperando aprobación",
+    "decidedLine": "{status} por {name} a las {time}",
+    "requestHeading": "Esta es la solicitud que se enviará.",
+    "mailNotConfigured": "El correo no está configurado. Las solicitudes nuevas aparecen aquí en Aprobaciones.",
     "status": {
       "pending": "En espera",
       "approved": "Aprobado",
@@ -841,5 +854,13 @@
       "executed": "Hecho",
       "failed": "Fallido"
     }
+  },
+  "knowledgeSources": {
+    "title": "Fuentes",
+    "showPassage": "Mostrar el pasaje",
+    "hidePassage": "Ocultar el pasaje",
+    "openInLibrary": "Abrir en la biblioteca",
+    "lines": "Líneas {start}–{end}",
+    "unavailable": "No se pudo abrir este pasaje."
   }
 }

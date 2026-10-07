@@ -6,6 +6,7 @@ import type {
   TaskPlanState,
   TaskCardKind,
   TaskCardState,
+  RagSourceRef,
 } from '@/stores/history'
 import { isTaskCardKind, isTaskCardState } from '@/stores/history'
 import { extractBTextPayload } from '@/utils/jsonResponse'
@@ -336,8 +337,13 @@ export interface ApiLoadedMessageRow {
       usedWorkspace?: boolean
       /** #1229 smart collapse: card prose is contained in the answer body. */
       redundant?: boolean
+      step_input?: string
+      step_output?: string
+      step_output_truncated?: boolean
+      duration_ms?: number
     }>
   } | null
+  ragSources?: RagSourceRef[] | null
   /** Background async media job (Release 4.0). */
   mediaJob?: {
     job_id: string
@@ -353,6 +359,7 @@ export interface ApiLoadedMessageRow {
     cost: string | null
     modelKey: string
     kind: string
+    priceKnown?: boolean
   } | null
   /** Auxiliary usage of the turn (sorting/routing call, media renders, TTS). */
   usageExtra?: Array<{
@@ -362,6 +369,7 @@ export interface ApiLoadedMessageRow {
     cost: string | null
     modelKey: string
     kind: string
+    priceKnown?: boolean
   }> | null
 }
 
@@ -489,6 +497,10 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         // the canonical answer surface; the duplicated card collapses (the
         // previous #1165 approach of REMOVING the body text is retired).
         redundant: c.redundant === true,
+        stepInput: typeof c.step_input === 'string' ? c.step_input : undefined,
+        stepOutput: typeof c.step_output === 'string' ? c.step_output : undefined,
+        stepOutputTruncated: c.step_output_truncated === true,
+        durationMs: typeof c.duration_ms === 'number' ? c.duration_ms : undefined,
       }
     })
     taskPlanState = {
@@ -575,6 +587,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     aiModels: m.aiModels || null,
     webSearch: m.webSearch || null,
     searchResults: m.searchResults || null,
+    ragSources: m.ragSources && m.ragSources.length > 0 ? m.ragSources : null,
     wasMultitask: m.multitask === true,
     tool: toolData,
     taskPlan: taskPlanState,
@@ -598,6 +611,10 @@ export interface ApiInProgressTurn {
     query?: string | null
     resultsCount?: number | null
     type?: string | null
+    step_input?: string | null
+    step_output?: string | null
+    step_output_truncated?: boolean | null
+    duration_ms?: number | null
   }>
 }
 
@@ -645,6 +662,10 @@ export function mapInProgressTurn(turn: ApiInProgressTurn): Message {
       ? { resultsCount: c.resultsCount }
       : {}),
     ...(typeof c.type === 'string' && c.type ? { mediaType: c.type } : {}),
+    ...(typeof c.step_input === 'string' && c.step_input ? { stepInput: c.step_input } : {}),
+    ...(typeof c.step_output === 'string' && c.step_output ? { stepOutput: c.step_output } : {}),
+    ...(c.step_output_truncated === true ? { stepOutputTruncated: true } : {}),
+    ...(typeof c.duration_ms === 'number' ? { durationMs: c.duration_ms } : {}),
   }))
 
   return {

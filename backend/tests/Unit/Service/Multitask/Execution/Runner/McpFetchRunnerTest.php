@@ -279,10 +279,28 @@ final class McpFetchRunnerTest extends TestCase
 
     public function testRequestFailureDoesNotClaimTheServerReportedAnError(): void
     {
-        $result = $this->runner(httpStatus: 503)->run($this->node(), $this->context());
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'McpFetchRunner: tool request failed',
+            self::callback(static function (array $context): bool {
+                return 3 === $context['server_id']
+                    && 'search_customers' === $context['tool']
+                    && 503 === $context['status'];
+            }),
+        );
+
+        $result = $this->runner(httpStatus: 503, logger: $logger)->run($this->node(), $this->context());
 
         self::assertTrue($result->isReportableFailure());
         self::assertStringContainsString('could not be reached', (string) $result->error);
         self::assertStringNotContainsString('reported an error', (string) $result->error);
+    }
+
+    public function testEmptyContentStillReachesTheAnswer(): void
+    {
+        $result = $this->runner(callToolResultText: '   ')->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertStringContainsString('returned no content', (string) $result->error);
     }
 }

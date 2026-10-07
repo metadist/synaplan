@@ -119,7 +119,7 @@ final readonly class McpFetchRunner implements TaskRunner
         try {
             $result = $this->client->callTool($server, $tool, $arguments);
         } catch (McpClientException $e) {
-            return $this->requestFailed($serverId, $server->getName(), $tool, $e->getMessage());
+            return $this->requestFailed($serverId, $server->getName(), $tool, $e->getMessage(), $e->httpStatus);
         }
 
         $text = $this->formatContent($result['content']);
@@ -127,7 +127,13 @@ final readonly class McpFetchRunner implements TaskRunner
             return $this->reportedError($serverId, $server->getName(), $tool, $text);
         }
         if ('' === trim($text)) {
-            return NodeResult::failed('the data source returned no usable content');
+            return $this->failReported(
+                'McpFetchRunner: tool returned no content',
+                $serverId,
+                $tool,
+                sprintf('%s returned no content.', $server->getName()),
+                $this->callMetadata($serverId, $server->getName(), $tool),
+            );
         }
 
         $this->logger->info('McpFetchRunner: tool call succeeded', [
@@ -157,7 +163,7 @@ final readonly class McpFetchRunner implements TaskRunner
      * The call never produced a tool result (blocked URL, auth, HTTP error,
      * unreadable body). That is not the server reporting a tool error.
      */
-    private function requestFailed(int $serverId, string $serverName, string $tool, string $detail): NodeResult
+    private function requestFailed(int $serverId, string $serverName, string $tool, string $detail, ?int $httpStatus = null): NodeResult
     {
         $detail = trim($detail);
         $error = '' === $detail
@@ -170,19 +176,24 @@ final readonly class McpFetchRunner implements TaskRunner
             $tool,
             $error,
             $this->callMetadata($serverId, $serverName, $tool),
+            $httpStatus,
         );
     }
 
     /**
      * @param array<string, mixed> $metadata
      */
-    private function failReported(string $logMessage, int $serverId, string $tool, string $error, array $metadata): NodeResult
+    private function failReported(string $logMessage, int $serverId, string $tool, string $error, array $metadata, ?int $httpStatus = null): NodeResult
     {
-        $this->logger->warning($logMessage, [
+        $context = [
             'server_id' => $serverId,
             'tool' => $tool,
             'error' => $error,
-        ]);
+        ];
+        if (null !== $httpStatus) {
+            $context['status'] = $httpStatus;
+        }
+        $this->logger->warning($logMessage, $context);
 
         return NodeResult::reportableFailure($error, $metadata);
     }

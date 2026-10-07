@@ -8,7 +8,7 @@
  */
 import type { TimelineModel, TimelineStep } from '@/utils/processingTimeline'
 
-export type Translate = (key: string, params?: Record<string, unknown>) => string
+export type Translate = (key: string, params?: Record<string, unknown>, choice?: number) => string
 
 export interface StepCopy {
   title: string
@@ -317,7 +317,7 @@ export function describeStep(
           1,
           Math.round(((step.endedAt ?? step.startedAt) - step.startedAt) / 1000)
         )
-        return { title: t('message.thoughtFor', { n: seconds }) }
+        return { title: t('message.thoughtFor', { n: seconds }, seconds) }
       }
       return {
         title: label

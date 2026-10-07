@@ -28,13 +28,19 @@ final class AgentKnowledgeFolders
     }
 
     /**
-     * @return list<array{ownerId: int, groupKey: string}>
+     * @return list<array{ownerId: int, groupKey: string, fileIds?: list<int>}>
      */
     public static function scopes(Agent $agent, AgentDefinition $definition): array
     {
         $scopes = [];
         if ($definition->ownFolderEnabled()) {
             $scopes[] = ['ownerId' => $agent->getOwnerId(), 'groupKey' => self::ownFolder($agent)];
+        }
+        $fileIds = $definition->knowledgeFileIds();
+        if ([] !== $fileIds) {
+            // groupKey stays empty: the search filters on file id, and the
+            // file is not copied into the assistant folder.
+            $scopes[] = ['ownerId' => $agent->getOwnerId(), 'groupKey' => '', 'fileIds' => $fileIds];
         }
         foreach ($definition->knowledgeFolders() as $folderId) {
             $parsed = KnowledgeFolderKind::parseId($folderId);

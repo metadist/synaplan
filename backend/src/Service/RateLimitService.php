@@ -501,6 +501,7 @@ final class RateLimitService implements ResetInterface
             promptTokens: (int) $promptTokens,
             completionTokens: (int) $completionTokens,
             totalTokens: (int) $totalTokens,
+            priceKnown: false !== ($costResult->priceSnapshot['price_known'] ?? true),
         );
     }
 

@@ -65,7 +65,55 @@ final readonly class ModelImportService
         // bound to an endpoint that does not exist.
         $this->assertEndpointResolvable($source);
 
-        return $this->applier->apply($source, $rows);
+        return $this->applier->apply($source, $this->attachListedPrices($source, $rows));
+    }
+
+    /**
+     * Copy the gateway's published price onto new rows. A re-import still goes
+     * through the applier, which refuses to overwrite a price already stored.
+     *
+     * @param list<array{providerId: string, name?: string, tags: list<string>}> $rows
+     *
+     * @return list<array{providerId: string, name?: string, tags: list<string>, priceKnown?: bool, priceIn?: float, priceOut?: float}>
+     */
+    private function attachListedPrices(string $source, array $rows): array
+    {
+        if (!str_starts_with($source, ModelDiscoveryService::OPENAI_COMPATIBLE_PREFIX)) {
+            return $rows;
+        }
+
+        $byId = [];
+        try {
+            $discovered = $this->discovery->discover($source);
+        } catch (UnknownImportSourceException) {
+            $discovered = null;
+        }
+        if (null !== $discovered && $discovered->ok) {
+            foreach ($discovered->models as $model) {
+                $byId[$model->providerId] = $model;
+            }
+        }
+
+        foreach ($rows as $index => $row) {
+            $id = trim($row['providerId']);
+            $listed = $byId[$id] ?? null;
+            if ($listed instanceof DiscoveredModel
+                && $listed->priceKnown
+                && null !== $listed->priceInPerMillion
+                && null !== $listed->priceOutPerMillion
+            ) {
+                $rows[$index]['priceKnown'] = true;
+                $rows[$index]['priceIn'] = $listed->priceInPerMillion;
+                $rows[$index]['priceOut'] = $listed->priceOutPerMillion;
+                continue;
+            }
+
+            // No pricing object, or the listing could not be read again.
+            // Unknown is not free: the row stays selectable, without a Free badge.
+            $rows[$index]['priceKnown'] = false;
+        }
+
+        return $rows;
     }
 
     private function assertEndpointResolvable(string $source): void
@@ -104,6 +152,9 @@ final readonly class ModelImportService
                 sizeBytes: $model->sizeBytes,
                 family: $model->family,
                 probe: $result->toArray(),
+                priceInPerMillion: $model->priceInPerMillion,
+                priceOutPerMillion: $model->priceOutPerMillion,
+                priceKnown: $model->priceKnown,
             );
         }
 

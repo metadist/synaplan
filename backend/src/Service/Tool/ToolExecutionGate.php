@@ -64,6 +64,7 @@ final readonly class ToolExecutionGate
         ?string $assistantKey = null,
         ?string $nodeApproval = null,
         bool $requireApproval = false,
+        ?array $resolvedRequest = null,
     ): array {
         $descriptor = $this->registry->get($userId, $toolName);
         if (null === $descriptor) {
@@ -104,7 +105,7 @@ final readonly class ToolExecutionGate
         }
 
         if (PolicyOutcome::Approve === $outcome) {
-            $approval = $this->approvalService->request($descriptor, $args, $requestedBy, $actor);
+            $approval = $this->approvalService->request($descriptor, $args, $requestedBy, $actor, $resolvedRequest);
 
             return [
                 'outcome' => $outcome,

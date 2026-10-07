@@ -122,6 +122,8 @@
     "fidelityNotice": "Une partie de la mise en forme du fichier d’origine n’a pas pu être conservée. Vous pouvez tout de même modifier le contenu.",
     "fidelityContinue": "Continuer",
     "removeFile": "Retirer le fichier",
+    "cancelUpload": "Annuler l'envoi",
+    "uploadCancelled": "L'envoi s'est arrêté.",
     "dropFiles": "Déposez les fichiers ici pour les téléverser",
     "dropFilesHint": "Relâchez pour ajouter les fichiers à la file d’envoi",
     "filesAddedToQueue": "{count} fichier ajouté — prêt à téléverser | {count} fichiers ajoutés — prêts à téléverser",

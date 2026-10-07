@@ -946,6 +946,10 @@ final readonly class TaskPlanExecutor
                 'error' => $error,
                 'query' => $query,
                 'resultsCount' => $resultsCount,
+                'step_input' => is_string($metadata['step_input'] ?? null) ? $metadata['step_input'] : null,
+                'step_output' => is_string($metadata['step_output'] ?? null) ? $metadata['step_output'] : null,
+                'step_output_truncated' => true === ($metadata['step_output_truncated'] ?? false),
+                'duration_ms' => is_int($metadata['duration_ms'] ?? null) ? $metadata['duration_ms'] : null,
             ]);
         };
     }
@@ -982,6 +986,10 @@ final readonly class TaskPlanExecutor
                 'error' => is_string($card['error'] ?? null) ? $card['error'] : null,
                 'query' => is_string($card['query'] ?? null) ? $card['query'] : null,
                 'resultsCount' => is_int($card['resultsCount'] ?? null) ? $card['resultsCount'] : null,
+                'step_input' => is_string($card['step_input'] ?? null) ? $card['step_input'] : null,
+                'step_output' => is_string($card['step_output'] ?? null) ? $card['step_output'] : null,
+                'step_output_truncated' => true === ($card['step_output_truncated'] ?? false),
+                'duration_ms' => is_int($card['duration_ms'] ?? null) ? $card['duration_ms'] : null,
             ];
         }
 

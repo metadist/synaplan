@@ -241,6 +241,7 @@
               :voice-reply-failed="message.voiceReplyFailed"
               :read-aloud-failed="message.readAloudFailed"
               :search-results="message.searchResults"
+              :rag-sources="message.ragSources"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
               :memory-ids="message.memoryIds"
@@ -405,6 +406,15 @@
             <span class="txt-primary">
               {{ $t('assistants.talkingTo', { name: pinnedAssistantName }) }}
             </span>
+            <button
+              type="button"
+              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-pinned-assistant-stop"
+              @click="stopPinnedAssistant"
+            >
+              <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+              {{ $t('assistants.useDefaultModel') }}
+            </button>
           </div>
         </template>
       </ChatInput>
@@ -543,6 +553,7 @@
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
@@ -600,6 +611,7 @@ import { useSmartSearchStore } from '@/stores/smartSearch'
 import { isAgentsEnabled } from '@/composables/useAgentsFeature'
 import {
   capturePinnedAgentForSend,
+  goToFreshChat,
   shouldOpenFreshAssistantChat,
   usePinnedAssistant,
 } from '@/composables/usePinnedAssistant'
@@ -950,6 +962,14 @@ const {
   greeting: pinnedAssistantGreeting,
   starterPrompts: pinnedStarterPrompts,
 } = usePinnedAssistant()
+
+async function stopPinnedAssistant(): Promise<void> {
+  // A thread that already names the assistant keeps that pin on its messages.
+  // Leave it for an empty chat first, then drop the address pin, so the next
+  // message goes to the default model.
+  await chatsStore.findOrCreateEmptyChat()
+  await goToFreshChat(router, route)
+}
 
 // Start chat (?agentId=) may still be leaving the previous thread. Send stays
 // off until that empty chat is the one on screen, so the first message cannot
@@ -3545,6 +3565,18 @@ const streamAIResponse = async (
               if (data.metadata?.used_workspace === true) {
                 card.usedWorkspace = true
               }
+              if (typeof data.metadata?.step_input === 'string') {
+                card.stepInput = data.metadata.step_input
+              }
+              if (typeof data.metadata?.step_output === 'string') {
+                card.stepOutput = data.metadata.step_output
+              }
+              if (data.metadata?.step_output_truncated === true) {
+                card.stepOutputTruncated = true
+              }
+              if (typeof data.metadata?.duration_ms === 'number') {
+                card.durationMs = data.metadata.duration_ms
+              }
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -3760,6 +3792,10 @@ const streamAIResponse = async (
                   query: data.searchResults[0]?.query || '',
                   resultsCount: data.searchResults.length,
                 }
+              }
+
+              if (Array.isArray(data.ragSources) && data.ragSources.length > 0) {
+                message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
               }
 
               applyDocsToMessage(message, data.docs)
@@ -4149,6 +4185,18 @@ const streamAIResponse = async (
               }
               if (data.metadata?.used_workspace === true) {
                 card.usedWorkspace = true
+              }
+              if (typeof data.metadata?.step_input === 'string') {
+                card.stepInput = data.metadata.step_input
+              }
+              if (typeof data.metadata?.step_output === 'string') {
+                card.stepOutput = data.metadata.step_output
+              }
+              if (data.metadata?.step_output_truncated === true) {
+                card.stepOutputTruncated = true
+              }
+              if (typeof data.metadata?.duration_ms === 'number') {
+                card.durationMs = data.metadata.duration_ms
               }
             }
           } else if (data.status === 'task_chunk') {
@@ -4643,6 +4691,10 @@ const streamAIResponse = async (
               // Store memory IDs if provided (full memories loaded from store)
               if (data.memoryIds && Array.isArray(data.memoryIds) && data.memoryIds.length > 0) {
                 message.memoryIds = data.memoryIds
+              }
+
+              if (Array.isArray(data.ragSources) && data.ragSources.length > 0) {
+                message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
               }
 
               applyDocsToMessage(message, data.docs)

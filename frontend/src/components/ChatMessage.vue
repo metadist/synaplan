@@ -423,6 +423,11 @@
           <!-- Used Feedbacks (AFTER memories, before search results) -->
           <MessageFeedbacks v-if="role === 'assistant' && feedbacks" :feedbacks="feedbacks" />
 
+          <KnowledgeSources
+            v-if="role === 'assistant' && ragSources && ragSources.length > 0"
+            :sources="ragSources"
+          />
+
           <!-- Web Search Results Carousel (AFTER content) -->
           <div
             v-if="searchResults && searchResults.length > 0 && role === 'assistant'"
@@ -993,6 +998,7 @@ import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import ToolBadge from '@/components/ToolBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
+import type { RagSourceRef } from '@/stores/history'
 import { useNotification } from '@/composables/useNotification'
 import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
 import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
@@ -1005,6 +1011,7 @@ import { useConfigStore } from '@/stores/config'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
+import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
@@ -1139,6 +1146,7 @@ interface Props {
     shared?: boolean
     ownerName?: string
   }> | null // Web search results
+  ragSources?: RagSourceRef[] | null
   aiModels?: {
     chat?: {
       provider: string
@@ -1247,7 +1255,9 @@ const usageBadge = computed<{ tokens: string; cost: string } | null>(() => {
 
   return {
     tokens: formatTokens(total.totalTokens, locale.value),
-    cost: formatCostDisplay(total.cost, locale.value, t('usageTaximeter.lessThanCent')),
+    cost: total.priceKnown
+      ? formatCostDisplay(total.cost, locale.value, t('usageTaximeter.lessThanCent'))
+      : t('models.costTier.unknown'),
   }
 })
 

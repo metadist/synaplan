@@ -648,6 +648,7 @@ import {
 } from '../composables/useNavItems'
 import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { goToFreshChat } from '@/composables/usePinnedAssistant'
 import { displaySessionTitle } from '@/utils/displaySessionTitle'
 import { useI18n } from 'vue-i18n'
 import { isLibraryLinkActive, useLibraryLinks } from '@/composables/useLibraryLinks'
@@ -764,7 +765,7 @@ const handleNewChat = async () => {
   closeDrawer()
   try {
     await chatsStore.findOrCreateEmptyChat()
-    if (route.path !== '/') router.push('/')
+    await goToFreshChat(router, route)
   } finally {
     isCreatingChat.value = false
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import ComputeSidecarStatus from '@/components/admin/ComputeSidecarStatus.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
 import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
 import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
@@ -19,6 +20,7 @@ defineProps<{
     </p>
     <M365SetupGuide v-if="section.tab === 'channels' && section.id === 'm365'" />
     <DropboxSetupGuide v-if="section.tab === 'channels' && section.id === 'dropbox'" />
+    <ComputeSidecarStatus v-if="section.id === 'compute'" />
     <ManagedKeysStatusCard v-if="section.allManaged" :fields="section.managedFields" />
     <template v-else>
       <ConfigField

@@ -432,6 +432,7 @@ final readonly class MessageSorter
                     'tokens' => $recordedSortingUsage->totalTokens,
                     'prompt_tokens' => $recordedSortingUsage->promptTokens,
                     'completion_tokens' => $recordedSortingUsage->completionTokens,
+                    'price_known' => $recordedSortingUsage->priceKnown,
                 ] : null,
             ], $routingDecision->toClassificationFields());
         } catch (StructuredOutputViolationException $e) {

@@ -224,6 +224,8 @@
   "chatInput": {
     "attach": "Anhängen",
     "placeholder": "Schreibe deine Nachricht...",
+    "knowledgeActive": "Wissensordner: {name}",
+    "knowledgeClear": "Diesen Wissensordner nicht mehr verwenden",
     "placeholderShort": "Nachricht...",
     "provider": "Anbieter",
     "model": "Modell",
@@ -519,6 +521,14 @@
     "scheduleThis": "Das später nach Zeitplan wiederholen",
     "download": "Herunterladen",
     "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
+    "details": "Was dieser Schritt gemacht hat",
+    "input": "Was gesendet wurde",
+    "output": "Was zurückkam",
+    "showMore": "Mehr anzeigen",
+    "showLess": "Weniger anzeigen",
+    "duration": "{seconds} Sekunde | {seconds} Sekunden",
+    "noDetails": "Für diesen Schritt wurden keine Details gespeichert.",
+    "outputTruncated": "Der Rest wurde weggelassen, damit das lesbar bleibt.",
     "cancelledBody": "Du hast diesen Schritt gestoppt.",
     "stop": "Stopp",
     "rendering": "Wird gerendert…",
@@ -725,7 +735,7 @@
   "message": {
     "thinking": "Denkprozess",
     "thinkingInProgress": "Denke nach…",
-    "thoughtFor": "{n} Sekunden nachgedacht",
+    "thoughtFor": "{n} Sekunde nachgedacht | {n} Sekunden nachgedacht",
     "reasoning": "KI-Überlegung",
     "downloadImage": "Bild herunterladen",
     "fileGenerated": "Ich habe die Datei '{filename}' für dich erstellt. Du kannst sie jetzt herunterladen.",
@@ -896,6 +906,9 @@
     "notifySaved": "Benachrichtigungseinstellung gespeichert.",
     "blocked": "Das kann ich nicht tun. Ein Administrator hat das ausgeschaltet.",
     "waitingForApproval": "Wartet auf Freigabe",
+    "decidedLine": "{status} von {name} um {time}",
+    "requestHeading": "Das ist die Anfrage, die gesendet wird.",
+    "mailNotConfigured": "E-Mail ist nicht eingerichtet. Neue Anfragen erscheinen hier unter Freigaben.",
     "status": {
       "pending": "Wartend",
       "approved": "Freigegeben",
@@ -904,5 +917,13 @@
       "executed": "Erledigt",
       "failed": "Fehlgeschlagen"
     }
+  },
+  "knowledgeSources": {
+    "title": "Quellen",
+    "showPassage": "Textstelle anzeigen",
+    "hidePassage": "Textstelle ausblenden",
+    "openInLibrary": "In der Bibliothek öffnen",
+    "lines": "Zeilen {start}–{end}",
+    "unavailable": "Diese Textstelle konnte nicht geöffnet werden."
   }
 }

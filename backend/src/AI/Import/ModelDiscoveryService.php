@@ -51,19 +51,24 @@ final readonly class ModelDiscoveryService implements ModelDiscovererInterface
             throw new UnknownImportSourceException('Unknown OpenAI-compatible endpoint: '.$endpointName);
         }
 
-        $listing = $this->endpoints->listModelIds($endpointName);
+        $listing = $this->endpoints->listModelCatalog($endpointName);
         if (!$listing['ok']) {
             return DiscoveryResult::unreachable($listing['error'] ?? 'Endpoint unreachable');
         }
 
         $existing = $this->existingProviderIds(OpenAiCompatibleEndpointRegistry::SERVICE);
         $models = [];
-        foreach ($listing['ids'] as $id) {
+        foreach ($listing['models'] as $row) {
+            $id = $row['id'];
+            $listedName = $row['name'] ?? null;
             $models[] = new DiscoveredModel(
                 providerId: $id,
-                name: $this->nameFromId($id),
+                name: null !== $listedName && '' !== $listedName ? mb_substr($listedName, 0, 48) : $this->nameFromId($id),
                 guessedTags: $this->guesser->guess($id),
                 exists: isset($existing[$id]),
+                priceInPerMillion: $row['priceInPerMillion'],
+                priceOutPerMillion: $row['priceOutPerMillion'],
+                priceKnown: $row['priceKnown'],
             );
         }
 
@@ -88,6 +93,9 @@ final readonly class ModelDiscoveryService implements ModelDiscovererInterface
                 exists: isset($existing[$name]),
                 sizeBytes: $row['size'] > 0 ? $row['size'] : null,
                 family: '' !== $row['family'] ? $row['family'] : null,
+                priceInPerMillion: 0.0,
+                priceOutPerMillion: 0.0,
+                priceKnown: true,
             );
         }
 

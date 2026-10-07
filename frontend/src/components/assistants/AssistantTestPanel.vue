@@ -51,6 +51,7 @@ import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api/chatApi'
 import { useAgentsStore } from '@/stores/agents'
 import { createSmoothStream, type SmoothStream } from '@/utils/smoothStream'
+import { consumeVisibleAnswer } from '@/utils/processingTimeline'
 
 const store = useAgentsStore()
 const authStore = useAuthStore()
@@ -86,6 +87,8 @@ function send(): void {
   liveReply.value = ''
   replySmoother?.cancel()
   let reply = ''
+  let insideThink = false
+  let pendingThink = ''
   const smoother = createSmoothStream({
     onRender: (text) => {
       liveReply.value = text
@@ -101,7 +104,10 @@ function send(): void {
     history: [],
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
-        reply += data.chunk
+        const visible = consumeVisibleAnswer(data.chunk, insideThink, pendingThink)
+        insideThink = visible.insideThink
+        pendingThink = visible.pending
+        reply += visible.text
         smoother.push(reply)
       }
       if (data.status === 'complete' || data.status === 'error') {

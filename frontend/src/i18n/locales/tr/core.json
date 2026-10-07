@@ -503,7 +503,8 @@
       "free": "Ücretsiz",
       "low": "Low Cost",
       "mid": "Mid Cost",
-      "high": "High Cost"
+      "high": "High Cost",
+      "unknown": "Fiyat bilinmiyor"
     }
   },
   "realtime": {

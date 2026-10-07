@@ -28,6 +28,7 @@ final readonly class InternalEmailService
         private TranslatorInterface $translator,
         private LoggerInterface $logger,
         private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
+        private ?MailerConfig $mailerConfig = null,
     ) {
     }
 
@@ -65,8 +66,17 @@ final readonly class InternalEmailService
     /**
      * Send email verification link.
      */
-    public function sendVerificationEmail(string $to, string $token, string $locale = 'en'): void
+    public function sendVerificationEmail(string $to, string $token, string $locale = 'en'): bool
     {
+        if (null !== $this->mailerConfig && !$this->mailerConfig->isConfigured()) {
+            $this->logger->warning('Verification email NOT delivered: mail transport is not configured', [
+                'to' => $to,
+                'locale' => $locale,
+            ]);
+
+            return false;
+        }
+
         $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
         $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
@@ -87,6 +97,8 @@ final readonly class InternalEmailService
         try {
             $this->sendWithRetry($email);
             $this->logger->info('Verification email sent', ['to' => $to, 'locale' => $locale]);
+
+            return true;
         } catch (\Exception $e) {
             $this->logger->error('Failed to send verification email', [
                 'to' => $to,
@@ -393,14 +405,18 @@ final readonly class InternalEmailService
     }
 
     /**
-     * Inbox link only — never include the tool arguments.
+     * Which tool is waiting, and where to decide. The request body is never included.
      */
-    public function sendApprovalRequestEmail(string $to, string $preview, string $inboxUrl): void
+    public function sendApprovalRequestEmail(string $to, string $toolName, string $inboxUrl): void
     {
+        $toolName = trim($toolName);
+        if ('' === $toolName) {
+            $toolName = 'A tool';
+        }
         $this->sendTaskResultEmail(
             $to,
             'Waiting for your approval',
-            $preview."\n\nNothing has been sent yet. Open Approvals to Approve or Reject:\n".$inboxUrl,
+            $toolName." is waiting for your approval.\n\nNothing has been sent yet. Open Approvals to Approve or Reject:\n".$inboxUrl,
         );
     }
 

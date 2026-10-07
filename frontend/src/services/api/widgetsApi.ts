@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { httpClient, getApiBaseUrl } from './httpClient'
 import { useConfigStore } from '@/stores/config'
+import type { RagSourceRef } from '@/stores/history'
 
 export class WidgetUnavailableError extends Error {
   constructor(
@@ -240,6 +241,7 @@ export interface SendWidgetMessageResult {
   metadata?: unknown
   remainingUploads?: number | null
   text: string
+  ragSources?: RagSourceRef[]
 }
 
 /**
@@ -327,6 +329,7 @@ async function consumeWidgetStream(
   let remainingUploads: number | null = null
   let completed = false
   let aggregatedText = ''
+  let ragSources: RagSourceRef[] | undefined
 
   const emitChunk = async (chunk: string) => {
     if (!chunk) {
@@ -372,6 +375,9 @@ async function consumeWidgetStream(
       metadata = data.metadata ?? metadata
       if (typeof data.remainingUploads === 'number') {
         remainingUploads = data.remainingUploads
+      }
+      if (Array.isArray(data.ragSources)) {
+        ragSources = data.ragSources as RagSourceRef[]
       }
       if (onStatus) {
         onStatus(data as WidgetStreamStatusPayload)
@@ -455,6 +461,7 @@ async function consumeWidgetStream(
     metadata,
     remainingUploads,
     text: aggregatedText,
+    ragSources,
   }
 }
 

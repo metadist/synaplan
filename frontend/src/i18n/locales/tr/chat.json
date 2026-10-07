@@ -222,6 +222,8 @@
   },
   "chatInput": {
     "placeholder": "Mesajınızı yazın...",
+    "knowledgeActive": "Bilgi klasörü: {name}",
+    "knowledgeClear": "Bu bilgi klasörünü kullanmayı bırak",
     "placeholderShort": "Mesaj...",
     "provider": "Sağlayıcı",
     "model": "Model",
@@ -529,6 +531,14 @@
     "scheduleThis": "Bunu daha sonra bir zamanlamayla tekrarla",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
+    "details": "Bu adımın yaptığı",
+    "input": "Gönderilen",
+    "output": "Gelen",
+    "showMore": "Daha fazla göster",
+    "showLess": "Daha az göster",
+    "duration": "{seconds} saniye",
+    "noDetails": "Bu adım ayrıntı kaydetmedi.",
+    "outputTruncated": "Okunabilir kalsın diye kalan kısım bırakıldı.",
     "cancelledBody": "Bu adımı durdurdunuz.",
     "stop": "Durdur",
     "rendering": "Oluşturuluyor…",
@@ -833,6 +843,9 @@
     "notifySaved": "Bildirim tercihi kaydedildi.",
     "blocked": "Bunu yapamam. Bir yönetici bunu kapattı.",
     "waitingForApproval": "Onay bekleniyor",
+    "decidedLine": "{status}, {name} tarafından {time}",
+    "requestHeading": "Gönderilecek istek budur.",
+    "mailNotConfigured": "E-posta ayarlı değil. Yeni istekler burada Onaylar bölümünde görünür.",
     "status": {
       "pending": "Bekliyor",
       "approved": "Onaylandı",
@@ -841,5 +854,13 @@
       "executed": "Tamamlandı",
       "failed": "Başarısız"
     }
+  },
+  "knowledgeSources": {
+    "title": "Kaynaklar",
+    "showPassage": "Pasajı göster",
+    "hidePassage": "Pasajı gizle",
+    "openInLibrary": "Kitaplıkta aç",
+    "lines": "Satırlar {start}–{end}",
+    "unavailable": "Bu pasaj açılamadı."
   }
 }

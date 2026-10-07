@@ -24,6 +24,7 @@ use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\PromptService;
+use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\SlackNotificationService;
 use App\Service\UrlContentService;
@@ -76,6 +77,7 @@ class WidgetPublicController extends AbstractController
         private ChatRunService $chatRunService,
         private string $uploadDir,
         private ChatErrorPresenter $chatErrorPresenter,
+        private VectorSearchService $vectorSearchService,
         private ?WidgetAgentRuntime $widgetAgentRuntime = null,
     ) {
     }
@@ -1015,6 +1017,14 @@ class WidgetPublicController extends AbstractController
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
 
+                    $ragSources = $responseMetadata['rag_sources'] ?? null;
+                    if (is_array($ragSources) && [] !== $ragSources) {
+                        $encodedSources = json_encode($ragSources, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
+                        if (is_string($encodedSources)) {
+                            $outgoingMessage->setMeta('rag_sources', $encodedSources);
+                        }
+                    }
+
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
 
@@ -1080,6 +1090,7 @@ class WidgetPublicController extends AbstractController
                     $completePayload = [
                         'messageId' => $incomingMessage->getId(),
                         'chatId' => $chat->getId(),
+                        'ragSources' => is_array($ragSources) && [] !== $ragSources ? $ragSources : null,
                         'metadata' => [
                             'response' => $responseMetadata,
                             'classification' => $result['classification'] ?? null,
@@ -1167,6 +1178,75 @@ class WidgetPublicController extends AbstractController
                 'error' => 'Failed to process message',
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Passage for a source this widget conversation already cited.
+     * The visitor session is required. A chunk id that was not cited here is not readable.
+     */
+    #[Route('/{widgetId}/rag/chunks/{chunkId}', name: 'rag_chunk', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/widget/{widgetId}/rag/chunks/{chunkId}',
+        summary: 'Load a cited knowledge passage for this widget session',
+        tags: ['Widget (Public)']
+    )]
+    #[OA\Parameter(name: 'widgetId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'chunkId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Response(response: 200, description: 'Passage text')]
+    #[OA\Response(response: 404, description: 'Session or passage not found')]
+    public function ragChunk(string $widgetId, string $chunkId, Request $request): JsonResponse
+    {
+        $sessionId = $request->headers->get('X-Widget-Session');
+        if (!is_string($sessionId) || '' === $sessionId) {
+            return $this->json(['error' => 'X-Widget-Session header required'], Response::HTTP_BAD_REQUEST);
+        }
+        $widget = $this->widgetService->getWidgetById($widgetId);
+        if (!$widget || !$this->widgetService->isWidgetActive($widget)) {
+            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($domainError = $this->ensureDomainAllowed($widget->getConfig(), $request, $widget->getOwnerId())) {
+            return $domainError;
+        }
+        $session = $this->sessionService->getSession($widgetId, $sessionId);
+        $chatId = $session?->getChatId();
+        if (!$session || null === $chatId || $chatId <= 0) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+        $chat = $this->chatRepository->find($chatId);
+        if (!$chat || $chat->getUserId() !== $widget->getOwnerId() || !$this->chatCitesChunk($chat, $chunkId)) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+        $passage = $this->vectorSearchService->passage($widget->getOwnerId(), $chunkId);
+        if (null === $passage) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json(['success' => true] + $passage);
+    }
+
+    private function chatCitesChunk(Chat $chat, string $chunkId): bool
+    {
+        $chatId = $chat->getId();
+        if (null === $chatId || '' === $chunkId) {
+            return false;
+        }
+        foreach ($this->messageRepository->findChatHistory($chat->getUserId(), $chatId, 50, 200000) as $message) {
+            $raw = $message->getMeta('rag_sources');
+            if (!is_string($raw) || !str_contains($raw, $chunkId)) {
+                continue;
+            }
+            $decoded = json_decode($raw, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            foreach ($decoded as $row) {
+                if (is_array($row) && (string) ($row['chunkId'] ?? '') === $chunkId) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1616,6 +1696,15 @@ class WidgetPublicController extends AbstractController
                 $sender = 'ai';
             }
 
+            $ragSources = null;
+            $ragRaw = $message->getMeta('rag_sources');
+            if (is_string($ragRaw) && '' !== $ragRaw) {
+                $decoded = json_decode($ragRaw, true);
+                if (is_array($decoded) && [] !== $decoded) {
+                    $ragSources = $decoded;
+                }
+            }
+
             return [
                 'id' => $message->getId(),
                 'direction' => $message->getDirection(),
@@ -1624,6 +1713,7 @@ class WidgetPublicController extends AbstractController
                 'messageType' => $message->getMessageType(),
                 'sender' => $sender,
                 'files' => $filesData,
+                'ragSources' => $ragSources,
                 'metadata' => [
                     'topic' => $message->getTopic(),
                     'language' => $message->getLanguage(),

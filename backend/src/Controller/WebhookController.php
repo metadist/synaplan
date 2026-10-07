@@ -570,7 +570,7 @@ class WebhookController extends AbstractController
             if (!empty($metadata['model_id'])) {
                 $outgoingMessage->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
             }
-            $outgoingMessage->setMeta('ai_chat_cost', $recordedChatUsage->chargedCost);
+            $recordedChatUsage->attachChatCost($outgoingMessage);
             if (is_array($metadata)) {
                 $docsMeta = PlatformDocReferenceResolver::encodeDocsMeta($metadata);
                 if (null !== $docsMeta) {
@@ -580,17 +580,11 @@ class WebhookController extends AbstractController
 
             $usageExtra = [];
             if (is_array($classification['sorting_usage'] ?? null)) {
-                $usageExtra[] = [
-                    'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
-                    'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
-                    'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
-                    'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
-                    'modelKey' => RecordedUsage::modelKey(
-                        $classification['sorting_provider'] ?? null,
-                        $classification['sorting_model_name'] ?? null,
-                    ),
-                    'kind' => 'SORT',
-                ];
+                $usageExtra[] = RecordedUsage::fromSortingUsage(
+                    $classification['sorting_usage'],
+                    isset($classification['sorting_provider']) ? (string) $classification['sorting_provider'] : null,
+                    isset($classification['sorting_model_name']) ? (string) $classification['sorting_model_name'] : null,
+                );
             }
             if (is_array($metadata['planning_usage'] ?? null)) {
                 $usageExtra[] = $metadata['planning_usage'];

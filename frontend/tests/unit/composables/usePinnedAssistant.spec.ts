@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   capturePinnedAgentForSend,
+  freshChatTarget,
   parseAgentIdQuery,
+  queryWithoutAssistantPin,
   resolvePinnedAgentId,
   shouldOpenFreshAssistantChat,
 } from '@/composables/usePinnedAssistant'
@@ -66,6 +68,32 @@ describe('capturePinnedAgentForSend', () => {
 
   it('is off when the feature flag is off', () => {
     expect(capturePinnedAgentForSend(false, 2, [])).toBeNull()
+  })
+})
+
+describe('freshChatTarget', () => {
+  it('drops the assistant pin when a new chat starts on the home page', () => {
+    expect(freshChatTarget('/', { agentId: '4', prefill: 'hi' })).toEqual({
+      path: '/',
+      query: { prefill: 'hi' },
+    })
+  })
+
+  it('does not navigate when the home chat is already unpinned', () => {
+    expect(freshChatTarget('/', {})).toBeNull()
+  })
+
+  it('opens home without the pin from another page', () => {
+    expect(freshChatTarget('/ai/assistants', { agentId: '4' })).toEqual({
+      path: '/',
+      query: {},
+    })
+  })
+
+  it('removes only the assistant pin', () => {
+    expect(queryWithoutAssistantPin({ agentId: '2', tool: 'summarize' })).toEqual({
+      tool: 'summarize',
+    })
   })
 })
 
