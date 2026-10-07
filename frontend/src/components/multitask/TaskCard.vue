@@ -22,7 +22,22 @@ const emit = defineEmits<{
   /** Stop a running media step (per-card Stop button). */
   cancel: [nodeId: string]
   followup: [prompt: string]
+  askUser: [payload: { nodeId: string; answer: string; skip: boolean }]
 }>()
+
+const askChoice = ref('')
+const askText = ref('')
+const askError = ref('')
+
+function submitAsk(): void {
+  const text = askText.value.trim() || askChoice.value
+  if (text === '') {
+    askError.value = t('taskPlan.askNeedAnswer')
+    return
+  }
+  askError.value = ''
+  emit('askUser', { nodeId: props.card.nodeId, answer: text, skip: false })
+}
 
 const aiConfigStore = useAiConfigStore()
 
@@ -348,6 +363,59 @@ const outputShown = computed(() =>
     <div v-else-if="card.state === 'skipped' && card.error" class="text-sm txt-muted break-words">
       {{ card.error }}
     </div>
+
+    <form
+      v-if="card.askUser && card.state === 'waiting_approval'"
+      class="space-y-2"
+      data-testid="ask-user-card"
+      @submit.prevent="submitAsk"
+    >
+      <p class="text-sm txt-primary">{{ card.askUser.question }}</p>
+      <p v-if="isReadonly" class="text-sm txt-secondary">{{ $t('taskPlan.askReadOnly') }}</p>
+      <label
+        v-for="option in card.askUser.options"
+        :key="option"
+        class="flex items-center gap-2 text-sm txt-primary"
+      >
+        <input
+          v-model="askChoice"
+          type="radio"
+          :name="`ask-user-${card.nodeId}`"
+          :value="option"
+          :disabled="isReadonly"
+        />
+        <span>{{ option }}</span>
+        <span v-if="option === card.askUser.recommended" class="text-xs txt-secondary">{{
+          $t('taskPlan.recommended')
+        }}</span>
+      </label>
+      <textarea
+        v-if="card.askUser.allowText"
+        v-model="askText"
+        :disabled="isReadonly"
+        class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
+        rows="2"
+        data-testid="input-ask-user"
+      />
+      <p v-if="askError" class="text-sm text-red-600 dark:text-red-400">{{ askError }}</p>
+      <div v-if="!isReadonly" class="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          class="btn-primary px-4 py-2.5 text-sm font-medium"
+          data-testid="btn-ask-user-submit"
+        >
+          {{ $t('taskPlan.askSubmit') }}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 text-sm font-medium"
+          data-testid="btn-ask-user-skip"
+          @click="emit('askUser', { nodeId: card.nodeId, answer: '', skip: true })"
+        >
+          {{ $t('taskPlan.askSkip') }}
+        </button>
+      </div>
+    </form>
 
     <!-- Cancelled by the user: neutral note, no error styling -->
     <div

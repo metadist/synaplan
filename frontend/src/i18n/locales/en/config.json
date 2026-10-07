@@ -741,8 +741,10 @@
     "routing": {
       "title": "Routing",
       "flowBody": "When a message arrives, the planner reads it and turns it into a small set of tasks (for example: generate an image, then summarize it as audio). Each task is handled by the right capability and the results are combined into one reply.",
-      "customCalloutBody": "Want your own topics and system prompts? Create and edit them on the Task Prompts page — the planner picks them up automatically.",
-      "customCalloutLink": "Open Task Prompts",
+      "customCalloutBody": "Save a recurring instruction with a /command, then insert it from the composer.",
+      "customCalloutLink": "Open prompt library",
+      "taskPromptsCalloutBody": "Want your own topics and system prompts? Create and edit them on the Task Prompts page — the planner picks them up automatically.",
+      "taskPromptsCalloutLink": "Open Task Prompts",
       "masterTitle": "Multi-task routing",
       "masterDesc": "Route messages through the planner so one request can trigger several tasks at once. When off, the legacy single-topic AI sorter handles routing instead.",
       "masterHint": "Global default for the workspace. Existing users keep their own setting until they opt in; turning this on here also enables it for your own account.",

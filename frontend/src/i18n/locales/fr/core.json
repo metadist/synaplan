@@ -102,7 +102,8 @@
     "assistants": "Assistants",
     "assistantBuilder": "Assistant",
     "approvals": "Approbations",
-    "filesWorkspace": "Espace de travail"
+    "filesWorkspace": "Espace de travail",
+    "prompts": "Prompts"
   },
   "welcome": "Bienvenue",
   "welcomeUser": "Bienvenue, {name}",
@@ -178,6 +179,7 @@
     "assistants": "Assistants",
     "linkedPlatforms": "Plateformes liées",
     "approvals": "Approbations",
+    "prompts": "Prompts",
     "home": "Accueil"
   },
   "common": {

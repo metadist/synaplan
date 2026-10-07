@@ -739,8 +739,10 @@
     "routing": {
       "title": "Routage",
       "flowBody": "Lorsqu’un message arrive, le planificateur le lit et le transforme en un petit ensemble de tâches (par exemple : générer une image, puis la résumer en audio). Chaque tâche est traitée par la bonne fonction et les résultats sont combinés en une seule réponse.",
-      "customCalloutBody": "Vous voulez vos propres sujets et messages système ? Créez-les et modifiez-les sur la page Instructions — le planificateur les prend automatiquement en compte.",
-      "customCalloutLink": "Ouvrir les instructions",
+      "customCalloutBody": "Enregistrez une instruction récurrente avec une /commande, puis insérez-la depuis le compositeur.",
+      "customCalloutLink": "Ouvrir la bibliothèque de prompts",
+      "taskPromptsCalloutBody": "Vous voulez vos propres sujets et messages système ? Créez-les et modifiez-les sur la page Instructions — le planificateur les prend automatiquement en compte.",
+      "taskPromptsCalloutLink": "Ouvrir les instructions",
       "masterTitle": "Routage multi-tâches",
       "masterDesc": "Faites passer les messages par le planificateur afin qu’une demande puisse déclencher plusieurs tâches à la fois. Lorsqu’il est désactivé, l’ancien trieur IA à sujet unique gère le routage.",
       "masterHint": "Valeur par défaut de l’espace de travail. Les utilisateurs existants conservent leur propre réglage jusqu’à ce qu’ils l’acceptent ; l’activer ici l’active aussi pour votre propre compte.",

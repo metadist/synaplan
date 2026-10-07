@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useIncomingStore } from '../stores/incoming'
 import { useDialog } from './useDialog'
+import { useNotification } from './useNotification'
 import { useDateFormat } from './useDateFormat'
 import { isIamSharingEnabled } from './useIamFeature'
 import { goToFreshChat } from './usePinnedAssistant'
@@ -251,6 +252,22 @@ export function useChatHistory() {
     void chatsStore.toggleChatPin(chatId)
   }
 
+  const toggleArchivedChats = () => {
+    void chatsStore.loadChats(chatsStore.viewingArchived ? '0' : '1')
+  }
+
+  const archiveChat = async (chatId: number) => {
+    const chat = chatsStore.chats.find((row) => row.id === chatId)
+    const archived = chat?.archived === true
+    await chatsStore.setChatArchived(chatId, !archived)
+    const { success } = useNotification()
+    success(archived ? t('chat.unarchivedDone') : t('chat.archivedDone'))
+  }
+
+  const exportChat = (chatId: number) => {
+    void chatsStore.downloadChatExport(chatId, 'md')
+  }
+
   const shareChat = (chatId: number) => {
     const chat = chatsStore.chats.find((row) => row.id === chatId)
     shareModalChatId.value = chatId
@@ -287,6 +304,9 @@ export function useChatHistory() {
     renameChat,
     toggleChatPin,
     deleteChat,
+    archiveChat,
+    toggleArchivedChats,
+    exportChat,
     shareChat,
     openPublicLinkFromIam,
     chatsStore,

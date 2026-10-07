@@ -869,7 +869,7 @@ final readonly class TaskPlanExecutor
             return $progressCallback;
         }
 
-        $terminal = ['done', 'failed', 'skipped'];
+        $terminal = ['done', 'failed', 'skipped', 'waiting_approval'];
         /** @var array<string, string> $chunkText */
         $chunkText = [];
         /** @var array<string, string> $fileUrls */
@@ -950,6 +950,7 @@ final readonly class TaskPlanExecutor
                 'step_output' => is_string($metadata['step_output'] ?? null) ? $metadata['step_output'] : null,
                 'step_output_truncated' => true === ($metadata['step_output_truncated'] ?? false),
                 'duration_ms' => is_int($metadata['duration_ms'] ?? null) ? $metadata['duration_ms'] : null,
+                'ask_user' => is_array($metadata['ask_user'] ?? null) ? $metadata['ask_user'] : null,
             ]);
         };
     }
@@ -990,6 +991,7 @@ final readonly class TaskPlanExecutor
                 'step_output' => is_string($card['step_output'] ?? null) ? $card['step_output'] : null,
                 'step_output_truncated' => true === ($card['step_output_truncated'] ?? false),
                 'duration_ms' => is_int($card['duration_ms'] ?? null) ? $card['duration_ms'] : null,
+                'ask_user' => is_array($card['ask_user'] ?? null) ? $card['ask_user'] : null,
             ];
         }
 

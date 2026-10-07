@@ -198,6 +198,32 @@
           :data-message-id="backendMessageId"
           :data-message-role="role"
         >
+          <div v-if="editing" class="space-y-2" data-testid="message-edit-form">
+            <textarea
+              v-model="editDraft"
+              class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              rows="3"
+              data-testid="input-message-edit"
+            />
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+                data-testid="btn-message-edit-save"
+                @click="saveEdit"
+              >
+                {{ t('chatMessage.editSave') }}
+              </button>
+              <button
+                type="button"
+                class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+                data-testid="btn-message-edit-cancel"
+                @click="editing = false"
+              >
+                {{ t('chatMessage.editCancel') }}
+              </button>
+            </div>
+          </div>
           <!-- Quoted reference the user attached when sending this message -->
           <div
             v-if="quotedText"
@@ -224,7 +250,7 @@
                       ? 'bg-black/25 hover:bg-black/35'
                       : 'bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20',
                   ]"
-                  @click="downloadFile(file)"
+                  @click="openFileChip(file, $event)"
                 >
                   <Icon :icon="getFileIcon(file.fileType)" class="w-4 h-4 flex-shrink-0" />
                   <span class="font-medium truncate min-w-0 flex-1">{{ file.filename }}</span>
@@ -233,6 +259,24 @@
                     class="text-xs opacity-60 flex-shrink-0 whitespace-nowrap"
                     >{{ formatFileSize(file.fileSize) }}</span
                   >
+                  <button
+                    type="button"
+                    class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
+                    :aria-label="t('files.download')"
+                    data-testid="btn-message-file-download"
+                    @click.stop="downloadFile(file)"
+                  >
+                    <ArrowDownTrayIcon class="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
+                    :aria-label="t('chatMessage.fileReattach')"
+                    data-testid="btn-message-file-reattach"
+                    @click.stop="emit('reattachFile', file)"
+                  >
+                    <ArrowPathIcon class="h-4 w-4" />
+                  </button>
                   <FileOfficeActions
                     v-if="file.id && showOfficeActions(file)"
                     :file-id="file.id"
@@ -340,6 +384,7 @@
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
             @followup-task="emit('followupTask', $event)"
+            @ask-user="emit('askUser', $event)"
           />
 
           <!-- Background async media job (Release 4.0 — e.g. detached video render) -->
@@ -616,6 +661,7 @@
                  properties, so we branch the whole class list instead. -->
             <div v-if="role === 'assistant' && hasInfoPopover && !isProcessing" class="relative">
               <button
+                ref="infoButtonRef"
                 type="button"
                 :class="
                   isMobileViewport
@@ -738,6 +784,16 @@
                     <!-- Per-reply usage (tokens + cost). Rendered here so it is
                          reachable on touch devices, where the inline badge is
                          hidden to keep the footer from colliding. -->
+                    <template v-if="usageExtraLines.length > 0">
+                      <div
+                        v-for="line in usageExtraLines"
+                        :key="line"
+                        class="flex items-center justify-between gap-2"
+                        data-testid="info-usage-step"
+                      >
+                        <span class="text-xs txt-secondary">{{ line }}</span>
+                      </div>
+                    </template>
                     <template v-if="usageBadge">
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs txt-tertiary">{{ t('chatMessage.infoTokens') }}</span>
@@ -770,6 +826,68 @@
               {{ usageBadge.tokens }} · {{ usageBadge.cost }}
             </span>
           </div>
+
+          <div
+            v-if="
+              canRewrite !== false &&
+              (role === 'assistant' ? versionList.length : editList.length) > 1
+            "
+            class="flex items-center gap-1"
+            data-testid="message-versions"
+          >
+            <button
+              type="button"
+              class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
+              :aria-label="t('chatMessage.versionPrevious')"
+              data-testid="btn-version-previous"
+              @click="stepVersion(-1)"
+            >
+              <ChevronLeftIcon class="h-4 w-4" />
+            </button>
+            <span class="text-xs txt-secondary tabular-nums">
+              {{
+                t('chatMessage.versionPosition', {
+                  current: versionPosition.current,
+                  total: versionPosition.total,
+                })
+              }}
+            </span>
+            <button
+              type="button"
+              class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
+              :aria-label="t('chatMessage.versionNext')"
+              data-testid="btn-version-next"
+              @click="stepVersion(1)"
+            >
+              <ChevronRightIcon class="h-4 w-4" />
+            </button>
+          </div>
+          <button
+            v-if="artifacts.length > 0"
+            type="button"
+            class="btn-secondary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
+            data-testid="btn-artifact-preview"
+            @click="openArtifact = artifacts[0]"
+          >
+            <EyeIcon class="h-4 w-4" />
+            {{ t('chatMessage.previewArtifact') }}
+          </button>
+          <button
+            v-if="
+              role === 'user' &&
+              backendMessageId &&
+              !editing &&
+              canRewrite !== false &&
+              !isGuestMode
+            "
+            type="button"
+            class="btn-secondary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
+            data-testid="btn-message-edit"
+            @click="startEdit"
+          >
+            <PencilIcon class="h-4 w-4" />
+            {{ t('chatMessage.edit') }}
+          </button>
 
           <!-- Right: Actions (assistant only, hidden during streaming) -->
           <!-- Show if: has againData OR has backend message ID (can fetch models) -->
@@ -972,11 +1090,21 @@
   </div>
 
   <ExternalLinkWarning :url="pendingUrl" :is-open="warningOpen" @close="closeWarning" />
-  <DocumentPreviewModal
+  <ChatFilePreview
     :open="previewFile !== null"
     :file="previewFile"
-    :guest-session-id="guestSessionId"
-    @close="previewFile = null"
+    :guest-session-id="isGuestMode ? guestSessionId : null"
+    :can-reattach="canRewrite !== false && !isGuestMode"
+    :return-focus="fileReturnFocus"
+    @close="closeFilePreview"
+    @download="previewFile && downloadPreview()"
+    @reattach="previewFile && reattachPreview()"
+  />
+  <ArtifactPanel
+    v-if="openArtifact"
+    :artifact="openArtifact"
+    :filename="artifactFilename"
+    @close="openArtifact = null"
   />
 </template>
 
@@ -991,6 +1119,11 @@ import {
   ChevronDownIcon,
   ClipboardDocumentIcon,
   CheckIcon,
+  ArrowDownTrayIcon,
+  PencilIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EyeIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
@@ -1026,6 +1159,7 @@ import MediaJobStatus from '@/components/MediaJobStatus.vue'
 import ProcessingTimeline from '@/components/chat/ProcessingTimeline.vue'
 import {
   timelineFromStatus,
+  timelineFromStoredCards,
   type TimelineModel,
   type TimelineStep,
 } from '@/utils/processingTimeline'
@@ -1038,14 +1172,16 @@ import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { chatErrorReasonKey } from '@/utils/chatErrorDisplay'
+import { extractArtifacts, type ChatArtifact } from '@/utils/chatArtifacts'
+import { isModuleConfigured } from '@/composables/useModuleFeature'
 
 const { t, te, locale } = useI18n()
 const guestStore = useGuestStore()
 const guestSessionId = computed(() => guestStore.sessionId)
-const previewFile = ref<{ id: number; filename: string } | null>(null)
-const DocumentPreviewModal = defineAsyncComponent(
-  () => import('@/components/files/DocumentPreviewModal.vue')
-)
+const previewFile = ref<{ id: number; filename: string; fileSize?: number } | null>(null)
+const fileReturnFocus = ref<HTMLElement | null>(null)
+const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
+const ArtifactPanel = defineAsyncComponent(() => import('@/components/chat/ArtifactPanel.vue'))
 
 const showOfficeActions = (file: MessageFile): boolean => {
   if (!file.id) return false
@@ -1055,7 +1191,40 @@ const showOfficeActions = (file: MessageFile): boolean => {
 }
 
 const openPreview = (file: MessageFile) => {
-  previewFile.value = { id: file.id, filename: file.filename }
+  previewFile.value = { id: file.id, filename: file.filename, fileSize: file.fileSize }
+}
+
+const openFileChip = (file: MessageFile, event: MouseEvent) => {
+  fileReturnFocus.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  openPreview(file)
+}
+
+const closeFilePreview = () => {
+  previewFile.value = null
+}
+
+const downloadPreview = () => {
+  const file = previewFile.value
+  if (!file) return
+  void downloadFile({
+    id: file.id,
+    filename: file.filename,
+    fileType: '',
+    filePath: '',
+    fileSize: file.fileSize,
+  })
+}
+
+const reattachPreview = () => {
+  const file = previewFile.value
+  if (!file) return
+  emit('reattachFile', {
+    id: file.id,
+    filename: file.filename,
+    fileType: '',
+    filePath: '',
+    fileSize: file.fileSize,
+  })
 }
 
 const officeSiblingIds = computed(() =>
@@ -1194,6 +1363,8 @@ interface Props {
   usage?: MessageUsage | null
   // Other billed steps in the same turn (sorting, planning, transcription, media).
   usageExtra?: MessageUsage[] | null
+  versions?: { id: number; index: number; selected: boolean; model: string | null }[]
+  edits?: { id: number; index: number; selected: boolean; model: string | null }[]
   // Whether the taximeter display is active (admin switch + authed web user).
   usageTaximeterActive?: boolean
   // Status for failed/pending messages
@@ -1246,6 +1417,18 @@ const stepLabel = (step: DocumentStep): string => {
  * Usage taximeter hover badge: "<tokens> · <cost>" for the complete assistant
  * turn, including routing, planning, transcription and media usage.
  */
+const usageExtraLines = computed(() => {
+  const extra = props.usageExtra ?? []
+  return extra
+    .filter((entry) => entry.totalTokens > 0)
+    .map((entry) =>
+      t('chatMessage.infoUsageStep', {
+        kind: entry.kind || 'step',
+        tokens: formatTokens(entry.totalTokens, locale.value),
+      })
+    )
+})
+
 const usageBadge = computed<{ tokens: string; cost: string } | null>(() => {
   if (props.role !== 'assistant' || !props.usageTaximeterActive) {
     return null
@@ -1478,11 +1661,12 @@ const visibleTimelineSteps = computed<TimelineStep[]>(() => {
   return steps.filter((step) => step.state === 'active')
 })
 
-const collapsedTimelineSteps = computed<TimelineStep[]>(() =>
-  progressNarrationSwitches().steps
-    ? allTimelineSteps.value.filter((step) => !step.afterAnswer && step.state === 'done')
-    : []
-)
+const collapsedTimelineSteps = computed<TimelineStep[]>(() => {
+  if (!progressNarrationSwitches().steps) return []
+  const live = allTimelineSteps.value.filter((step) => !step.afterAnswer && step.state === 'done')
+  if (live.length > 0) return live
+  return timelineFromStoredCards(props.taskPlan?.cards)
+})
 
 // Multitask routing, #1229 smart collapse: mark a task card's prose redundant
 // when that text is already part of the final answer in the message body —
@@ -1656,11 +1840,75 @@ const emit = defineEmits<{
   mediaJobUpdate: [job: MediaJobInfo]
   mediaJobCompleted: [payload: { url: string; type: string }]
   mediaJobCancel: [jobId: string]
+  reattachFile: [file: MessageFile]
+  selectVersion: [messageId: number, kind: 'answer' | 'edit']
+  editMessage: [text: string]
+  askUser: [payload: { nodeId: string; answer: string; skip: boolean }]
 }>()
 
 const router = useRouter()
 const modelDropdownOpen = ref(false)
 const infoPopoverOpen = ref(false)
+const infoButtonRef = ref<HTMLButtonElement | null>(null)
+const editing = ref(false)
+const editDraft = ref('')
+const openArtifact = ref<ChatArtifact | null>(null)
+
+const artifactSource = computed(() =>
+  props.parts
+    .filter((part) => part.type === 'text')
+    .map((part) => part.content || '')
+    .join('\n')
+)
+const artifacts = computed(() =>
+  isModuleConfigured('chat_artifacts') ? extractArtifacts(artifactSource.value) : []
+)
+const artifactFilename = computed(() => `preview-${props.backendMessageId ?? 'chat'}`)
+const versionList = computed(() => props.versions ?? [])
+const editList = computed(() => props.edits ?? [])
+const versionPosition = computed(() => {
+  const list = props.role === 'user' ? editList.value : versionList.value
+  const current = list.findIndex((item) => item.selected) + 1
+  return { current: current > 0 ? current : 1, total: list.length }
+})
+
+function stepVersion(delta: number): void {
+  const list = props.role === 'user' ? editList.value : versionList.value
+  if (list.length < 2) return
+  const current = Math.max(
+    0,
+    list.findIndex((item) => item.selected)
+  )
+  const next = list[(current + delta + list.length) % list.length]
+  emit('selectVersion', next.id, props.role === 'user' ? 'edit' : 'answer')
+}
+
+function startEdit(): void {
+  editDraft.value = artifactSource.value
+  editing.value = true
+}
+
+function saveEdit(): void {
+  const text = editDraft.value.trim()
+  if (text === '') return
+  editing.value = false
+  emit('editMessage', text)
+}
+
+function onInfoEscape(event: KeyboardEvent): void {
+  if (event.key !== 'Escape' || !infoPopoverOpen.value) return
+  event.preventDefault()
+  closeInfoPopover()
+}
+
+watch(infoPopoverOpen, (open) => {
+  if (open) {
+    window.addEventListener('keydown', onInfoEscape)
+    return
+  }
+  window.removeEventListener('keydown', onInfoEscape)
+  infoButtonRef.value?.focus()
+})
 
 const hasMessageMetadata = computed(() => {
   if (props.topic) return true
@@ -1999,6 +2247,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', handleReferenceClick)
   mobileMq.removeEventListener('change', onMobileMqChange)
+  window.removeEventListener('keydown', onInfoEscape)
   clearLongRunningTimer()
 })
 </script>

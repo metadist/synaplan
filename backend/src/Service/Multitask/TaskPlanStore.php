@@ -110,7 +110,7 @@ final readonly class TaskPlanStore
      * user prompt. A miss only affects that transient reload view, never the
      * turn, so failures are logged and swallowed.
      *
-     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int} $result
+     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int, ask_user?: ?array<string, mixed>} $result
      */
     public function updateNodeStatus(int $messageId, string $nodeId, string $status, array $result = []): void
     {
@@ -156,6 +156,39 @@ final readonly class TaskPlanStore
      *
      * @return list<array{nodeId: string, capability: string, kind: string, state: string, text?: string, url?: string, error?: string, query?: string, resultsCount?: int, type?: string}>
      */
+    /**
+     * Expiry stored on the paused ask-the-user card. The plan node itself
+     * does not carry it; AskUserRunner writes ask_user.expiresAt into the
+     * result payload.
+     */
+    public function askUserExpiresAt(int $messageId, string $nodeId): ?int
+    {
+        try {
+            $raw = $this->connection->fetchOne(
+                'SELECT BRESULTREF FROM BMESSAGE_TASKS WHERE BMESSAGEID = ? AND BNODEID = ?',
+                [$messageId, $nodeId],
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanStore: failed to read ask-user expiry', [
+                'message_id' => $messageId,
+                'node_id' => $nodeId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+        if (!is_string($raw) || '' === $raw) {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        $expires = is_array($decoded) ? ($decoded['ask_user']['expiresAt'] ?? null) : null;
+        if (is_int($expires)) {
+            return $expires;
+        }
+
+        return is_numeric($expires) ? (int) $expires : null;
+    }
+
     public function loadCards(int $messageId): array
     {
         try {
@@ -238,7 +271,7 @@ final readonly class TaskPlanStore
     /**
      * Encode card body fields into the BRESULTREF / BERROR columns (#1343).
      *
-     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int} $result
+     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int, ask_user?: ?array<string, mixed>} $result
      *
      * @return array{BRESULTREF: ?string, BERROR: ?string}
      */
@@ -261,6 +294,9 @@ final readonly class TaskPlanStore
         }
         if (true === ($result['step_output_truncated'] ?? false)) {
             $ref['step_output_truncated'] = true;
+        }
+        if (is_array($result['ask_user'] ?? null)) {
+            $ref['ask_user'] = $result['ask_user'];
         }
 
         $error = $result['error'] ?? null;
@@ -304,6 +340,9 @@ final readonly class TaskPlanStore
         }
         if (true === ($decoded['step_output_truncated'] ?? false)) {
             $out['step_output_truncated'] = true;
+        }
+        if (is_array($decoded['ask_user'] ?? null)) {
+            $out['ask_user'] = $decoded['ask_user'];
         }
 
         return $out;

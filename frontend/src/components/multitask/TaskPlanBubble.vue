@@ -32,6 +32,7 @@ const emit = defineEmits<{
   cancelTask: [nodeId: string]
   /** Re-run file work with the user's notes as a new turn. */
   followupTask: [prompt: string]
+  askUser: [payload: { nodeId: string; answer: string; skip: boolean }]
 }>()
 
 const { t, locale } = useI18n()
@@ -118,6 +119,7 @@ const onSchedule = async () => {
       @retry="emit('retryTask', $event)"
       @cancel="emit('cancelTask', $event)"
       @followup="emit('followupTask', $event)"
+      @ask-user="emit('askUser', $event)"
     />
 
     <button

@@ -1058,7 +1058,9 @@
         "TOOLS_REGISTRY_ENABLED": "Catálogo de herramientas",
         "TOOLS_APPROVALS_ENABLED": "Aprobaciones de herramientas",
         "TOOLS_CUSTOM_HTTP_ENABLED": "Herramientas HTTP propias",
-        "WORKFLOWS_BUILDER_ENABLED": "Editor de pasos"
+        "WORKFLOWS_BUILDER_ENABLED": "Editor de pasos",
+        "CHAT_EXPORT_ENABLED": "Exportar chats",
+        "CHAT_SHARE_ENABLED": "Compartir chats"
       }
     }
   },
@@ -1282,6 +1284,9 @@
       "body": "Esta función es opcional. La activa el administrador de esta instalación.",
       "howToEnable": "Cómo activarla",
       "openFeatureStatus": "Abrir estado del sistema"
+    },
+    "chat_artifacts": {
+      "label": "Vista previa de HTML y SVG"
     }
   },
   "partners": {

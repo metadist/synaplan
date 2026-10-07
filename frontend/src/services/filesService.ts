@@ -988,6 +988,13 @@ export const downloadFile = async (fileId: number, filename: string): Promise<vo
  * @param fileId File ID
  * @param filename Original filename for download
  */
+export const fetchGuestFileBlob = async (sessionId: string, fileId: number): Promise<Blob> => {
+  return httpClient<Blob>(
+    `/api/v1/guest/files/${encodeURIComponent(sessionId)}/${fileId}/download`,
+    { responseType: 'blob' }
+  )
+}
+
 export const downloadGuestFile = async (
   sessionId: string,
   fileId: number,

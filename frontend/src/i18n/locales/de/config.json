@@ -726,8 +726,10 @@
     "routing": {
       "title": "Routing",
       "flowBody": "Wenn eine Nachricht eintrifft, liest der Planer sie und zerlegt sie in eine kleine Reihe von Aufgaben (zum Beispiel: ein Bild erzeugen und es dann als Audio zusammenfassen). Jede Aufgabe wird von der passenden Fähigkeit bearbeitet und die Ergebnisse werden zu einer Antwort zusammengeführt.",
-      "customCalloutBody": "Eigene Themen und System-Prompts gewünscht? Erstelle und bearbeite sie auf der Seite Task-Prompts — der Planer übernimmt sie automatisch.",
-      "customCalloutLink": "Task-Prompts öffnen",
+      "customCalloutBody": "Speichere eine wiederkehrende Anweisung mit einem /Befehl und füge sie im Eingabefeld ein.",
+      "customCalloutLink": "Prompt-Bibliothek öffnen",
+      "taskPromptsCalloutBody": "Eigene Themen und System-Prompts gewünscht? Erstelle und bearbeite sie auf der Seite Task-Prompts — der Planer übernimmt sie automatisch.",
+      "taskPromptsCalloutLink": "Task-Prompts öffnen",
       "masterTitle": "Multi-Task-Routing",
       "masterDesc": "Nachrichten über den Planer leiten, sodass eine Anfrage mehrere Aufgaben gleichzeitig auslösen kann. Wenn aus, übernimmt der bisherige Einzelthema-AI-Sorter das Routing.",
       "masterHint": "Globale Voreinstellung für den Workspace. Bestehende Nutzer behalten ihre eigene Einstellung, bis sie zustimmen; das Aktivieren hier schaltet es auch für dein eigenes Konto frei.",

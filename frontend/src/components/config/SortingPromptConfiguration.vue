@@ -7,16 +7,23 @@
       data-testid="section-routing-overview"
     />
 
-    <!-- Prominent callout: custom prompts live in Task Prompts -->
+    <!-- Saved prompts (/command) and the planner's task prompts are different pages. -->
     <div
       class="p-4 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex items-start gap-3"
       data-testid="callout-custom-prompts"
     >
       <Icon icon="heroicons:light-bulb" class="w-5 h-5 text-[var(--brand)] flex-shrink-0 mt-0.5" />
       <p class="text-sm txt-secondary leading-relaxed">
-        {{ $t('config.routing.customCalloutBody') }}
-        <router-link to="/ai/task-prompts" class="text-[var(--brand)] hover:underline font-medium">
+        <span>{{ $t('config.routing.customCalloutBody') }}</span>
+        <router-link to="/prompts" class="ml-1 text-[var(--brand)] hover:underline font-medium">
           {{ $t('config.routing.customCalloutLink') }}
+        </router-link>
+        <span class="ml-1">{{ $t('config.routing.taskPromptsCalloutBody') }}</span>
+        <router-link
+          to="/ai/task-prompts"
+          class="ml-1 text-[var(--brand)] hover:underline font-medium"
+        >
+          {{ $t('config.routing.taskPromptsCalloutLink') }}
         </router-link>
       </p>
     </div>
@@ -534,7 +541,7 @@ const { success, error: showError, warning } = useNotification()
 const { t, locale } = useI18n()
 const markdownRenderer = getMarkdownRenderer()
 
-const getPromptLink = (topic: string) => `/ai/instructions?topic=${encodeURIComponent(topic)}`
+const getPromptLink = (topic: string) => `/ai/task-prompts?topic=${encodeURIComponent(topic)}`
 
 // --- AI-fallback markdown rendering (kept verbatim from previous component) -
 const renderedPromptText = computed(

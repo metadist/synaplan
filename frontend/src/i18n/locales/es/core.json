@@ -101,7 +101,8 @@
     "assistants": "Asistentes",
     "assistantBuilder": "Asistente",
     "approvals": "Aprobaciones",
-    "filesWorkspace": "Espacio de trabajo"
+    "filesWorkspace": "Espacio de trabajo",
+    "prompts": "Prompts"
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",
@@ -177,6 +178,7 @@
     "usage": "Uso",
     "assistants": "Asistentes",
     "approvals": "Aprobaciones",
+    "prompts": "Prompts",
     "home": "Inicio"
   },
   "common": {

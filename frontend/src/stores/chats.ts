@@ -75,6 +75,8 @@ export interface Chat {
   pinned?: boolean
   /** When the chat was last pinned. Null when it is not pinned. */
   pinnedAt?: string | null
+  archived?: boolean
+  tags?: string[]
   access?: 'owner' | 'read' | 'use'
 }
 
@@ -221,6 +223,8 @@ export const useChatsStore = defineStore('chats', () => {
       widgetSession: c.widgetSession ?? null,
       pinned: c.pinned === true,
       pinnedAt: typeof c.pinnedAt === 'string' ? c.pinnedAt : null,
+      archived: c.archived === true,
+      tags: Array.isArray(c.tags) ? c.tags.filter((tag) => typeof tag === 'string') : [],
     }
   }
 
@@ -346,7 +350,9 @@ export const useChatsStore = defineStore('chats', () => {
     activeRunChatIds.value = applyLiveRunOverlay(serverRunIds, loadSeq)
   }
 
-  async function loadChats() {
+  const viewingArchived = ref(false)
+
+  async function loadChats(archived: '0' | '1' = '0') {
     if (!checkAuthOrRedirect()) return
 
     const seq = ++chatsLoadSeq
@@ -356,8 +362,9 @@ export const useChatsStore = defineStore('chats', () => {
     const run = (async () => {
       try {
         const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
-          '/api/v1/chats'
+          `/api/v1/chats?archived=${archived}`
         )
+        viewingArchived.value = archived === '1'
         if (seq !== chatsLoadSeq) {
           return
         }
@@ -1026,6 +1033,37 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  async function setChatArchived(chatId: number, archived: boolean) {
+    if (!checkAuthOrRedirect()) return
+    await httpClient(`/api/v1/chats/${chatId}/${archived ? 'archive' : 'unarchive'}`, {
+      method: 'POST',
+    })
+    const chat = chats.value.find((row) => row.id === chatId)
+    if (chat) chat.archived = archived
+    if (archived) {
+      chats.value = chats.value.filter((row) => row.id !== chatId)
+      forgetRailChat(chatId)
+      if (activeChatId.value === chatId) {
+        updateActiveChatSelection(chats.value[0]?.id ?? null)
+      }
+    } else {
+      await loadChats(viewingArchived.value ? '1' : '0')
+    }
+  }
+
+  async function downloadChatExport(chatId: number, format: 'md' | 'json' | 'pdf') {
+    if (!checkAuthOrRedirect()) return
+    const blob = await httpClient<Blob>(`/api/v1/chats/${chatId}/export?format=${format}`, {
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `chat-${chatId}.${format === 'md' ? 'md' : format}`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function deleteChat(chatId: number, silent: boolean = false) {
     if (!checkAuthOrRedirect()) return
 
@@ -1394,6 +1432,7 @@ export const useChatsStore = defineStore('chats', () => {
     markChatGenerating,
     watchDetachedRun,
     stopDetachedRunWatch,
+    viewingArchived,
     loadChats,
     loadChatHistory,
     createChat,
@@ -1402,6 +1441,8 @@ export const useChatsStore = defineStore('chats', () => {
     toggleChatPin,
     applyChatTitle,
     deleteChat,
+    setChatArchived,
+    downloadChatExport,
     shareChat,
     getShareInfo,
     setActiveChat,

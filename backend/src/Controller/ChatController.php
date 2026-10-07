@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Service\Chat\ChatActionPolicy;
 use App\Service\Chat\ChatDeletionService;
 use App\Service\Chat\Run\ChatRunService;
 use App\Service\File\ConversationFileHistory;
@@ -52,6 +53,7 @@ class ChatController extends AbstractController
         private ShareService $shareService,
         private UserRepository $userRepository,
         private ConversationFileHistory $conversationFileHistory,
+        private ChatActionPolicy $chatActionPolicy,
     ) {
     }
 
@@ -146,12 +148,18 @@ class ChatController extends AbstractController
         $paginate = $request->query->has('limit');
         $limit = max(1, min((int) $request->query->get('limit', 20), 100));
         $offset = max(0, (int) $request->query->get('offset', 0));
+        $archivedParam = (string) $request->query->get('archived', '0');
+        $archived = match ($archivedParam) {
+            '1', 'true' => true,
+            'all' => null,
+            default => false,
+        };
 
         if ($paginate) {
-            $chats = $this->chatRepository->findByUserPaginated($user->getId(), $limit, $offset);
-            $total = $this->chatRepository->countByUser($user->getId());
+            $chats = $this->chatRepository->findByUserPaginated($user->getId(), $limit, $offset, $archived);
+            $total = $this->chatRepository->countByUser($user->getId(), $archived);
         } else {
-            $chats = $this->chatRepository->findByUser($user->getId());
+            $chats = $this->chatRepository->findByUser($user->getId(), $archived);
             $total = count($chats);
         }
 
@@ -203,6 +211,8 @@ class ChatController extends AbstractController
                 'firstMessagePreview' => $firstMessagePreview,
                 'pinned' => $chat->isPinned(),
                 'pinnedAt' => $chat->getPinnedAt()?->format('c'),
+                'archived' => $chat->isArchived(),
+                'tags' => $chat->getTags(),
             ];
         }, $chats);
 
@@ -659,6 +669,9 @@ class ChatController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
         $enable = $data['enable'] ?? true;
+        if ($enable && !$this->chatActionPolicy->canShare($user->getId())) {
+            return $this->json(['error' => 'Sharing chats is turned off for your account'], Response::HTTP_FORBIDDEN);
+        }
 
         if ($enable) {
             if (!$chat->getShareToken()) {
@@ -808,10 +821,7 @@ class ChatController extends AbstractController
 
         // Issue #1070: serialization lives in MessageApiFormatter so this
         // endpoint and GET /api/v1/messages/{id} can never diverge.
-        $messageData = array_map(
-            fn ($m) => $this->messageApiFormatter->format($m),
-            $messages
-        );
+        $messageData = $this->messageApiFormatter->formatMany($messages);
 
         $totalCount = $this->messageRepository->createQueryBuilder('m')
             ->select('COUNT(m.id)')
@@ -920,10 +930,7 @@ class ChatController extends AbstractController
         // exposed as `files[]`) are visible to viewers — the previous inline
         // serializer only emitted the legacy single `file` field, so uploads
         // silently disappeared in the shared view.
-        $messageData = array_map(
-            fn ($m) => $this->messageApiFormatter->format($m),
-            $messages
-        );
+        $messageData = $this->messageApiFormatter->formatMany($messages);
 
         return $this->json([
             'success' => true,

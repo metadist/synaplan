@@ -76,7 +76,7 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(expectedIds).toContain('opendesk_stt')
     expect(expectedIds).toContain('telegram')
     expect(expectedIds).toContain('federation')
-    expect(expectedIds).toHaveLength(16)
+    expect(expectedIds).toHaveLength(17)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -146,7 +146,7 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(ids).toContain('opendesk_stt')
     expect(ids).toContain('telegram')
     expect(ids).toContain('federation')
-    expect(ids).toHaveLength(16)
+    expect(ids).toHaveLength(17)
     expect(modules.tika?.configured).toBe(false)
     expect(modules.opendesk_stt?.configured).toBe(false)
     expect(modules.higgsfield?.configured).toBe(false)

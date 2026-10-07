@@ -170,7 +170,19 @@
     "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
     "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin.",
     "conversation": "sohbet",
-    "conversations": "sohbetler"
+    "conversations": "sohbetler",
+    "archive": "Arşivle",
+    "unarchive": "Arşivden çıkar",
+    "archivedFilter": "Arşivlenenler",
+    "exportMarkdown": "Markdown olarak dışa aktar",
+    "exportPdf": "PDF olarak dışa aktar",
+    "exportJson": "JSON olarak dışa aktar",
+    "tags": "Etiketler",
+    "tagsSaved": "Etiketler kaydedildi.",
+    "archivedDone": "Arşivlendi. Tüm sohbetler → Arşivlenenler altında.",
+    "unarchivedDone": "Kenar çubuğuna geri döndü.",
+    "showOpenChats": "Açık sohbetler",
+    "versionLinkFailed": "Yeni yanıt görünüyor, ancak önceki yanıtın başka bir sürümü olarak kaydedilmedi."
   },
   "moderation": {
     "report": {
@@ -247,6 +259,11 @@
     "webSearch": "Web'de güncel bilgi ara",
     "enhance": "Geliştir",
     "enhanceRejected": "Bu metin geliştirilemedi. Daha net bir cümle veya soru deneyin.",
+    "enhanceSummary": {
+      "unchanged": "Metin zaten anlaşılır — hiçbir şey değişmedi.",
+      "capitalized": "İlk harf büyük yapıldı ve noktalama düzeltildi.",
+      "rewritten": "Metin daha anlaşılır olacak şekilde yeniden yazıldı."
+    },
     "thinking": "Düşünme",
     "reasoningLevel": {
       "label": "Akıl yürütme",
@@ -342,7 +359,8 @@
       "filterLabel": "Modelleri filtrele",
       "filterPlaceholder": "Modelleri filtrele…",
       "clearFilter": "Filtreyi temizle",
-      "noMatch": "“{query}” ile eşleşen model yok."
+      "noMatch": "“{query}” ile eşleşen model yok.",
+      "assistants": "Asistanlar"
     },
     "removeTool": "Aracı kaldır",
     "pastedText": {
@@ -354,7 +372,9 @@
       "modalTitle": "Yapıştırılan içerik",
       "save": "Kaydet",
       "cancel": "İptal"
-    }
+    },
+    "toolsSummary": "{count} araç",
+    "toolsSummaryActive": "{count} araç · {name} açık"
   },
   "chatMessage": {
     "again": "Tekrar",
@@ -364,7 +384,25 @@
     "infoAiModel": "Yapay Zeka Modeli",
     "infoAudioModel": "Ses Modeli",
     "infoTokens": "Token",
-    "infoCost": "Maliyet"
+    "infoCost": "Maliyet",
+    "edit": "Düzenle",
+    "editSave": "Kaydet ve gönder",
+    "editCancel": "İptal",
+    "versionPrevious": "Önceki sürüm",
+    "versionNext": "Sonraki sürüm",
+    "versionPosition": "{current} / {total}",
+    "infoUsageStep": "{kind}: {tokens}",
+    "previewArtifact": "Önizleme",
+    "artifactCopy": "Kopyala",
+    "artifactDownload": "İndir",
+    "artifactFullscreen": "Tam ekran",
+    "artifactClose": "Kapat",
+    "fileReattach": "Yeniden ekle",
+    "fileOpenLibrary": "Kitaplıkta aç",
+    "filePreviewLoading": "Dosya açılıyor…",
+    "filePreviewEmpty": "Bu dosya için henüz önizleme yok.",
+    "fileSearchable": "Aranabilir",
+    "fileNotSearchable": "Henüz aranabilir değil"
   },
   "chatError": {
     "title": "Yanıt tamamlanamadı",
@@ -592,7 +630,13 @@
     "copyFailed": "Kopyalanamadı",
     "expand": "Metni göster",
     "collapse": "Metni gizle",
-    "redundantCollapsed": "Adım çıktısı daraltıldı — incelemek için genişletin veya aşağıdaki yanıtı okuyun."
+    "redundantCollapsed": "Adım çıktısı daraltıldı — incelemek için genişletin veya aşağıdaki yanıtı okuyun.",
+    "recommended": "Önerilen",
+    "askSubmit": "Gönder",
+    "askSkip": "Atla",
+    "askNeedAnswer": "Bir seçenek seçin veya bir yanıt yazın.",
+    "askFailed": "Çalışma devam edemedi. Yeni bir mesaj gönderin.",
+    "askReadOnly": "Yalnızca sahibi yanıtlayabilir. Soruyu yine de okuyabilirsiniz."
   },
   "processing": {
     "timeline": {
@@ -862,5 +906,14 @@
     "openInLibrary": "Kitaplıkta aç",
     "lines": "Satırlar {start}–{end}",
     "unavailable": "Bu pasaj açılamadı."
+  },
+  "savedPrompts": {
+    "title": "Promptlar",
+    "empty": "Bir prompt kaydedin, sonra / yazarak ekleyin.",
+    "new": "Yeni prompt",
+    "name": "Ad",
+    "command": "Komut",
+    "body": "Prompt",
+    "saved": "Prompt kaydedildi."
   }
 }

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import config from '@/stores/config'
 import { i18n } from '@/i18n/instance'
+import { httpClient } from '@/services/api/httpClient'
 
 export interface Command {
   name: string
@@ -9,6 +10,8 @@ export interface Command {
   usage: string
   requiresArgs: boolean
   icon: string
+  /** When set, choosing the command inserts this text instead of a slash command. */
+  promptBody?: string
   /** True for commands contributed by an installed plugin's manifest. */
   isPlugin?: boolean
   /** Owning plugin id (plugin commands only). */
@@ -67,7 +70,7 @@ function helpCommand(): Command {
  */
 export function pluginCommands(): Command[] {
   const result: Command[] = []
-  for (const plugin of config.plugins) {
+  for (const plugin of config?.plugins ?? []) {
     const chatCommands = plugin.chatCommands
     if (!chatCommands) {
       continue
@@ -94,10 +97,37 @@ export function pluginCommands(): Command[] {
 }
 
 export const useCommandsStore = defineStore('commands', () => {
+  const savedPrompts = ref<Command[]>([])
+  let savedPromptsLoaded = false
+
+  async function loadSavedPrompts(): Promise<void> {
+    if (savedPromptsLoaded) return
+    savedPromptsLoaded = true
+    try {
+      const data = await httpClient<{
+        prompts?: Array<{ command?: string; name?: string; body?: string }>
+      }>('/api/v1/saved-prompts')
+      savedPrompts.value = (data.prompts ?? [])
+        .filter((row) => row.command && row.body)
+        .map((row) => ({
+          name: String(row.command),
+          description: String(row.name || row.command),
+          usage: `/${row.command}`,
+          requiresArgs: false,
+          icon: 'mdi:text-box-outline',
+          promptBody: String(row.body),
+        }))
+    } catch {
+      savedPrompts.value = []
+      savedPromptsLoaded = false
+    }
+  }
+
   const commands = computed<Command[]>(() => [
     ...commandsData,
-    ...(config.features.selfAware ? [helpCommand()] : []),
+    ...(config?.features?.selfAware ? [helpCommand()] : []),
     ...pluginCommands(),
+    ...savedPrompts.value,
   ])
 
   const recentCommands = ref<string[]>(JSON.parse(localStorage.getItem('recentCommands') || '[]'))
@@ -117,5 +147,6 @@ export const useCommandsStore = defineStore('commands', () => {
     recentCommands,
     addRecentCommand,
     getCommand,
+    loadSavedPrompts,
   }
 })

@@ -8,6 +8,7 @@ use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Credential\ProviderKeyStore;
 use App\Module\Channel\TelegramModule;
 use App\Module\Channel\WhatsappModule;
+use App\Module\Chat\ChatArtifactsModule;
 use App\Module\Commerce\MobileIapModule;
 use App\Module\Commerce\StripeBillingModule;
 use App\Module\Contract\FeatureModuleInterface;
@@ -24,6 +25,7 @@ use App\Module\Sidecar\PiperTtsModule;
 use App\Module\Sidecar\SearxngModule;
 use App\Module\Sidecar\TikaModule;
 use App\Service\BillingService;
+use App\Service\Chat\ChatArtifactsConfig;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
@@ -73,6 +75,7 @@ trait BuildsAllModules
             new FederationModule('http://localhost:8000', false),
             new ComputeModule($probe, $this->createStub(ComputeConfig::class), '', ''),
             new OpendeskSttModule($probe, '', '', '', ''),
+            new ChatArtifactsModule($this->disabledArtifacts()),
         ];
 
         $byId = [];
@@ -81,5 +84,13 @@ trait BuildsAllModules
         }
 
         return $byId;
+    }
+
+    private function disabledArtifacts(): ChatArtifactsConfig
+    {
+        $config = $this->createStub(ChatArtifactsConfig::class);
+        $config->method('isEnabled')->willReturn(false);
+
+        return $config;
     }
 }

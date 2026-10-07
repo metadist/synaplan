@@ -42,6 +42,7 @@ final class MinimalModuleEnvTest extends TestCase
         'federation' => ['FEDERATION_ALLOW_LOCAL'],
         'compute' => ['COMPUTE_URL', 'COMPUTE_TOKEN'],
         'opendesk_stt' => ['OPENDESK_STT_URL'],
+        'chat_artifacts' => ['CHAT_ARTIFACTS_ENABLED'],
     ];
 
     public function testEveryDeclaredModuleHasADecisiveEnvList(): void

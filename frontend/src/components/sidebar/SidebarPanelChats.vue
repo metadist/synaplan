@@ -31,6 +31,14 @@
         <PlusIcon v-else class="w-5 h-5" aria-hidden="true" />
         {{ $t('chat.newChat') }}
       </button>
+      <button
+        type="button"
+        class="btn-secondary mt-2 w-full px-4 py-2.5 text-sm font-medium"
+        data-testid="btn-sidebar-archived-chats"
+        @click="toggleArchivedChats"
+      >
+        {{ chatsStore.viewingArchived ? $t('chat.showOpenChats') : $t('chat.archivedFilter') }}
+      </button>
     </div>
 
     <div v-if="iamSharingEnabled" class="mt-4" data-testid="section-sidebar-incoming">
@@ -86,6 +94,8 @@
           @share="shareChat"
           @rename="renameChat"
           @delete="deleteChat"
+          @archive="archiveChat"
+          @export="exportChat"
           @pin="toggleChatPin"
         />
       </div>
@@ -119,6 +129,8 @@
           @share="shareChat"
           @rename="renameChat"
           @delete="deleteChat"
+          @archive="archiveChat"
+          @export="exportChat"
           @pin="toggleChatPin"
         />
       </div>
@@ -162,6 +174,8 @@
           @share="shareChat"
           @rename="renameChat"
           @delete="deleteChat"
+          @archive="archiveChat"
+          @export="exportChat"
           @pin="toggleChatPin"
         >
           <template #empty>
@@ -216,6 +230,9 @@ const {
   renameChat,
   toggleChatPin,
   deleteChat,
+  archiveChat,
+  toggleArchivedChats,
+  exportChat,
   shareChat,
   chatsStore,
   incomingStore,

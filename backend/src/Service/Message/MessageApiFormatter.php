@@ -32,6 +32,21 @@ final readonly class MessageApiFormatter
     }
 
     /**
+     * @param list<Message> $messages oldest first
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function formatMany(array $messages): array
+    {
+        $rows = [];
+        foreach ($messages as $message) {
+            $rows[] = $this->format($message);
+        }
+
+        return MessageTurnView::present($rows);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function format(Message $m): array
@@ -219,6 +234,13 @@ final readonly class MessageApiFormatter
             'voiceReplyFailed' => $this->voiceReplyFailedReason($m),
             'agentId' => $this->agentIdFromMeta($m),
             'agentVersionId' => $this->intMeta($m, 'AGENTVERSIONID'),
+            'versionGroup' => $this->intMeta($m, MessageVersionService::VERSION_GROUP),
+            'versionIndex' => $this->intMeta($m, MessageVersionService::VERSION_INDEX),
+            'versionSelected' => '0' !== (string) ($m->getMeta(MessageVersionService::VERSION_SELECTED) ?? '1'),
+            'editGroup' => $this->intMeta($m, MessageVersionService::EDIT_GROUP),
+            'editIndex' => $this->intMeta($m, MessageVersionService::EDIT_INDEX),
+            'editSelected' => '0' !== (string) ($m->getMeta(MessageVersionService::EDIT_SELECTED) ?? '1'),
+            'branchInactive' => '1' === (string) $m->getMeta(MessageVersionService::BRANCH_INACTIVE),
             // Generated content (images, videos, audio from AI)
             'file' => ($m->getFile() && $filePath) ? [
                 'path' => $filePath,

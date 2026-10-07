@@ -1062,7 +1062,9 @@
         "TOOLS_REGISTRY_ENABLED": "Werkzeugkatalog",
         "TOOLS_APPROVALS_ENABLED": "Werkzeug-Freigaben",
         "TOOLS_CUSTOM_HTTP_ENABLED": "Eigene HTTP-Werkzeuge",
-        "WORKFLOWS_BUILDER_ENABLED": "Schritte-Editor"
+        "WORKFLOWS_BUILDER_ENABLED": "Schritte-Editor",
+        "CHAT_EXPORT_ENABLED": "Chats exportieren",
+        "CHAT_SHARE_ENABLED": "Chats teilen"
       }
     }
   },
@@ -1286,6 +1288,9 @@
       "body": "Diese Funktion ist optional. Sie wird vom Administrator dieser Installation eingeschaltet.",
       "howToEnable": "So wird sie aktiviert",
       "openFeatureStatus": "System-Status öffnen"
+    },
+    "chat_artifacts": {
+      "label": "HTML- und SVG-Vorschau"
     }
   },
   "partners": {

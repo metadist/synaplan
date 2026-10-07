@@ -412,6 +412,13 @@
               class="min-w-0 max-w-[6.5rem] flex-shrink overflow-hidden"
               @remove="clearTool"
             />
+            <span
+              v-if="!isGuestMode"
+              class="max-w-[10rem] truncate text-xs txt-secondary"
+              data-testid="chip-tools-summary"
+            >
+              {{ toolsSummaryText }}
+            </span>
 
             <div
               class="ml-auto flex min-w-0 max-w-full items-center gap-1.5"
@@ -492,6 +499,7 @@ import ToolsDropdown from './ToolsDropdown.vue'
 import ToolBadge from './ToolBadge.vue'
 import DesktopJobCard from './DesktopJobCard.vue'
 import ModelDropdown from './ModelDropdown.vue'
+import { toolsSummaryLabel } from '@/utils/toolsSummary'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import PastedTextCard from './chat/PastedTextCard.vue'
@@ -661,6 +669,21 @@ const isToolCommand = (name: string): name is ChatTool =>
   (TOOL_COMMANDS as readonly string[]).includes(name)
 
 const activeTool = ref<ChatTool | null>(null)
+const toolsSummaryText = computed(() => {
+  const names: Record<string, string> = {
+    search: t('chatInput.tools.webSearch'),
+    pic: t('chatInput.tools.imageGen'),
+    vid: t('chatInput.tools.videoGen'),
+    help: t('selfAware.helpCommand.label'),
+  }
+  return toolsSummaryLabel(
+    {
+      count: configStore.features?.selfAware ? 4 : 3,
+      activeName: activeTool.value ? (names[activeTool.value] ?? null) : null,
+    },
+    (key, params) => String(t(key, params))
+  )
+})
 const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
@@ -1207,6 +1230,7 @@ watch(
   message,
   (newValue) => {
     if (newValue.startsWith('/')) {
+      void commandsStore.loadSavedPrompts()
       // Only show palette if no space (still typing command) or only command without args
       const hasSpace = newValue.includes(' ')
       const parsed = parseCommand(newValue)
@@ -1387,7 +1411,9 @@ const toggleVoiceReply = () => {
 // any other command (e.g. /tts) keeps the legacy inline-text behaviour.
 const handleCommandSelect = (cmd: Command) => {
   paletteVisible.value = false
-  if (isToolCommand(cmd.name)) {
+  if (cmd.promptBody) {
+    message.value = cmd.promptBody
+  } else if (isToolCommand(cmd.name)) {
     setActiveTool(cmd.name)
     // Drop the partial "/cmd" the user was typing so only the query remains.
     message.value = ''
@@ -2143,6 +2169,12 @@ const toggleEnhance = async () => {
 
   try {
     const result = await chatApi.enhanceMessage(currentText)
+    const summary =
+      result.summary ?? (result.enhanced.trim() === currentText ? 'unchanged' : 'rewritten')
+    success(t(`chatInput.enhanceSummary.${summary}`))
+    if (summary === 'unchanged') {
+      return
+    }
     originalMessage.value = currentText
     enhancedMessage.value = result.enhanced
     message.value = result.enhanced

@@ -171,6 +171,8 @@ parameters:
     env(DOCLING_MAX_BYTES): '52428800'
     # SearXNG sidecar. Empty = off (OSS / fresh-install default).
     env(SEARXNG_BASE_URL): ''
+    # HTML/SVG chat preview. Empty = off. The dev compose defaults this to 1.
+    env(CHAT_ARTIFACTS_ENABLED): ''
     # Office convert (Collabora CODE). Empty = disabled (OSS default).
     env(OFFICE_CONVERT_URL): ''
     env(OFFICE_CONVERT_TIMEOUT_MS): '60000'
@@ -1198,6 +1200,10 @@ services:
     App\Module\Sidecar\SearxngModule:
         arguments:
             $baseUrl: '%env(SEARXNG_BASE_URL)%'
+
+    App\Service\Chat\ChatArtifactsConfig:
+        arguments:
+            $envValue: '%env(CHAT_ARTIFACTS_ENABLED)%'
 
     App\Module\Sidecar\PiperTtsModule:
         arguments:

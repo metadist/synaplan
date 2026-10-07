@@ -1062,7 +1062,9 @@
         "TOOLS_REGISTRY_ENABLED": "Tool catalog",
         "TOOLS_APPROVALS_ENABLED": "Tool approvals",
         "TOOLS_CUSTOM_HTTP_ENABLED": "Custom HTTP tools",
-        "WORKFLOWS_BUILDER_ENABLED": "Task steps editor"
+        "WORKFLOWS_BUILDER_ENABLED": "Task steps editor",
+        "CHAT_EXPORT_ENABLED": "Export chats",
+        "CHAT_SHARE_ENABLED": "Share chats"
       }
     }
   },
@@ -1286,6 +1288,9 @@
       "body": "This feature is optional. It is switched on by the administrator of this installation.",
       "howToEnable": "How to enable it",
       "openFeatureStatus": "Open system status"
+    },
+    "chat_artifacts": {
+      "label": "HTML and SVG preview"
     }
   },
   "partners": {

@@ -444,6 +444,12 @@ const router = createRouter({
       beforeEnter: aiAccountsRouteGuard,
     },
     {
+      path: '/prompts',
+      name: 'prompts',
+      component: () => import('@/views/PromptsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.prompts', i18n: ['chat'] },
+    },
+    {
       path: '/ai/task-prompts',
       name: 'ai-task-prompts',
       component: () => import('@/views/ConfigView.vue'),

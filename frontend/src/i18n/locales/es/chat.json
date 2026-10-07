@@ -170,7 +170,19 @@
     "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto.",
     "voiceMessageDefaultMessage": "Por favor, responde a mi mensaje de voz.",
     "conversation": "conversación",
-    "conversations": "conversaciones"
+    "conversations": "conversaciones",
+    "archive": "Archivar",
+    "unarchive": "Desarchivar",
+    "archivedFilter": "Archivados",
+    "exportMarkdown": "Exportar como Markdown",
+    "exportPdf": "Exportar como PDF",
+    "exportJson": "Exportar como JSON",
+    "tags": "Etiquetas",
+    "tagsSaved": "Etiquetas guardadas.",
+    "archivedDone": "Archivado. Está en Todos los chats → Archivados.",
+    "unarchivedDone": "De vuelta en la barra lateral.",
+    "showOpenChats": "Chats abiertos",
+    "versionLinkFailed": "La nueva respuesta se muestra, pero no se guardó como otra versión de la anterior."
   },
   "moderation": {
     "report": {
@@ -247,6 +259,11 @@
     "webSearch": "Buscar información actualizada en la web",
     "enhance": "Mejorar",
     "enhanceRejected": "No se pudo mejorar este texto. Prueba con una frase o pregunta más clara.",
+    "enhanceSummary": {
+      "unchanged": "El texto ya se lee bien — no se cambió nada.",
+      "capitalized": "Se puso mayúscula al inicio y se ajustó la puntuación.",
+      "rewritten": "Se reescribió el texto para que sea más claro."
+    },
     "thinking": "Pensamiento",
     "reasoningLevel": {
       "label": "Razonamiento",
@@ -342,7 +359,8 @@
       "filterLabel": "Filtrar modelos",
       "filterPlaceholder": "Filtrar modelos…",
       "clearFilter": "Borrar filtro",
-      "noMatch": "Ningún modelo coincide con «{query}»."
+      "noMatch": "Ningún modelo coincide con «{query}».",
+      "assistants": "Asistentes"
     },
     "removeTool": "Quitar herramienta",
     "pastedText": {
@@ -354,7 +372,9 @@
       "modalTitle": "Contenido pegado",
       "save": "Guardar",
       "cancel": "Cancelar"
-    }
+    },
+    "toolsSummary": "{count} herramientas",
+    "toolsSummaryActive": "{count} herramientas · {name} activada"
   },
   "chatMessage": {
     "again": "Otra vez",
@@ -364,7 +384,25 @@
     "infoAiModel": "Modelo de IA",
     "infoAudioModel": "Modelo de audio",
     "infoTokens": "Tokens",
-    "infoCost": "Coste"
+    "infoCost": "Coste",
+    "edit": "Editar",
+    "editSave": "Guardar y enviar",
+    "editCancel": "Cancelar",
+    "versionPrevious": "Versión anterior",
+    "versionNext": "Versión siguiente",
+    "versionPosition": "{current} de {total}",
+    "infoUsageStep": "{kind}: {tokens}",
+    "previewArtifact": "Vista previa",
+    "artifactCopy": "Copiar",
+    "artifactDownload": "Descargar",
+    "artifactFullscreen": "Pantalla completa",
+    "artifactClose": "Cerrar",
+    "fileReattach": "Volver a adjuntar",
+    "fileOpenLibrary": "Abrir en la biblioteca",
+    "filePreviewLoading": "Abriendo el archivo…",
+    "filePreviewEmpty": "Todavía no hay vista previa de este archivo.",
+    "fileSearchable": "Se puede buscar",
+    "fileNotSearchable": "Aún no se puede buscar"
   },
   "chatError": {
     "title": "La respuesta no se completó",
@@ -592,7 +630,13 @@
     "copyFailed": "No se pudo copiar",
     "expand": "Mostrar texto",
     "collapse": "Ocultar texto",
-    "redundantCollapsed": "Salida del paso oculta — expande para verla o lee la respuesta abajo."
+    "redundantCollapsed": "Salida del paso oculta — expande para verla o lee la respuesta abajo.",
+    "recommended": "Recomendado",
+    "askSubmit": "Enviar",
+    "askSkip": "Omitir",
+    "askNeedAnswer": "Elige una opción o escribe una respuesta.",
+    "askFailed": "La ejecución no pudo continuar. Envía un mensaje nuevo.",
+    "askReadOnly": "Solo quien lo creó puede responder. Aun así puede leer la pregunta."
   },
   "processing": {
     "timeline": {
@@ -862,5 +906,14 @@
     "openInLibrary": "Abrir en la biblioteca",
     "lines": "Líneas {start}–{end}",
     "unavailable": "No se pudo abrir este pasaje."
+  },
+  "savedPrompts": {
+    "title": "Prompts",
+    "empty": "Guarda un prompt y luego insértalo escribiendo /.",
+    "new": "Nuevo prompt",
+    "name": "Nombre",
+    "command": "Comando",
+    "body": "Prompt",
+    "saved": "Prompt guardado."
   }
 }

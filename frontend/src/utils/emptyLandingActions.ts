@@ -10,8 +10,11 @@ export type EmptyLandingActionsInput = {
  * Companion product cards belong on the unpinned start page only.
  * A pinned assistant owns that empty state — even when it has no starters.
  */
-export function shouldShowCompanionLinks(input: EmptyLandingActionsInput): boolean {
-  return !input.incognito && !input.hasPinnedAssistant
+export function shouldShowCompanionLinks(
+  input: EmptyLandingActionsInput,
+  storeCardsEnabled = true
+): boolean {
+  return storeCardsEnabled && !input.incognito && !input.hasPinnedAssistant
 }
 
 /**

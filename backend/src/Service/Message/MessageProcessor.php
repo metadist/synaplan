@@ -245,13 +245,7 @@ final readonly class MessageProcessor
                     'history_count' => count($conversationHistory),
                 ]);
             } elseif ($message->getChatId()) {
-                $conversationHistory = $this->messageRepository->findChatHistory(
-                    $message->getUserId(),
-                    $message->getChatId(),
-                    self::HISTORY_MAX_MESSAGES,
-                    self::HISTORY_MAX_CHARS,
-                    $message->getId(),
-                );
+                $conversationHistory = $this->activeChatHistory($message);
                 $this->logger->debug('Using chat history for streaming', [
                     'chat_id' => $message->getChatId(),
                     'history_count' => count($conversationHistory),
@@ -738,13 +732,7 @@ final readonly class MessageProcessor
                     'history_count' => count($conversationHistory),
                 ]);
             } elseif ($message->getChatId()) {
-                $conversationHistory = $this->messageRepository->findChatHistory(
-                    $message->getUserId(),
-                    $message->getChatId(),
-                    self::HISTORY_MAX_MESSAGES,
-                    self::HISTORY_MAX_CHARS,
-                    $message->getId(),
-                );
+                $conversationHistory = $this->activeChatHistory($message);
                 $this->logger->debug('Using chat history for non-streaming', [
                     'chat_id' => $message->getChatId(),
                     'history_count' => count($conversationHistory),
@@ -1976,5 +1964,43 @@ final readonly class MessageProcessor
         $value = $meta[$key] ?? null;
 
         return \is_string($value) && '' !== $value ? $value : null;
+    }
+
+    /**
+     * Active turns only, then the usual message and character caps.
+     * Unselected versions are dropped before the cap so a long "Again"
+     * trail cannot push the real conversation out of the window.
+     *
+     * @return list<Message>
+     */
+    private function activeChatHistory(Message $message): array
+    {
+        $chatId = $message->getChatId();
+        if (null === $chatId) {
+            return [];
+        }
+        $fetched = $this->messageRepository->findChatHistory(
+            $message->getUserId(),
+            $chatId,
+            self::HISTORY_MAX_MESSAGES * 8,
+            self::HISTORY_MAX_CHARS * 8,
+            $message->getId(),
+        );
+        $active = (new MessageVersionService())->activeForContext($fetched);
+        $newestFirst = [];
+        $chars = 0;
+        foreach (array_reverse($active) as $row) {
+            $length = strlen($row->getText());
+            if ([] !== $newestFirst && ($chars + $length) > self::HISTORY_MAX_CHARS) {
+                break;
+            }
+            if (count($newestFirst) >= self::HISTORY_MAX_MESSAGES) {
+                break;
+            }
+            $newestFirst[] = $row;
+            $chars += $length;
+        }
+
+        return array_reverse($newestFirst);
     }
 }

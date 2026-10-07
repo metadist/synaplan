@@ -176,7 +176,19 @@
     "fileOnlyDefaultMessage": "Please review the attached file.",
     "voiceMessageDefaultMessage": "Please respond to my voice message.",
     "conversation": "conversation",
-    "conversations": "conversations"
+    "conversations": "conversations",
+    "archive": "Archive",
+    "unarchive": "Unarchive",
+    "archivedFilter": "Archived",
+    "exportMarkdown": "Export as Markdown",
+    "exportPdf": "Export as PDF",
+    "exportJson": "Export as JSON",
+    "tags": "Tags",
+    "tagsSaved": "Tags saved.",
+    "archivedDone": "Archived. It is under All chats → Archived.",
+    "unarchivedDone": "Back in the sidebar.",
+    "showOpenChats": "Open chats",
+    "versionLinkFailed": "The new answer is shown, but it was not saved as another version of the previous one."
   },
   "moderation": {
     "report": {
@@ -256,6 +268,11 @@
     "webSearch": "Search the web for up-to-date information",
     "enhance": "Enhance",
     "enhanceRejected": "This text could not be improved. Try a clearer sentence or question.",
+    "enhanceSummary": {
+      "unchanged": "Your prompt already reads well — nothing changed.",
+      "capitalized": "Capitalized the first word and tidied the punctuation.",
+      "rewritten": "Rewrote the prompt so it is clearer."
+    },
     "thinking": "Thinking",
     "reasoningLevel": {
       "label": "Reasoning",
@@ -351,7 +368,8 @@
       "filterLabel": "Filter models",
       "filterPlaceholder": "Filter models…",
       "clearFilter": "Clear filter",
-      "noMatch": "No model matches “{query}”."
+      "noMatch": "No model matches “{query}”.",
+      "assistants": "Assistants"
     },
     "removeTool": "Remove tool",
     "pastedText": {
@@ -363,7 +381,9 @@
       "modalTitle": "Pasted content",
       "save": "Save",
       "cancel": "Cancel"
-    }
+    },
+    "toolsSummary": "{count} tools",
+    "toolsSummaryActive": "{count} tools · {name} on"
   },
   "chatMessage": {
     "again": "Again",
@@ -377,7 +397,25 @@
     "infoProvider": "Provider",
     "infoAudioModel": "Audio Model",
     "infoTokens": "Tokens",
-    "infoCost": "Cost"
+    "infoCost": "Cost",
+    "edit": "Edit",
+    "editSave": "Save & send",
+    "editCancel": "Cancel",
+    "versionPrevious": "Previous version",
+    "versionNext": "Next version",
+    "versionPosition": "{current} of {total}",
+    "infoUsageStep": "{kind}: {tokens}",
+    "previewArtifact": "Preview",
+    "artifactCopy": "Copy",
+    "artifactDownload": "Download",
+    "artifactFullscreen": "Fullscreen",
+    "artifactClose": "Close",
+    "fileReattach": "Re-attach",
+    "fileOpenLibrary": "Open in Library",
+    "filePreviewLoading": "Opening the file…",
+    "filePreviewEmpty": "There is no preview for this file yet.",
+    "fileSearchable": "Searchable",
+    "fileNotSearchable": "Not searchable yet"
   },
   "chatError": {
     "title": "The answer did not finish",
@@ -584,7 +622,13 @@
     "copyFailed": "Could not copy",
     "expand": "Show text",
     "collapse": "Hide text",
-    "redundantCollapsed": "Step output collapsed — expand to inspect, or read the answer below."
+    "redundantCollapsed": "Step output collapsed — expand to inspect, or read the answer below.",
+    "recommended": "Recommended",
+    "askSubmit": "Submit",
+    "askSkip": "Skip",
+    "askNeedAnswer": "Choose an option or type an answer.",
+    "askFailed": "The run could not continue. Send a new message.",
+    "askReadOnly": "Only the owner can answer this. You can still read the question."
   },
   "processing": {
     "timeline": {
@@ -927,5 +971,14 @@
     "openInLibrary": "Open in Library",
     "lines": "Lines {start}–{end}",
     "unavailable": "This passage could not be opened."
+  },
+  "savedPrompts": {
+    "title": "Prompts",
+    "empty": "Save a prompt once, then insert it by typing /.",
+    "new": "New prompt",
+    "name": "Name",
+    "command": "Command",
+    "body": "Prompt",
+    "saved": "Prompt saved."
   }
 }

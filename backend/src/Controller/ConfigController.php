@@ -125,6 +125,8 @@ class ConfigController extends AbstractController
         private readonly ?ComputeConfig $computeConfig = null,
         private readonly ?GroupRepository $groupRepository = null,
         private readonly ?SearchInterpreter $searchInterpreter = null,
+        private readonly ?\App\Service\Chat\ChatWelcomeConfig $chatWelcomeConfig = null,
+        private readonly ?\App\Service\Chat\ChatActionPolicy $chatActionPolicy = null,
     ) {
     }
 
@@ -445,6 +447,24 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'chatWelcome',
+                    type: 'object',
+                    description: 'Empty-chat promotions. Missing configuration keeps both on.',
+                    properties: [
+                        new OA\Property(property: 'showStoreCards', type: 'boolean', example: true),
+                        new OA\Property(property: 'showWidgetPromo', type: 'boolean', example: true),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'chatActions',
+                    type: 'object',
+                    description: 'Whether this account may export or share chats. Missing policy keeps both on.',
+                    properties: [
+                        new OA\Property(property: 'export', type: 'boolean', example: true),
+                        new OA\Property(property: 'share', type: 'boolean', example: true),
+                    ]
+                ),
+                new OA\Property(
                     property: 'usageTaximeter',
                     type: 'object',
                     description: 'In-chat usage-display master switch (admin-controlled, on by default). When false, the frontend renders no consumption bar/ring and no per-message token-cost badge, and performs no usage-summary fetch. Does not affect the Statistics page.',
@@ -739,6 +759,14 @@ class ConfigController extends AbstractController
             'aiProviders' => $this->aiProviderDisclosure->chatProviderNames(),
             'marketingNews' => [
                 'enabled' => $this->marketingNewsConfig->isEnabled(),
+            ],
+            'chatWelcome' => [
+                'showStoreCards' => $this->chatWelcomeConfig?->showStoreCards() ?? true,
+                'showWidgetPromo' => $this->chatWelcomeConfig?->showWidgetPromo() ?? true,
+            ],
+            'chatActions' => [
+                'export' => $this->chatActionPolicy?->canExport($user?->getId()) ?? true,
+                'share' => $this->chatActionPolicy?->canShare($user?->getId()) ?? true,
             ],
             'usageTaximeter' => [
                 'enabled' => $this->usageTaximeterConfig->isEnabled(),

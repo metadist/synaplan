@@ -115,6 +115,13 @@ enum Capability: string
     case CodeRun = 'code_run';
 
     /**
+     * Pause the run and ask the person a question. The answer is the node's text
+     * for later steps. Hidden from installs that have not turned the step on —
+     * the runner is always available to an authored plan.
+     */
+    case AskUser = 'ask_user';
+
+    /**
      * Capabilities that exist only for the Steps editor (flag-gated at validate).
      *
      * @return list<string>
@@ -158,6 +165,7 @@ enum Capability: string
             self::OutboundWebhook => 'email',
             self::Condition => 'text',
             self::CodeRun => 'compute',
+            self::AskUser => 'text',
         };
     }
 
@@ -195,7 +203,8 @@ enum Capability: string
             self::ToolCall,
             self::OutboundWebhook,
             self::Condition,
-            self::CodeRun => null,
+            self::CodeRun,
+            self::AskUser => null,
         };
     }
 

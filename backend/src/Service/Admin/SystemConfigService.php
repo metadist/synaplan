@@ -14,6 +14,7 @@ use App\Repository\ConfigRepository;
 use App\Seed\ModuleGateSeeder;
 use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
+use App\Service\Chat\ChatArtifactsConfig;
 use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\MobileVersionService;
 use App\Service\Compute\ComputeClient;
@@ -72,6 +73,7 @@ final readonly class SystemConfigService
         private readonly ?ModuleRegistry $modules = null,
         private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
         private readonly ?ComputeClient $computeClient = null,
+        private readonly ?ChatArtifactsConfig $chatArtifactsConfig = null,
     ) {
         $this->schema = $this->markManagedFields($this->buildSchema());
     }
@@ -225,6 +227,8 @@ final readonly class SystemConfigService
                     'logos' => ['label' => 'Logos & Icon', 'fields' => ['BRAND_LOGO_URL', 'BRAND_LOGO_DARK_URL', 'BRAND_ICON_URL']],
                     'legal' => ['label' => 'Legal Links', 'fields' => ['BRAND_PRIVACY_URL', 'BRAND_TERMS_URL']],
                     'navigation' => ['label' => 'Start Page', 'fields' => ['BRAND_LANDING_PAGE', 'BRAND_DEFAULT_ROUTE']],
+                    'welcome' => ['label' => 'Empty chat', 'fields' => ['CHAT_WELCOME_SHOW_STORE_CARDS', 'CHAT_WELCOME_SHOW_WIDGET_PROMO']],
+                    'chat' => ['label' => 'Chat', 'fields' => ['CHAT_EXPORT_ENABLED', 'CHAT_SHARE_ENABLED', 'CHAT_ARTIFACTS_ENABLED']],
                     'attribution' => ['label' => 'Attribution ("Powered by")', 'fields' => ['BRAND_SHOW_POWERED_BY', 'BRAND_POWERED_BY_LABEL', 'BRAND_POWERED_BY_URL']],
                 ],
             ],
@@ -474,6 +478,7 @@ final readonly class SystemConfigService
         foreach ([
             'REGISTRATION_ENABLED' => $this->registrationConfig->envOverride(),
             'GUEST_CHAT_ENABLED' => $this->guestChatConfig->envOverride(),
+            'CHAT_ARTIFACTS_ENABLED' => $this->chatArtifactsConfig?->envOverride(),
         ] as $key => $envOverride) {
             if (!isset($values[$key]) || null === $envOverride) {
                 continue;
@@ -2405,6 +2410,51 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MarketingNewsConfig::CONFIG_GROUP,
                 'dbKey' => MarketingNewsConfig::KEY_FEED_URL_DEFAULT,
+            ],
+            'CHAT_WELCOME_SHOW_STORE_CARDS' => [
+                'tab' => 'branding', 'section' => 'welcome', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the App Store, Google Play and GitHub cards on an empty chat. On when this row is missing, so existing installations stay as they are until you turn it off.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => \App\Service\Chat\ChatWelcomeConfig::GROUP,
+                'dbKey' => \App\Service\Chat\ChatWelcomeConfig::SHOW_STORE_CARDS,
+            ],
+            'CHAT_WELCOME_SHOW_WIDGET_PROMO' => [
+                'tab' => 'branding', 'section' => 'welcome', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the "embed a chat widget on your website" promotion above the composer. On when this row is missing.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => \App\Service\Chat\ChatWelcomeConfig::GROUP,
+                'dbKey' => \App\Service\Chat\ChatWelcomeConfig::SHOW_WIDGET_PROMO,
+            ],
+            'CHAT_EXPORT_ENABLED' => [
+                'tab' => 'branding', 'section' => 'chat', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let people download a chat (Markdown, PDF, JSON) and include chats in account export. A group policy can turn this off for one group. On when this row is missing.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => \App\Service\Chat\ChatActionPolicy::GROUP,
+                'dbKey' => \App\Service\Chat\ChatActionPolicy::EXPORT,
+            ],
+            'CHAT_SHARE_ENABLED' => [
+                'tab' => 'branding', 'section' => 'chat', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let people create a public link for a chat. A group policy can turn this off for one group. On when this row is missing.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => \App\Service\Chat\ChatActionPolicy::GROUP,
+                'dbKey' => \App\Service\Chat\ChatActionPolicy::SHARE,
+            ],
+            'CHAT_ARTIFACTS_ENABLED' => [
+                'tab' => 'branding', 'section' => 'chat', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Offer a sandboxed preview for HTML and SVG answers. Off when this row is missing and CHAT_ARTIFACTS_ENABLED is empty. An explicit on in either place turns the preview on. An explicit off in either place turns it off.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ChatArtifactsConfig::GROUP,
+                'dbKey' => ChatArtifactsConfig::ENABLED,
             ],
             // === AI Services ===
             'OLLAMA_BASE_URL' => [

@@ -43,6 +43,7 @@ final class CapabilityMessageHandlerTest extends TestCase
             'outbound_webhook' => null,
             'condition' => null,
             'code_run' => null,
+            'ask_user' => null,
         ];
 
         $actual = [];

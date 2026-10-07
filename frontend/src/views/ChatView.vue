@@ -257,15 +257,21 @@
               :was-multitask="message.wasMultitask"
               :usage="message.usage"
               :usage-extra="message.usageExtra"
+              :versions="message.versions"
+              :edits="message.edits"
               :usage-taximeter-active="usageTaximeterStore.active"
               :is-guest-mode="isGuestMode"
               :can-rewrite="canRewriteConversation"
               :foreign-memory="sharedConversationLocked"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
+              @select-version="selectMessageVersion"
+              @edit-message="editUserMessage(message, $event)"
+              @reattach-file="reattachMessageFile"
               @retry="handleRetryMessage(message, $event)"
               @retry-task="handleTaskRetry"
               @followup-task="handleTaskFollowup"
+              @ask-user="answerAskUser(message, $event)"
               @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
               @report="openReportModal"
@@ -354,8 +360,29 @@
         class="flex max-w-[70rem] mx-auto w-full px-4 mb-3"
         data-testid="section-conversation-files-readonly"
       >
-        <ConversationFilesBar :files="conversationFiles" :can-attach="false" :can-delete="false" />
+        <ConversationFilesBar
+          :files="conversationFiles"
+          :can-attach="false"
+          :can-delete="false"
+          @preview="previewConversationFile"
+        />
       </div>
+      <ChatFilePreview
+        :open="conversationPreview !== null"
+        :file="conversationPreview"
+        :guest-session-id="isGuestMode ? guestStore.sessionId : null"
+        :can-reattach="canComposeSharedChat && !isGuestMode"
+        @close="conversationPreview = null"
+        @download="conversationPreview && downloadConversationPreview()"
+        @reattach="
+          conversationPreview &&
+          attachConversationFile({
+            id: conversationPreview.id,
+            name: conversationPreview.filename,
+            fileType: '',
+          })
+        "
+      />
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
@@ -382,6 +409,7 @@
             :can-attach="canComposeSharedChat"
             :can-delete="canComposeSharedChat && !isGuestMode"
             @attach="attachConversationFile"
+            @preview="previewConversationFile"
             @delete="deleteConversationFile"
           />
         </template>
@@ -564,7 +592,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
+import {
+  ref,
+  computed,
+  nextTick,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  defineAsyncComponent,
+} from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
@@ -666,6 +702,7 @@ import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { shouldShowCompanionLinks, shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
+import { showStoreCards } from '@/composables/useChatWelcome'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { createSmoothStream } from '@/utils/smoothStream'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
@@ -748,6 +785,18 @@ const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const { files: conversationFiles, refresh: refreshConversationFiles } = useConversationFiles()
 const { confirm: confirmDialog } = useDialog()
 
+const conversationPreview = ref<{ id: number; filename: string } | null>(null)
+const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
+const previewConversationFile = (file: { id: number | null; name: string }) => {
+  if (file.id == null) return
+  conversationPreview.value = { id: file.id, filename: file.name }
+}
+const downloadConversationPreview = async () => {
+  const file = conversationPreview.value
+  if (!file) return
+  const { downloadFile } = await import('@/services/filesService')
+  await downloadFile(file.id, file.filename)
+}
 const attachConversationFile = (file: { id: number | null; name: string; fileType: string }) => {
   if (file.id === null) {
     return
@@ -973,7 +1022,6 @@ const {
   agentId: pinnedAgentId,
   queryAgentId,
   name: pinnedAssistantName,
-  greeting: pinnedAssistantGreeting,
   starterPrompts: pinnedStarterPrompts,
 } = usePinnedAssistant()
 
@@ -1068,10 +1116,10 @@ const emptyLandingTitle = computed(() => {
   if (incognitoStore.active) {
     return t('incognito.emptyTitle')
   }
-  if (pinnedAgentId.value) {
-    return pinnedAssistantGreeting.value || pinnedAssistantName.value || t('companionLinks.tagline')
+  if (pinnedAgentId.value && pinnedAssistantName.value) {
+    return pinnedAssistantName.value
   }
-  return t('companionLinks.tagline')
+  return aiConfigStore.getCurrentModel('CHAT')?.name || t('companionLinks.tagline')
 })
 const emptyLandingHint = computed(() => {
   if (incognitoStore.active) {
@@ -1160,7 +1208,9 @@ const emptyLandingActions = computed(() => ({
   canCompose: canComposeSharedChat.value,
   needsProviderSetup: needsProviderSetup.value,
 }))
-const showCompanionLinks = computed(() => shouldShowCompanionLinks(emptyLandingActions.value))
+const showCompanionLinks = computed(() =>
+  shouldShowCompanionLinks(emptyLandingActions.value, showStoreCards())
+)
 const showSelfAwareEmptyHint = computed(() =>
   shouldShowSelfAwareEmptyHint(emptyLandingActions.value)
 )
@@ -3276,6 +3326,30 @@ function buildIncognitoHistorySnapshot(): IncognitoHistoryEntry[] {
   return entries
 }
 
+/**
+ * The stream starts and returns before the server has saved the new answer.
+ * Linking immediately used the previous answer's id and rejected the request
+ * ("An answer cannot be a version of itself"), which crashed the chat.
+ * Call this from the complete/error handler, after that id exists.
+ */
+function recordVersionLink(
+  link: { kind: 'again' | 'edit'; previousId: number } | undefined,
+  createdId: number | undefined
+): void {
+  if (!link || !createdId || createdId === link.previousId) return
+  void (async () => {
+    try {
+      // Do not reload the transcript here. The new answer is already on screen,
+      // and a reload that lands while the next Again is opening replaces that
+      // bubble and closes its model list.
+      await chatApi.linkTurn(createdId, link.kind, link.previousId)
+    } catch (err) {
+      console.error('Failed to record the answer version', err)
+      showErrorToast(t('chat.versionLinkFailed'))
+    }
+  })()
+}
+
 const streamAIResponse = async (
   userMessage: string,
   options?: {
@@ -3286,6 +3360,8 @@ const streamAIResponse = async (
     fileIds?: number[]
     voiceReply?: boolean
     isAgain?: boolean
+    /** Record this answer as a version once the server has saved it. */
+    linkVersion?: { kind: 'again' | 'edit'; previousId: number }
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
@@ -3590,6 +3666,9 @@ const streamAIResponse = async (
               }
               if (typeof data.metadata?.duration_ms === 'number') {
                 card.durationMs = data.metadata.duration_ms
+              }
+              if (isAskUserPayload(data.metadata?.ask_user)) {
+                card.askUser = data.metadata.ask_user
               }
             }
           } else if (data.status === 'task_chunk') {
@@ -4212,6 +4291,9 @@ const streamAIResponse = async (
               if (typeof data.metadata?.duration_ms === 'number') {
                 card.durationMs = data.metadata.duration_ms
               }
+              if (isAskUserPayload(data.metadata?.ask_user)) {
+                card.askUser = data.metadata.ask_user
+              }
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -4814,6 +4896,9 @@ const streamAIResponse = async (
             }
 
             historyStore.finishStreamingMessage(messageId)
+            if (typeof data.messageId === 'number') {
+              recordVersionLink(options?.linkVersion, data.messageId)
+            }
 
             // Issue #1070: the streamed state is only a live preview — the
             // persisted message is the single source of truth for files,
@@ -5062,6 +5147,9 @@ const streamAIResponse = async (
               historyStore.updateStreamingMessage(messageId, errorMsg)
             }
             historyStore.finishStreamingMessage(messageId)
+            if (typeof data.messageId === 'number') {
+              recordVersionLink(options?.linkVersion, data.messageId)
+            }
 
             // Clean up streaming resources after error
             streamingAbortController = null
@@ -5405,8 +5493,13 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   // the single-node legacy path.
   //
   // Reattach the original file IDs so a file_analysis Again still has the
-  // attachment to analyze (issue #1910).
-  await streamAIResponse(userText, modelId ? { modelId, isAgain: true, fileIds } : { fileIds })
+  // attachment to analyze (issue #1910). The version link waits for the
+  // saved message id — streamAIResponse returns while the stream is still open.
+  const previousId = assistantMessage.backendMessageId
+  await streamAIResponse(userText, {
+    ...(modelId ? { modelId, isAgain: true, fileIds } : { fileIds }),
+    linkVersion: previousId ? { kind: 'again', previousId } : undefined,
+  })
 }
 
 /**
@@ -5528,6 +5621,56 @@ function finishStreamingTurnLocally() {
   streamingAbortController = null
   currentTrackId = undefined
   currentStreamingChatId = undefined
+}
+
+function isAskUserPayload(
+  value: unknown
+): value is NonNullable<import('@/stores/history').TaskCard['askUser']> {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    typeof (value as { question?: unknown }).question === 'string'
+  )
+}
+
+async function answerAskUser(
+  message: Message,
+  payload: { nodeId: string; answer: string; skip: boolean }
+): Promise<void> {
+  if (!message.backendMessageId) return
+  try {
+    await chatApi.answerAskUser(
+      message.backendMessageId,
+      payload.nodeId,
+      payload.answer,
+      payload.skip
+    )
+    const chatId = chatsStore.activeChatId
+    if (chatId) await historyStore.loadMessages(chatId)
+  } catch (err) {
+    showErrorToast(err instanceof Error ? err.message : t('taskPlan.askFailed'))
+  }
+}
+
+async function selectMessageVersion(messageId: number, kind: 'answer' | 'edit'): Promise<void> {
+  await chatApi.selectVersion(messageId, kind)
+  const chatId = chatsStore.activeChatId
+  if (chatId) await historyStore.loadMessages(chatId)
+}
+
+async function editUserMessage(message: Message, text: string): Promise<void> {
+  const previousId = message.backendMessageId
+  await streamAIResponse(text, {
+    linkVersion: previousId ? { kind: 'edit', previousId } : undefined,
+  })
+}
+
+function reattachMessageFile(file: { id: number; filename: string; fileType?: string }): void {
+  chatInputRef.value?.attachExistingFile({
+    file_id: file.id,
+    filename: file.filename,
+    file_type: file.fileType || '',
+  })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
