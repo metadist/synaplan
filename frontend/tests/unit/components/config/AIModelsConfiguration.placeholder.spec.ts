@@ -249,6 +249,40 @@ describe('AIModelsConfiguration empty model row', () => {
     errorSpy.mockRestore()
   })
 
+  it('filters a long model menu by name the way the chat menu does', async () => {
+    const chatModels = [
+      chatModel,
+      { ...chatModel, id: 43, name: 'Gemini Flash', providerId: 'gemini-flash', service: 'google' },
+      { ...chatModel, id: 44, name: 'Claude Sonnet', providerId: 'claude', service: 'anthropic' },
+      { ...chatModel, id: 45, name: 'GPT', providerId: 'gpt-4o', service: 'openai' },
+      { ...chatModel, id: 46, name: 'Mistral', providerId: 'mistral', service: 'mistral' },
+      { ...chatModel, id: 47, name: 'Qwen', providerId: 'qwen', service: 'groq' },
+    ]
+    getModels.mockResolvedValue({ success: true, models: { CHAT: chatModels }, providers: [] })
+
+    await mountPage()
+    const row = wrapper!
+      .findAll('[data-testid="item-capability"]')
+      .find((item) => item.text().includes('Chat / General AI'))!
+    await row.get('[data-testid="btn-model-dropdown"]').trigger('click')
+
+    const filter = row.get('[data-testid="input-model-choice-filter"]')
+    await filter.setValue('claude')
+
+    const names = row
+      .findAll('[data-testid="btn-model-option"]')
+      .map((option) => option.text())
+      .filter((text) => !text.includes('Select Model'))
+    expect(names).toHaveLength(1)
+    expect(names[0]).toContain('Claude Sonnet')
+    expect(names[0]).not.toContain('Gemini')
+
+    await filter.setValue('no-such-model')
+    expect(row.get('[data-testid="text-model-choice-filter-empty"]').text()).toContain(
+      'no-such-model'
+    )
+  })
+
   it('shows a retry on the full list when the model list fails', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     getModels.mockRejectedValueOnce(new Error('network'))

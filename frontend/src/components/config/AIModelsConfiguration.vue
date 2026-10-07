@@ -225,39 +225,88 @@
             <!-- Custom Dropdown -->
             <div
               v-if="openDropdown === capability"
-              class="absolute z-50 mt-2 w-full max-h-[60vh] overflow-y-auto dropdown-panel"
+              class="absolute z-50 mt-2 flex w-full max-h-[60vh] flex-col dropdown-panel"
             >
-              <button
-                type="button"
-                class="dropdown-item w-full"
-                data-testid="btn-model-option"
-                @click="selectModel(capability as Capability, null)"
+              <div
+                v-if="showDropdownFilter(capability as Capability)"
+                class="shrink-0 border-b border-light-border/30 p-2 dark:border-dark-border/20"
+                data-testid="section-model-choice-filter"
               >
-                <span class="txt-model-placeholder">{{ $t('config.aiModels.selectModel') }}</span>
-              </button>
-              <button
-                v-for="model in getModelsByPurpose(capability as Capability)"
-                :key="model.id"
-                type="button"
-                :class="[
-                  'dropdown-item w-full',
-                  defaultConfig[capability as Capability] === model.id && 'dropdown-item--active',
-                ]"
-                data-testid="btn-model-option"
-                @click="selectModel(capability as Capability, model.id)"
-              >
-                <ServiceIcon :service="model.service" :size="20" />
-                <div class="flex-1 min-w-0 text-left">
-                  <div class="flex items-center gap-2">
-                    <span class="font-medium truncate">{{ model.name }}</span>
-                    <ModelCostBadge
-                      :model="model"
-                      :peers="getModelsByPurpose(capability as Capability)"
-                    />
-                  </div>
-                  <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
+                <label class="sr-only" :for="`model-choice-filter-${capability}`">
+                  {{ $t('config.aiModels.dropdownFilterLabel') }}
+                </label>
+                <div class="relative">
+                  <MagnifyingGlassIcon
+                    class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 txt-secondary"
+                    aria-hidden="true"
+                  />
+                  <input
+                    :id="`model-choice-filter-${capability}`"
+                    v-model="dropdownFilter"
+                    type="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    enterkeyhint="go"
+                    class="w-full rounded-xl surface-card border border-light-border/30 py-1.5 pl-9 pr-9 text-sm txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] dark:border-dark-border/20"
+                    :placeholder="$t('config.aiModels.dropdownFilterPlaceholder')"
+                    data-testid="input-model-choice-filter"
+                    @keydown.enter.prevent="pickFirstFiltered(capability as Capability)"
+                    @keydown.escape.stop.prevent="onDropdownFilterEscape"
+                  />
+                  <button
+                    v-if="dropdownFilter"
+                    type="button"
+                    class="icon-ghost absolute right-1.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md"
+                    :aria-label="$t('config.aiModels.dropdownClearFilter')"
+                    data-testid="btn-model-choice-filter-clear"
+                    @click="dropdownFilter = ''"
+                  >
+                    <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
                 </div>
-              </button>
+              </div>
+              <div class="min-h-0 overflow-y-auto">
+                <button
+                  type="button"
+                  class="dropdown-item w-full"
+                  data-testid="btn-model-option"
+                  @click="selectModel(capability as Capability, null)"
+                >
+                  <span class="txt-model-placeholder">{{ $t('config.aiModels.selectModel') }}</span>
+                </button>
+                <button
+                  v-for="model in visibleModelsFor(capability as Capability)"
+                  :key="model.id"
+                  type="button"
+                  :class="[
+                    'dropdown-item w-full',
+                    defaultConfig[capability as Capability] === model.id && 'dropdown-item--active',
+                  ]"
+                  data-testid="btn-model-option"
+                  @click="selectModel(capability as Capability, model.id)"
+                >
+                  <ServiceIcon :service="model.service" :size="20" />
+                  <div class="flex-1 min-w-0 text-left">
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium truncate">{{ model.name }}</span>
+                      <ModelCostBadge
+                        :model="model"
+                        :peers="getModelsByPurpose(capability as Capability)"
+                      />
+                    </div>
+                    <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
+                  </div>
+                </button>
+                <p
+                  v-if="
+                    dropdownFilter.trim() && visibleModelsFor(capability as Capability).length === 0
+                  "
+                  class="px-3 py-2 text-sm txt-secondary"
+                  data-testid="text-model-choice-filter-empty"
+                >
+                  {{ $t('config.aiModels.dropdownNoMatch', { query: dropdownFilter.trim() }) }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -650,6 +699,7 @@ import {
   ListBulletIcon,
   LockClosedIcon,
   MagnifyingGlassIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
@@ -917,6 +967,9 @@ const capabilityRefs = ref<Record<Capability, HTMLElement | null>>(
   {} as Record<Capability, HTMLElement | null>
 )
 const openDropdown = ref<Capability | null>(null)
+/** Same cutoff as the chat model menu: a short list is faster to scan than to filter. */
+const DROPDOWN_FILTER_MIN = 6
+const dropdownFilter = ref('')
 const showRatings = ref(false)
 const sortBy = ref<'alphabet' | 'service' | 'rating' | 'quality' | 'purpose'>('alphabet')
 const sortDirection = ref<'asc' | 'desc'>('asc')
@@ -1187,6 +1240,43 @@ const getModelsByPurpose = (purpose: Capability): AIModel[] => {
   return modelsByPurpose.value[purpose] || []
 }
 
+const normalizeFilter = (value: string): string =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+const dropdownFilterTerms = computed(() =>
+  normalizeFilter(dropdownFilter.value).split(/\s+/).filter(Boolean)
+)
+
+function modelMatchesDropdownFilter(model: AIModel): boolean {
+  if (dropdownFilterTerms.value.length === 0) return true
+  const text = normalizeFilter(`${model.name} ${model.service} ${model.providerId ?? ''}`)
+  return dropdownFilterTerms.value.every((term) => text.includes(term))
+}
+
+function showDropdownFilter(purpose: Capability): boolean {
+  return getModelsByPurpose(purpose).length >= DROPDOWN_FILTER_MIN
+}
+
+function visibleModelsFor(purpose: Capability): AIModel[] {
+  return getModelsByPurpose(purpose).filter(modelMatchesDropdownFilter)
+}
+
+function pickFirstFiltered(purpose: Capability): void {
+  const first = visibleModelsFor(purpose)[0]
+  if (first) void selectModel(purpose, first.id)
+}
+
+function onDropdownFilterEscape(): void {
+  if (dropdownFilter.value) {
+    dropdownFilter.value = ''
+    return
+  }
+  openDropdown.value = null
+}
+
 const selectedModelInfo = computed<Record<string, { label: string; service: string }>>(() => {
   const info: Record<string, { label: string; service: string }> = {}
   for (const purpose of Object.keys(purposeLabels.value)) {
@@ -1231,6 +1321,15 @@ const toggleDropdown = (capability: Capability) => {
     return
   }
   openDropdown.value = openDropdown.value === capability ? null : capability
+  dropdownFilter.value = ''
+  const opened = openDropdown.value
+  if (opened && showDropdownFilter(opened)) {
+    void nextTick(() => {
+      capabilityRefs.value[opened]
+        ?.querySelector<HTMLInputElement>('[data-testid="input-model-choice-filter"]')
+        ?.focus()
+    })
+  }
 }
 
 const selectModel = async (capability: Capability, modelId: number | null) => {
