@@ -93,27 +93,50 @@ final class UpstreamHandover
      */
     public static function render(array $missing): string
     {
-        if ([] === $missing) {
+        $blocks = self::renderBlocks($missing);
+        if ('' === $blocks) {
             return '';
         }
 
-        $blocks = [];
         $mentionsFailure = false;
         foreach ($missing as $label => $text) {
             if (str_ends_with((string) $label, ' · FAILED')) {
                 $mentionsFailure = true;
+                break;
             }
-            $blocks[] = '['.$label."]\n".mb_substr($text, 0, self::MAX_CHARS_PER_STEP);
         }
 
+        // Prompt-only. A failed step may be a tool answer (NotFound) or a
+        // request that never completed. Do not tell the model the step "did
+        // run", and do not forbid "does not exist" — that is often the answer.
         $failureLine = $mentionsFailure
-            ? "\nA step marked FAILED did run. Say what failed and why, in the user's language. Do not say that the connection or the data source does not exist."
+            ? "\nA step marked FAILED was attempted. Describe that block in the user's language. Do not claim that no connection is configured."
             : '';
 
         return "\n\n---\nData returned by the previous steps of this request."
             ."\nUse it as the source of truth for your answer and never claim it was not provided."
             .$failureLine
-            ."\n\n".implode("\n\n", $blocks);
+            .$blocks;
+    }
+
+    /**
+     * The labelled blocks only, for a reply that is shown as-is.
+     * {@see render()} adds instructions for a model; those must not reach the user.
+     *
+     * @param array<string, string> $missing
+     */
+    public static function renderBlocks(array $missing): string
+    {
+        if ([] === $missing) {
+            return '';
+        }
+
+        $blocks = [];
+        foreach ($missing as $label => $text) {
+            $blocks[] = '['.$label."]\n".mb_substr($text, 0, self::MAX_CHARS_PER_STEP);
+        }
+
+        return "\n\n".implode("\n\n", $blocks);
     }
 
     /**

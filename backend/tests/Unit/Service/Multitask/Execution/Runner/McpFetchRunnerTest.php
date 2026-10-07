@@ -67,13 +67,14 @@ final class McpFetchRunnerTest extends TestCase
         string $callToolResultText = 'Customer: Acme GmbH, last order #42.',
         bool $toolIsError = false,
         ?LoggerInterface $logger = null,
+        int $httpStatus = 200,
     ): McpFetchRunner {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
             static fn (int $owner, string $group, string $setting): ?string => $flags["{$group}.{$setting}"] ?? null,
         );
 
-        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText, $toolIsError): MockResponse {
+        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText, $toolIsError, $httpStatus): MockResponse {
             $body = json_decode((string) ($options['body'] ?? ''), true);
             $rpcMethod = is_array($body) ? ($body['method'] ?? '') : '';
 
@@ -85,7 +86,7 @@ final class McpFetchRunnerTest extends TestCase
 
             return new MockResponse(
                 (string) json_encode(['jsonrpc' => '2.0', 'id' => 1, 'result' => $result]),
-                ['http_code' => 200, 'response_headers' => ['content-type' => 'application/json']],
+                ['http_code' => 'tools/call' === $rpcMethod ? $httpStatus : 200, 'response_headers' => ['content-type' => 'application/json']],
             );
         };
 
@@ -274,5 +275,14 @@ final class McpFetchRunnerTest extends TestCase
 
         self::assertTrue($result->isReportableFailure());
         self::assertSame('Company CRM reported an error and gave no details.', $result->error);
+    }
+
+    public function testRequestFailureDoesNotClaimTheServerReportedAnError(): void
+    {
+        $result = $this->runner(httpStatus: 503)->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertStringContainsString('could not be reached', (string) $result->error);
+        self::assertStringNotContainsString('reported an error', (string) $result->error);
     }
 }

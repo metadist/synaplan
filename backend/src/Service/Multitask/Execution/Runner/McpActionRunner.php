@@ -136,7 +136,7 @@ final readonly class McpActionRunner implements TaskRunner
         try {
             $result = $this->client->callTool($server, $tool, $arguments);
         } catch (McpClientException $e) {
-            return $this->reportedError($userId, $serverId, $server->getName(), $tool, $arguments, $e->getMessage());
+            return $this->unconfirmedWrite($userId, $serverId, $server->getName(), $tool, $arguments, $e->getMessage());
         }
 
         $text = $this->formatContent($result['content']);
@@ -160,8 +160,7 @@ final readonly class McpActionRunner implements TaskRunner
     }
 
     /**
-     * The remote system was reached and reported a failure. Answer steps still
-     * run so the reply can say the write did not happen; the card stays failed.
+     * The tool answered with isError, so the write did not happen.
      *
      * @param array<string, mixed> $arguments
      */
@@ -172,7 +171,38 @@ final readonly class McpActionRunner implements TaskRunner
             ? sprintf('%s reported an error and gave no details.', $serverName)
             : sprintf('%s reported an error: %s', $serverName, mb_substr($detail, 0, 300));
 
-        $this->logger->warning('McpActionRunner: write action reported an error', [
+        return $this->failReported($userId, $serverId, $tool, $arguments, 'McpActionRunner: write action reported an error', $error, $this->callMetadata($serverId, $serverName, $tool));
+    }
+
+    /**
+     * The POST may have reached the server and the response was lost, or the
+     * request never left. The write is unconfirmed either way.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    private function unconfirmedWrite(?int $userId, int $serverId, string $serverName, string $tool, array $arguments, string $detail): NodeResult
+    {
+        $detail = trim($detail);
+        $error = sprintf(
+            "%s did not confirm whether '%s' finished. Check %s before trying again.",
+            $serverName,
+            $tool,
+            $serverName,
+        );
+        if ('' !== $detail) {
+            $error .= ' '.mb_substr($detail, 0, 300);
+        }
+
+        return $this->failReported($userId, $serverId, $tool, $arguments, 'McpActionRunner: write action was not confirmed', $error, $this->callMetadata($serverId, $serverName, $tool));
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     * @param array<string, mixed> $metadata
+     */
+    private function failReported(?int $userId, int $serverId, string $tool, array $arguments, string $logMessage, string $error, array $metadata): NodeResult
+    {
+        $this->logger->warning($logMessage, [
             'user_id' => $userId,
             'server_id' => $serverId,
             'tool' => $tool,
@@ -180,7 +210,7 @@ final readonly class McpActionRunner implements TaskRunner
             'error' => $error,
         ]);
 
-        return NodeResult::reportableFailure($error, $this->callMetadata($serverId, $serverName, $tool));
+        return NodeResult::reportableFailure($error, $metadata);
     }
 
     /**

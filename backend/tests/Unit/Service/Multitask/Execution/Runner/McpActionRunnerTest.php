@@ -70,13 +70,14 @@ final class McpActionRunnerTest extends TestCase
         string $callToolResultText = 'Created page "Launch plan" at https://wiki.example.com/x/abc',
         bool $toolIsError = false,
         ?LoggerInterface $logger = null,
+        int $httpStatus = 200,
     ): McpActionRunner {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
             static fn (int $owner, string $group, string $setting): ?string => $flags["{$group}.{$setting}"] ?? null,
         );
 
-        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText, $toolIsError): MockResponse {
+        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText, $toolIsError, $httpStatus): MockResponse {
             $body = json_decode((string) ($options['body'] ?? ''), true);
             $rpcMethod = is_array($body) ? ($body['method'] ?? '') : '';
 
@@ -88,7 +89,7 @@ final class McpActionRunnerTest extends TestCase
 
             return new MockResponse(
                 (string) json_encode(['jsonrpc' => '2.0', 'id' => 1, 'result' => $result]),
-                ['http_code' => 200, 'response_headers' => ['content-type' => 'application/json']],
+                ['http_code' => 'tools/call' === $rpcMethod ? $httpStatus : 200, 'response_headers' => ['content-type' => 'application/json']],
             );
         };
 
@@ -275,5 +276,15 @@ final class McpActionRunnerTest extends TestCase
         self::assertStringContainsString('space not found', (string) $result->error);
         self::assertSame('Confluence · create_page', $result->metadata['query']);
         self::assertTrue($result->metadata['mcp']['write']);
+    }
+
+    public function testUnconfirmedWriteDoesNotClaimTheServerReportedAnError(): void
+    {
+        $result = $this->runner(httpStatus: 503)->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertStringContainsString("did not confirm whether 'create_page' finished", (string) $result->error);
+        self::assertStringContainsString('Check Confluence before trying again', (string) $result->error);
+        self::assertStringNotContainsString('reported an error', (string) $result->error);
     }
 }

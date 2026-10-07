@@ -55,7 +55,7 @@ final readonly class ComposeReplyRunner implements TaskRunner
             static fn (string $label): bool => str_ends_with($label, ' · FAILED'),
             ARRAY_FILTER_USE_KEY,
         );
-        $text .= UpstreamHandover::render($failures);
+        $text .= UpstreamHandover::renderBlocks($failures);
 
         $files = [];
         foreach ($this->flatten($inputs['attachments'] ?? []) as $candidate) {

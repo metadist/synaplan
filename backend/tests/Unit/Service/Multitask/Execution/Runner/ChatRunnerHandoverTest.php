@@ -186,7 +186,8 @@ final class ChatRunnerHandoverTest extends TestCase
         $user = $captured[1]['content'];
         self::assertStringContainsString('[n1 · Backblaze · s3_head_bucket · FAILED]', $user);
         self::assertStringContainsString('Backblaze reported an error: NotFound', $user);
-        self::assertStringContainsString('A step marked FAILED did run', $user);
+        self::assertStringContainsString('A step marked FAILED was attempted', $user);
+        self::assertStringContainsString('Do not claim that no connection is configured', $user);
     }
 
     public function testHardFailureIsNotAppended(): void

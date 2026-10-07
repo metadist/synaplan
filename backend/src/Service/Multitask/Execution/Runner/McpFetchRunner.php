@@ -119,7 +119,7 @@ final readonly class McpFetchRunner implements TaskRunner
         try {
             $result = $this->client->callTool($server, $tool, $arguments);
         } catch (McpClientException $e) {
-            return $this->reportedError($serverId, $server->getName(), $tool, $e->getMessage());
+            return $this->requestFailed($serverId, $server->getName(), $tool, $e->getMessage());
         }
 
         $text = $this->formatContent($result['content']);
@@ -140,23 +140,60 @@ final readonly class McpFetchRunner implements TaskRunner
     }
 
     /**
-     * The remote system was reached and reported a failure. Answer steps still
-     * run so the reply can say what went wrong; the card stays failed.
+     * The tool answered with isError. Answer steps still run; the card stays failed.
      */
     private function reportedError(int $serverId, string $serverName, string $tool, string $detail): NodeResult
     {
+        return $this->failReported(
+            'McpFetchRunner: tool reported an error',
+            $serverId,
+            $tool,
+            $this->reportedSentence($serverName, $detail),
+            $this->callMetadata($serverId, $serverName, $tool),
+        );
+    }
+
+    /**
+     * The call never produced a tool result (blocked URL, auth, HTTP error,
+     * unreadable body). That is not the server reporting a tool error.
+     */
+    private function requestFailed(int $serverId, string $serverName, string $tool, string $detail): NodeResult
+    {
         $detail = trim($detail);
         $error = '' === $detail
-            ? sprintf('%s reported an error and gave no details.', $serverName)
-            : sprintf('%s reported an error: %s', $serverName, mb_substr($detail, 0, 300));
+            ? sprintf('%s could not be reached.', $serverName)
+            : sprintf('%s could not be reached: %s', $serverName, mb_substr($detail, 0, 300));
 
-        $this->logger->warning('McpFetchRunner: tool reported an error', [
+        return $this->failReported(
+            'McpFetchRunner: tool request failed',
+            $serverId,
+            $tool,
+            $error,
+            $this->callMetadata($serverId, $serverName, $tool),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function failReported(string $logMessage, int $serverId, string $tool, string $error, array $metadata): NodeResult
+    {
+        $this->logger->warning($logMessage, [
             'server_id' => $serverId,
             'tool' => $tool,
             'error' => $error,
         ]);
 
-        return NodeResult::reportableFailure($error, $this->callMetadata($serverId, $serverName, $tool));
+        return NodeResult::reportableFailure($error, $metadata);
+    }
+
+    private function reportedSentence(string $serverName, string $detail): string
+    {
+        $detail = trim($detail);
+
+        return '' === $detail
+            ? sprintf('%s reported an error and gave no details.', $serverName)
+            : sprintf('%s reported an error: %s', $serverName, mb_substr($detail, 0, 300));
     }
 
     /**

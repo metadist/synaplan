@@ -44,6 +44,8 @@ final class ComposeReplyRunnerTest extends TestCase
         self::assertStringContainsString('real-bucket exists', (string) $result->text);
         self::assertStringContainsString('[n2 · Backblaze · s3_head_bucket · FAILED]', (string) $result->text);
         self::assertStringContainsString('Backblaze reported an error: NotFound', (string) $result->text);
+        self::assertStringNotContainsString('source of truth', (string) $result->text);
+        self::assertStringNotContainsString('was attempted', (string) $result->text);
     }
 
     public function testErrorAlreadyQuotedIsNotAppendedTwice(): void

@@ -1,6 +1,6 @@
 Title: fix(multitask): an MCP tool error drops the plan or skips the answer step, and the reply hides the failure
 
-**Kind:** Ready to implement. No open decisions. Do the five steps below and stop.
+**Kind:** Implemented on this branch, pending merge.
 
 **Reported by:** partner hoster running the Backblaze B2 MCP server
 **Version:** 5.2.0 (upgraded from 5.0.6). These code paths are unchanged on current `main`.
