@@ -42,7 +42,7 @@ n2 chat        depends_on n1, inputs.text contains $n1.text
 n3 compose_reply   depends_on n1 and n2, inputs.text = $n2.text, reply_node = n3
 ```
 
-`compose_reply` is hidden and copies text. It does not call a model. The explanation has to be written by `chat` (or `summarize` / `translate` / `rag_query`).
+`compose_reply` is hidden and copies text. It does not call a model. The explanation has to be written by `chat` (or `summarize` / `translate` / `rag_query` — all four share the one `ChatRunner::run()`, so one handover change covers them).
 
 ---
 
@@ -60,14 +60,16 @@ n3 compose_reply   depends_on n1 and n2, inputs.text = $n2.text, reply_node = n3
 
 **File:** `backend/src/Service/Multitask/Execution/NodeResult.php`
 
-Add a constructor and a predicate. Do not add a `NodeStatus` case. The card state stays `failed`, which the UI already renders.
+Add a named constructor (static factory, not `__construct`) plus a predicate. Do not add a `NodeStatus` case. The card state stays `failed`, which the UI already renders. Set the flag with a plain assignment, not a `+` union or `array_merge` (both have silent key-precedence behaviour a later edit could flip):
 
 ```php
 public const META_REPORTABLE = 'reportable_failure';
 
 public static function reportableFailure(string $error, array $metadata = []): self
 {
-    return new self(NodeStatus::Failed, error: $error, metadata: [self::META_REPORTABLE => true] + $metadata);
+    $metadata[self::META_REPORTABLE] = true;
+
+    return new self(NodeStatus::Failed, error: $error, metadata: $metadata);
 }
 
 public function isReportableFailure(): bool
@@ -76,21 +78,23 @@ public function isReportableFailure(): bool
 }
 ```
 
+The flag lives only in memory. It is never read off persisted message meta, and the card builders below only copy `text` / `url` / `error` / `query` / counts — do not forward `META_REPORTABLE` into any user-visible metadata yourself.
+
 **Files:** `McpFetchRunner::run()` and `McpActionRunner::run()`
 
-Use `reportableFailure` only after the tool was actually called:
+Use `reportableFailure` only on the two branches where the tool was actually called:
 
 - `isError: true`
-- `catch (McpClientException)` — the server was unreachable, returned HTTP 4xx/5xx, or the sign-in failed
+- `catch (McpClientException)` — unreachable server, HTTP 4xx/5xx, failed sign-in
 
-Pass the same metadata the success path already passes for the card: `query` = server name + ` · ` + tool name. Put the server name in the error string, for example `Backblaze reported an error: ` plus the tool text, capped at 300 characters. An empty tool text still produces a sentence (`Backblaze reported an error and gave no details.`).
+Keep the metadata shape the success path already uses, so cards and logs keep working: `mcp` (`server_id`, `server`, `tool`, plus `write: true` in the action runner) and `query` (`server name . ' · ' . tool`). Build the error as `sprintf('%s reported an error: %s', $server->getName(), mb_substr($text, 0, 300))`. When the tool text is empty or whitespace-only, return `sprintf('%s reported an error and gave no details.', $server->getName())` instead of a sentence that ends with a bare colon.
 
-Log a warning before returning:
+Log a warning on both branches before returning:
 
 - `McpFetchRunner: tool reported an error` with `server_id`, `tool`, `error`
 - `McpActionRunner: write action reported an error` with `user_id`, `server_id`, `tool`, `argument_keys`, `error`
 
-Leave these as hard `NodeResult::failed()` with no new log line: flags off, missing params, server not owned or disabled, topic not allowed, tool not in the catalog, tool declares itself mutating. Those are our refusals, not an answer from the remote system.
+Leave everything before the tool call as hard `NodeResult::failed()` with no new log line: flags off, missing params, server not owned or disabled, write opt-in missing, topic not allowed, tool not in the catalog, tool self-declares mutating/destructive, and the fetch's `returned no usable content` empty case. Those are our refusals (or an empty answer), not an error the remote system reported.
 
 ---
 
@@ -98,16 +102,29 @@ Leave these as hard `NodeResult::failed()` with no new log line: flags off, miss
 
 **File:** `backend/src/Service/Multitask/Execution/DagExecutor.php`
 
-An answer step may run when a dependency is a reportable failure. Every other capability keeps today's skip. A reportable failure is not permission to send an email, save a file, or call another tool.
+An answer step may run when a dependency is a reportable failure. Every other capability keeps today's skip. A reportable failure is not permission to send an email, save a file, or call another tool: any action node whose direct dependency is a reportable failure is still skipped.
 
-Answer capabilities: `chat`, `summarize`, `translate`, `rag_query`, `compose_reply`.
-
-`compose_reply` is on the list because the canonical reply node depends on the fetch and on the chat. If it stays skipped, the reply node is skipped even though the chat already wrote the explanation.
-
-Add one private method and use it from all three existing checks: `failedDependency()`, `blockedByIncompleteDependency()`, and `dependenciesSatisfied()`. Do not patch only one of them.
+Answer capabilities (`Capability::Chat`, `Capability::Summarize`, `Capability::Translate`, `Capability::RagQuery`, `Capability::ComposeReply`):
 
 ```php
-/** 'ready' | 'failed' | 'pending' */
+/** Capabilities that turn upstream output into the user's answer. */
+private const ANSWER_CAPABILITIES = [
+    Capability::Chat,
+    Capability::Summarize,
+    Capability::Translate,
+    Capability::RagQuery,
+    Capability::ComposeReply,
+];
+
+private function isAnswerNode(TaskNode $node): bool
+{
+    return in_array($node->capability, self::ANSWER_CAPABILITIES, true);
+}
+
+/**
+ * 'ready' if the node may consume this dependency now, 'failed' if it must
+ * skip, 'pending' if the dependency has not settled yet.
+ */
 private function dependencyState(NodeContext $context, TaskNode $node, string $depId): string
 {
     $result = $context->getResult($depId);
@@ -121,21 +138,28 @@ private function dependencyState(NodeContext $context, TaskNode $node, string $d
         return 'ready';
     }
 
-    return 'failed'; // Failed, Skipped, and Stopped (a condition that was not met)
+    // Failed, Skipped, and Stopped (a condition that evaluated false).
+    return 'failed';
 }
 ```
 
-- `failedDependency()` returns the first dependency whose state is `failed`.
-- `blockedByIncompleteDependency()` is true when any dependency is `pending`. It is not true for `ready` or `failed` (`failed` is already handled by the skip above it).
-- `dependenciesSatisfied()` is true only when every dependency is `ready`.
+Two methods, not one: the capability list lives in `isAnswerNode()`, the state machine in `dependencyState()`. Rewrite the three existing checks on top of it, with no other behaviour change:
 
-Trap, sequential mode: `executeSequential()` walks the plan once. A node it does not run and does not skip stays `pending` forever. `ResultAssembler` treats pending as "still running", so `all_failed` stays false and the legacy fallback does not run either. The user then gets whatever text another step produced, with no explanation. A reportable failure must be `ready` for an answer node, never `pending`.
+- `failedDependency()` returns the first dependency whose state is `failed`, else null. (`settledFailedDependency()` in the parallel scheduler delegates to it — no fourth patch needed.)
+- `blockedByIncompleteDependency()` is true when any dependency state is `pending`. It is false for `ready` and for `failed` (`failed` is already handled by the skip above it in sequential mode).
+- `dependenciesSatisfied()` (parallel scheduler) is true only when every dependency state is `ready`.
 
-Trap, parallel mode: the loop exits when a pass starts nothing and nothing is in flight. A node that is neither ready nor skipped is dropped the same way. The same helper prevents that.
+`compose_reply` is on the list because the canonical reply node depends on the fetch and on the chat. If it stays skipped, the reply node is skipped even though the chat already wrote the explanation.
 
-Do not treat `NodeStatus::Stopped` as reportable. A condition that evaluated false must still skip its dependents.
+Do not treat `NodeStatus::Stopped` as reportable. A condition that evaluated false must still skip its dependents (locked by test, see below).
 
-In `failureMetadata()`, when the result metadata has a non-empty string `query`, copy it onto the `task_update` the same way `successMetadata()` does. Otherwise the live card has the error but not the "Backblaze · s3_head_bucket" line that the reloaded card gets from `ResultAssembler`.
+Trap, sequential mode: `executeSequential()` walks the plan once. A node it neither runs nor skips stays `pending` forever, and `ResultAssembler` counts pending as "still running" — so `all_failed` stays false, the legacy fallback does not run either, and the user gets whatever text another step produced with no explanation. A tolerated reportable failure must resolve to `ready`, never `pending`. The helper above does that; do not special-case it at the call sites.
+
+Trap, parallel mode: the loop exits when a pass starts nothing and nothing is in flight. A node that is neither ready nor skipped is dropped the same way. Same helper, same reason.
+
+In `failureMetadata()`, keep the existing `error` entry and ADD `query` when the result metadata holds a non-empty string `query` (mirror the `successMetadata()` lines for search-style nodes). Do not replace the error with the query. Otherwise the live card carries the error but not the "Backblaze · s3_head_bucket" line that the reloaded card gets from `ResultAssembler`.
+
+Regression watch (accepted, not a blocker): a summary node between a failed fetch and an action (`fetch → summarize → email_me`) now runs and re-explains the error, so the mail says the lookup failed instead of the turn falling back to chat. That is the U8 outcome — the user asked for mail about the lookup. Direct action dependents still skip; write actions additionally stay behind the approval gate.
 
 ---
 
@@ -143,9 +167,9 @@ In `failureMetadata()`, when the result metadata has a non-empty string `query`,
 
 **File:** `backend/src/Service/Multitask/Execution/UpstreamHandover.php`
 
-`missing()` currently skips unsuccessful steps. Also collect reportable failures. Do not collect hard failures or skipped steps.
+`missing()` currently skips every unsuccessful step. Also collect reportable failures; keep skipping hard failures and skipped steps. A reportable failure has no `$nX.text`, so the "already in the prompt" verbatim check cannot see it — always include it, labelled by reusing the existing `self::label($dep, $result)` plus a suffix: `self::label($dep, $result).' · FAILED'`. The value is the error string. Apply the same `MAX_CHARS_PER_STEP` cap as the other blocks.
 
-A reportable failure has no `$nX.text`, so the "already in the prompt" check cannot see it. Always include it, labelled `{nodeId} · {query} · FAILED`, value = the error string. Add one line to `render()`, after the existing "never claim it was not provided" line:
+Add one line to `render()`, after the existing "never claim it was not provided" line:
 
 ```text
 A step marked FAILED did run. Say what failed and why, in the user's language. Do not say that the connection or the data source does not exist.
@@ -155,7 +179,18 @@ A step marked FAILED did run. Say what failed and why, in the user's language. D
 
 **File:** `backend/src/Service/Multitask/Execution/Runner/ComposeReplyRunner.php`
 
-`compose_reply` does not call a model. After resolving `inputs.text`, append `UpstreamHandover::render(UpstreamHandover::missing(...))`. When the chat step already quoted the error, `missing()` finds it in the text and appends nothing. When the reply node copies only the successful fetch, the failed step is still in the reply.
+`compose_reply` does not call a model, so without this change a plan whose reply copies fetch output directly (no chat in between) still answers with nothing. After resolving the inputs and before the empty-check, append:
+
+```php
+use App\Service\Multitask\Execution\UpstreamHandover;
+
+// inside run(), with $text (string), $inputs (resolved array), $node, $context in scope:
+$text .= UpstreamHandover::render(UpstreamHandover::missing($node, $context, $text, $inputs));
+```
+
+then keep the existing `'' === $text ? null : $text` empty-check on the combined string. The dedupe inside `missing()` means a chat text that already quotes the error verbatim gains nothing.
+
+Accepted redundancy: in the canonical shape the chat already explained the failure and the reply node copies the chat text, so the appended FAILED block repeats it in raw form. Keep it anyway — the block is labelled, it only appears when something actually failed, and it is the only thing that speaks when no chat ran. Do not "fix" this by dropping the compose change; that reopens silence for chat-less plans.
 
 ---
 
@@ -163,21 +198,36 @@ A step marked FAILED did run. Say what failed and why, in the user's language. D
 
 **File:** `backend/src/Service/Multitask/TaskPlanExecutor.php`
 
-Replace `planRunsCode()` with one check used at both `all_failed` branches (`executeStream` and `execute`):
+Replace `planRunsCode()` with the generalisation below, and point both `all_failed` branches (`executeStream` and `execute`) at it. Delete the old method; do not leave two overlapping checks. Keep the `$plan->authored` exception exactly as it is.
 
 ```php
+/**
+ * Capabilities the legacy chat router cannot perform. Falling back to it
+ * after such a plan failed produces an answer that denies the capability
+ * ("I can't execute code", "there is no Backblaze connection") and hides
+ * the real error (U8). Surface the node's own failure instead.
+ */
 private const NO_CHAT_FALLBACK = [
     Capability::CodeRun,
     Capability::McpFetch,
     Capability::McpAction,
 ];
+
+private function planNeedsCapabilityChatCannotPerform(TaskPlan $plan): bool
+{
+    foreach ($plan->nodes as $node) {
+        if (in_array($node->capability, self::NO_CHAT_FALLBACK, true)) {
+            return true;
+        }
+    }
+
+    return false;
+}
 ```
 
-True when any node uses one of those. Keep the authored-plan exception as it is.
+`Capability` is already imported in this file. Do not add `EmailSearch` or `ToolCall` in this change.
 
-Do not add `EmailSearch` or `ToolCall` in this change.
-
-On both "DAG produced no successful node" log lines, add `node_errors`: node id → error string, taken from `task_plan_render.cards`.
+On both `DAG produced no successful node …` log lines, add `node_errors`: node id → error string, built from `$assembled['metadata']['task_plan_render']['cards']` (present at that point), keeping only cards with a non-empty `error`. This is what makes the next "nothing in the logs" report answerable.
 
 This path is what a hard failure still hits (unknown tool, feature off). The text it shows is step 5.
 
@@ -187,9 +237,9 @@ This path is what a hard failure still hits (unknown tool, feature off). The tex
 
 **File:** `backend/src/Service/Multitask/Execution/ResultAssembler.php`
 
-`bestEffort()` runs only when the reply node produced nothing. That is the hard-failure case. When the chat step ran, its text is the reply and this method is not used.
+`bestEffort()` runs only when the reply node produced nothing. That is the hard-failure case (unknown tool, feature off): step 2 never let an answer run, so nothing explained anything. When the chat step ran, its text is the reply and this method is not used — do not touch that path.
 
-Append one sentence per failed visible step (skip `uiKind() === 'hidden'`). Use the `query` metadata when it is set, otherwise the capability name. Then the error string. The raw error is the sentence. Do not write "see the card".
+After the existing fallback-text resolution, append one sentence per failed visible step. Iterate `$plan->nodes` in order with `$context->getResult()`: keep nodes whose result is `Failed` with a non-empty error and whose `uiKind()` is not `hidden` (this skips `compose_reply`). The label is the result's `query` metadata when it is a non-empty string, else the capability value. The error string follows it verbatim — it is already a full sentence from step 1, so no "see the card" pointer:
 
 ```text
 en: One step could not be completed: {label}. {error}
@@ -199,15 +249,16 @@ fr: Une étape n'a pas pu être terminée : {label}. {error}
 tr: Bir adım tamamlanamadı: {label}. {error}
 ```
 
-Put them in a constant map next to `FALLBACK_TEXT`. Add the missing French `FALLBACK_TEXT` entry: `Je n'ai pas pu terminer cette demande entièrement.`
+Put them in a constant map next to `FALLBACK_TEXT`, keyed by the same language resolution `bestEffort()` already uses (`classification['language']`, else message language, else `en`). Add the missing French `FALLBACK_TEXT` entry: `Je n'ai pas pu terminer cette demande entièrement.`
 
-These strings live in PHP on purpose. `ResultAssembler` has no translator. Do not add vue-i18n keys.
+The label and error are appended, never embedded in translated grammar — word order stays correct in all five languages. These strings live in PHP on purpose: `ResultAssembler` has no translator. Do not add vue-i18n keys.
 
 ---
 
 ## Do not
 
 - Do not add a `NodeStatus` value. Persistence, the task card and the API all switch on the current set.
+- Do not change `ChatRunner`. All four text capabilities share its `run()`.
 - Do not change Vue, OpenAPI, or the five locale JSON files. The card already shows `error`.
 - Do not add a planner example or a migration. `PromptCatalog::planPrompt()` already contains "Pull data from a connected system, then answer (mcp_fetch)", and it already wires `$n1.text`. It has been there since v3.9.0. `tests/Eval/plan_eval_corpus.json` already has `mcp_knowledge_base_query`, which expects an `mcp_fetch` → `chat` edge.
 - Do not change `EmailSearch` or `ToolCall` fallback behaviour.
@@ -219,15 +270,17 @@ These strings live in PHP on purpose. `ResultAssembler` has no translator. Do no
 
 | File | What to assert |
 | ---- | -------------- |
-| `tests/Unit/Service/Multitask/Execution/Runner/McpFetchRunnerTest.php` | `isError: true` with a NotFound body → `isReportableFailure()`, error contains the body, one warning logged. A hallucinated tool and a disabled flag → `isReportableFailure()` is false. |
-| `tests/Unit/Service/Multitask/Execution/Runner/McpActionRunnerTest.php` | Same for `isError: true`: reportable, and a warning is logged. |
-| `tests/Unit/Service/Multitask/Execution/DagExecutorTest.php` | Fetch reportable-failure → chat runs, `all_failed` is false. Fetch reportable-failure → `email_me` is skipped. One fetch ok, one reportable-failure, chat depends on both → chat runs. A `Stopped` dependency still skips its chat dependent. Cover `execute()` sequential. If a test already drives the parallel scheduler, add the same chat case there; do not add a parallel test from scratch if the file has no parallel fixture. |
-| `tests/Unit/Service/Multitask/Execution/Runner/ChatRunnerHandoverTest.php` | A reportable failure is appended as a `FAILED` block even when `inputs.text` is `$n1.text`. A hard failure is not appended. |
-| `tests/Unit/Service/Multitask/Execution/Runner/ComposeReplyRunnerTest.php` (new; there is no compose-reply test file today) | Reply text is the successful step, and the failed step's error is appended. |
+| `tests/Unit/Service/Multitask/Execution/Runner/McpFetchRunnerTest.php` | `isError: true` with a NotFound body → `isReportableFailure()`, error contains the body and the server name, `query` and `mcp` metadata present, one warning logged. Empty-body `isError` → the "gave no details" sentence. A hallucinated tool and a disabled flag → `isReportableFailure()` is false. |
+| `tests/Unit/Service/Multitask/Execution/Runner/McpActionRunnerTest.php` | Same for `isError: true` (note: the fixture needs a write-enabled server, otherwise the gate refuses before the tool call). Reportable, warning logged with `user_id` and `argument_keys`. A destructive tool and a missing tool stay hard failures. |
+| `tests/Unit/Service/Multitask/Execution/DagExecutorTest.php` | Fetch reportable-failure → chat runs, `all_failed` is false. Fetch reportable-failure → `email_me` is skipped. One fetch ok, one reportable-failure, chat depends on both → chat runs. A `Stopped` dependency still skips its chat dependent. Cover `execute()` sequential. If a test already drives the parallel scheduler, add the same chat case there; do not build a parallel fixture from scratch if the file has none. |
+| `tests/Unit/Service/Multitask/Execution/Runner/ChatRunnerHandoverTest.php` | A reportable failure is appended as a `· FAILED` block even when `inputs.text` is `$n1.text`. A hard failure is not appended. (The existing `testMissingSkipsFailedEmptyAndAlreadyPresentUpstreamText` uses a hard failure and must keep passing unchanged.) |
+| `tests/Unit/Service/Multitask/Execution/Runner/ComposeReplyRunnerTest.php` (new; no compose-reply test file exists today) | Reply text is the successful step, and the failed step's error is appended. Second case: reply text already quotes the error verbatim → nothing appended twice. |
 | `tests/Unit/Service/Multitask/TaskPlanExecutorTest.php` | Mirror `testFailedCodeRunDoesNotFallBackToLegacyRouter` for a one-node `mcp_fetch` plan and a one-node `mcp_action` plan: `routeStream` is never called, `plan_discarded` is not emitted, the streamed text is the assembled error. |
-| `tests/Unit/Service/Multitask/Execution/ResultAssemblerTest.php` | Reply node produced nothing, one visible step failed → the reply contains the English "could not be completed" sentence and the error. Language `fr` → the French fallback, not the English one. |
+| `tests/Unit/Service/Multitask/Execution/ResultAssemblerTest.php` | Reply node produced nothing, one visible step failed → the reply contains the English "could not be completed" sentence, the label and the error. A failed hidden `compose_reply` alone produces no sentence. Language `fr` → the French fallback, not the English one. |
 
-Then `make ci-local`. Backend-only: frontend lint, `vue-tsc` and Vitest may be skipped. PHPUnit must be the unfiltered `make -C backend test`, not a `--filter` run.
+Then the backend gate, unfiltered: `make -C backend lint && make -C backend phpstan && make -C backend test`. PHPUnit must be the full `make -C backend test`, not a `--filter` run. Frontend lint, `vue-tsc` and Vitest are unaffected (no frontend or OpenAPI change); a full `make ci-local` also passes by virtue of touching nothing it checks.
+
+Also update the failure paragraph of `docs/MULTITASK_DATA_NODES.md` (the "Three layers" handover section): one short paragraph on reportable failures — card stays `failed`, answer dependents still run, hard refusals still skip. No other docs change.
 
 ---
 
