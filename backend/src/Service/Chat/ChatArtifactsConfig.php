@@ -23,6 +23,22 @@ final readonly class ChatArtifactsConfig
     ) {
     }
 
+    /**
+     * Null when the environment does not pin the switch. True or false when
+     * CHAT_ARTIFACTS_ENABLED is explicitly on or off.
+     */
+    public function envOverride(): ?bool
+    {
+        if ($this->isExplicitlyOn($this->envValue)) {
+            return true;
+        }
+        if ($this->isExplicitlyOff($this->envValue)) {
+            return false;
+        }
+
+        return null;
+    }
+
     public function isEnabled(): bool
     {
         $env = $this->envValue;

@@ -180,7 +180,8 @@
     "tags": "Etiketler",
     "tagsSaved": "Etiketler kaydedildi.",
     "archivedDone": "Arşivlendi. Tüm sohbetler → Arşivlenenler altında.",
-    "unarchivedDone": "Kenar çubuğuna geri döndü."
+    "unarchivedDone": "Kenar çubuğuna geri döndü.",
+    "showOpenChats": "Açık sohbetler"
   },
   "moderation": {
     "report": {
@@ -633,7 +634,8 @@
     "askSubmit": "Gönder",
     "askSkip": "Atla",
     "askNeedAnswer": "Bir seçenek seçin veya bir yanıt yazın.",
-    "askFailed": "Çalışma devam edemedi. Yeni bir mesaj gönderin."
+    "askFailed": "Çalışma devam edemedi. Yeni bir mesaj gönderin.",
+    "askReadOnly": "Yalnızca sahibi yanıtlayabilir. Soruyu yine de okuyabilirsiniz."
   },
   "processing": {
     "timeline": {

@@ -181,7 +181,8 @@
     "tags": "Tags",
     "tagsSaved": "Tags gespeichert.",
     "archivedDone": "Archiviert. Zu finden unter Alle Chats → Archiviert.",
-    "unarchivedDone": "Wieder in der Seitenleiste."
+    "unarchivedDone": "Wieder in der Seitenleiste.",
+    "showOpenChats": "Offene Chats"
   },
   "moderation": {
     "report": {
@@ -623,7 +624,8 @@
     "askSubmit": "Senden",
     "askSkip": "Überspringen",
     "askNeedAnswer": "Wähle eine Option oder schreibe eine Antwort.",
-    "askFailed": "Der Lauf konnte nicht weitergehen. Sende eine neue Nachricht."
+    "askFailed": "Der Lauf konnte nicht weitergehen. Sende eine neue Nachricht.",
+    "askReadOnly": "Nur die besitzende Person kann antworten. Die Frage können Sie trotzdem lesen."
   },
   "processing": {
     "timeline": {

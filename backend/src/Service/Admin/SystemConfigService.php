@@ -14,6 +14,7 @@ use App\Repository\ConfigRepository;
 use App\Seed\ModuleGateSeeder;
 use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
+use App\Service\Chat\ChatArtifactsConfig;
 use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\MobileVersionService;
 use App\Service\Compute\ComputeClient;
@@ -72,6 +73,7 @@ final readonly class SystemConfigService
         private readonly ?ModuleRegistry $modules = null,
         private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
         private readonly ?ComputeClient $computeClient = null,
+        private readonly ?ChatArtifactsConfig $chatArtifactsConfig = null,
     ) {
         $this->schema = $this->markManagedFields($this->buildSchema());
     }
@@ -474,6 +476,7 @@ final readonly class SystemConfigService
         foreach ([
             'REGISTRATION_ENABLED' => $this->registrationConfig->envOverride(),
             'GUEST_CHAT_ENABLED' => $this->guestChatConfig->envOverride(),
+            'CHAT_ARTIFACTS_ENABLED' => $this->chatArtifactsConfig?->envOverride(),
         ] as $key => $envOverride) {
             if (!isset($values[$key]) || null === $envOverride) {
                 continue;
@@ -2445,11 +2448,11 @@ final readonly class SystemConfigService
             'CHAT_ARTIFACTS_ENABLED' => [
                 'tab' => 'features', 'section' => 'chat', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Offer a sandboxed preview for HTML and SVG answers. Off hides the Preview action. On when this row and CHAT_ARTIFACTS_ENABLED are not explicitly false.',
-                'default' => 'true',
+                'description' => 'Offer a sandboxed preview for HTML and SVG answers. Off when this row is missing and CHAT_ARTIFACTS_ENABLED is empty. An explicit on in either place turns the preview on. An explicit off in either place turns it off.',
+                'default' => 'false',
                 'source' => 'database',
-                'dbGroup' => \App\Service\Chat\ChatArtifactsConfig::GROUP,
-                'dbKey' => \App\Service\Chat\ChatArtifactsConfig::ENABLED,
+                'dbGroup' => ChatArtifactsConfig::GROUP,
+                'dbKey' => ChatArtifactsConfig::ENABLED,
             ],
             // === AI Services ===
             'OLLAMA_BASE_URL' => [

@@ -1227,6 +1227,7 @@ watch(
   message,
   (newValue) => {
     if (newValue.startsWith('/')) {
+      void commandsStore.loadSavedPrompts()
       // Only show palette if no space (still typing command) or only command without args
       const hasSpace = newValue.includes(' ')
       const parsed = parseCommand(newValue)
@@ -1407,7 +1408,9 @@ const toggleVoiceReply = () => {
 // any other command (e.g. /tts) keeps the legacy inline-text behaviour.
 const handleCommandSelect = (cmd: Command) => {
   paletteVisible.value = false
-  if (isToolCommand(cmd.name)) {
+  if (cmd.promptBody) {
+    message.value = cmd.promptBody
+  } else if (isToolCommand(cmd.name)) {
     setActiveTool(cmd.name)
     // Drop the partial "/cmd" the user was typing so only the query remains.
     message.value = ''

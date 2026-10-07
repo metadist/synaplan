@@ -87,17 +87,16 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import type { z } from 'zod'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import { useNotification } from '@/composables/useNotification'
 import { httpClient } from '@/services/api/httpClient'
+import { GetApiSavedPromptsListResponseSchema } from '@/generated/api-schemas'
 
-interface SavedPromptRow {
-  id: number
-  name: string
-  command: string
-  body: string
-}
+type SavedPromptRow = NonNullable<
+  z.infer<typeof GetApiSavedPromptsListResponseSchema>['prompts']
+>[number]
 
 const { t } = useI18n()
 const { success, error } = useNotification()
@@ -107,7 +106,9 @@ const errorText = ref('')
 const draft = ref({ name: '', command: '', body: '' })
 
 async function load(): Promise<void> {
-  const data = await httpClient<{ prompts: SavedPromptRow[] }>('/api/v1/saved-prompts')
+  const data = await httpClient('/api/v1/saved-prompts', {
+    schema: GetApiSavedPromptsListResponseSchema,
+  })
   prompts.value = data.prompts ?? []
 }
 

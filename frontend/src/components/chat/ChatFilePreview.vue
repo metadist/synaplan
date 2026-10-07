@@ -108,6 +108,7 @@ import * as filesService from '@/services/filesService'
 const props = defineProps<{
   open: boolean
   file: { id: number; filename: string; fileSize?: number; sharedBy?: string | null } | null
+  guestSessionId?: string | null
   canReattach?: boolean
   returnFocus?: HTMLElement | null
 }>()
@@ -126,11 +127,24 @@ const kind = computed(() =>
 const showPdf = computed(
   () => kind.value === 'pdf' || (kind.value === 'document' && isOfficeConvertEnabled())
 )
+const fileUrl = (path: string): string => {
+  if (props.guestSessionId && props.file) {
+    return path.replace(
+      `/api/v1/files/${props.file.id}`,
+      `/api/v1/guest/files/${encodeURIComponent(props.guestSessionId)}/${props.file.id}`
+    )
+  }
+  return path
+}
 const pdfSrc = computed(() =>
-  props.file && showPdf.value ? mediaSrc(filesService.exportUrl(props.file.id, 'pdf', true)) : ''
+  props.file && showPdf.value
+    ? mediaSrc(fileUrl(filesService.exportUrl(props.file.id, 'pdf', true)))
+    : ''
 )
 const imageSrc = computed(() =>
-  props.file && kind.value === 'image' ? mediaSrc(`/api/v1/files/${props.file.id}/download`) : ''
+  props.file && kind.value === 'image'
+    ? mediaSrc(fileUrl(`/api/v1/files/${props.file.id}/download`))
+    : ''
 )
 
 const csvTable = computed(() => {
@@ -174,9 +188,15 @@ watch(
     if (!open || !id || showPdf.value || kind.value === 'image') return
     loading.value = true
     try {
-      const content = await filesService.getFileContent(id)
-      textBody.value = content.extracted_text || ''
-      searchable.value = content.status === 'vectorized' || content.extracted_text.length > 0
+      if (props.guestSessionId) {
+        const blob = await filesService.fetchGuestFileBlob(props.guestSessionId, id)
+        textBody.value = (await blob.text()).slice(0, 20000)
+        searchable.value = false
+      } else {
+        const content = await filesService.getFileContent(id)
+        textBody.value = content.extracted_text || ''
+        searchable.value = content.status === 'vectorized' || content.extracted_text.length > 0
+      }
     } catch {
       textBody.value = ''
     } finally {

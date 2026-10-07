@@ -25,12 +25,26 @@ export function extractArtifacts(text: string): ChatArtifact[] {
 
 /** Drop script, event handlers, and external URLs before an SVG is shown. */
 export function sanitizeSvg(source: string): string {
-  return source
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/\son\w+\s*=\s*(['"]).*?\1/gi, '')
-    .replace(/\son\w+\s*=\s*[^\s>]+/gi, '')
-    .replace(/\s(?:href|xlink:href|src)\s*=\s*(['"])https?:[\s\S]*?\1/gi, '')
-    .replace(/\s(?:href|xlink:href|src)\s*=\s*(['"])\/\/[\s\S]*?\1/gi, '')
+  if (typeof DOMParser === 'undefined') return ''
+  const doc = new DOMParser().parseFromString(source, 'image/svg+xml')
+  doc.querySelectorAll('script, foreignObject').forEach((node) => node.remove())
+  const svg = doc.querySelector('svg')
+  if (!svg) return ''
+  const strip = (el: Element) => {
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase()
+      const external = /^(https?:|\/\/)/i.test(attr.value.trim())
+      if (
+        name.startsWith('on') ||
+        (external && (name === 'href' || name.endsWith(':href') || name === 'src'))
+      ) {
+        el.removeAttribute(attr.name)
+      }
+    }
+    for (const child of [...el.children]) strip(child)
+  }
+  strip(svg)
+  return svg.outerHTML
 }
 
 const CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;">`

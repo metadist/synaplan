@@ -34,7 +34,19 @@ final class SavedPromptController extends AbstractController
         responses: [
             new OA\Response(response: 200, description: 'Saved prompts', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'success', type: 'boolean'),
-                new OA\Property(property: 'prompts', type: 'array', items: new OA\Items(type: 'object')),
+                new OA\Property(property: 'prompts', type: 'array', items: new OA\Items(
+                    required: ['id', 'name', 'command', 'body'],
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer'),
+                        new OA\Property(property: 'name', type: 'string'),
+                        new OA\Property(property: 'command', type: 'string'),
+                        new OA\Property(property: 'body', type: 'string'),
+                        new OA\Property(property: 'tags', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'variables', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'updatedAt', type: 'string'),
+                    ],
+                    type: 'object',
+                )),
             ])),
         ]
     )]

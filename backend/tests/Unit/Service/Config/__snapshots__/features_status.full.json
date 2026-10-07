@@ -210,7 +210,7 @@
             },
             "capabilities": [],
             "docs_anchor": "modules/chat-artifacts",
-            "mobile_class": "backend-only"
+            "mobile_class": "ota-candidate"
         },
         {
             "id": "compute",

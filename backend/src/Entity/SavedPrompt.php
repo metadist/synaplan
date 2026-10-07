@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: SavedPromptRepository::class)]
 #[ORM\Table(name: 'BSAVEDPROMPTS')]
 #[ORM\UniqueConstraint(name: 'uniq_saved_prompt_user_command', columns: ['BUSERID', 'BCOMMAND'])]
+#[ORM\Index(name: 'idx_saved_prompt_user', columns: ['BUSERID'])]
 class SavedPrompt
 {
     public const RESERVED_COMMANDS = ['search', 'pic', 'vid', 'tts', 'help'];

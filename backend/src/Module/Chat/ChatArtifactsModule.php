@@ -76,6 +76,6 @@ final class ChatArtifactsModule implements FeatureModuleInterface
 
     public function mobileClass(): MobileClass
     {
-        return MobileClass::BackendOnly;
+        return MobileClass::OtaCandidate;
     }
 }

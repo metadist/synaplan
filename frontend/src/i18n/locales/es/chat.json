@@ -180,7 +180,8 @@
     "tags": "Etiquetas",
     "tagsSaved": "Etiquetas guardadas.",
     "archivedDone": "Archivado. Está en Todos los chats → Archivados.",
-    "unarchivedDone": "De vuelta en la barra lateral."
+    "unarchivedDone": "De vuelta en la barra lateral.",
+    "showOpenChats": "Chats abiertos"
   },
   "moderation": {
     "report": {
@@ -633,7 +634,8 @@
     "askSubmit": "Enviar",
     "askSkip": "Omitir",
     "askNeedAnswer": "Elige una opción o escribe una respuesta.",
-    "askFailed": "La ejecución no pudo continuar. Envía un mensaje nuevo."
+    "askFailed": "La ejecución no pudo continuar. Envía un mensaje nuevo.",
+    "askReadOnly": "Solo quien lo creó puede responder. Aun así puede leer la pregunta."
   },
   "processing": {
     "timeline": {

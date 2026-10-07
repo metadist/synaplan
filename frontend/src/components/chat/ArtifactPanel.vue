@@ -7,6 +7,7 @@
     >
       <div
         class="flex h-full w-full flex-col surface-card shadow-2xl md:max-w-3xl"
+        :class="fullscreen ? 'max-w-none' : ''"
         role="dialog"
         aria-modal="true"
         :aria-label="t('chatMessage.previewArtifact')"
@@ -52,7 +53,6 @@
         </div>
         <iframe
           class="min-h-0 w-full flex-1 bg-white"
-          :class="fullscreen ? 'fixed inset-0 z-[90] h-screen' : ''"
           sandbox="allow-scripts"
           :srcdoc="srcDoc"
           :title="t('chatMessage.previewArtifact')"

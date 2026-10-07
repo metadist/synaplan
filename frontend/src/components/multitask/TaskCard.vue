@@ -371,12 +371,19 @@ const outputShown = computed(() =>
       @submit.prevent="submitAsk"
     >
       <p class="text-sm txt-primary">{{ card.askUser.question }}</p>
+      <p v-if="isReadonly" class="text-sm txt-secondary">{{ $t('taskPlan.askReadOnly') }}</p>
       <label
         v-for="option in card.askUser.options"
         :key="option"
         class="flex items-center gap-2 text-sm txt-primary"
       >
-        <input v-model="askChoice" type="radio" name="ask-user" :value="option" />
+        <input
+          v-model="askChoice"
+          type="radio"
+          :name="`ask-user-${card.nodeId}`"
+          :value="option"
+          :disabled="isReadonly"
+        />
         <span>{{ option }}</span>
         <span v-if="option === card.askUser.recommended" class="text-xs txt-secondary">{{
           $t('taskPlan.recommended')
@@ -385,12 +392,13 @@ const outputShown = computed(() =>
       <textarea
         v-if="card.askUser.allowText"
         v-model="askText"
-        class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        :disabled="isReadonly"
+        class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
         rows="2"
         data-testid="input-ask-user"
       />
       <p v-if="askError" class="text-sm text-red-600 dark:text-red-400">{{ askError }}</p>
-      <div class="flex flex-wrap gap-2">
+      <div v-if="!isReadonly" class="flex flex-wrap gap-2">
         <button
           type="submit"
           class="btn-primary px-4 py-2.5 text-sm font-medium"

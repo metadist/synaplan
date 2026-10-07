@@ -350,7 +350,9 @@ export const useChatsStore = defineStore('chats', () => {
     activeRunChatIds.value = applyLiveRunOverlay(serverRunIds, loadSeq)
   }
 
-  async function loadChats() {
+  const viewingArchived = ref(false)
+
+  async function loadChats(archived: '0' | '1' = '0') {
     if (!checkAuthOrRedirect()) return
 
     const seq = ++chatsLoadSeq
@@ -360,8 +362,9 @@ export const useChatsStore = defineStore('chats', () => {
     const run = (async () => {
       try {
         const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
-          '/api/v1/chats'
+          `/api/v1/chats?archived=${archived}`
         )
+        viewingArchived.value = archived === '1'
         if (seq !== chatsLoadSeq) {
           return
         }
@@ -1044,7 +1047,7 @@ export const useChatsStore = defineStore('chats', () => {
         updateActiveChatSelection(chats.value[0]?.id ?? null)
       }
     } else {
-      await loadChats()
+      await loadChats(viewingArchived.value ? '1' : '0')
     }
   }
 
@@ -1429,6 +1432,7 @@ export const useChatsStore = defineStore('chats', () => {
     markChatGenerating,
     watchDetachedRun,
     stopDetachedRunWatch,
+    viewingArchived,
     loadChats,
     loadChatHistory,
     createChat,

@@ -828,7 +828,10 @@
           </div>
 
           <div
-            v-if="(role === 'assistant' ? versionList.length : editList.length) > 1"
+            v-if="
+              canRewrite !== false &&
+              (role === 'assistant' ? versionList.length : editList.length) > 1
+            "
             class="flex items-center gap-1"
             data-testid="message-versions"
           >
@@ -870,7 +873,13 @@
             {{ t('chatMessage.previewArtifact') }}
           </button>
           <button
-            v-if="role === 'user' && backendMessageId && !editing"
+            v-if="
+              role === 'user' &&
+              backendMessageId &&
+              !editing &&
+              canRewrite !== false &&
+              !isGuestMode
+            "
             type="button"
             class="btn-secondary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
             data-testid="btn-message-edit"
@@ -1084,7 +1093,8 @@
   <ChatFilePreview
     :open="previewFile !== null"
     :file="previewFile"
-    :can-reattach="true"
+    :guest-session-id="isGuestMode ? guestSessionId : null"
+    :can-reattach="canRewrite !== false && !isGuestMode"
     :return-focus="fileReturnFocus"
     @close="closeFilePreview"
     @download="previewFile && downloadPreview()"

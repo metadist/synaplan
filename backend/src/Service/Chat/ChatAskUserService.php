@@ -53,8 +53,9 @@ final readonly class ChatAskUserService
         }
 
         $question = $node->params;
-        $expires = $question['expires_at'] ?? null;
-        if (is_int($expires) && $expires > 0 && time() > $expires) {
+        $messageId = $message->getId();
+        $expires = null !== $messageId ? $this->plans->askUserExpiresAt($messageId, $nodeId) : null;
+        if (null !== $expires && $expires > 0 && time() > $expires) {
             throw new \RuntimeException('This question expired. Send a new message and the run will start again.');
         }
 

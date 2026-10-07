@@ -22,6 +22,7 @@ use App\Repository\PluginDataRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Repository\RevectorizeRunRepository;
+use App\Repository\SavedPromptRepository;
 use App\Repository\SavedTaskRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Repository\SearchIndexRepository;
@@ -37,6 +38,7 @@ use App\Service\Agent\AgentCascadeCleanup;
 use App\Service\Agent\AgentExternalCleanup;
 use App\Service\File\FileStorageService;
 use App\Service\Iam\ResourceKind\AgentKind;
+use App\Service\Iam\ResourceKind\SavedPromptKind;
 use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\Telegram\TelegramConnectionService;
@@ -78,6 +80,7 @@ final readonly class UserDeletionService
         private AgentRepository $agentRepository,
         private AgentCascadeCleanup $agentCascade,
         private SavedTaskRepository $savedTaskRepository,
+        private SavedPromptRepository $savedPromptRepository,
         private SavedTaskRunRepository $savedTaskRunRepository,
         private TelegramConnectionService $telegramConnections,
         private SearchIndexRepository $searchIndexRepository,
@@ -122,6 +125,7 @@ final readonly class UserDeletionService
             $this->deleteInboundEmailHandlers($userId);
             $this->deleteConfigs($userId);
             $this->deletePrompts($userId);
+            $this->deleteSavedPrompts($userId);
             $this->deletePluginData($userId);
             $this->deleteTopups($userId);
             $this->deleteMcpServerConfigs($userId);
@@ -203,6 +207,7 @@ final readonly class UserDeletionService
             $this->deleteInboundEmailHandlers($userId);
             $this->deleteConfigs($userId);
             $this->deletePrompts($userId);
+            $this->deleteSavedPrompts($userId);
             $this->deletePluginData($userId);
             $this->deleteTopups($userId);
             $this->deleteMcpServerConfigs($userId);
@@ -416,6 +421,17 @@ final readonly class UserDeletionService
         $handlers = $this->inboundEmailHandlerRepository->findBy(['userId' => $userId]);
         foreach ($handlers as $handler) {
             $this->em->remove($handler);
+        }
+    }
+
+    private function deleteSavedPrompts(int $userId): void
+    {
+        foreach ($this->savedPromptRepository->findByUser($userId) as $prompt) {
+            $id = $prompt->getId();
+            if (null !== $id) {
+                $this->shareRepository->deleteByResource(SavedPromptKind::KEY, (string) $id);
+            }
+            $this->em->remove($prompt);
         }
     }
 

@@ -843,9 +843,7 @@ export const chatApi = {
     })
   },
 
-  async enhanceMessage(
-    text: string
-  ): Promise<{
+  async enhanceMessage(text: string): Promise<{
     original: string
     enhanced: string
     summary?: 'unchanged' | 'capitalized' | 'rewritten'

@@ -30,6 +30,8 @@ describe('extractArtifacts', () => {
     expect(clean).not.toContain('https://evil.test')
     expect(clean).not.toContain('onclick')
     expect(artifactSrcDoc({ language: 'svg', code: clean, index: 0 })).toContain('default-src')
-    expect(artifactSrcDoc({ language: 'svg', code: clean, index: 0 })).not.toContain('allow-same-origin')
+    expect(artifactSrcDoc({ language: 'svg', code: clean, index: 0 })).not.toContain(
+      'allow-same-origin'
+    )
   })
 })

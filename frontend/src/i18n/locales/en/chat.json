@@ -186,7 +186,8 @@
     "tags": "Tags",
     "tagsSaved": "Tags saved.",
     "archivedDone": "Archived. It is under All chats → Archived.",
-    "unarchivedDone": "Back in the sidebar."
+    "unarchivedDone": "Back in the sidebar.",
+    "showOpenChats": "Open chats"
   },
   "moderation": {
     "report": {
@@ -625,7 +626,8 @@
     "askSubmit": "Submit",
     "askSkip": "Skip",
     "askNeedAnswer": "Choose an option or type an answer.",
-    "askFailed": "The run could not continue. Send a new message."
+    "askFailed": "The run could not continue. Send a new message.",
+    "askReadOnly": "Only the owner can answer this. You can still read the question."
   },
   "processing": {
     "timeline": {

@@ -186,7 +186,8 @@
     "tags": "Tags",
     "tagsSaved": "Tags enregistrés.",
     "archivedDone": "Archivé. Il est dans Tous les chats → Archivés.",
-    "unarchivedDone": "De retour dans la barre latérale."
+    "unarchivedDone": "De retour dans la barre latérale.",
+    "showOpenChats": "Discussions ouvertes"
   },
   "moderation": {
     "report": {
@@ -625,7 +626,8 @@
     "askSubmit": "Envoyer",
     "askSkip": "Ignorer",
     "askNeedAnswer": "Choisissez une option ou écrivez une réponse.",
-    "askFailed": "L'exécution n'a pas pu continuer. Envoyez un nouveau message."
+    "askFailed": "L'exécution n'a pas pu continuer. Envoyez un nouveau message.",
+    "askReadOnly": "Seul le propriétaire peut répondre. Vous pouvez quand même lire la question."
   },
   "processing": {
     "timeline": {

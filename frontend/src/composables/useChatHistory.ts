@@ -252,6 +252,10 @@ export function useChatHistory() {
     void chatsStore.toggleChatPin(chatId)
   }
 
+  const toggleArchivedChats = () => {
+    void chatsStore.loadChats(chatsStore.viewingArchived ? '0' : '1')
+  }
+
   const archiveChat = async (chatId: number) => {
     const chat = chatsStore.chats.find((row) => row.id === chatId)
     const archived = chat?.archived === true
@@ -301,6 +305,7 @@ export function useChatHistory() {
     toggleChatPin,
     deleteChat,
     archiveChat,
+    toggleArchivedChats,
     exportChat,
     shareChat,
     openPublicLinkFromIam,
