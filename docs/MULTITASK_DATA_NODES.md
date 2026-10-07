@@ -50,6 +50,24 @@ Debugging a turn: `BMESSAGEMETA.task_plan_definition` holds the executed plan
 call happened at all, and `McpFetchRunner: tool call succeeded` reports the
 returned character count per tool call.
 
+A tool attempt that does not succeed is a **reportable failure**. The card
+stays `failed`, and answer steps (`chat`, `summarize`, `translate`,
+`rag_query`, `compose_reply`) still run. Two shapes:
+
+- `isError: true` — the tool answered. The error says the server reported it
+  (`McpFetchRunner: tool reported an error`).
+- `McpClientException` — the request failed or the response could not be read,
+  including after a write POST. The error says the server could not be reached,
+  or, for a write, that it did not confirm the action (`McpActionRunner: write
+  action was not confirmed`). It does not claim the tool reported an error.
+
+`UpstreamHandover` appends that text as a `FAILED` block for the model.
+`compose_reply` copies only the labelled block, not the model instructions.
+Refusals made before the call (flag off, unknown tool, topic not allowed,
+mutating tool) stay hard failures: dependents skip. A plan that contains
+`mcp_fetch` or `mcp_action` does not fall back to legacy chat, which cannot
+see the connection and would claim none exists.
+
 ## The nodes
 
 | Capability | Runner | Source | Flag (`BCONFIG`) | Default |

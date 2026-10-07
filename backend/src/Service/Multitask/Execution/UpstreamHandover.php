@@ -43,7 +43,21 @@ final class UpstreamHandover
 
         foreach ($node->dependsOn as $dep) {
             $result = $context->getResult($dep);
-            if (null === $result || !$result->isSuccessful()) {
+            if (null === $result) {
+                continue;
+            }
+            if ($result->isReportableFailure()) {
+                $error = trim((string) $result->error);
+                // `$nX.text` on a failed step is empty, so the verbatim check
+                // cannot see it. Skip only when the prompt already quotes the
+                // error itself (the chat step explained it; compose copies that).
+                if ('' === $error || str_contains($resolvedText, $error)) {
+                    continue;
+                }
+                $missing[self::label($dep, $result).' · FAILED'] = $error;
+                continue;
+            }
+            if (!$result->isSuccessful()) {
                 continue;
             }
             $text = trim((string) $result->text);
@@ -79,6 +93,40 @@ final class UpstreamHandover
      */
     public static function render(array $missing): string
     {
+        $blocks = self::renderBlocks($missing);
+        if ('' === $blocks) {
+            return '';
+        }
+
+        $mentionsFailure = false;
+        foreach ($missing as $label => $text) {
+            if (str_ends_with((string) $label, ' · FAILED')) {
+                $mentionsFailure = true;
+                break;
+            }
+        }
+
+        // Prompt-only. A failed step may be a tool answer (NotFound) or a
+        // request that never completed. Do not tell the model the step "did
+        // run", and do not forbid "does not exist" — that is often the answer.
+        $failureLine = $mentionsFailure
+            ? "\nA step marked FAILED was attempted. Describe that block in the user's language. Do not claim that no connection is configured."
+            : '';
+
+        return "\n\n---\nData returned by the previous steps of this request."
+            ."\nUse it as the source of truth for your answer and never claim it was not provided."
+            .$failureLine
+            .$blocks;
+    }
+
+    /**
+     * The labelled blocks only, for a reply that is shown as-is.
+     * {@see render()} adds instructions for a model; those must not reach the user.
+     *
+     * @param array<string, string> $missing
+     */
+    public static function renderBlocks(array $missing): string
+    {
         if ([] === $missing) {
             return '';
         }
@@ -88,9 +136,7 @@ final class UpstreamHandover
             $blocks[] = '['.$label."]\n".mb_substr($text, 0, self::MAX_CHARS_PER_STEP);
         }
 
-        return "\n\n---\nData returned by the previous steps of this request."
-            ."\nUse it as the source of truth for your answer and never claim it was not provided."
-            ."\n\n".implode("\n\n", $blocks);
+        return "\n\n".implode("\n\n", $blocks);
     }
 
     /**

@@ -136,18 +136,12 @@ final readonly class McpActionRunner implements TaskRunner
         try {
             $result = $this->client->callTool($server, $tool, $arguments);
         } catch (McpClientException $e) {
-            $this->logger->warning('McpActionRunner: tool call failed', [
-                'server_id' => $serverId,
-                'tool' => $tool,
-                'error' => $e->getMessage(),
-            ]);
-
-            return NodeResult::failed('could not reach the connected system: '.$e->getMessage());
+            return $this->unconfirmedWrite($userId, $serverId, $server->getName(), $tool, $arguments, $e->getMessage());
         }
 
         $text = $this->formatContent($result['content']);
         if ($result['isError']) {
-            return NodeResult::failed('the connected system reported an error: '.mb_substr($text, 0, 300));
+            return $this->reportedError($userId, $serverId, $server->getName(), $tool, $arguments, $text);
         }
         if ('' === trim($text)) {
             $text = sprintf("The action '%s' on %s completed.", $tool, $server->getName());
@@ -162,10 +156,72 @@ final readonly class McpActionRunner implements TaskRunner
             'argument_keys' => array_keys($arguments),
         ]);
 
-        return NodeResult::ok($text, [], [
-            'mcp' => ['server_id' => $serverId, 'server' => $server->getName(), 'tool' => $tool, 'write' => true],
-            'query' => $server->getName().' · '.$tool,
+        return NodeResult::ok($text, [], $this->callMetadata($serverId, $server->getName(), $tool));
+    }
+
+    /**
+     * The tool answered with isError, so the write did not happen.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    private function reportedError(?int $userId, int $serverId, string $serverName, string $tool, array $arguments, string $detail): NodeResult
+    {
+        $detail = trim($detail);
+        $error = '' === $detail
+            ? sprintf('%s reported an error and gave no details.', $serverName)
+            : sprintf('%s reported an error: %s', $serverName, mb_substr($detail, 0, 300));
+
+        return $this->failReported($userId, $serverId, $tool, $arguments, 'McpActionRunner: write action reported an error', $error, $this->callMetadata($serverId, $serverName, $tool));
+    }
+
+    /**
+     * The POST may have reached the server and the response was lost, or the
+     * request never left. The write is unconfirmed either way.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    private function unconfirmedWrite(?int $userId, int $serverId, string $serverName, string $tool, array $arguments, string $detail): NodeResult
+    {
+        $detail = trim($detail);
+        $error = sprintf(
+            "%s did not confirm whether '%s' finished. Check %s before trying again.",
+            $serverName,
+            $tool,
+            $serverName,
+        );
+        if ('' !== $detail) {
+            $error .= ' '.mb_substr($detail, 0, 300);
+        }
+
+        return $this->failReported($userId, $serverId, $tool, $arguments, 'McpActionRunner: write action was not confirmed', $error, $this->callMetadata($serverId, $serverName, $tool));
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     * @param array<string, mixed> $metadata
+     */
+    private function failReported(?int $userId, int $serverId, string $tool, array $arguments, string $logMessage, string $error, array $metadata): NodeResult
+    {
+        $this->logger->warning($logMessage, [
+            'user_id' => $userId,
+            'server_id' => $serverId,
+            'tool' => $tool,
+            'argument_keys' => array_keys($arguments),
+            'error' => $error,
         ]);
+
+        return NodeResult::reportableFailure($error, $metadata);
+    }
+
+    /**
+     * @return array{mcp: array{server_id: int, server: string, tool: string, write: true}, query: string}
+     */
+    private function callMetadata(int $serverId, string $serverName, string $tool): array
+    {
+        return [
+            'mcp' => ['server_id' => $serverId, 'server' => $serverName, 'tool' => $tool, 'write' => true],
+            'query' => $serverName.' · '.$tool,
+        ];
     }
 
     /**

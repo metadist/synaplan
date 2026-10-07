@@ -119,18 +119,12 @@ final readonly class McpFetchRunner implements TaskRunner
         try {
             $result = $this->client->callTool($server, $tool, $arguments);
         } catch (McpClientException $e) {
-            $this->logger->warning('McpFetchRunner: tool call failed', [
-                'server_id' => $serverId,
-                'tool' => $tool,
-                'error' => $e->getMessage(),
-            ]);
-
-            return NodeResult::failed('could not reach the data source: '.$e->getMessage());
+            return $this->requestFailed($serverId, $server->getName(), $tool, $e->getMessage());
         }
 
         $text = $this->formatContent($result['content']);
         if ($result['isError']) {
-            return NodeResult::failed('the data source reported an error: '.mb_substr($text, 0, 300));
+            return $this->reportedError($serverId, $server->getName(), $tool, $text);
         }
         if ('' === trim($text)) {
             return NodeResult::failed('the data source returned no usable content');
@@ -142,11 +136,75 @@ final readonly class McpFetchRunner implements TaskRunner
             'chars' => mb_strlen($text),
         ]);
 
-        return NodeResult::ok($text, [], [
-            'mcp' => ['server_id' => $serverId, 'server' => $server->getName(), 'tool' => $tool],
-            // Compact summary line for the search-style task card.
-            'query' => $server->getName().' · '.$tool,
+        return NodeResult::ok($text, [], $this->callMetadata($serverId, $server->getName(), $tool));
+    }
+
+    /**
+     * The tool answered with isError. Answer steps still run; the card stays failed.
+     */
+    private function reportedError(int $serverId, string $serverName, string $tool, string $detail): NodeResult
+    {
+        return $this->failReported(
+            'McpFetchRunner: tool reported an error',
+            $serverId,
+            $tool,
+            $this->reportedSentence($serverName, $detail),
+            $this->callMetadata($serverId, $serverName, $tool),
+        );
+    }
+
+    /**
+     * The call never produced a tool result (blocked URL, auth, HTTP error,
+     * unreadable body). That is not the server reporting a tool error.
+     */
+    private function requestFailed(int $serverId, string $serverName, string $tool, string $detail): NodeResult
+    {
+        $detail = trim($detail);
+        $error = '' === $detail
+            ? sprintf('%s could not be reached.', $serverName)
+            : sprintf('%s could not be reached: %s', $serverName, mb_substr($detail, 0, 300));
+
+        return $this->failReported(
+            'McpFetchRunner: tool request failed',
+            $serverId,
+            $tool,
+            $error,
+            $this->callMetadata($serverId, $serverName, $tool),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function failReported(string $logMessage, int $serverId, string $tool, string $error, array $metadata): NodeResult
+    {
+        $this->logger->warning($logMessage, [
+            'server_id' => $serverId,
+            'tool' => $tool,
+            'error' => $error,
         ]);
+
+        return NodeResult::reportableFailure($error, $metadata);
+    }
+
+    private function reportedSentence(string $serverName, string $detail): string
+    {
+        $detail = trim($detail);
+
+        return '' === $detail
+            ? sprintf('%s reported an error and gave no details.', $serverName)
+            : sprintf('%s reported an error: %s', $serverName, mb_substr($detail, 0, 300));
+    }
+
+    /**
+     * @return array{mcp: array{server_id: int, server: string, tool: string}, query: string}
+     */
+    private function callMetadata(int $serverId, string $serverName, string $tool): array
+    {
+        return [
+            'mcp' => ['server_id' => $serverId, 'server' => $serverName, 'tool' => $tool],
+            'query' => $serverName.' · '.$tool,
+        ];
     }
 
     /**

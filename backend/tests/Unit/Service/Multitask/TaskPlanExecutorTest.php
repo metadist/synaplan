@@ -286,6 +286,48 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertContains('File work could not finish. SyntaxError: bad token', $streamed);
     }
 
+    public function testFailedMcpFetchDoesNotFallBackToLegacyRouter(): void
+    {
+        $this->assertFailedCapabilityDoesNotFallBack('mcp_fetch', 'Backblaze reported an error: NotFound');
+    }
+
+    public function testFailedMcpActionDoesNotFallBackToLegacyRouter(): void
+    {
+        $this->assertFailedCapabilityDoesNotFallBack('mcp_action', 'Confluence reported an error: space not found');
+    }
+
+    private function assertFailedCapabilityDoesNotFallBack(string $capability, string $error): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => $capability],
+            ],
+        ]);
+        $this->planner->method('plan')->willReturn(new TaskPlanResult($plan, fallback: false, modelId: 76));
+        $this->dagExecutor->method('execute')->willReturn($this->assembled([
+            'content' => $error,
+            'all_failed' => true,
+            'node_statuses' => ['n1' => 'failed'],
+        ]));
+
+        $this->router->expects(self::never())->method('routeStream');
+
+        $statuses = [];
+        $streamed = [];
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
+            function (string $text) use (&$streamed): void { $streamed[] = $text; },
+            function (array $event) use (&$statuses): void { $statuses[] = $event['status'] ?? null; },
+        );
+
+        self::assertSame($error, $result['content'] ?? null);
+        self::assertContains($error, $streamed);
+        self::assertNotContains('plan_discarded', $statuses);
+    }
+
     public function testSingleNodePlanFromPlannerUsesLegacyPath(): void
     {
         // Planner says single-node → trust the proven router path, no DAG.
