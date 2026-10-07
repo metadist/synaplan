@@ -3599,7 +3599,7 @@ class StreamController extends AbstractController
      * Returns null when there is nothing to show (no tokens and no cost), so
      * the badge / session store only react to real usage.
      *
-     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string, priceKnown: bool}|null
      */
     private function buildChatUsagePayload(Message $message, RecordedUsage $recorded, ?string $provider, ?string $model): ?array
     {
@@ -3611,6 +3611,9 @@ class StreamController extends AbstractController
         // session model costs after a reload. Tokens already live in the
         // ai_chat_usage meta; the model identity comes from ai_chat_model(_*).
         $message->setMeta('ai_chat_cost', $recorded->chargedCost);
+        if (!$recorded->priceKnown) {
+            $message->setMeta('ai_chat_price_known', '0');
+        }
 
         return $recorded->toMessageUsage($provider, $model, 'LLM');
     }
@@ -3619,7 +3622,7 @@ class StreamController extends AbstractController
      * Build one auxiliary usage entry (sorting / media / TTS) for the
      * taximeter's `usage_extra` list. Same shape as the chat `usage` payload.
      *
-     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string, priceKnown: bool}
      */
     private function buildExtraUsageEntry(string $kind, ?string $provider, ?string $model, RecordedUsage $recorded): array
     {

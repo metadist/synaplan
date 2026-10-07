@@ -17,6 +17,8 @@ export interface MessageUsage {
   cost: string | null
   modelKey: string
   kind: string
+  /** False when the model has no published price, so 0.00 must not be shown as a real cost. */
+  priceKnown?: boolean
 }
 
 /** Live daily totals delivered with the SSE `complete` event (`usage_totals`). */
@@ -71,16 +73,17 @@ function parseCost(raw: string | number | null | undefined): number {
 export function aggregateTurnUsage(
   usage?: MessageUsage | null,
   extra?: MessageUsage[] | null
-): { totalTokens: number; cost: number } | null {
+): { totalTokens: number; cost: number; priceKnown: boolean } | null {
   const entries = [...(usage ? [usage] : []), ...(extra ?? [])]
   if (entries.length === 0) return null
 
-  return entries.reduce(
+  return entries.reduce<{ totalTokens: number; cost: number; priceKnown: boolean }>(
     (total, entry) => ({
       totalTokens: total.totalTokens + entry.totalTokens,
       cost: total.cost + parseCost(entry.cost),
+      priceKnown: total.priceKnown && entry.priceKnown !== false,
     }),
-    { totalTokens: 0, cost: 0 }
+    { totalTokens: 0, cost: 0, priceKnown: true }
   )
 }
 

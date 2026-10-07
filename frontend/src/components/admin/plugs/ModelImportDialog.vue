@@ -82,6 +82,9 @@
                     {{ $t('aiInfra.modelImport.colTags') }}
                   </th>
                   <th class="py-2 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide">
+                    {{ $t('aiInfra.modelImport.colPrice') }}
+                  </th>
+                  <th class="py-2 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide">
                     {{ $t('aiInfra.modelImport.colStatus') }}
                   </th>
                 </tr>
@@ -123,6 +126,11 @@
                     >
                       chat: {{ row.probe.chat }} · embeddings: {{ row.probe.embeddings }}
                     </div>
+                  </td>
+                  <td
+                    class="py-2 px-2 align-top txt-secondary text-xs tabular-nums whitespace-nowrap"
+                  >
+                    {{ priceLabel(row) }}
                   </td>
                   <td class="py-2 px-2 align-top">
                     <span v-if="row.exists" class="pill text-[10px] px-1.5 py-0.5 txt-secondary">{{
@@ -182,7 +190,7 @@ import { useNotification } from '@/composables/useNotification'
 const props = defineProps<{ source: string; label: string }>()
 const emit = defineEmits<{ close: []; applied: [] }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { success, error: showError } = useNotification()
 
 // Kept in sync with ModelImportApplier::ALLOWED_TAGS on the backend.
@@ -277,6 +285,22 @@ async function apply(): Promise<void> {
   } finally {
     applying.value = false
   }
+}
+
+function priceLabel(row: Row): string {
+  if (!row.priceKnown) return t('models.costTier.unknown')
+  const priceIn = row.priceInPerMillion ?? 0
+  const priceOut = row.priceOutPerMillion ?? 0
+  if (priceIn === 0 && priceOut === 0) return t('models.costTier.free')
+  const money = new Intl.NumberFormat(locale.value, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 4,
+  })
+  return t('aiInfra.modelImport.pricePair', {
+    in: money.format(priceIn),
+    out: money.format(priceOut),
+  })
 }
 
 function formatSize(bytes: number): string {

@@ -24,6 +24,7 @@ final readonly class RecordedUsage
         public int $promptTokens,
         public int $completionTokens,
         public int $totalTokens,
+        public bool $priceKnown = true,
     ) {
     }
 
@@ -31,7 +32,7 @@ final readonly class RecordedUsage
      * Build the canonical message-usage shape shared by live SSE events and
      * persisted message metadata.
      *
-     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string, priceKnown: bool}
      */
     public function toMessageUsage(?string $provider, ?string $model, string $kind): array
     {
@@ -42,6 +43,7 @@ final readonly class RecordedUsage
             'cost' => $this->chargedCost,
             'modelKey' => self::modelKey($provider, $model),
             'kind' => $kind,
+            'priceKnown' => $this->priceKnown,
         ];
     }
 
