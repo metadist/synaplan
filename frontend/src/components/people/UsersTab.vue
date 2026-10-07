@@ -75,10 +75,10 @@
             class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="select-add-user-level"
           >
-          <option value="NEW">NEW</option>
-          <option value="PRO">PRO</option>
-          <option value="TEAM">TEAM</option>
-          <option value="BUSINESS">BUSINESS</option>
+            <option value="NEW">NEW</option>
+            <option value="PRO">PRO</option>
+            <option value="TEAM">TEAM</option>
+            <option value="BUSINESS">BUSINESS</option>
           </select>
         </label>
         <button

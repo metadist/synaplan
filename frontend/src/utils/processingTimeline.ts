@@ -307,7 +307,11 @@ export function ingestTimelineEvent(
   }
 
   if (status === 'data' && typeof payload.chunk === 'string' && payload.chunk !== '') {
-    const visible = consumeVisibleAnswer(payload.chunk, state.insideThink ?? false, state.pendingThink ?? '')
+    const visible = consumeVisibleAnswer(
+      payload.chunk,
+      state.insideThink ?? false,
+      state.pendingThink ?? ''
+    )
     state.insideThink = visible.insideThink
     state.pendingThink = visible.pending
     if (visible.text.trim() === '') {

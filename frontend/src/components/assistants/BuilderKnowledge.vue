@@ -86,7 +86,12 @@
           </option>
         </select>
       </label>
-      <p v-if="libraryFilesLoaded && libraryFileOptions.length === 0 && selectedLibraryFiles.length === 0" class="txt-secondary text-sm">
+      <p
+        v-if="
+          libraryFilesLoaded && libraryFileOptions.length === 0 && selectedLibraryFiles.length === 0
+        "
+        class="txt-secondary text-sm"
+      >
         {{ $t('assistants.libraryFilesEmpty') }}
       </p>
     </div>
