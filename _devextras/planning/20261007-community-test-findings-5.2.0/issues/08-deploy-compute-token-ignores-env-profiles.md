@@ -1,7 +1,10 @@
 <!-- title: Deploy: File work sidecar crash-loops after following deploy/README — ensure_compute_token only sees COMPOSE_PROFILES from the shell, not from deploy/.env -->
 <!-- type: Bug -->
 <!-- labels: prio:1, area:setup -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2380](https://github.com/metadist/synaplan/pull/2380) (`c5b6f22b5`). The token is written to `data/compute.token`. Host `COMPOSE_PROFILES` wins; otherwise the value is read from `deploy/.env` and `${VAR}` / `${VAR:-default}` are expanded without executing the file. `docker compose config --profiles` is the wrong detector: it lists every declared profile, including `compute`, even when File work is off. Do not re-implement.
 
 ## Problem
 `deploy/README.md` says to enable File work with `COMPOSE_PROFILES=compute` in `deploy/.env`. Doing exactly that starts the compute container, which crash-loops with `COMPUTE_AUTH_TOKEN must be at least 32 bytes`: no token was generated, `.env` has no `COMPUTE_URL` / `COMPUTE_TOKEN` values, and `deploy/data/compute.token` does not exist.
@@ -26,11 +29,11 @@ Setting the profile where the docs say to set it produces a running sidecar: the
 ---
 
 ## Notes
-- Findings: F24 — community test round on 5.2.0 ("Open; worked around"). **Re-verify on 5.3.0 first**: #2370 (`feat(deploy): start Synaplan from one compose file…`) reshaped `deploy/`; the gate below is unchanged on `main` as of 2026-10-07.
+- Findings: F24 — community test round on 5.2.0 ("Open; worked around"). Shipped in #2380 on the deploy layout from #2370. The notes below are the 5.2.0 diagnosis.
 - Verified in code: `ensure_compute_token()` (`deploy/scripts/lib.sh` ~line 807) returns early unless `,${COMPOSE_PROFILES:-},` contains `compute`. By design the env file is **handed to Compose, not sourced** (header comment in `lib.sh`: "Compose stays the single parser"), so a profile set only in `deploy/.env` is invisible to the lifecycle shell. `deploy/compose.yaml` passes `COMPUTE_AUTH_TOKEN: "${COMPUTE_TOKEN:-}"` to the sidecar, which then fails its length check.
 - `deploy/selfhost.env.example` ships `COMPUTE_URL=` and `COMPUTE_TOKEN=` empty with the comment "prepare.sh then writes COMPUTE_TOKEN".
 
-Fix direction: keep Compose as the only parser of `deploy/.env`. Do **not** `source` that file — `lib.sh` refuses to because sourcing executes whatever the file contains. Do **not** write `COMPUTE_TOKEN` back into `deploy/.env` or into `secrets.env`. The token file `data/compute.token` is the source of truth on purpose ("marketplace rewrites of deploy/.env do not rotate it", comment above `ensure_compute_token`). Detect the profile the way Compose will (`docker compose --env-file <resolved> config --profiles`, or the same `COMPOSE_PROFILES` line Compose would read — a value, not shell), then run the existing generator. Export `COMPUTE_TOKEN` and `COMPUTE_URL` in the process that invokes Compose; host environment already wins over the env file. Re-running must keep the same token. `prepare.sh` prints "File work enabled: token written to data/compute.token" and does not print the token. Sidecar health next to the File work switch is in scope (U8); a stopped sidecar says so there, not only later in chat.
+What shipped (#2380): Compose stays the only parser of `deploy/.env`. The lifecycle script does not source that file and does not write `COMPUTE_TOKEN` into `.env` or `secrets.env`. Host `COMPOSE_PROFILES` wins. Otherwise the value is read from the env file and `${VAR}`, `${VAR:-default}` and `${VAR-default}` are expanded without executing `$(...)` or backticks. `docker compose config --profiles` is the wrong detector: it lists every declared profile, including `compute`, even when File work is off. Calling `docker compose config` from `ensure_compute_token` also breaks the lifecycle command contract, which records every docker invocation. The token file `data/compute.token` is the source of truth. Re-running keeps the same token. The script prints "File work enabled: token written to data/compute.token" on create and "using the token in data/compute.token" on reuse, and never prints the token. Sidecar status sits next to the File work switch.
 
 Journey (U10): set `COMPOSE_PROFILES=compute` in `deploy/.env` → run the deploy → `compute` is healthy → admin File work switch shows "Sidecar reachable" → a chat request produces a spreadsheet → turn the profile off → switch shows "Sidecar not running: File work is unavailable".
 

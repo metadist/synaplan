@@ -1,7 +1,10 @@
 <!-- title: RAG: show citations with the matched passage for answers from knowledge files -->
 <!-- type: Feature -->
 <!-- labels: prio:1, area:rag, area:chat -->
+<!-- status: shipped -->
 <!-- issue-type: Feature -->
+
+> **Shipped** in [#2380](https://github.com/metadist/synaplan/pull/2380) (`c5b6f22b5`). Sources are chunk ids. The passage loads when the person opens the source. The widget loads only a chunk this chat cited, through its own session endpoint. Do not re-implement.
 
 ## Summary
 Every answer that used Library files shows which file(s) and which passage(s) it drew on — a chip per source after the claim or at the end of the answer, opening the matched passage with tables intact — the way web search answers already show a Sources carousel with numbered citations.

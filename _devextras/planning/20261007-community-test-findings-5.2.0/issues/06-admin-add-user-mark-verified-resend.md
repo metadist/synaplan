@@ -1,7 +1,10 @@
 <!-- title: Admin: Add user, Mark verified and Resend verification in People (the provisioning endpoint exists, the UI never calls it) -->
 <!-- type: Feature -->
 <!-- labels: prio:1, area:admin, area:auth -->
+<!-- status: shipped -->
 <!-- issue-type: Feature -->
+
+> **Shipped** in [#2379](https://github.com/metadist/synaplan/pull/2379) (`c97e79144`). Do not re-implement. The sections below describe the 5.2.0 bug.
 
 ## Summary
 Give administrators three actions in People → Users: an "Add user" form (creates a ready-to-use, verified account), "Mark verified" and "Resend verification email" on each unverified row.

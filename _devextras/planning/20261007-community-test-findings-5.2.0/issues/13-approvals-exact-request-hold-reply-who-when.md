@@ -1,7 +1,10 @@
 <!-- title: Approvals: the card shows a model-written summary instead of the exact request, the reply is written before the decision, and Decided shows no who or when -->
 <!-- type: Bug -->
 <!-- labels: prio:2, area:chat, area:admin -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2380](https://github.com/metadist/synaplan/pull/2380) (`c5b6f22b5`). The card shows method, URL, and the masked body. `decidedBy` and `decidedAt` were already on the approval, so there is no migration. The decided time uses the app date format. Do not re-implement.
 
 ## Problem
 Tool approvals work with strong defaults (read runs, change asks, delete is blocked, 72-hour expiry, card in chat and in the Approvals inbox). Rough edges: the card shows only a model-written summary, not the method, URL or body that will be sent; the reply already says "I couldn't fully complete that request" while waiting; after approval a second message says only "Done … Result: Request finished" and the first card still says Waiting for approval; Decided shows "Done" with no who or when; new requests are announced by email by default, which a null mail transport discards.

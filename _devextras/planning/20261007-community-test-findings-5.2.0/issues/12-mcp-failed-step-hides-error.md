@@ -1,7 +1,10 @@
 <!-- title: MCP: a failed MCP step drops the plan into the chat fallback and hides the error; with one good and one failed call the answer step is skipped -->
 <!-- type: Bug -->
 <!-- labels: prio:2, area:routing -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped.** [#2377](https://github.com/metadist/synaplan/pull/2377) (`a68637c33`) returns `NodeResult::reportableFailure` so the answer step still runs. [#2380](https://github.com/metadist/synaplan/pull/2380) (`c5b6f22b5`) logs the HTTP status and treats an empty tool body as reportable. A hard `NodeResult::failed` still skips dependents. Do not convert reportable failures back to `failed`.
 
 ## Problem
 The success path is fixed in 5.2.0 (list buckets, bucket location and head bucket ran and the answer used their results; steps are labelled with server and tool name). The error path is still open: a single missing bucket (404) made the plan drop and the legacy chat say no connection is available (5 of 5 runs), with nothing logged for the error. With one good and one missing bucket, the answer step is skipped and only the good bucket is reported; the 404 shows only on the task card.
@@ -30,7 +33,7 @@ A failed MCP step is treated like a failed code-run step: the step shows the rea
 - Runners: `backend/src/Service/Multitask/Execution/Runner/McpFetchRunner.php`, `McpActionRunner.php`; the compose step is `ComposeReplyRunner.php`. Compare with `CodeRunRunner`, which keeps the answer step on failure.
 - The fallback to legacy chat is the "plan dropped" path in the multitask executor; a step failure should mark the step failed and continue to the answer step with the error in the step output.
 
-Fix direction: MCP runners return a failed step result with `error` populated (status + server message, sanitized) instead of throwing out of the plan; the executor only abandons the plan when no step can run at all; `ComposeReplyRunner` receives failed steps and is prompted to report them; log at `warning` with server, tool and status.
+What shipped: #2377 returns `NodeResult::reportableFailure` from `McpFetchRunner` when the tool sets `isError` or the HTTP call throws, so answer nodes still run (`DagExecutor::dependencyState` treats a reportable failure as ready for Chat, Summarize, Translate, RagQuery, and ComposeReply). A hard `NodeResult::failed` still skips dependents. That remains correct for a disabled tool, missing params, a topic that is not allowed, a hallucinated tool, or a mutating tool. Do not convert reportable failures back to `failed`. #2380 logs the HTTP status on request failure and treats an empty tool body as reportable ("returned no content").
 
 Journey (U10): one good and one missing bucket → answer names both outcomes → expand the failed step → "404 Not Found: <server message>".
 

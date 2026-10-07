@@ -1,7 +1,10 @@
 <!-- title: Assistants: saving with a shared folder fails with "knowledge.folders entry does not match the expected shape" -->
 <!-- type: Bug -->
 <!-- labels: prio:1, area:rag -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2379](https://github.com/metadist/synaplan/pull/2379) (`c97e79144`). Do not re-implement. The sections below describe the 5.2.0 bug.
 
 ## Problem
 Adding a Library folder to an assistant's knowledge and saving fails with "This part could not be saved. knowledge.folders entry does not match the expected shape"; the builder keeps saying "Unsaved changes" until the folder is removed. The assistant cannot be grounded in Library files at all.

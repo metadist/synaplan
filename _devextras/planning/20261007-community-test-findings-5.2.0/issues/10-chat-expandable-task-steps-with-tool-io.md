@@ -1,7 +1,10 @@
 <!-- title: Chat: expandable task steps with the plan, tool input and output, timing and the real error -->
 <!-- type: Feature -->
 <!-- labels: prio:1, area:chat, area:routing -->
+<!-- status: shipped -->
 <!-- issue-type: Feature -->
+
+> **Shipped** in [#2380](https://github.com/metadist/synaplan/pull/2380) (`c5b6f22b5`). An expanded step shows the resolved inputs with secrets masked, a capped output, the status, and the duration. Do not re-implement.
 
 ## Summary
 Every step on a task card can be expanded to show what it did: the plan contents, the capability chosen and the ones considered and skipped (with the reason), the sanitized tool input, the returned payload (or a preview of it), timing, and the actual error when it failed. Steps are labelled with the tool's own name.
