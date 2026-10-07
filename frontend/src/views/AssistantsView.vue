@@ -113,6 +113,12 @@ async function openBuilder(id: string): Promise<void> {
     await router.replace({ name: 'ai-assistants' })
     return
   }
+  if (untouchedDraft.value?.id === numericId && store.current?.id === numericId) {
+    if (untouchedDraft.value.snapshot === '') {
+      untouchedDraft.value = { id: numericId, snapshot: editableSnapshot(store.current) }
+    }
+    return
+  }
   try {
     const agent = await store.load(numericId)
     if (untouchedDraft.value?.id === numericId && untouchedDraft.value.snapshot === '') {

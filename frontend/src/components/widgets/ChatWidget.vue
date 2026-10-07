@@ -2,7 +2,7 @@
   <div
     :class="[
       'synaplan-widget',
-      widgetTheme === 'dark' ? 'dark' : '',
+      widgetTheme === 'oled' ? 'dark theme-oled' : isDarkChrome ? 'dark' : '',
       testMode || internalMode ? 'relative w-full h-full' : isPreview ? 'absolute' : 'fixed',
       testMode || internalMode ? '' : 'z-[9999]',
       testMode || internalMode
@@ -94,7 +94,7 @@
           ...chatWindowClasses,
         ]"
         :style="{
-          backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
+          backgroundColor: widgetInk('#1a1a1a', '#ffffff'),
           ...chatWindowStyle,
         }"
         data-testid="section-chat-window"
@@ -151,13 +151,11 @@
             </button>
             <button
               class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-              :aria-label="
-                widgetTheme === 'dark' ? $t('widget.switchToLight') : $t('widget.switchToDark')
-              "
+              :aria-label="isDarkChrome ? $t('widget.switchToLight') : $t('widget.switchToDark')"
               data-testid="btn-theme"
               @click="toggleTheme"
             >
-              <SunIcon v-if="widgetTheme === 'dark'" class="w-5 h-5 text-white" />
+              <SunIcon v-if="isDarkChrome" class="w-5 h-5 text-white" />
               <MoonIcon v-else class="w-5 h-5 text-white" />
             </button>
             <button
@@ -186,7 +184,7 @@
           ref="messagesContainer"
           class="flex-1 overflow-y-auto p-4 flex flex-col gap-3"
           :style="{
-            backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
+            backgroundColor: widgetInk('#1a1a1a', '#ffffff'),
           }"
           data-testid="section-messages"
           @click="handleMessagesClick"
@@ -196,9 +194,9 @@
             v-if="!privacyDismissed"
             class="text-[11px] leading-relaxed px-3 py-2 rounded-xl"
             :style="{
-              backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f9fafb',
-              color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280',
-              border: `1px solid ${widgetTheme === 'dark' ? '#374151' : '#e5e7eb'}`,
+              backgroundColor: widgetInk('#2a2a2a', '#f9fafb'),
+              color: widgetInk('#9ca3af', '#6b7280'),
+              border: `1px solid ${widgetInk('#374151', '#e5e7eb')}`,
             }"
             data-testid="privacy-notice"
           >
@@ -262,7 +260,7 @@
               :style="
                 message.role === 'user'
                   ? { backgroundColor: primaryColor, color: '#ffffff' }
-                  : { backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }
+                  : { backgroundColor: widgetInk('#2a2a2a', '#f3f4f6') }
               "
             >
               <span
@@ -278,11 +276,11 @@
                 >
                   <div
                     class="h-3 w-32 rounded animate-pulse"
-                    :class="widgetTheme === 'dark' ? 'bg-white/20' : 'bg-black/10'"
+                    :class="isDarkChrome ? 'bg-white/20' : 'bg-black/10'"
                   />
                   <div
                     class="h-3 w-24 rounded animate-pulse"
-                    :class="widgetTheme === 'dark' ? 'bg-white/15' : 'bg-black/5'"
+                    :class="isDarkChrome ? 'bg-white/15' : 'bg-black/5'"
                   />
                 </div>
                 <div
@@ -297,11 +295,7 @@
                   "
                   :style="{
                     color:
-                      message.role === 'user'
-                        ? '#ffffff'
-                        : widgetTheme === 'dark'
-                          ? '#e5e5e5'
-                          : '#1f2937',
+                      message.role === 'user' ? '#ffffff' : isDarkChrome ? '#e5e5e5' : '#1f2937',
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget message markdown/linkify -->
@@ -336,7 +330,7 @@
                         color:
                           message.role === 'user'
                             ? '#ffffff'
-                            : widgetTheme === 'dark'
+                            : isDarkChrome
                               ? '#e5e5e5'
                               : '#1f2937',
                       }"
@@ -347,7 +341,7 @@
                         color:
                           message.role === 'user'
                             ? '#ffffff'
-                            : widgetTheme === 'dark'
+                            : isDarkChrome
                               ? '#e5e5e5'
                               : '#1f2937',
                       }"
@@ -362,11 +356,7 @@
                   class="text-sm markdown-content overflow-x-auto"
                   :style="{
                     color:
-                      message.role === 'user'
-                        ? '#ffffff'
-                        : widgetTheme === 'dark'
-                          ? '#e5e5e5'
-                          : '#1f2937',
+                      message.role === 'user' ? '#ffffff' : isDarkChrome ? '#e5e5e5' : '#1f2937',
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget file message markdown -->
@@ -377,12 +367,7 @@
                 v-if="message.timestamp"
                 class="text-xs mt-1 opacity-70"
                 :style="{
-                  color:
-                    message.role === 'user'
-                      ? '#ffffff'
-                      : widgetTheme === 'dark'
-                        ? '#9ca3af'
-                        : '#6b7280',
+                  color: message.role === 'user' ? '#ffffff' : isDarkChrome ? '#9ca3af' : '#6b7280',
                 }"
               >
                 <span class="font-medium">{{ getSenderLabel(message) }}</span>
@@ -395,7 +380,7 @@
           <div v-if="isTyping && !isSending && chatMode === 'human'" class="flex justify-start">
             <div
               class="rounded-2xl px-4 py-3"
-              :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
+              :style="{ backgroundColor: widgetInk('#2a2a2a', '#f3f4f6') }"
             >
               <div class="flex gap-1">
                 <div
@@ -456,7 +441,7 @@
         <!-- Input Area -->
         <div
           class="border-t p-3"
-          :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
+          :style="{ borderColor: widgetInk('#333', '#e5e7eb') }"
           data-testid="section-input"
         >
           <div
@@ -488,20 +473,20 @@
               v-for="(file, index) in selectedFiles"
               :key="`${file.name}-${file.size}`"
               class="flex items-center gap-2 p-2 rounded-lg"
-              :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
+              :style="{ backgroundColor: widgetInk('#2a2a2a', '#f3f4f6') }"
             >
               <DocumentIcon
                 class="w-5 h-5 flex-shrink-0"
-                :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+                :style="{ color: widgetInk('#9ca3af', '#6b7280') }"
               />
               <span
                 class="text-sm flex-1 truncate"
-                :style="{ color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937' }"
+                :style="{ color: widgetInk('#e5e5e5', '#1f2937') }"
                 >{{ file.name }}</span
               >
               <span
                 class="text-xs flex-shrink-0"
-                :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+                :style="{ color: widgetInk('#9ca3af', '#6b7280') }"
                 >{{ formatFileSize(file.size) }}</span
               >
               <button
@@ -553,7 +538,7 @@
               >
                 <PaperClipIcon
                   class="w-5 h-5"
-                  :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+                  :style="{ color: widgetInk('#9ca3af', '#6b7280') }"
                 />
               </button>
             </template>
@@ -571,8 +556,8 @@
               rows="1"
               class="flex-1 px-4 py-2 rounded-xl resize-none focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
               :style="{
-                backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6',
-                color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937',
+                backgroundColor: widgetInk('#2a2a2a', '#f3f4f6'),
+                color: widgetInk('#e5e5e5', '#1f2937'),
                 borderColor: primaryColor,
                 maxHeight: '120px',
                 minHeight: '40px',
@@ -635,9 +620,9 @@
           :class="{
             'pb-[calc(env(safe-area-inset-bottom,0px)+12px)]': isMobile && !isPreview,
           }"
-          :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
+          :style="{ borderColor: widgetInk('#333', '#e5e7eb') }"
         >
-          <p class="text-xs" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }">
+          <p class="text-xs" :style="{ color: widgetInk('#9ca3af', '#6b7280') }">
             {{ $t('branding.poweredBy') }}
             <a
               :href="poweredByUrl"
@@ -711,7 +696,7 @@ interface Props {
   autoMessage?: string
   messageLimit?: number
   maxFileSize?: number
-  defaultTheme?: 'light' | 'dark'
+  defaultTheme?: 'light' | 'dark' | 'oled'
   isPreview?: boolean
   widgetTitle?: string
   widgetSubtitle?: string | null
@@ -836,7 +821,22 @@ function operatorEventFileToMessageFile(item: unknown): MessageFile {
 
 const isOpen = ref(false)
 const isFullscreen = ref(props.fullscreenMode)
-const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
+const widgetTheme = ref<'light' | 'dark' | 'oled'>(props.defaultTheme)
+const isDarkChrome = computed(() => widgetTheme.value === 'dark' || widgetTheme.value === 'oled')
+
+function widgetInk(whenDark: string, whenLight: string): string {
+  if (widgetTheme.value === 'light') return whenLight
+  if (widgetTheme.value !== 'oled') return whenDark
+  const black: Record<string, string> = {
+    '#1a1a1a': '#000',
+    '#2a2a2a': '#0a0a0a',
+    '#333': 'rgba(255,255,255,0.16)',
+    '#374151': 'rgba(255,255,255,0.16)',
+    '#9ca3af': '#c8c8c8',
+    '#e5e5e5': '#ffffff',
+  }
+  return black[whenDark] ?? whenDark
+}
 const inputMessage = ref('')
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const privacyStorageKey = `synaplan_privacy_${props.widgetId}`
@@ -1957,11 +1957,7 @@ const handleCloseEvent = (event: Event) => {
 
 const handleThemeSyncEvent = (event: Event) => {
   const theme = (event as CustomEvent).detail?.theme
-  if (theme === 'oled') {
-    widgetTheme.value = 'dark'
-    return
-  }
-  if (theme === 'dark' || theme === 'light') {
+  if (theme === 'oled' || theme === 'dark' || theme === 'light') {
     widgetTheme.value = theme
   }
 }

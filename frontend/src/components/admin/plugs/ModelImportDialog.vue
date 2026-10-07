@@ -241,7 +241,7 @@ const visibleRows = computed(() => {
 
 const selectedCount = computed(() => rows.value.filter((r) => r.selected).length)
 const allNewSelected = computed(() => {
-  const newRows = rows.value.filter((r) => !r.exists)
+  const newRows = visibleRows.value.filter((r) => !r.exists)
   return newRows.length > 0 && newRows.every((r) => r.selected)
 })
 
