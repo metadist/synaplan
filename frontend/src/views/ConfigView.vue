@@ -110,7 +110,8 @@ const currentPage = computed(() => {
   if (path.startsWith('/channels')) return 'inbound'
   if (path.startsWith('/ai/providers/higgsfield')) return 'ai-provider-higgsfield'
   if (path.startsWith('/ai/models')) return 'ai-models'
-  if (path.startsWith('/ai/instructions')) return 'task-prompts'
+  if (path.startsWith('/ai/instructions') || path.startsWith('/ai/task-prompts'))
+    return 'task-prompts'
   if (path.startsWith('/ai/routing')) return 'sorting-prompt'
   return 'inbound'
 })

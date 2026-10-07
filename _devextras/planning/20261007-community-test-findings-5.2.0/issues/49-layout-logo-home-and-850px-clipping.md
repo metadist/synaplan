@@ -1,6 +1,7 @@
 <!-- title: Layout: the logo looks clickable but does nothing; at ~850 px with the chats panel open the usage meter and the message column run past the viewport -->
 <!-- type: Bug -->
 <!-- labels: prio:2, area:header, area:nav -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
 
 ## Problem

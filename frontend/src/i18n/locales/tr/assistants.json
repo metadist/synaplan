@@ -219,7 +219,8 @@
       "friday": "Cuma",
       "saturday": "Cumartesi",
       "sunday": "Pazar"
-    }
+    },
+    "shareDraftHint": "Bu bir taslak. Birinin okuması veya özel bir sohbette denemesi için paylaşabilirsiniz. Yayımlanmadığı için yönlendirici onu seçmez."
   },
   "bundle": {
     "title": "Dışa ve içe aktar",

@@ -677,7 +677,10 @@
     "preview": "Preview operations",
     "applyImport": "Import selected",
     "imported": "Tools imported.",
-    "importFailed": "The OpenAPI description could not be imported."
+    "importFailed": "The OpenAPI description could not be imported.",
+    "tryRequest": "Request",
+    "tryResponse": "Response",
+    "tryNotSent": "Nothing was sent. This tool can change data, so Try it only shows the request."
   },
   "workflows": {
     "steps": "Steps",

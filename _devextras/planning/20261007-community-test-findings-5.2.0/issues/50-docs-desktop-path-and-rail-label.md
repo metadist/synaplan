@@ -1,6 +1,7 @@
 <!-- title: Docs: three different menu paths for Synaplan Desktop are in circulation — verify #2359 against the 5.3.0 rail and derive the path from one shared label -->
 <!-- type: Bug -->
 <!-- labels: prio:3, documentation, area:nav -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
 
 ## Problem

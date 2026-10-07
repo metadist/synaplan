@@ -17,12 +17,19 @@
         type="checkbox"
         class="mt-1"
         :checked="store.current?.routable ?? false"
+        :disabled="store.current?.status !== 'published'"
         data-testid="chk-routable"
         @change="onRoutable(($event.target as HTMLInputElement).checked)"
       />
       <span>
         <span class="txt-primary text-sm">{{ $t('assistants.routable') }}</span>
         <span class="block txt-secondary text-sm">{{ $t('assistants.routableHint') }}</span>
+        <span
+          v-if="store.current?.status === 'draft'"
+          class="block txt-secondary text-sm"
+          data-testid="hint-share-draft"
+          >{{ $t('assistants.shareDraftHint') }}</span
+        >
       </span>
     </label>
 
@@ -50,7 +57,7 @@
       <button
         type="button"
         class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
-        :disabled="store.current?.status !== 'published'"
+        :disabled="!store.current || store.current.status === 'archived'"
         data-testid="btn-share-assistant"
         @click="shareOpen = true"
       >

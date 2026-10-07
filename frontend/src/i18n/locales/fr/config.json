@@ -117,7 +117,7 @@
         "namePlaceholder": "Nom (GPT-4.1)",
         "createModel": "Créer un modèle",
         "creating": "Création…",
-        "uniqueKey": "Clé unique",
+        "uniqueKey": "Identifié par le fournisseur, l’id du modèle et l’étiquette",
         "loadingModels": "Chargement des modèles admin…",
         "id": "ID",
         "service": "Service",
@@ -130,7 +130,7 @@
         "unitIn": "Unité entrée",
         "priceOut": "Prix sortie",
         "unitOut": "Unité sortie",
-        "showWhenFree": "OK si gratuit",
+        "showWhenFree": "Afficher même si c’est gratuit",
         "showWhenFreeTooltip": "Afficher le modèle dans la sélection même lorsque les prix d’entrée et de sortie sont à 0 (gratuit)",
         "showWhenFreeOn": "Exception active : modèle visible même si les deux prix sont à 0",
         "showWhenFreeOff": "Par défaut : modèle masqué lorsque les deux prix sont à 0",
@@ -182,7 +182,8 @@
           "serviceRequired": "Le service est requis",
           "providerIdRequired": "L’ID du modèle est requis",
           "nameRequired": "Le nom affiché est requis"
-        }
+        },
+        "uniqueKeyHint": "Deux lignes avec le même fournisseur, le même id et la même étiquette sont le même modèle."
       },
       "pagination": {
         "showing": "Affichage de {start}–{end} sur {total}"

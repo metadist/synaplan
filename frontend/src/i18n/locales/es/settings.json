@@ -5,15 +5,15 @@
   },
   "usageTaximeter": {
     "sessionLabel": "Tokens",
-    "todayTooltip": "{tokens} tokens hoy",
-    "todayLabel": "Tuyo hoy",
+    "todayTooltip": "{tokens} tokens hoy. Los importes son dólares estadounidenses.",
+    "todayLabel": "Uso de hoy",
     "todayAria": "Tu gasto de hoy: {cost}",
     "openStats": "Mostrar estadísticas de uso",
     "usedModels": "Modelos usados",
     "promptsInSession": "Prompts en esta sesión",
     "modelChanges": "Cambios de modelo: {count}",
     "allStatistics": "Todas las estadísticas",
-    "lessThanCent": "< 0,01 €"
+    "lessThanCent": "< 0,01 $"
   },
   "profile": {
     "title": "Configuración de Perfil",
@@ -346,7 +346,8 @@
       "description": "Elige tu esquema de colores",
       "light": "Claro",
       "dark": "Oscuro",
-      "system": "Sistema"
+      "system": "Sistema",
+      "oled": "Negro OLED"
     },
     "language": {
       "title": "Idioma",

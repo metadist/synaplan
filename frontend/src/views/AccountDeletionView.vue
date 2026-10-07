@@ -18,12 +18,10 @@
       </button>
       <button
         class="h-10 w-10 rounded-xl icon-ghost flex items-center justify-center"
-        :aria-label="
-          themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-        "
+        :aria-label="$t('appearance.cycle')"
         @click="toggleTheme"
       >
-        <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-5 h-5" />
+        <SunIcon v-if="themeStore.isDark?.value" class="w-5 h-5" />
         <MoonIcon v-else class="w-5 h-5" />
       </button>
     </div>
@@ -175,11 +173,7 @@ const { t, locale, tm } = useI18n()
 const themeStore = useTheme()
 const config = useConfigStore()
 
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
+const isDark = themeStore.isDark
 
 const { logoSrc } = useBrandLogo(isDark)
 
@@ -205,10 +199,5 @@ const cycleLanguage = () => {
   void cycleLocale()
 }
 
-const toggleTheme = () => {
-  const themes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system']
-  const currentIndex = themes.indexOf(themeStore.theme.value)
-  const nextTheme = themes[(currentIndex + 1) % themes.length]
-  themeStore.setTheme(nextTheme)
-}
+const toggleTheme = () => themeStore.cycleTheme()
 </script>

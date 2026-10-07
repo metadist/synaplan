@@ -348,7 +348,7 @@
         "summary": "{env} del entorno, {db} sobrescritas en la interfaz.",
         "cta": "Abrir Proveedores y claves"
       },
-      "envOverridesDb": "Fijado por la variable de entorno {key}. Actualmente: {value}. Elimina la variable del entorno para gestionar este ajuste aquí.",
+      "envOverridesDb": "Bloqueado por la variable de entorno {key}. Ahora vale {value}. Defina {key} en el entorno de esta instalación y reinicie el servidor.",
       "unsaved": "Cambios sin guardar",
       "clear": "Borrar",
       "clearHint": "Quita el valor guardado. Se vuelve a usar el predeterminado.",
@@ -510,7 +510,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Cuando la persona propietaria está presente (chat o una llamada API en vivo): ejecutar el trabajo automáticamente, preguntar primero o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_POLICY_UNATTENDED": "Cuando una tarea guardada ejecuta trabajo con archivos por su cuenta: preguntar primero (predeterminado), ejecutar automáticamente o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Cuántos días puede permanecer sin uso una carpeta de trabajo con archivos antes de que la limpieza la elimine. Predeterminado: 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Gestionar → Canales. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Canales → Synaplan Desktop. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código.",
         "FEATURE_SEARCH_AI_ENABLED": "Ayuda de IA en la paleta de búsqueda (Ctrl/Cmd+K): ante una pregunta en lenguaje normal, el modelo de herramientas elige el resultado que mejor encaja y lo explica en una frase. Nunca cambia nada por sí mismo. Cada uso es una llamada breve a la IA. Desactivado: se mantienen la búsqueda por palabras clave y por significado."
       },
       "fieldOptions": {
@@ -529,7 +529,9 @@
           "approve": "Preguntar primero",
           "block": "No ejecutar nunca"
         }
-      }
+      },
+      "valueSet": "Este ajuste tiene un valor guardado.",
+      "valueEmpty": "Este ajuste sigue vacío."
     }
   },
   "statistics": {
@@ -566,7 +568,9 @@
       "applying": "Importando…",
       "applied": "Se importaron {created} fila(s) de modelo, se omitieron {skipped} ya presentes.",
       "applyFailed": "No se pudieron importar los modelos.",
-      "noValidTags": "Da a cada modelo seleccionado al menos una capacidad válida."
+      "noValidTags": "Da a cada modelo seleccionado al menos una capacidad válida.",
+      "filterLabel": "Filtrar modelos",
+      "filterPlaceholder": "Filtrar por nombre o id"
     },
     "extraction": {
       "lead": "Elija cómo se convierte un documento en texto. Docling conserva tablas y títulos; si no está en marcha, se usa Tika y la carga nunca falla.",
@@ -655,7 +659,8 @@
       "testButton": "Consulta de prueba",
       "testing": "Probando…",
       "testProvider": "Respondido por {provider}",
-      "testProviderFallback": "Respondido por {provider} (reserva de {from})"
+      "testProviderFallback": "Respondido por {provider} (reserva de {from})",
+      "allowUsersHint": "Si está activado, cada persona puede elegir otro proveedor de búsqueda en Preferencias."
     },
     "rerank": {
       "title": "Reordenación",
@@ -892,7 +897,11 @@
         "widget": "Widget de chat",
         "agent": "Agente",
         "tool": "Herramienta"
-      }
+      },
+      "manualHint": "Creado a mano en Synaplan, no desde el inicio de sesión.",
+      "fromLoginHint": "Creado desde el inicio de sesión de la empresa.",
+      "roleLabel": "Rol",
+      "roleUpdated": "Rol actualizado."
     },
     "audit": {
       "when": "Cuándo",

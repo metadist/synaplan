@@ -51,13 +51,11 @@
       </button>
       <button
         class="h-9 w-9 rounded-xl icon-ghost flex items-center justify-center"
-        :aria-label="
-          themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-        "
+        :aria-label="$t('appearance.cycle')"
         data-testid="btn-theme-toggle"
         @click="toggleTheme"
       >
-        <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-4 h-4" />
+        <SunIcon v-if="themeStore.isDark?.value" class="w-4 h-4" />
         <MoonIcon v-else class="w-4 h-4" />
       </button>
     </div>
@@ -454,11 +452,7 @@ const themeStore = useTheme()
 const { getToken: getReCaptchaToken } = useRecaptcha()
 const config = useConfigStore()
 
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
+const isDark = themeStore.isDark
 
 const { logoSrc } = useBrandLogo(isDark)
 
@@ -475,11 +469,7 @@ const cycleLanguage = () => {
   void cycleLocale()
 }
 
-const toggleTheme = () => {
-  const themes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system']
-  const currentIndex = themes.indexOf(themeStore.theme.value)
-  themeStore.setTheme(themes[(currentIndex + 1) % themes.length])
-}
+const toggleTheme = () => themeStore.cycleTheme()
 
 // The native shell has no browser back button, so auth pages would otherwise be a
 // dead end for guests. Go back in history when possible, else fall back to the

@@ -1065,12 +1065,11 @@ watch(
   }
 )
 
-// Resolve actual theme (system -> light/dark based on preference)
+// Resolve actual theme. OLED black uses the dark Mermaid palette.
 function getActualTheme(): 'light' | 'dark' {
-  if (theme.value === 'system') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
-  return theme.value
+  if (theme.value === 'light') return 'light'
+  if (theme.value === 'dark' || theme.value === 'oled') return 'dark'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 // Render mermaid diagrams after content is mounted/updated (debounced).

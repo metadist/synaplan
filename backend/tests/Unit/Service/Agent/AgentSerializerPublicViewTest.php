@@ -24,6 +24,7 @@ final class AgentSerializerPublicViewTest extends TestCase
         $agent->method('getSource')->willReturn(Agent::SOURCE_MANUAL);
         $agent->method('isRoutable')->willReturn(false);
         $agent->method('getPublishedVersionId')->willReturn(4);
+        $agent->method('hasPublishedVersion')->willReturn(true);
         $agent->method('getDraft')->willReturn([
             'models' => ['chat' => 'secret:draft:chat'],
             'tools' => ['token' => 'nope'],

@@ -126,7 +126,12 @@
             class="mt-1"
             data-testid="web-search-user-override"
           />
-          <span>{{ $t('aiInfra.webSearch.allowUsers') }}</span>
+          <span>
+            <span class="block">{{ $t('aiInfra.webSearch.allowUsers') }}</span>
+            <span class="block text-xs txt-secondary mt-0.5">{{
+              $t('aiInfra.webSearch.allowUsersHint')
+            }}</span>
+          </span>
         </label>
 
         <button

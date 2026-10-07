@@ -677,7 +677,10 @@
     "preview": "Aperçu des opérations",
     "applyImport": "Importer la sélection",
     "imported": "Outils importés.",
-    "importFailed": "La description OpenAPI n’a pas pu être importée."
+    "importFailed": "La description OpenAPI n’a pas pu être importée.",
+    "tryRequest": "Requête",
+    "tryResponse": "Réponse",
+    "tryNotSent": "Rien n’a été envoyé. Cet outil peut modifier des données, donc Essayer n’affiche que la requête."
   },
   "workflows": {
     "steps": "Étapes",

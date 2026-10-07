@@ -197,11 +197,7 @@ const officeChannelAvailable = ref(false)
 const publicHost = ref<string>('')
 const clientPolicy = ref<PlatformClientPolicy | null>(null)
 
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
+const isDark = themeStore.isDark
 
 const currentLanguage = computed(() => locale.value)
 const userEmail = computed(() => authStore.user?.email ?? '')

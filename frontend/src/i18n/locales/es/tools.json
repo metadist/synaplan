@@ -603,7 +603,10 @@
     "preview": "Ver operaciones",
     "applyImport": "Importar selección",
     "imported": "Herramientas importadas.",
-    "importFailed": "No se pudo importar la descripción OpenAPI."
+    "importFailed": "No se pudo importar la descripción OpenAPI.",
+    "tryRequest": "Solicitud",
+    "tryResponse": "Respuesta",
+    "tryNotSent": "No se envió nada. Esta herramienta puede cambiar datos, así que Probar solo muestra la solicitud."
   },
   "workflows": {
     "steps": "Pasos",

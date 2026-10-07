@@ -3,6 +3,9 @@
 <!-- labels: prio:2, area:admin -->
 <!-- issue-type: Bug -->
 
+## Progress
+Try it returns the masked request and the capped response body (including a 400 or 502 body). Import keeps `description` and honors `x-synaplan-side-effect`. The wizard still does not offer a risk-class select before import.
+
 ## Problem
 The Try it panel shows only the HTTP status, "Request finished" and `fields: []`, never the response body; when early versions of a tool got HTTP 400 and 502 there was no way to see why, and when a call worked the admin could not see what the model received. Import from OpenAPI classed a read-only POST as "Changes something" (so every call would need approval) and kept only the short `summary`, dropping the `description` the model uses to decide when to call the tool.
 

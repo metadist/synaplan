@@ -214,18 +214,15 @@ final readonly class AgentService
             if (!$agent instanceof Agent || $agent->isArchived() || $agent->getOwnerId() === $userId) {
                 continue;
             }
-            // Recipients see the published snapshot only; the draft is the
-            // owner's work in progress even for editors (they open it in the builder).
+            // A shared draft is visible so a reviewer can find it. The
+            // published snapshot is used once one exists.
             $published = $this->publishedVersion($agent);
-            if (null === $published) {
-                continue;
-            }
             $cards[] = $this->serializer->galleryCard(
                 $agent,
-                $published->getDefinition(),
+                $published?->getDefinition() ?? $agent->getDraft(),
                 $this->ownerDisplayName($agent->getOwnerId()),
                 'shared',
-                $published->getVersion(),
+                $published?->getVersion(),
                 $this->shareService->sharedViaFor($userId, AgentKind::KEY, (string) $id),
                 $row['permission'],
             );

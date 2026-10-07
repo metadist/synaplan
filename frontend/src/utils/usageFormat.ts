@@ -5,11 +5,19 @@
  * trivially unit-testable and shared by the bar, ring and stats panel.
  */
 
-/** Format a euro amount with the locale's currency style (e.g. "1,12 €"). */
-export function formatEuro(value: number, locale = 'en'): string {
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(
+/**
+ * Model prices are stored as US dollars per 1M tokens. The usage meter shows
+ * that same currency. Language only changes grouping and the symbol position.
+ */
+export function formatUsd(value: number, locale = 'en'): string {
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' }).format(
     Number.isFinite(value) ? value : 0
   )
+}
+
+/** @deprecated Use formatUsd. Kept so older call sites keep compiling. */
+export function formatEuro(value: number, locale = 'en'): string {
+  return formatUsd(value, locale)
 }
 
 /** Format a token count with locale grouping (e.g. "8.420"). */
@@ -29,5 +37,5 @@ export function formatCostDisplay(
   if (value > 0 && value < 0.01) {
     return lessThanCentLabel
   }
-  return formatEuro(value, locale)
+  return formatUsd(value, locale)
 }

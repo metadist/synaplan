@@ -52,7 +52,12 @@ export const customToolsApi = {
   async try(
     id: number,
     input: Record<string, unknown>
-  ): Promise<{ sent: boolean; result?: unknown; request?: unknown }> {
+  ): Promise<{
+    sent: boolean
+    result?: unknown
+    request?: unknown
+    response?: { status?: number; body?: string; truncated?: boolean }
+  }> {
     return httpClient(`/api/v1/tools/custom/${id}/try`, {
       method: 'POST',
       body: JSON.stringify({ input }),

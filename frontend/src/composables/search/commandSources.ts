@@ -105,6 +105,12 @@ export function useCommandSources() {
         run: () => setTheme('dark'),
       },
       {
+        id: 'command:theme-oled',
+        titleKey: 'search.palette.commands.themeOled',
+        icon: MoonIcon,
+        run: () => setTheme('oled'),
+      },
+      {
         id: 'command:theme-system',
         titleKey: 'search.palette.commands.themeSystem',
         icon: ComputerDesktopIcon,

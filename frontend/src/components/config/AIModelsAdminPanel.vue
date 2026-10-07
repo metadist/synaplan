@@ -28,10 +28,9 @@
         </div>
       </div>
 
-      <div class="text-xs txt-secondary mb-6">
-        {{ t('config.aiModels.admin.uniqueKey') }}:
-        <span class="txt-primary font-semibold">BSERVICE + BTAG + BPROVID</span>
-      </div>
+      <p class="text-xs txt-secondary mb-6" :title="t('config.aiModels.admin.uniqueKeyHint')">
+        {{ t('config.aiModels.admin.uniqueKey') }}
+      </p>
 
       <div v-if="modelsLoading" class="text-center py-8">
         <div

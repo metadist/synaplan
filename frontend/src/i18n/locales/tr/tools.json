@@ -603,7 +603,10 @@
     "preview": "İşlemleri önizle",
     "applyImport": "Seçilenleri içe aktar",
     "imported": "Araçlar içe aktarıldı.",
-    "importFailed": "OpenAPI açıklaması içe aktarılamadı."
+    "importFailed": "OpenAPI açıklaması içe aktarılamadı.",
+    "tryRequest": "İstek",
+    "tryResponse": "Yanıt",
+    "tryNotSent": "Hiçbir şey gönderilmedi. Bu araç veriyi değiştirebilir, bu yüzden Dene yalnızca isteği gösterir."
   },
   "workflows": {
     "steps": "Adımlar",

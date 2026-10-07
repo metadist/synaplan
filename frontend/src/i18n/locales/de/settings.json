@@ -5,15 +5,15 @@
   },
   "usageTaximeter": {
     "sessionLabel": "Tokens",
-    "todayTooltip": "{tokens} Tokens heute",
-    "todayLabel": "Deins heute",
+    "todayTooltip": "{tokens} Tokens heute. Beträge sind US-Dollar.",
+    "todayLabel": "Verbrauch heute",
     "todayAria": "Deine Ausgaben heute: {cost}",
     "openStats": "Nutzungsstatistik anzeigen",
     "usedModels": "Verwendete Modelle",
     "promptsInSession": "Prompts in dieser Sitzung",
     "modelChanges": "Modelländerungen: {count}",
     "allStatistics": "Alle Statistiken",
-    "lessThanCent": "< 0,01 €"
+    "lessThanCent": "< 0,01 $"
   },
   "export": {
     "title": "Export",
@@ -370,7 +370,8 @@
       "description": "Wählen Sie Ihr Farbschema",
       "light": "Hell",
       "dark": "Dunkel",
-      "system": "System"
+      "system": "System",
+      "oled": "OLED-Schwarz"
     },
     "language": {
       "title": "Sprache",

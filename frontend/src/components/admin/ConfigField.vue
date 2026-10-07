@@ -218,7 +218,11 @@ const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
           <code class="text-xs bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded shrink-0">{{
             fieldKey
           }}</code>
-          <Icon :icon="statusIcon" :class="['w-4 h-4 shrink-0', statusColor]" />
+          <Icon
+            :icon="statusIcon"
+            :class="['w-4 h-4 shrink-0', statusColor]"
+            :title="value.isSet ? $t('admin.config.valueSet') : $t('admin.config.valueEmpty')"
+          />
         </label>
         <ProviderHelpHint
           v-if="helpMeta"

@@ -119,7 +119,7 @@
         "namePlaceholder": "Name (GPT-4.1)",
         "createModel": "Create Model",
         "creating": "Creating…",
-        "uniqueKey": "Unique key",
+        "uniqueKey": "Identified by provider, model id and tag",
         "loadingModels": "Loading admin models…",
         "id": "ID",
         "service": "Service",
@@ -132,7 +132,7 @@
         "unitIn": "Unit in",
         "priceOut": "Price out",
         "unitOut": "Unit out",
-        "showWhenFree": "Free OK",
+        "showWhenFree": "Show even when free",
         "showWhenFreeTooltip": "Show model in selection even when both price in and price out are 0 (free)",
         "showWhenFreeOn": "Override active: model visible even when both prices are 0",
         "showWhenFreeOff": "Default: model hidden when both prices are 0",
@@ -184,7 +184,8 @@
           "serviceRequired": "Service is required",
           "providerIdRequired": "Model ID is required",
           "nameRequired": "Display name is required"
-        }
+        },
+        "uniqueKeyHint": "Two rows with the same provider, model id and tag are the same model."
       },
       "pagination": {
         "showing": "Showing {start}–{end} of {total}"

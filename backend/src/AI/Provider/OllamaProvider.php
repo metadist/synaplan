@@ -488,6 +488,12 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
      */
     public function getAvailableModels(): array
     {
+        // An empty base URL is a stock install, not a failure. Listing would
+        // throw "URI must include a scheme and host" on every call.
+        if (!$this->isConfigured()) {
+            return [];
+        }
+
         try {
             $models = $this->client->models()->list();
             $modelNames = [];

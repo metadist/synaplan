@@ -149,7 +149,7 @@ final class AgentPublishFlowTest extends WebTestCase
         );
     }
 
-    public function testDraftCannotBeShared(): void
+    public function testDraftCanBeShared(): void
     {
         $owner = $this->createUser('agent-draft-share@synaplan.internal');
         $this->authenticateClient($this->client, $owner);
@@ -164,7 +164,7 @@ final class AgentPublishFlowTest extends WebTestCase
             'subjectId' => (int) $other->getId(),
             'permission' => 'use',
         ]);
-        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
     }
 
     /**

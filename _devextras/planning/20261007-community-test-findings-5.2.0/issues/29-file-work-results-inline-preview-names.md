@@ -3,6 +3,9 @@
 <!-- labels: prio:2, area:files, area:chat -->
 <!-- issue-type: Bug -->
 
+## Progress
+Generated names use the file's own name (`chart.png`), not the run id. An image result is shown inline, with preview and a separate download. Tables, repeated stdout, the "image request" label, and Library time zones are still open.
+
 ## Problem
 The first File work test worked end to end (CSV → totals, PNG bar chart, saved to Library → Generated, about 30 s). Rough edges: the chart is not shown inline in the reply; the in-chat "Preview" link downloads one of the files; the data is printed twice as plain text; file names carry long internal IDs; the planner first labelled the request "Looks like an image request"; Library shows times in UTC while the chat shows local time.
 

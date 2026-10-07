@@ -111,7 +111,9 @@ final class AgentSerializer
     public function publicView(Agent $agent, ?array $visibleDefinition = null): array
     {
         $full = $this->full($agent);
-        unset($full['draft']);
+        if ($agent->hasPublishedVersion()) {
+            unset($full['draft']);
+        }
         $full['models'] = $this->readerModels($visibleDefinition ?? $agent->getDraft());
 
         return $full;
