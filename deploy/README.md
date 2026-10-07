@@ -211,8 +211,12 @@ because it mounts the host Docker socket:
 COMPOSE_PROFILES=compute
 ```
 
-`prepare.sh` writes `COMPUTE_TOKEN` and the scratch dirs. That generated
-value is the production token. Do not copy the local demo token from
+`prepare.sh` writes the token to `data/compute.token` (and creates the
+scratch dirs) when `COMPOSE_PROFILES` includes `compute`, including when
+that line exists only in this env file. It does not print the token and
+does not write it back into `.env`. Re-running the deploy keeps the same
+token. That generated value is the production token. Do not copy the local
+demo token from
 `docker-compose.yml` (`synaplan-dev-compute-token-change-me-32b`); that
 default exists so a developer clone starts without a new secret. Combine
 profiles with a comma (`local-ai,office,compute`). Never publish port

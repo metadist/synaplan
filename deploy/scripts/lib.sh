@@ -801,16 +801,81 @@ deployment_secret_is_adoptable() {
     esac
 }
 
+# The profile list Compose will use, as a value — never by sourcing the env file.
+#
+# An exported COMPOSE_PROFILES wins, which is Compose's own rule. Otherwise the
+# assignment is read from the file Compose will parse. Quotes, a trailing
+# " #" comment and spaces around commas are stripped the same way
+# deploy/scripts/local-tls.sh does. The raw text is never evaluated, so a
+# value like `$(...)` stays text.
+compose_profile_list_value() {
+    local value="$1" quote=""
+    value="${value%$'\r'}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    if [[ ${#value} -ge 2 ]]; then
+        quote="${value:0:1}"
+        if [[ ( "$quote" == '"' || "$quote" == "'" ) && "${value: -1}" == "$quote" ]]; then
+            value="${value:1:${#value}-2}"
+        elif [[ "$value" == *" #"* ]]; then
+            value="${value%% #*}"
+            value="${value%"${value##*[![:space:]]}"}"
+            if [[ ${#value} -ge 2 ]]; then
+                quote="${value:0:1}"
+                if [[ ( "$quote" == '"' || "$quote" == "'" ) && "${value: -1}" == "$quote" ]]; then
+                    value="${value:1:${#value}-2}"
+                fi
+            fi
+        fi
+    fi
+    while [[ "$value" == *", "* || "$value" == *" ,"* ]]; do
+        value="${value//, /,}"
+        value="${value// ,/,}"
+    done
+    printf '%s' "$value"
+}
+
+compose_profiles_resolved() {
+    local raw="" env_file=""
+    if host_environment_defines COMPOSE_PROFILES; then
+        raw="${COMPOSE_PROFILES-}"
+    else
+        env_file="$(resolve_compose_env_file || true)"
+        if [[ -n "$env_file" && -f "$env_file" ]]; then
+            raw="$(env_file_raw_value "$env_file" COMPOSE_PROFILES || true)"
+        fi
+    fi
+    compose_profile_list_value "$raw"
+}
+
+# A non-secret value from the env file, only when the host did not export it.
+env_file_plain_value() {
+    local key="$1" env_file="" raw=""
+    if host_environment_defines "$key"; then
+        printf '%s' "${!key-}"
+        return 0
+    fi
+    env_file="$(resolve_compose_env_file || true)"
+    if [[ -n "$env_file" && -f "$env_file" ]]; then
+        raw="$(env_file_raw_value "$env_file" "$key" || true)"
+    fi
+    compose_profile_list_value "$raw"
+}
+
 # File-work token is optional and only required when COMPOSE_PROFILES includes
 # compute. It lives next to the other data (not in the 8-key secrets.env) so
-# marketplace rewrites of deploy/.env do not rotate it.
+# marketplace rewrites of deploy/.env do not rotate it. The token is never
+# written back into deploy/.env or secrets.env, and it is never printed.
 ensure_compute_token() {
     mkdir -p "$DATA_DIR/compute/scratch" "$DATA_DIR/compute/workspaces"
-    case ",${COMPOSE_PROFILES:-}," in
+    local profiles
+    profiles="$(compose_profiles_resolved)"
+    case ",${profiles}," in
         *,compute,*) ;;
         *) return 0 ;;
     esac
     local token_file="$DATA_DIR/compute.token"
+    local wrote=false
     if [[ -z "${COMPUTE_TOKEN:-}" ]]; then
         if [[ -f "$token_file" ]]; then
             COMPUTE_TOKEN="$(tr -d '\n' < "$token_file")"
@@ -818,13 +883,26 @@ ensure_compute_token() {
             COMPUTE_TOKEN="$(openssl rand -hex 32)"
             umask 077
             printf '%s\n' "$COMPUTE_TOKEN" > "$token_file"
+            wrote=true
         fi
     elif [[ ! -f "$token_file" ]]; then
         umask 077
         printf '%s\n' "$COMPUTE_TOKEN" > "$token_file"
+        wrote=true
     fi
     export COMPUTE_TOKEN
-    export COMPUTE_URL="${COMPUTE_URL:-http://compute:8080}"
+    local compute_url
+    compute_url="$(env_file_plain_value COMPUTE_URL)"
+    if [[ -z "$compute_url" ]]; then
+        compute_url="http://compute:8080"
+    fi
+    export COMPUTE_URL="$compute_url"
+    local shown="${token_file#"$DEPLOY_DIR"/}"
+    if [[ "$wrote" == true ]]; then
+        printf 'File work enabled: token written to %s\n' "$shown"
+    else
+        printf 'File work enabled: using the token in %s\n' "$shown"
+    fi
 }
 
 # 32 bytes of randomness rendered as 64 hexadecimal characters.

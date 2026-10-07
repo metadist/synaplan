@@ -1261,7 +1261,9 @@
       "running": "Dateiarbeit läuft.",
       "runningOff": "Der Sidecar läuft; Dateiarbeit ist unter Systemkonfiguration › Werkzeuge & Automatisierung ausgeschaltet.",
       "unreachable": "Der Dateiarbeits-Sidecar ist nicht erreichbar.",
-      "unset": "COMPUTE_URL oder COMPUTE_TOKEN ist nicht gesetzt."
+      "unset": "COMPUTE_URL oder COMPUTE_TOKEN ist nicht gesetzt.",
+      "reachable": "Sidecar erreichbar.",
+      "notRunning": "Sidecar läuft nicht: Dateiarbeit ist nicht verfügbar."
     },
     "state": {
       "available": "Verfügbar",

@@ -1857,6 +1857,117 @@ else
     echo "Bootstrap email contract test skipped; set SYNAPLAN_CONTRACT_PHP_IMAGE to a PHP-capable image to run it."
 fi
 
+# File work: a profile that exists only in the env file must still mint the
+# token. The file is never sourced, so a command substitution in it must not run.
+assert_compute_token_follows_env_file() {
+    local root saved_deploy saved_data
+    root="$(mktemp -d)"
+    saved_deploy="$DEPLOY_DIR"
+    saved_data="$DATA_DIR"
+    DEPLOY_DIR="$root/deploy"
+    DATA_DIR="$DEPLOY_DIR/data"
+    mkdir -p "$DEPLOY_DIR"
+
+    printf '%s\n' \
+        'COMPOSE_PROFILES=compute' \
+        'COMPUTE_URL=' \
+        'COMPUTE_TOKEN=' \
+        "BOGUS=\$(touch '$root/sourced')" \
+        > "$DEPLOY_DIR/.env"
+
+    (
+        unset COMPOSE_PROFILES COMPUTE_TOKEN COMPUTE_URL
+        ensure_compute_token
+    ) > "$root/first.out"
+
+    [[ ! -e "$root/sourced" ]] || {
+        echo "ensure_compute_token executed a command from the env file" >&2
+        exit 1
+    }
+    [[ -f "$DATA_DIR/compute.token" ]] || {
+        echo "A compute profile set only in the env file did not write a token" >&2
+        exit 1
+    }
+    local token
+    token="$(tr -d '\n' < "$DATA_DIR/compute.token")"
+    [[ "$token" =~ ^[0-9a-f]{64}$ ]] || {
+        echo "The generated file-work token is not 64 hex characters" >&2
+        exit 1
+    }
+    grep -Fq 'File work enabled: token written to data/compute.token' "$root/first.out" || {
+        echo "prepare output did not name the token file" >&2
+        exit 1
+    }
+    grep -Fq "$token" "$root/first.out" && {
+        echo "prepare output printed the file-work token" >&2
+        exit 1
+    }
+    grep -Fq "COMPUTE_TOKEN=$token" "$DEPLOY_DIR/.env" && {
+        echo "The token was written back into the env file" >&2
+        exit 1
+    }
+
+    (
+        unset COMPOSE_PROFILES COMPUTE_TOKEN COMPUTE_URL
+        ensure_compute_token
+    ) > "$root/second.out"
+    [[ "$(tr -d '\n' < "$DATA_DIR/compute.token")" == "$token" ]] || {
+        echo "Re-running the deploy rotated the file-work token" >&2
+        exit 1
+    }
+    grep -Fq 'using the token in data/compute.token' "$root/second.out" || {
+        echo "A second run did not keep the existing token" >&2
+        exit 1
+    }
+
+    # Host environment wins over the file, including "profile is not compute".
+    rm -f "$DATA_DIR/compute.token"
+    (
+        unset COMPUTE_TOKEN COMPUTE_URL
+        export COMPOSE_PROFILES=office
+        ensure_compute_token
+    ) > "$root/host.out"
+    [[ ! -f "$DATA_DIR/compute.token" ]] || {
+        echo "An exported profile without compute still wrote a token" >&2
+        exit 1
+    }
+
+    # Quoted lists and an inline comment are the spellings Compose accepts.
+    printf '%s\n' 'COMPOSE_PROFILES="local-ai, compute" # file work' > "$DEPLOY_DIR/.env"
+    (
+        unset COMPOSE_PROFILES COMPUTE_TOKEN COMPUTE_URL
+        ensure_compute_token
+    ) > "$root/quoted.out"
+    [[ -f "$DATA_DIR/compute.token" ]] || {
+        echo "A quoted COMPOSE_PROFILES value was not recognised" >&2
+        exit 1
+    }
+
+    # A shell-exported compute profile with no file still mints a token.
+    rm -rf "$DEPLOY_DIR"
+    mkdir -p "$DEPLOY_DIR"
+    (
+        unset COMPUTE_TOKEN COMPUTE_URL
+        export COMPOSE_PROFILES=compute
+        ensure_compute_token
+    ) > "$root/shell.out"
+    [[ -f "$DATA_DIR/compute.token" ]] || {
+        echo "A shell-exported compute profile did not write a token" >&2
+        exit 1
+    }
+    grep -Fq 'File work enabled: token written to data/compute.token' "$root/shell.out" || {
+        echo "A shell-exported profile did not report the token path" >&2
+        exit 1
+    }
+
+    DEPLOY_DIR="$saved_deploy"
+    DATA_DIR="$saved_data"
+    rm -rf "$root"
+    echo "File-work token follows the env file without sourcing it."
+}
+
+assert_compute_token_follows_env_file
+
 bash "$(dirname "$0")/test-local-tls.sh"
 
 echo "Lifecycle contract tests passed."
