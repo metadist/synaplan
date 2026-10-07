@@ -1,7 +1,10 @@
 <!-- title: Assistants: "Add a file" should pick from the Library, not only upload from the computer -->
 <!-- type: Feature -->
 <!-- labels: prio:1, area:rag, area:files -->
+<!-- status: shipped -->
 <!-- issue-type: Feature -->
+
+> **Shipped** in [#2379](https://github.com/metadist/synaplan/pull/2379) (`c97e79144`). Do not re-implement. The sections below describe the 5.2.0 bug.
 
 ## Summary
 Let the assistant builder's Knowledge section pick files that already exist in the Library (own or shared with "Can use" or higher), in addition to uploading from the computer.

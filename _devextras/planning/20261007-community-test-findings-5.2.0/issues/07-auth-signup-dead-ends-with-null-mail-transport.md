@@ -1,7 +1,10 @@
 <!-- title: Auth: sign-up with the null mail transport dead-ends silently — warn the admin, log honestly, tell the user -->
 <!-- type: Bug -->
 <!-- labels: prio:1, area:auth, area:setup, area:mail-handler -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2379](https://github.com/metadist/synaplan/pull/2379) (`c97e79144`). Do not re-implement. The sections below describe the 5.2.0 bug.
 
 ## Problem
 `deploy/selfhost.env.example` ships `MAILER_DSN=null://null` and `APP_SENDER_EMAIL=` while registration requires email verification. Registration succeeds, the backend logs "Verification email sent", the null transport discards the message, and the new user is stuck at "email not verified" with no explanation. The log gives the admin no hint that nothing was delivered.

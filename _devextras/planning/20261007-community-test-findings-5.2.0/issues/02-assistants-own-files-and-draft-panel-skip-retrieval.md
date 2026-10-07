@@ -1,7 +1,10 @@
 <!-- title: Assistants: "Also search the person's own files" and Try-a-draft run no file search; raw <think> blocks are shown -->
 <!-- type: Bug -->
 <!-- labels: prio:1, area:rag, area:chat -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2379](https://github.com/metadist/synaplan/pull/2379) (`c97e79144`). Do not re-implement. The sections below describe the 5.2.0 bug.
 
 ## Problem
 With "Also search the person's own files" switched on and saved, a chat started from the assistant answers "I don't see an invoice here" in 3 s and 625 tokens, so no retrieval ran. The Try-a-draft panel ignores knowledge too and prints the model's raw `<think>` reasoning as answer text.

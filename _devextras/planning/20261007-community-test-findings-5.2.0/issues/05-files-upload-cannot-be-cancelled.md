@@ -1,7 +1,10 @@
 <!-- title: Files: an upload in progress cannot be cancelled, and a reload warns about files that did upload -->
 <!-- type: Bug -->
 <!-- labels: prio:1, area:files -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2379](https://github.com/metadist/synaplan/pull/2379) (`c97e79144`). Do not re-implement. The sections below describe the 5.2.0 bug.
 
 ## Problem
 While a Library upload runs, the red X next to the file shows a not-allowed cursor and does nothing, and there is no Cancel button; the only way out is to reload or close the page. After a reload during an upload the page shows "1 selected file(s) were lost … Please select the files again" although the file had been uploaded and is in the Library, which invites a duplicate upload.

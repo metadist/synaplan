@@ -1,7 +1,10 @@
 <!-- title: File work: a follow-up cannot use the file the previous run just made, and the failure card gives no reason -->
 <!-- type: Bug -->
 <!-- labels: prio:1, area:files, area:chat -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2380](https://github.com/metadist/synaplan/pull/2380) (`c5b6f22b5`). A follow-up mounts a named file from this chat, or the single prior file when the text is a follow-up and there is exactly one. It does not mount every earlier file, and it does not turn the shared workspace on. Do not re-implement.
 
 ## Problem
 Request 1 (count a 20,000-row CSV by make and model year, save a spreadsheet) worked in 17 s and saved a two-sheet .xlsx to Library → Generated. Request 2 in the same chat ("using the summary spreadsheet you just made, chart the top ten makes as a PNG") failed after 32 s with "File work could not finish. Check Workspace for anything this run already wrote" and no reason. The Workspace was empty: the first result went to Generated, not the workspace, so the follow-up had nothing to work on.

@@ -1,7 +1,10 @@
 <!-- title: Routing / File work: edit requests on an attached file are refused instead of routed to File work; the sandbox has no PDF-editing library -->
 <!-- type: Feature -->
 <!-- labels: prio:2, area:routing, area:files -->
+<!-- status: shipped -->
 <!-- issue-type: Feature -->
+
+> **Shipped** in [#2380](https://github.com/metadist/synaplan/pull/2380) (`c5b6f22b5`), routing only. File work is offered for modify, edit, and replace on an attached file. The sandbox still cannot change PDF text in place, and the reply says so. PyMuPDF was not added; that remains an ask-first dependency. Do not re-implement the routing, and do not add the library from this draft.
 
 ## Summary
 When a person attaches a file and asks to change it, the planner offers File work (code run on the attached file) without the person having to name it. A PDF-editing library in the sandbox image is a follow-up, only after routing is proven, and only with an in-place edit — not a rebuilt page.

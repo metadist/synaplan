@@ -1,15 +1,17 @@
 # Community test round on 5.2.0 — triage, fixing order, issue drafts
 
-**Status:** triage of record for the external hands-on test of Synaplan
-5.2.0 (tested 2026-10-05/06 against Open WebUI 0.11.4, same model and
-files in both apps). Two documents were delivered: *Synaplan 5.2.0 — Test
-Findings* (F1–F49, grouped by impact) and *Synaplan 5.2.0 vs Open WebUI
-0.11.4 — Comparison*. Both are on file with the product owner; this folder
-does not copy them because they name the testers' infrastructure.
+**Status:** waves 1 and 2 are shipped (issues 01–14). Waves 3–6 are
+still open. This folder remains the triage of record for the external
+hands-on test of Synaplan 5.2.0 (tested 2026-10-05/06 against Open WebUI
+0.11.4, same model and files in both apps). Two documents were delivered:
+*Synaplan 5.2.0 — Test Findings* (F1–F49, grouped by impact) and
+*Synaplan 5.2.0 vs Open WebUI 0.11.4 — Comparison*. Both are on file with
+the product owner; this folder does not copy them because they name the
+testers' infrastructure.
 **Owner:** product owner.
-**Code baseline for this triage:** `main` at v5.3.0 + 2 commits
-(2026-10-07). The testers ran 5.2.0; everything below says when `main`
-already moved.
+**Code baseline:** `main` at `96d0d54d6` (2026-10-07), which includes
+#2377, #2379, #2380 and this triage (#2378). The testers ran 5.2.0.
+Shipped work is marked below; do not re-implement it.
 **Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
 (U1–U12) and the AGENTS.md Perfect-UX bar apply to every user-visible
 issue in [`issues/`](./issues/). Each UI issue names its journey.
@@ -17,10 +19,23 @@ issue in [`issues/`](./issues/). Each UI issue names its journey.
 The testers' own verdict, kept here because the order below follows it:
 the 5.2.0 rework is a big step forward; tool approvals with read / change /
 delete classes, the folder sharing levels, the honest web page reader and
-File work on a real CSV all worked. The gaps are concentrated in four
-places: assistants cannot be grounded in Library files, large uploads blow
-PHP memory, knowledge answers cannot be checked, and a default self-host
-install dead-ends new accounts.
+File work on a real CSV all worked. The gaps they named were concentrated
+in four places: assistants cannot be grounded in Library files, large
+uploads blow PHP memory, knowledge answers cannot be checked, and a
+default self-host install dead-ends new accounts. Those four are the
+work in waves 1 and 2, and they shipped on 2026-10-07.
+
+## 0. Shipped since the triage was written
+
+`create-issues.sh` skips any draft whose header says `<!-- status: shipped -->`.
+
+| Issues | PR | What landed |
+| ------ | -- | ----------- |
+| 01–07 | [#2379](https://github.com/metadist/synaplan/pull/2379) `c97e79144` | Folder ids with spaces and non-ASCII save. An assistant searches its own files, and a greeting does not. Add a file from the Library. Large uploads chunk in windows and can be cancelled. Admins can add a user, mark verified, and resend. Sign-up says when mail is not configured. |
+| 12 (core) | [#2377](https://github.com/metadist/synaplan/pull/2377) `a68637c33` | A reportable MCP failure keeps the answer step. A plain `NodeResult::failed` still skips dependents. |
+| 08–14 | [#2380](https://github.com/metadist/synaplan/pull/2380) `c5b6f22b5` | File-work token from `COMPOSE_PROFILES` in `deploy/.env`, including `${VAR}`, without sourcing the file. Knowledge sources with the passage loaded on open. Expandable task steps. A follow-up mounts a named file from this chat. Approval cards show the request and who decided. PDF edits are offered to File work; the sandbox still cannot change PDF text in place, and the reply says so. No PDF library was added. |
+
+**Next open work is wave 3, starting at issue 15** (OpenRouter prices) and issue 16 (edit and rerun). Wave 2's price item (15) was not in #2379 or #2380.
 
 ---
 
@@ -51,17 +66,17 @@ reproducible are listed in §4, not turned into issues blindly.
 
 ## 2. Fixing order — six waves
 
-Waves are a dependency order, not a calendar. A wave can start when the
-previous one is **in review**; nothing in wave 3+ waits for wave 2 to ship.
+Waves are a dependency order, not a calendar. Waves 1 and 2 are on `main`
+except issue 15. Wave 3 does not wait for that price fix.
 
-| Wave | Theme | Issues (see [`issues/`](./issues/)) | Findings | Effort |
-| ---- | ----- | ----------------------------------- | -------- | ------ |
-| **1** | **Unblock the core jobs** — knowledge in assistants, big uploads, accounts, compute setup | 01 · 02 · 03 · 04 · 05 · 06 · 07 · 08 | F44 F46 F47 F13 F14 F24 | 01 S · 02 M · 03 M · 04 M · 05 S · 06 S · 07 S · 08 S |
-| **2** | **Make answers and runs checkable** — citations, step detail, honest failures, real prices | 09 · 10 · 11 · 12 · 13 · 14 · 15 | F40 F9 F26 F43(4,6) F35 F48 F2 F16 | 09 M · 10 M · 11 M · 12 S · 13 M · 14 M · 15 S |
-| **3** | **Everyday chat actions** — edit/rerun, artifacts, export, prompts, previews, composer context | 16 · 17 · 18 · 19 · 20 · 21 · 22 · 23 · 24 | F36 F37 F38 F45 F32 F7 F17 F31 F41(reload) | 16 M · 17 M · 18 M · 19 M · 20 S · 21 M · 22 S · 23 L · 24 S |
-| **4** | **Builders, tools, files** — custom tool form and visibility, builder gaps, File work results, Library | 25 · 26 · 27 · 28 · 29 · 30 · 31 · 32 · 33 · 34 | F43(1–3,5) F41 F42(drafts) F25 F30 F27 F49 F39 | 25 M · 26 M · 27 S · 28 S · 29 M · 30 S · 31 M · 32 M · 33 M · 34 S |
-| **5** | **Admin, models, setup** — import dialog, embedding status, CA trust, impersonation lock, sharing for tools/MCP, policies | 35 · 36 · 37 · 38 · 39 · 40 · 41 · 42 · 43 · 44 · 45 | F4 F5 F18 F19 F28 F21 F29 F42 F22 F23 F12 F8 F20 F1 F46(noise) | 35 M · 36 S · 37 M · 38 M · 39 M · 40 M · 41 L · 42 S · 43 S · 44 M · 45 M |
-| **6** | **Readability, accessibility, polish** — UI scale, OLED theme, shortcuts, layout, docs | 46 · 47 · 48 · 49 · 50 | F34 F10 F33 F6 F15 F3 + OLED request | 46 M · 47 S · 48 S · 49 S · 50 S |
+| Wave | Theme | Issues (see [`issues/`](./issues/)) | Findings | Effort | State |
+| ---- | ----- | ----------------------------------- | -------- | ------ | ----- |
+| **1** | **Unblock the core jobs** — knowledge in assistants, big uploads, accounts, compute setup | 01 · 02 · 03 · 04 · 05 · 06 · 07 · 08 | F44 F46 F47 F13 F14 F24 | 01 S · 02 M · 03 M · 04 M · 05 S · 06 S · 07 S · 08 S | **Shipped** #2379 (01–07) and #2380 (08) |
+| **2** | **Make answers and runs checkable** — citations, step detail, honest failures, real prices | 09 · 10 · 11 · 12 · 13 · 14 · 15 | F40 F9 F26 F43(4,6) F35 F48 F2 F16 | 09 M · 10 M · 11 M · 12 S · 13 M · 14 M · 15 S | **09–14 shipped** (#2377, #2380). **15 still open** |
+| **3** | **Everyday chat actions** — edit/rerun, artifacts, export, prompts, previews, composer context | 16 · 17 · 18 · 19 · 20 · 21 · 22 · 23 · 24 | F36 F37 F38 F45 F32 F7 F17 F31 F41(reload) | 16 M · 17 M · 18 M · 19 M · 20 S · 21 M · 22 S · 23 L · 24 S | **Open** |
+| **4** | **Builders, tools, files** — custom tool form and visibility, builder gaps, File work results, Library | 25 · 26 · 27 · 28 · 29 · 30 · 31 · 32 · 33 · 34 | F43(1–3,5) F41 F42(drafts) F25 F30 F27 F49 F39 | 25 M · 26 M · 27 S · 28 S · 29 M · 30 S · 31 M · 32 M · 33 M · 34 S | **Open** |
+| **5** | **Admin, models, setup** — import dialog, embedding status, CA trust, impersonation lock, sharing for tools/MCP, policies | 35 · 36 · 37 · 38 · 39 · 40 · 41 · 42 · 43 · 44 · 45 | F4 F5 F18 F19 F28 F21 F29 F42 F22 F23 F12 F8 F20 F1 F46(noise) | 35 M · 36 S · 37 M · 38 M · 39 M · 40 M · 41 L · 42 S · 43 S · 44 M · 45 M | **Open** |
+| **6** | **Readability, accessibility, polish** — UI scale, OLED theme, shortcuts, layout, docs | 46 · 47 · 48 · 49 · 50 | F34 F10 F33 F6 F15 F3 + OLED request | 46 M · 47 S · 48 S · 49 S · 50 S | **Open** |
 
 **Why this order and not the testers' list.** Their ten priorities are
 kept almost one-to-one (their 1–3 are wave 1–2, 4 is wave 2, 5–6 are
@@ -71,12 +86,10 @@ badge on a billed model is a money-correctness bug, not a polish item; and
 **Open Terminal (their 9) is not an issue** — it is a product decision and
 a sprint of its own, recorded in §6.
 
-**Recommended first three PRs:** issue 01 (widen the folder-id check to
-the names the picker already emits; do not use an unbounded pattern),
-issues 06 + 07 together (admin form on the existing provisioning
-endpoint, plus an honest mail warning), issue 04 (bound chunker memory,
-and only then a real queue — `processFile()` is still a synchronous
-HTTP call).
+**Next PRs, now that waves 1 and 2 are on `main`:** issue 15 (OpenRouter
+prices — do not clear `showWhenFree`, do not overwrite an admin's price),
+then wave 3 starting at issue 16 (edit and rerun). Issue 23 is the large
+one in that wave; do not start it until 16–22 are scoped.
 
 ## 2.1 Guards for whoever implements these
 
@@ -89,14 +102,17 @@ literally would ship one of these:
 | 02 | Run retrieval on every assistant turn. "Hello" stays a normal chat. Do not give the draft panel tool side effects. Do not strip `<think>` out of user text. |
 | 04 | Call `processFile()` and call it a background job. It runs in the request and will OOM the same way. Do not content-hash-dedupe two different files. Do not drop chunk overlap. Partial indexing stays off unless an admin opts in. |
 | 05 | Rebuild abort in the file picker; it already has an `AbortController`. Aborting the browser does not stop PHP. |
-| 08 | `source deploy/.env`. Write `COMPUTE_TOKEN` into `deploy/.env` or `secrets.env`. The token file is the source of truth so a marketplace rewrite cannot rotate it. |
+| 08 | `source deploy/.env`. Write `COMPUTE_TOKEN` into `deploy/.env` or `secrets.env`. Call `docker compose config --profiles` (it lists every declared profile, including `compute` when File work is off) or `docker compose config` from `ensure_compute_token` (the lifecycle contract records every docker invocation). The token file is the source of truth. |
 | 09 | Store chunk bodies on the message and in the SSE event. Store ids; load the passage on open. |
 | 11 | Mount every earlier file into every later sandbox run. Turn `useWorkspace` on by default — that folder is shared across chats. |
+| 12 | Return `NodeResult::failed` for a tool error or an empty body. That skips the answer step. Use `reportableFailure`. Keep `failed` for a disabled tool, missing params, a disallowed topic, a hallucinated tool, and a mutating tool. |
 | 15 | Clear `showWhenFree` on priceless imports. That hides Ollama rows from the model menu (#2110). Do not overwrite a price an admin typed. Do not change `listModelIds()`'s return type. |
 | 32 | Unpack zip/tar during indexing. Do not remove an extension that is allowed today. |
 | 33 | Raise `MAX_TEXT_LENGTH` for every URL mention. Leave the private-address refusal alone. |
-| 38 | Install the extra CA into the OS trust store (that covers billing, OIDC, and mail). Do not add "skip TLS verification". |
+| 34 | Say "the planner adds a follow-up after search". The DAG is fixed before search runs. Evaluate quality inside the search runner, plan one optional retry up front, or add real replanning. Pick one before coding. |
+| 38 | Install the extra CA into the OS trust store (that covers billing, OIDC, and mail). Do not add "skip TLS verification". Do not pass a private-only PEM as `cafile`: that replaces the public root bundle and breaks public endpoints. Build a combined bundle (public roots plus the extra CA) for the scoped clients only. |
 | 41 | Default a new chat-action policy to off. Missing row = today's behavior. |
+| 44 | Hide negative model ids whenever `APP_ENV !== 'dev'`. That also hides the test fixtures `ModelSeeder` inserts for E2E. Filter production only (`APP_ENV === 'prod'`). |
 | 45 | Apply the MCP allowlist to the page reader. Check the IP at connect time, not only at save time. |
 
 ---
@@ -131,7 +147,7 @@ cover note, with its destination.
 | F21 Internal CA not trusted | 5 | [38](./issues/38-setup-extra-trusted-ca-certificates.md) | Also covers MCP, WebDAV, webhooks |
 | F22 Group role only at add time; "Manual" pills | 5 | [42](./issues/42-admin-tooltips-and-plain-labels-sweep.md) | |
 | F23 Tooltips, DB column names in Edit Models | 5 | [42](./issues/42-admin-tooltips-and-plain-labels-sweep.md) | |
-| F24 Compute sidecar crash-loops after deploy/README | 1 | [08](./issues/08-deploy-compute-token-ignores-env-profiles.md) | Re-verify against #2370 (5.3.0) |
+| F24 Compute sidecar crash-loops after deploy/README | 1 | [08](./issues/08-deploy-compute-token-ignores-env-profiles.md) | Shipped in #2380. Token is `data/compute.token`; the env file is not sourced. |
 | F25 File work results not inline, Preview downloads | 4 | [29](./issues/29-file-work-results-inline-preview-names.md) | |
 | F26 PDF edit refused; step detail missing | 2 | [14](./issues/14-file-work-offer-for-attached-file-edits-pdf-library.md) + [10](./issues/10-chat-expandable-task-steps-with-tool-io.md) | |
 | F27 Fixed allowed-extensions list and 128 MB | 4 | [32](./issues/32-files-admin-configurable-types-size-count.md) | |
@@ -165,24 +181,29 @@ cover note, with its destination.
 
 ## 4. What `main` already changed since 5.2.0
 
-Checked against `git log v5.2.0..HEAD` (18 commits, v5.2.1 and v5.3.0
-tagged 2026-10-05/06):
+Checked against `git log v5.2.0..HEAD` on 2026-10-07, after #2377, #2379
+and #2380. v5.2.1 and v5.3.0 were tagged 2026-10-05/06; the finding fixes
+landed the next day and are not in those tags.
 
 | Finding | Commit | Effect on the issue |
 | ------- | ------ | ------------------- |
-| F3 docs path | #2359 `fix(nav): point stale menu paths at Manage…` (5.2.1) | Docs now say **Manage → Channels → Synaplan Desktop**. The testers report the 5.2.0 rail has no "Manage" entry (Chats, Library, Assistants, Channels, Operate). Issue 50 is a verification task, not a rewrite. |
-| F24 compute setup | #2370 `feat(deploy): start Synaplan from one compose file…` (5.3.0) | `deploy/scripts/lib.sh` still gates `ensure_compute_token` on the shell's `COMPOSE_PROFILES`. Issue 08 asks to re-verify on 5.3.0 before fixing. |
-| F7 composer context | 5.2.0 itself | Model chip in the composer shipped; the remaining asks (tools, assistant, knowledge folder, promotions) are issue 22. |
+| F44, F46, F47, F13, F14 | #2379 | Issues 01–07. Shipped. |
+| F2 | #2377, then #2380 | Issue 12. A reportable MCP failure keeps the answer. Shipped. |
+| F24, F40, F9, F26, F43 (label and error), F35, F48 | #2380 | Issues 08–11, 13, 14. Shipped. PDF text still cannot be edited in place; the reply says so. PyMuPDF was not added. |
+| F3 docs path | #2359 (5.2.1) | Docs now say **Manage → Channels → Synaplan Desktop**. Issue 50 is still a verification task, not a rewrite. |
+| F7 composer context | 5.2.0, plus the knowledge-folder chip in #2380 | Model chip shipped in 5.2.0. The active knowledge folder is now on the composer. Tools, assistant and promotions remain issue 22. |
 | F11 | — | Not reproducible on 5.2.0 per the testers. No issue. |
 
-Nothing else in that range touches the findings.
+F16 (prices, issue 15) and everything in waves 3–6 are still open.
 
 ---
 
-## 5. Verified in the code (2026-10-07)
+## 5. Verified in the code (2026-10-07, before waves 1 and 2)
 
-What a vibe-coding session can rely on without re-discovering it. Each
-issue repeats the pointers it needs.
+Snapshot of the 5.2.0 / early-5.3.0 code the drafts were written against.
+**Do not treat the F44, F46, F13, F14 and F24 rows as the current code.**
+Those bugs shipped in #2379 and #2380. The rows stay so the next reader
+can see what was wrong. Each open issue still repeats the pointers it needs.
 
 | Finding | What the code shows | File |
 | ------- | ------------------- | ---- |
@@ -198,8 +219,9 @@ issue repeats the pointers it needs.
 | F21 | No `cafile`, `capath`, `EXTRA_CA_*` or per-endpoint TLS option anywhere in `backend/src`, `backend/config`, `deploy/compose.yaml` or `deploy/selfhost.env.example`. | — |
 | F13 default | `deploy/selfhost.env.example` ships `MAILER_DSN=null://null` and `APP_SENDER_EMAIL=`. | `deploy/selfhost.env.example` |
 
-Not verified in code (hands-on only, taken from the report): F2 error
-path, F16 price import, F35 timing, F39, F40 party reversal, F48, F49.
+Not verified in code when this triage was written (hands-on only): F16
+price import, F39, F49. F2, F35, F40 and F48 were checked while shipping
+#2377 and #2380; those four are closed.
 
 ---
 
@@ -218,17 +240,17 @@ path, F16 price import, F35 timing, F39, F40 party reversal, F48, F49.
 
 Short, honest, for the product owner to adapt:
 
-- *knowledge.folders error known? Should assistants use Library files directly?* — Not known before this report. Root cause is a validation regex that rejects folder names with spaces or non-ASCII characters (issue 01). Yes: picking Library files directly is issue 03.
-- *Is indexing meant to run inside the upload request?* — For Library uploads today, yes; an async `processFile` path exists for "fast upload" and issue 04 moves indexing onto it with bounded memory.
-- *Should File work see files generated earlier in the chat?* — Yes, that is the intended follow-up journey; issue 11.
+- *knowledge.folders error known? Should assistants use Library files directly?* — Fixed in #2379. Folder names with spaces and non-ASCII save (issue 01). Picking Library files directly shipped with issue 03.
+- *Is indexing meant to run inside the upload request?* — Library uploads no longer hold the whole file in one request (#2379, issue 04). An upload can be cancelled (issue 05).
+- *Should File work see files generated earlier in the chat?* — Yes. #2380 mounts a file this chat already saved when the person or the planner names it (issue 11). It does not mount every earlier file, and it does not turn the shared workspace on by default.
 - *Page reader: Library extraction for PDF links, Firecrawl for JS, length limit?* — Issue 33 asks exactly that; the limit will be shown in the step.
 - *Custom HTTP tools: response visibility, credentials, template syntax docs?* — Issues 25 and 26.
-- *Failed MCP steps keep the answer step and show the error?* — Issue 12.
+- *Failed MCP steps keep the answer step and show the error?* — Shipped. #2377 keeps the answer on a reportable failure. #2380 logs server, tool and status (issue 12).
 - *Trusted-local MCP allowlist or STDIO?* — Issue 45; pairs with CA trust (issue 38).
 - *USD in README vs EUR in UI?* — Issue 43 has to answer how the EUR figure is derived before changing display.
-- *Expandable tool input / output / timing / errors on task cards?* — Issue 10.
-- *File work on attached files; PyMuPDF in the sandbox?* — Issue 14 (sandbox image change is an ask-first dependency decision).
-- *Installer writes COMPUTE_URL / COMPUTE_TOKEN?* — Issue 08.
+- *Expandable tool input / output / timing / errors on task cards?* — Shipped in #2380 (issue 10). The expanded step shows the resolved inputs, a capped output, status and duration.
+- *File work on attached files; PyMuPDF in the sandbox?* — Routing shipped in #2380 (issue 14). The sandbox still cannot change PDF text in place, and the reply says so. PyMuPDF was not added; that remains an ask-first dependency.
+- *Installer writes COMPUTE_URL / COMPUTE_TOKEN?* — Shipped in #2380 (issue 08). The token is written to `data/compute.token`, not into `.env`. `${VAR}` in `COMPOSE_PROFILES` is expanded. The file is not sourced. `docker compose config --profiles` is the wrong detector: it lists every declared profile, including `compute`, even when File work is off.
 - *Extra trusted CA?* — Issue 38, smallest form first (`EXTRA_CA_CERTS` PEM path + compose mount).
 - *Import dialog search, cached probes, prices?* — Issues 35 and 15.
 - *Docling default?* — Open (§6).
@@ -240,22 +262,24 @@ Short, honest, for the product owner to adapt:
 
 Each file in [`issues/`](./issues/) is one GitHub issue in the repository's
 template shape (`.github/ISSUE_TEMPLATE/bug.md` / `feature.md`), with
-title, type and labels in the first three HTML comments. Labels used:
+title, type and labels in the header HTML comments, plus
+`<!-- status: shipped -->` once the work has merged. Labels used:
 `prio:1` / `prio:2` / `prio:3` and the existing `area:*` set; nothing new
 has to be created.
 
 ```bash
-# prints the gh commands, creates nothing
+# prints what would be created; shipped drafts are listed and skipped
 _devextras/planning/20261007-community-test-findings-5.2.0/create-issues.sh
 
-# creates every issue that does not already exist (matched by exact title)
+# creates every open issue that does not already exist (matched by exact title)
 _devextras/planning/20261007-community-test-findings-5.2.0/create-issues.sh --create
 
-# only one wave
-_devextras/planning/20261007-community-test-findings-5.2.0/create-issues.sh --create --only 0[1-8]
+# wave 3 only (issues 01–14 are shipped and skipped even if the glob matches)
+_devextras/planning/20261007-community-test-findings-5.2.0/create-issues.sh --create --only '1[6-9]'
 ```
 
 The script needs a `gh` login with write access to issues; the read-only
 token used by cloud agents cannot create them, which is why the drafts
-live here. After creation, add the issue numbers to the table in §3 so the
+live here. A draft with `<!-- status: shipped -->` in its header is never
+created. After creation, add the issue numbers to the table in §3 so the
 next test round can reference them.

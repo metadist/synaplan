@@ -1,7 +1,10 @@
 <!-- title: Files: a 78 MB CSV exhausts PHP memory while being indexed inside the upload request; every failed attempt leaves a duplicate -->
 <!-- type: Bug -->
 <!-- labels: prio:1, area:files, area:semantic-search -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
+
+> **Shipped** in [#2379](https://github.com/metadist/synaplan/pull/2379) (`c97e79144`). Do not re-implement. The sections below describe the 5.2.0 bug.
 
 ## Problem
 Uploading a 78.2 MB CSV (under the 128 MB limit) fails with a generic "failed to load" and HTTP 500. The file is stored and text extraction starts, then chunking runs inside the same upload request and `TextChunker.php` exhausts PHP's 512 MB memory limit. Each failed attempt still leaves the file in the Library, so the user sees duplicates of a file whose upload reported failure.
