@@ -61,7 +61,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'label' => 'Running arbitrary code',
             'detail' => 'The assistant cannot execute Python, shell, or other code on the server',
             'alternative' => 'Synaplan Desktop skills on the user\'s computer',
-            'adminHint' => 'Manage → Channels → Synaplan Desktop',
+            'adminHint' => 'Channels → Synaplan Desktop',
             'docsSlug' => 'desktop-skills',
         ],
         [
@@ -327,7 +327,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $desktopOn,
             $desktopOn ? 'skills on your computer' : 'not enabled',
             'ask me to draft the steps here',
-            'Manage → Channels → Synaplan Desktop',
+            'Channels → Synaplan Desktop',
             'desktop-skills',
         );
         $mcpServerOn = $this->mcpClientConfig->isClientEnabled($userId > 0 ? $userId : null);

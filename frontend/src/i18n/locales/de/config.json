@@ -104,7 +104,7 @@
         "namePlaceholder": "Name (GPT-4.1)",
         "createModel": "Modell erstellen",
         "creating": "Erstelle…",
-        "uniqueKey": "Eindeutiger Schlüssel",
+        "uniqueKey": "Erkannt an Anbieter, Modellkennung und Merkmal",
         "loadingModels": "Lade Admin-Modelle…",
         "id": "ID",
         "service": "Service",
@@ -117,7 +117,7 @@
         "unitIn": "Einheit ein",
         "priceOut": "Preis aus",
         "unitOut": "Einheit aus",
-        "showWhenFree": "Gratis OK",
+        "showWhenFree": "Auch anzeigen, wenn kostenlos",
         "showWhenFreeTooltip": "Modell in der Auswahl anzeigen, auch wenn Preis ein und Preis aus beide 0 sind (kostenlos)",
         "showWhenFreeOn": "Override aktiv: Modell sichtbar, auch wenn beide Preise 0 sind",
         "showWhenFreeOff": "Standard: Modell wird ausgeblendet, wenn beide Preise 0 sind",
@@ -169,7 +169,8 @@
           "serviceRequired": "Service ist erforderlich",
           "providerIdRequired": "Modell-ID ist erforderlich",
           "nameRequired": "Anzeigename ist erforderlich"
-        }
+        },
+        "uniqueKeyHint": "Zwei Zeilen mit demselben Anbieter, derselben Modellkennung und demselben Merkmal sind dasselbe Modell."
       },
       "pagination": {
         "showing": "Zeige {start}–{end} von {total}"
@@ -452,6 +453,11 @@
       "updateFailed": "Die gespeicherte Aufgabe konnte nicht aktualisiert werden.",
       "runsFailed": "Ausführungen konnten nicht geladen werden.",
       "scheduleSaved": "Zeitplan gespeichert.",
+      "timezoneLabel": "Zeitzone: {tz}",
+      "timezoneDeviceUnsaved": "Zeitzone {tz} von diesem Gerät. Dein Profil wurde nicht geändert.",
+      "timezoneLoadFailed": "Die Zeitzone aus deinem Profil konnte nicht geladen werden. Versuche es gleich noch einmal.",
+      "timezoneNotSavedLoad": "Diese Uhrzeit wurde nicht gespeichert, weil die Zeitzone aus deinem Profil nicht geladen werden konnte. Der bisherige Zeitplan bleibt unverändert.",
+      "timezoneSwitchHint": "Eine neu gespeicherte Uhrzeit gilt in {tz} aus Sprache & Darstellung. Dieser Plan läuft weiter in {current}.",
       "resumed": "Die Aufgabe läuft wieder.",
       "resume": "Fortsetzen",
       "showResults": "Ergebnisse anzeigen",
@@ -722,6 +728,8 @@
       "flowBody": "Wenn eine Nachricht eintrifft, liest der Planer sie und zerlegt sie in eine kleine Reihe von Aufgaben (zum Beispiel: ein Bild erzeugen und es dann als Audio zusammenfassen). Jede Aufgabe wird von der passenden Fähigkeit bearbeitet und die Ergebnisse werden zu einer Antwort zusammengeführt.",
       "customCalloutBody": "Speichere eine wiederkehrende Anweisung mit einem /Befehl und füge sie im Eingabefeld ein.",
       "customCalloutLink": "Prompt-Bibliothek öffnen",
+      "taskPromptsCalloutBody": "Eigene Themen und System-Prompts gewünscht? Erstelle und bearbeite sie auf der Seite Task-Prompts — der Planer übernimmt sie automatisch.",
+      "taskPromptsCalloutLink": "Task-Prompts öffnen",
       "masterTitle": "Multi-Task-Routing",
       "masterDesc": "Nachrichten über den Planer leiten, sodass eine Anfrage mehrere Aufgaben gleichzeitig auslösen kann. Wenn aus, übernimmt der bisherige Einzelthema-AI-Sorter das Routing.",
       "masterHint": "Globale Voreinstellung für den Workspace. Bestehende Nutzer behalten ihre eigene Einstellung, bis sie zustimmen; das Aktivieren hier schaltet es auch für dein eigenes Konto frei.",

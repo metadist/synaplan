@@ -51,8 +51,12 @@
               <td class="py-3 px-3 txt-primary font-medium">{{ group.name }}</td>
               <td class="py-3 px-3">
                 <span
-                  class="pill text-xs"
-                  :title="group.kind === 'directory' ? (group.externalSource ?? '') : undefined"
+                  class="inline-flex items-center px-2 py-0.5 rounded-md text-xs txt-secondary bg-black/5 dark:bg-white/10"
+                  :title="
+                    group.kind === 'directory'
+                      ? group.externalSource || $t('people.groups.fromLoginHint')
+                      : $t('people.groups.manualHint')
+                  "
                   >{{
                     group.kind === 'directory'
                       ? $t('people.groups.fromLogin')

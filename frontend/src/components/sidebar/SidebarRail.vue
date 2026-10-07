@@ -1,12 +1,20 @@
 <template>
   <aside class="v2-sidebar-rail flex flex-col items-center" data-testid="section-sidebar-rail">
     <div class="flex items-center justify-center flex-shrink-0 h-14 w-full">
-      <img
-        :src="iconSrc"
-        :alt="configStore.branding.name"
-        class="h-6 w-auto"
-        data-testid="img-sidebar-brand"
-      />
+      <router-link
+        to="/"
+        class="inline-flex items-center justify-center rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        :aria-label="$t('nav.home')"
+        :title="$t('nav.home')"
+        data-testid="link-sidebar-brand"
+      >
+        <img
+          :src="iconSrc"
+          :alt="configStore.branding.name"
+          class="h-6 w-auto"
+          data-testid="img-sidebar-brand"
+        />
+      </router-link>
     </div>
 
     <button

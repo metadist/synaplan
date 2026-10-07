@@ -350,7 +350,7 @@
         "summary": "{env} aus der Umgebung, {db} in der Oberfläche überschrieben.",
         "cta": "Anbieter & Schlüssel öffnen"
       },
-      "envOverridesDb": "Von der Umgebungsvariablen {key} festgelegt. Aktuell: {value}. Entferne die Variable aus der Umgebung, um diese Einstellung hier zu verwalten.",
+      "envOverridesDb": "Gesperrt durch die Umgebungsvariable {key}. Aktueller Wert: {value}. Setzen Sie {key} in der Umgebung dieser Installation und starten Sie das Backend neu.",
       "unsaved": "Nicht gespeicherte Änderungen",
       "clear": "Löschen",
       "clearHint": "Gespeicherten Wert entfernen. Danach gilt wieder der Standard.",
@@ -514,7 +514,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Verwalten → Kanäle. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Kanäle → Synaplan Desktop. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut.",
         "FEATURE_SEARCH_AI_ENABLED": "KI-Hilfe in der Suchpalette (Strg/Cmd+K): Bei einer Frage in normalen Worten wählt das Tools-Modell den passendsten Treffer und begründet ihn in einem Satz. Es ändert selbst nichts. Jede Nutzung ist ein kurzer KI-Aufruf. Aus: Stichwort- und Bedeutungssuche bleiben."
       },
       "fieldOptions": {
@@ -533,7 +533,9 @@
           "approve": "Zuerst fragen",
           "block": "Nie ausführen"
         }
-      }
+      },
+      "valueSet": "Für diese Einstellung ist ein Wert gespeichert.",
+      "valueEmpty": "Diese Einstellung ist noch leer."
     }
   },
   "statistics": {
@@ -570,7 +572,9 @@
       "applying": "Wird importiert…",
       "applied": "{created} Modellzeile(n) importiert, {skipped} bereits vorhanden übersprungen.",
       "applyFailed": "Die Modelle konnten nicht importiert werden.",
-      "noValidTags": "Gib jedem ausgewählten Modell mindestens eine gültige Fähigkeit."
+      "noValidTags": "Gib jedem ausgewählten Modell mindestens eine gültige Fähigkeit.",
+      "filterLabel": "Modelle filtern",
+      "filterPlaceholder": "Nach Name oder Kennung filtern"
     },
     "extraction": {
       "lead": "Legen Sie fest, wie Dokumente zu Text werden. Docling erhält Tabellen und Überschriften; wenn es nicht läuft, übernimmt Tika — Uploads schlagen nie fehl.",
@@ -659,7 +663,8 @@
       "testButton": "Testabfrage",
       "testing": "Test läuft…",
       "testProvider": "Beantwortet von {provider}",
-      "testProviderFallback": "Beantwortet von {provider} (Ersatz für {from})"
+      "testProviderFallback": "Beantwortet von {provider} (Ersatz für {from})",
+      "allowUsersHint": "Wenn dies an ist, kann jede Person in den Einstellungen einen eigenen Suchanbieter wählen."
     },
     "rerank": {
       "title": "Neuordnung",
@@ -896,7 +901,11 @@
         "widget": "Chat-Widget",
         "agent": "Agent",
         "tool": "Werkzeug"
-      }
+      },
+      "manualHint": "Von Hand in Synaplan angelegt, nicht über die Anmeldung.",
+      "fromLoginHint": "Aus der Unternehmensanmeldung übernommen.",
+      "roleLabel": "Rolle",
+      "roleUpdated": "Rolle aktualisiert."
     },
     "audit": {
       "when": "Wann",

@@ -4,7 +4,7 @@
       class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-config"
     >
-      <div class="max-w-7xl mx-auto" data-testid="section-config">
+      <div class="max-w-[100rem] mx-auto" data-testid="section-config">
         <div v-if="currentPage === 'inbound'" data-testid="section-inbound">
           <InboundConfiguration />
         </div>
@@ -110,7 +110,8 @@ const currentPage = computed(() => {
   if (path.startsWith('/channels')) return 'inbound'
   if (path.startsWith('/ai/providers/higgsfield')) return 'ai-provider-higgsfield'
   if (path.startsWith('/ai/models')) return 'ai-models'
-  if (path.startsWith('/ai/instructions')) return 'task-prompts'
+  if (path.startsWith('/ai/instructions') || path.startsWith('/ai/task-prompts'))
+    return 'task-prompts'
   if (path.startsWith('/ai/routing')) return 'sorting-prompt'
   return 'inbound'
 })

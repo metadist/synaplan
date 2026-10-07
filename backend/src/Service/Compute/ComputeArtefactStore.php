@@ -92,21 +92,38 @@ final readonly class ComputeArtefactStore
 
         $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', $artefact->name) ?? 'artefact';
         $ext = strtolower(pathinfo($safe, PATHINFO_EXTENSION) ?: 'bin');
-        $basename = pathinfo($safe, PATHINFO_FILENAME) ?: 'artefact';
-        $filename = $basename.'_'.$runId.'_'.bin2hex(random_bytes(4)).'.'.$ext;
-        $relative = $this->paths->buildUserBaseRelativePath($userId).'/'.date('Y').'/'.date('m').'/'.$filename;
-        $absolute = rtrim($this->uploadDir, '/').'/'.$relative;
-        if (!FileHelper::ensureParentDirectory($absolute)) {
-            $this->logger->error('ComputeArtefactStore: cannot create directory', ['dir' => dirname($absolute)]);
-
-            return null;
+        $basename = strtolower(trim((string) (pathinfo($safe, PATHINFO_FILENAME) ?: 'file'), '._-'));
+        if ('' === $basename) {
+            $basename = 'file';
         }
-        $written = file_put_contents($absolute, $bytes);
-        if (false === $written || $written !== strlen($bytes)) {
-            if (is_file($absolute)) {
-                unlink($absolute);
+        $basename = substr($basename, 0, 80);
+        $displayName = $basename.'.'.$ext;
+        $relative = null;
+        $absolute = null;
+        $stored = false;
+        for ($attempt = 0; $attempt < 3; ++$attempt) {
+            $storedName = $basename.'-'.bin2hex(random_bytes(4)).'.'.$ext;
+            $relative = $this->paths->buildUserBaseRelativePath($userId).'/'.date('Y').'/'.date('m').'/'.$storedName;
+            $absolute = rtrim($this->uploadDir, '/').'/'.$relative;
+            if (!FileHelper::ensureParentDirectory($absolute)) {
+                $this->logger->error('ComputeArtefactStore: cannot create directory', ['dir' => dirname($absolute)]);
+
+                return null;
             }
-            $this->logger->error('ComputeArtefactStore: write failed', ['path' => $relative]);
+            $handle = fopen($absolute, 'xb');
+            if (false === $handle) {
+                continue;
+            }
+            $written = fwrite($handle, $bytes);
+            fclose($handle);
+            if (false !== $written && $written === strlen($bytes)) {
+                $stored = true;
+                break;
+            }
+            unlink($absolute);
+        }
+        if (!$stored) {
+            $this->logger->error('ComputeArtefactStore: write failed', ['name' => $displayName]);
 
             return null;
         }
@@ -115,7 +132,7 @@ final readonly class ComputeArtefactStore
         $file->setUserId($userId);
         $file->setFilePath($relative);
         $file->setFileType($ext);
-        $file->setFileName($filename);
+        $file->setFileName($displayName);
         $file->setFileSize(strlen($bytes));
         $file->setFileMime($artefact->mime);
         $file->setFileText('');

@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import type { TaskCard } from '@/stores/history'
 import { getConfigSync } from '@/services/api/httpClient'
+import TaskCardMedia from '@/components/multitask/TaskCardMedia.vue'
 
 const props = defineProps<{
   card: TaskCard
@@ -38,6 +39,13 @@ const showWorkspace = computed(
     getConfigSync().features?.computeWorkspacesEnabled === true &&
     ['done', 'failed'].includes(props.card.state)
 )
+const previewKind = computed(() => {
+  const type = (props.card.mediaType ?? '').toLowerCase()
+  if (type.startsWith('image/') || type === 'image') return 'image'
+  if (type.startsWith('video/') || type === 'video') return 'video'
+  if (type.startsWith('audio/') || type === 'audio') return 'audio'
+  return 'document'
+})
 const notesId = computed(() => `compute-run-notes-${props.card.nodeId}`)
 const notesHelpId = computed(() => `${notesId.value}-help`)
 
@@ -62,15 +70,9 @@ const submitRerun = () => {
     </p>
     <p v-else-if="card.text" class="text-sm txt-primary break-words">{{ card.text }}</p>
     <div v-if="card.state === 'done' || showWorkspace" class="flex flex-wrap gap-2">
-      <a
-        v-if="card.state === 'done' && card.url"
-        :href="card.url"
-        class="inline-flex items-center gap-1 pill text-xs"
-        data-testid="compute-run-preview"
-      >
-        <Icon icon="mdi:file-outline" class="w-4 h-4" />
-        {{ $t('compute.preview') }}
-      </a>
+      <div v-if="card.state === 'done' && card.url" data-testid="compute-run-preview">
+        <TaskCardMedia :kind="previewKind" :url="card.url" />
+      </div>
       <router-link
         v-if="card.state === 'done'"
         to="/files/generated"

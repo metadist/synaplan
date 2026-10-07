@@ -35,7 +35,7 @@ interface WidgetConfig {
   iconColor?: string
   buttonIcon?: 'chat' | 'headset' | 'help' | 'robot' | 'message' | 'support' | string
   buttonIconUrl?: string
-  defaultTheme?: 'light' | 'dark'
+  defaultTheme?: 'light' | 'dark' | 'oled'
   autoOpen?: boolean
   autoMessage?: string
   apiUrl?: string
@@ -243,7 +243,8 @@ class SynaplanWidget {
     }
   }
 
-  private detectHostTheme(): 'light' | 'dark' {
+  private detectHostTheme(): 'light' | 'dark' | 'oled' {
+    if (document.documentElement.classList.contains('theme-oled')) return 'oled'
     return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
   }
 

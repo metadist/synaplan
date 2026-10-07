@@ -600,7 +600,10 @@
     "preview": "Operationen anzeigen",
     "applyImport": "Auswahl importieren",
     "imported": "Werkzeuge importiert.",
-    "importFailed": "Die OpenAPI-Beschreibung konnte nicht importiert werden."
+    "importFailed": "Die OpenAPI-Beschreibung konnte nicht importiert werden.",
+    "tryRequest": "Anfrage",
+    "tryResponse": "Antwort",
+    "tryNotSent": "Es wurde nichts gesendet. Dieses Werkzeug kann Daten ändern, deshalb zeigt Ausprobieren nur die Anfrage."
   },
   "workflows": {
     "steps": "Schritte",

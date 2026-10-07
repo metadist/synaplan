@@ -20,6 +20,9 @@
           <span v-if="card.status === 'archived'" data-testid="badge-card-archived">
             · {{ $t('assistants.archivedBadge') }}</span
           >
+          <span v-else-if="card.status === 'draft'" data-testid="badge-card-draft">
+            · {{ $t('assistants.statusDraft') }}</span
+          >
         </p>
       </div>
     </div>

@@ -12,6 +12,7 @@ use OpenApi\Attributes as OA;
     properties: [
         new OA\Property(property: 'operationId', type: 'string', example: 'createTicket'),
         new OA\Property(property: 'summary', type: 'string'),
+        new OA\Property(property: 'description', type: 'string'),
         new OA\Property(property: 'method', type: 'string', example: 'POST'),
         new OA\Property(property: 'path', type: 'string', example: '/tickets'),
         new OA\Property(property: 'sideEffect', type: 'string', enum: ['read', 'write', 'destructive']),

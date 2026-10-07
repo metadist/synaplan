@@ -1,57 +1,72 @@
 <template>
-  <nav class="flex flex-col gap-4 px-3 py-2" :aria-label="$t('nav.profile')">
-    <div class="flex flex-col gap-0.5">
-      <router-link
-        v-for="item in preferenceLinks"
-        :key="item.slug"
-        :to="item.to"
-        class="flex items-center min-h-11 px-2 rounded-lg text-[15px] transition-colors"
-        :class="linkClass(item.path)"
-        :aria-current="isCurrent(item.path) ? 'page' : undefined"
-        :data-testid="`link-sidebar-v2-settings-${item.slug}`"
-      >
-        <span class="truncate">{{ item.label }}</span>
-      </router-link>
-    </div>
-
-    <div v-if="accountLinks.length > 0" class="flex flex-col gap-0.5">
-      <router-link
-        v-for="item in accountLinks"
-        :key="item.id"
-        :to="item.to"
-        class="flex items-center gap-2 min-h-11 px-2 rounded-lg text-[15px] transition-colors"
-        :class="[linkClass(item.path), item.locked ? 'opacity-60' : '']"
-        :aria-current="isCurrent(item.path) ? 'page' : undefined"
-        :data-testid="`link-sidebar-v2-${item.id}`"
-      >
-        <span class="flex-1 truncate">{{ item.label }}</span>
-        <Icon
-          v-if="item.locked"
-          icon="mdi:lock"
-          class="w-3.5 h-3.5 flex-shrink-0 text-orange-500 dark:text-orange-400"
+  <nav class="flex flex-col gap-5 px-3 pt-3 pb-3" :aria-label="$t('nav.profile')">
+    <section>
+      <h3 :class="headingClass">{{ $t('settings.title') }}</h3>
+      <div class="flex flex-col gap-0.5">
+        <SidebarNavLink
+          v-for="item in preferenceLinks"
+          :key="item.slug"
+          :to="item.to"
+          :label="item.label"
+          :icon="item.icon"
+          :active="isCurrent(item.path)"
+          :test-id="`link-sidebar-v2-settings-${item.slug}`"
         />
-      </router-link>
-    </div>
+      </div>
+    </section>
 
-    <div v-if="deleteLink" class="flex flex-col gap-0.5">
-      <router-link
+    <section v-if="accountLinks.length > 0">
+      <h3 :class="headingClass">{{ $t('nav.account') }}</h3>
+      <div class="flex flex-col gap-0.5">
+        <SidebarNavLink
+          v-for="item in accountLinks"
+          :key="item.id"
+          :to="item.to"
+          :label="item.label"
+          :icon="item.icon"
+          :locked="item.locked"
+          :active="isCurrent(item.path)"
+          :test-id="`link-sidebar-v2-${item.id}`"
+        />
+      </div>
+    </section>
+
+    <div
+      v-if="deleteLink"
+      class="flex flex-col gap-0.5 border-t border-black/[0.06] pt-3 dark:border-white/[0.06]"
+    >
+      <SidebarNavLink
         :to="deleteLink.to"
-        class="flex items-center min-h-11 px-2 rounded-lg text-[15px] transition-colors"
-        :class="linkClass(deleteLink.path)"
-        :aria-current="isCurrent(deleteLink.path) ? 'page' : undefined"
-        data-testid="link-sidebar-v2-settings-delete"
-      >
-        <span class="truncate">{{ deleteLink.label }}</span>
-      </router-link>
+        :label="deleteLink.label"
+        :icon="TrashIcon"
+        danger
+        :active="isCurrent(deleteLink.path)"
+        test-id="link-sidebar-v2-settings-delete"
+      />
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Icon } from '@iconify/vue'
+import {
+  ArchiveBoxIcon,
+  ChartBarIcon,
+  ChatBubbleLeftEllipsisIcon,
+  DevicePhoneMobileIcon,
+  HandThumbUpIcon,
+  CreditCardIcon,
+  LightBulbIcon,
+  LockClosedIcon,
+  ScaleIcon,
+  StarIcon,
+  SwatchIcon,
+  TrashIcon,
+  UserCircleIcon,
+} from '@heroicons/vue/24/outline'
+import SidebarNavLink from './SidebarNavLink.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
@@ -64,10 +79,25 @@ const configStore = useConfigStore()
 const { sections } = useSettingsSections()
 const purchaseAllowed = isPurchaseAllowed()
 
+const headingClass =
+  'px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider txt-secondary'
+
+const SECTION_ICONS: Record<string, Component> = {
+  profile: UserCircleIcon,
+  appearance: SwatchIcon,
+  chat: ChatBubbleLeftEllipsisIcon,
+  data: ArchiveBoxIcon,
+  billing: CreditCardIcon,
+  security: LockClosedIcon,
+  app: DevicePhoneMobileIcon,
+  legal: ScaleIcon,
+}
+
 function toLink(item: { slug: string; labelKey: string }) {
   return {
     slug: item.slug,
     label: t(item.labelKey),
+    icon: SECTION_ICONS[item.slug],
     path: `/settings/${item.slug}`,
     to: `/settings/${item.slug}`,
   }
@@ -92,6 +122,7 @@ const accountLinks = computed(() => {
   const links: Array<{
     id: string
     label: string
+    icon: Component
     path: string
     to: string
     locked?: boolean
@@ -101,6 +132,7 @@ const accountLinks = computed(() => {
     links.push({
       id: 'memories',
       label: t('pageTitles.memories'),
+      icon: LightBulbIcon,
       path: '/memories',
       to: locked ? '/settings/chat?highlight=memories' : '/memories',
       locked,
@@ -109,6 +141,7 @@ const accountLinks = computed(() => {
   links.push({
     id: 'statistics',
     label: t('nav.statistics'),
+    icon: ChartBarIcon,
     path: '/statistics',
     to: '/statistics',
   })
@@ -116,6 +149,7 @@ const accountLinks = computed(() => {
     links.push({
       id: 'feedback',
       label: t('pageTitles.feedback'),
+      icon: HandThumbUpIcon,
       path: '/feedbacks',
       to: '/feedbacks',
     })
@@ -124,6 +158,7 @@ const accountLinks = computed(() => {
     links.push({
       id: 'subscription',
       label: t('nav.subscription'),
+      icon: StarIcon,
       path: '/subscription',
       to: '/subscription',
     })
@@ -133,11 +168,5 @@ const accountLinks = computed(() => {
 
 function isCurrent(path: string): boolean {
   return route.path === path || route.path.startsWith(`${path}/`)
-}
-
-function linkClass(path: string): string {
-  return isCurrent(path)
-    ? 'text-[var(--brand)] bg-[var(--brand)]/[0.08] font-medium'
-    : 'txt-primary hover:bg-black/[0.04] dark:hover:bg-white/[0.04]'
 }
 </script>

@@ -117,7 +117,7 @@
         "namePlaceholder": "Nom (GPT-4.1)",
         "createModel": "Créer un modèle",
         "creating": "Création…",
-        "uniqueKey": "Clé unique",
+        "uniqueKey": "Identifié par le fournisseur, l’id du modèle et l’étiquette",
         "loadingModels": "Chargement des modèles admin…",
         "id": "ID",
         "service": "Service",
@@ -130,7 +130,7 @@
         "unitIn": "Unité entrée",
         "priceOut": "Prix sortie",
         "unitOut": "Unité sortie",
-        "showWhenFree": "OK si gratuit",
+        "showWhenFree": "Afficher même si c’est gratuit",
         "showWhenFreeTooltip": "Afficher le modèle dans la sélection même lorsque les prix d’entrée et de sortie sont à 0 (gratuit)",
         "showWhenFreeOn": "Exception active : modèle visible même si les deux prix sont à 0",
         "showWhenFreeOff": "Par défaut : modèle masqué lorsque les deux prix sont à 0",
@@ -182,7 +182,8 @@
           "serviceRequired": "Le service est requis",
           "providerIdRequired": "L’ID du modèle est requis",
           "nameRequired": "Le nom affiché est requis"
-        }
+        },
+        "uniqueKeyHint": "Deux lignes avec le même fournisseur, le même id et la même étiquette sont le même modèle."
       },
       "pagination": {
         "showing": "Affichage de {start}–{end} sur {total}"
@@ -465,6 +466,11 @@
       "updateFailed": "Impossible de mettre à jour cette tâche enregistrée.",
       "runsFailed": "Impossible de charger les exécutions.",
       "scheduleSaved": "Planning enregistré.",
+      "timezoneLabel": "Fuseau horaire : {tz}",
+      "timezoneDeviceUnsaved": "Fuseau horaire {tz} de cet appareil. Votre profil n’a pas été modifié.",
+      "timezoneLoadFailed": "Le fuseau horaire de votre profil n’a pas pu être chargé. Réessayez dans un instant.",
+      "timezoneNotSavedLoad": "Cette heure n’a pas été enregistrée, car le fuseau horaire de votre profil n’a pas pu être chargé. Le planning précédent est inchangé.",
+      "timezoneSwitchHint": "Une heure nouvellement enregistrée utilise {tz} de Langue et apparence. Ce planning continue dans {current}.",
       "resumed": "La tâche va à nouveau s’exécuter.",
       "resume": "Reprendre",
       "showResults": "Afficher les résultats",
@@ -735,6 +741,8 @@
       "flowBody": "Lorsqu’un message arrive, le planificateur le lit et le transforme en un petit ensemble de tâches (par exemple : générer une image, puis la résumer en audio). Chaque tâche est traitée par la bonne fonction et les résultats sont combinés en une seule réponse.",
       "customCalloutBody": "Enregistrez une instruction récurrente avec une /commande, puis insérez-la depuis le compositeur.",
       "customCalloutLink": "Ouvrir la bibliothèque de prompts",
+      "taskPromptsCalloutBody": "Vous voulez vos propres sujets et messages système ? Créez-les et modifiez-les sur la page Instructions — le planificateur les prend automatiquement en compte.",
+      "taskPromptsCalloutLink": "Ouvrir les instructions",
       "masterTitle": "Routage multi-tâches",
       "masterDesc": "Faites passer les messages par le planificateur afin qu’une demande puisse déclencher plusieurs tâches à la fois. Lorsqu’il est désactivé, l’ancien trieur IA à sujet unique gère le routage.",
       "masterHint": "Valeur par défaut de l’espace de travail. Les utilisateurs existants conservent leur propre réglage jusqu’à ce qu’ils l’acceptent ; l’activer ici l’active aussi pour votre propre compte.",

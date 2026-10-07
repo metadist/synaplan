@@ -5,15 +5,15 @@
   },
   "usageTaximeter": {
     "sessionLabel": "Tokens",
-    "todayTooltip": "{tokens} Tokens heute",
-    "todayLabel": "Deins heute",
+    "todayTooltip": "{tokens} Tokens heute. Beträge sind US-Dollar.",
+    "todayLabel": "Verbrauch heute",
     "todayAria": "Deine Ausgaben heute: {cost}",
     "openStats": "Nutzungsstatistik anzeigen",
     "usedModels": "Verwendete Modelle",
     "promptsInSession": "Prompts in dieser Sitzung",
     "modelChanges": "Modelländerungen: {count}",
     "allStatistics": "Alle Statistiken",
-    "lessThanCent": "< 0,01 €"
+    "lessThanCent": "< 0,01 $"
   },
   "export": {
     "title": "Export",
@@ -32,7 +32,11 @@
     "download": "Herunterladen",
     "exporting": "Exportiere...",
     "selectedChats": "{count} Chats ausgewählt",
-    "selectedChatsHint": "Nur diese ausgewählten Chats werden exportiert"
+    "selectedChatsHint": "Nur diese ausgewählten Chats werden exportiert",
+    "timezoneLoading": "Zeitzone wird geladen…",
+    "timezoneProfile": "Die Uhrzeiten in dieser Datei gelten in {tz} aus Sprache & Darstellung.",
+    "timezoneBrowser": "Die Uhrzeiten in dieser Datei gelten in der Zeitzone dieses Computers ({tz}). Dein Profil wurde nicht geändert.",
+    "timezoneUnavailable": "Die Uhrzeiten in dieser Datei gelten in der Zeitzone dieses Computers ({tz}), weil die Zeitzone aus Sprache & Darstellung nicht geladen werden konnte."
   },
   "profile": {
     "title": "Profil-Einstellungen",
@@ -84,9 +88,11 @@
       "language": "Sprache",
       "languageHint": "Sprache der Benutzeroberfläche",
       "timezone": "Zeitzone",
-      "timezoneHint": "Bei jedem Ort steht die aktuelle Abweichung von UTC, in Stunden und Minuten.",
+      "timezoneHint": "Gib eine Stadt oder eine Abweichung wie +02:00 ein. Passende Orte erscheinen darunter. Enter wählt den markierten Ort. Danach speichern, damit er bleibt.",
       "timezoneSearch": "Nach Stadt oder Abweichung suchen",
       "timezonePlaceholder": "Zeitzone wählen",
+      "timezoneCurrent": "Gewählt: {label}",
+      "timezoneMatchCount": "{count} Ort | {count} Orte",
       "timezoneNoMatch": "Keine Zeitzone passt zu dieser Suche.",
       "timezoneInvalid": "Wähle eine Zeitzone aus der Liste. Es wurde nichts gespeichert.",
       "invoiceEmail": "Rechnungs-E-Mail",
@@ -370,7 +376,8 @@
       "description": "Wählen Sie Ihr Farbschema",
       "light": "Hell",
       "dark": "Dunkel",
-      "system": "System"
+      "system": "System",
+      "oled": "OLED-Schwarz"
     },
     "language": {
       "title": "Sprache",

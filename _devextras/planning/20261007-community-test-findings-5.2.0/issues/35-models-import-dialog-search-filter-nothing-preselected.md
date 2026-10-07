@@ -3,6 +3,9 @@
 <!-- labels: prio:2, area:models -->
 <!-- issue-type: Feature -->
 
+## Progress
+The import dialog has a live filter on name and model id. Select all applies to the rows that filter leaves visible. New rows are still pre-selected, and probe results are unchanged.
+
 ## Summary
 The Import models dialog gets search (name, provider, model id), filters (provider / family, capability, already-imported), alphabetical and provider sort, opens with nothing selected (or confirms before importing more than a handful), and keeps capability probe results with a timestamp so closing the dialog does not throw away a billable probe.
 

@@ -178,7 +178,8 @@
     "usage": "Kullanım",
     "assistants": "Asistanlar",
     "approvals": "Onaylar",
-    "prompts": "Promptlar"
+    "prompts": "Promptlar",
+    "home": "Ana sayfa"
   },
   "common": {
     "ok": "Tamam",
@@ -321,7 +322,9 @@
           "searchKeywords": "web internet google çevrimiçi araştırma",
           "help": "Synaplan nasıl çalışır diye sor (/help)",
           "helpKeywords": "yardım destek rehber dokümantasyon"
-        }
+        },
+        "themeOled": "OLED siyaha geç",
+        "themeOledKeywords": "oled siyah amoled görünüm"
       },
       "synonyms": {
         "chat": "sohbet konuşma sor mesaj asistan",
@@ -541,5 +544,8 @@
       "text": "Satın alman hesabını bekliyor",
       "cta": "Hesap oluştur"
     }
+  },
+  "appearance": {
+    "cycle": "Görünümü değiştir"
   }
 }

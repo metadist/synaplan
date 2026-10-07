@@ -450,6 +450,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.prompts', i18n: ['chat'] },
     },
     {
+      path: '/ai/task-prompts',
+      name: 'ai-task-prompts',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configTaskPrompts', i18n: ['config'] },
+    },
+    {
       path: '/ai/instructions',
       name: 'ai-instructions',
       component: () => import('@/views/ConfigView.vue'),

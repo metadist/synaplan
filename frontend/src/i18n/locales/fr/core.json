@@ -179,7 +179,8 @@
     "assistants": "Assistants",
     "linkedPlatforms": "Plateformes liées",
     "approvals": "Approbations",
-    "prompts": "Prompts"
+    "prompts": "Prompts",
+    "home": "Accueil"
   },
   "common": {
     "ok": "OK",
@@ -332,7 +333,9 @@
           "searchKeywords": "web internet google en ligne recherche",
           "help": "Demander comment fonctionne Synaplan (/help)",
           "helpKeywords": "aide support guide documentation"
-        }
+        },
+        "themeOled": "Passer au noir OLED",
+        "themeOledKeywords": "oled noir amoled apparence"
       },
       "synonyms": {
         "chat": "chat conversation demander message assistant",
@@ -552,5 +555,8 @@
       "text": "Votre achat attend votre compte",
       "cta": "Créer un compte"
     }
+  },
+  "appearance": {
+    "cycle": "Changer l’apparence"
   }
 }

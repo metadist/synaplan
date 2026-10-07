@@ -180,7 +180,8 @@
     "assistants": "Assistenten",
     "linkedPlatforms": "Verknüpfte Plattformen",
     "approvals": "Freigaben",
-    "prompts": "Prompts"
+    "prompts": "Prompts",
+    "home": "Start"
   },
   "unsavedChanges": {
     "title": "Du hast ungespeicherte Änderungen",
@@ -385,7 +386,9 @@
           "searchKeywords": "web internet google online recherche",
           "help": "Fragen, wie Synaplan funktioniert (/help)",
           "helpKeywords": "hilfe support anleitung dokumentation"
-        }
+        },
+        "themeOled": "Auf OLED-Schwarz umschalten",
+        "themeOledKeywords": "oled schwarz amoled darstellung"
       },
       "synonyms": {
         "chat": "chat unterhaltung fragen nachricht assistent",
@@ -553,5 +556,8 @@
       "text": "Dein Kauf wartet auf dein Konto",
       "cta": "Konto erstellen"
     }
+  },
+  "appearance": {
+    "cycle": "Darstellung wechseln"
   }
 }

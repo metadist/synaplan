@@ -4,7 +4,7 @@
       class="min-h-screen bg-chat p-2 md:p-4 lg:p-8 relative overflow-x-hidden"
       data-testid="page-memories"
     >
-      <div class="max-w-7xl mx-auto h-full flex flex-col">
+      <div class="max-w-[100rem] mx-auto h-full flex flex-col">
         <!-- Header -->
         <PageHeader :title="$t('pageTitles.memories')" icon="heroicons:light-bulb">
           <template #actions>

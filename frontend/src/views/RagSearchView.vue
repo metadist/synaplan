@@ -5,7 +5,7 @@
       data-testid="page-rag-search"
     >
       <div class="px-3 py-4 sm:p-4 md:p-8">
-        <div class="max-w-7xl mx-auto space-y-6">
+        <div class="max-w-[100rem] mx-auto space-y-6">
           <FilesTabs />
 
           <!-- §4.8 #4: one compact status line instead of 4 jargon stat cards -->
@@ -127,7 +127,7 @@
                 <button
                   type="submit"
                   :disabled="isSearching || !query.trim()"
-                  class="btn-primary px-8 py-3 rounded-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform"
+                  class="btn-primary px-4 py-2.5 rounded-xl inline-flex items-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="btn-search"
                 >
                   <svg

@@ -1,6 +1,7 @@
 <!-- title: Theme: a true OLED black variant (and a dark-grey option) next to Light, Dark and System -->
 <!-- type: Feature -->
 <!-- labels: prio:3, area:profile -->
+<!-- status: shipped -->
 <!-- issue-type: Feature -->
 
 ## Summary

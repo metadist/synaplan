@@ -301,8 +301,28 @@ final class CustomToolController extends AbstractController
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'sent', type: 'boolean'),
-                        new OA\Property(property: 'result', description: 'Present when the read-class call was sent'),
-                        new OA\Property(property: 'request', description: 'Resolved request preview when the call was not sent'),
+                        new OA\Property(property: 'result', description: 'Mapped fields when the read-class call was sent'),
+                        new OA\Property(
+                            property: 'request',
+                            description: 'Resolved request with the credential masked',
+                            properties: [
+                                new OA\Property(property: 'method', type: 'string'),
+                                new OA\Property(property: 'url', type: 'string'),
+                                new OA\Property(property: 'headers', type: 'object'),
+                                new OA\Property(property: 'body', type: 'string', nullable: true),
+                            ],
+                            type: 'object'
+                        ),
+                        new OA\Property(
+                            property: 'response',
+                            description: 'Present when the call was sent, including error statuses',
+                            properties: [
+                                new OA\Property(property: 'status', type: 'integer'),
+                                new OA\Property(property: 'body', type: 'string'),
+                                new OA\Property(property: 'truncated', type: 'boolean'),
+                            ],
+                            type: 'object'
+                        ),
                     ]
                 )
             ),

@@ -14,6 +14,11 @@
       "updateFailed": "Kayıtlı görev güncellenemedi.",
       "runsFailed": "Çalıştırmalar yüklenemedi.",
       "scheduleSaved": "Zamanlama kaydedildi.",
+      "timezoneLabel": "Saat dilimi: {tz}",
+      "timezoneDeviceUnsaved": "Saat dilimi {tz} bu cihazdan. Profilin değişmedi.",
+      "timezoneLoadFailed": "Profilindeki saat dilimi yüklenemedi. Biraz sonra yeniden dene.",
+      "timezoneNotSavedLoad": "Bu saat kaydedilmedi, çünkü profilindeki saat dilimi yüklenemedi. Önceki zamanlama aynı kaldı.",
+      "timezoneSwitchHint": "Yeni kaydedilen bir saat, Dil ve görünüm bölümündeki {tz} dilimini kullanır. Bu plan {current} diliminde çalışmaya devam eder.",
       "resumed": "Görev yeniden çalışacak.",
       "resume": "Devam et",
       "showResults": "Sonuçları göster",
@@ -374,7 +379,10 @@
           "serviceRequired": "Hizmet gereklidir",
           "providerIdRequired": "Model kimliği gereklidir",
           "nameRequired": "Görünen ad gereklidir"
-        }
+        },
+        "uniqueKey": "Sağlayıcı, model kimliği ve etiketle tanınır",
+        "uniqueKeyHint": "Aynı sağlayıcı, model kimliği ve etikete sahip iki satır aynı modeldir.",
+        "showWhenFree": "Ücretsiz olsa da göster"
       },
       "chat": "Sohbet Modeli",
       "sorting": "Sıralama Modeli",
@@ -488,6 +496,8 @@
       "flowBody": "Bir mesaj geldiğinde planlayıcı onu okur ve küçük bir görev kümesine dönüştürür (örneğin: bir görsel oluştur, ardından onu ses olarak özetle). Her görev uygun yetenek tarafından işlenir ve sonuçlar tek bir yanıtta birleştirilir.",
       "customCalloutBody": "Tekrarlayan bir yönergeyi /komut ile kaydedin, sonra yazı alanından ekleyin.",
       "customCalloutLink": "Prompt kitaplığını aç",
+      "taskPromptsCalloutBody": "Kendi konularınızı ve sistem promptlarınızı mı istiyorsunuz? Bunları Görev Promptları sayfasında oluşturup düzenleyin — planlayıcı bunları otomatik olarak alır.",
+      "taskPromptsCalloutLink": "Görev Promptlarını aç",
       "masterTitle": "Çoklu görev yönlendirmesi",
       "masterDesc": "Bir isteğin aynı anda birden fazla görevi tetikleyebilmesi için mesajları planlayıcı üzerinden yönlendirin. Kapalıyken, eski tek konulu yapay zeka sıralayıcısı yönlendirmeyi üstlenir.",
       "masterHint": "Çalışma alanı için genel varsayılan. Mevcut kullanıcılar kendi tercih edene kadar kendi ayarlarını korur; bunu burada açmak kendi hesabınız için de etkinleştirir.",

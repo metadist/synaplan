@@ -127,31 +127,36 @@ describe('AIModelsConfiguration defaults scope', () => {
     await flushPromises()
   }
 
-  it('lets an admin set the model guests and members without a choice get', async () => {
+  it('opens on Just me so an admin does not change models for everyone by accident', async () => {
     await mountAs('ADMIN')
 
-    expect(getDefaultModels).toHaveBeenCalledWith('instance')
-    expect(
-      wrapper!.get('[data-testid="btn-defaults-scope-instance"]').attributes('aria-pressed')
-    ).toBe('true')
-    expect(wrapper!.get('[data-testid="text-defaults-scope-hint"]').text()).toContain('Guests')
+    const scopeButtons = wrapper!.findAll('[data-testid^="btn-defaults-scope-"]')
+    expect(scopeButtons.map((button) => button.text())).toEqual(['Just me', 'Everyone'])
+    expect(getDefaultModels).toHaveBeenCalledWith('user')
+    expect(wrapper!.get('[data-testid="btn-defaults-scope-user"]').attributes('aria-pressed')).toBe(
+      'true'
+    )
+    expect(wrapper!.get('[data-testid="text-defaults-scope-hint"]').text()).toContain(
+      'Only your own chats'
+    )
 
     await pickChatModel()
 
-    expect(saveDefaultModels).toHaveBeenCalledWith({ defaults: { CHAT: 385 }, global: true })
-    expect(notify.success).toHaveBeenCalledWith(expect.stringContaining('Saved for everyone'))
+    expect(saveDefaultModels).toHaveBeenCalledWith({ defaults: { CHAT: 385 } })
+    expect(notify.success).toHaveBeenCalledWith('Model configuration saved')
   })
 
-  it('saves only the admin’s own choice under "Just me" and remembers it', async () => {
+  it('saves for everyone only after choosing Everyone, and remembers that choice', async () => {
     await mountAs('ADMIN')
-    await wrapper!.get('[data-testid="btn-defaults-scope-user"]').trigger('click')
+    await wrapper!.get('[data-testid="btn-defaults-scope-instance"]').trigger('click')
     await flushPromises()
 
-    expect(getDefaultModels).toHaveBeenLastCalledWith('user')
-    expect(localStorage.getItem('ai-models-defaults-scope')).toBe('user')
+    expect(getDefaultModels).toHaveBeenLastCalledWith('instance')
+    expect(localStorage.getItem('ai-models-defaults-scope')).toBe('instance')
 
     await pickChatModel()
-    expect(saveDefaultModels).toHaveBeenCalledWith({ defaults: { CHAT: 385 } })
+    expect(saveDefaultModels).toHaveBeenCalledWith({ defaults: { CHAT: 385 }, global: true })
+    expect(notify.success).toHaveBeenCalledWith(expect.stringContaining('Saved for everyone'))
   })
 
   it('saves where the model was picked even if the scope changes during the check', async () => {
@@ -165,7 +170,7 @@ describe('AIModelsConfiguration defaults scope', () => {
     await mountAs('ADMIN')
 
     await pickChatModel()
-    await wrapper!.get('[data-testid="btn-defaults-scope-user"]').trigger('click')
+    await wrapper!.get('[data-testid="btn-defaults-scope-instance"]').trigger('click')
     await flushPromises()
     resolveCheck({
       available: true,
@@ -176,7 +181,7 @@ describe('AIModelsConfiguration defaults scope', () => {
     await flushPromises()
 
     expect(saveDefaultModels).toHaveBeenCalledTimes(1)
-    expect(saveDefaultModels).toHaveBeenCalledWith({ defaults: { CHAT: 385 }, global: true })
+    expect(saveDefaultModels).toHaveBeenCalledWith({ defaults: { CHAT: 385 } })
   })
 
   it('shows members no scope choice and keeps saving their own defaults', async () => {

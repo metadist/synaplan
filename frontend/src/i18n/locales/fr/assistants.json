@@ -194,6 +194,9 @@
       "onDay": "Le",
       "atTime": "À",
       "timezoneHint": "Fuseau horaire : {tz}",
+      "timezoneLoading": "Chargement de votre fuseau horaire…",
+      "timezoneDeviceUnsaved": "Fuseau horaire {tz} de cet appareil. Votre profil n’a pas été modifié.",
+      "timezoneLoadFailed": "Le fuseau horaire de votre profil n’a pas pu être chargé. Ce planning n’a pas été ajouté.",
       "askItTo": "Demandez-lui de",
       "scheduleHint": "S’exécute seul, en votre nom. Intervalle minimal : 15 minutes.",
       "advancedCron": "Avancé",
@@ -219,7 +222,8 @@
       "friday": "vendredi",
       "saturday": "samedi",
       "sunday": "dimanche"
-    }
+    },
+    "shareDraftHint": "Ceci est un brouillon. Vous pouvez le partager pour qu’une personne le lise ou l’essaie dans une discussion privée. Il n’est pas publié, donc le routeur ne le choisira pas."
   },
   "bundle": {
     "title": "Exporter et importer",

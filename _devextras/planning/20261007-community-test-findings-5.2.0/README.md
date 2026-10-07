@@ -1,7 +1,11 @@
 # Community test round on 5.2.0 — triage, fixing order, issue drafts
 
-**Status:** waves 1 and 2 are shipped (issues 01–14). Waves 3–6 are
-still open. This folder remains the triage of record for the external
+**Status:** waves 1 and 2 are shipped (issues 01–15). In wave 3, the
+assistant-pin bug (issue 20) is shipped. Issues 16–24 are implemented on
+PR #2385 and are **not** on `main` until that PR merges — do not redo them.
+An extra release (OLED black, the model-import filter, and the remaining
+bugs that are not in #2385) is [#2386](https://github.com/metadist/synaplan/pull/2386).
+What that branch actually finishes is listed in §0. This folder remains the triage of record for the external
 hands-on test of Synaplan 5.2.0 (tested 2026-10-05/06 against Open WebUI
 0.11.4, same model and files in both apps). Two documents were delivered:
 *Synaplan 5.2.0 — Test Findings* (F1–F49, grouped by impact) and
@@ -9,9 +13,10 @@ hands-on test of Synaplan 5.2.0 (tested 2026-10-05/06 against Open WebUI
 the product owner; this folder does not copy them because they name the
 testers' infrastructure.
 **Owner:** product owner.
-**Code baseline:** `main` at `96d0d54d6` (2026-10-07), which includes
-#2377, #2379, #2380 and this triage (#2378). The testers ran 5.2.0.
-Shipped work is marked below; do not re-implement it.
+**Code baseline:** `main` at `dbffbfd65` (2026-10-07), which includes
+#2377, #2379, #2380, #2382, #2383, the triage update (#2384) and the 5.3.0
+install note (#2373).
+The testers ran 5.2.0. Shipped work is marked below; do not re-implement it.
 **Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
 (U1–U12) and the AGENTS.md Perfect-UX bar apply to every user-visible
 issue in [`issues/`](./issues/). Each UI issue names its journey.
@@ -34,8 +39,20 @@ work in waves 1 and 2, and they shipped on 2026-10-07.
 | 01–07 | [#2379](https://github.com/metadist/synaplan/pull/2379) `c97e79144` | Folder ids with spaces and non-ASCII save. An assistant searches its own files, and a greeting does not. Add a file from the Library. Large uploads chunk in windows and can be cancelled. Admins can add a user, mark verified, and resend. Sign-up says when mail is not configured. |
 | 12 (core) | [#2377](https://github.com/metadist/synaplan/pull/2377) `a68637c33` | A reportable MCP failure keeps the answer step. A plain `NodeResult::failed` still skips dependents. |
 | 08–14 | [#2380](https://github.com/metadist/synaplan/pull/2380) `c5b6f22b5` | File-work token from `COMPOSE_PROFILES` in `deploy/.env`, including `${VAR}`, without sourcing the file. Knowledge sources with the passage loaded on open. Expandable task steps. A follow-up mounts a named file from this chat. Approval cards show the request and who decided. PDF edits are offered to File work; the sandbox still cannot change PDF text in place, and the reply says so. No PDF library was added. |
+| 15 | [#2382](https://github.com/metadist/synaplan/pull/2382) `eb02310a4` | OpenRouter import stores `pricing.prompt` / `pricing.completion` as USD per 1M tokens. A listing with no price stays selectable and says "Price unknown", not Free. A published 0 is still Free. `showWhenFree` stays on. Re-import does not overwrite a price an admin typed. `listModelIds()` stays id-only. Mail, WhatsApp, Telegram and the routing step keep the unknown-price flag. The EUR formatter is still issue 43. |
+| 20 | [#2383](https://github.com/metadist/synaplan/pull/2383) `cc075dcfa` | New-chat entry points drop `?agentId=`. The banner button opens an empty chat first, then clears the pin, because messages on the old thread still name the assistant. The close icon is on that button. The model chip still lists models only; an Assistants section is issue 22. |
+| 28, 36, 42, 43, 47, 49, 50, plus parts of 26, 29 and 35 | [#2386](https://github.com/metadist/synaplan/pull/2386) | OLED black is a fourth appearance choice (System still resolves to Dark). The model import list filters by name or id. Ollama listing is skipped when the base URL is empty. Admin copy no longer shows column names; a member's role can change without remove and re-add; Routing opens task prompts on a route the assistants guard does not steal. The usage meter shows US dollars. The logo goes home. Generated file names drop the run id, and an image result is shown inline. An untouched new assistant is deleted on leave, and a draft can be shared. Try it shows the masked request and the response body. |
 
-**Next open work is wave 3, starting at issue 15** (OpenRouter prices) and issue 16 (edit and rerun). Wave 2's price item (15) was not in #2379 or #2380.
+**Next open work** depends on #2385. If that PR is still open, do not start
+16–24 again. If it has merged, the next run starts at the leftover bugs and
+the open features below.
+
+Still open after the OLED / remaining-bugs branch:
+
+- **26** — Try it now shows the masked request and the response body, and OpenAPI import keeps `description` (a marked POST can stay `read`). The import wizard still does not let the admin change the risk class before import.
+- **29** — Generated file names no longer include the run id, and an image result renders inline (preview, then download). A table is still plain text, stdout can still repeat the data, the fast classifier can still say "image request", and Library times are unchanged.
+- **35** — The import dialog has a name/id filter, and Select all applies to the visible rows. New rows are still pre-selected. Probe results are unchanged.
+- Features still open: 16–19 and 21–23 (only if #2385 has not merged), then 25, 27, 30–34, 37–41, 44–46, 48. Issue 24 is a bug inside #2385.
 
 ---
 
@@ -66,17 +83,17 @@ reproducible are listed in §4, not turned into issues blindly.
 
 ## 2. Fixing order — six waves
 
-Waves are a dependency order, not a calendar. Waves 1 and 2 are on `main`
-except issue 15. Wave 3 does not wait for that price fix.
+Waves are a dependency order, not a calendar. Waves 1 and 2, including
+issue 15, are on `main`. Wave 3 can start at issue 16.
 
 | Wave | Theme | Issues (see [`issues/`](./issues/)) | Findings | Effort | State |
 | ---- | ----- | ----------------------------------- | -------- | ------ | ----- |
 | **1** | **Unblock the core jobs** — knowledge in assistants, big uploads, accounts, compute setup | 01 · 02 · 03 · 04 · 05 · 06 · 07 · 08 | F44 F46 F47 F13 F14 F24 | 01 S · 02 M · 03 M · 04 M · 05 S · 06 S · 07 S · 08 S | **Shipped** #2379 (01–07) and #2380 (08) |
-| **2** | **Make answers and runs checkable** — citations, step detail, honest failures, real prices | 09 · 10 · 11 · 12 · 13 · 14 · 15 | F40 F9 F26 F43(4,6) F35 F48 F2 F16 | 09 M · 10 M · 11 M · 12 S · 13 M · 14 M · 15 S | **09–14 shipped** (#2377, #2380). **15 still open** |
-| **3** | **Everyday chat actions** — edit/rerun, artifacts, export, prompts, previews, composer context | 16 · 17 · 18 · 19 · 20 · 21 · 22 · 23 · 24 | F36 F37 F38 F45 F32 F7 F17 F31 F41(reload) | 16 M · 17 M · 18 M · 19 M · 20 S · 21 M · 22 S · 23 L · 24 S | **Open** |
-| **4** | **Builders, tools, files** — custom tool form and visibility, builder gaps, File work results, Library | 25 · 26 · 27 · 28 · 29 · 30 · 31 · 32 · 33 · 34 | F43(1–3,5) F41 F42(drafts) F25 F30 F27 F49 F39 | 25 M · 26 M · 27 S · 28 S · 29 M · 30 S · 31 M · 32 M · 33 M · 34 S | **Open** |
-| **5** | **Admin, models, setup** — import dialog, embedding status, CA trust, impersonation lock, sharing for tools/MCP, policies | 35 · 36 · 37 · 38 · 39 · 40 · 41 · 42 · 43 · 44 · 45 | F4 F5 F18 F19 F28 F21 F29 F42 F22 F23 F12 F8 F20 F1 F46(noise) | 35 M · 36 S · 37 M · 38 M · 39 M · 40 M · 41 L · 42 S · 43 S · 44 M · 45 M | **Open** |
-| **6** | **Readability, accessibility, polish** — UI scale, OLED theme, shortcuts, layout, docs | 46 · 47 · 48 · 49 · 50 | F34 F10 F33 F6 F15 F3 + OLED request | 46 M · 47 S · 48 S · 49 S · 50 S | **Open** |
+| **2** | **Make answers and runs checkable** — citations, step detail, honest failures, real prices | 09 · 10 · 11 · 12 · 13 · 14 · 15 | F40 F9 F26 F43(4,6) F35 F48 F2 F16 | 09 M · 10 M · 11 M · 12 S · 13 M · 14 M · 15 S | **Shipped** (#2377, #2380, #2382) |
+| **3** | **Everyday chat actions** — edit/rerun, artifacts, export, prompts, previews, composer context | 16 · 17 · 18 · 19 · 20 · 21 · 22 · 23 · 24 | F36 F37 F38 F45 F32 F7 F17 F31 F41(reload) | 16 M · 17 M · 18 M · 19 M · 20 S · 21 M · 22 S · 23 L · 24 S | **20 shipped** (#2383). **16–19 and 21–24 are in #2385, not on main** |
+| **4** | **Builders, tools, files** — custom tool form and visibility, builder gaps, File work results, Library | 25 · 26 · 27 · 28 · 29 · 30 · 31 · 32 · 33 · 34 | F43(1–3,5) F41 F42(drafts) F25 F30 F27 F49 F39 | 25 M · 26 M · 27 S · 28 S · 29 M · 30 S · 31 M · 32 M · 33 M · 34 S | **28 shipped** on the OLED branch. **26 and 29 partly done** (see §0). The rest is open |
+| **5** | **Admin, models, setup** — import dialog, embedding status, CA trust, impersonation lock, sharing for tools/MCP, policies | 35 · 36 · 37 · 38 · 39 · 40 · 41 · 42 · 43 · 44 · 45 | F4 F5 F18 F19 F28 F21 F29 F42 F22 F23 F12 F8 F20 F1 F46(noise) | 35 M · 36 S · 37 M · 38 M · 39 M · 40 M · 41 L · 42 S · 43 S · 44 M · 45 M | **36, 42, 43 shipped** on the OLED branch. **35 has the filter only** |
+| **6** | **Readability, accessibility, polish** — UI scale, OLED theme, shortcuts, layout, docs | 46 · 47 · 48 · 49 · 50 | F34 F10 F33 F6 F15 F3 + OLED request | 46 M · 47 S · 48 S · 49 S · 50 S | **47, 49, 50 shipped** on the OLED branch. 46 and 48 stay open |
 
 **Why this order and not the testers' list.** Their ten priorities are
 kept almost one-to-one (their 1–3 are wave 1–2, 4 is wave 2, 5–6 are
@@ -86,10 +103,9 @@ badge on a billed model is a money-correctness bug, not a polish item; and
 **Open Terminal (their 9) is not an issue** — it is a product decision and
 a sprint of its own, recorded in §6.
 
-**Next PRs, now that waves 1 and 2 are on `main`:** issue 15 (OpenRouter
-prices — do not clear `showWhenFree`, do not overwrite an admin's price),
-then wave 3 starting at issue 16 (edit and rerun). Issue 23 is the large
-one in that wave; do not start it until 16–22 are scoped.
+**Next PR:** if #2385 is still open, leave 16–24 alone. Otherwise start at
+issue 25, then 27, 30–34. Do not reopen 26, 29 or 35 except for the leftovers
+named in §0. Issue 23 stays inside #2385.
 
 ## 2.1 Guards for whoever implements these
 
@@ -106,7 +122,8 @@ literally would ship one of these:
 | 09 | Store chunk bodies on the message and in the SSE event. Store ids; load the passage on open. |
 | 11 | Mount every earlier file into every later sandbox run. Turn `useWorkspace` on by default — that folder is shared across chats. |
 | 12 | Return `NodeResult::failed` for a tool error or an empty body. That skips the answer step. Use `reportableFailure`. Keep `failed` for a disabled tool, missing params, a disallowed topic, a hallucinated tool, and a mutating tool. |
-| 15 | Clear `showWhenFree` on priceless imports. That hides Ollama rows from the model menu (#2110). Do not overwrite a price an admin typed. Do not change `listModelIds()`'s return type. |
+| 15 | Clear `showWhenFree` on priceless imports. That hides Ollama rows from the model menu (#2110). Do not overwrite a price an admin typed. Do not change `listModelIds()`'s return type. A missing price is "Price unknown", not Free. A turn with any unpriced step must not show a partial cost as the whole cost. |
+| 20 | Only delete `?agentId=` while the open thread's messages still name the assistant. That leaves the banner and the next send pinned. Open an empty chat first, then drop the query. The Assistants section on the model chip is issue 22. |
 | 32 | Unpack zip/tar during indexing. Do not remove an extension that is allowed today. |
 | 33 | Raise `MAX_TEXT_LENGTH` for every URL mention. Leave the private-address refusal alone. |
 | 34 | Say "the planner adds a follow-up after search". The DAG is fixed before search runs. Evaluate quality inside the search runner, plan one optional retry up front, or add real replanning. Pick one before coding. |
@@ -139,7 +156,7 @@ cover note, with its destination.
 | F13 Sign-up with null mail transport | 1 | [07](./issues/07-auth-signup-dead-ends-with-null-mail-transport.md) | |
 | F14 Admin cannot create / verify users | 1 | [06](./issues/06-admin-add-user-mark-verified-resend.md) | Endpoint exists, UI does not call it |
 | F15 Clipping at ~850 px | 6 | [49](./issues/49-layout-logo-home-and-850px-clipping.md) | U9 |
-| F16 OpenRouter models imported without prices | 2 | [15](./issues/15-models-openrouter-import-prices-zero-free-badge.md) | Money correctness |
+| F16 OpenRouter models imported without prices | 2 | [15](./issues/15-models-openrouter-import-prices-zero-free-badge.md) | Shipped in #2382. EUR display is still issue 43. |
 | F17 Promotional cards on new chat | 3 | [22](./issues/22-chat-new-chat-screen-context-and-promotions.md) | |
 | F18 "Select all new" pre-ticked (Import 461) | 5 | [35](./issues/35-models-import-dialog-search-filter-nothing-preselected.md) | |
 | F19 Three screens disagree on the embedding model | 5 | [37](./issues/37-models-embedding-status-card-and-setup-polish.md) | |
@@ -168,7 +185,7 @@ cover note, with its destination.
 | F42 Access control gaps | 4 / 5 | [40](./issues/40-iam-share-custom-tools-and-mcp-servers.md) + [41](./issues/41-iam-group-policies-for-chat-actions.md) + [28](./issues/28-assistants-draft-on-first-save-and-share-draft.md) + [19](./issues/19-prompts-prompt-library-on-slash.md) | Tool share is already roadmap row 1 |
 | F43 Custom tool builder gaps | 2 / 4 | [25](./issues/25-custom-tools-arguments-credentials-template-hints.md) + [26](./issues/26-custom-tools-show-request-response-openapi-import.md) + [10](./issues/10-chat-expandable-task-steps-with-tool-io.md) | |
 | F44 Assistants cannot use Library files | 1 | [01](./issues/01-assistants-knowledge-folders-save-fails.md) + [02](./issues/02-assistants-own-files-and-draft-panel-skip-retrieval.md) + [03](./issues/03-assistants-add-file-from-library.md) | |
-| F45 Pinned assistant banner sticks | 3 | [20](./issues/20-chat-pinned-assistant-banner-sticks.md) | Silent misrouting |
+| F45 Pinned assistant banner sticks | 3 | [20](./issues/20-chat-pinned-assistant-banner-sticks.md) | Pin and banner shipped in #2383. Assistants section on the model chip is issue 22. |
 | F46 78 MB CSV exhausts PHP memory | 1 | [04](./issues/04-files-large-upload-oom-in-request.md) + [36](./issues/36-models-skip-ollama-listing-without-base-url.md) | Log noise split out |
 | F47 Upload cannot be cancelled | 1 | [05](./issues/05-files-upload-cannot-be-cancelled.md) | |
 | F48 File work follow-up cannot see earlier result | 2 | [11](./issues/11-file-work-follow-up-cannot-use-earlier-result.md) | |
@@ -181,9 +198,9 @@ cover note, with its destination.
 
 ## 4. What `main` already changed since 5.2.0
 
-Checked against `git log v5.2.0..HEAD` on 2026-10-07, after #2377, #2379
-and #2380. v5.2.1 and v5.3.0 were tagged 2026-10-05/06; the finding fixes
-landed the next day and are not in those tags.
+Checked against `git log v5.2.0..HEAD` on 2026-10-07, after #2377, #2379,
+#2380, #2382 and #2383. v5.2.1 and v5.3.0 were tagged 2026-10-05/06; the
+finding fixes landed after those tags.
 
 | Finding | Commit | Effect on the issue |
 | ------- | ------ | ------------------- |
@@ -191,18 +208,23 @@ landed the next day and are not in those tags.
 | F2 | #2377, then #2380 | Issue 12. A reportable MCP failure keeps the answer. Shipped. |
 | F24, F40, F9, F26, F43 (label and error), F35, F48 | #2380 | Issues 08–11, 13, 14. Shipped. PDF text still cannot be edited in place; the reply says so. PyMuPDF was not added. |
 | F3 docs path | #2359 (5.2.1) | Docs now say **Manage → Channels → Synaplan Desktop**. Issue 50 is still a verification task, not a rewrite. |
+| F16 prices | #2382 | Issue 15. Shipped. Unknown price is not Free. EUR display remains issue 43. |
+| F45 pinned assistant | #2383 | Issue 20. A new chat drops the pin. The banner leaves the assistant thread before clearing it. The model chip's Assistants section remains issue 22. |
 | F7 composer context | 5.2.0, plus the knowledge-folder chip in #2380 | Model chip shipped in 5.2.0. The active knowledge folder is now on the composer. Tools, assistant and promotions remain issue 22. |
 | F11 | — | Not reproducible on 5.2.0 per the testers. No issue. |
 
-F16 (prices, issue 15) and everything in waves 3–6 are still open.
+Waves 3–6 are not all open. Issue 20 is on main. Issues 16–24 are in #2385.
+Issues 28, 36, 42, 43, 47, 49 and 50 are on the OLED branch. Issues 26, 29
+and 35 are only partly done there. The sentence above this table is the
+historical snapshot; the wave table in §2 is the current state.
 
 ---
 
 ## 5. Verified in the code (2026-10-07, before waves 1 and 2)
 
 Snapshot of the 5.2.0 / early-5.3.0 code the drafts were written against.
-**Do not treat the F44, F46, F13, F14 and F24 rows as the current code.**
-Those bugs shipped in #2379 and #2380. The rows stay so the next reader
+**Do not treat the F44, F46, F13, F14, F16, F24 and F45 rows as the current code.**
+Those bugs shipped in #2379, #2380, #2382 and #2383. The rows stay so the next reader
 can see what was wrong. Each open issue still repeats the pointers it needs.
 
 | Finding | What the code shows | File |
@@ -219,9 +241,9 @@ can see what was wrong. Each open issue still repeats the pointers it needs.
 | F21 | No `cafile`, `capath`, `EXTRA_CA_*` or per-endpoint TLS option anywhere in `backend/src`, `backend/config`, `deploy/compose.yaml` or `deploy/selfhost.env.example`. | — |
 | F13 default | `deploy/selfhost.env.example` ships `MAILER_DSN=null://null` and `APP_SENDER_EMAIL=`. | `deploy/selfhost.env.example` |
 
-Not verified in code when this triage was written (hands-on only): F16
-price import, F39, F49. F2, F35, F40 and F48 were checked while shipping
-#2377 and #2380; those four are closed.
+Not verified in code when this triage was written (hands-on only): F39
+and F49. F16 was checked while shipping #2382. F2, F35, F40, F45 and F48
+were checked while shipping #2377, #2380 and #2383. Those are closed.
 
 ---
 
@@ -247,12 +269,12 @@ Short, honest, for the product owner to adapt:
 - *Custom HTTP tools: response visibility, credentials, template syntax docs?* — Issues 25 and 26.
 - *Failed MCP steps keep the answer step and show the error?* — Shipped. #2377 keeps the answer on a reportable failure. #2380 logs server, tool and status (issue 12).
 - *Trusted-local MCP allowlist or STDIO?* — Issue 45; pairs with CA trust (issue 38).
-- *USD in README vs EUR in UI?* — Issue 43 has to answer how the EUR figure is derived before changing display.
+- *USD in README vs EUR in UI?* — Issue 43 has to answer how the EUR figure is derived before changing display. OpenRouter prices themselves shipped in #2382 as USD per 1M tokens.
 - *Expandable tool input / output / timing / errors on task cards?* — Shipped in #2380 (issue 10). The expanded step shows the resolved inputs, a capped output, status and duration.
 - *File work on attached files; PyMuPDF in the sandbox?* — Routing shipped in #2380 (issue 14). The sandbox still cannot change PDF text in place, and the reply says so. PyMuPDF was not added; that remains an ask-first dependency.
 - *Installer writes COMPUTE_URL / COMPUTE_TOKEN?* — Shipped in #2380 (issue 08). The token is written to `data/compute.token`, not into `.env`. `${VAR}` in `COMPOSE_PROFILES` is expanded. The file is not sourced. `docker compose config --profiles` is the wrong detector: it lists every declared profile, including `compute`, even when File work is off.
 - *Extra trusted CA?* — Issue 38, smallest form first (`EXTRA_CA_CERTS` PEM path + compose mount).
-- *Import dialog search, cached probes, prices?* — Issues 35 and 15.
+- *Import dialog search, cached probes, prices?* — Prices shipped in #2382 (issue 15). Search, filter and cached probes are still issue 35.
 - *Docling default?* — Open (§6).
 - *What is planned for later parts of the UI rework?* — Point them at [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 and [`../20260914-navigation-consolidation/`](../20260914-navigation-consolidation/).
 

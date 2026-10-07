@@ -36,7 +36,7 @@
       <h2 class="text-lg font-semibold txt-primary mb-2">{{ $t('settings.theme.title') }}</h2>
       <p class="txt-secondary text-sm mb-4">{{ $t('settings.theme.description') }}</p>
 
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <button
           type="button"
           :class="[
@@ -68,6 +68,23 @@
           <MoonIcon class="w-6 h-6 mx-auto mb-2 txt-primary" />
           <div class="text-sm font-medium txt-primary text-center">
             {{ $t('settings.theme.dark') }}
+          </div>
+        </button>
+
+        <button
+          type="button"
+          :class="[
+            'p-4 rounded-xl border-2 transition-all',
+            theme === 'oled'
+              ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)]'
+              : 'border-light-border/30 dark:border-dark-border/20 hover-surface',
+          ]"
+          data-testid="btn-theme-oled"
+          @click="setTheme('oled')"
+        >
+          <MoonIcon class="w-6 h-6 mx-auto mb-2 txt-primary" />
+          <div class="text-sm font-medium txt-primary text-center">
+            {{ $t('settings.theme.oled') }}
           </div>
         </button>
 

@@ -194,6 +194,9 @@
       "onDay": "On",
       "atTime": "At",
       "timezoneHint": "Time zone: {tz}",
+      "timezoneLoading": "Loading your time zone…",
+      "timezoneDeviceUnsaved": "Time zone {tz} from this device. Your profile was not changed.",
+      "timezoneLoadFailed": "The time zone from your profile could not be loaded. This schedule was not added.",
       "askItTo": "Ask it to",
       "scheduleHint": "Runs on its own, as you. Shortest interval: 15 minutes.",
       "advancedCron": "Advanced",
@@ -219,7 +222,8 @@
       "friday": "Friday",
       "saturday": "Saturday",
       "sunday": "Sunday"
-    }
+    },
+    "shareDraftHint": "This is a draft. You can share it so someone can read it or try it in a private chat. It is not published, so the router will not pick it."
   },
   "bundle": {
     "title": "Export & import",

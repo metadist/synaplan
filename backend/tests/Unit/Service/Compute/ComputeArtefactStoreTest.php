@@ -55,7 +55,8 @@ final class ComputeArtefactStoreTest extends TestCase
         $this->assertSame('image', $file->getOriginKind());
         $this->assertSame(File::VECTOR_STATE_NONE, $file->getVectorState());
         $this->assertSame(99, $file->getMessageId());
-        $this->assertStringContainsString('run1', $file->getFileName());
+        $this->assertSame('chart.png', $file->getFileName());
+        $this->assertStringNotContainsString('run1', $file->getFileName());
         $this->assertFileExists($dir.'/'.$file->getFilePath());
     }
 

@@ -1,10 +1,31 @@
 import { computed, readonly, ref, watch, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import {
+  AdjustmentsHorizontalIcon,
+  ArrowsRightLeftIcon,
+  BookOpenIcon,
+  BuildingOffice2Icon,
+  ChatBubbleBottomCenterTextIcon,
+  CheckBadgeIcon,
   ClockIcon,
+  Cog6ToothIcon,
+  CommandLineIcon,
+  ComputerDesktopIcon,
+  CpuChipIcon,
+  DocumentTextIcon,
+  EnvelopeIcon,
   FolderIcon,
+  GlobeAltIcon,
+  IdentificationIcon,
+  InboxArrowDownIcon,
+  KeyIcon,
+  LifebuoyIcon,
+  LinkIcon,
   PuzzlePieceIcon,
+  ServerStackIcon,
   ShieldCheckIcon,
+  Squares2X2Icon,
+  UsersIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
@@ -26,6 +47,8 @@ export interface NavChild {
   path: string
   label: string
   badge?: string
+  /** Glyph in the desktop context panel */
+  icon?: Component
   /** Translated group label shown in the first-level Manage flyout */
   group?: string
   /** Stable group id (`assistants`, `channels`, …) for testids and nesting */
@@ -214,6 +237,7 @@ export function useNavItems() {
           key: 'ai-models',
           path: '/ai/models',
           label: t('nav.configAiModels'),
+          icon: CpuChipIcon,
           ...grouped('assistants', assistants),
         },
         ...(isAiAccountsEnabled()
@@ -222,26 +246,30 @@ export function useNavItems() {
                 key: 'ai-accounts',
                 path: '/ai/providers',
                 label: t('nav.aiAccounts'),
+                icon: KeyIcon,
                 ...grouped('assistants', assistants),
               },
             ]
           : []),
         {
           key: 'task-prompts',
-          path: isAgentsEnabled() ? '/ai/assistants' : '/ai/instructions',
+          path: isAgentsEnabled() ? '/ai/assistants' : '/ai/task-prompts',
           label: isAgentsEnabled() ? t('nav.assistants') : t('nav.configTaskPrompts'),
+          icon: isAgentsEnabled() ? IdentificationIcon : DocumentTextIcon,
           ...grouped('assistants', assistants),
         },
         {
           key: 'saved-prompts',
           path: '/prompts',
           label: t('nav.prompts'),
+          icon: BookOpenIcon,
           ...grouped('assistants', assistants),
         },
         {
           key: 'sorting-prompt',
           path: '/ai/routing',
           label: t('nav.configSortingPrompt'),
+          icon: ArrowsRightLeftIcon,
           ...grouped('assistants', assistants),
         },
         ...(isSavedTasksEnabled()
@@ -250,6 +278,7 @@ export function useNavItems() {
                 key: 'saved-tasks',
                 path: '/channels/tasks',
                 label: t('nav.savedTasks'),
+                icon: ClockIcon,
                 ...grouped('automations', automations),
               },
             ]
@@ -260,6 +289,7 @@ export function useNavItems() {
                 key: 'approvals',
                 path: '/channels/approvals',
                 label: t('nav.approvals'),
+                icon: CheckBadgeIcon,
                 badge:
                   approvalsStore.pendingCount > 0 ? String(approvalsStore.pendingCount) : undefined,
                 ...grouped('automations', automations),
@@ -270,24 +300,28 @@ export function useNavItems() {
           key: 'inbound',
           path: '/channels',
           label: t('nav.configInbound'),
+          icon: InboxArrowDownIcon,
           ...grouped('channels', channels),
         },
         {
           key: 'chat-widget',
           path: '/channels/widgets',
           label: t('nav.toolsChatWidget'),
+          icon: ChatBubbleBottomCenterTextIcon,
           ...grouped('channels', channels),
         },
         {
           key: 'mail-handler',
           path: '/channels/email',
           label: t('nav.toolsMailHandler'),
+          icon: EnvelopeIcon,
           ...grouped('channels', channels),
         },
         {
           key: 'live-support',
           path: '/channels/widgets/live-support',
           label: t('nav.liveSupport'),
+          icon: LifebuoyIcon,
           ...grouped('channels', channels),
         },
         ...(isDesktopAgentEnabled()
@@ -296,6 +330,7 @@ export function useNavItems() {
                 key: 'desktop',
                 path: '/channels/desktop',
                 label: t('nav.desktop'),
+                icon: ComputerDesktopIcon,
                 ...grouped('channels', channels),
               },
             ]
@@ -304,12 +339,14 @@ export function useNavItems() {
           key: 'connections',
           path: '/channels/connections',
           label: t('nav.configConnections'),
+          icon: LinkIcon,
           ...grouped('connections', connections),
         },
         {
           key: 'mcp-servers',
           path: '/channels/mcp',
           label: t('nav.mcpServers'),
+          icon: ServerStackIcon,
           ...grouped('connections', connections),
         },
         ...(isPlatformLinksEnabled()
@@ -318,6 +355,7 @@ export function useNavItems() {
                 key: 'linked-platforms',
                 path: '/channels/platform-links',
                 label: t('nav.linkedPlatforms'),
+                icon: GlobeAltIcon,
                 ...grouped('connections', connections),
               },
             ]
@@ -326,18 +364,21 @@ export function useNavItems() {
           key: 'api-keys',
           path: '/channels/api',
           label: t('nav.configApiKeys'),
+          icon: KeyIcon,
           ...grouped('developer', developer),
         },
         {
           key: 'api-docs',
           path: '/channels/api/docs',
           label: t('pageTitles.configApiDocs'),
+          icon: BookOpenIcon,
           ...grouped('developer', developer),
         },
         {
           key: 'ai-agents',
           path: '/channels/agents',
           label: t('nav.aiAgents'),
+          icon: CommandLineIcon,
           ...grouped('developer', developer),
         },
       ]
@@ -364,6 +405,7 @@ export function useNavItems() {
         children: configStore.plugins.map((plugin: { name?: string }) => ({
           key: `plugin-${plugin.name ?? 'unknown'}`,
           path: `/plugins/${plugin.name}`,
+          icon: PuzzlePieceIcon,
           label: plugin.name
             ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
             : t('common.unknown'),
@@ -377,33 +419,43 @@ export function useNavItems() {
       // infrastructure, so its badge sits on that entry.
       const badge = (count: number) => (count > 0 ? String(count) : undefined)
       const adminChildren: NavChild[] = [
-        { key: 'admin-dashboard', path: '/admin', label: t('nav.adminDashboard') },
+        {
+          key: 'admin-dashboard',
+          path: '/admin',
+          label: t('nav.adminDashboard'),
+          icon: Squares2X2Icon,
+        },
         {
           key: 'admin-features',
           path: '/admin/features',
           label: t('nav.adminFeatureStatus'),
+          icon: AdjustmentsHorizontalIcon,
           badge: badge(disabledFeaturesCount.value),
         },
         {
           key: 'admin-setup',
           path: '/admin/setup',
           label: t('nav.adminProviderSetup'),
+          icon: CpuChipIcon,
           badge: badge(offlineModelsCount.value),
         },
         {
           key: 'admin-people',
           path: '/admin/people',
           label: t('nav.adminPeople'),
+          icon: UsersIcon,
         },
         {
           key: 'admin-partners',
           path: '/admin/partners',
           label: t('nav.adminPartners'),
+          icon: BuildingOffice2Icon,
         },
         {
           key: 'admin-config',
           path: '/admin/config',
           label: t('nav.adminSystemConfig'),
+          icon: Cog6ToothIcon,
         },
       ]
 

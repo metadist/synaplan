@@ -350,7 +350,7 @@
         "summary": "{env} from the environment, {db} overridden in the UI.",
         "cta": "Open Providers & keys"
       },
-      "envOverridesDb": "Locked by the environment variable {key}. It is currently {value}. Remove the variable from your environment to manage this setting here.",
+      "envOverridesDb": "Locked by the environment variable {key}. It is currently {value}. Set {key} in your deployment's environment, then restart the backend.",
       "unsaved": "Unsaved changes",
       "clear": "Clear",
       "clearHint": "Remove the saved value. The default is used again.",
@@ -514,7 +514,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "When the owner is present (chat or a live API call): run file work automatically, ask first, or never run it. An assistant cannot loosen this.",
         "COMPUTE_POLICY_UNATTENDED": "When a saved task runs file work on its own: ask the owner first (default), run automatically, or never run it. An assistant cannot loosen this.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "How many days a file-work folder may sit unused before cleanup can remove it. Default 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Manage → Channels. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Channels → Synaplan Desktop. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository.",
         "FEATURE_SEARCH_AI_ENABLED": "AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why in one sentence. It never changes anything by itself. Each use is one short AI call. Off keeps keyword and meaning search."
       },
       "fieldOptions": {
@@ -533,7 +533,9 @@
           "approve": "Ask first",
           "block": "Never run"
         }
-      }
+      },
+      "valueSet": "This setting has a saved value.",
+      "valueEmpty": "This setting is still empty."
     }
   },
   "statistics": {
@@ -570,7 +572,9 @@
       "applying": "Importing…",
       "applied": "Imported {created} model row(s), skipped {skipped} already present.",
       "applyFailed": "The models could not be imported.",
-      "noValidTags": "Give each selected model at least one valid capability."
+      "noValidTags": "Give each selected model at least one valid capability.",
+      "filterLabel": "Filter models",
+      "filterPlaceholder": "Filter by name or id"
     },
     "extraction": {
       "lead": "Choose how documents are turned into text. Docling keeps tables and headings; if it is not running, Tika is used instead and uploads never fail.",
@@ -659,7 +663,8 @@
       "testButton": "Test query",
       "testing": "Testing…",
       "testProvider": "Answered by {provider}",
-      "testProviderFallback": "Answered by {provider} (fell back from {from})"
+      "testProviderFallback": "Answered by {provider} (fell back from {from})",
+      "allowUsersHint": "When this is on, each person can pick a different search provider in Preferences."
     },
     "rerank": {
       "title": "Reranking",
@@ -896,7 +901,11 @@
         "widget": "Chat widget",
         "agent": "Agent",
         "tool": "Tool"
-      }
+      },
+      "manualHint": "Created by hand in Synaplan, not from your login.",
+      "fromLoginHint": "Created from your company login.",
+      "roleLabel": "Role",
+      "roleUpdated": "Role updated."
     },
     "audit": {
       "when": "When",

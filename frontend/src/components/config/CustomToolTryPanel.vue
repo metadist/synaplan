@@ -15,15 +15,36 @@ const props = defineProps<{
 const { t } = useI18n()
 const { error: showError } = useNotification()
 const inputJson = ref('{}')
-const output = ref('')
+const requestText = ref('')
+const responseText = ref('')
 const trying = ref(false)
+
+const pretty = (value: unknown): string => {
+  if (typeof value === 'string') {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2)
+    } catch {
+      return value
+    }
+  }
+  return JSON.stringify(value, null, 2)
+}
 
 const run = async () => {
   trying.value = true
+  requestText.value = ''
+  responseText.value = ''
   try {
     const parsed = JSON.parse(inputJson.value) as Record<string, unknown>
     const result = await customToolsApi.try(props.tool.id, parsed)
-    output.value = JSON.stringify(result, null, 2)
+    if (result.request) {
+      requestText.value = pretty(result.request)
+    }
+    if (result.response) {
+      responseText.value = pretty(result.response)
+    } else if (result.sent === false) {
+      responseText.value = t('customTools.tryNotSent')
+    }
   } catch {
     showError(t('customTools.tryFailed'))
   } finally {
@@ -44,6 +65,19 @@ const run = async () => {
     >
       {{ $t('customTools.try') }}
     </button>
-    <pre v-if="output" class="text-xs txt-secondary overflow-x-auto">{{ output }}</pre>
+    <div v-if="requestText" class="space-y-1">
+      <p class="text-xs font-medium txt-primary">{{ $t('customTools.tryRequest') }}</p>
+      <pre
+        class="text-xs txt-secondary overflow-x-auto whitespace-pre-wrap"
+        data-testid="custom-tool-try-request"
+        >{{ requestText }}</pre>
+    </div>
+    <div v-if="responseText" class="space-y-1">
+      <p class="text-xs font-medium txt-primary">{{ $t('customTools.tryResponse') }}</p>
+      <pre
+        class="text-xs txt-secondary overflow-x-auto whitespace-pre-wrap"
+        data-testid="custom-tool-try-response"
+        >{{ responseText }}</pre>
+    </div>
   </div>
 </template>

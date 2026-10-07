@@ -303,8 +303,8 @@ export function getExportUrl(widgetId: string, params: ExportParams = {}): strin
     queryParams.set('sessionIds', params.sessionIds.join(','))
   }
 
-  const timezone = params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
-  queryParams.set('timezone', timezone)
+  const timezone = params.timezone?.trim()
+  if (timezone) queryParams.set('timezone', timezone)
 
   const queryString = queryParams.toString()
   return `/api/v1/widgets/${widgetId}/export${queryString ? `?${queryString}` : ''}`

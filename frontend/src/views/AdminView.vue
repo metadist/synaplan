@@ -1,6 +1,6 @@
 <template>
   <MainLayout data-testid="view-admin">
-    <div class="container mx-auto px-6 py-8 max-w-7xl overflow-x-hidden">
+    <div class="container mx-auto px-6 py-8 max-w-[100rem] overflow-x-hidden">
       <!-- Header -->
       <PageHeader
         :title="$t('admin.title')"

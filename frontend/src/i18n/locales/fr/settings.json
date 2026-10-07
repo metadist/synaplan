@@ -5,15 +5,15 @@
   },
   "usageTaximeter": {
     "sessionLabel": "Jetons",
-    "todayTooltip": "{tokens} jetons aujourd’hui",
-    "todayLabel": "Le vôtre aujourd’hui",
+    "todayTooltip": "{tokens} jetons aujourd’hui. Les montants sont en dollars américains.",
+    "todayLabel": "Consommation du jour",
     "todayAria": "Vos dépenses aujourd’hui : {cost}",
     "openStats": "Afficher les statistiques d’utilisation",
     "usedModels": "Modèles utilisés",
     "promptsInSession": "Instructions dans cette session",
     "modelChanges": "Changements de modèle : {count}",
     "allStatistics": "Toutes les statistiques",
-    "lessThanCent": "< 0,01 €"
+    "lessThanCent": "< 0,01 $"
   },
   "limitReached": {
     "lifetime": {
@@ -207,7 +207,11 @@
     "download": "Télécharger",
     "exporting": "Export…",
     "selectedChats": "{count} chats sélectionnés",
-    "selectedChatsHint": "Seuls ces chats sélectionnés seront exportés"
+    "selectedChatsHint": "Seuls ces chats sélectionnés seront exportés",
+    "timezoneLoading": "Chargement de votre fuseau horaire…",
+    "timezoneProfile": "Les heures de ce fichier utilisent {tz} de Langue et apparence.",
+    "timezoneBrowser": "Les heures de ce fichier utilisent le fuseau de cet ordinateur ({tz}). Votre profil n’a pas été modifié.",
+    "timezoneUnavailable": "Les heures de ce fichier utilisent le fuseau de cet ordinateur ({tz}), car le fuseau de Langue et apparence n’a pas pu être chargé."
   },
   "profile": {
     "title": "Réglages du profil",
@@ -259,9 +263,11 @@
       "language": "Langue",
       "languageHint": "Langue de l’interface",
       "timezone": "Fuseau horaire",
-      "timezoneHint": "Chaque lieu indique son décalage actuel par rapport à UTC, en heures et minutes.",
+      "timezoneHint": "Saisissez une ville ou un décalage comme +02:00. Les lieux correspondants s’affichent en dessous. Entrée choisit le lieu surligné. Enregistrez ensuite pour le conserver.",
       "timezoneSearch": "Rechercher par ville ou décalage",
       "timezonePlaceholder": "Choisir un fuseau horaire",
+      "timezoneCurrent": "Choix : {label}",
+      "timezoneMatchCount": "{count} lieu | {count} lieux",
       "timezoneNoMatch": "Aucun fuseau horaire ne correspond à cette recherche.",
       "timezoneInvalid": "Choisissez un fuseau horaire dans la liste. Rien n’a été enregistré.",
       "invoiceEmail": "E-mail de facturation",
@@ -370,7 +376,8 @@
       "description": "Choisissez votre palette de couleurs",
       "light": "Clair",
       "dark": "Sombre",
-      "system": "Système"
+      "system": "Système",
+      "oled": "Noir OLED"
     },
     "language": {
       "title": "Langue",

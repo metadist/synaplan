@@ -1,6 +1,7 @@
 <!-- title: Models: "Failed to list Ollama models: URI must include a scheme and host" is logged repeatedly on installs without an Ollama base URL -->
 <!-- type: Bug -->
 <!-- labels: prio:3, area:models -->
+<!-- status: shipped -->
 <!-- issue-type: Bug -->
 
 ## Problem

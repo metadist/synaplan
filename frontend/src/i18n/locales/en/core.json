@@ -179,7 +179,8 @@
     "usage": "Usage",
     "assistants": "Assistants",
     "approvals": "Approvals",
-    "prompts": "Prompts"
+    "prompts": "Prompts",
+    "home": "Home"
   },
   "common": {
     "ok": "OK",
@@ -332,7 +333,9 @@
           "searchKeywords": "web internet google online research",
           "help": "Ask how Synaplan works (/help)",
           "helpKeywords": "help support how to guide documentation"
-        }
+        },
+        "themeOled": "Switch to OLED black",
+        "themeOledKeywords": "oled black true black amoled appearance"
       },
       "synonyms": {
         "chat": "chat conversation ask message assistant",
@@ -552,5 +555,8 @@
       "text": "Your purchase is waiting for your account",
       "cta": "Create account"
     }
+  },
+  "appearance": {
+    "cycle": "Switch appearance"
   }
 }

@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
 
 final class AgentKindTest extends TestCase
 {
-    public function testDraftsAreNotListedAndCannotBeShared(): void
+    public function testDraftCanBeSharedButIsNotInThePublishedList(): void
     {
         $draft = new Agent(4, 20, 'drafty', 'Drafty', AgentDefinition::defaults()->toArray());
         (new \ReflectionProperty(Agent::class, 'id'))->setValue($draft, 9);
@@ -33,6 +33,20 @@ final class AgentKindTest extends TestCase
         self::assertSame(AgentKind::KEY, $kind->key());
         self::assertSame([Permission::Read, Permission::Use, Permission::Edit], $kind->supportedPermissions());
         self::assertSame([], iterator_to_array($kind->listOwnedBy(4)));
+        $kind->assertShareable('9');
+    }
+
+    public function testArchivedCannotBeShared(): void
+    {
+        $archived = new Agent(4, 20, 'old', 'Old', AgentDefinition::defaults()->toArray());
+        $archived->setStatus(Agent::STATUS_ARCHIVED);
+        (new \ReflectionProperty(Agent::class, 'id'))->setValue($archived, 9);
+
+        $repo = $this->createMock(AgentRepository::class);
+        $repo->method('find')->willReturn($archived);
+
+        $kind = new AgentKind($repo, $this->createMock(AgentVersionRepository::class), $this->createMock(AgentConfig::class));
+
         $this->expectException(ShareNotAllowedException::class);
         $kind->assertShareable('9');
     }
