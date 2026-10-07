@@ -122,7 +122,7 @@ final readonly class ComputeArtefactStore
             }
             unlink($absolute);
         }
-        if (!$stored || null === $relative) {
+        if (!$stored) {
             $this->logger->error('ComputeArtefactStore: write failed', ['name' => $displayName]);
 
             return null;
