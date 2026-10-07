@@ -359,6 +359,7 @@ export interface ApiLoadedMessageRow {
     cost: string | null
     modelKey: string
     kind: string
+    priceKnown?: boolean
   } | null
   /** Auxiliary usage of the turn (sorting/routing call, media renders, TTS). */
   usageExtra?: Array<{
@@ -368,6 +369,7 @@ export interface ApiLoadedMessageRow {
     cost: string | null
     modelKey: string
     kind: string
+    priceKnown?: boolean
   }> | null
 }
 

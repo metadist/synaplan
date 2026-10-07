@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Credential;
 
+use App\AI\Import\ListedModelPrice;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\EncryptionService;
@@ -85,7 +86,7 @@ final class OpenAiCompatibleEndpointRegistry
             return ['ok' => false, 'error' => 'base_url must be a valid absolute URL'];
         }
 
-        $result = $this->fetchModelIds($baseUrl, $apiKey, $this->normalizeHeaders($headers));
+        $result = $this->fetchModelCatalog($baseUrl, $apiKey, $this->normalizeHeaders($headers));
         if (!$result['ok']) {
             $out = ['ok' => false, 'error' => $result['error'] ?? 'Upstream did not answer'];
             if (isset($result['status'])) {
@@ -95,11 +96,16 @@ final class OpenAiCompatibleEndpointRegistry
             return $out;
         }
 
+        $ids = [];
+        foreach ($result['models'] as $model) {
+            $ids[] = $model['id'];
+        }
+
         return [
             'ok' => true,
             'status' => $result['status'] ?? 200,
-            'model_count' => count($result['ids']),
-            'sample' => array_slice($result['ids'], 0, 10),
+            'model_count' => count($ids),
+            'sample' => array_slice($ids, 0, 10),
         ];
     }
 
@@ -109,29 +115,66 @@ final class OpenAiCompatibleEndpointRegistry
      * Returns a result rather than throwing so callers can tell an unreachable
      * endpoint (`ok = false`) apart from one that lists nothing (`ok = true`,
      * empty `ids`) — the distinction the import re-check (S5) relies on.
+     * Ids only: pricing lives on {@see listModelCatalog()} so existing callers
+     * keep this shape.
      *
      * @return array{ok: bool, ids: list<string>, status?: int, error?: string}
      */
     public function listModelIds(string $name): array
     {
-        $endpoint = $this->getEndpoint($name);
-        if (null === $endpoint) {
-            return ['ok' => false, 'ids' => [], 'error' => 'Unknown endpoint: '.$name];
+        $catalog = $this->listModelCatalog($name);
+        $ids = [];
+        foreach ($catalog['models'] as $model) {
+            $ids[] = $model['id'];
         }
 
-        return $this->fetchModelIds($endpoint['base_url'], $endpoint['api_key'], $endpoint['headers']);
+        $out = ['ok' => $catalog['ok'], 'ids' => $ids];
+        if (isset($catalog['status'])) {
+            $out['status'] = $catalog['status'];
+        }
+        if (isset($catalog['error'])) {
+            $out['error'] = $catalog['error'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Same listing as {@see listModelIds()}, plus the display name and the
+     * published per-1M price when the gateway sends one.
+     *
+     * @return array{
+     *     ok: bool,
+     *     models: list<array{id: string, name: string|null, priceInPerMillion: float|null, priceOutPerMillion: float|null, priceKnown: bool}>,
+     *     status?: int,
+     *     error?: string
+     * }
+     */
+    public function listModelCatalog(string $name): array
+    {
+        $endpoint = $this->getEndpoint($name);
+        if (null === $endpoint) {
+            return ['ok' => false, 'models' => [], 'error' => 'Unknown endpoint: '.$name];
+        }
+
+        return $this->fetchModelCatalog($endpoint['base_url'], $endpoint['api_key'], $endpoint['headers']);
     }
 
     /**
      * @param array<string, string> $headers
      *
-     * @return array{ok: bool, ids: list<string>, status?: int, error?: string}
+     * @return array{
+     *     ok: bool,
+     *     models: list<array{id: string, name: string|null, priceInPerMillion: float|null, priceOutPerMillion: float|null, priceKnown: bool}>,
+     *     status?: int,
+     *     error?: string
+     * }
      */
-    private function fetchModelIds(?string $baseUrl, ?string $apiKey, array $headers): array
+    private function fetchModelCatalog(?string $baseUrl, ?string $apiKey, array $headers): array
     {
         $baseUrl = rtrim((string) $baseUrl, '/');
         if ('' === $baseUrl || !filter_var($baseUrl, FILTER_VALIDATE_URL)) {
-            return ['ok' => false, 'ids' => [], 'error' => 'base_url must be a valid absolute URL'];
+            return ['ok' => false, 'models' => [], 'error' => 'base_url must be a valid absolute URL'];
         }
 
         $requestHeaders = $headers;
@@ -146,20 +189,29 @@ final class OpenAiCompatibleEndpointRegistry
             ]);
             $status = $response->getStatusCode();
             if ($status >= 400) {
-                return ['ok' => false, 'ids' => [], 'status' => $status, 'error' => 'Upstream returned HTTP '.$status];
+                return ['ok' => false, 'models' => [], 'status' => $status, 'error' => 'Upstream returned HTTP '.$status];
             }
 
             $body = $response->toArray(false);
-            $ids = [];
+            $models = [];
             foreach ($body['data'] ?? [] as $item) {
-                if (isset($item['id']) && is_string($item['id']) && '' !== $item['id']) {
-                    $ids[] = $item['id'];
+                if (!is_array($item) || !isset($item['id']) || !is_string($item['id']) || '' === $item['id']) {
+                    continue;
                 }
+                $price = ListedModelPrice::fromListingItem($item);
+                $name = isset($item['name']) && is_string($item['name']) ? trim($item['name']) : '';
+                $models[] = [
+                    'id' => $item['id'],
+                    'name' => '' !== $name ? $name : null,
+                    'priceInPerMillion' => $price->priceInPerMillion,
+                    'priceOutPerMillion' => $price->priceOutPerMillion,
+                    'priceKnown' => $price->known,
+                ];
             }
 
-            return ['ok' => true, 'ids' => $ids, 'status' => $status];
+            return ['ok' => true, 'models' => $models, 'status' => $status];
         } catch (\Throwable $e) {
-            return ['ok' => false, 'ids' => [], 'error' => $e->getMessage()];
+            return ['ok' => false, 'models' => [], 'error' => $e->getMessage()];
         }
     }
 

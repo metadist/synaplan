@@ -64,7 +64,7 @@ final class AdminModelsImportEndpointController extends AbstractController
                     property: 'rows',
                     type: 'array',
                     items: new OA\Items(
-                        required: ['providerId', 'name', 'guessedTags', 'exists', 'sizeBytes', 'family', 'probe'],
+                        required: ['providerId', 'name', 'guessedTags', 'exists', 'sizeBytes', 'family', 'probe', 'priceInPerMillion', 'priceOutPerMillion', 'priceKnown'],
                         properties: [
                             new OA\Property(property: 'providerId', type: 'string', example: 'Qwen/Qwen3-32B'),
                             new OA\Property(property: 'name', type: 'string', example: 'Qwen3 32B'),
@@ -72,6 +72,9 @@ final class AdminModelsImportEndpointController extends AbstractController
                             new OA\Property(property: 'exists', type: 'boolean', example: false),
                             new OA\Property(property: 'sizeBytes', type: 'integer', nullable: true, example: null),
                             new OA\Property(property: 'family', type: 'string', nullable: true, example: null),
+                            new OA\Property(property: 'priceInPerMillion', type: 'number', format: 'float', nullable: true, example: 0.15, description: 'USD per 1M input tokens when the listing published a price'),
+                            new OA\Property(property: 'priceOutPerMillion', type: 'number', format: 'float', nullable: true, example: 0.6, description: 'USD per 1M output tokens when the listing published a price'),
+                            new OA\Property(property: 'priceKnown', type: 'boolean', example: true, description: 'False when the listing published no price. That is not the same as a free model.'),
                             new OA\Property(
                                 property: 'probe',
                                 nullable: true,

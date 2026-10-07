@@ -74,6 +74,35 @@ final class MessageApiFormatterUsageTest extends TestCase
         self::assertSame('0.031200', $usage['cost']);
         self::assertSame('openai:gpt-4o', $usage['modelKey']);
         self::assertSame('LLM', $usage['kind']);
+        self::assertTrue($usage['priceKnown']);
+    }
+
+    public function testUnknownPriceSurvivesHistorySerialization(): void
+    {
+        $m = $this->makeOutMessage();
+        $m->setMeta('ai_chat_usage', json_encode([
+            'prompt_tokens' => 10,
+            'completion_tokens' => 4,
+            'total_tokens' => 14,
+        ]));
+        $m->setMeta('ai_chat_cost', '0.000000');
+        $m->setMeta('ai_chat_price_known', '0');
+        $m->setMeta('ai_usage_extra', json_encode([[
+            'promptTokens' => 8,
+            'completionTokens' => 2,
+            'totalTokens' => 10,
+            'cost' => '0.000000',
+            'modelKey' => 'openaicompatible:router',
+            'kind' => 'SORT',
+            'priceKnown' => false,
+        ]]));
+
+        $formatted = $this->formatter->format($m);
+
+        self::assertIsArray($formatted['usage']);
+        self::assertFalse($formatted['usage']['priceKnown']);
+        self::assertIsArray($formatted['usageExtra']);
+        self::assertFalse($formatted['usageExtra'][0]['priceKnown']);
     }
 
     public function testUsageOmittedWhenNoMetaPresent(): void

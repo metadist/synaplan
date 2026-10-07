@@ -53,6 +53,7 @@ final readonly class CostCalculationService
         $priceIn = (float) $priceSnapshot['price_in'];
         $priceOut = (float) $priceSnapshot['price_out'];
         $cachePriceIn = $priceSnapshot['cache_price_in'];
+        $priceSnapshot['price_known'] = $model->isPriceKnown() || $priceIn > 0.0 || $priceOut > 0.0;
 
         if ($priceIn <= 0 && $priceOut <= 0) {
             return new CostResult(

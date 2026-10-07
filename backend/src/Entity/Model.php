@@ -298,6 +298,20 @@ class Model
         return 0.0 === $this->priceIn && 0.0 === $this->priceOut && 0 === $this->showWhenFree;
     }
 
+    /**
+     * False only when an import recorded that the gateway published no price.
+     * Catalog rows, Ollama, and a price an admin typed stay known.
+     */
+    public function isPriceKnown(): bool
+    {
+        $flag = $this->json['meta']['import']['priceKnown'] ?? null;
+        if (null === $flag) {
+            return true;
+        }
+
+        return (bool) $flag;
+    }
+
     public function getDescription(): ?string
     {
         return $this->description;

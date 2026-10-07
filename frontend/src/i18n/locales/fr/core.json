@@ -514,7 +514,8 @@
       "free": "Gratuit",
       "low": "Faible coût",
       "mid": "Coût moyen",
-      "high": "Coût élevé"
+      "high": "Coût élevé",
+      "unknown": "Prix inconnu"
     }
   },
   "realtime": {
