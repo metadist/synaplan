@@ -854,7 +854,7 @@ class MessageProcessorTest extends TestCase
         $this->preProcessor->method('process')->willReturn($message);
         $this->messageRepository->expects($this->once())
             ->method('findChatHistory')
-            ->with(1, 500, MessageProcessor::HISTORY_MAX_MESSAGES, MessageProcessor::HISTORY_MAX_CHARS, 99)
+            ->with(1, 500, MessageProcessor::HISTORY_MAX_MESSAGES * 8, MessageProcessor::HISTORY_MAX_CHARS * 8, 99)
             ->willReturn([]);
         $this->messageRepository->method('countByChatId')->willReturn(40);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);

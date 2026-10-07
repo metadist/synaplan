@@ -181,7 +181,8 @@
     "tagsSaved": "Etiquetas guardadas.",
     "archivedDone": "Archivado. Está en Todos los chats → Archivados.",
     "unarchivedDone": "De vuelta en la barra lateral.",
-    "showOpenChats": "Chats abiertos"
+    "showOpenChats": "Chats abiertos",
+    "versionLinkFailed": "La nueva respuesta se muestra, pero no se guardó como otra versión de la anterior."
   },
   "moderation": {
     "report": {

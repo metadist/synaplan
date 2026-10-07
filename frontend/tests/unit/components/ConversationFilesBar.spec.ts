@@ -78,8 +78,13 @@ describe('ConversationFilesBar', () => {
 
     await chip.trigger('click')
 
+    expect(wrapper.emitted('preview')?.[0]).toEqual([contract])
+    expect(wrapper.emitted('attach')).toBeUndefined()
+
+    await wrapper.get('[data-testid="conversation-file-reattach"]').trigger('click')
+
     expect(wrapper.emitted('attach')?.[0]).toEqual([contract])
-    // Attaching closes the popover again.
+    // Re-attaching closes the popover again.
     expect(toggle.attributes('aria-expanded')).toBe('false')
   })
 

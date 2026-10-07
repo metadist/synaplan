@@ -182,7 +182,8 @@
     "tagsSaved": "Tags gespeichert.",
     "archivedDone": "Archiviert. Zu finden unter Alle Chats → Archiviert.",
     "unarchivedDone": "Wieder in der Seitenleiste.",
-    "showOpenChats": "Offene Chats"
+    "showOpenChats": "Offene Chats",
+    "versionLinkFailed": "Die neue Antwort wird angezeigt, wurde aber nicht als weitere Version der vorherigen gespeichert."
   },
   "moderation": {
     "report": {

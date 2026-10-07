@@ -145,6 +145,11 @@ final readonly class SystemConfigService
             'search' => ['label' => 'Search', 'fields' => [
                 'FEATURE_SEARCH_AI_ENABLED',
             ]],
+            'chat' => ['label' => 'Chat', 'fields' => [
+                'CHAT_EXPORT_ENABLED',
+                'CHAT_SHARE_ENABLED',
+                'CHAT_ARTIFACTS_ENABLED',
+            ]],
         ];
 
         $gateKeys = array_keys($this->moduleGateFields());
@@ -227,6 +232,7 @@ final readonly class SystemConfigService
                     'logos' => ['label' => 'Logos & Icon', 'fields' => ['BRAND_LOGO_URL', 'BRAND_LOGO_DARK_URL', 'BRAND_ICON_URL']],
                     'legal' => ['label' => 'Legal Links', 'fields' => ['BRAND_PRIVACY_URL', 'BRAND_TERMS_URL']],
                     'navigation' => ['label' => 'Start Page', 'fields' => ['BRAND_LANDING_PAGE', 'BRAND_DEFAULT_ROUTE']],
+                    'welcome' => ['label' => 'Empty chat', 'fields' => ['CHAT_WELCOME_SHOW_STORE_CARDS', 'CHAT_WELCOME_SHOW_WIDGET_PROMO']],
                     'attribution' => ['label' => 'Attribution ("Powered by")', 'fields' => ['BRAND_SHOW_POWERED_BY', 'BRAND_POWERED_BY_LABEL', 'BRAND_POWERED_BY_URL']],
                 ],
             ],

@@ -187,7 +187,8 @@
     "tagsSaved": "Tags saved.",
     "archivedDone": "Archived. It is under All chats → Archived.",
     "unarchivedDone": "Back in the sidebar.",
-    "showOpenChats": "Open chats"
+    "showOpenChats": "Open chats",
+    "versionLinkFailed": "The new answer is shown, but it was not saved as another version of the previous one."
   },
   "moderation": {
     "report": {

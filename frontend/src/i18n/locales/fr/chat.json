@@ -187,7 +187,8 @@
     "tagsSaved": "Tags enregistrés.",
     "archivedDone": "Archivé. Il est dans Tous les chats → Archivés.",
     "unarchivedDone": "De retour dans la barre latérale.",
-    "showOpenChats": "Discussions ouvertes"
+    "showOpenChats": "Discussions ouvertes",
+    "versionLinkFailed": "La nouvelle réponse s'affiche, mais elle n'a pas été enregistrée comme une autre version de la précédente."
   },
   "moderation": {
     "report": {

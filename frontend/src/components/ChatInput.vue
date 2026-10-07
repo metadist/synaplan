@@ -675,7 +675,7 @@ const toolsSummaryText = computed(() => {
   }
   return toolsSummaryLabel(
     {
-      count: configStore.features.selfAware ? 4 : 3,
+      count: configStore.features?.selfAware ? 4 : 3,
       activeName: activeTool.value ? (names[activeTool.value] ?? null) : null,
     },
     (key, params) => String(t(key, params))

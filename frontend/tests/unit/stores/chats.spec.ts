@@ -261,7 +261,7 @@ describe('Chats Store', () => {
       expect(store.activeChatId).toBe(9)
       // One full-list GET, no duplicate-creating POST.
       expect(httpClientMock).toHaveBeenCalledTimes(1)
-      expect(httpClientMock.mock.calls[0][0]).toBe('/api/v1/chats')
+      expect(httpClientMock.mock.calls[0][0]).toBe('/api/v1/chats?archived=0')
     })
   })
 
@@ -925,7 +925,7 @@ describe('Chats Store', () => {
 
       await store.noteExternalActivity(42)
 
-      expect(httpClientMock).toHaveBeenCalledWith('/api/v1/chats')
+      expect(httpClientMock).toHaveBeenCalledWith('/api/v1/chats?archived=0')
       expect(store.chats.map((c) => c.id)).toContain(42)
     })
 

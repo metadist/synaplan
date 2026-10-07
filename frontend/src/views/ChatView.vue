@@ -3306,6 +3306,29 @@ function buildIncognitoHistorySnapshot(): IncognitoHistoryEntry[] {
   return entries
 }
 
+/**
+ * The stream starts and returns before the server has saved the new answer.
+ * Linking immediately used the previous answer's id and rejected the request
+ * ("An answer cannot be a version of itself"), which crashed the chat.
+ * Call this from the complete/error handler, after that id exists.
+ */
+function recordVersionLink(
+  link: { kind: 'again' | 'edit'; previousId: number } | undefined,
+  createdId: number | undefined
+): void {
+  if (!link || !createdId || createdId === link.previousId) return
+  void (async () => {
+    try {
+      await chatApi.linkTurn(createdId, link.kind, link.previousId)
+      const chatId = chatsStore.activeChatId
+      if (chatId) await historyStore.loadMessages(chatId)
+    } catch (err) {
+      console.error('Failed to record the answer version', err)
+      showErrorToast(t('chat.versionLinkFailed'))
+    }
+  })()
+}
+
 const streamAIResponse = async (
   userMessage: string,
   options?: {
@@ -3316,6 +3339,8 @@ const streamAIResponse = async (
     fileIds?: number[]
     voiceReply?: boolean
     isAgain?: boolean
+    /** Record this answer as a version once the server has saved it. */
+    linkVersion?: { kind: 'again' | 'edit'; previousId: number }
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
@@ -4850,6 +4875,9 @@ const streamAIResponse = async (
             }
 
             historyStore.finishStreamingMessage(messageId)
+            if (typeof data.messageId === 'number') {
+              recordVersionLink(options?.linkVersion, data.messageId)
+            }
 
             // Issue #1070: the streamed state is only a live preview — the
             // persisted message is the single source of truth for files,
@@ -5098,6 +5126,9 @@ const streamAIResponse = async (
               historyStore.updateStreamingMessage(messageId, errorMsg)
             }
             historyStore.finishStreamingMessage(messageId)
+            if (typeof data.messageId === 'number') {
+              recordVersionLink(options?.linkVersion, data.messageId)
+            }
 
             // Clean up streaming resources after error
             streamingAbortController = null
@@ -5441,16 +5472,13 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   // the single-node legacy path.
   //
   // Reattach the original file IDs so a file_analysis Again still has the
-  // attachment to analyze (issue #1910).
-  await streamAIResponse(userText, modelId ? { modelId, isAgain: true, fileIds } : { fileIds })
-  const created = [...historyStore.messages]
-    .reverse()
-    .find((row) => row.role === 'assistant' && row.backendMessageId)
-  if (created?.backendMessageId && assistantMessage.backendMessageId) {
-    await chatApi.linkTurn(created.backendMessageId, 'again', assistantMessage.backendMessageId)
-    const chatId = chatsStore.activeChatId
-    if (chatId) await historyStore.loadMessages(chatId)
-  }
+  // attachment to analyze (issue #1910). The version link waits for the
+  // saved message id — streamAIResponse returns while the stream is still open.
+  const previousId = assistantMessage.backendMessageId
+  await streamAIResponse(userText, {
+    ...(modelId ? { modelId, isAgain: true, fileIds } : { fileIds }),
+    linkVersion: previousId ? { kind: 'again', previousId } : undefined,
+  })
 }
 
 /**
@@ -5611,15 +5639,9 @@ async function selectMessageVersion(messageId: number, kind: 'answer' | 'edit'):
 
 async function editUserMessage(message: Message, text: string): Promise<void> {
   const previousId = message.backendMessageId
-  await streamAIResponse(text, {})
-  const created = [...historyStore.messages]
-    .reverse()
-    .find((row) => row.role === 'assistant' && row.backendMessageId)
-  if (previousId && created?.backendMessageId) {
-    await chatApi.linkTurn(created.backendMessageId, 'edit', previousId)
-    const chatId = chatsStore.activeChatId
-    if (chatId) await historyStore.loadMessages(chatId)
-  }
+  await streamAIResponse(text, {
+    linkVersion: previousId ? { kind: 'edit', previousId } : undefined,
+  })
 }
 
 function reattachMessageFile(file: { id: number; filename: string; fileType?: string }): void {

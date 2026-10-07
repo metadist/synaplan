@@ -181,7 +181,8 @@
     "tagsSaved": "Etiketler kaydedildi.",
     "archivedDone": "Arşivlendi. Tüm sohbetler → Arşivlenenler altında.",
     "unarchivedDone": "Kenar çubuğuna geri döndü.",
-    "showOpenChats": "Açık sohbetler"
+    "showOpenChats": "Açık sohbetler",
+    "versionLinkFailed": "Yeni yanıt görünüyor, ancak önceki yanıtın başka bir sürümü olarak kaydedilmedi."
   },
   "moderation": {
     "report": {

@@ -70,7 +70,7 @@ function helpCommand(): Command {
  */
 export function pluginCommands(): Command[] {
   const result: Command[] = []
-  for (const plugin of config.plugins) {
+  for (const plugin of config?.plugins ?? []) {
     const chatCommands = plugin.chatCommands
     if (!chatCommands) {
       continue
@@ -125,7 +125,7 @@ export const useCommandsStore = defineStore('commands', () => {
 
   const commands = computed<Command[]>(() => [
     ...commandsData,
-    ...(config.features.selfAware ? [helpCommand()] : []),
+    ...(config?.features?.selfAware ? [helpCommand()] : []),
     ...pluginCommands(),
     ...savedPrompts.value,
   ])
