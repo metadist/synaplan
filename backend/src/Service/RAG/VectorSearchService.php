@@ -503,6 +503,64 @@ final readonly class VectorSearchService
     }
 
     /**
+     * The matched passage for one source chip. Null when the chunk is missing
+     * or the caller cannot read it.
+     *
+     * @return array{chunkId: string, fileId: int, fileName: string|null, groupKey: string, text: string, startLine: int, endLine: int}|null
+     */
+    public function passage(int $userId, string $chunkId): ?array
+    {
+        $chunkId = trim($chunkId);
+        if ('' === $chunkId) {
+            return null;
+        }
+        $result = $this->vectorStorage->findChunk($userId, $chunkId);
+        if (null === $result || '' === trim($result->text) || !$this->mayReadChunk($userId, $result)) {
+            return null;
+        }
+
+        return [
+            'chunkId' => (string) $result->chunkId,
+            'fileId' => $result->fileId,
+            'fileName' => $result->fileName,
+            'groupKey' => $result->groupKey,
+            'text' => $result->text,
+            'startLine' => $result->startLine,
+            'endLine' => $result->endLine,
+        ];
+    }
+
+    /**
+     * Own chunks are readable. A foreign chunk is readable only while a live
+     * share still grants this user that owner, folder, and file.
+     */
+    private function mayReadChunk(int $userId, VectorStorage\DTO\SearchResult $chunk): bool
+    {
+        $ownerId = $chunk->ownerId ?? 0;
+        if ($ownerId === $userId) {
+            return true;
+        }
+        if ($ownerId <= 0) {
+            return false;
+        }
+        foreach ($this->ragScopeResolver->resolve($userId, null) as $scope) {
+            if ($scope->ownerId !== $ownerId) {
+                continue;
+            }
+            if (null !== $scope->groupKey && $scope->groupKey !== $chunk->groupKey) {
+                continue;
+            }
+            if ([] !== $scope->fileIds && !in_array($chunk->fileId, $scope->fileIds, true)) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * @param list<VectorStorage\DTO\SearchResult> $results
      *
      * @return array<int, string>

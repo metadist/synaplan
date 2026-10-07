@@ -183,6 +183,20 @@ const handleRetry = () => {
   if (!props.card.prompt || !retryModel.value) return
   emit('retry', { prompt: props.card.prompt, modelId: retryModel.value.id })
 }
+
+const detailsOpen = ref(false)
+const showFullOutput = ref(false)
+const durationLabel = computed(() => {
+  if (typeof props.card.durationMs !== 'number') return ''
+  const seconds = Math.max(1, Math.round(props.card.durationMs / 1000))
+  return t('taskPlan.duration', { seconds }, seconds)
+})
+const outputText = computed(() => props.card.stepOutput ?? '')
+const outputShown = computed(() =>
+  showFullOutput.value || outputText.value.length <= 800
+    ? outputText.value
+    : outputText.value.slice(0, 800)
+)
 </script>
 
 <template>
@@ -203,7 +217,7 @@ const handleRetry = () => {
     <div class="flex items-center gap-2 mb-1">
       <Icon :icon="iconForKind" class="w-4 h-4 flex-shrink-0 txt-secondary" />
       <span class="text-sm font-medium txt-primary flex-1 truncate">
-        {{ $t(title, $t(`taskPlan.kind.${card.kind}`)) }}
+        {{ card.query || $t(title, $t(`taskPlan.kind.${card.kind}`)) }}
       </span>
 
       <button
@@ -227,6 +241,17 @@ const handleRetry = () => {
         @click="copyText"
       >
         <Icon icon="mdi:content-copy" class="w-4 h-4" />
+      </button>
+
+      <button
+        type="button"
+        class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
+        :aria-label="$t('taskPlan.details')"
+        :aria-expanded="detailsOpen"
+        data-testid="task-card-details-toggle"
+        @click="detailsOpen = !detailsOpen"
+      >
+        <Icon :icon="detailsOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="w-4 h-4" />
       </button>
 
       <button
@@ -386,6 +411,40 @@ const handleRetry = () => {
         {{ $t('message.mediaJob.backgroundHint') }}
       </p>
     </template>
+
+    <div v-if="detailsOpen" class="mt-2 space-y-2" data-testid="task-card-details">
+      <p class="text-xs txt-secondary">
+        {{ $t(`taskPlan.state.${card.state}`) }}
+        <span v-if="durationLabel"> · {{ durationLabel }}</span>
+      </p>
+      <p v-if="!card.stepInput && !outputText" class="text-sm txt-secondary">
+        {{ $t('taskPlan.noDetails') }}
+      </p>
+      <div v-if="card.stepInput">
+        <p class="text-xs font-medium txt-secondary mb-1">{{ $t('taskPlan.input') }}</p>
+        <pre
+          class="text-xs txt-primary whitespace-pre-wrap break-words surface-chip p-2 rounded-xl"
+          >{{ card.stepInput }}</pre>
+      </div>
+      <div v-if="outputText">
+        <p class="text-xs font-medium txt-secondary mb-1">{{ $t('taskPlan.output') }}</p>
+        <pre
+          class="text-xs txt-primary whitespace-pre-wrap break-words surface-chip p-2 rounded-xl"
+          >{{ outputShown }}</pre>
+        <button
+          v-if="outputText.length > 800"
+          type="button"
+          class="btn-secondary mt-1 px-3 py-2 rounded-xl text-xs font-medium"
+          data-testid="task-card-output-more"
+          @click="showFullOutput = !showFullOutput"
+        >
+          {{ showFullOutput ? $t('taskPlan.showLess') : $t('taskPlan.showMore') }}
+        </button>
+        <p v-if="card.stepOutputTruncated" class="text-xs txt-secondary mt-1">
+          {{ $t('taskPlan.outputTruncated') }}
+        </p>
+      </div>
+    </div>
   </div>
 </template>
 

@@ -356,7 +356,7 @@ final readonly class TaskPlanner
             return '';
         }
 
-        return $block.'If the user asks about a file listed above, plan a file_analysis or rag_query step even when this turn has no new attachment.'."\n";
+        return $block.'If the user asks about a file listed above, plan a file_analysis or rag_query step even when this turn has no new attachment. When they want file work on one of those files, set code_run params.inputFileNames to its quoted name. Do not invent an id, and do not turn on the shared workspace only because the file is listed here.'."\n";
     }
 
     /**

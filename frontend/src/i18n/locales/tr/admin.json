@@ -1257,7 +1257,9 @@
       "running": "Dosya çalışması çalışıyor.",
       "runningOff": "Sidecar çalışıyor; dosya çalışması Sistem yapılandırması › Araçlar ve otomasyon altında kapalı.",
       "unreachable": "Dosya çalışması sidecar’ına ulaşılamıyor.",
-      "unset": "COMPUTE_URL veya COMPUTE_TOKEN ayarlı değil."
+      "unset": "COMPUTE_URL veya COMPUTE_TOKEN ayarlı değil.",
+      "reachable": "Sidecar erişilebilir.",
+      "notRunning": "Sidecar çalışmıyor: Dosya çalışması kullanılamıyor."
     },
     "state": {
       "available": "Kullanılabilir",

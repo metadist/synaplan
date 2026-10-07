@@ -259,4 +259,26 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
     {
         return 'qdrant';
     }
+
+    public function findChunk(int $userId, int|string $chunkId): ?SearchResult
+    {
+        $point = $this->qdrantClient->getDocument((string) $chunkId);
+        if (null === $point) {
+            return null;
+        }
+        $payload = is_array($point['payload'] ?? null) ? $point['payload'] : [];
+        $ownerId = (int) ($payload['user_id'] ?? 0);
+
+        return new SearchResult(
+            chunkId: (string) ($point['id'] ?? $chunkId),
+            fileId: (int) ($payload['file_id'] ?? 0),
+            groupKey: (string) ($payload['group_key'] ?? ''),
+            text: (string) ($payload['text'] ?? ''),
+            score: 0.0,
+            startLine: (int) ($payload['start_line'] ?? 0),
+            endLine: (int) ($payload['end_line'] ?? 0),
+            ownerId: $ownerId,
+            shared: false,
+        );
+    }
 }

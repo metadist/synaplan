@@ -656,8 +656,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $isRagQuery,
         );
         $ragContext = '';
+        $ragSources = [];
         if ($searchKnowledge) {
-            $ragContext = $this->loadRagContext(
+            $loaded = $this->loadRagContext(
                 $message,
                 $topic,
                 $ragGroupKey,
@@ -666,6 +667,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $agentScopes,
                 true,
             );
+            $ragContext = $loaded['context'];
+            $ragSources = $loaded['sources'];
         }
 
         if ($isRagQuery && '' === $ragContext) {
@@ -1271,6 +1274,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'feedbacks' => $loadedFeedbacks,
                 'digests' => $loadedDigests,
                 'docs' => $docsList,
+                'rag_sources' => $ragSources,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ]),
         ];
@@ -1337,6 +1341,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Load RAG context for task prompt (if files are associated)
         $ragContext = '';
+        $ragSources = [];
         $ragResultsCount = 0;
 
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
@@ -1428,6 +1433,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
                 if (!empty($ragResults)) {
                     $ragContext = $this->knowledgeContextFormatter->formatRagContext($ragResults);
+                    $ragSources = $this->knowledgeContextFormatter->citationRefs($ragResults);
                     $ragResultsCount = count($ragResults);
 
                     error_log('🔍 ChatHandler: RAG context loaded, total length: '.strlen($ragContext));
@@ -2064,6 +2070,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'feedbacks' => $loadedFeedbacks,
                 'digests' => $loadedDigests,
                 'docs' => $docsList,
+                'rag_sources' => $ragSources,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ],
         ];
@@ -2546,14 +2553,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
         float $minScore = 0.3,
         ?array $explicitScopes = null,
         bool $forceUserKnowledge = false,
-    ): string {
+    ): array {
         if (empty($message->getText())) {
             $this->logger->debug('ChatHandler: Skipping RAG context (empty text)', [
                 'topic' => $topic,
                 'has_text' => false,
             ]);
 
-            return '';
+            return ['context' => '', 'sources' => []];
         }
 
         if (!$groupKey) {
@@ -2562,7 +2569,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     'topic' => $topic,
                 ]);
 
-                return '';
+                return ['context' => '', 'sources' => []];
             }
 
             if (!$forceUserKnowledge) {
@@ -2606,7 +2613,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
 
             if (empty($ragResults)) {
-                return '';
+                return ['context' => '', 'sources' => []];
             }
 
             $ragContext = $this->knowledgeContextFormatter->formatRagContext($ragResults);
@@ -2618,7 +2625,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'group_key' => $groupKey,
             ]);
 
-            return $ragContext;
+            return [
+                'context' => $ragContext,
+                'sources' => $this->knowledgeContextFormatter->citationRefs($ragResults),
+            ];
         } catch (\Throwable $e) {
             error_log('❌ ChatHandler: RAG context loading failed: '.$e->getMessage());
             error_log('❌ Stack trace: '.$e->getTraceAsString());
@@ -2629,7 +2639,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'group_key' => $groupKey,
             ]);
 
-            return '';
+            return ['context' => '', 'sources' => []];
         }
     }
 

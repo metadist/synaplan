@@ -1261,7 +1261,9 @@
       "running": "Le travail sur fichiers est en cours.",
       "runningOff": "Le sidecar tourne ; le travail sur fichiers est désactivé sous Configuration système › Outils et automatisation.",
       "unreachable": "Le sidecar de travail sur fichiers n’est pas joignable.",
-      "unset": "COMPUTE_URL ou COMPUTE_TOKEN n’est pas défini."
+      "unset": "COMPUTE_URL ou COMPUTE_TOKEN n’est pas défini.",
+      "reachable": "Sidecar accessible.",
+      "notRunning": "Le sidecar n’est pas démarré : le travail sur fichiers n’est pas disponible."
     },
     "state": {
       "available": "Disponible",

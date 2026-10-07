@@ -199,6 +199,46 @@ class RagController extends AbstractController
         }
     }
 
+    #[Route('/chunks/{chunkId}', name: 'chunk', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/rag/chunks/{chunkId}',
+        summary: 'Load one knowledge passage',
+        description: 'Returns the matched passage for a source the caller is allowed to read. The chat stores only the chunk id.',
+        security: [['Bearer' => []]],
+        tags: ['RAG (Retrieval-Augmented Generation)']
+    )]
+    #[OA\Parameter(name: 'chunkId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Response(
+        response: 200,
+        description: 'Passage text',
+        content: new OA\JsonContent(
+            required: ['success', 'chunkId', 'fileId', 'text', 'startLine', 'endLine'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'chunkId', type: 'string'),
+                new OA\Property(property: 'fileId', type: 'integer'),
+                new OA\Property(property: 'fileName', type: 'string', nullable: true),
+                new OA\Property(property: 'groupKey', type: 'string'),
+                new OA\Property(property: 'text', type: 'string'),
+                new OA\Property(property: 'startLine', type: 'integer'),
+                new OA\Property(property: 'endLine', type: 'integer'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 404, description: 'Chunk not found')]
+    public function chunk(string $chunkId, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $passage = $this->vectorSearchService->passage($user->getId(), $chunkId);
+        if (null === $passage) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json(['success' => true] + $passage);
+    }
+
     /**
      * Get RAG statistics.
      *

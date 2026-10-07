@@ -237,6 +237,7 @@
               :voice-reply-failed="message.voiceReplyFailed"
               :read-aloud-failed="message.readAloudFailed"
               :search-results="message.searchResults"
+              :rag-sources="message.ragSources"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
               :memory-ids="message.memoryIds"
@@ -3545,6 +3546,18 @@ const streamAIResponse = async (
               if (data.metadata?.used_workspace === true) {
                 card.usedWorkspace = true
               }
+              if (typeof data.metadata?.step_input === 'string') {
+                card.stepInput = data.metadata.step_input
+              }
+              if (typeof data.metadata?.step_output === 'string') {
+                card.stepOutput = data.metadata.step_output
+              }
+              if (data.metadata?.step_output_truncated === true) {
+                card.stepOutputTruncated = true
+              }
+              if (typeof data.metadata?.duration_ms === 'number') {
+                card.durationMs = data.metadata.duration_ms
+              }
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -3760,6 +3773,10 @@ const streamAIResponse = async (
                   query: data.searchResults[0]?.query || '',
                   resultsCount: data.searchResults.length,
                 }
+              }
+
+              if (Array.isArray(data.ragSources) && data.ragSources.length > 0) {
+                message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
               }
 
               applyDocsToMessage(message, data.docs)
@@ -4149,6 +4166,18 @@ const streamAIResponse = async (
               }
               if (data.metadata?.used_workspace === true) {
                 card.usedWorkspace = true
+              }
+              if (typeof data.metadata?.step_input === 'string') {
+                card.stepInput = data.metadata.step_input
+              }
+              if (typeof data.metadata?.step_output === 'string') {
+                card.stepOutput = data.metadata.step_output
+              }
+              if (data.metadata?.step_output_truncated === true) {
+                card.stepOutputTruncated = true
+              }
+              if (typeof data.metadata?.duration_ms === 'number') {
+                card.durationMs = data.metadata.duration_ms
               }
             }
           } else if (data.status === 'task_chunk') {
@@ -4643,6 +4672,10 @@ const streamAIResponse = async (
               // Store memory IDs if provided (full memories loaded from store)
               if (data.memoryIds && Array.isArray(data.memoryIds) && data.memoryIds.length > 0) {
                 message.memoryIds = data.memoryIds
+              }
+
+              if (Array.isArray(data.ragSources) && data.ragSources.length > 0) {
+                message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
               }
 
               applyDocsToMessage(message, data.docs)

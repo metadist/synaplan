@@ -1261,7 +1261,9 @@
       "running": "File work is running.",
       "runningOff": "The sidecar is running; file work is turned off under System configuration › Tools & automation.",
       "unreachable": "The file-work sidecar is not reachable.",
-      "unset": "COMPUTE_URL or COMPUTE_TOKEN is not set."
+      "unset": "COMPUTE_URL or COMPUTE_TOKEN is not set.",
+      "reachable": "Sidecar reachable.",
+      "notRunning": "Sidecar not running: File work is unavailable."
     },
     "state": {
       "available": "Available",

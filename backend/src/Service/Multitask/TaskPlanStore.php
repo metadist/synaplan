@@ -110,7 +110,7 @@ final readonly class TaskPlanStore
      * user prompt. A miss only affects that transient reload view, never the
      * turn, so failures are logged and swallowed.
      *
-     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string} $result
+     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int} $result
      */
     public function updateNodeStatus(int $messageId, string $nodeId, string $status, array $result = []): void
     {
@@ -238,14 +238,14 @@ final readonly class TaskPlanStore
     /**
      * Encode card body fields into the BRESULTREF / BERROR columns (#1343).
      *
-     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string} $result
+     * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string, step_input?: ?string, step_output?: ?string, step_output_truncated?: ?bool, duration_ms?: ?int} $result
      *
      * @return array{BRESULTREF: ?string, BERROR: ?string}
      */
     private function encodeResultPayload(array $result): array
     {
         $ref = [];
-        foreach (['text', 'url', 'query', 'type'] as $key) {
+        foreach (['text', 'url', 'query', 'type', 'step_input', 'step_output'] as $key) {
             $value = $result[$key] ?? null;
             if (is_string($value) && '' !== $value) {
                 $ref[$key] = $value;
@@ -254,6 +254,13 @@ final readonly class TaskPlanStore
         $resultsCount = $result['resultsCount'] ?? null;
         if (is_int($resultsCount) && $resultsCount > 0) {
             $ref['resultsCount'] = $resultsCount;
+        }
+        $durationMs = $result['duration_ms'] ?? null;
+        if (is_int($durationMs) && $durationMs >= 0) {
+            $ref['duration_ms'] = $durationMs;
+        }
+        if (true === ($result['step_output_truncated'] ?? false)) {
+            $ref['step_output_truncated'] = true;
         }
 
         $error = $result['error'] ?? null;
@@ -281,7 +288,7 @@ final readonly class TaskPlanStore
         }
 
         $out = [];
-        foreach (['text', 'url', 'query', 'type'] as $key) {
+        foreach (['text', 'url', 'query', 'type', 'step_input', 'step_output'] as $key) {
             $value = $decoded[$key] ?? null;
             if (is_string($value) && '' !== $value) {
                 $out[$key] = $value;
@@ -290,6 +297,13 @@ final readonly class TaskPlanStore
         $resultsCount = $decoded['resultsCount'] ?? null;
         if (is_int($resultsCount) && $resultsCount > 0) {
             $out['resultsCount'] = $resultsCount;
+        }
+        $durationMs = $decoded['duration_ms'] ?? null;
+        if (is_int($durationMs) && $durationMs >= 0) {
+            $out['duration_ms'] = $durationMs;
+        }
+        if (true === ($decoded['step_output_truncated'] ?? false)) {
+            $out['step_output_truncated'] = true;
         }
 
         return $out;

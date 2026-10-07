@@ -1257,7 +1257,9 @@
       "running": "El trabajo con archivos está en marcha.",
       "runningOff": "El sidecar está en marcha; el trabajo con archivos está desactivado en Configuración del sistema › Herramientas y automatización.",
       "unreachable": "El sidecar de trabajo con archivos no es accesible.",
-      "unset": "COMPUTE_URL o COMPUTE_TOKEN no está definido."
+      "unset": "COMPUTE_URL o COMPUTE_TOKEN no está definido.",
+      "reachable": "Sidecar accesible.",
+      "notRunning": "El sidecar no está en marcha: el trabajo con archivos no está disponible."
     },
     "state": {
       "available": "Disponible",

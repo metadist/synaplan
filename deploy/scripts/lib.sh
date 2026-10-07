@@ -801,16 +801,173 @@ deployment_secret_is_adoptable() {
     esac
 }
 
+# The profile list Compose will use, as a value — never by sourcing the env file.
+#
+# An exported COMPOSE_PROFILES wins, which is Compose's own rule. Otherwise the
+# assignment is read from the file Compose will parse. Quotes, a trailing
+# " #" comment and spaces around commas are stripped the same way
+# deploy/scripts/local-tls.sh does. The raw text is never evaluated, so a
+# value like `$(...)` stays text.
+compose_profile_list_value() {
+    local value="$1" quote=""
+    value="${value%$'\r'}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    if [[ ${#value} -ge 2 ]]; then
+        quote="${value:0:1}"
+        if [[ ( "$quote" == '"' || "$quote" == "'" ) && "${value: -1}" == "$quote" ]]; then
+            value="${value:1:${#value}-2}"
+        elif [[ "$value" == *" #"* ]]; then
+            value="${value%% #*}"
+            value="${value%"${value##*[![:space:]]}"}"
+            if [[ ${#value} -ge 2 ]]; then
+                quote="${value:0:1}"
+                if [[ ( "$quote" == '"' || "$quote" == "'" ) && "${value: -1}" == "$quote" ]]; then
+                    value="${value:1:${#value}-2}"
+                fi
+            fi
+        fi
+    fi
+    while [[ "$value" == *", "* || "$value" == *" ,"* ]]; do
+        value="${value//, /,}"
+        value="${value// ,/,}"
+    done
+    printf '%s' "$value"
+}
+
+# Expand ${VAR}, ${VAR:-default}, ${VAR-default} and $VAR the way Compose does.
+# $$ is a literal dollar. $(...) and backticks are left untouched and never run.
+# Host environment wins over the env file. Lookups in the file are one level
+# deep so a cycle cannot loop.
+interpolate_compose_value() {
+    local env_file="$1" value="$2" depth="${3:-0}"
+    local out="" i=0 n char name default_value looked
+    (( depth < 5 )) || {
+        printf '%s' "$value"
+        return 0
+    }
+    n=${#value}
+    while (( i < n )); do
+        char="${value:i:1}"
+        if [[ "$char" != '$' ]]; then
+            out+="$char"
+            i=$((i + 1))
+            continue
+        fi
+        if [[ "${value:i:2}" == '$$' ]]; then
+            out+='$'
+            i=$((i + 2))
+            continue
+        fi
+        if [[ "${value:i:2}" == '$(' ]]; then
+            out+="${value:i}"
+            break
+        fi
+        if [[ "${value:i:2}" == '${' ]]; then
+            local rest="${value:i+2}" close
+            close="${rest%%\}*}"
+            if [[ "$rest" == "$close" ]]; then
+                out+="${value:i}"
+                break
+            fi
+            name="${close%%[:?-]*}"
+            default_value=""
+            if [[ "$close" == *':-'* ]]; then
+                default_value="${close#*:-}"
+            elif [[ "$close" == *'-'* && "$close" != *'?'* ]]; then
+                default_value="${close#*-}"
+            fi
+            if [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && looked="$(lookup_compose_name "$env_file" "$name")"; then
+                out+="$(interpolate_compose_value "$env_file" "$looked" $((depth + 1)))"
+            else
+                out+="$(interpolate_compose_value "$env_file" "$default_value" $((depth + 1)))"
+            fi
+            i=$((i + 2 + ${#close} + 1))
+            continue
+        fi
+        if [[ "${value:i+1:1}" =~ [A-Za-z_] ]]; then
+            name=""
+            local j=$((i + 1))
+            while (( j < n )) && [[ "${value:j:1}" =~ [A-Za-z0-9_] ]]; do
+                name+="${value:j:1}"
+                j=$((j + 1))
+            done
+            if looked="$(lookup_compose_name "$env_file" "$name")"; then
+                out+="$(interpolate_compose_value "$env_file" "$looked" $((depth + 1)))"
+            fi
+            i=$j
+            continue
+        fi
+        out+="$char"
+        i=$((i + 1))
+    done
+    printf '%s' "$out"
+}
+
+lookup_compose_name() {
+    local env_file="$1" name="$2"
+    if host_environment_defines "$name"; then
+        printf '%s' "${!name-}"
+        return 0
+    fi
+    if [[ -n "$env_file" && -f "$env_file" ]]; then
+        env_file_raw_value "$env_file" "$name"
+        return $?
+    fi
+    return 1
+}
+
+# COMPOSE_PROFILES after Compose-style interpolation, without sourcing the file
+# and without invoking Compose. An extra `compose config` here would run before
+# the deployment commands the lifecycle contract records, and `config --profiles`
+# lists every declared profile rather than the enabled set.
+# An exported value wins. Otherwise ${VAR}, ${VAR:-default} and $VAR expand from
+# the host environment, then from other assignments in the file. $$ is a literal
+# dollar. $(...) and backticks are not expanded and never run.
+compose_profiles_resolved() {
+    local raw="" env_file=""
+    if host_environment_defines COMPOSE_PROFILES; then
+        raw="${COMPOSE_PROFILES-}"
+    else
+        env_file="$(resolve_compose_env_file || true)"
+        if [[ -n "$env_file" && -f "$env_file" ]]; then
+            raw="$(env_file_raw_value "$env_file" COMPOSE_PROFILES || true)"
+            if [[ "$raw" == *'$'* ]]; then
+                raw="$(interpolate_compose_value "$env_file" "$raw")"
+            fi
+        fi
+    fi
+    compose_profile_list_value "$raw"
+}
+
+# A non-secret value from the env file, only when the host did not export it.
+env_file_plain_value() {
+    local key="$1" env_file="" raw=""
+    if host_environment_defines "$key"; then
+        printf '%s' "${!key-}"
+        return 0
+    fi
+    env_file="$(resolve_compose_env_file || true)"
+    if [[ -n "$env_file" && -f "$env_file" ]]; then
+        raw="$(env_file_raw_value "$env_file" "$key" || true)"
+    fi
+    compose_profile_list_value "$raw"
+}
+
 # File-work token is optional and only required when COMPOSE_PROFILES includes
 # compute. It lives next to the other data (not in the 8-key secrets.env) so
-# marketplace rewrites of deploy/.env do not rotate it.
+# marketplace rewrites of deploy/.env do not rotate it. The token is never
+# written back into deploy/.env or secrets.env, and it is never printed.
 ensure_compute_token() {
     mkdir -p "$DATA_DIR/compute/scratch" "$DATA_DIR/compute/workspaces"
-    case ",${COMPOSE_PROFILES:-}," in
+    local profiles
+    profiles="$(compose_profiles_resolved)"
+    case ",${profiles}," in
         *,compute,*) ;;
         *) return 0 ;;
     esac
     local token_file="$DATA_DIR/compute.token"
+    local wrote=false
     if [[ -z "${COMPUTE_TOKEN:-}" ]]; then
         if [[ -f "$token_file" ]]; then
             COMPUTE_TOKEN="$(tr -d '\n' < "$token_file")"
@@ -818,13 +975,26 @@ ensure_compute_token() {
             COMPUTE_TOKEN="$(openssl rand -hex 32)"
             umask 077
             printf '%s\n' "$COMPUTE_TOKEN" > "$token_file"
+            wrote=true
         fi
     elif [[ ! -f "$token_file" ]]; then
         umask 077
         printf '%s\n' "$COMPUTE_TOKEN" > "$token_file"
+        wrote=true
     fi
     export COMPUTE_TOKEN
-    export COMPUTE_URL="${COMPUTE_URL:-http://compute:8080}"
+    local compute_url
+    compute_url="$(env_file_plain_value COMPUTE_URL)"
+    if [[ -z "$compute_url" ]]; then
+        compute_url="http://compute:8080"
+    fi
+    export COMPUTE_URL="$compute_url"
+    local shown="${token_file#"$DEPLOY_DIR"/}"
+    if [[ "$wrote" == true ]]; then
+        printf 'File work enabled: token written to %s\n' "$shown"
+    else
+        printf 'File work enabled: using the token in %s\n' "$shown"
+    fi
 }
 
 # 32 bytes of randomness rendered as 64 hexadecimal characters.

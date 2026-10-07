@@ -203,6 +203,7 @@ final readonly class MessageApiFormatter
             'aiModels' => !empty($aiModels) ? $aiModels : null, // AI model metadata
             'webSearch' => $webSearchData, // Web search metadata
             'searchResults' => !empty($searchResultsData) ? $searchResultsData : null, // Actual search results
+            'ragSources' => $this->decodeRagSources($m),
             'usage' => $usage, // Per-message token/cost usage (taximeter); null when absent
             'usageExtra' => $usageExtra, // Auxiliary usage of this turn (sorting/planning/transcription/media/TTS); null when absent
             'multitask' => $wasMultitask, // True when the turn ran the multi-task DAG
@@ -356,6 +357,23 @@ final readonly class MessageApiFormatter
      *
      * @return array<string, mixed>|null
      */
+    /**
+     * @return list<array<string, mixed>>|null
+     */
+    private function decodeRagSources(Message $m): ?array
+    {
+        $raw = $m->getMeta('rag_sources');
+        if (!is_string($raw) || '' === $raw) {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded) || [] === $decoded) {
+            return null;
+        }
+
+        return $decoded;
+    }
+
     private function decodeTaskPlanMeta(Message $m): ?array
     {
         $raw = $m->getMeta('task_plan');

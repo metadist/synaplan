@@ -405,14 +405,18 @@ final readonly class InternalEmailService
     }
 
     /**
-     * Inbox link only — never include the tool arguments.
+     * Which tool is waiting, and where to decide. The request body is never included.
      */
-    public function sendApprovalRequestEmail(string $to, string $preview, string $inboxUrl): void
+    public function sendApprovalRequestEmail(string $to, string $toolName, string $inboxUrl): void
     {
+        $toolName = trim($toolName);
+        if ('' === $toolName) {
+            $toolName = 'A tool';
+        }
         $this->sendTaskResultEmail(
             $to,
             'Waiting for your approval',
-            $preview."\n\nNothing has been sent yet. Open Approvals to Approve or Reject:\n".$inboxUrl,
+            $toolName." is waiting for your approval.\n\nNothing has been sent yet. Open Approvals to Approve or Reject:\n".$inboxUrl,
         );
     }
 

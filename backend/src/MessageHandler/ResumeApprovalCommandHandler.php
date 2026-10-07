@@ -14,6 +14,7 @@ use App\Repository\UserRepository;
 use App\Service\Mcp\McpClient;
 use App\Service\Tool\ApprovalRealtimeNotifier;
 use App\Service\Tool\ApprovalReference;
+use App\Service\Tool\ApprovalService;
 use App\Service\Tool\ChatApprovalContinuationService;
 use App\Service\Tool\Custom\HttpToolExecutor;
 use App\Service\Tool\ToolDescriptor;
@@ -149,7 +150,7 @@ final readonly class ResumeApprovalCommandHandler
         if (null === $tool) {
             throw new \RuntimeException(sprintf('Custom tool %s is no longer available', $approval->getTool()));
         }
-        $result = $this->httpExecutor->execute($tool, $approval->getArgs() ?? [], $approval->getOwnerId());
+        $result = $this->httpExecutor->execute($tool, ApprovalService::executionArgs($approval), $approval->getOwnerId());
 
         return ['custom:'.$tool->getId().':'.$result['status'], $this->clip($result['summary'])];
     }
@@ -165,7 +166,7 @@ final readonly class ResumeApprovalCommandHandler
         if (null === $server || !$server->isEnabled() || '' === $toolName) {
             throw new \RuntimeException(sprintf('MCP server %d for tool %s is not available', $serverId, $approval->getTool()));
         }
-        $call = $this->mcpClient->callTool($server, $toolName, $approval->getArgs() ?? []);
+        $call = $this->mcpClient->callTool($server, $toolName, ApprovalService::executionArgs($approval));
         if ($call['isError']) {
             throw new \RuntimeException(sprintf('MCP tool %s reported an error: %s', $toolName, $this->formatContent($call['content'])));
         }

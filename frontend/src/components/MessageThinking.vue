@@ -138,7 +138,7 @@ const headerLabel = computed(() => {
     return t('message.thinkingInProgress')
   }
   if (typeof props.thinkingTime === 'number' && props.thinkingTime > 0) {
-    return t('message.thoughtFor', { n: props.thinkingTime })
+    return t('message.thoughtFor', { n: props.thinkingTime }, props.thinkingTime)
   }
   return t('message.thinking')
 })

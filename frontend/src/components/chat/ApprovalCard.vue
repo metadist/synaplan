@@ -58,7 +58,17 @@ const onReject = async () => {
 <template>
   <section class="surface-card p-4 space-y-3" data-testid="approval-card">
     <p class="text-sm txt-secondary">{{ $t('approvals.nothingCreatedYet') }}</p>
-    <p class="txt-primary font-medium">{{ approval.preview || approval.tool }}</p>
+    <div v-if="approval.resolvedRequest" class="space-y-1" data-testid="approval-request">
+      <p class="text-xs txt-secondary">{{ $t('approvals.requestHeading') }}</p>
+      <p class="txt-primary font-medium break-words">
+        {{ approval.resolvedRequest.method }} {{ approval.resolvedRequest.url }}
+      </p>
+      <pre
+        v-if="approval.resolvedRequest.body"
+        class="text-xs txt-primary whitespace-pre-wrap break-words surface-chip p-2 rounded-xl"
+        >{{ approval.resolvedRequest.body }}</pre>
+    </div>
+    <p v-else class="txt-primary font-medium">{{ approval.preview || approval.tool }}</p>
     <p class="text-xs txt-secondary" data-testid="approval-expires">{{ expiresIn }}</p>
     <div class="flex flex-wrap gap-2">
       <button
