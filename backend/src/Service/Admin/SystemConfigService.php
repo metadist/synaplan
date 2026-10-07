@@ -145,11 +145,6 @@ final readonly class SystemConfigService
             'search' => ['label' => 'Search', 'fields' => [
                 'FEATURE_SEARCH_AI_ENABLED',
             ]],
-            'chat' => ['label' => 'Chat', 'fields' => [
-                'CHAT_EXPORT_ENABLED',
-                'CHAT_SHARE_ENABLED',
-                'CHAT_ARTIFACTS_ENABLED',
-            ]],
         ];
 
         $gateKeys = array_keys($this->moduleGateFields());
@@ -233,6 +228,7 @@ final readonly class SystemConfigService
                     'legal' => ['label' => 'Legal Links', 'fields' => ['BRAND_PRIVACY_URL', 'BRAND_TERMS_URL']],
                     'navigation' => ['label' => 'Start Page', 'fields' => ['BRAND_LANDING_PAGE', 'BRAND_DEFAULT_ROUTE']],
                     'welcome' => ['label' => 'Empty chat', 'fields' => ['CHAT_WELCOME_SHOW_STORE_CARDS', 'CHAT_WELCOME_SHOW_WIDGET_PROMO']],
+                    'chat' => ['label' => 'Chat', 'fields' => ['CHAT_EXPORT_ENABLED', 'CHAT_SHARE_ENABLED', 'CHAT_ARTIFACTS_ENABLED']],
                     'attribution' => ['label' => 'Attribution ("Powered by")', 'fields' => ['BRAND_SHOW_POWERED_BY', 'BRAND_POWERED_BY_LABEL', 'BRAND_POWERED_BY_URL']],
                 ],
             ],
@@ -2434,7 +2430,7 @@ final readonly class SystemConfigService
                 'dbKey' => \App\Service\Chat\ChatWelcomeConfig::SHOW_WIDGET_PROMO,
             ],
             'CHAT_EXPORT_ENABLED' => [
-                'tab' => 'features', 'section' => 'chat', 'type' => 'boolean',
+                'tab' => 'branding', 'section' => 'chat', 'type' => 'boolean',
                 'sensitive' => false,
                 'description' => 'Let people download a chat (Markdown, PDF, JSON) and include chats in account export. A group policy can turn this off for one group. On when this row is missing.',
                 'default' => 'true',
@@ -2443,7 +2439,7 @@ final readonly class SystemConfigService
                 'dbKey' => \App\Service\Chat\ChatActionPolicy::EXPORT,
             ],
             'CHAT_SHARE_ENABLED' => [
-                'tab' => 'features', 'section' => 'chat', 'type' => 'boolean',
+                'tab' => 'branding', 'section' => 'chat', 'type' => 'boolean',
                 'sensitive' => false,
                 'description' => 'Let people create a public link for a chat. A group policy can turn this off for one group. On when this row is missing.',
                 'default' => 'true',
@@ -2452,7 +2448,7 @@ final readonly class SystemConfigService
                 'dbKey' => \App\Service\Chat\ChatActionPolicy::SHARE,
             ],
             'CHAT_ARTIFACTS_ENABLED' => [
-                'tab' => 'features', 'section' => 'chat', 'type' => 'boolean',
+                'tab' => 'branding', 'section' => 'chat', 'type' => 'boolean',
                 'sensitive' => false,
                 'description' => 'Offer a sandboxed preview for HTML and SVG answers. Off when this row is missing and CHAT_ARTIFACTS_ENABLED is empty. An explicit on in either place turns the preview on. An explicit off in either place turns it off.',
                 'default' => 'false',
