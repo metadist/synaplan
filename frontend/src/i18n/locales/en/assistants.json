@@ -13,6 +13,7 @@
     "filterPlugins": "From plugins",
     "searchPlaceholder": "Search assistants",
     "talkingTo": "Talking to {name}",
+    "useDefaultModel": "New messages go to the default model",
     "emptyHint": "This chat uses {name}.",
     "suggested": "Try one of these",
     "save": "Save",

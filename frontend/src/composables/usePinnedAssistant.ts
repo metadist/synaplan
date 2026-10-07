@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, type LocationQuery, type LocationQueryRaw, type Router } from 'vue-router'
 import { agentsApi } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
 import { useHistoryStore } from '@/stores/history'
@@ -57,6 +57,45 @@ export function shouldOpenFreshAssistantChat(
     return false
   }
   return !messages.some((message) => message.agentId === queryAgentId)
+}
+
+/** Drop `agentId` and keep every other query param. */
+export function queryWithoutAssistantPin(query: LocationQuery): LocationQueryRaw {
+  const next: LocationQueryRaw = { ...query }
+  delete next.agentId
+  return next
+}
+
+/**
+ * Where a brand-new chat should open. Null when we are already on the home
+ * chat and no assistant is pinned in the URL — navigating again would be a no-op.
+ * A pin set only in the query must be removed, including when the path is already `/`.
+ */
+export function freshChatTarget(
+  path: string,
+  query: LocationQuery
+): { path: '/'; query: LocationQueryRaw } | null {
+  const pinned = query.agentId != null && query.agentId !== ''
+  if (path === '/' && !pinned) {
+    return null
+  }
+  return { path: '/', query: queryWithoutAssistantPin(query) }
+}
+
+/** Leave the assistant pin behind. Replace when we stay on the same page. */
+export async function goToFreshChat(
+  router: Router,
+  route: { path: string; query: LocationQuery }
+): Promise<void> {
+  const target = freshChatTarget(route.path, route.query)
+  if (!target) {
+    return
+  }
+  if (route.path === '/') {
+    await router.replace(target)
+    return
+  }
+  await router.push(target)
 }
 
 function trimmedStrings(values: unknown): string[] {

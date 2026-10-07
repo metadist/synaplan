@@ -22,6 +22,7 @@ import { setLocale } from '@/i18n/loader'
 import { useTheme } from '@/composables/useTheme'
 import { useAuth } from '@/composables/useAuth'
 import { useChatsStore } from '@/stores/chats'
+import { goToFreshChat } from '@/composables/usePinnedAssistant'
 import { useCommandsStore } from '@/stores/commands'
 import { useSmartSearchStore } from '@/stores/smartSearch'
 import { allLocaleTexts } from './localeTexts'
@@ -76,7 +77,7 @@ export function useCommandSources() {
         icon: PlusIcon,
         run: async () => {
           await chatsStore.findOrCreateEmptyChat()
-          await router.push('/')
+          await goToFreshChat(router, router.currentRoute.value)
         },
       },
       {

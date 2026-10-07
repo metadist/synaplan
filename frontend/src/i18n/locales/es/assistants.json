@@ -13,6 +13,7 @@
     "filterPlugins": "De plugins",
     "searchPlaceholder": "Buscar asistentes",
     "talkingTo": "Hablando con {name}",
+    "useDefaultModel": "Los mensajes nuevos van al modelo predeterminado",
     "emptyHint": "Este chat usa {name}.",
     "suggested": "Prueba una de estas",
     "save": "Guardar",

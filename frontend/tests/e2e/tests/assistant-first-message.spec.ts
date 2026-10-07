@@ -66,6 +66,16 @@ test.describe('@ci Assistants first chat message', () => {
       await expect.poll(() => seen.length, { timeout: TIMEOUTS.STANDARD }).toBe(2)
       expect(seen[1]).toBe(String(agentId))
       await expect(page.locator('[data-testid="banner-pinned-assistant"]')).toBeVisible()
+
+      await page.locator('[data-testid="btn-pinned-assistant-stop"]').click()
+      await expect(page.locator('[data-testid="banner-pinned-assistant"]')).toBeHidden({
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await page.locator(CHAT.textInput).fill('Without the assistant')
+      await expect(page.locator(CHAT.sendBtn)).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
+      await page.locator(CHAT.sendBtn).click()
+      await expect.poll(() => seen.length, { timeout: TIMEOUTS.STANDARD }).toBe(3)
+      expect(seen[2]).toBe('')
     } finally {
       await request.delete(`${getApiUrl()}/api/v1/agents/${agentId}`, { headers })
     }
