@@ -253,7 +253,7 @@ export function useNavItems() {
           : []),
         {
           key: 'task-prompts',
-          path: isAgentsEnabled() ? '/ai/assistants' : '/ai/task-prompts',
+          path: isAgentsEnabled() ? '/ai/assistants' : '/ai/instructions',
           label: isAgentsEnabled() ? t('nav.assistants') : t('nav.configTaskPrompts'),
           icon: isAgentsEnabled() ? IdentificationIcon : DocumentTextIcon,
           ...grouped('assistants', assistants),
