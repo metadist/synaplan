@@ -357,7 +357,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $scopes = [];
         foreach ($profile->ragScopes as $scope) {
-            $scopes[] = new RagScope($scope['ownerId'], $scope['groupKey']);
+            $groupKey = $scope['groupKey'];
+            $scopes[] = new RagScope(
+                $scope['ownerId'],
+                '' === $groupKey ? null : $groupKey,
+                $scope['fileIds'] ?? [],
+            );
         }
         if ($profile->includeUserFiles) {
             $scopes[] = new RagScope($viewerId, null);
@@ -618,14 +623,20 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
         $isRagQuery = Capability::RagQuery->value === ($classification['intent'] ?? '');
+        $agentScopes = $this->agentRagScopes($profile, $message->getUserId());
+        $searchKnowledge = \App\Service\Agent\AgentKnowledgeSearchGate::shouldSearch(
+            $agentScopes,
+            (string) $message->getText(),
+            null !== $ragGroupKey || $isRagQuery,
+        );
         $ragContext = $this->loadRagContext(
             $message,
             $topic,
             $ragGroupKey,
             $ragLimit,
             $ragMinScore,
-            $this->agentRagScopes($profile, $message->getUserId()),
-            $isRagQuery,
+            $agentScopes,
+            $searchKnowledge,
         );
 
         if ($isRagQuery && '' === $ragContext) {
@@ -1309,7 +1320,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $ragResults = [];
 
-        if (!empty($message->getText()) && (null !== $ragGroupKey || $isRagQuery)) {
+        $searchKnowledge = \App\Service\Agent\AgentKnowledgeSearchGate::shouldSearch(
+            $agentScopes,
+            (string) $message->getText(),
+            null !== $ragGroupKey || $isRagQuery,
+        );
+
+        if (!empty($message->getText()) && $searchKnowledge) {
             try {
                 error_log('🔍 ChatHandler: Attempting to load RAG context for topic: '.$topic.' (groupKey: '.$ragGroupKey.')');
 

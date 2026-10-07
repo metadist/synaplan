@@ -13,6 +13,14 @@
           />
         </div>
         <button
+          type="button"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
+          data-testid="btn-add-user"
+          @click="showAddUser = !showAddUser"
+        >
+          {{ $t('admin.users.addUser') }}
+        </button>
+        <button
           class="btn-secondary px-6 py-2.5 rounded-xl font-medium"
           data-testid="btn-refresh-users"
           @click="loadUsers()"
@@ -20,6 +28,56 @@
           <Icon icon="mdi:refresh" class="w-5 h-5" />
         </button>
       </div>
+      <form
+        v-if="showAddUser"
+        class="mt-4 grid gap-3 sm:grid-cols-2"
+        data-testid="form-add-user"
+        @submit.prevent="submitAddUser"
+      >
+        <input
+          v-model="newUser.email"
+          type="email"
+          required
+          :placeholder="$t('admin.users.email')"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          data-testid="input-add-user-email"
+        />
+        <input
+          v-model="newUser.displayName"
+          type="text"
+          :placeholder="$t('admin.users.displayName')"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          data-testid="input-add-user-name"
+        />
+        <input
+          v-model="newUser.password"
+          type="password"
+          required
+          minlength="8"
+          autocomplete="new-password"
+          :placeholder="$t('admin.users.password')"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          data-testid="input-add-user-password"
+        />
+        <select
+          v-model="newUser.level"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          data-testid="select-add-user-level"
+        >
+          <option value="NEW">NEW</option>
+          <option value="PRO">PRO</option>
+          <option value="TEAM">TEAM</option>
+          <option value="BUSINESS">BUSINESS</option>
+        </select>
+        <button
+          type="submit"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium sm:col-span-2"
+          :disabled="addingUser"
+          data-testid="btn-submit-add-user"
+        >
+          {{ $t('admin.users.createUser') }}
+        </button>
+      </form>
     </div>
 
     <div class="surface-card rounded-lg p-6">
@@ -87,6 +145,13 @@
                       class="w-4 h-4 text-success"
                       :title="$t('admin.users.verified')"
                     />
+                    <span
+                      v-else
+                      class="text-xs txt-secondary"
+                      :title="$t('admin.users.notVerifiedHint')"
+                    >
+                      {{ $t('admin.users.notVerified') }}
+                    </span>
                   </div>
                 </td>
                 <td class="py-3 px-4">
@@ -148,6 +213,24 @@
                       @click="confirmImpersonate(user)"
                     >
                       <Icon icon="mdi:incognito" class="w-5 h-5" />
+                    </button>
+                    <button
+                      v-if="!user.emailVerified"
+                      type="button"
+                      class="btn-secondary px-3 py-2 rounded-xl text-xs font-medium"
+                      :data-testid="`btn-verify-user-${user.id}`"
+                      @click="confirmVerify(user)"
+                    >
+                      {{ $t('admin.users.markVerified') }}
+                    </button>
+                    <button
+                      v-if="!user.emailVerified && mailerConfigured"
+                      type="button"
+                      class="btn-secondary px-3 py-2 rounded-xl text-xs font-medium"
+                      :data-testid="`btn-resend-verification-${user.id}`"
+                      @click="resendVerification(user)"
+                    >
+                      {{ $t('admin.users.resendVerification') }}
                     </button>
                     <button
                       class="icon-ghost icon-ghost--danger p-2 rounded-xl"
@@ -260,6 +343,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useEscapeKey } from '@/composables/useEscapeKey'
 import { isIamImpersonationDisabled } from '@/composables/useIamFeature'
+import { isMailerConfigured } from '@/utils/mailerConfigured'
 
 withDefaults(
   defineProps<{
@@ -274,6 +358,10 @@ const authStore = useAuthStore()
 const { success, error: showError } = useNotification()
 const { confirm } = useDialog()
 const router = useRouter()
+const mailerConfigured = computed(() => isMailerConfigured())
+const showAddUser = ref(false)
+const addingUser = ref(false)
+const newUser = ref({ email: '', displayName: '', password: '', level: 'NEW' })
 
 const users = ref<AdminUser[]>([])
 const usersLoading = ref(false)
@@ -324,6 +412,55 @@ function debouncedSearchUsers() {
     currentPage.value = 1
     loadUsers()
   }, 300)
+}
+
+async function submitAddUser(): Promise<void> {
+  addingUser.value = true
+  try {
+    await adminApi.createUserAccount({
+      email: newUser.value.email,
+      displayName: newUser.value.displayName,
+      level: newUser.value.level,
+      password: newUser.value.password,
+    })
+    newUser.value = { email: '', displayName: '', password: '', level: 'NEW' }
+    showAddUser.value = false
+    success(t('admin.users.accountCreated'))
+    await loadUsers()
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('admin.users.createFailed'))
+  } finally {
+    addingUser.value = false
+  }
+}
+
+async function confirmVerify(user: AdminUser): Promise<void> {
+  const ok = await confirm({
+    title: t('admin.users.markVerified'),
+    message: t('admin.users.markVerifiedConfirm', { email: user.email ?? '' }),
+  })
+  if (!ok) return
+  try {
+    await adminApi.markUserVerified(user.id)
+    success(t('admin.users.verifiedNow'))
+    await loadUsers()
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('admin.users.verifyFailed'))
+  }
+}
+
+async function resendVerification(user: AdminUser): Promise<void> {
+  const ok = await confirm({
+    title: t('admin.users.resendVerification'),
+    message: t('admin.users.resendVerificationConfirm', { email: user.email ?? '' }),
+  })
+  if (!ok) return
+  try {
+    await adminApi.resendUserVerification(user.id)
+    success(t('admin.users.resent'))
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('admin.users.resendFailed'))
+  }
 }
 
 async function updateUserLevel(userId: number, newLevel: string, event?: Event) {

@@ -82,10 +82,11 @@
                 <p class="text-xs txt-secondary">{{ formatFileSize(file.size) }}</p>
               </div>
               <button
-                :disabled="isUploading"
-                class="p-1.5 rounded-xl hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                :aria-label="$t('files.removeFile')"
-                @click="removeSelectedFile(index)"
+                type="button"
+                class="p-1.5 rounded-xl hover:bg-red-500/10 transition-colors"
+                :aria-label="isUploading ? $t('files.cancelUpload') : $t('files.removeFile')"
+                :title="isUploading ? $t('files.cancelUpload') : $t('files.removeFile')"
+                @click="isUploading ? cancelUpload() : removeSelectedFile(index)"
               >
                 <XMarkIcon class="w-4 h-4 text-red-500" />
               </button>
@@ -2312,6 +2313,12 @@ const rowActions = (file: FileItem): FileRowAction[] => {
   return actions
 }
 
+const uploadAbortController = ref<AbortController | null>(null)
+
+function cancelUpload(): void {
+  uploadAbortController.value?.abort()
+}
+
 const uploadFiles = async () => {
   if (openSharedFolder.value) return
   if (selectedFiles.value.length === 0) {
@@ -2320,6 +2327,10 @@ const uploadFiles = async () => {
   }
 
   const groupKey = activeUploadFolder.value
+  const names = new Set(selectedFiles.value.map((file) => file.name))
+  const beforeIds = new Set(files.value.map((file) => file.id))
+  const controller = new AbortController()
+  uploadAbortController.value = controller
 
   isUploading.value = true
   uploadProgress.value = { loaded: 0, total: 0, percentage: 0 }
@@ -2332,6 +2343,7 @@ const uploadFiles = async () => {
       // without indexing — the user makes it RAG-ready per file via the
       // "Describe, vectorize & sort" action.
       processLevel: 'vectorize',
+      signal: controller.signal,
       onProgress: (progress) => {
         uploadProgress.value = progress
       },
@@ -2361,6 +2373,20 @@ const uploadFiles = async () => {
       })
     }
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      await loadFiles()
+      const appeared = files.value.filter(
+        (file) => !beforeIds.has(file.id) && (names.has(file.filename) || names.has(file.display_name ?? ''))
+      )
+      for (const file of appeared) {
+        await filesService.deleteFile(file.id)
+      }
+      if (appeared.length > 0) {
+        await loadFiles()
+      }
+      showSuccess(t('files.uploadCancelled'))
+      return
+    }
     if (error instanceof UploadBlockedError) {
       showError(translateUploadBlocked(error))
       if (storageWidget.value) await storageWidget.value.refresh()
@@ -2371,6 +2397,7 @@ const uploadFiles = async () => {
   } finally {
     isUploading.value = false
     uploadProgress.value = null
+    uploadAbortController.value = null
   }
 }
 

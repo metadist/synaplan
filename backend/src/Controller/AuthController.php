@@ -12,6 +12,7 @@ use App\Service\Client\ClientContextResolver;
 use App\Service\GuestSessionService;
 use App\Service\ImpersonationService;
 use App\Service\InternalEmailService;
+use App\Service\MailerConfig;
 use App\Service\NativeAuthHandoffService;
 use App\Service\OidcTokenService;
 use App\Service\RecaptchaService;
@@ -55,6 +56,7 @@ class AuthController extends AbstractController
         private NativeAuthHandoffService $handoffService,
         private UserLifecycleService $userLifecycleService,
         private RegistrationConfig $registrationConfig,
+        private MailerConfig $mailerConfig,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
@@ -238,10 +240,7 @@ class AuthController extends AbstractController
                 'ip' => $request->getClientIp(),
             ]);
 
-            return $this->json([
-                'success' => true,
-                'message' => 'If this email is not already registered, you will receive a verification email shortly.',
-            ], Response::HTTP_OK);
+            return $this->json($this->registrationAccepted(), Response::HTTP_OK);
         }
 
         // Check if user exists
@@ -257,10 +256,7 @@ class AuthController extends AbstractController
             // Hash the password anyway to prevent timing attacks
             $this->passwordHasher->hashPassword($existingUser, $dto->password);
 
-            return $this->json([
-                'success' => true,
-                'message' => 'If this email is not already registered, you will receive a verification email shortly.',
-            ], Response::HTTP_OK);
+            return $this->json($this->registrationAccepted(), Response::HTTP_OK);
         }
 
         $user = $this->userLifecycleService->createUser(
@@ -272,9 +268,9 @@ class AuthController extends AbstractController
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h
 
-        // Send verification email
+        $delivered = false;
         try {
-            $this->internalEmailService->sendVerificationEmail(
+            $delivered = $this->internalEmailService->sendVerificationEmail(
                 $user->getMail(),
                 $token->getToken(),
                 $user->getLocale()
@@ -286,12 +282,29 @@ class AuthController extends AbstractController
             ]);
         }
 
-        $this->logger->info('User registered', ['user_id' => $user->getId()]);
+        $this->logger->info('User registered', ['user_id' => $user->getId(), 'mail_delivered' => $delivered]);
 
-        return $this->json([
+        return $this->json($this->registrationAccepted($delivered), Response::HTTP_OK);
+    }
+
+    /**
+     * Same shape for a new account and an address that already exists, so
+     * registration does not reveal which emails are taken. `mailDelivered`
+     * is false for every response when this install cannot send mail.
+     *
+     * @return array{success: true, message: string, mailDelivered: bool}
+     */
+    private function registrationAccepted(?bool $delivered = null): array
+    {
+        $mailDelivered = $this->mailerConfig->isConfigured() && (null === $delivered || $delivered);
+
+        return [
             'success' => true,
-            'message' => 'If this email is not already registered, you will receive a verification email shortly.',
-        ], Response::HTTP_OK);
+            'mailDelivered' => $mailDelivered,
+            'message' => $mailDelivered
+                ? 'If this email is not already registered, you will receive a verification email shortly.'
+                : 'No verification email was sent. An administrator has to confirm the account before sign-in.',
+        ];
     }
 
     #[Route('/login', name: 'login', methods: ['POST'])]

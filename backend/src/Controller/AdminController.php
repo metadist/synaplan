@@ -8,6 +8,7 @@ use App\Repository\ExternalIdentityRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UseLogRepository;
 use App\Repository\UserRepository;
+use App\Service\Admin\AdminPeopleAccountService;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\GroupService;
 use App\Service\Iam\IamConfig;
@@ -39,6 +40,7 @@ class AdminController extends AbstractController
         private ExternalIdentityRepository $externalIdentityRepository,
         private AuditLogWriter $auditLogWriter,
         private LoggerInterface $logger,
+        private AdminPeopleAccountService $peopleAccounts,
     ) {
     }
 
@@ -391,6 +393,124 @@ class AdminController extends AbstractController
     /**
      * Delete user (admin only).
      */
+    #[Route('/users/accounts', name: 'admin_create_user_account', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/admin/users/accounts',
+        summary: 'Create a verified account',
+        description: 'Creates a ready-to-use email/password account. The password is not stored in the audit log and is not emailed.',
+        security: [['Bearer' => []]],
+        tags: ['Admin']
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            required: ['email', 'password', 'level'],
+            properties: [
+                new OA\Property(property: 'email', type: 'string', format: 'email'),
+                new OA\Property(property: 'display_name', type: 'string'),
+                new OA\Property(property: 'level', type: 'string', enum: ['NEW', 'PRO', 'TEAM', 'BUSINESS']),
+                new OA\Property(property: 'password', type: 'string', format: 'password', minLength: 8),
+            ]
+        )
+    )]
+    #[OA\Response(response: 201, description: 'Account created')]
+    #[OA\Response(response: 400, description: 'Invalid input')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    public function createUserAccount(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user || !$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+        $data = json_decode($request->getContent(), true);
+        if (!is_array($data)) {
+            return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
+        }
+        try {
+            $created = $this->peopleAccounts->create(
+                $user,
+                (string) ($data['email'] ?? ''),
+                (string) ($data['display_name'] ?? ''),
+                (string) ($data['level'] ?? 'NEW'),
+                (string) ($data['password'] ?? ''),
+                (string) $request->getClientIp(),
+            );
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json(['success' => true, 'user' => $this->peopleUserPayload($created)], Response::HTTP_CREATED);
+    }
+
+    #[Route('/users/{id}/verify', name: 'admin_verify_user', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[OA\Post(
+        path: '/api/v1/admin/users/{id}/verify',
+        summary: 'Mark an account email as verified',
+        security: [['Bearer' => []]],
+        tags: ['Admin']
+    )]
+    #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(response: 200, description: 'Account verified')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(response: 404, description: 'User not found')]
+    public function verifyUser(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user || !$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+        $target = $this->userRepository->find($id);
+        if (!$target instanceof User) {
+            return $this->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+        }
+        $this->peopleAccounts->markVerified($user, $target, (string) $request->getClientIp());
+
+        return $this->json(['success' => true, 'user' => $this->peopleUserPayload($target)]);
+    }
+
+    #[Route('/users/{id}/resend-verification', name: 'admin_resend_user_verification', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[OA\Post(
+        path: '/api/v1/admin/users/{id}/resend-verification',
+        summary: 'Resend the verification email',
+        security: [['Bearer' => []]],
+        tags: ['Admin']
+    )]
+    #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(response: 200, description: 'Email sent')]
+    #[OA\Response(response: 409, description: 'Mail is not configured')]
+    #[OA\Response(response: 403, description: 'Admin access required')]
+    #[OA\Response(response: 404, description: 'User not found')]
+    public function resendUserVerification(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user || !$user->isAdmin()) {
+            return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
+        }
+        $target = $this->userRepository->find($id);
+        if (!$target instanceof User) {
+            return $this->json(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+        }
+        $result = $this->peopleAccounts->resendVerification($user, $target, (string) $request->getClientIp());
+        if ('unconfigured' === $result) {
+            return $this->json([
+                'error' => 'Mail is not configured, so the verification email was not sent. Mark the account verified instead.',
+            ], Response::HTTP_CONFLICT);
+        }
+
+        return $this->json(['success' => true]);
+    }
+
+    /**
+     * @return array{id: int, email: string, level: string, emailVerified: bool, providerId: string}
+     */
+    private function peopleUserPayload(User $user): array
+    {
+        return [
+            'id' => (int) $user->getId(),
+            'email' => $user->getMail(),
+            'level' => $user->getUserLevel(),
+            'emailVerified' => $user->isEmailVerified(),
+            'providerId' => $user->getProviderId(),
+        ];
+    }
+
     #[Route('/users/{id}', name: 'admin_delete_user', methods: ['DELETE'])]
     #[OA\Delete(
         path: '/api/v1/admin/users/{id}',

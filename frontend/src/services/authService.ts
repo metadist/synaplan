@@ -159,7 +159,7 @@ export const authService = {
     password: string,
     recaptchaToken?: string,
     language?: string
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; mailDelivered?: boolean }> {
     try {
       const response = await authFetch(
         '/api/v1/auth/register',
@@ -177,7 +177,7 @@ export const authService = {
         return { success: false, error: data.error || 'Registration failed' }
       }
 
-      return { success: true }
+      return { success: true, mailDelivered: data.mailDelivered !== false }
     } catch (error) {
       console.error('Registration error:', error)
       return { success: false, error: 'Network error' }

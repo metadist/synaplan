@@ -11,6 +11,7 @@ use App\Repository\MessageRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\InternalEmailService;
+use App\Service\MailerConfig;
 
 final readonly class ApprovalService
 {
@@ -24,6 +25,7 @@ final readonly class ApprovalService
         private ?SavedTaskRunRepository $savedTaskRuns = null,
         private ?InternalEmailService $mail = null,
         private ?ChatApprovalContinuationService $continuation = null,
+        private ?MailerConfig $mailerConfig = null,
     ) {
     }
 
@@ -101,6 +103,9 @@ final readonly class ApprovalService
     private function notifyInstant(User $owner, Approval $approval): void
     {
         if (null === $this->mail) {
+            return;
+        }
+        if (null !== $this->mailerConfig && !$this->mailerConfig->isConfigured()) {
             return;
         }
         if (ToolsConfig::NOTIFY_INSTANT !== $this->toolsConfig->notifyMode((int) $owner->getId())) {

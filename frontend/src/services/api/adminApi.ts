@@ -124,6 +124,31 @@ export const adminApi = {
     )
   },
 
+  async createUserAccount(input: {
+    email: string
+    displayName: string
+    level: string
+    password: string
+  }): Promise<{ success: boolean; user: { id: number; email: string; emailVerified: boolean } }> {
+    return httpClient('/api/v1/admin/users/accounts', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: input.email,
+        display_name: input.displayName,
+        level: input.level,
+        password: input.password,
+      }),
+    })
+  },
+
+  async markUserVerified(userId: number): Promise<{ success: boolean }> {
+    return httpClient(`/api/v1/admin/users/${userId}/verify`, { method: 'POST' })
+  },
+
+  async resendUserVerification(userId: number): Promise<{ success: boolean }> {
+    return httpClient(`/api/v1/admin/users/${userId}/resend-verification`, { method: 'POST' })
+  },
+
   async deleteUser(userId: number): Promise<{ success: boolean; message: string }> {
     return httpClient<{ success: boolean; message: string }>(`/api/v1/admin/users/${userId}`, {
       method: 'DELETE',
