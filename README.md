@@ -336,7 +336,7 @@ Synaplan is provider-neutral: connect the providers you want in **Operate → AI
 | Anthropic | `ANTHROPIC_API_KEY` | Claude Opus 5, Sonnet 5, Fable 5, Opus 4.8, Haiku 4.5 (chat + vision) |
 | Google Gemini | `GOOGLE_GEMINI_API_KEY` | Gemini 3.x / 2.5 chat + vision, Nano Banana (incl. Pro / Lite), Veo 3.1, Gemini TTS |
 | Groq | `GROQ_API_KEY` | Qwen 3.6 27B (chat + vision), GPT-OSS 20B/120B, Whisper Large v3 |
-| Mistral 🇫🇷 | `MISTRAL_API_KEY` | Mistral Medium 3.5 (+ vision), Mistral Large 3, Voxtral transcription + TTS |
+| Mistral 🇫🇷 | `MISTRAL_API_KEY` | Mistral Medium 3.5 (+ vision), Mistral Large 3, Mistral Large 4 (+ vision), Voxtral transcription + TTS |
 | xAI | `XAI_API_KEY` | Grok 4.7 / 4.6 / 4.5 (+ vision, 500K context), Grok Imagine image + video (incl. Pro / 1.5 tiers) |
 | [Meta](https://dev.meta.ai/) | `META_API_KEY` | Muse Spark 1.3 (+ vision) — Meta Model API |
 | [Cerebras](https://cloud.cerebras.ai/) | `CEREBRAS_API_KEY` | Qwen 3.8 27B (+ vision), GPT OSS 120B — very fast inference (~2,000–3,000 tokens/s) |

@@ -369,19 +369,21 @@ Current catalog values are labelled "approximate (credits → USD)" and were lef
 
 Positive: cancel/refund path is sound — FAQ confirms failed/NSFW/cancelled requests are auto-refunded, and our provider sends a cancel on Stop (`cancelRemote`).
 
-### Mistral (verified 2026-07-13; cached-input rates added 2026-09-24)
+### Mistral (verified 2026-07-13; cached-input rates added 2026-09-24; Large 4 added 2026-10-07)
 
-Use the **API** price page https://mistral.ai/pricing/api/ (the plain /pricing page is JS-rendered consumer Le Chat plans). All 5 catalog entries already match:
+Use the **API** price page https://docs.mistral.ai/inference/pricing (the plain /pricing page is JS-rendered consumer Le Chat plans). Catalog entries match the Standard-tier rates:
 
 | BID | Model | Catalog | Official |
 | --- | ----- | ------- | -------- |
+| 387 | Mistral Large 4 (`mistral-large-4`) | $0.68 / $2.09 per1M | $0.68 / $2.09 (launch discount; list $1.36 / $4.18) |
+| 388 | Large 4 Vision (same model id) | $0.68 / $2.09 per1M | $0.68 / $2.09 |
 | 245 | Mistral Large 3 (`mistral-large-latest`) | $0.50 / $1.50 per1M | $0.50 / $1.50 |
 | 244 | Mistral Medium 3.5 (`mistral-medium-latest`) | $1.50 / $7.50 per1M | $1.50 / $7.50 |
 | 248 | Medium 3.5 Vision (same model id) | $1.50 / $7.50 per1M | $1.50 / $7.50 |
 | 246 | Voxtral Mini Transcribe (`voxtral-mini-latest`) | $0.003 permin | $0.003/min |
 | 247 | Voxtral TTS (`voxtral-mini-tts-2603`) | $0.000016 perChar | $0.016/1k chars |
 
-**Billing mechanics:** per-token for chat/vision (in/out separate), Voxtral STT per audio-minute, Voxtral TTS per character. 50% batch discount exists (we don't use it). Cached input bills at 10% of the input rate — $0.15 for Medium 3.5, $0.05 for Large 3 — authored as `cache_read_price_per_1M`; the per-model figures are only in the "Cached input" column of https://docs.mistral.ai/inference/pricing, not on the API price page. Our provider sends no price-changing params. Note: FAQ on the consumer page quotes "Large $2/$6" — that's the OLD Large 2411, not Large 3. Voxtral Transcribe (per-min) now carries `pricing_mode: per_second` and is metered via the shared duration path (#1314 fixed).
+**Billing mechanics:** per-token for chat/vision (in/out separate), Voxtral STT per audio-minute, Voxtral TTS per character. 50% batch discount exists (we don't use it). Cached input bills at 10% of the input rate — $0.15 for Medium 3.5, $0.05 for Large 3, $0.068 for Large 4 (sale; list $0.136 — the pricing page rounds both to $0.07 / $0.14) — authored as `cache_read_price_per_1M`. Large 4 is public preview and is **not** what `mistral-large-latest` points at (that alias is still Large 3 / `mistral-large-2512`). The live API bills Large 4 as `mistral-large-4-0-launch-discount`; when that SKU disappears, raise the catalog to the list rate. `mistral-large-latest` rejects `reasoning_effort` (HTTP 400), so that parameter is sent only for `mistral-large-4`. Voxtral Transcribe (per-min) now carries `pricing_mode: per_second` and is metered via the shared duration path (#1314 fixed).
 
 ### Cloudflare Workers AI (verified 2026-07-13 — all correct, no change)
 

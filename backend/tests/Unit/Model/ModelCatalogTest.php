@@ -559,6 +559,37 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Mistral Large 4 is a public-preview id. `mistral-large-latest` still
+     * resolves to Large 3, and the catalog price is the launch discount
+     * ($0.68 / $2.09), not the $1.36 / $4.18 list.
+     */
+    public function testMistralLarge4IsPinnedToThePreviewIdAndLaunchPrice(): void
+    {
+        $rows = ModelCatalog::find('mistral:mistral-large-4');
+
+        $this->assertCount(2, $rows, 'Expected mistral-large-4 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($rows, 'tag'));
+        $this->assertNotSame(
+            ModelCatalog::findBidByKey('mistral:mistral-large-latest:chat'),
+            ModelCatalog::findBidByKey('mistral:mistral-large-4:chat'),
+        );
+
+        foreach ($rows as $row) {
+            $this->assertSame('Mistral', $row['service']);
+            $this->assertSame('mistral-large-4', $row['providerId']);
+            $this->assertSame('mistral-large-4', $row['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(0.68, (float) $row['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(2.09, (float) $row['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.068, (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+
+        $chat = ModelCatalog::find('mistral:mistral-large-4:chat')[0];
+        $this->assertSame('524288', $chat['json']['meta']['context_window'] ?? null);
+        $this->assertContains('reasoning', $chat['json']['features'] ?? []);
+        $this->assertContains('vision', $chat['json']['features'] ?? []);
+    }
+
+    /**
      * GPT-6 Luna — released 2026-09-22. Chat + vision share the same upstream
      * id, official $0.10/$0.50 per-1M pricing, $0.01/1M cached input, and the
      * >272k long-context 2x/1.5x tier via CONTEXT_PRICING.
@@ -625,6 +656,7 @@ class ModelCatalogTest extends TestCase
             'gemini-3-flash-preview' => ['google:gemini-3-flash-preview', 0.05],
             'mistral-medium-3.5' => ['mistral:mistral-medium-latest', 0.15],
             'mistral-large-3' => ['mistral:mistral-large-latest', 0.05],
+            'mistral-large-4' => ['mistral:mistral-large-4', 0.068],
             'gemini-3.8-flash' => ['google:gemini-3.8-flash', 0.075],
             'gemini-3.7-flash' => ['google:gemini-3.7-flash', 0.075],
             'gemini-3.6-flash' => ['google:gemini-3.6-flash', 0.075],

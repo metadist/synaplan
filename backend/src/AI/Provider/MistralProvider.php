@@ -24,9 +24,10 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 /**
  * Mistral AI Provider.
  *
- * Chat uses Mistral's OpenAI-compatible endpoint (/v1/chat/completions) via the
- * openai-php client, mirroring GroqProvider. The Voxtral audio endpoints are
- * NOT OpenAI-shaped, so they are called directly over HTTP:
+ * Chat uses Mistral's OpenAI-compatible endpoint (/v1/chat/completions) over
+ * plain HTTP. openai-php cannot be used: Mistral Large 4 returns message
+ * content as a list of thinking/text parts, which that client types as
+ * `?string`. The Voxtral audio endpoints are not OpenAI-shaped either:
  *  - Speech-to-text  : POST /v1/audio/transcriptions (Voxtral Mini Transcribe)
  *  - Text-to-speech  : POST /v1/audio/speech (Voxtral TTS, returns base64 JSON)
  *
@@ -37,7 +38,6 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
 {
     use ChatCompletionsToolSupport;
     private const PROVIDER_NAME = 'mistral';
-    private const BASE_URI = 'https://api.mistral.ai/v1';
     private const TRANSCRIBE_ENDPOINT = 'https://api.mistral.ai/v1/audio/transcriptions';
     private const SPEECH_ENDPOINT = 'https://api.mistral.ai/v1/audio/speech';
     private const VOICES_ENDPOINT = 'https://api.mistral.ai/v1/audio/voices';
@@ -53,13 +53,21 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
     private const DEFAULT_TTS_VOICE = 'fr_marie_neutral';
     private const DEFAULT_VISION_MODEL = 'mistral-medium-latest';
     private const VISION_MAX_TOKENS = 2048;
+    private const CHAT_ENDPOINT = 'https://api.mistral.ai/v1/chat/completions';
+    private const CHAT_TIMEOUT_SECONDS = 180;
+
+    /**
+     * Models that accept `reasoning_effort`. Large 3 (`mistral-large-latest`)
+     * rejects the parameter with HTTP 400, so it must not be sent there.
+     *
+     * @var list<string>
+     */
+    private const REASONING_EFFORT_MODELS = [
+        'mistral-large-4',
+        'mistral-large-4-0',
+    ];
 
     private const TIMEOUT_AUDIO_SECONDS = 120;
-
-    private ?\OpenAI\Client $client = null;
-
-    /** Key the cached client was built with (rebuild on key change). */
-    private ?string $clientKey = null;
 
     /**
      * Cached raw preset-voice catalog, used to resolve a default voice when the
@@ -93,32 +101,6 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
         return $this->keyStore?->getKey($this->getName());
     }
 
-    /**
-     * Lazily build the API client with the CURRENT key; rebuilt when the key
-     * changes at runtime (admin UI save / env import).
-     */
-    private function client(): ?\OpenAI\Client
-    {
-        $key = $this->resolveApiKey();
-        if (null === $key || '' === $key) {
-            $this->client = null;
-            $this->clientKey = null;
-
-            return null;
-        }
-
-        if (null === $this->client || $this->clientKey !== $key) {
-            // Mistral exposes an OpenAI-compatible chat API; reuse the same client.
-            $this->client = \OpenAI::factory()
-                ->withApiKey($key)
-                ->withBaseUri(self::BASE_URI)
-                ->make();
-            $this->clientKey = $key;
-        }
-
-        return $this->client;
-    }
-
     // ==================== METADATA ====================
 
     public function getName(): string
@@ -133,7 +115,7 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
 
     public function getDescription(): string
     {
-        return 'Mistral AI — chat (Mistral Medium/Large), transcription (Voxtral Mini Transcribe) and text-to-speech (Voxtral TTS).';
+        return 'Mistral AI — chat (Mistral Medium/Large, including Large 4), transcription (Voxtral Mini Transcribe) and text-to-speech (Voxtral TTS).';
     }
 
     public function getCapabilities(): array
@@ -169,7 +151,9 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
 
     public function isAvailable(): bool
     {
-        return null !== $this->client();
+        $key = $this->resolveApiKey();
+
+        return null !== $key && '' !== $key;
     }
 
     public function getRequiredEnvVars(): array
@@ -190,13 +174,15 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
 
         try {
             $requestOptions = $this->buildChatOptions($messages, $options, false);
-            $response = $this->client()->chat()->create($requestOptions);
-            $responseArray = $response->toArray();
+            $responseArray = $this->postChatCompletion($requestOptions);
+            $choice = is_array($responseArray['choices'][0] ?? null) ? $responseArray['choices'][0] : [];
+            $message = is_array($choice['message'] ?? null) ? $choice['message'] : [];
+            $split = $this->splitMessageContent($message['content'] ?? '');
 
             return $this->mergeChatCompletionsToolResult([
-                'content' => $response->choices[0]->message->content ?? '',
-                'usage' => $this->parseUsage($responseArray['usage'] ?? []),
-            ], $responseArray['choices'][0] ?? []);
+                'content' => $split['text'],
+                'usage' => $this->parseUsage(is_array($responseArray['usage'] ?? null) ? $responseArray['usage'] : []),
+            ], $choice);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -215,36 +201,73 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
 
         try {
             $requestOptions = $this->buildChatOptions($messages, $options, true);
-            $stream = $this->client()->chat()->createStreamed($requestOptions);
+            $response = $this->openChatCompletion($requestOptions, true);
+            // Throws an HttpExceptionInterface on 3xx-5xx, which
+            // ProviderFailureFactory turns into a classified failure.
+            $response->getHeaders();
 
             $usage = $this->parseUsage([]);
             $finishReason = null;
+            $buffer = '';
 
-            foreach ($stream as $response) {
-                $responseArray = $response->toArray();
+            foreach ($this->httpClient->stream($response) as $chunk) {
+                $buffer .= $chunk->getContent();
 
-                if (isset($responseArray['usage'])) {
-                    $usage = $this->parseUsage($responseArray['usage']);
+                while (false !== ($pos = strpos($buffer, "\n"))) {
+                    $line = trim(substr($buffer, 0, $pos));
+                    $buffer = substr($buffer, $pos + 1);
+
+                    if ('' === $line || !str_starts_with($line, 'data:')) {
+                        continue;
+                    }
+
+                    $payload = trim(substr($line, 5));
+                    if ('' === $payload || '[DONE]' === $payload) {
+                        continue;
+                    }
+
+                    try {
+                        $decoded = json_decode($payload, true, 512, \JSON_THROW_ON_ERROR);
+                    } catch (\JsonException) {
+                        continue;
+                    }
+
+                    if (!is_array($decoded)) {
+                        continue;
+                    }
+
+                    if ('error' === ($decoded['object'] ?? null) || is_array($decoded['error'] ?? null)) {
+                        throw $this->streamFailure($decoded);
+                    }
+
+                    if (is_array($decoded['usage'] ?? null)) {
+                        $usage = $this->parseUsage($decoded['usage']);
+                    }
+
+                    $choice = $decoded['choices'][0] ?? null;
+                    if (!is_array($choice)) {
+                        continue;
+                    }
+
+                    $chunkFinishReason = $choice['finish_reason'] ?? null;
+                    if (is_string($chunkFinishReason) && '' !== $chunkFinishReason) {
+                        $finishReason = $chunkFinishReason;
+                    }
+
+                    $delta = is_array($choice['delta'] ?? null) ? $choice['delta'] : [];
+                    if (is_string($delta['reasoning_content'] ?? null) && '' !== $delta['reasoning_content']) {
+                        $callback([
+                            'type' => 'reasoning',
+                            'content' => $delta['reasoning_content'],
+                        ]);
+                    }
+
+                    if (array_key_exists('content', $delta)) {
+                        $this->emitContentParts($delta['content'], $callback);
+                    }
+
+                    $this->emitChatCompletionsToolDeltas($choice, $callback);
                 }
-
-                $chunkFinishReason = $responseArray['choices'][0]['finish_reason'] ?? null;
-                if (null !== $chunkFinishReason) {
-                    $finishReason = $chunkFinishReason;
-                }
-
-                // Reasoning content (Magistral / reasoning-capable models).
-                if (isset($response->choices[0]->delta->reasoning_content)) {
-                    $callback([
-                        'type' => 'reasoning',
-                        'content' => $response->choices[0]->delta->reasoning_content,
-                    ]);
-                }
-
-                if (isset($response->choices[0]->delta->content)) {
-                    $callback($response->choices[0]->delta->content);
-                }
-
-                $this->emitChatCompletionsToolDeltas($responseArray['choices'][0] ?? [], $callback);
             }
 
             $callback(['type' => 'finish', 'finish_reason' => $finishReason ?? 'stop']);
@@ -272,7 +295,7 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
         $prompt = '' !== $prompt ? $prompt : 'Please describe this image in detail.';
 
         try {
-            $response = $this->client()->chat()->create([
+            $body = [
                 'model' => $model,
                 'messages' => [[
                     'role' => 'user',
@@ -282,9 +305,15 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
                     ],
                 ]],
                 'max_tokens' => $options['max_tokens'] ?? self::VISION_MAX_TOKENS,
-            ]);
+            ];
+            if ($this->acceptsReasoningEffort($model)) {
+                $body['reasoning_effort'] = 'none';
+            }
+            $responseArray = $this->postChatCompletion($body);
+            $choice = is_array($responseArray['choices'][0] ?? null) ? $responseArray['choices'][0] : [];
+            $message = is_array($choice['message'] ?? null) ? $choice['message'] : [];
 
-            return $response->choices[0]->message->content ?? '';
+            return $this->splitMessageContent($message['content'] ?? '')['text'];
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Throwable $e) {
@@ -305,7 +334,7 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
         $this->assertApiKey();
 
         try {
-            $response = $this->client()->chat()->create([
+            $body = [
                 'model' => self::DEFAULT_VISION_MODEL,
                 'messages' => [[
                     'role' => 'user',
@@ -316,10 +345,13 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
                     ],
                 ]],
                 'max_tokens' => self::VISION_MAX_TOKENS,
-            ]);
+            ];
+            $responseArray = $this->postChatCompletion($body);
+            $choice = is_array($responseArray['choices'][0] ?? null) ? $responseArray['choices'][0] : [];
+            $message = is_array($choice['message'] ?? null) ? $choice['message'] : [];
 
             return [
-                'comparison' => $response->choices[0]->message->content ?? '',
+                'comparison' => $this->splitMessageContent($message['content'] ?? '')['text'],
                 'image1' => basename($imageUrl1),
                 'image2' => basename($imageUrl2),
             ];
@@ -698,6 +730,13 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
             $requestOptions['temperature'] = $options['temperature'];
         }
 
+        // Thinking off. Only models that accept the parameter get it —
+        // mistral-large-latest returns 400 "reasoning_effort is not enabled".
+        $model = is_string($options['model'] ?? null) ? $options['model'] : '';
+        if ($this->acceptsReasoningEffort($model) && array_key_exists('reasoning', $options) && !$options['reasoning']) {
+            $requestOptions['reasoning_effort'] = 'none';
+        }
+
         if ($stream) {
             $requestOptions['stream'] = true;
             $requestOptions['stream_options'] = ['include_usage' => true];
@@ -796,6 +835,145 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
         $base64 = base64_encode((string) file_get_contents($fullPath));
 
         return "data:{$mimeType};base64,{$base64}";
+    }
+
+    /**
+     * Large 4 returns message content as a list of parts (thinking + text).
+     * Older models return a string. Both shapes become visible text plus the
+     * thinking trace.
+     *
+     * @return array{text: string, reasoning: string}
+     */
+    private function splitMessageContent(mixed $content): array
+    {
+        if (is_string($content) || null === $content) {
+            return ['text' => (string) $content, 'reasoning' => ''];
+        }
+
+        if (!is_array($content)) {
+            return ['text' => '', 'reasoning' => ''];
+        }
+
+        if (isset($content['type']) || isset($content['text'])) {
+            $content = [$content];
+        }
+
+        $text = '';
+        $reasoning = '';
+        foreach ($content as $part) {
+            if (is_string($part)) {
+                $text .= $part;
+                continue;
+            }
+            if (!is_array($part)) {
+                continue;
+            }
+
+            $type = is_string($part['type'] ?? null) ? $part['type'] : 'text';
+            $piece = $this->partText($part['thinking'] ?? $part['text'] ?? $part['reasoning'] ?? '');
+            if ('thinking' === $type || 'reasoning' === $type) {
+                $reasoning .= $piece;
+                continue;
+            }
+
+            $text .= $piece;
+        }
+
+        return ['text' => $text, 'reasoning' => $reasoning];
+    }
+
+    private function partText(mixed $value): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (!is_array($value)) {
+            return '';
+        }
+
+        $out = '';
+        foreach ($value as $piece) {
+            if (is_string($piece)) {
+                $out .= $piece;
+                continue;
+            }
+            if (is_array($piece)) {
+                $out .= $this->partText($piece['text'] ?? '');
+            }
+        }
+
+        return $out;
+    }
+
+    private function emitContentParts(mixed $content, callable $callback): void
+    {
+        $split = $this->splitMessageContent($content);
+        if ('' !== $split['reasoning']) {
+            $callback([
+                'type' => 'reasoning',
+                'content' => $split['reasoning'],
+            ]);
+        }
+        if ('' !== $split['text']) {
+            $callback($split['text']);
+        }
+    }
+
+    private function acceptsReasoningEffort(string $model): bool
+    {
+        return in_array(strtolower($model), self::REASONING_EFFORT_MODELS, true);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     *
+     * @return array<string, mixed>
+     */
+    private function postChatCompletion(array $body): array
+    {
+        /** @var array<string, mixed> $data */
+        $data = $this->openChatCompletion($body, false)->toArray();
+
+        return $data;
+    }
+
+    /**
+     * @param array<string, mixed> $frame
+     */
+    private function streamFailure(array $frame): ProviderException
+    {
+        $error = is_array($frame['error'] ?? null) ? $frame['error'] : $frame;
+        $message = is_string($error['message'] ?? null) ? $error['message'] : 'unknown error';
+        $code = $error['code'] ?? null;
+        $status = $frame['raw_status_code'] ?? $error['raw_status_code'] ?? 0;
+
+        return (new ProviderFailureFactory())->fromParsed(
+            'Mistral streaming error: '.$message,
+            self::PROVIDER_NAME,
+            'chat_stream',
+            is_int($status) ? $status : 0,
+            is_string($error['type'] ?? null) ? $error['type'] : null,
+            is_string($code) || is_int($code) ? $code : null,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function openChatCompletion(array $body, bool $stream): ResponseInterface
+    {
+        $options = [
+            'auth_bearer' => $this->resolveApiKey(),
+            'json' => $body,
+            'timeout' => self::CHAT_TIMEOUT_SECONDS,
+        ];
+        if ($stream) {
+            $options['buffer'] = false;
+            $options['headers'] = ['Accept' => 'text/event-stream'];
+        }
+
+        return $this->httpClient->request('POST', self::CHAT_ENDPOINT, $options);
     }
 
     private function assertHttpOk(ResponseInterface $response, string $context): void
