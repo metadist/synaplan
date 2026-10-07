@@ -96,6 +96,18 @@ final readonly class TaskPlanExecutor
         Capability::DocumentGeneration,
     ];
 
+    /**
+     * Capabilities the legacy chat router cannot perform. Falling back to it
+     * after such a plan failed produces an answer that denies the capability
+     * ("I can't execute code", "there is no Backblaze connection") and hides
+     * the real error (U8). Surface the node's own failure instead.
+     */
+    private const NO_CHAT_FALLBACK = [
+        Capability::CodeRun,
+        Capability::McpFetch,
+        Capability::McpAction,
+    ];
+
     public function __construct(
         private InferenceRouter $router,
         private ClassificationPlanMapper $mapper,
@@ -152,10 +164,11 @@ final readonly class TaskPlanExecutor
         $assembled = $this->runDag($message, $thread, $classification, $options, $plan, $progressCallback);
 
         if ($assembled['all_failed']) {
-            if ($plan->authored || $this->planRunsCode($plan->plan)) {
+            if ($plan->authored || $this->planNeedsCapabilityChatCannotPerform($plan->plan)) {
                 $this->logger->info('TaskPlanExecutor: DAG produced no successful node, not falling back to chat', [
                     'message_id' => $message->getId(),
                     'authored' => $plan->authored,
+                    'node_errors' => $this->nodeErrors($assembled),
                 ]);
                 $streamCallback($assembled['content']);
 
@@ -164,6 +177,7 @@ final readonly class TaskPlanExecutor
 
             $this->logger->info('TaskPlanExecutor: DAG produced no successful node, falling back to legacy router', [
                 'message_id' => $message->getId(),
+                'node_errors' => $this->nodeErrors($assembled),
             ]);
 
             // The legacy router is about to produce a clean answer, so retract the
@@ -229,10 +243,11 @@ final readonly class TaskPlanExecutor
         $assembled = $this->runDag($message, $thread, $classification, $options, $plan, $progressCallback);
 
         if ($assembled['all_failed']) {
-            if ($plan->authored || $this->planRunsCode($plan->plan)) {
+            if ($plan->authored || $this->planNeedsCapabilityChatCannotPerform($plan->plan)) {
                 $this->logger->info('TaskPlanExecutor: DAG produced no successful node, not falling back to chat', [
                     'message_id' => $message->getId(),
                     'authored' => $plan->authored,
+                    'node_errors' => $this->nodeErrors($assembled),
                 ]);
 
                 return $this->toHandlerResult($assembled);
@@ -282,26 +297,44 @@ final readonly class TaskPlanExecutor
         return in_array($plan->nodes[0]->capability, self::LEGACY_ROUTER_CAPABILITIES, true);
     }
 
-    /**
-     * True when the plan runs code on files ({@see Capability::CodeRun}).
-     *
-     * A failed code-run DAG must NOT fall back to the legacy chat router: that
-     * router cannot execute code, so it answers "I can't execute code or write
-     * files…", denying a capability the product actually has and hiding the real
-     * failure. Surfacing the node's own error is the honest outcome (U8). Other
-     * capabilities keep their existing fallback (e.g. document_combine/export
-     * are deliberately remapped to file analysis by
-     * {@see legacyFallbackClassification()}).
-     */
-    private function planRunsCode(TaskPlan $plan): bool
+    private function planNeedsCapabilityChatCannotPerform(TaskPlan $plan): bool
     {
         foreach ($plan->nodes as $node) {
-            if (Capability::CodeRun === $node->capability) {
+            if (in_array($node->capability, self::NO_CHAT_FALLBACK, true)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * @param array<string, mixed> $assembled
+     *
+     * @return array<string, string>
+     */
+    private function nodeErrors(array $assembled): array
+    {
+        $metadata = $assembled['metadata'] ?? null;
+        $render = is_array($metadata) ? ($metadata['task_plan_render'] ?? null) : null;
+        $cards = is_array($render) ? ($render['cards'] ?? null) : null;
+        if (!is_array($cards)) {
+            return [];
+        }
+
+        $errors = [];
+        foreach ($cards as $card) {
+            if (!is_array($card)) {
+                continue;
+            }
+            $nodeId = $card['nodeId'] ?? null;
+            $error = $card['error'] ?? null;
+            if (is_string($nodeId) && '' !== $nodeId && is_string($error) && '' !== $error) {
+                $errors[$nodeId] = $error;
+            }
+        }
+
+        return $errors;
     }
 
     /**

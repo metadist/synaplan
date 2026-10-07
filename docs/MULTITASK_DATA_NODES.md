@@ -50,6 +50,17 @@ Debugging a turn: `BMESSAGEMETA.task_plan_definition` holds the executed plan
 call happened at all, and `McpFetchRunner: tool call succeeded` reports the
 returned character count per tool call.
 
+A tool that was actually called and answered with an error (`isError`, or the
+call threw) is a **reportable failure**. The card stays `failed`, and answer
+steps (`chat`, `summarize`, `translate`, `rag_query`, `compose_reply`) still
+run. `UpstreamHandover` appends the error as a `FAILED` block so the reply can
+say what went wrong — including `compose_reply`, which only copies text.
+Refusals made before the call (flag off, unknown tool, topic not allowed,
+mutating tool) stay hard failures: dependents skip. A plan that contains
+`mcp_fetch` or `mcp_action` does not fall back to legacy chat, which cannot
+see the connection and would claim none exists. `McpFetchRunner: tool reported
+an error` is the log line for that case.
+
 ## The nodes
 
 | Capability | Runner | Source | Flag (`BCONFIG`) | Default |

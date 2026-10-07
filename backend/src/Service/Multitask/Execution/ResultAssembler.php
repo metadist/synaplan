@@ -29,7 +29,21 @@ final class ResultAssembler
         'en' => "I couldn't fully complete that request.",
         'de' => 'Ich konnte diese Anfrage leider nicht vollständig abschließen.',
         'es' => 'No pude completar esa solicitud por completo.',
+        'fr' => "Je n'ai pas pu terminer cette demande entièrement.",
         'tr' => 'Bu isteği tamamen tamamlayamadım.',
+    ];
+
+    /**
+     * Appended by {@see bestEffort()} for each failed visible step when the
+     * reply node produced nothing. `{label}` and `{error}` stay in this order
+     * in every language so the sentence does not depend on grammar around them.
+     */
+    private const FAILED_STEP_TEXT = [
+        'en' => 'One step could not be completed: {label}. {error}',
+        'de' => 'Ein Schritt konnte nicht abgeschlossen werden: {label}. {error}',
+        'es' => 'No se pudo completar un paso: {label}. {error}',
+        'fr' => "Une étape n'a pas pu être terminée : {label}. {error}",
+        'tr' => 'Bir adım tamamlanamadı: {label}. {error}',
     ];
 
     /**
@@ -309,13 +323,50 @@ final class ResultAssembler
             $metadata = array_merge($metadata, $result->metadata);
         }
 
+        $language = is_string($context->classification['language'] ?? null)
+            ? $context->classification['language']
+            : ($context->message->getLanguage() ?: 'en');
         if ('' === $text) {
-            $language = is_string($context->classification['language'] ?? null)
-                ? $context->classification['language']
-                : ($context->message->getLanguage() ?: 'en');
             $text = self::FALLBACK_TEXT[$language] ?? self::FALLBACK_TEXT['en'];
+            // Only when nothing else wrote an answer. A recovered summary or
+            // tool result stays as it is — the failed step is already on its
+            // card, and appending "provider 500" would rewrite that reply.
+            $notes = $this->failedStepNotes($plan, $context, $language);
+            if ([] !== $notes) {
+                $text = rtrim($text)."\n".implode("\n", $notes);
+            }
         }
 
         return [$text, $files, $metadata];
+    }
+
+    /**
+     * One plain sentence per failed visible step. Hidden nodes (compose_reply)
+     * are the assembler and have no card, so they are not named here.
+     *
+     * @return list<string>
+     */
+    private function failedStepNotes(TaskPlan $plan, NodeContext $context, string $language): array
+    {
+        $template = self::FAILED_STEP_TEXT[$language] ?? self::FAILED_STEP_TEXT['en'];
+        $notes = [];
+        foreach ($plan->nodes as $node) {
+            if ('hidden' === $node->capability->uiKind()) {
+                continue;
+            }
+            $result = $context->getResult($node->id);
+            if (null === $result || NodeStatus::Failed !== $result->status) {
+                continue;
+            }
+            $error = trim((string) $result->error);
+            if ('' === $error) {
+                continue;
+            }
+            $query = $result->metadata['query'] ?? null;
+            $label = is_string($query) && '' !== trim($query) ? trim($query) : $node->capability->value;
+            $notes[] = str_replace(['{label}', '{error}'], [$label, $error], $template);
+        }
+
+        return $notes;
     }
 }

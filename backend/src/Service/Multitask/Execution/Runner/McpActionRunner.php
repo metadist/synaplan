@@ -136,18 +136,12 @@ final readonly class McpActionRunner implements TaskRunner
         try {
             $result = $this->client->callTool($server, $tool, $arguments);
         } catch (McpClientException $e) {
-            $this->logger->warning('McpActionRunner: tool call failed', [
-                'server_id' => $serverId,
-                'tool' => $tool,
-                'error' => $e->getMessage(),
-            ]);
-
-            return NodeResult::failed('could not reach the connected system: '.$e->getMessage());
+            return $this->reportedError($userId, $serverId, $server->getName(), $tool, $arguments, $e->getMessage());
         }
 
         $text = $this->formatContent($result['content']);
         if ($result['isError']) {
-            return NodeResult::failed('the connected system reported an error: '.mb_substr($text, 0, 300));
+            return $this->reportedError($userId, $serverId, $server->getName(), $tool, $arguments, $text);
         }
         if ('' === trim($text)) {
             $text = sprintf("The action '%s' on %s completed.", $tool, $server->getName());
@@ -162,10 +156,42 @@ final readonly class McpActionRunner implements TaskRunner
             'argument_keys' => array_keys($arguments),
         ]);
 
-        return NodeResult::ok($text, [], [
-            'mcp' => ['server_id' => $serverId, 'server' => $server->getName(), 'tool' => $tool, 'write' => true],
-            'query' => $server->getName().' · '.$tool,
+        return NodeResult::ok($text, [], $this->callMetadata($serverId, $server->getName(), $tool));
+    }
+
+    /**
+     * The remote system was reached and reported a failure. Answer steps still
+     * run so the reply can say the write did not happen; the card stays failed.
+     *
+     * @param array<string, mixed> $arguments
+     */
+    private function reportedError(?int $userId, int $serverId, string $serverName, string $tool, array $arguments, string $detail): NodeResult
+    {
+        $detail = trim($detail);
+        $error = '' === $detail
+            ? sprintf('%s reported an error and gave no details.', $serverName)
+            : sprintf('%s reported an error: %s', $serverName, mb_substr($detail, 0, 300));
+
+        $this->logger->warning('McpActionRunner: write action reported an error', [
+            'user_id' => $userId,
+            'server_id' => $serverId,
+            'tool' => $tool,
+            'argument_keys' => array_keys($arguments),
+            'error' => $error,
         ]);
+
+        return NodeResult::reportableFailure($error, $this->callMetadata($serverId, $serverName, $tool));
+    }
+
+    /**
+     * @return array{mcp: array{server_id: int, server: string, tool: string, write: true}, query: string}
+     */
+    private function callMetadata(int $serverId, string $serverName, string $tool): array
+    {
+        return [
+            'mcp' => ['server_id' => $serverId, 'server' => $serverName, 'tool' => $tool, 'write' => true],
+            'query' => $serverName.' · '.$tool,
+        ];
     }
 
     /**

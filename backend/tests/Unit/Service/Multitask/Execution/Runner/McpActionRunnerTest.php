@@ -26,6 +26,7 @@ use App\Service\Security\SsrfGuard;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -67,19 +68,21 @@ final class McpActionRunnerTest extends TestCase
         array $topicMetaRows = ['tool_mcp' => '1'],
         ?McpServerConfig $server = null,
         string $callToolResultText = 'Created page "Launch plan" at https://wiki.example.com/x/abc',
+        bool $toolIsError = false,
+        ?LoggerInterface $logger = null,
     ): McpActionRunner {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
             static fn (int $owner, string $group, string $setting): ?string => $flags["{$group}.{$setting}"] ?? null,
         );
 
-        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText): MockResponse {
+        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText, $toolIsError): MockResponse {
             $body = json_decode((string) ($options['body'] ?? ''), true);
             $rpcMethod = is_array($body) ? ($body['method'] ?? '') : '';
 
             $result = match ($rpcMethod) {
                 'tools/list' => ['tools' => $this->serverTools],
-                'tools/call' => ['content' => [['type' => 'text', 'text' => $callToolResultText]], 'isError' => false],
+                'tools/call' => ['content' => [['type' => 'text', 'text' => $callToolResultText]], 'isError' => $toolIsError],
                 default => [],
             };
 
@@ -112,7 +115,7 @@ final class McpActionRunnerTest extends TestCase
             $clientConfig,
             new MultitaskRoutingConfig($configRepo),
             $this->promptService($topicMetaRows),
-            new NullLogger(),
+            $logger ?? new NullLogger(),
         );
     }
 
@@ -182,6 +185,7 @@ final class McpActionRunnerTest extends TestCase
         $result = $this->runner()->run($this->node(tool: 'delete_page'), $this->context());
 
         self::assertFalse($result->isSuccessful());
+        self::assertFalse($result->isReportableFailure());
         self::assertStringContainsString('destructive', (string) $result->error);
     }
 
@@ -206,6 +210,7 @@ final class McpActionRunnerTest extends TestCase
         $result = $this->runner()->run($this->node(tool: 'made_up_tool'), $this->context());
 
         self::assertFalse($result->isSuccessful());
+        self::assertFalse($result->isReportableFailure());
         self::assertStringContainsString('does not exist', (string) $result->error);
     }
 
@@ -243,5 +248,32 @@ final class McpActionRunnerTest extends TestCase
 
         self::assertNotNull($descriptor->dynamicNote);
         self::assertNull(($descriptor->dynamicNote)(self::USER_ID, ['topic' => 'general', 'topic_metadata' => ['tool_mcp' => true]]));
+    }
+
+    public function testToolErrorIsAReportableFailureAndIsLogged(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'McpActionRunner: write action reported an error',
+            self::callback(static function (array $context): bool {
+                return self::USER_ID === $context['user_id']
+                    && 5 === $context['server_id']
+                    && 'create_page' === $context['tool']
+                    && ['title', 'content'] === $context['argument_keys']
+                    && str_contains((string) $context['error'], 'space not found');
+            }),
+        );
+
+        $result = $this->runner(
+            callToolResultText: 'space not found',
+            toolIsError: true,
+            logger: $logger,
+        )->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertStringContainsString('Confluence', (string) $result->error);
+        self::assertStringContainsString('space not found', (string) $result->error);
+        self::assertSame('Confluence · create_page', $result->metadata['query']);
+        self::assertTrue($result->metadata['mcp']['write']);
     }
 }

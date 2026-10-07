@@ -169,7 +169,7 @@ Regression watch (accepted, not a blocker): a summary node between a failed fetc
 
 `missing()` currently skips every unsuccessful step. Also collect reportable failures; keep skipping hard failures and skipped steps. A reportable failure has no `$nX.text`, so the "already in the prompt" verbatim check cannot see it — always include it, labelled by reusing the existing `self::label($dep, $result)` plus a suffix: `self::label($dep, $result).' · FAILED'`. The value is the error string. Apply the same `MAX_CHARS_PER_STEP` cap as the other blocks.
 
-Add one line to `render()`, after the existing "never claim it was not provided" line:
+Add one line to `render()`, after the existing "never claim it was not provided" line, and only when the map contains a `· FAILED` entry. A successful handover must not grow a sentence that says a step failed:
 
 ```text
 A step marked FAILED did run. Say what failed and why, in the user's language. Do not say that the connection or the data source does not exist.
@@ -179,13 +179,15 @@ A step marked FAILED did run. Say what failed and why, in the user's language. D
 
 **File:** `backend/src/Service/Multitask/Execution/Runner/ComposeReplyRunner.php`
 
-`compose_reply` does not call a model, so without this change a plan whose reply copies fetch output directly (no chat in between) still answers with nothing. After resolving the inputs and before the empty-check, append:
+`compose_reply` does not call a model, so without this change a plan whose reply copies fetch output directly (no chat in between) still answers with nothing. After resolving the inputs and before the empty-check, append **only the `· FAILED` entries** from `missing()` (filter the keys). Passing the whole map also lists successful steps and file references, and that leaks raw file paths into a reply that already copied `$nX.text` (`RunnersTest::testComposeReplyGathersTextAndAttachments`).
 
 ```php
-use App\Service\Multitask\Execution\UpstreamHandover;
-
-// inside run(), with $text (string), $inputs (resolved array), $node, $context in scope:
-$text .= UpstreamHandover::render(UpstreamHandover::missing($node, $context, $text, $inputs));
+$failures = array_filter(
+    UpstreamHandover::missing($node, $context, $text, $inputs),
+    static fn (string $label): bool => str_ends_with($label, ' · FAILED'),
+    ARRAY_FILTER_USE_KEY,
+);
+$text .= UpstreamHandover::render($failures);
 ```
 
 then keep the existing `'' === $text ? null : $text` empty-check on the combined string. The dedupe inside `missing()` means a chat text that already quotes the error verbatim gains nothing.
@@ -239,7 +241,7 @@ This path is what a hard failure still hits (unknown tool, feature off). The tex
 
 `bestEffort()` runs only when the reply node produced nothing. That is the hard-failure case (unknown tool, feature off): step 2 never let an answer run, so nothing explained anything. When the chat step ran, its text is the reply and this method is not used — do not touch that path.
 
-After the existing fallback-text resolution, append one sentence per failed visible step. Iterate `$plan->nodes` in order with `$context->getResult()`: keep nodes whose result is `Failed` with a non-empty error and whose `uiKind()` is not `hidden` (this skips `compose_reply`). The label is the result's `query` metadata when it is a non-empty string, else the capability value. The error string follows it verbatim — it is already a full sentence from step 1, so no "see the card" pointer:
+After the existing fallback-text resolution, append one sentence per failed visible step, **only when the reply is the generic fallback** (no successful step produced text). A recovered summary or tool result stays unchanged — appending `provider 500` rewrote the partial-media reply (`DagExecutorTest::testParallelMediaFailureIsIsolated`). The failed step is already on its card. Iterate `$plan->nodes` in order with `$context->getResult()`: keep nodes whose result is `Failed` with a non-empty error and whose `uiKind()` is not `hidden` (this skips `compose_reply`). The label is the result's `query` metadata when it is a non-empty string, else the capability value. The error string follows it verbatim — it is already a full sentence from step 1, so no "see the card" pointer:
 
 ```text
 en: One step could not be completed: {label}. {error}

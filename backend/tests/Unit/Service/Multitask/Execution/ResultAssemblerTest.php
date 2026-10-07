@@ -25,7 +25,7 @@ final class ResultAssemblerTest extends TestCase
         $this->assembler = new ResultAssembler();
     }
 
-    private function context(string $messageText = 'hello'): NodeContext
+    private function context(string $messageText = 'hello', string $language = 'en'): NodeContext
     {
         $m = $this->createMock(Message::class);
         $m->method('getText')->willReturn($messageText);
@@ -33,9 +33,9 @@ final class ResultAssemblerTest extends TestCase
         $m->method('getFile')->willReturn(0);
         $m->method('getFilePath')->willReturn('');
         $m->method('getFiles')->willReturn(new ArrayCollection());
-        $m->method('getLanguage')->willReturn('en');
+        $m->method('getLanguage')->willReturn($language);
 
-        return new NodeContext($m, [], 1, ['language' => 'en']);
+        return new NodeContext($m, [], 1, ['language' => $language]);
     }
 
     private function plan(): TaskPlan
@@ -396,5 +396,63 @@ final class ResultAssemblerTest extends TestCase
 
         // replyNode metadata wins (it was already set from n2).
         $this->assertSame('pre-set', $result['metadata']['search_results']['query']);
+    }
+
+    public function testBestEffortNamesFailedSteps(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_fetch'],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1']],
+            ],
+        ]);
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::failed('the tool does not exist', ['query' => 'Backblaze · s3_head_bucket']));
+        $ctx->setResult('n2', NodeResult::skipped("dependency 'n1' did not complete"));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertStringContainsString("I couldn't fully complete that request.", $result['content']);
+        $this->assertStringContainsString(
+            'One step could not be completed: Backblaze · s3_head_bucket. the tool does not exist',
+            $result['content'],
+        );
+    }
+
+    public function testBestEffortIgnoresAFailedHiddenStep(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'compose_reply'],
+            ],
+        ]);
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::failed('nothing to assemble'));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertSame("I couldn't fully complete that request.", $result['content']);
+    }
+
+    public function testFrenchFallbackIsNotEnglish(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'fr', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_fetch'],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1']],
+            ],
+        ]);
+        $ctx = $this->context('bonjour', 'fr');
+        $ctx->setResult('n1', NodeResult::failed('outil inconnu', ['query' => 'Backblaze · s3_head_bucket']));
+        $ctx->setResult('n2', NodeResult::skipped("dependency 'n1' did not complete"));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertStringContainsString("Je n'ai pas pu terminer cette demande entièrement.", $result['content']);
+        $this->assertStringContainsString("Une étape n'a pas pu être terminée : Backblaze · s3_head_bucket. outil inconnu", $result['content']);
+        $this->assertStringNotContainsString("I couldn't fully complete", $result['content']);
     }
 }

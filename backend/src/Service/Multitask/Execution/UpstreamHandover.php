@@ -43,7 +43,21 @@ final class UpstreamHandover
 
         foreach ($node->dependsOn as $dep) {
             $result = $context->getResult($dep);
-            if (null === $result || !$result->isSuccessful()) {
+            if (null === $result) {
+                continue;
+            }
+            if ($result->isReportableFailure()) {
+                $error = trim((string) $result->error);
+                // `$nX.text` on a failed step is empty, so the verbatim check
+                // cannot see it. Skip only when the prompt already quotes the
+                // error itself (the chat step explained it; compose copies that).
+                if ('' === $error || str_contains($resolvedText, $error)) {
+                    continue;
+                }
+                $missing[self::label($dep, $result).' · FAILED'] = $error;
+                continue;
+            }
+            if (!$result->isSuccessful()) {
                 continue;
             }
             $text = trim((string) $result->text);
@@ -84,12 +98,21 @@ final class UpstreamHandover
         }
 
         $blocks = [];
+        $mentionsFailure = false;
         foreach ($missing as $label => $text) {
+            if (str_ends_with((string) $label, ' · FAILED')) {
+                $mentionsFailure = true;
+            }
             $blocks[] = '['.$label."]\n".mb_substr($text, 0, self::MAX_CHARS_PER_STEP);
         }
 
+        $failureLine = $mentionsFailure
+            ? "\nA step marked FAILED did run. Say what failed and why, in the user's language. Do not say that the connection or the data source does not exist."
+            : '';
+
         return "\n\n---\nData returned by the previous steps of this request."
             ."\nUse it as the source of truth for your answer and never claim it was not provided."
+            .$failureLine
             ."\n\n".implode("\n\n", $blocks);
     }
 

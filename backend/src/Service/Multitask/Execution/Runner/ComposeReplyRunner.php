@@ -7,6 +7,7 @@ namespace App\Service\Multitask\Execution\Runner;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
+use App\Service\Multitask\Execution\UpstreamHandover;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
@@ -46,6 +47,15 @@ final readonly class ComposeReplyRunner implements TaskRunner
             $text = implode("\n\n", array_filter($text, 'is_string'));
         }
         $text = is_string($text) ? $text : '';
+        // No model call here. Append only reportable failures. The full
+        // handover also lists successful steps and file references, and those
+        // would leak raw paths into a reply that already copied `$nX.text`.
+        $failures = array_filter(
+            UpstreamHandover::missing($node, $context, $text, $inputs),
+            static fn (string $label): bool => str_ends_with($label, ' · FAILED'),
+            ARRAY_FILTER_USE_KEY,
+        );
+        $text .= UpstreamHandover::render($failures);
 
         $files = [];
         foreach ($this->flatten($inputs['attachments'] ?? []) as $candidate) {

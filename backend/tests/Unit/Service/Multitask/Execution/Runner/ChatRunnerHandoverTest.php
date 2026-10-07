@@ -169,6 +169,39 @@ final class ChatRunnerHandoverTest extends TestCase
         self::assertSame('', UpstreamHandover::render([]));
     }
 
+    public function testReportableFailureIsAppendedEvenWhenTheReferenceWasWired(): void
+    {
+        $captured = null;
+        $ctx = new NodeContext($this->message('is the bucket reachable?'), [], 1, ['language' => 'en']);
+        $ctx->setResult('n1', NodeResult::reportableFailure(
+            'Backblaze reported an error: NotFound',
+            ['query' => 'Backblaze · s3_head_bucket'],
+        ));
+        $node = new TaskNode('n2', Capability::Chat, ['n1'], [
+            'text' => "Answer based on:\n\$n1.text",
+        ]);
+
+        $this->runner($captured)->run($node, $ctx);
+
+        $user = $captured[1]['content'];
+        self::assertStringContainsString('[n1 · Backblaze · s3_head_bucket · FAILED]', $user);
+        self::assertStringContainsString('Backblaze reported an error: NotFound', $user);
+        self::assertStringContainsString('A step marked FAILED did run', $user);
+    }
+
+    public function testHardFailureIsNotAppended(): void
+    {
+        $captured = null;
+        $ctx = new NodeContext($this->message('q'), [], 1, ['language' => 'en']);
+        $ctx->setResult('n1', NodeResult::failed('the tool does not exist'));
+        $node = new TaskNode('n2', Capability::Chat, ['n1'], ['text' => 'Answer the question.']);
+
+        $this->runner($captured)->run($node, $ctx);
+
+        self::assertStringNotContainsString('FAILED', $captured[1]['content']);
+        self::assertStringNotContainsString('does not exist', $captured[1]['content']);
+    }
+
     public function testLiteralExtraInputsAreNotMistakenForData(): void
     {
         $ctx = $this->contextWithToolResults('q');

@@ -15,6 +15,9 @@ namespace App\Service\Multitask\Execution;
  */
 final readonly class NodeResult
 {
+    /** In-memory flag: answer steps may still run and explain this failure. */
+    public const META_REPORTABLE = 'reportable_failure';
+
     /**
      * @param list<array<string, mixed>> $files
      * @param array<string, mixed>       $metadata
@@ -42,6 +45,20 @@ final readonly class NodeResult
      */
     public static function failed(string $error, array $metadata = []): self
     {
+        return new self(NodeStatus::Failed, error: $error, metadata: $metadata);
+    }
+
+    /**
+     * The step failed, but the error is something the answering step should
+     * explain (a connected system answered with an error). The card stays
+     * `failed`; answer-type dependents still run.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    public static function reportableFailure(string $error, array $metadata = []): self
+    {
+        $metadata[self::META_REPORTABLE] = true;
+
         return new self(NodeStatus::Failed, error: $error, metadata: $metadata);
     }
 
@@ -94,6 +111,11 @@ final readonly class NodeResult
     public function isSuccessful(): bool
     {
         return NodeStatus::Done === $this->status;
+    }
+
+    public function isReportableFailure(): bool
+    {
+        return NodeStatus::Failed === $this->status && true === ($this->metadata[self::META_REPORTABLE] ?? false);
     }
 
     public function isRunning(): bool

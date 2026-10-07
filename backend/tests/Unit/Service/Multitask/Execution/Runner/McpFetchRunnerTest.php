@@ -26,6 +26,7 @@ use App\Service\Security\SsrfGuard;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -64,19 +65,21 @@ final class McpFetchRunnerTest extends TestCase
         array $topicMetaRows = ['tool_mcp' => '1'],
         ?McpServerConfig $server = null,
         string $callToolResultText = 'Customer: Acme GmbH, last order #42.',
+        bool $toolIsError = false,
+        ?LoggerInterface $logger = null,
     ): McpFetchRunner {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
             static fn (int $owner, string $group, string $setting): ?string => $flags["{$group}.{$setting}"] ?? null,
         );
 
-        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText): MockResponse {
+        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText, $toolIsError): MockResponse {
             $body = json_decode((string) ($options['body'] ?? ''), true);
             $rpcMethod = is_array($body) ? ($body['method'] ?? '') : '';
 
             $result = match ($rpcMethod) {
                 'tools/list' => ['tools' => $this->serverTools],
-                'tools/call' => ['content' => [['type' => 'text', 'text' => $callToolResultText]], 'isError' => false],
+                'tools/call' => ['content' => [['type' => 'text', 'text' => $callToolResultText]], 'isError' => $toolIsError],
                 default => [],
             };
 
@@ -109,7 +112,7 @@ final class McpFetchRunnerTest extends TestCase
             $clientConfig,
             new MultitaskRoutingConfig($configRepo),
             $this->promptService($topicMetaRows),
-            new NullLogger(),
+            $logger ?? new NullLogger(),
         );
     }
 
@@ -170,6 +173,7 @@ final class McpFetchRunnerTest extends TestCase
         $result = $this->runner(flags: [])->run($this->node(), $this->context());
 
         self::assertFalse($result->isSuccessful());
+        self::assertFalse($result->isReportableFailure());
         self::assertStringContainsString('disabled', (string) $result->error);
     }
 
@@ -195,6 +199,7 @@ final class McpFetchRunnerTest extends TestCase
         $result = $this->runner()->run($this->node(tool: 'made_up_tool'), $this->context());
 
         self::assertFalse($result->isSuccessful());
+        self::assertFalse($result->isReportableFailure());
         self::assertStringContainsString('does not exist', (string) $result->error);
     }
 
@@ -233,5 +238,41 @@ final class McpFetchRunnerTest extends TestCase
 
         // Allowlist excluding this server → invisible.
         self::assertNull(($descriptor->dynamicNote)(self::USER_ID, ['topic' => 'general', 'topic_metadata' => ['tool_mcp' => true, 'mcp_servers' => '55']]));
+    }
+
+    public function testToolErrorIsAReportableFailureAndIsLogged(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'McpFetchRunner: tool reported an error',
+            self::callback(static function (array $context): bool {
+                return 3 === $context['server_id']
+                    && 'search_customers' === $context['tool']
+                    && str_contains((string) $context['error'], 'NotFound');
+            }),
+        );
+
+        $result = $this->runner(
+            callToolResultText: 'NotFound: bucket does-not-exist-123',
+            toolIsError: true,
+            logger: $logger,
+        )->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('NotFound: bucket does-not-exist-123', (string) $result->error);
+        self::assertStringContainsString('Company CRM', (string) $result->error);
+        self::assertSame('Company CRM · search_customers', $result->metadata['query']);
+        self::assertSame(3, $result->metadata['mcp']['server_id']);
+        self::assertSame('search_customers', $result->metadata['mcp']['tool']);
+    }
+
+    public function testEmptyToolErrorStillNamesTheServer(): void
+    {
+        $result = $this->runner(callToolResultText: '   ', toolIsError: true)
+            ->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertSame('Company CRM reported an error and gave no details.', $result->error);
     }
 }
