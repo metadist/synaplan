@@ -150,6 +150,26 @@
         </p>
       </div>
 
+      <div
+        v-if="assistantCards.length > 0"
+        class="border-t border-light-border/20 p-2"
+        data-testid="section-model-assistants"
+      >
+        <p class="px-2 pb-1 text-xs font-medium txt-secondary">
+          {{ $t('chatInput.modelDropdown.assistants') }}
+        </p>
+        <button
+          v-for="card in assistantCards"
+          :key="card.id"
+          type="button"
+          class="dropdown-item model-option w-full"
+          :data-testid="`btn-assistant-${card.id}`"
+          @click="chooseAssistant(card.id)"
+        >
+          <span class="min-w-0 flex-1 truncate text-sm">{{ card.name }}</span>
+        </button>
+      </div>
+
       <ReasoningLevelOptions
         v-if="levels.length > 0"
         :levels="levels"
@@ -162,7 +182,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useModelListKeyboard } from '@/composables/useModelListKeyboard'
 import { CheckIcon, ChevronUpIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -174,6 +195,10 @@ import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import type { AIModel } from '@/types/ai-models'
 import { modelPickerPanelStyle } from '@/utils/modelPickerPanel'
+import { isAgentsEnabled } from '@/composables/useAgentsFeature'
+import { useAgentsStore } from '@/stores/agents'
+import { useChatsStore } from '@/stores/chats'
+import { useHistoryStore } from '@/stores/history'
 
 const props = withDefaults(
   defineProps<{
@@ -204,6 +229,32 @@ const panelId = useId()
 const filterId = useId()
 const listboxId = useId()
 const isOpen = ref(false)
+const router = useRouter()
+const agentsStore = useAgentsStore()
+const chatsStore = useChatsStore()
+const historyStore = useHistoryStore()
+const assistantCards = computed(() =>
+  isAgentsEnabled()
+    ? agentsStore.gallery
+        .filter((card) => typeof card.name === 'string' && card.name.trim() !== '')
+        .slice(0, 8)
+        .map((card) => ({ id: card.id as number, name: String(card.name) }))
+    : []
+)
+
+watch(isOpen, (open) => {
+  if (open && isAgentsEnabled() && agentsStore.gallery.length === 0) {
+    void agentsStore.loadGallery()
+  }
+})
+
+async function chooseAssistant(id: number): Promise<void> {
+  isOpen.value = false
+  if (historyStore.messages.length > 0) {
+    await chatsStore.findOrCreateEmptyChat()
+  }
+  await router.push({ name: 'chat', query: { agentId: String(id) } })
+}
 const filterQuery = ref('')
 const filterRef = ref<HTMLInputElement | null>(null)
 const listRef = ref<HTMLElement | null>(null)

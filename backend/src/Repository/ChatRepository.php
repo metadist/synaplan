@@ -13,14 +13,15 @@ class ChatRepository extends ServiceEntityRepository
         parent::__construct($registry, Chat::class);
     }
 
-    public function findByUser(int $userId): array
+    public function findByUser(int $userId, ?bool $archived = null): array
     {
-        return $this->createQueryBuilder('c')
+        $qb = $this->createQueryBuilder('c')
             ->where('c.userId = :userId')
             ->setParameter('userId', $userId)
-            ->orderBy('c.updatedAt', 'DESC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('c.updatedAt', 'DESC');
+        $this->applyArchived($qb, $archived);
+
+        return $qb->getQuery()->getResult();
     }
 
     /**
@@ -31,26 +32,36 @@ class ChatRepository extends ServiceEntityRepository
      *
      * @return list<Chat>
      */
-    public function findByUserPaginated(int $userId, int $limit, int $offset): array
+    public function findByUserPaginated(int $userId, int $limit, int $offset, ?bool $archived = null): array
     {
-        return $this->createQueryBuilder('c')
+        $qb = $this->createQueryBuilder('c')
             ->where('c.userId = :userId')
             ->setParameter('userId', $userId)
             ->orderBy('c.updatedAt', 'DESC')
             ->setFirstResult($offset)
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($limit);
+        $this->applyArchived($qb, $archived);
+
+        return $qb->getQuery()->getResult();
     }
 
-    public function countByUser(int $userId): int
+    public function countByUser(int $userId, ?bool $archived = null): int
     {
-        return (int) $this->createQueryBuilder('c')
+        $qb = $this->createQueryBuilder('c')
             ->select('COUNT(c.id)')
             ->where('c.userId = :userId')
-            ->setParameter('userId', $userId)
-            ->getQuery()
-            ->getSingleScalarResult();
+            ->setParameter('userId', $userId);
+        $this->applyArchived($qb, $archived);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    private function applyArchived(\Doctrine\ORM\QueryBuilder $qb, ?bool $archived): void
+    {
+        if (null === $archived) {
+            return;
+        }
+        $qb->andWhere('c.archived = :archived')->setParameter('archived', $archived);
     }
 
     /**

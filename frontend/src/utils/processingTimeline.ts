@@ -444,6 +444,47 @@ export function timelineFromStatus(
   return state
 }
 
+const STEP_BY_CAPABILITY: Record<string, TimelineStepKey> = {
+  web_search: 'web',
+  search: 'web',
+  url_fetch: 'pages',
+  rag_query: 'files',
+  rag: 'files',
+  code_run: 'generate',
+  chat: 'generate',
+  summarize: 'generate',
+  translate: 'generate',
+  plan: 'plan',
+}
+
+/**
+ * Rebuild the folded step header from a stored task plan after a reload.
+ * Live stream steps win when they exist; this only fills the gap.
+ */
+export function timelineFromStoredCards(
+  cards: Array<{ capability: string; state: string; durationMs?: number }> | null | undefined,
+  now: number = Date.now()
+): TimelineStep[] {
+  if (!cards || cards.length === 0) return []
+  const steps: TimelineStep[] = []
+  for (const card of cards) {
+    if (card.state !== 'done' && card.state !== 'failed' && card.state !== 'skipped') continue
+    const duration =
+      typeof card.durationMs === 'number' && card.durationMs > 0 ? card.durationMs : 0
+    steps.push({
+      id: steps.length + 1,
+      key: STEP_BY_CAPABILITY[card.capability] ?? 'generate',
+      status: card.state === 'done' ? 'complete' : 'error',
+      metadata: {},
+      startedAt: now - duration,
+      endedAt: now,
+      state: 'done',
+      afterAnswer: false,
+    })
+  }
+  return steps
+}
+
 /** Seconds with one decimal below 10 s, whole seconds above. */
 export function formatDurationSeconds(ms: number): string {
   const seconds = ms / 1000

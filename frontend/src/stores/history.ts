@@ -244,6 +244,8 @@ export interface Message {
   usage?: MessageUsage | null
   /** Auxiliary usage of the turn (sorting/routing call, media renders, TTS). */
   usageExtra?: MessageUsage[] | null
+  versions?: { id: number; index: number; selected: boolean; model: string | null }[]
+  edits?: { id: number; index: number; selected: boolean; model: string | null }[]
 }
 
 export const TASK_CARD_KINDS = [
@@ -321,6 +323,13 @@ export interface TaskCard {
    * at assembly time and by markRedundantTaskPlanProse client-side).
    */
   redundant?: boolean
+  askUser?: {
+    question: string
+    options: string[]
+    recommended: string
+    allowText: boolean
+    expiresAt: number
+  }
 }
 
 export interface RagSourceRef {

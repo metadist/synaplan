@@ -11,6 +11,7 @@ import {
   preAnswerSteps,
   stepDurationMs,
   timelineFromStatus,
+  timelineFromStoredCards,
   type TimelineState,
 } from '@/utils/processingTimeline'
 import { describeStep, intentSentence, type Translate } from '@/utils/processingStepCopy'
@@ -469,5 +470,22 @@ describe('cloneTimelineSteps', () => {
       name: 'M',
       provider: 'groq',
     })
+  })
+})
+
+describe('timelineFromStoredCards', () => {
+  it('rebuilds done steps with their duration after a reload', () => {
+    const steps = timelineFromStoredCards(
+      [
+        { capability: 'web_search', state: 'done', durationMs: 2400 },
+        { capability: 'chat', state: 'running' },
+      ],
+      10_000
+    )
+    expect(steps).toHaveLength(1)
+    expect(steps[0]?.key).toBe('web')
+    expect(steps[0]?.state).toBe('done')
+    expect(steps[0]?.startedAt).toBe(7600)
+    expect(steps[0]?.endedAt).toBe(10_000)
   })
 })

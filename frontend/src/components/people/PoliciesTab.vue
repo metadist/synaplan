@@ -260,12 +260,16 @@ const featureKeys = [
   'TOOLS.APPROVALS_ENABLED',
   'TOOLS.CUSTOM_HTTP_ENABLED',
   'WORKFLOWS.BUILDER_ENABLED',
+  'CHAT.EXPORT_ENABLED',
+  'CHAT.SHARE_ENABLED',
 ] as const
 /** Code defaults used when no instance row exists. Matches the PHP resolvers. */
 const featureBuiltinOn = new Set<string>([
   'MULTITASK.ROUTING_ENABLED',
   'MULTITASK.URL_FETCH_ENABLED',
   'TOOLS.REGISTRY_ENABLED',
+  'CHAT.EXPORT_ENABLED',
+  'CHAT.SHARE_ENABLED',
 ])
 const tiers = ['NEW', 'PRO', 'TEAM', 'BUSINESS'] as const
 const lockableKeys = [

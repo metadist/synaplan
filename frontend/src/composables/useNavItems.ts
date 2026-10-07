@@ -233,6 +233,12 @@ export function useNavItems() {
           ...grouped('assistants', assistants),
         },
         {
+          key: 'saved-prompts',
+          path: '/prompts',
+          label: t('nav.prompts'),
+          ...grouped('assistants', assistants),
+        },
+        {
           key: 'sorting-prompt',
           path: '/ai/routing',
           label: t('nav.configSortingPrompt'),

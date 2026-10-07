@@ -171,7 +171,17 @@
     "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
     "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht.",
     "conversation": "Unterhaltung",
-    "conversations": "Unterhaltungen"
+    "conversations": "Unterhaltungen",
+    "archive": "Archivieren",
+    "unarchive": "Wiederherstellen",
+    "archivedFilter": "Archiviert",
+    "exportMarkdown": "Als Markdown exportieren",
+    "exportPdf": "Als PDF exportieren",
+    "exportJson": "Als JSON exportieren",
+    "tags": "Tags",
+    "tagsSaved": "Tags gespeichert.",
+    "archivedDone": "Archiviert. Zu finden unter Alle Chats → Archiviert.",
+    "unarchivedDone": "Wieder in der Seitenleiste."
   },
   "moderation": {
     "report": {
@@ -256,6 +266,11 @@
     "share": "Teilen",
     "enhance": "Verbessern",
     "enhanceRejected": "Dieser Text konnte nicht verbessert werden. Bitte formuliere einen klareren Satz oder eine konkretere Frage.",
+    "enhanceSummary": {
+      "unchanged": "Der Text liest sich schon gut — es wurde nichts geändert.",
+      "capitalized": "Der erste Buchstabe wurde großgeschrieben und die Satzzeichen wurden bereinigt.",
+      "rewritten": "Der Text wurde klarer formuliert."
+    },
     "thinking": "Denken",
     "reasoningLevel": {
       "label": "Denkaufwand",
@@ -346,7 +361,8 @@
       "filterLabel": "Modelle filtern",
       "filterPlaceholder": "Modelle filtern…",
       "clearFilter": "Filter löschen",
-      "noMatch": "Kein Modell passt zu „{query}“."
+      "noMatch": "Kein Modell passt zu „{query}“.",
+      "assistants": "Assistenten"
     },
     "removeTool": "Werkzeug entfernen",
     "pastedText": {
@@ -358,7 +374,9 @@
       "modalTitle": "Eingefügter Inhalt",
       "save": "Speichern",
       "cancel": "Abbrechen"
-    }
+    },
+    "toolsSummary": "{count} Werkzeuge",
+    "toolsSummaryActive": "{count} Werkzeuge · {name} an"
   },
   "chatMessage": {
     "again": "Nochmal",
@@ -372,7 +390,25 @@
     "infoProvider": "Anbieter",
     "infoAudioModel": "Audio-Modell",
     "infoTokens": "Tokens",
-    "infoCost": "Kosten"
+    "infoCost": "Kosten",
+    "edit": "Bearbeiten",
+    "editSave": "Speichern und senden",
+    "editCancel": "Abbrechen",
+    "versionPrevious": "Vorherige Version",
+    "versionNext": "Nächste Version",
+    "versionPosition": "{current} von {total}",
+    "infoUsageStep": "{kind}: {tokens}",
+    "previewArtifact": "Vorschau",
+    "artifactCopy": "Kopieren",
+    "artifactDownload": "Herunterladen",
+    "artifactFullscreen": "Vollbild",
+    "artifactClose": "Schließen",
+    "fileReattach": "Erneut anhängen",
+    "fileOpenLibrary": "In der Bibliothek öffnen",
+    "filePreviewLoading": "Datei wird geöffnet…",
+    "filePreviewEmpty": "Für diese Datei gibt es noch keine Vorschau.",
+    "fileSearchable": "Durchsuchbar",
+    "fileNotSearchable": "Noch nicht durchsuchbar"
   },
   "chatError": {
     "title": "Die Antwort ist nicht fertig geworden",
@@ -582,7 +618,12 @@
     "copyFailed": "Kopieren fehlgeschlagen",
     "expand": "Text anzeigen",
     "collapse": "Text ausblenden",
-    "redundantCollapsed": "Schrittausgabe eingeklappt — zum Prüfen aufklappen oder die Antwort unten lesen."
+    "redundantCollapsed": "Schrittausgabe eingeklappt — zum Prüfen aufklappen oder die Antwort unten lesen.",
+    "recommended": "Empfohlen",
+    "askSubmit": "Senden",
+    "askSkip": "Überspringen",
+    "askNeedAnswer": "Wähle eine Option oder schreibe eine Antwort.",
+    "askFailed": "Der Lauf konnte nicht weitergehen. Sende eine neue Nachricht."
   },
   "processing": {
     "timeline": {
@@ -925,5 +966,14 @@
     "openInLibrary": "In der Bibliothek öffnen",
     "lines": "Zeilen {start}–{end}",
     "unavailable": "Diese Textstelle konnte nicht geöffnet werden."
+  },
+  "savedPrompts": {
+    "title": "Prompts",
+    "empty": "Speichere einen Prompt und füge ihn mit / ein.",
+    "new": "Neuer Prompt",
+    "name": "Name",
+    "command": "Befehl",
+    "body": "Prompt",
+    "saved": "Prompt gespeichert."
   }
 }

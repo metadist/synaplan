@@ -12,6 +12,7 @@ use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
+use App\Service\Message\EnhanceChangeSummary;
 use App\Service\Message\EnhanceOutputGuard;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Message\MessagePreProcessor;
@@ -610,6 +611,7 @@ class MessageController extends AbstractController
                 'success' => true,
                 'original' => $inputText,
                 'enhanced' => $enhancedText,
+                'summary' => EnhanceChangeSummary::code($inputText, $enhancedText),
             ]);
         } catch (\App\AI\Exception\ProviderException $e) {
             $this->logger->warning('Enhancement provider error', [

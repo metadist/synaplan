@@ -341,6 +341,13 @@ export interface ApiLoadedMessageRow {
       step_output?: string
       step_output_truncated?: boolean
       duration_ms?: number
+      ask_user?: {
+        question?: string
+        options?: string[]
+        recommended?: string
+        allowText?: boolean
+        expiresAt?: number
+      }
     }>
   } | null
   ragSources?: RagSourceRef[] | null
@@ -371,6 +378,8 @@ export interface ApiLoadedMessageRow {
     kind: string
     priceKnown?: boolean
   }> | null
+  versions?: Message['versions']
+  edits?: Message['edits']
 }
 
 /**
@@ -380,6 +389,22 @@ export interface ApiLoadedMessageRow {
  * resolves the final message state through the exact same logic as a page
  * reload (issue #1070).
  */
+function askUserFrom(value: unknown): import('@/stores/history').TaskCard['askUser'] {
+  if (!value || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  if (typeof row.question !== 'string' || row.question.trim() === '') return undefined
+  const options = Array.isArray(row.options)
+    ? row.options.filter((option): option is string => typeof option === 'string')
+    : []
+  return {
+    question: row.question,
+    options,
+    recommended: typeof row.recommended === 'string' ? row.recommended : '',
+    allowText: row.allowText !== false,
+    expiresAt: typeof row.expiresAt === 'number' ? row.expiresAt : 0,
+  }
+}
+
 export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   const role = m.direction === 'IN' ? 'user' : 'assistant'
 
@@ -501,6 +526,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         stepOutput: typeof c.step_output === 'string' ? c.step_output : undefined,
         stepOutputTruncated: c.step_output_truncated === true,
         durationMs: typeof c.duration_ms === 'number' ? c.duration_ms : undefined,
+        askUser: askUserFrom(c.ask_user),
       }
     })
     taskPlanState = {
@@ -594,6 +620,8 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     mediaJob: parseMediaJobPayload(m.mediaJob),
     usage: m.usage ?? null,
     usageExtra: m.usageExtra ?? null,
+    versions: Array.isArray(m.versions) ? m.versions : undefined,
+    edits: Array.isArray(m.edits) ? m.edits : undefined,
   }
 }
 

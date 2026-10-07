@@ -39,6 +39,8 @@ final class PolicyAllowList
         'TOOLS.APPROVALS_ENABLED',
         'TOOLS.CUSTOM_HTTP_ENABLED',
         'WORKFLOWS.BUILDER_ENABLED',
+        'CHAT.EXPORT_ENABLED',
+        'CHAT.SHARE_ENABLED',
     ];
 
     /**

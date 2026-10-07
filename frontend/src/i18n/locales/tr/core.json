@@ -101,7 +101,8 @@
     "assistants": "Asistanlar",
     "assistantBuilder": "Asistan",
     "approvals": "Onaylar",
-    "filesWorkspace": "Çalışma alanı"
+    "filesWorkspace": "Çalışma alanı",
+    "prompts": "Promptlar"
   },
   "welcome": "Hoş Geldiniz",
   "welcomeUser": "Hoş geldin, {name}",
@@ -176,7 +177,8 @@
     "liveSupport": "Canlı destek",
     "usage": "Kullanım",
     "assistants": "Asistanlar",
-    "approvals": "Onaylar"
+    "approvals": "Onaylar",
+    "prompts": "Promptlar"
   },
   "common": {
     "ok": "Tamam",

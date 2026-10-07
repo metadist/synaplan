@@ -60,13 +60,22 @@
               :title="attachTitle(file)"
               :aria-label="attachTitle(file)"
               data-testid="conversation-file-chip"
-              @click="onAttach(file)"
+              @click="emit('preview', file)"
             >
               <Icon
                 :icon="fileIcon(file.fileType || file.category)"
                 class="w-3.5 h-3.5 flex-shrink-0"
               />
               <span class="truncate">{{ file.name }}</span>
+            </button>
+            <button
+              type="button"
+              class="btn-secondary px-2 py-1.5 text-xs font-medium"
+              :disabled="!canAttach || file.id === null"
+              data-testid="conversation-file-reattach"
+              @click="onAttach(file)"
+            >
+              {{ $t('chatMessage.fileReattach') }}
             </button>
             <button
               v-if="canDelete && file.id !== null"
@@ -102,6 +111,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   attach: [file: ConversationFileRow]
+  preview: [file: ConversationFileRow]
   delete: [file: ConversationFileRow]
 }>()
 

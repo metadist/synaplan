@@ -252,6 +252,7 @@ final readonly class MessageProcessor
                     self::HISTORY_MAX_CHARS,
                     $message->getId(),
                 );
+                $conversationHistory = (new MessageVersionService())->activeForContext($conversationHistory);
                 $this->logger->debug('Using chat history for streaming', [
                     'chat_id' => $message->getChatId(),
                     'history_count' => count($conversationHistory),
@@ -745,6 +746,7 @@ final readonly class MessageProcessor
                     self::HISTORY_MAX_CHARS,
                     $message->getId(),
                 );
+                $conversationHistory = (new MessageVersionService())->activeForContext($conversationHistory);
                 $this->logger->debug('Using chat history for non-streaming', [
                     'chat_id' => $message->getChatId(),
                     'history_count' => count($conversationHistory),

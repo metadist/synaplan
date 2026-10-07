@@ -822,7 +822,34 @@ export const chatApi = {
     return httpClient(`/api/v1/messages/history?${params}`, { method: 'GET' })
   },
 
-  async enhanceMessage(text: string): Promise<{ original: string; enhanced: string }> {
+  async linkTurn(messageId: number, kind: 'again' | 'edit', previousId: number) {
+    return httpClient(`/api/v1/messages/${messageId}/turn-link`, {
+      method: 'POST',
+      body: JSON.stringify({ kind, previousId }),
+    })
+  },
+
+  async selectVersion(messageId: number, kind: 'answer' | 'edit') {
+    return httpClient(`/api/v1/messages/${messageId}/select-version`, {
+      method: 'POST',
+      body: JSON.stringify({ kind }),
+    })
+  },
+
+  async answerAskUser(messageId: number, nodeId: string, answer: string, skip = false) {
+    return httpClient(`/api/v1/messages/${messageId}/ask-user`, {
+      method: 'POST',
+      body: JSON.stringify({ nodeId, answer, skip }),
+    })
+  },
+
+  async enhanceMessage(
+    text: string
+  ): Promise<{
+    original: string
+    enhanced: string
+    summary?: 'unchanged' | 'capitalized' | 'rewritten'
+  }> {
     return httpClient<{ original: string; enhanced: string }>('/api/v1/messages/enhance', {
       method: 'POST',
       body: JSON.stringify({ text }),

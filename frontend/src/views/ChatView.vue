@@ -253,15 +253,21 @@
               :was-multitask="message.wasMultitask"
               :usage="message.usage"
               :usage-extra="message.usageExtra"
+              :versions="message.versions"
+              :edits="message.edits"
               :usage-taximeter-active="usageTaximeterStore.active"
               :is-guest-mode="isGuestMode"
               :can-rewrite="canRewriteConversation"
               :foreign-memory="sharedConversationLocked"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
+              @select-version="selectMessageVersion"
+              @edit-message="editUserMessage(message, $event)"
+              @reattach-file="reattachMessageFile"
               @retry="handleRetryMessage(message, $event)"
               @retry-task="handleTaskRetry"
               @followup-task="handleTaskFollowup"
+              @ask-user="answerAskUser(message, $event)"
               @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
               @report="openReportModal"
@@ -351,7 +357,23 @@
           :can-attach="canComposeSharedChat"
           :can-delete="canComposeSharedChat && !isGuestMode"
           @attach="attachConversationFile"
+          @preview="previewConversationFile"
           @delete="deleteConversationFile"
+        />
+        <ChatFilePreview
+          :open="conversationPreview !== null"
+          :file="conversationPreview"
+          :can-reattach="canComposeSharedChat"
+          @close="conversationPreview = null"
+          @download="conversationPreview && downloadConversationPreview()"
+          @reattach="
+            conversationPreview &&
+            attachConversationFile({
+              id: conversationPreview.id,
+              name: conversationPreview.filename,
+              fileType: '',
+            })
+          "
         />
       </div>
       <ChatInput
@@ -550,7 +572,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
+import {
+  ref,
+  computed,
+  nextTick,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  defineAsyncComponent,
+} from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
@@ -652,6 +682,7 @@ import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { shouldShowCompanionLinks, shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
+import { showStoreCards } from '@/composables/useChatWelcome'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { createSmoothStream } from '@/utils/smoothStream'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
@@ -734,6 +765,18 @@ const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const { files: conversationFiles, refresh: refreshConversationFiles } = useConversationFiles()
 const { confirm: confirmDialog } = useDialog()
 
+const conversationPreview = ref<{ id: number; filename: string } | null>(null)
+const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
+const previewConversationFile = (file: { id: number | null; name: string }) => {
+  if (file.id == null) return
+  conversationPreview.value = { id: file.id, filename: file.name }
+}
+const downloadConversationPreview = async () => {
+  const file = conversationPreview.value
+  if (!file) return
+  const { downloadFile } = await import('@/services/filesService')
+  await downloadFile(file.id, file.filename)
+}
 const attachConversationFile = (file: { id: number | null; name: string; fileType: string }) => {
   if (file.id === null) {
     return
@@ -959,7 +1002,6 @@ const {
   agentId: pinnedAgentId,
   queryAgentId,
   name: pinnedAssistantName,
-  greeting: pinnedAssistantGreeting,
   starterPrompts: pinnedStarterPrompts,
 } = usePinnedAssistant()
 
@@ -1054,10 +1096,10 @@ const emptyLandingTitle = computed(() => {
   if (incognitoStore.active) {
     return t('incognito.emptyTitle')
   }
-  if (pinnedAgentId.value) {
-    return pinnedAssistantGreeting.value || pinnedAssistantName.value || t('companionLinks.tagline')
+  if (pinnedAgentId.value && pinnedAssistantName.value) {
+    return pinnedAssistantName.value
   }
-  return t('companionLinks.tagline')
+  return aiConfigStore.getCurrentModel('CHAT')?.name || t('companionLinks.tagline')
 })
 const emptyLandingHint = computed(() => {
   if (incognitoStore.active) {
@@ -1146,7 +1188,9 @@ const emptyLandingActions = computed(() => ({
   canCompose: canComposeSharedChat.value,
   needsProviderSetup: needsProviderSetup.value,
 }))
-const showCompanionLinks = computed(() => shouldShowCompanionLinks(emptyLandingActions.value))
+const showCompanionLinks = computed(() =>
+  shouldShowCompanionLinks(emptyLandingActions.value, showStoreCards())
+)
 const showSelfAwareEmptyHint = computed(() =>
   shouldShowSelfAwareEmptyHint(emptyLandingActions.value)
 )
@@ -3577,6 +3621,9 @@ const streamAIResponse = async (
               if (typeof data.metadata?.duration_ms === 'number') {
                 card.durationMs = data.metadata.duration_ms
               }
+              if (isAskUserPayload(data.metadata?.ask_user)) {
+                card.askUser = data.metadata.ask_user
+              }
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -4197,6 +4244,9 @@ const streamAIResponse = async (
               }
               if (typeof data.metadata?.duration_ms === 'number') {
                 card.durationMs = data.metadata.duration_ms
+              }
+              if (isAskUserPayload(data.metadata?.ask_user)) {
+                card.askUser = data.metadata.ask_user
               }
             }
           } else if (data.status === 'task_chunk') {
@@ -5393,6 +5443,14 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   // Reattach the original file IDs so a file_analysis Again still has the
   // attachment to analyze (issue #1910).
   await streamAIResponse(userText, modelId ? { modelId, isAgain: true, fileIds } : { fileIds })
+  const created = [...historyStore.messages]
+    .reverse()
+    .find((row) => row.role === 'assistant' && row.backendMessageId)
+  if (created?.backendMessageId && assistantMessage.backendMessageId) {
+    await chatApi.linkTurn(created.backendMessageId, 'again', assistantMessage.backendMessageId)
+    const chatId = chatsStore.activeChatId
+    if (chatId) await historyStore.loadMessages(chatId)
+  }
 }
 
 /**
@@ -5514,6 +5572,62 @@ function finishStreamingTurnLocally() {
   streamingAbortController = null
   currentTrackId = undefined
   currentStreamingChatId = undefined
+}
+
+function isAskUserPayload(
+  value: unknown
+): value is NonNullable<import('@/stores/history').TaskCard['askUser']> {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    typeof (value as { question?: unknown }).question === 'string'
+  )
+}
+
+async function answerAskUser(
+  message: Message,
+  payload: { nodeId: string; answer: string; skip: boolean }
+): Promise<void> {
+  if (!message.backendMessageId) return
+  try {
+    await chatApi.answerAskUser(
+      message.backendMessageId,
+      payload.nodeId,
+      payload.answer,
+      payload.skip
+    )
+    const chatId = chatsStore.activeChatId
+    if (chatId) await historyStore.loadMessages(chatId)
+  } catch (err) {
+    showErrorToast(err instanceof Error ? err.message : t('taskPlan.askFailed'))
+  }
+}
+
+async function selectMessageVersion(messageId: number, kind: 'answer' | 'edit'): Promise<void> {
+  await chatApi.selectVersion(messageId, kind)
+  const chatId = chatsStore.activeChatId
+  if (chatId) await historyStore.loadMessages(chatId)
+}
+
+async function editUserMessage(message: Message, text: string): Promise<void> {
+  const previousId = message.backendMessageId
+  await streamAIResponse(text, {})
+  const created = [...historyStore.messages]
+    .reverse()
+    .find((row) => row.role === 'assistant' && row.backendMessageId)
+  if (previousId && created?.backendMessageId) {
+    await chatApi.linkTurn(created.backendMessageId, 'edit', previousId)
+    const chatId = chatsStore.activeChatId
+    if (chatId) await historyStore.loadMessages(chatId)
+  }
+}
+
+function reattachMessageFile(file: { id: number; filename: string; fileType?: string }): void {
+  chatInputRef.value?.attachExistingFile({
+    file_id: file.id,
+    filename: file.filename,
+    file_type: file.fileType || '',
+  })
 }
 
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {

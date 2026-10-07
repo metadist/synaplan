@@ -15,7 +15,7 @@
       <Icon icon="heroicons:light-bulb" class="w-5 h-5 text-[var(--brand)] flex-shrink-0 mt-0.5" />
       <p class="text-sm txt-secondary leading-relaxed">
         {{ $t('config.routing.customCalloutBody') }}
-        <router-link to="/ai/instructions" class="text-[var(--brand)] hover:underline font-medium">
+        <router-link to="/prompts" class="text-[var(--brand)] hover:underline font-medium">
           {{ $t('config.routing.customCalloutLink') }}
         </router-link>
       </p>

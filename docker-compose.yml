@@ -326,6 +326,7 @@ services:
       # reach the local models too.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
+      CHAT_ARTIFACTS_ENABLED: ${CHAT_ARTIFACTS_ENABLED:-1}
       QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
@@ -531,6 +532,7 @@ services:
       # Empty until the `local-ai` profile sets it in the command below.
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
+      CHAT_ARTIFACTS_ENABLED: ${CHAT_ARTIFACTS_ENABLED:-1}
       QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}

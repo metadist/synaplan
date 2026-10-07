@@ -85,6 +85,8 @@
           @share="shareChat"
           @rename="renameChat"
           @delete="deleteChat"
+          @archive="archiveChat"
+          @export="exportChat"
           @pin="toggleChatPin"
         />
       </div>
@@ -117,6 +119,8 @@
           @share="shareChat"
           @rename="renameChat"
           @delete="deleteChat"
+          @archive="archiveChat"
+          @export="exportChat"
           @pin="toggleChatPin"
         />
       </div>
@@ -159,6 +163,8 @@
           @share="shareChat"
           @rename="renameChat"
           @delete="deleteChat"
+          @archive="archiveChat"
+          @export="exportChat"
           @pin="toggleChatPin"
         >
           <template #empty>
@@ -211,6 +217,8 @@ const {
   renameChat,
   toggleChatPin,
   deleteChat,
+  archiveChat,
+  exportChat,
   shareChat,
   chatsStore,
   incomingStore,

@@ -55,6 +55,13 @@ class Chat
     #[ORM\Column(name: 'BPINNEDAT', type: 'datetime', nullable: true)]
     private ?\DateTimeInterface $pinnedAt = null;
 
+    #[ORM\Column(name: 'BARCHIVED', type: 'boolean', options: ['default' => false])]
+    private bool $archived = false;
+
+    /** JSON list of lowercase tags, e.g. ["weekly","ops"]. */
+    #[ORM\Column(name: 'BTAGS', type: 'string', length: 500, options: ['default' => '[]'])]
+    private string $tags = '[]';
+
     #[ORM\OneToMany(mappedBy: 'chat', targetEntity: Message::class)]
     private Collection $messages;
 
@@ -231,6 +238,59 @@ class Chat
     public function updateTimestamp(): self
     {
         $this->updatedAt = new \DateTime();
+
+        return $this;
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->archived;
+    }
+
+    public function setArchived(bool $archived): self
+    {
+        $this->archived = $archived;
+
+        return $this;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getTags(): array
+    {
+        $decoded = json_decode($this->tags, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        $tags = [];
+        foreach ($decoded as $tag) {
+            if (is_string($tag) && '' !== $tag) {
+                $tags[] = $tag;
+            }
+        }
+
+        return $tags;
+    }
+
+    /**
+     * @param list<string> $tags
+     */
+    public function setTags(array $tags): self
+    {
+        $clean = [];
+        foreach ($tags as $tag) {
+            $normalized = strtolower(trim($tag));
+            $normalized = preg_replace('/[^a-z0-9_-]+/', '', $normalized) ?? '';
+            if ('' === $normalized || strlen($normalized) > 32 || isset($clean[$normalized])) {
+                continue;
+            }
+            $clean[$normalized] = $normalized;
+            if (count($clean) >= 8) {
+                break;
+            }
+        }
+        $this->tags = json_encode(array_values($clean), \JSON_THROW_ON_ERROR);
 
         return $this;
     }

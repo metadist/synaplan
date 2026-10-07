@@ -36,6 +36,7 @@ final class ModuleDescriptorContractTest extends TestCase
         'federation',
         'compute',
         'opendesk_stt',
+        'chat_artifacts',
     ];
 
     public function testTheDescriptorSetIsExactlyThePlan(): void

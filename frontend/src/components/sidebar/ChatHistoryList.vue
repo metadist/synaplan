@@ -161,6 +161,7 @@
       <div v-if="menuChatId !== null" class="fixed inset-0 z-[150]" @click="menuChatId = null">
         <div class="fixed w-44 dropdown-panel origin-top-right" :style="menuStyle" @click.stop>
           <button
+            v-if="shareAllowed"
             type="button"
             class="dropdown-item"
             data-testid="btn-chat-v2-share"
@@ -177,6 +178,25 @@
           >
             <Icon icon="mdi:pencil-outline" class="w-4 h-4" />
             {{ $t('common.rename') }}
+          </button>
+          <button
+            type="button"
+            class="dropdown-item"
+            data-testid="btn-chat-v2-archive"
+            @click="onArchive"
+          >
+            <Icon icon="mdi:archive-outline" class="w-4 h-4" />
+            {{ menuChat?.archived ? $t('chat.unarchive') : $t('chat.archive') }}
+          </button>
+          <button
+            v-if="exportAllowed"
+            type="button"
+            class="dropdown-item"
+            data-testid="btn-chat-v2-export"
+            @click="onExport"
+          >
+            <Icon icon="mdi:download-outline" class="w-4 h-4" />
+            {{ $t('chat.exportMarkdown') }}
           </button>
           <button
             type="button"
@@ -199,6 +219,7 @@ import { useI18n } from 'vue-i18n'
 import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
+import { canExportChats, canShareChats } from '@/composables/useChatWelcome'
 import { useChatsStore } from '@/stores/chats'
 import type { HistoryChat } from '@/composables/useChatHistory'
 
@@ -253,10 +274,14 @@ const emit = defineEmits<{
   rename: [chatId: number]
   delete: [chatId: number]
   pin: [chatId: number]
+  archive: [chatId: number]
+  export: [chatId: number]
 }>()
 
 const { t } = useI18n()
 const chatsStore = useChatsStore()
+const shareAllowed = computed(() => canShareChats())
+const exportAllowed = computed(() => canExportChats())
 
 const menuChatId = ref<number | null>(null)
 const menuStyle = ref<Record<string, string>>({})
@@ -486,6 +511,18 @@ const onRename = () => {
 const onDelete = () => {
   const id = takeMenuId()
   if (id !== null) emit('delete', id)
+}
+
+const menuChat = computed(() => props.chats.find((chat) => chat.id === menuChatId.value) ?? null)
+
+const onArchive = () => {
+  const id = takeMenuId()
+  if (id !== null) emit('archive', id)
+}
+
+const onExport = () => {
+  const id = takeMenuId()
+  if (id !== null) emit('export', id)
 }
 
 onUnmounted(() => {

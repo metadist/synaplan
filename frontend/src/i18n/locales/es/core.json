@@ -101,7 +101,8 @@
     "assistants": "Asistentes",
     "assistantBuilder": "Asistente",
     "approvals": "Aprobaciones",
-    "filesWorkspace": "Espacio de trabajo"
+    "filesWorkspace": "Espacio de trabajo",
+    "prompts": "Prompts"
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",
@@ -176,7 +177,8 @@
     "liveSupport": "Soporte en vivo",
     "usage": "Uso",
     "assistants": "Asistentes",
-    "approvals": "Aprobaciones"
+    "approvals": "Aprobaciones",
+    "prompts": "Prompts"
   },
   "common": {
     "ok": "OK",

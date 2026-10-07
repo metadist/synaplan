@@ -305,6 +305,10 @@ final class ResultAssembler
                 if (is_array($mediaJob) && is_string($mediaJob['job_id'] ?? null) && '' !== $mediaJob['job_id']) {
                     $card['job_id'] = $mediaJob['job_id'];
                 }
+                $askUser = $nodeResult->metadata['ask_user'] ?? null;
+                if (is_array($askUser)) {
+                    $card['ask_user'] = $askUser;
+                }
             }
             $renderCards[] = $card;
         }
