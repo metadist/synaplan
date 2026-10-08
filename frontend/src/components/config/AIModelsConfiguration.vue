@@ -250,7 +250,7 @@
                     class="w-full rounded-xl surface-card border border-light-border/30 py-1.5 pl-9 pr-9 text-sm txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] dark:border-dark-border/20"
                     :placeholder="$t('config.aiModels.dropdownFilterPlaceholder')"
                     data-testid="input-model-choice-filter"
-                    @keydown.enter.prevent="pickFirstFiltered(capability as Capability)"
+                    @keydown.enter="onDropdownFilterEnter($event, capability as Capability)"
                     @keydown.escape.stop.prevent="onDropdownFilterEscape"
                   />
                   <button
@@ -259,7 +259,7 @@
                     class="icon-ghost absolute right-1.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md"
                     :aria-label="$t('config.aiModels.dropdownClearFilter')"
                     data-testid="btn-model-choice-filter-clear"
-                    @click="dropdownFilter = ''"
+                    @click="clearDropdownFilter"
                   >
                     <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
@@ -1264,9 +1264,55 @@ function visibleModelsFor(purpose: Capability): AIModel[] {
   return getModelsByPurpose(purpose).filter(modelMatchesDropdownFilter)
 }
 
+function choiceTrigger(purpose: Capability): HTMLButtonElement | null {
+  return (
+    capabilityRefs.value[purpose]?.querySelector<HTMLButtonElement>(
+      '[data-testid="btn-model-dropdown"]'
+    ) ?? null
+  )
+}
+
+function choiceFilterInput(purpose: Capability): HTMLInputElement | null {
+  return (
+    capabilityRefs.value[purpose]?.querySelector<HTMLInputElement>(
+      '[data-testid="input-model-choice-filter"]'
+    ) ?? null
+  )
+}
+
+function focusChoiceTrigger(purpose: Capability): void {
+  choiceTrigger(purpose)?.focus()
+}
+
+/** Enter confirms an IME composition before Vue updates the field. */
+function isImeKey(event: KeyboardEvent): boolean {
+  return event.isComposing || event.keyCode === 229
+}
+
+function onDropdownFilterEnter(event: KeyboardEvent, purpose: Capability): void {
+  if (isImeKey(event)) return
+  event.preventDefault()
+  pickFirstFiltered(purpose)
+}
+
 function pickFirstFiltered(purpose: Capability): void {
   const first = visibleModelsFor(purpose)[0]
-  if (first) void selectModel(purpose, first.id)
+  if (!first) return
+  // Focus the trigger before selectModel so a later embedding dialog can take focus.
+  focusChoiceTrigger(purpose)
+  void selectModel(purpose, first.id)
+}
+
+function clearDropdownFilter(): void {
+  const purpose = openDropdown.value
+  dropdownFilter.value = ''
+  if (purpose) choiceFilterInput(purpose)?.focus()
+}
+
+function closeChoiceDropdown(purpose: Capability | null): void {
+  if (!purpose) return
+  focusChoiceTrigger(purpose)
+  openDropdown.value = null
 }
 
 function onDropdownFilterEscape(): void {
@@ -1274,7 +1320,7 @@ function onDropdownFilterEscape(): void {
     dropdownFilter.value = ''
     return
   }
-  openDropdown.value = null
+  closeChoiceDropdown(openDropdown.value)
 }
 
 const selectedModelInfo = computed<Record<string, { label: string; service: string }>>(() => {
@@ -1325,9 +1371,7 @@ const toggleDropdown = (capability: Capability) => {
   const opened = openDropdown.value
   if (opened && showDropdownFilter(opened)) {
     void nextTick(() => {
-      capabilityRefs.value[opened]
-        ?.querySelector<HTMLInputElement>('[data-testid="input-model-choice-filter"]')
-        ?.focus()
+      choiceFilterInput(opened)?.focus()
     })
   }
 }
@@ -1531,9 +1575,8 @@ const handleClickOutside = (event: MouseEvent) => {
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && openDropdown.value) {
-    openDropdown.value = null
-  }
+  if (event.key !== 'Escape' || !openDropdown.value || isImeKey(event)) return
+  closeChoiceDropdown(openDropdown.value)
 }
 
 /**
