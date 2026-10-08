@@ -250,6 +250,10 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'logoUrl', type: 'string', example: '', description: 'Light-mode logo URL; empty string falls back to the bundled asset'),
                         new OA\Property(property: 'logoDarkUrl', type: 'string', example: '', description: 'Dark-mode logo URL; empty string falls back to the bundled asset'),
                         new OA\Property(property: 'iconUrl', type: 'string', example: '', description: 'Brand icon/favicon URL; empty string falls back to the bundled asset'),
+                        new OA\Property(property: 'resolvedLogoUrl', type: 'string', example: '/synaplan-dark.svg', description: 'Logo for a light theme, never empty: logoUrl, else the bundled logo. The resolved* fields are for integrations that cannot apply the fallbacks themselves'),
+                        new OA\Property(property: 'resolvedLogoDarkUrl', type: 'string', example: '/synaplan-light.svg', description: 'Logo for a dark theme, never empty: logoDarkUrl, else logoUrl, else the bundled logo'),
+                        new OA\Property(property: 'resolvedIconUrl', type: 'string', example: '/single_bird-dark.svg', description: 'Icon for a light theme, never empty: iconUrl, else the resolved logo, else the bundled icon'),
+                        new OA\Property(property: 'resolvedIconDarkUrl', type: 'string', example: '/single_bird-light.svg', description: 'Icon for a dark theme, never empty: iconUrl, else the resolved dark logo, else the bundled icon'),
                         new OA\Property(property: 'homepageUrl', type: 'string', example: 'https://www.synaplan.com', description: 'Brand homepage link used in auth/footer surfaces'),
                         new OA\Property(property: 'privacyUrl', type: 'string', example: 'https://www.synaplan.com/privacy-policy', description: 'Privacy-policy link (reachable in-app + store metadata; store-policy mandatory)'),
                         new OA\Property(property: 'termsUrl', type: 'string', example: 'https://www.synaplan.com/terms', description: 'Terms-of-use link (reachable in-app + store metadata)'),
@@ -742,7 +746,16 @@ class ConfigController extends AbstractController
                 'mailerConfigured' => $this->mailerConfig->isConfigured(),
             ],
             'recaptcha' => $recaptchaConfig,
-            'branding' => $this->brandingService->getBranding(),
+            'branding' => $this->brandingService->getBranding() + [
+                'resolvedLogoUrl' => $this->brandingService->getLogoUrl(false)
+                    ?? $request->getBasePath().'/synaplan-dark.svg',
+                'resolvedLogoDarkUrl' => $this->brandingService->getLogoUrl(true)
+                    ?? $request->getBasePath().'/synaplan-light.svg',
+                'resolvedIconUrl' => $this->brandingService->getIconUrl(false)
+                    ?? $request->getBasePath().'/single_bird-dark.svg',
+                'resolvedIconDarkUrl' => $this->brandingService->getIconUrl(true)
+                    ?? $request->getBasePath().'/single_bird-light.svg',
+            ],
             'features' => $features,
             'speech' => $speech,
             'plugins' => $plugins,
