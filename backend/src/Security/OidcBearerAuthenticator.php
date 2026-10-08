@@ -2,6 +2,7 @@
 
 namespace App\Security;
 
+use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\OidcTokenService;
 use App\Service\OidcUserService;
 use Psr\Log\LoggerInterface;
@@ -91,7 +92,11 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         }
 
         // Find or create user via shared service (full claims include role data)
-        $user = $this->oidcUserService->findOrCreateFromClaims($claims);
+        try {
+            $user = $this->oidcUserService->findOrCreateFromClaims($claims);
+        } catch (OidcAccessDeniedException) {
+            throw new CustomUserMessageAuthenticationException('Invalid or expired OIDC bearer token');
+        }
 
         $this->logger->debug('OIDC bearer token authenticated', [
             'user_id' => $user->getId(),

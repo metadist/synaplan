@@ -6,8 +6,12 @@ namespace App\Tests\Service;
 
 use App\Repository\UserRepository;
 use App\Service\Auth\AuthCookieFactory;
+use App\Service\Auth\OidcAccessDenialReason;
+use App\Service\Auth\OidcAccessDeniedException;
+use App\Service\Auth\OidcAccessPolicy;
 use App\Service\JwtValidator;
 use App\Service\OidcTokenService;
+use App\Tests\Support\OidcAccessPolicyFixture;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -50,6 +54,7 @@ final class OidcLoginClaimsTest extends TestCase
         array $userInfo = [],
         ?LoggerInterface $logger = null,
         int $userInfoHttpCode = 200,
+        ?OidcAccessPolicy $policy = null,
     ): array {
         $this->requestedUrls = [];
 
@@ -80,6 +85,7 @@ final class OidcLoginClaimsTest extends TestCase
             $logger ?? new NullLogger(),
             $jwtValidator,
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            $policy ?? OidcAccessPolicyFixture::open(),
             'synaplan-app',
             'test-client-secret',
             self::REALM,
@@ -232,5 +238,95 @@ final class OidcLoginClaimsTest extends TestCase
         $jwtValidator->method('validateToken')->willReturn(['sub' => 'kc-user-6']);
 
         self::assertSame(['sub' => 'kc-user-6'], $service->resolveLoginClaims($this->jwt()));
+    }
+
+    public function testLoginInTheConfiguredOrganizationWithTheRequiredRoleIsAdmitted(): void
+    {
+        [$service, $jwtValidator] = $this->createService(
+            policy: OidcAccessPolicyFixture::with(orgCode: 'org_acme', requiredRoles: 'admin', roleClaims: 'roles'),
+        );
+        $jwtValidator->method('validateToken')->willReturn([
+            'sub' => 'kinde-1',
+            'email' => 'ada@acme.example',
+            'org_code' => 'org_acme',
+            'roles' => [['id' => 'r1', 'key' => 'admin', 'name' => 'Admin']],
+        ]);
+
+        self::assertSame('kinde-1', $service->resolveLoginClaims($this->jwt())['sub'] ?? null);
+    }
+
+    public function testLoginFromAnotherOrganizationIsDenied(): void
+    {
+        [$service, $jwtValidator] = $this->createService(
+            policy: OidcAccessPolicyFixture::with(orgCode: 'org_acme'),
+        );
+        $jwtValidator->method('validateToken')->willReturn([
+            'sub' => 'kinde-2',
+            'email' => 'eve@other.example',
+            'org_code' => 'org_other',
+        ]);
+
+        $this->expectDenied(OidcAccessDenialReason::OrgMismatch);
+        $service->resolveLoginClaims($this->jwt());
+    }
+
+    /**
+     * Userinfo tops up profile claims; it must never be able to supply the
+     * claim that admits the user.
+     */
+    public function testUserinfoCannotSupplyAMissingAuthorizationClaim(): void
+    {
+        [$service, $jwtValidator] = $this->createService(
+            ['sub' => 'kinde-3', 'email' => 'x@acme.example', 'org_code' => 'org_acme'],
+            policy: OidcAccessPolicyFixture::with(orgCode: 'org_acme'),
+        );
+        $jwtValidator->method('validateToken')->willReturn(['sub' => 'kinde-3']);
+
+        $this->expectDenied(OidcAccessDenialReason::OrgClaimMissing);
+        $service->resolveLoginClaims($this->jwt());
+    }
+
+    public function testOpaqueAccessTokenIsDeniedWhenRestrictionsAreConfigured(): void
+    {
+        [$service, $jwtValidator] = $this->createService(
+            ['sub' => 'kinde-4', 'email' => 'x@acme.example', 'org_code' => 'org_acme'],
+            policy: OidcAccessPolicyFixture::with(requiredRoles: 'admin'),
+        );
+        $jwtValidator->expects($this->never())->method('validateToken');
+
+        try {
+            $service->resolveLoginClaims('a1b2c3-opaque-token');
+            self::fail('An opaque token must not pass a claim restriction');
+        } catch (OidcAccessDeniedException $e) {
+            self::assertSame(OidcAccessDenialReason::OpaqueToken, $e->reason);
+        }
+        self::assertFalse($this->userInfoWasCalled(), 'Denied before asking the IdP');
+    }
+
+    public function testBearerValidationReturnsNullForADeniedIdentity(): void
+    {
+        [$service, $jwtValidator] = $this->createService(
+            policy: OidcAccessPolicyFixture::with(requiredPermissions: 'use:synaplan'),
+        );
+        $jwtValidator->method('validateToken')->willReturn(['sub' => 'kinde-5', 'permissions' => ['read:docs']]);
+
+        self::assertNull($service->validateBearerToken($this->jwt()));
+    }
+
+    public function testSessionValidationRefusesADeniedIdentity(): void
+    {
+        [$service, $jwtValidator] = $this->createService(
+            policy: OidcAccessPolicyFixture::with(orgCode: 'org_acme'),
+        );
+        $jwtValidator->method('validateToken')->willReturn(['sub' => 'kinde-6', 'org_code' => 'org_other']);
+
+        $this->expectException(OidcAccessDeniedException::class);
+        $service->validateOidcToken($this->jwt());
+    }
+
+    private function expectDenied(OidcAccessDenialReason $reason): void
+    {
+        $this->expectException(OidcAccessDeniedException::class);
+        $this->expectExceptionMessage($reason->value);
     }
 }

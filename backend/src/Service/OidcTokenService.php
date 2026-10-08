@@ -5,6 +5,8 @@ namespace App\Service;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\AuthCookieFactory;
+use App\Service\Auth\OidcAccessDeniedException;
+use App\Service\Auth\OidcAccessPolicy;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -38,6 +40,7 @@ final class OidcTokenService
         private LoggerInterface $logger,
         private JwtValidator $jwtValidator,
         private AuthCookieFactory $authCookieFactory,
+        private OidcAccessPolicy $accessPolicy,
         private string $oidcClientId,
         private string $oidcClientSecret,
         private string $oidcDiscoveryUrl,
@@ -183,6 +186,8 @@ final class OidcTokenService
      *
      * Performance improvement: ~50-200ms → <5ms (no HTTP call!)
      * Security improvement: Cryptographic signature verification
+     *
+     * @throws OidcAccessDeniedException when the token is valid but the instance policy refuses it
      */
     public function validateOidcToken(string $accessToken, string $provider = 'keycloak'): ?array
     {
@@ -208,6 +213,11 @@ final class OidcTokenService
                 return null;
             }
 
+            // A policy refusal must not look like an expired token: callers
+            // fall back to the internal app token on null, which would keep a
+            // person signed in after their organization or role was revoked.
+            $this->accessPolicy->assertAllowed($claims, 'session');
+
             // Return claims in same format as before (for compatibility)
             return [
                 'sub' => $claims['sub'] ?? null,
@@ -217,6 +227,8 @@ final class OidcTokenService
                 'family_name' => $claims['family_name'] ?? null,
                 'name' => $claims['name'] ?? null,
             ];
+        } catch (OidcAccessDeniedException $denied) {
+            throw $denied;
         } catch (\Exception $e) {
             $this->logger->error('OIDC token validation error', [
                 'error' => $e->getMessage(),
@@ -237,6 +249,27 @@ final class OidcTokenService
      * @return array<string, mixed>|null Full JWT claims if valid, null otherwise
      */
     public function validateBearerToken(string $accessToken, string $provider = 'keycloak'): ?array
+    {
+        $claims = $this->validateJwtClaims($accessToken, $provider);
+        if (null === $claims) {
+            return null;
+        }
+
+        try {
+            $this->accessPolicy->assertAllowed($claims, 'bearer');
+        } catch (OidcAccessDeniedException) {
+            return null;
+        }
+
+        return $claims;
+    }
+
+    /**
+     * Signature (JWKS), iss, exp and aud — no instance policy.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function validateJwtClaims(string $accessToken, string $provider): ?array
     {
         $expectedAudience = $this->resolveExpectedAudience();
         if (null === $expectedAudience) {
@@ -283,13 +316,21 @@ final class OidcTokenService
      * killing every session on the first refresh five minutes later (#1520).
      *
      * An opaque access token carries nothing we can inspect, so the IdP has to
-     * resolve it: those fall back to the userinfo endpoint.
+     * resolve it: those fall back to the userinfo endpoint — unless the
+     * instance restricts access by claims, which an opaque token cannot prove.
+     *
+     * The instance access policy is applied to the validated JWT claims only,
+     * before any userinfo top-up, so userinfo can never grant access.
      *
      * @return array<string, mixed>|null Claims to provision the user from, null when the token is not acceptable
+     *
+     * @throws OidcAccessDeniedException when the identity is valid but not admitted to this instance
      */
     public function resolveLoginClaims(string $accessToken, string $provider = 'keycloak'): ?array
     {
         if (!self::looksLikeJwt($accessToken)) {
+            $this->accessPolicy->assertOpaqueTokenAllowed('login');
+
             $this->logger->debug('OIDC login: opaque access token, resolving via userinfo', [
                 'provider' => $provider,
             ]);
@@ -297,7 +338,7 @@ final class OidcTokenService
             return $this->fetchUserInfo($accessToken, $provider);
         }
 
-        $claims = $this->validateBearerToken($accessToken, $provider);
+        $claims = $this->validateJwtClaims($accessToken, $provider);
 
         if (null === $claims) {
             $this->logger->error('OIDC login rejected: the access token failed local JWT validation', [
@@ -307,6 +348,8 @@ final class OidcTokenService
 
             return null;
         }
+
+        $this->accessPolicy->assertAllowed($claims, 'login');
 
         // Which profile claims reach the access token depends on the client's
         // protocol mappers, and provisioning needs at least one identifier
@@ -381,6 +424,9 @@ final class OidcTokenService
 
     /**
      * Get user from OIDC token (validates and returns user).
+     */
+    /**
+     * @throws OidcAccessDeniedException when the token is valid but the instance policy refuses it
      */
     public function getUserFromOidcToken(string $accessToken, string $provider = 'keycloak'): ?User
     {

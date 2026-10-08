@@ -156,6 +156,7 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
             $this->externalIdentities,
             new OidcClaimResolver(),
             $sync,
+            \App\Tests\Support\OidcAccessPolicyFixture::open(),
             'admin',
             'realm_access.roles',
             'test-client-id',

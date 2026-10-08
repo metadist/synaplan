@@ -32,6 +32,15 @@ parameters:
     env(OIDC_SCOPES): 'openid email profile offline_access'
     env(OIDC_PROVIDER_LABEL): ''
 
+    # OIDC instance access policy — all optional, empty = admit every
+    # authenticated identity (see .env.example "OIDC access restrictions").
+    env(OIDC_ORG_CODE): ''
+    env(OIDC_ORG_CLAIM): 'org_code'
+    env(OIDC_REQUIRED_ROLE): ''
+    env(OIDC_REQUIRED_PERMISSIONS): ''
+    env(OIDC_PERMISSIONS_CLAIM): 'permissions'
+    env(OIDC_ALLOW_USER_PROVISIONING): 'true'
+
     # Native mobile deep-link scheme used for the OAuth handoff (Epic 3).
     # Must match the custom URL scheme registered by the Capacitor app
     # (synaplan-apps). Default matches the production bundle id.
@@ -947,6 +956,22 @@ services:
     App\Controller\OidcController:
         arguments:
             $oidcAutoRedirect: '%env(string:default::OIDC_AUTO_REDIRECT)%'
+
+    # OIDC instance access policy (organization / role / permission / provisioning)
+    App\Service\Auth\OidcAccessPolicy:
+        arguments:
+            $orgCode: '%env(string:OIDC_ORG_CODE)%'
+            $orgClaim: '%env(string:OIDC_ORG_CLAIM)%'
+            $requiredRoles: '%env(string:OIDC_REQUIRED_ROLE)%'
+            $roleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
+            $requiredPermissions: '%env(string:OIDC_REQUIRED_PERMISSIONS)%'
+            $permissionsClaim: '%env(string:OIDC_PERMISSIONS_CLAIM)%'
+            $clientId: '%env(OIDC_CLIENT_ID)%'
+            $allowUserProvisioning: '%env(string:OIDC_ALLOW_USER_PROVISIONING)%'
+
+    App\Service\Auth\OidcAuthorizeParams:
+        arguments:
+            $bearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
 
     # OIDC Token Service for Keycloak integration
     App\Service\OidcTokenService:
