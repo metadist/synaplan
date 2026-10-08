@@ -43,6 +43,18 @@
   },
   "companionLinks": {
     "tagline": "What can I help you with?",
+    "greetings": {
+      "1": "What can I help you with?",
+      "2": "What's on your mind?",
+      "3": "What should we figure out?",
+      "4": "Start anywhere. We'll sort it.",
+      "5": "A question, a draft, or a mess.",
+      "6": "What would help right now?",
+      "7": "Blank page. I'm all ears.",
+      "8": "Tell me where you're stuck.",
+      "9": "A file, a question, a half idea.",
+      "10": "Surprise me, or the boring task."
+    },
     "opensInNewTab": "Opens in a new tab",
     "choice": {
       "title": "Your model and assistant",

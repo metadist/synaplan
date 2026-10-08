@@ -43,6 +43,18 @@
   },
   "companionLinks": {
     "tagline": "Wobei kann ich dir helfen?",
+    "greetings": {
+      "1": "Wobei kann ich dir helfen?",
+      "2": "Was geht dir durch den Kopf?",
+      "3": "Was sollen wir klären?",
+      "4": "Fang irgendwo an. Wir sortieren das.",
+      "5": "Eine Frage, ein Entwurf, ein Chaos.",
+      "6": "Was würde dir gerade helfen?",
+      "7": "Leere Seite. Ich bin ganz Ohr.",
+      "8": "Sag mir, wo es hakt.",
+      "9": "Eine Datei, eine Frage, eine halbe Idee.",
+      "10": "Überrasch mich. Oder die lästige Aufgabe."
+    },
     "opensInNewTab": "Öffnet in einem neuen Tab",
     "choice": {
       "title": "Dein Modell und dein Assistent",

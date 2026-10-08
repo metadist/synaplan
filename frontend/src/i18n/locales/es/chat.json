@@ -43,6 +43,18 @@
   },
   "companionLinks": {
     "tagline": "¿En qué puedo ayudarte?",
+    "greetings": {
+      "1": "¿En qué puedo ayudarte?",
+      "2": "¿Qué tienes en mente?",
+      "3": "¿Qué aclaramos?",
+      "4": "Empieza donde quieras. Lo ordenamos.",
+      "5": "Una pregunta, un borrador o un lío.",
+      "6": "¿Qué te ayudaría ahora?",
+      "7": "Página en blanco. Te escucho.",
+      "8": "Cuéntame dónde te atascas.",
+      "9": "Un archivo, una pregunta, una idea a medias.",
+      "10": "Sorpréndeme. O la tarea aburrida."
+    },
     "opensInNewTab": "Se abre en una pestaña nueva",
     "choice": {
       "title": "Tu modelo y tu asistente",

@@ -582,6 +582,22 @@ describe('Chats Store', () => {
 
       expect(store.activeChatId).toBe(9)
     })
+
+    it('drops a stored id once incoming has loaded and the own list is empty', async () => {
+      incomingOpenableMock.mockReturnValue(true)
+      localStorage.setItem('synaplan_active_chat_id', '13')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [] })
+      await store.loadChats()
+      expect(store.activeChatId).toBe(13)
+
+      incomingOpenableMock.mockReturnValue(false)
+      incomingLoaded.value = true
+      await nextTick()
+
+      expect(store.activeChatId).toBeNull()
+      expect(localStorage.getItem('synaplan_active_chat_id')).toBeNull()
+    })
   })
 
   describe('applyChatTitle', () => {
@@ -856,6 +872,16 @@ describe('Chats Store', () => {
 
       expect(store.conversationAccess).toBe('owner')
       expect(store.conversationSource).toBeNull()
+    })
+
+    it('settles a blank chat as owned after $reset so the composer is not withheld', () => {
+      const store = useChatsStore()
+      store.resolveConversationAccessAsOwn()
+
+      store.$reset()
+
+      expect(store.activeChatId).toBeNull()
+      expect(store.conversationAccess).toBe('owner')
     })
 
     it('drops an in-flight probe once the answer is known to be owned', async () => {

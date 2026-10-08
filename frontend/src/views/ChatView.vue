@@ -170,7 +170,7 @@
               >
                 <Icon icon="mdi:incognito" class="w-6 h-6 txt-brand" aria-hidden="true" />
               </div>
-              <h2 class="text-2xl font-semibold txt-primary mb-2">
+              <h2 class="text-2xl font-semibold txt-primary mb-2 text-balance max-w-md mx-auto">
                 {{ emptyLandingTitle }}
               </h2>
               <p class="txt-secondary">
@@ -702,6 +702,7 @@ import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { shouldShowCompanionLinks, shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
+import { pickEmptyGreetingKey } from '@/utils/emptyGreeting'
 import { showStoreCards } from '@/composables/useChatWelcome'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { createSmoothStream } from '@/utils/smoothStream'
@@ -868,6 +869,10 @@ const canComposeSharedChat = computed(() =>
     incognito: incognitoStore.active,
     access: chatsStore.conversationAccess,
     sharingEnabled: isIamSharingEnabled(),
+    chatOpen: chatsStore.activeChatId != null,
+    // Read lazily: isEmptyLanding is declared further down, and this getter
+    // only runs once setup has finished.
+    emptyThread: isEmptyLanding.value,
   })
 )
 // Owner-only writes (Again, Retry, Stop, task-plan controls). Unresolved
@@ -1112,6 +1117,10 @@ const showPendingPurchaseBanner = computed(
     pendingPurchaseAtSetup && !pendingPurchaseBannerDismissed.value && !authStore.isAuthenticated
 )
 
+// Chosen once per visit. A refresh picks again; later store updates must not
+// swap the heading while the person is looking at the empty chat.
+const emptyGreetingKey = pickEmptyGreetingKey(Math.random())
+
 const emptyLandingTitle = computed(() => {
   if (incognitoStore.active) {
     return t('incognito.emptyTitle')
@@ -1119,7 +1128,7 @@ const emptyLandingTitle = computed(() => {
   if (pinnedAgentId.value && pinnedAssistantName.value) {
     return pinnedAssistantName.value
   }
-  return aiConfigStore.getCurrentModel('CHAT')?.name || t('companionLinks.tagline')
+  return t(`companionLinks.greetings.${emptyGreetingKey}`)
 })
 const emptyLandingHint = computed(() => {
   if (incognitoStore.active) {

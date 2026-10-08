@@ -37,6 +37,44 @@ describe('canComposeChat', () => {
     ).toBe(true)
   })
 
+  it('shows the composer on the empty start page while access is still unresolved', () => {
+    expect(
+      canComposeChat({
+        guest: false,
+        incognito: false,
+        access: null,
+        sharingEnabled: true,
+        chatOpen: true,
+        emptyThread: true,
+      })
+    ).toBe(true)
+  })
+
+  it('keeps the composer hidden on an empty shared read-only thread', () => {
+    expect(
+      canComposeChat({
+        guest: false,
+        incognito: false,
+        access: 'read',
+        sharingEnabled: true,
+        chatOpen: true,
+        emptyThread: true,
+      })
+    ).toBe(false)
+  })
+
+  it('shows the composer on a blank chat even when access is still unresolved', () => {
+    expect(
+      canComposeChat({
+        guest: false,
+        incognito: false,
+        access: null,
+        sharingEnabled: true,
+        chatOpen: false,
+      })
+    ).toBe(true)
+  })
+
   it('keeps the owner and guest composers', () => {
     expect(
       canComposeChat({ guest: false, incognito: false, access: 'owner', sharingEnabled: true })
