@@ -5,6 +5,8 @@ namespace App\Service;
 use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
+use App\Service\Auth\OidcAccessDeniedException;
+use App\Service\Auth\OidcAccessPolicy;
 use App\Service\Auth\OidcClaimResolver;
 use App\Service\Iam\DirectoryGroupSync;
 use Doctrine\ORM\EntityManagerInterface;
@@ -33,6 +35,7 @@ class OidcUserService
         private ExternalIdentityRepository $externalIdentityRepository,
         private OidcClaimResolver $claimResolver,
         private DirectoryGroupSync $directoryGroupSync,
+        private OidcAccessPolicy $accessPolicy,
         string $oidcAdminRoles,
         string $oidcRoleClaims,
         string $oidcClientId,
@@ -48,6 +51,8 @@ class OidcUserService
      * @param array<string, mixed> $claims         OIDC token/userinfo claims
      * @param string|null          $refreshToken   Keycloak refresh token (only set during browser login)
      * @param string|null          $signupLanguage UI language for a brand-new account (de, en, es, fr, tr)
+     *
+     * @throws OidcAccessDeniedException when no account exists and OIDC provisioning is turned off
      */
     public function findOrCreateFromClaims(array $claims, ?string $refreshToken = null, ?string $signupLanguage = null): User
     {
@@ -78,6 +83,8 @@ class OidcUserService
                 'original_provider' => $user->getProviderId(),
             ]);
         } else {
+            $this->accessPolicy->assertProvisioningAllowed($claims, 'provisioning');
+
             $isNewUser = true;
             $user = new User();
             $user->setMail($email ?? $username.'@keycloak.local');
@@ -127,13 +134,7 @@ class OidcUserService
 
     private function syncRoles(User $user, array $claims): void
     {
-        $oidcRoles = [];
-        foreach ($this->roleClaimPaths as $segments) {
-            $value = $this->claimResolver->resolve($claims, $segments);
-            if (is_array($value)) {
-                $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $value)));
-            }
-        }
+        $oidcRoles = $this->claimResolver->roleValues($claims, $this->roleClaimPaths);
 
         if (empty($oidcRoles)) {
             return;

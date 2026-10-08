@@ -246,7 +246,8 @@ final readonly class SystemConfigService
                     'google' => ['label' => 'Google OAuth 2.0', 'fields' => ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CLOUD_PROJECT_ID']],
                     'github' => ['label' => 'GitHub OAuth 2.0', 'fields' => ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']],
                     'apple' => ['label' => 'Sign in with Apple', 'fields' => ['APPLE_CLIENT_ID', 'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY', 'APPLE_APP_BUNDLE_ID']],
-                    'oidc' => ['label' => 'OIDC (Enterprise SSO)', 'fields' => ['OIDC_DISCOVERY_URL', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'OIDC_SCOPES', 'OIDC_PROVIDER_LABEL']],
+                    'oidc' => ['label' => 'OIDC (Enterprise SSO)', 'fields' => ['OIDC_DISCOVERY_URL', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'OIDC_SCOPES', 'OIDC_BEARER_AUDIENCE', 'OIDC_PROVIDER_LABEL']],
+                    'oidc_access' => ['label' => 'OIDC access restrictions', 'fields' => ['OIDC_ORG_CODE', 'OIDC_ORG_CLAIM', 'OIDC_REQUIRED_ROLE', 'OIDC_ROLE_CLAIMS', 'OIDC_REQUIRED_PERMISSIONS', 'OIDC_PERMISSIONS_CLAIM', 'OIDC_ALLOW_USER_PROVISIONING']],
                 ],
             ],
             'channels' => [
@@ -2694,11 +2695,59 @@ final readonly class SystemConfigService
                 'description' => 'Space-separated permissions requested at sign-in. offline_access is rewritten to offline when the provider advertises offline and not offline_access (Kinde). A refused permission stops sign-in and names the permission. Restart required.',
                 'default' => 'openid email profile offline_access',
             ],
+            'OIDC_BEARER_AUDIENCE' => [
+                'tab' => 'auth', 'section' => 'oidc', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Audience the access token must carry. Leave empty to use the client ID. When set, it is also requested at sign-in, which Kinde and Auth0 need (Kinde: the audience of the API registered for the application). Restart required.',
+                'default' => '',
+            ],
             'OIDC_PROVIDER_LABEL' => [
                 'tab' => 'auth', 'section' => 'oidc', 'type' => 'text',
                 'sensitive' => false,
                 'description' => 'Text on the sign-in button. Leave empty to show Enterprise SSO. Restart required.',
                 'default' => '',
+            ],
+            'OIDC_ORG_CODE' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Only people from this organization may sign in. Sent to the provider at sign-in (Kinde org_code) and checked in the token. Leave empty for no organization check. Restart required.',
+                'default' => '',
+            ],
+            'OIDC_ORG_CLAIM' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Token claim that holds the organization (dot notation). org_code for Kinde, organization for Keycloak. Restart required.',
+                'default' => 'org_code',
+            ],
+            'OIDC_REQUIRED_ROLE' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Comma-separated roles; a person needs at least one of them to sign in (case-insensitive). Roles are read from the role claims below. Leave empty for no role check. Restart required.',
+                'default' => '',
+            ],
+            'OIDC_ROLE_CLAIMS' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Comma-separated token claims that hold roles (dot notation, {client_id} placeholder). Also decides who becomes administrator. Add roles for Kinde. Restart required.',
+                'default' => 'realm_access.roles,resource_access.{client_id}.roles,groups',
+            ],
+            'OIDC_REQUIRED_PERMISSIONS' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Comma-separated permissions; a person needs all of them to sign in. Leave empty for no permission check. Restart required.',
+                'default' => '',
+            ],
+            'OIDC_PERMISSIONS_CLAIM' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Token claim that holds the permissions (dot notation). Restart required.',
+                'default' => 'permissions',
+            ],
+            'OIDC_ALLOW_USER_PROVISIONING' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Create a Synaplan account on the first SSO sign-in. Turn off to admit only people who have signed in through SSO before; accounts created another way are not taken over. Restart required.',
+                'default' => 'true',
             ],
 
             // === Inbound Channels ===

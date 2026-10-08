@@ -7,6 +7,7 @@ namespace App\Tests\Service;
 use App\Service\Auth\AuthCookieFactory;
 use App\Service\JwtValidator;
 use App\Service\OidcTokenService;
+use App\Tests\Support\OidcAccessPolicyFixture;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -25,6 +26,7 @@ class OidcTokenServiceTest extends TestCase
             $this->createMock(LoggerInterface::class),
             $this->createMock(JwtValidator::class),
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            OidcAccessPolicyFixture::open(),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -61,6 +63,7 @@ class OidcTokenServiceTest extends TestCase
             $logger ?? $this->createMock(LoggerInterface::class),
             $jwtValidator,
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            OidcAccessPolicyFixture::open(),
             $oidcClientId,
             'test-client-secret',
             'https://keycloak.example.com/realms/test',
@@ -230,6 +233,7 @@ class OidcTokenServiceTest extends TestCase
             $logger,
             $this->createMock(JwtValidator::class),
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            OidcAccessPolicyFixture::open(),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -263,6 +267,7 @@ class OidcTokenServiceTest extends TestCase
             $logger,
             $this->createMock(JwtValidator::class),
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            OidcAccessPolicyFixture::open(),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -340,6 +345,7 @@ class OidcTokenServiceTest extends TestCase
             $logger,
             $this->createMock(JwtValidator::class),
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            OidcAccessPolicyFixture::open(),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -439,6 +445,7 @@ class OidcTokenServiceTest extends TestCase
             $logger,
             $this->createMock(JwtValidator::class),
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            OidcAccessPolicyFixture::open(),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'
@@ -475,6 +482,7 @@ class OidcTokenServiceTest extends TestCase
             $logger,
             $this->createMock(JwtValidator::class),
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            OidcAccessPolicyFixture::open(),
             'test-client-id',
             'test-client-secret',
             'https://keycloak.example.com/realms/test'

@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
+use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Client\ClientContextResolver;
 use App\Service\GuestSessionService;
 use App\Service\ImpersonationService;
@@ -653,6 +654,26 @@ class AuthController extends AbstractController
     }
 
     /**
+     * End an OIDC session that the identity provider still considers valid
+     * but this instance no longer admits. Same answer as a rejected refresh.
+     */
+    private function oidcSessionEnded(string $reason): JsonResponse
+    {
+        $this->logger->info($reason);
+
+        $response = new JsonResponse([
+            'error' => 'Session expired',
+            'code' => 'OIDC_SESSION_EXPIRED',
+            'message' => 'Your session has expired. Please log in again.',
+        ], Response::HTTP_UNAUTHORIZED);
+
+        $this->tokenService->clearAuthCookies($response);
+        $this->oidcTokenService->clearOidcCookies($response);
+
+        return $response;
+    }
+
+    /**
      * Refresh OIDC tokens against identity provider (Keycloak).
      * If Keycloak rejects the refresh (user logged out), session is terminated.
      */
@@ -660,7 +681,11 @@ class AuthController extends AbstractController
     {
         $existingOidcAccess = $request->cookies->get(OidcTokenService::OIDC_ACCESS_COOKIE);
         if (is_string($existingOidcAccess) && '' !== $existingOidcAccess) {
-            $knownUser = $this->oidcTokenService->getUserFromOidcToken($existingOidcAccess, $provider);
+            try {
+                $knownUser = $this->oidcTokenService->getUserFromOidcToken($existingOidcAccess, $provider);
+            } catch (OidcAccessDeniedException) {
+                return $this->oidcSessionEnded('OIDC refresh refused by instance policy');
+            }
             if ($knownUser instanceof User && !$knownUser->isActive()) {
                 $response = $this->accountSuspendedResponse($knownUser, 'OIDC refresh');
                 $this->tokenService->clearAuthCookies($response);
@@ -692,7 +717,11 @@ class AuthController extends AbstractController
         }
 
         // Get user from the new access token
-        $user = $this->oidcTokenService->getUserFromOidcToken($newTokens['access_token'], $provider);
+        try {
+            $user = $this->oidcTokenService->getUserFromOidcToken($newTokens['access_token'], $provider);
+        } catch (OidcAccessDeniedException) {
+            return $this->oidcSessionEnded('OIDC refresh refused by instance policy');
+        }
 
         if (!$user) {
             $response = new JsonResponse([

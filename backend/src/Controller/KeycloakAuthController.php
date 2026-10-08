@@ -3,6 +3,8 @@
 namespace App\Controller;
 
 use App\Service\AccountLanguage;
+use App\Service\Auth\OidcAccessDeniedException;
+use App\Service\Auth\OidcAuthorizeParams;
 use App\Service\ImpersonationService;
 use App\Service\OAuthLoginResponder;
 use App\Service\OAuthStateService;
@@ -53,6 +55,7 @@ class KeycloakAuthController extends AbstractController
         private string $appUrl,
         private string $frontendUrl,
         private OidcScopeResolver $oidcScopeResolver,
+        private OidcAuthorizeParams $oidcAuthorizeParams,
     ) {
         $this->appEnv = $_ENV['APP_ENV'] ?? 'prod';
     }
@@ -112,6 +115,7 @@ class KeycloakAuthController extends AbstractController
                 'code_challenge' => $codeChallenge,
                 'code_challenge_method' => 'S256', // SHA-256
             ];
+            $params += $this->oidcAuthorizeParams->params();
 
             $authUrl = $discovery['authorization_endpoint'].'?'.http_build_query($params);
 
@@ -300,6 +304,16 @@ class KeycloakAuthController extends AbstractController
             ]);
 
             return $response;
+        } catch (OidcAccessDeniedException) {
+            // The policy already logged the reason; the browser learns nothing
+            // about which rule failed, and no account was created. Clients that
+            // do not know the error code show this sentence as-is.
+            return $this->oauthLoginResponder->error(
+                'keycloak',
+                OidcAccessDeniedException::USER_MESSAGE,
+                $native,
+                ['error_code' => OidcAccessDeniedException::ERROR_CODE],
+            );
         } catch (\Exception $e) {
             // Log detailed error information for debugging
             $errorDetails = [

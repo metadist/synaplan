@@ -7,6 +7,8 @@ namespace App\Tests\Unit;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Security\CookieTokenAuthenticator;
+use App\Service\Auth\OidcAccessDenialReason;
+use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\OidcTokenService;
 use App\Service\TokenService;
 use PHPUnit\Framework\Constraint\IsType;
@@ -212,6 +214,26 @@ class CookieTokenAuthenticatorTest extends TestCase
             ->willReturn(null);
 
         $this->expectException(AuthenticationException::class);
+
+        $this->authenticator->authenticate($request);
+    }
+
+    public function testPolicyDenialDoesNotFallBackToTheAppToken(): void
+    {
+        $request = new Request();
+        $request->cookies->set(OidcTokenService::OIDC_ACCESS_COOKIE, 'valid-but-refused');
+        $request->cookies->set(OidcTokenService::OIDC_PROVIDER_COOKIE, 'keycloak');
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'still-valid-app-token');
+
+        $this->oidcTokenService
+            ->expects($this->once())
+            ->method('getUserFromOidcToken')
+            ->willThrowException(new OidcAccessDeniedException(OidcAccessDenialReason::RoleMissing));
+
+        $this->tokenService->expects($this->never())->method('validateAccessToken');
+
+        $this->expectException(AuthenticationException::class);
+        $this->expectExceptionMessage('Authentication failed');
 
         $this->authenticator->authenticate($request);
     }
