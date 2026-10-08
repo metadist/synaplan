@@ -43,6 +43,14 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     private const ERROR_EXCERPT_LENGTH = 500;
 
+    private const BODY_FORMAT_MP3 = 'mp3';
+    private const BODY_FORMAT_WAV = 'wav';
+
+    /** Mono speech; roughly a fifth of Piper's 16-bit PCM WAV. */
+    private const SPEECH_MP3_BITRATE = '64k';
+
+    private const FFMPEG_TIMEOUT_SECONDS = 30;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private string $ttsUrl,
@@ -177,8 +185,11 @@ class PiperProvider implements TextToSpeechProviderInterface
     {
         $voice = $this->resolveVoice($options);
 
-        if ($this->streamsWav($options)) {
-            return self::yieldOnce($this->synthesizeWav($text, $voice, $options));
+        $bodyFormat = $this->bodyFormat($options);
+        if (null !== $bodyFormat) {
+            $wav = $this->synthesizeWav($text, $voice, $options);
+
+            return self::yieldOnce(self::BODY_FORMAT_MP3 === $bodyFormat ? $this->encodeSpeechMp3($wav) : $wav);
         }
 
         $response = $this->httpClient->request('GET', $this->ttsUrl.'/api/tts', [
@@ -220,22 +231,57 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     public function getStreamContentType(array $options = []): string
     {
-        return $this->streamsWav($options) ? 'audio/wav' : 'audio/webm';
+        return match ($this->bodyFormat($options)) {
+            self::BODY_FORMAT_MP3 => 'audio/mpeg',
+            self::BODY_FORMAT_WAV => 'audio/wav',
+            default => 'audio/webm',
+        };
     }
 
     /**
      * Piper's streaming endpoint only produces WebM/Opus, which some clients
      * (AVFoundation on iOS) cannot play. A caller that explicitly asks for
-     * another format gets one complete WAV body instead; callers that send no
-     * format keep the WebM stream.
+     * mp3 gets one complete MP3 body, any other non-WebM format one WAV body;
+     * callers that send no format keep the WebM stream (null).
      *
      * @param array<string, mixed> $options
      */
-    private function streamsWav(array $options): bool
+    private function bodyFormat(array $options): ?string
     {
         $format = strtolower(trim((string) ($options['format'] ?? '')));
 
-        return '' !== $format && !in_array($format, self::WEBM_STREAM_FORMATS, true);
+        if ('' === $format || in_array($format, self::WEBM_STREAM_FORMATS, true)) {
+            return null;
+        }
+
+        return self::BODY_FORMAT_MP3 === $format ? self::BODY_FORMAT_MP3 : self::BODY_FORMAT_WAV;
+    }
+
+    /**
+     * Constant bitrate, because a piped MP3 carries no VBR seek index and the
+     * player would have to estimate the duration.
+     */
+    private function encodeSpeechMp3(string $wav): string
+    {
+        $process = new Process([
+            'ffmpeg',
+            '-hide_banner',
+            '-loglevel', 'error',
+            '-f', 'wav',
+            '-i', 'pipe:0',
+            '-codec:a', 'libmp3lame',
+            '-b:a', self::SPEECH_MP3_BITRATE,
+            '-f', 'mp3',
+            'pipe:1',
+        ], null, null, $wav, self::FFMPEG_TIMEOUT_SECONDS);
+
+        $process->run();
+
+        if (!$process->isSuccessful() || '' === $process->getOutput()) {
+            throw new ProviderException('FFmpeg MP3 encoding failed: '.substr($process->getErrorOutput(), 0, self::ERROR_EXCERPT_LENGTH), 'piper');
+        }
+
+        return $process->getOutput();
     }
 
     /**
