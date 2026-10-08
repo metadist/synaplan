@@ -36,7 +36,7 @@ class TtsController extends AbstractController
     #[OA\Parameter(name: 'text', in: 'query', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'language', in: 'query', required: true, description: 'Language of the spoken text (e.g. de, en). Required so the provider can select the matching voice.', schema: new OA\Schema(type: 'string', example: 'de'))]
     #[OA\Parameter(name: 'voice', in: 'query', required: false, schema: new OA\Schema(type: 'string'))]
-    #[OA\Parameter(name: 'format', in: 'query', required: false, description: 'Audio format (mp3, opus, aac, flac)', schema: new OA\Schema(type: 'string', default: 'mp3'))]
+    #[OA\Parameter(name: 'format', in: 'query', required: false, description: 'Requested audio format (mp3, opus, aac, flac). Providers fall back to their own default when omitted. Piper streams audio/webm by default or for webm/opus, and answers any other format with one complete audio/wav body. Always read the response Content-Type.', schema: new OA\Schema(type: 'string', example: 'mp3'))]
     #[OA\Parameter(name: 'speed', in: 'query', required: false, schema: new OA\Schema(type: 'number', default: 1.0))]
     public function streamAudio(Request $request, #[CurrentUser] ?User $user): Response
     {

@@ -9,6 +9,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 class PiperProvider implements TextToSpeechProviderInterface
 {
@@ -36,6 +37,11 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     /** Requested formats the native WebM stream already satisfies. */
     private const WEBM_STREAM_FORMATS = ['webm', 'opus'];
+
+    private const MIN_SPEED = 0.25;
+    private const MAX_SPEED = 4.0;
+
+    private const ERROR_EXCERPT_LENGTH = 500;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -162,14 +168,17 @@ class PiperProvider implements TextToSpeechProviderInterface
         return $filename;
     }
 
+    /**
+     * Not a generator itself: the Piper request and its status check run
+     * before the caller sends response headers, so a failing or unreachable
+     * TTS service surfaces as an error instead of an empty 200 audio body.
+     */
     public function synthesizeStream(string $text, array $options = []): \Generator
     {
         $voice = $this->resolveVoice($options);
 
         if ($this->streamsWav($options)) {
-            yield $this->synthesizeWav($text, $voice, $options);
-
-            return;
+            return self::yieldOnce($this->synthesizeWav($text, $voice, $options));
         }
 
         $response = $this->httpClient->request('GET', $this->ttsUrl.'/api/tts', [
@@ -182,15 +191,31 @@ class PiperProvider implements TextToSpeechProviderInterface
         ]);
 
         if (200 !== $response->getStatusCode()) {
-            throw new ProviderException('Piper TTS streaming failed: '.$response->getContent(false), 'piper');
+            throw new ProviderException('Piper TTS streaming failed: '.self::errorExcerpt($response), 'piper');
         }
 
+        return $this->streamChunks($response);
+    }
+
+    /**
+     * @return \Generator<int, string, void, void>
+     */
+    private function streamChunks(ResponseInterface $response): \Generator
+    {
         foreach ($this->httpClient->stream($response) as $chunk) {
             $content = $chunk->getContent();
             if ('' !== $content) {
                 yield $content;
             }
         }
+    }
+
+    /**
+     * @return \Generator<int, string, void, void>
+     */
+    private static function yieldOnce(string $content): \Generator
+    {
+        yield $content;
     }
 
     public function getStreamContentType(array $options = []): string
@@ -222,15 +247,34 @@ class PiperProvider implements TextToSpeechProviderInterface
             'json' => [
                 'text' => $text,
                 'voice' => $voice,
-                'length_scale' => $options['speed'] ?? 1.0,
+                'length_scale' => self::lengthScale($options),
             ],
         ]);
 
         if (200 !== $response->getStatusCode()) {
-            throw new ProviderException('Piper TTS failed: '.$response->getContent(false), 'piper');
+            throw new ProviderException('Piper TTS failed: '.self::errorExcerpt($response), 'piper');
         }
 
         return $response->getContent();
+    }
+
+    /**
+     * Piper's length_scale is the inverse of a speed factor: below 1.0 speaks
+     * faster, above 1.0 slower.
+     *
+     * @param array<string, mixed> $options
+     */
+    private static function lengthScale(array $options): float
+    {
+        $speed = is_numeric($options['speed'] ?? null) ? (float) $options['speed'] : 1.0;
+        $speed = max(self::MIN_SPEED, min(self::MAX_SPEED, $speed));
+
+        return 1.0 / $speed;
+    }
+
+    private static function errorExcerpt(ResponseInterface $response): string
+    {
+        return 'HTTP '.$response->getStatusCode().': '.substr($response->getContent(false), 0, self::ERROR_EXCERPT_LENGTH);
     }
 
     public function supportsStreaming(): bool
