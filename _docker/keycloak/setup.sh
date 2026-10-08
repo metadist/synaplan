@@ -81,6 +81,35 @@ $KCADM set-password -r synaplan \
 $KCADM create roles -r synaplan -s name=administrator
 $KCADM add-roles -r synaplan --uusername testuser --rolename administrator
 
+# Logins for people working on the stack, so testuser stays reserved for the
+# E2E tests: an administrator and a regular user. Their emails must differ
+# from the local fixture accounts (admin@synaplan.com, demo@synaplan.com),
+# because an OIDC login is rejected for an email that already belongs to a
+# password account.
+$KCADM create users -r synaplan \
+  -s username=admin \
+  -s email=oidc-admin@synaplan.com \
+  -s emailVerified=true \
+  -s enabled=true \
+  -s firstName=Admin \
+  -s lastName=User
+
+$KCADM set-password -r synaplan \
+  --username admin --new-password admin
+
+$KCADM add-roles -r synaplan --uusername admin --rolename administrator
+
+$KCADM create users -r synaplan \
+  -s username=demo \
+  -s email=oidc-demo@synaplan.com \
+  -s emailVerified=true \
+  -s enabled=true \
+  -s firstName=Demo \
+  -s lastName=User
+
+$KCADM set-password -r synaplan \
+  --username demo --new-password demo
+
 # --- OpenCloud integration clients (for synaplan-opencloud) ---
 # These are created here pragmatically so both Synaplan and OpenCloud
 # share the same Keycloak realm without maintaining separate setups.
