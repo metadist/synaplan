@@ -26,6 +26,12 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 {
     private const DEFAULT_MAX_TOKENS = 4096;
 
+    /**
+     * Image models that need `input_fidelity: high` to keep an attached photo
+     * on edits. gpt-image-2 and later always keep it and reject the key.
+     */
+    private const INPUT_FIDELITY_IMAGE_MODELS = ['gpt-image-1', 'gpt-image-1.5'];
+
     private ?OpenAI\Client $client = null;
 
     /** Key the cached client was built with (rebuild on key change). */
@@ -1170,27 +1176,8 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'size' => $options['size'] ?? '1024x1024',
             ];
 
-            if (isset($options['quality'])) {
-                $quality = $options['quality'];
-
-                // Map legacy values to supported ones
-                $qualityMap = [
-                    'standard' => 'medium',
-                    'hd' => 'high',
-                ];
-                if (isset($qualityMap[strtolower((string) $quality)])) {
-                    $quality = $qualityMap[strtolower((string) $quality)];
-                }
-
-                $quality = strtolower((string) $quality);
-                $allowedQualities = $this->allowedGptImageQualities($model);
-                if (!in_array($quality, $allowedQualities, true)) {
-                    $this->logger->warning('OpenAI '.$model.': Unsupported quality value, defaulting to high', [
-                        'provided' => $options['quality'],
-                    ]);
-                    $quality = 'high';
-                }
-
+            $quality = $this->gptImageQuality($model, $options['quality'] ?? null);
+            if (null !== $quality) {
                 $requestBody['quality'] = $quality;
             }
             if (isset($options['background'])) {
@@ -1317,34 +1304,27 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $model = $options['model'] ?? 'gpt-image-1.5';
             $responsesModel = $this->pickResponsesModel($model);
 
-            $this->logger->info('OpenAI: Pic2pic via Responses API', [
-                'model' => $responsesModel,
-                'image_model' => $model,
-                'image_count' => \count($imagePaths),
-                'prompt_length' => \strlen($prompt),
-            ]);
-
-            $contentParts = [['type' => 'input_text', 'text' => $prompt]];
+            $imageDataUrls = [];
             foreach ($imagePaths as $imgPath) {
                 $data = file_get_contents($imgPath);
                 if (false === $data) {
                     throw new \Exception('Failed to read image: '.basename($imgPath));
                 }
                 $mime = mime_content_type($imgPath) ?: 'image/png';
-                $contentParts[] = [
-                    'type' => 'input_image',
-                    'image_url' => 'data:'.$mime.';base64,'.base64_encode($data),
-                ];
+                $imageDataUrls[] = 'data:'.$mime.';base64,'.base64_encode($data);
             }
 
-            $requestBody = [
+            $requestBody = $this->buildImageEditRequest($prompt, $imageDataUrls, $options);
+            $imageTool = $requestBody['tools'][0];
+
+            $this->logger->info('OpenAI: Pic2pic via Responses API', [
                 'model' => $responsesModel,
-                'input' => [['role' => 'user', 'content' => $contentParts]],
-                // GPT Image 2.5 must be named on the tool; omitting `model`
-                // lets the Responses API pick a default that is not the
-                // catalog row the user selected.
-                'tools' => [['type' => 'image_generation', 'model' => $model]],
-            ];
+                'image_model' => $model,
+                'image_count' => \count($imagePaths),
+                'prompt_length' => \strlen($prompt),
+                'quality' => $imageTool['quality'] ?? null,
+                'input_fidelity' => $imageTool['input_fidelity'] ?? null,
+            ]);
 
             $key = $this->resolveApiKey();
 
@@ -1389,6 +1369,9 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                         'url' => 'data:image/png;base64,'.$output['result'],
                         'b64_json' => $output['result'],
                         'revised_prompt' => $output['revised_prompt'] ?? $prompt,
+                        // What the model rendered, e.g. 1536x1024: the edit
+                        // request leaves the size to the model.
+                        'size' => is_string($output['size'] ?? null) ? $output['size'] : null,
                     ];
                 }
             }
@@ -1406,6 +1389,78 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI Responses API pic2pic error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    /**
+     * Responses API body for an edit of attached images. Pure: the caller
+     * reads and encodes the images.
+     *
+     * gpt-image-1 and gpt-image-1.5 redraw the photo unless the tool asks
+     * for high input fidelity; gpt-image-2 and later always keep it and
+     * must not get the key. No `size` is sent, so the model keeps the
+     * orientation of the photo.
+     *
+     * @param list<string>         $imageDataUrls `data:` URLs of the attached images
+     * @param array<string, mixed> $options       model, quality
+     *
+     * @return array{model: string, input: list<array<string, mixed>>, tools: list<array<string, mixed>>}
+     */
+    private function buildImageEditRequest(string $prompt, array $imageDataUrls, array $options): array
+    {
+        $model = (string) ($options['model'] ?? 'gpt-image-1.5');
+
+        $content = [['type' => 'input_text', 'text' => $prompt]];
+        foreach ($imageDataUrls as $dataUrl) {
+            $content[] = ['type' => 'input_image', 'image_url' => $dataUrl];
+        }
+
+        // GPT Image 2.5 must be named on the tool; omitting `model` lets the
+        // Responses API pick a default that is not the catalog row the user
+        // selected.
+        $tool = ['type' => 'image_generation', 'model' => $model];
+        $quality = $this->gptImageQuality($model, $options['quality'] ?? null);
+        if (null !== $quality) {
+            $tool['quality'] = $quality;
+        }
+        if ([] !== $imageDataUrls && in_array($model, self::INPUT_FIDELITY_IMAGE_MODELS, true)) {
+            $tool['input_fidelity'] = 'high';
+        }
+
+        return [
+            'model' => $this->pickResponsesModel($model),
+            'input' => [['role' => 'user', 'content' => $content]],
+            'tools' => [$tool],
+        ];
+    }
+
+    /**
+     * The quality tier to send to a gpt-image model, or null when the caller
+     * asked for none. Legacy values map onto the gpt-image tiers
+     * (standard → medium, hd → high); a tier the model does not accept is
+     * sent as high, the tier media billing assumes for an unknown value.
+     */
+    private function gptImageQuality(string $model, mixed $requested): ?string
+    {
+        if (null === $requested) {
+            return null;
+        }
+
+        $quality = strtolower((string) $requested);
+        $quality = match ($quality) {
+            'standard' => 'medium',
+            'hd' => 'high',
+            default => $quality,
+        };
+
+        if (!in_array($quality, $this->allowedGptImageQualities($model), true)) {
+            $this->logger->warning('OpenAI '.$model.': Unsupported quality value, defaulting to high', [
+                'provided' => $requested,
+            ]);
+
+            return 'high';
+        }
+
+        return $quality;
     }
 
     /**
