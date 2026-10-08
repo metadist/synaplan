@@ -3,6 +3,7 @@
 namespace App\Security;
 
 use App\Repository\UserRepository;
+use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\OidcTokenService;
 use App\Service\TokenService;
 use Psr\Log\LoggerInterface;
@@ -121,8 +122,13 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
         if ($request->cookies->has(OidcTokenService::OIDC_ACCESS_COOKIE)) {
             $oidcProvider = $request->cookies->get(OidcTokenService::OIDC_PROVIDER_COOKIE, 'keycloak');
 
-            // Try OIDC token validation
-            $user = $this->oidcTokenService->getUserFromOidcToken($token, $oidcProvider);
+            // Try OIDC token validation. A policy refusal is not an expired
+            // token: falling back to the app cookie would keep the session.
+            try {
+                $user = $this->oidcTokenService->getUserFromOidcToken($token, $oidcProvider);
+            } catch (OidcAccessDeniedException) {
+                throw new CustomUserMessageAuthenticationException('Authentication failed');
+            }
 
             if ($user) {
                 $this->logger->debug('OIDC token authenticated successfully', [

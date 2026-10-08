@@ -186,6 +186,8 @@ final class OidcTokenService
      *
      * Performance improvement: ~50-200ms → <5ms (no HTTP call!)
      * Security improvement: Cryptographic signature verification
+     *
+     * @throws OidcAccessDeniedException when the token is valid but the instance policy refuses it
      */
     public function validateOidcToken(string $accessToken, string $provider = 'keycloak'): ?array
     {
@@ -211,11 +213,10 @@ final class OidcTokenService
                 return null;
             }
 
-            try {
-                $this->accessPolicy->assertAllowed($claims, 'session');
-            } catch (OidcAccessDeniedException) {
-                return null;
-            }
+            // A policy refusal must not look like an expired token: callers
+            // fall back to the internal app token on null, which would keep a
+            // person signed in after their organization or role was revoked.
+            $this->accessPolicy->assertAllowed($claims, 'session');
 
             // Return claims in same format as before (for compatibility)
             return [
@@ -226,6 +227,8 @@ final class OidcTokenService
                 'family_name' => $claims['family_name'] ?? null,
                 'name' => $claims['name'] ?? null,
             ];
+        } catch (OidcAccessDeniedException $denied) {
+            throw $denied;
         } catch (\Exception $e) {
             $this->logger->error('OIDC token validation error', [
                 'error' => $e->getMessage(),
@@ -421,6 +424,9 @@ final class OidcTokenService
 
     /**
      * Get user from OIDC token (validates and returns user).
+     */
+    /**
+     * @throws OidcAccessDeniedException when the token is valid but the instance policy refuses it
      */
     public function getUserFromOidcToken(string $accessToken, string $provider = 'keycloak'): ?User
     {

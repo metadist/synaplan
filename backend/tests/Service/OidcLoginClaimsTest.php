@@ -313,14 +313,15 @@ final class OidcLoginClaimsTest extends TestCase
         self::assertNull($service->validateBearerToken($this->jwt()));
     }
 
-    public function testSessionValidationReturnsNullForADeniedIdentity(): void
+    public function testSessionValidationRefusesADeniedIdentity(): void
     {
         [$service, $jwtValidator] = $this->createService(
             policy: OidcAccessPolicyFixture::with(orgCode: 'org_acme'),
         );
         $jwtValidator->method('validateToken')->willReturn(['sub' => 'kinde-6', 'org_code' => 'org_other']);
 
-        self::assertNull($service->validateOidcToken($this->jwt()));
+        $this->expectException(OidcAccessDeniedException::class);
+        $service->validateOidcToken($this->jwt());
     }
 
     private function expectDenied(OidcAccessDenialReason $reason): void
