@@ -87,19 +87,16 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import type { z } from 'zod'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import { useNotification } from '@/composables/useNotification'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiSavedPromptsListResponseSchema } from '@/generated/api-schemas'
-
-type SavedPromptRow = NonNullable<
-  z.infer<typeof GetApiSavedPromptsListResponseSchema>['prompts']
->[number]
+import { useCommandsStore, type SavedPromptRow } from '@/stores/commands'
 
 const { t } = useI18n()
 const { success, error } = useNotification()
+const commandsStore = useCommandsStore()
 const prompts = ref<SavedPromptRow[]>([])
 const editing = ref(false)
 const errorText = ref('')
@@ -110,6 +107,8 @@ async function load(): Promise<void> {
     schema: GetApiSavedPromptsListResponseSchema,
   })
   prompts.value = data.prompts ?? []
+  // The slash menu and the command search list the same prompts.
+  commandsStore.setSavedPrompts(prompts.value)
 }
 
 function startNew(): void {
