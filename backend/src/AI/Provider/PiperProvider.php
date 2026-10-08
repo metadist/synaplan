@@ -34,6 +34,9 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     private const DEFAULT_VOICE = 'en_US-lessac-medium';
 
+    /** Requested formats the native WebM stream already satisfies. */
+    private const WEBM_STREAM_FORMATS = ['webm', 'opus'];
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private string $ttsUrl,
@@ -127,21 +130,7 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     public function synthesize(string $text, array $options = []): string
     {
-        $voice = $this->resolveVoice($options);
-
-        $response = $this->httpClient->request('POST', $this->ttsUrl.'/api/tts', [
-            'json' => [
-                'text' => $text,
-                'voice' => $voice,
-                'length_scale' => $options['speed'] ?? 1.0,
-            ],
-        ]);
-
-        if (200 !== $response->getStatusCode()) {
-            throw new ProviderException('Piper TTS failed: '.$response->getContent(false), 'piper');
-        }
-
-        $wavContent = $response->getContent();
+        $wavContent = $this->synthesizeWav($text, $this->resolveVoice($options), $options);
 
         // 2. Save WAV to temp file
         $wavPath = $this->tempDir.'/'.uniqid('piper_', true).'.wav';
@@ -177,6 +166,12 @@ class PiperProvider implements TextToSpeechProviderInterface
     {
         $voice = $this->resolveVoice($options);
 
+        if ($this->streamsWav($options)) {
+            yield $this->synthesizeWav($text, $voice, $options);
+
+            return;
+        }
+
         $response = $this->httpClient->request('GET', $this->ttsUrl.'/api/tts', [
             'query' => [
                 'text' => $text,
@@ -200,7 +195,42 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     public function getStreamContentType(array $options = []): string
     {
-        return 'audio/webm';
+        return $this->streamsWav($options) ? 'audio/wav' : 'audio/webm';
+    }
+
+    /**
+     * Piper's streaming endpoint only produces WebM/Opus, which some clients
+     * (AVFoundation on iOS) cannot play. A caller that explicitly asks for
+     * another format gets one complete WAV body instead; callers that send no
+     * format keep the WebM stream.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function streamsWav(array $options): bool
+    {
+        $format = strtolower(trim((string) ($options['format'] ?? '')));
+
+        return '' !== $format && !in_array($format, self::WEBM_STREAM_FORMATS, true);
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function synthesizeWav(string $text, string $voice, array $options): string
+    {
+        $response = $this->httpClient->request('POST', $this->ttsUrl.'/api/tts', [
+            'json' => [
+                'text' => $text,
+                'voice' => $voice,
+                'length_scale' => $options['speed'] ?? 1.0,
+            ],
+        ]);
+
+        if (200 !== $response->getStatusCode()) {
+            throw new ProviderException('Piper TTS failed: '.$response->getContent(false), 'piper');
+        }
+
+        return $response->getContent();
     }
 
     public function supportsStreaming(): bool
