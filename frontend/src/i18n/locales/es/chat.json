@@ -128,6 +128,8 @@
     "notFound": "El chat ya no existe",
     "goneDeleted": "Este chat se ha eliminado.",
     "goneUnshared": "Este chat ya no está compartido contigo.",
+    "accessFailed": "No se pudo cargar este chat, así que todavía no puedes escribir en él. Comprueba tu conexión e inténtalo de nuevo.",
+    "accessRetry": "Intentar de nuevo",
     "notFoundDesc": "Este chat ha sido eliminado y ya no está disponible.",
     "browser": {
       "title": "Todos los Chats",
