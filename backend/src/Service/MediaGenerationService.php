@@ -13,6 +13,7 @@ use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\RenderedImageSize;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -250,8 +251,11 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
         $this->registerGeneratedFile($user, $localPath, $mimeType);
 
-        // pic2pic uses high quality (see generateImage call above).
-        $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId, null, null, 'high', self::DEFAULT_IMAGE_SIZE);
+        // pic2pic uses high quality (see generateImage call above). The edit
+        // leaves the size to the model, so bill the size it rendered (#2404).
+        $renderedSize = $result['images'][0]['size'] ?? null;
+        $billedSize = RenderedImageSize::billingKey(is_string($renderedSize) ? $renderedSize : null) ?? self::DEFAULT_IMAGE_SIZE;
+        $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId, null, null, 'high', $billedSize);
 
         // Clean up temporary upload files
         foreach ($imagePaths as $tmpPath) {
