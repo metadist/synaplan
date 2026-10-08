@@ -111,6 +111,9 @@ export const useChatsStore = defineStore('chats', () => {
   const activeChatId = ref<number | null>(readActiveChatId())
   const conversationAccess = ref<'owner' | 'read' | 'use' | null>(null)
   const conversationSource = ref<ConversationSource | null>(null)
+  // The access probe failed for a reason other than "gone": access stays
+  // null (no composer), so the view must say so and offer a retry.
+  const conversationAccessFailed = ref(false)
   let conversationAccessSeq = 0
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -1163,6 +1166,7 @@ export const useChatsStore = defineStore('chats', () => {
     ++conversationAccessSeq
     conversationAccess.value = 'owner'
     conversationSource.value = null
+    conversationAccessFailed.value = false
   }
 
   async function loadConversationAccess(chatId: number) {
@@ -1182,6 +1186,7 @@ export const useChatsStore = defineStore('chats', () => {
     const seq = ++conversationAccessSeq
     conversationAccess.value = null
     conversationSource.value = null
+    conversationAccessFailed.value = false
     try {
       const data = await httpClient<{
         chat: {
@@ -1210,7 +1215,17 @@ export const useChatsStore = defineStore('chats', () => {
       }
       conversationAccess.value = null
       conversationSource.value = null
+      conversationAccessFailed.value = true
     }
+  }
+
+  function retryConversationAccess(): Promise<void> {
+    const chatId = activeChatId.value
+    if (!chatId) {
+      resolveConversationAccessAsOwn()
+      return Promise.resolve()
+    }
+    return loadConversationAccess(chatId)
   }
 
   async function getShareInfo(chatId: number) {
@@ -1416,7 +1431,9 @@ export const useChatsStore = defineStore('chats', () => {
     activeChatId,
     conversationAccess,
     conversationSource,
+    conversationAccessFailed,
     loadConversationAccess,
+    retryConversationAccess,
     resolveConversationAccessAsOwn,
     activeChat,
     loading,
