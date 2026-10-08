@@ -375,6 +375,25 @@ class ModelCatalog
             'successor' => 'openai:gpt-5.6-luna:chat',
             'reason' => 'Deprecated by OpenAI; access ends on 2027-04-01. Migrate to GPT-5.6 Luna.',
         ],
+
+        // --- 2026-10-08 (OpenAI image model shutdowns, 2026-10-23 and 2026-12-01) ---
+        // Retired ahead of the shutdown, like BID 234: OpenAI still serves both
+        // ids, so the availability check would only see them once every binding
+        // already fails. GPT Image 2.5 Flare is the same provider and key on the
+        // same Responses API edit path, ranks above both on the public image-edit
+        // boards and costs less per image (high 1024²: $0.05268 vs $0.133/$0.167).
+        29 => [
+            'providerId' => 'gpt-image-1',
+            'retiredOn' => '2026-10-08',
+            'successor' => 'openai:gpt-image-2.5-flare:text2pic',
+            'reason' => 'Deprecated by OpenAI; access ends on 2026-10-23. Migrate to GPT Image 2.5 Flare.',
+        ],
+        151 => [
+            'providerId' => 'gpt-image-1.5',
+            'retiredOn' => '2026-10-08',
+            'successor' => 'openai:gpt-image-2.5-flare:text2pic',
+            'reason' => 'Deprecated by OpenAI; access ends on 2026-12-01. Migrate to GPT Image 2.5 Flare.',
+        ],
     ];
 
     /**
@@ -1428,6 +1447,8 @@ class ModelCatalog
         ],
         // ==================== OPENAI MODELS ====================
         [
+            // Retired 2026-10-08 ahead of OpenAI's 2026-10-23 shutdown; see
+            // RETIREMENTS[29] (successor GPT Image 2.5 Flare).
             'id' => 29,
             'service' => 'OpenAI',
             'name' => 'gpt-image-1',
@@ -2259,6 +2280,8 @@ class ModelCatalog
             ],
         ],
         [
+            // Retired 2026-10-08 ahead of OpenAI's 2026-12-01 shutdown; see
+            // RETIREMENTS[151] (successor GPT Image 2.5 Flare).
             'id' => 151,
             'service' => 'OpenAI',
             'name' => 'gpt-image-1.5',

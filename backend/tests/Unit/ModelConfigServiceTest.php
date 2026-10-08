@@ -9,6 +9,7 @@ use App\Entity\Config;
 use App\Entity\GroupConfig;
 use App\Entity\GroupMember;
 use App\Entity\Model;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use App\Repository\GroupConfigRepository;
 use App\Repository\GroupMemberRepository;
@@ -645,6 +646,25 @@ class ModelConfigServiceTest extends TestCase
         $this->givenDefaultModelRows([1 => 335, 0 => 255]);
 
         self::assertSame(332, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * #2413: a user who picked gpt-image-1.5 for image edits lands on the
+     * successor the retirement records, GPT Image 2.5 Flare.
+     */
+    public function testAUserLevelPic2PicBindingToGptImage15ResolvesToFlare(): void
+    {
+        $flare = ModelCatalog::successorBid(151);
+        self::assertSame(348, $flare);
+        $this->givenModels(
+            [151 => 'OpenAI', 348 => 'OpenAI', 371 => 'Google'],
+            inactiveModelIds: [151],
+            successorByModelId: [151 => $flare],
+        );
+        $this->givenUsableProviders(['openai', 'google']);
+        $this->givenDefaultModelRows([1 => 151, 0 => 371]);
+
+        self::assertSame(348, $this->service->getDefaultModel('PIC2PIC', 1));
     }
 
     public function testResolveUsableModelIdKeepsAnOverrideThatStillWorks(): void
@@ -1657,7 +1677,7 @@ class ModelConfigServiceTest extends TestCase
             'ollama:bge-m3:vectorize' => 'Ollama',
         ];
         foreach ($keyToService as $key => $service) {
-            $bid = \App\Model\ModelCatalog::findBidByKey($key);
+            $bid = ModelCatalog::findBidByKey($key);
             $this->assertNotNull($bid, "catalog key $key must resolve");
             $servicesById[$bid] = $service;
         }

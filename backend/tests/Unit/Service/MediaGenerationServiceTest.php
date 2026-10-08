@@ -512,6 +512,49 @@ class MediaGenerationServiceTest extends TestCase
         $this->em->expects(self::any())->method('getRepository')->with(Model::class)->willReturn($repo);
     }
 
+    public function testAnExplicitRetiredModelIdFollowsItsSuccessor(): void
+    {
+        $this->allowRateLimit();
+        $retired = $this->createModel('OpenAI', 'gpt-image-1.5', 'gpt-image-1.5');
+        $retired->method('isRetired')->willReturn(true);
+        $flare = $this->createModel('OpenAI', 'gpt-image-2.5-flare', 'GPT Image 2.5 Flare');
+        $repo = $this->createMock(EntityRepository::class);
+        $repo->method('find')->willReturnCallback(static fn (int $id): ?Model => match ($id) {
+            151 => $retired,
+            348 => $flare,
+            default => null,
+        });
+        $this->em->expects(self::any())->method('getRepository')->with(Model::class)->willReturn($repo);
+        $this->modelConfigService->expects(self::once())
+            ->method('resolveUsableModelId')
+            ->with(151, 'TEXT2PIC', self::anything())
+            ->willReturn(348);
+
+        $pngData = "\x89PNG\r\n\x1a\n".str_repeat("\0", 100);
+        $this->aiFacade->expects(self::once())
+            ->method('generateImage')
+            ->with('a lighthouse', self::anything(), self::callback(static fn (array $o): bool => 'gpt-image-2.5-flare' === $o['model']))
+            ->willReturn(['images' => ['data:image/png;base64,'.base64_encode($pngData)]]);
+
+        $result = $this->service->generate($this->createUser(), 'a lighthouse', 'image', 151);
+
+        self::assertSame('gpt-image-2.5-flare', $result['model']);
+    }
+
+    public function testAnExplicitRetiredModelWithoutAUsableSuccessorIsRefused(): void
+    {
+        $this->allowRateLimit();
+        $retired = $this->createModel('OpenAI', 'gpt-image-1', 'gpt-image-1');
+        $retired->method('isRetired')->willReturn(true);
+        $this->setUpModelResolution(29, $retired);
+        $this->modelConfigService->method('resolveUsableModelId')->willReturn(null);
+        $this->aiFacade->expects(self::never())->method('generateImage');
+
+        $this->expectException(NoModelAvailableException::class);
+
+        $this->service->generate($this->createUser(), 'a lighthouse', 'image', 29);
+    }
+
     public function testEmptyPromptThrowsInvalidArgument(): void
     {
         $this->expectException(\InvalidArgumentException::class);

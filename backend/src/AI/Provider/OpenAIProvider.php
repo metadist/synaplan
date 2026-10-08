@@ -1314,7 +1314,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     private function generateImageWithResponsesApi(string $prompt, array $imagePaths, array $options = []): array
     {
         try {
-            $model = $options['model'] ?? 'gpt-image-1.5';
+            $model = $options['model'] ?? 'gpt-image-2.5-flare';
             $responsesModel = $this->pickResponsesModel($model);
 
             $this->logger->info('OpenAI: Pic2pic via Responses API', [
