@@ -9,7 +9,7 @@
 # Local AI, office documents, file work, local-network TLS and scripted backups
 # use deploy/compose.yaml instead.
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.3.0}
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.3.1}
 
 x-app-command: &app-command
   - |
@@ -23,7 +23,7 @@ x-app-environment: &app-environment
   APP_ENV: prod
   APP_DEBUG: "0"
   SYNAPLAN_PLATFORM: selfhost
-  APP_VERSION: ${SYNAPLAN_VERSION:-5.3.0}
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.3.1}
   APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   # Space-separated. Without SYNAPLAN_URL both local spellings keep live chat
