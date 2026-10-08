@@ -43,6 +43,18 @@
   },
   "companionLinks": {
     "tagline": "En quoi puis-je vous aider ?",
+    "greetings": {
+      "1": "En quoi puis-je vous aider ?",
+      "2": "Qu’avez-vous en tête ?",
+      "3": "Que faut-il éclaircir ?",
+      "4": "Commencez où vous voulez.",
+      "5": "Une question, un brouillon, un bazar.",
+      "6": "Qu’est-ce qui vous aiderait ?",
+      "7": "Page blanche. Je vous écoute.",
+      "8": "Dites-moi où ça coince.",
+      "9": "Un fichier, une question, une ébauche.",
+      "10": "Surprenez-moi. Ou la tâche ennuyeuse."
+    },
     "opensInNewTab": "S’ouvre dans un nouvel onglet",
     "choice": {
       "title": "Votre modèle et votre assistant",
@@ -74,6 +86,7 @@
     "pin": "Épingler le chat",
     "unpin": "Retirer l'épingle",
     "pinSaveFailed": "L'épingle n'a pas pu être enregistrée. Le chat reste où il était.",
+    "sendNeedsChat": "Ce message n'a pas été envoyé. Le chat n'a pas pu être ouvert. Réessayez.",
     "stillGenerating": "Réponse en cours",
     "answerReady": "Réponse prête",
     "listOrigin": {

@@ -290,10 +290,13 @@ export const useChatsStore = defineStore('chats', () => {
 
   // Once the incoming list has arrived, an active chat that is neither mine nor
   // shared with me (revoked share, stale storage) falls back like before.
+  // Wait until the own list has loaded too, including when that list is empty:
+  // a stored id is kept while incoming is still in flight, and skipping the
+  // empty list left it selected. Sharing then hides the composer for good.
   watch(
     () => useIncomingStore().loaded,
     (incomingLoaded) => {
-      if (incomingLoaded && chats.value.length > 0) ensureValidActiveChat()
+      if (incomingLoaded && chatsListLoaded) ensureValidActiveChat()
     }
   )
 
@@ -1378,9 +1381,6 @@ export const useChatsStore = defineStore('chats', () => {
     stopDetachedRunWatch()
     localTurnCompletions.clear()
     chats.value = []
-    conversationAccess.value = null
-    conversationSource.value = null
-    conversationAccessSeq += 1
     invalidateInFlightChatsLoad()
     locallyCreatedIds.clear()
     chatsListLoaded = false
@@ -1403,6 +1403,10 @@ export const useChatsStore = defineStore('chats', () => {
     railLoadSeq += 1
     removedChatIds.clear()
     updateActiveChatSelection(null)
+    // Nothing is open. Settle as the viewer's own chat: leaving access at
+    // null hides the composer when sharing is on, and the ChatView watcher
+    // does not run again if the selection was already empty.
+    resolveConversationAccessAsOwn()
     loading.value = false
     error.value = null
   }

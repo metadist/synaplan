@@ -18,8 +18,16 @@ export function canComposeChat(input: {
   incognito: boolean
   access: ConversationAccess
   sharingEnabled: boolean
+  /**
+   * False when no conversation is open. A blank page belongs to the viewer.
+   * A selected chat stays locked until ownership is known: an empty shared
+   * thread looks the same while its access lookup is still pending, and
+   * sending then would be rejected.
+   */
+  chatOpen?: boolean
 }): boolean {
   if (input.guest || input.incognito) return true
+  if (input.chatOpen === false) return true
   if (isSharedConversationLocked(input.access, false)) return false
   if (input.access === 'owner') return true
   return !input.sharingEnabled
