@@ -4493,6 +4493,64 @@ class ModelCatalog
             ],
         ],
         [
+            // Public preview, pinned id (not mistral-large-latest, which still
+            // resolves to Large 3 / mistral-large-2512). Alias: mistral-large-4-0.
+            // Prices are the launch-discount rate the API bills
+            // (billing_model_name mistral-large-4-0-launch-discount), not the
+            // struck-through list ($1.36 / $0.14 cached / $4.18). Re-check
+            // when that discount ends.
+            // https://docs.mistral.ai/inference/pricing (2026-10-07).
+            // Cached input bills at exactly 10% of input ($0.068); the
+            // pricing page rounds it to $0.07.
+            // Context is the live /v1/models max_context_length. The model card
+            // says "1M"; the API enforces 524288.
+            'id' => 387,
+            'service' => 'Mistral',
+            'name' => 'Mistral Large 4',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'mistral-large-4',
+            'priceIn' => 0.68,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.09,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 3,
+            'json' => [
+                'description' => 'Mistral Large 4 - open-weight multimodal flagship with reasoning and tool use. 512K context. OpenAI-compatible chat endpoint. Public preview, launch pricing.',
+                'max_tokens' => 131072,
+                'params' => ['model' => 'mistral-large-4'],
+                'cache_read_price_per_1M' => 0.068,
+                'meta' => ['context_window' => '524288', 'max_output' => '131072'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+            ],
+        ],
+        [
+            'id' => 388,
+            'service' => 'Mistral',
+            'name' => 'Mistral Large 4 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'mistral-large-4',
+            'priceIn' => 0.68,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.09,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 2,
+            'json' => [
+                'description' => 'Mistral Large 4 vision - describe images and extract text via the chat endpoint. Same model as the chat row. Public preview, launch pricing.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'max_tokens' => 8192,
+                'params' => ['model' => 'mistral-large-4'],
+                'cache_read_price_per_1M' => 0.068,
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'meta' => ['supports_images' => true],
+            ],
+        ],
+        [
             'id' => 246,
             'service' => 'Mistral',
             'name' => 'Voxtral Mini Transcribe',
