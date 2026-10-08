@@ -2749,11 +2749,13 @@ class ModelCatalog
             // and https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide).
             // Claude Sonnet 5.5 — released 2026-09-28. Faster, lower-cost
             // complement to Opus 5.5 for everyday tasks. Same $2/$10 rate as
-            // Sonnet 5; cache reads stay the Anthropic-wide 0.1x ($0.20/1M),
-            // so no cache_read_price_per_1M override. Adaptive thinking is on
-            // when the field is omitted; the lowest setting is
-            // thinking.type between_tools (low/medium/high only). Effort also
-            // accepts xhigh and max. No temperature. Rejects forced
+            // Sonnet 5. Cache reads are 0.05x base input ($0.10/1M), NOT the
+            // Anthropic-wide 0.1x — overridden below via
+            // `cache_read_price_per_1M` (pricing page, verified 2026-10-08:
+            // https://platform.claude.com/docs/en/about-claude/pricing).
+            // Adaptive thinking is on when the field is omitted; the lowest
+            // setting is thinking.type between_tools (low/medium/high only).
+            // Effort also accepts xhigh and max. No temperature. Rejects forced
             // tool_choice — see AnthropicProvider / StructuredOutputCapability.
             'id' => 379,
             'service' => 'Anthropic',
@@ -2774,6 +2776,7 @@ class ModelCatalog
                 'params' => ['model' => 'claude-sonnet-5-5'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
                 'meta' => ['context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30', 'reasoning_effort_default' => 'high'],
+                'cache_read_price_per_1M' => 0.10,
             ],
         ],
         [
@@ -2796,6 +2799,7 @@ class ModelCatalog
                 'params' => ['model' => 'claude-sonnet-5-5'],
                 'features' => ['vision'],
                 'meta' => ['supports_images' => true],
+                'cache_read_price_per_1M' => 0.10,
             ],
         ],
         [

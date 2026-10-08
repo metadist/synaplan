@@ -874,8 +874,9 @@ class ModelCatalogTest extends TestCase
 
     /**
      * Claude Sonnet 5.5 — released 2026-09-28. Same $2/$10 rate as Sonnet 5.
-     * Cache reads stay the Anthropic-wide 0.1x, so the rows carry no
-     * cache_read_price_per_1M override. The chat row's default effort is high.
+     * Cache reads are 0.05x base input ($0.10/1M), not the Anthropic-wide
+     * 0.1x, so the rows carry an explicit `cache_read_price_per_1M` override
+     * (#2392). The chat row's default effort is high.
      */
     public function testClaudeSonnet55ModelsAreAvailableWithExpectedApiIds(): void
     {
@@ -892,7 +893,7 @@ class ModelCatalogTest extends TestCase
             $this->assertSame('claude-sonnet-5-5', $variant['json']['params']['model'] ?? null);
             $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
             $this->assertEqualsWithDelta(10.0, (float) $variant['priceOut'], 1e-9);
-            $this->assertArrayNotHasKey('cache_read_price_per_1M', $variant['json']);
+            $this->assertEqualsWithDelta(0.10, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
         }
 
         $chat = ModelCatalog::find('anthropic:claude-sonnet-5-5:chat')[0];
