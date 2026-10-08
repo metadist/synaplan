@@ -694,6 +694,11 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Lint OpenAPI spec
+        # Rules live in redocly.yaml. Catches spec defects that client
+        # generators do not report, e.g. an undeclared security scheme.
+        run: npx --yes @redocly/cli@2.60.0 lint backend/openapi-spec.json
+
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
