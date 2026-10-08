@@ -70,6 +70,11 @@ class MediaErrorMessageBuilder
                     $lang,
                 );
             }
+
+            $textResponse = $ctx['text_response'] ?? null;
+            if (is_string($textResponse) && '' !== trim($textResponse)) {
+                return $this->buildTextInsteadOfMediaMessage($e->getProviderName(), $textResponse, $mediaType, $lang);
+            }
         }
 
         // Map common, recognisable failure modes onto a clear, actionable
@@ -253,6 +258,38 @@ class MediaErrorMessageBuilder
                 .'Please pick a different model in Settings and try again.',
             default => null,
         };
+    }
+
+    /**
+     * The model answered in text and produced no image. Quote the reply (an
+     * image model asked a question often answers it instead) and name the
+     * two ways out.
+     */
+    private function buildTextInsteadOfMediaMessage(string $providerName, string $textResponse, string $mediaType, string $lang): string
+    {
+        $displayName = ProviderException::displayName($providerName);
+        $preview = mb_substr(trim($textResponse), 0, 300);
+        $quote = '> '.str_replace("\n", "\n> ", $preview);
+
+        if ('de' === $lang) {
+            $mediaLabel = match ($mediaType) {
+                'audio' => 'kein Audio',
+                'video' => 'kein Video',
+                default => 'kein Bild',
+            };
+
+            return "{$displayName} hat {$mediaLabel} erstellt, sondern mit Text geantwortet:\n\n{$quote}\n\n"
+                .'Formuliere die Anfrage als Bildanweisung um oder wähle ein anderes Bildmodell.';
+        }
+
+        $mediaLabel = match ($mediaType) {
+            'audio' => 'audio',
+            'video' => 'video',
+            default => 'image',
+        };
+
+        return "{$displayName} returned no {$mediaLabel} and answered with text instead:\n\n{$quote}\n\n"
+            .'Rephrase the request as an image instruction or choose a different image model.';
     }
 
     private function buildContentBlockedMessage(string $providerName, string $reason, ?string $textResponse, string $mediaType, string $lang): string

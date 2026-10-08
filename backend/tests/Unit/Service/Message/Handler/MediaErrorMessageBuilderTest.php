@@ -35,6 +35,53 @@ class MediaErrorMessageBuilderTest extends TestCase
         $this->assertStringContainsString('Sorry, the image could not be generated right now.', $message);
     }
 
+    public function testATextOnlyReplyIsQuotedWithARecoveryInEnglish(): void
+    {
+        $exception = ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP');
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'en');
+
+        $this->assertSame(
+            "Google returned no image and answered with text instead:\n\n> 10\n\n"
+            .'Rephrase the request as an image instruction or choose a different image model.',
+            $message,
+        );
+    }
+
+    public function testATextOnlyReplyIsQuotedWithARecoveryInGerman(): void
+    {
+        $exception = ProviderException::noImage('google', 'gemini-3.1-flash-image', "Zehn.\nAlle sichtbar.", 'STOP');
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'de');
+
+        $this->assertSame(
+            "Google hat kein Bild erstellt, sondern mit Text geantwortet:\n\n> Zehn.\n> Alle sichtbar.\n\n"
+            .'Formuliere die Anfrage als Bildanweisung um oder wähle ein anderes Bildmodell.',
+            $message,
+        );
+        $this->assertStringNotContainsString('gemini-3.1-flash-image', $message);
+    }
+
+    public function testATextOnlyReplyIsCutTo300Characters(): void
+    {
+        $exception = ProviderException::noImage('openai', 'gpt-image-1.5', str_repeat('A', 500), null);
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'en');
+
+        $this->assertStringStartsWith('OpenAI returned no image', $message);
+        $this->assertStringContainsString('> '.str_repeat('A', 300)."\n\n", $message);
+        $this->assertStringNotContainsString(str_repeat('A', 301), $message);
+    }
+
+    public function testNoImageWithoutAReplyKeepsTheGenericCopy(): void
+    {
+        $exception = ProviderException::noImage('google', 'gemini-3.1-flash-image', null, 'STOP');
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'en');
+
+        $this->assertSame('Sorry, the image could not be generated right now. Please try again or use a different model.', $message);
+    }
+
     public function testBuildErrorMessageWithGenericException(): void
     {
         $exception = new \Exception('Generic error');
