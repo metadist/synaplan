@@ -1140,6 +1140,11 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             }
 
             return $images;
+        } catch (ProviderException $e) {
+            // A text-only reply (and any other provider outcome) already
+            // carries its context. Wrapping it here drops the quoted reply
+            // and the model, so the chat shows the generic generation error.
+            throw $e;
         } catch (\Exception $e) {
             // Check for content policy violations
             if (false !== stripos($e->getMessage(), 'content_policy')
@@ -1348,26 +1353,15 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
             $key = $this->resolveApiKey();
 
-            $ch = curl_init('https://api.openai.com/v1/responses');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer '.$key,
+            $response = $this->httpClient->request('POST', 'https://api.openai.com/v1/responses', [
+                'headers' => [
+                    'Authorization' => 'Bearer '.$key,
                 ],
-                CURLOPT_POSTFIELDS => json_encode($requestBody),
-                CURLOPT_TIMEOUT => 180,
+                'json' => $requestBody,
+                'timeout' => 180,
             ]);
-
-            $responseBody = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($curlError) {
-                throw new \Exception('cURL error: '.$curlError);
-            }
+            $httpCode = $response->getStatusCode();
+            $responseBody = $response->getContent(false);
 
             if (200 !== $httpCode) {
                 $this->logger->error('OpenAI Responses API: HTTP error', [

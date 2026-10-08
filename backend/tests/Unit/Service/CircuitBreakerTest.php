@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Exception\StructuredOutputViolationException;
 use App\Service\CircuitBreaker;
 use App\Service\Exception\StreamCancelledException;
@@ -25,7 +26,7 @@ class CircuitBreakerTest extends TestCase
             }
         }
 
-        $this->expectException(\App\AI\Exception\ProviderException::class);
+        $this->expectException(ProviderException::class);
         $breaker->execute(static fn () => 'never reached', 'ai_provider_test');
     }
 
@@ -74,5 +75,28 @@ class CircuitBreakerTest extends TestCase
         }
 
         $this->assertSame('still closed', $breaker->execute(static fn () => 'still closed', 'ai_provider_groq'));
+    }
+
+    /**
+     * A text-only image reply is a finished request, not an outage. Five of
+     * them must leave the next image call free to run.
+     */
+    public function testTextOnlyImageReplyDoesNotOpenTheCircuit(): void
+    {
+        $breaker = new CircuitBreaker(new ArrayAdapter(), new NullLogger(), failureThreshold: 2);
+
+        for ($attempt = 0; $attempt < 5; ++$attempt) {
+            try {
+                $breaker->execute(
+                    static fn () => throw ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP'),
+                    'ai_provider_image_google',
+                );
+                $this->fail('The text-only reply must reach the caller unchanged');
+            } catch (\App\AI\Exception\NoImageException $e) {
+                $this->assertSame('10', $e->getContext()['text_response'] ?? null);
+            }
+        }
+
+        $this->assertSame('still closed', $breaker->execute(static fn () => 'still closed', 'ai_provider_image_google'));
     }
 }

@@ -80,6 +80,24 @@ final class ModelHealthRecorderTest extends TestCase
         self::assertTrue($this->recorder->snapshot(self::MODEL_ID)->isEmpty());
     }
 
+    public function testTextOnlyImageRepliesAreNotCountedAgainstTheModel(): void
+    {
+        for ($attempt = 0; $attempt < 5; ++$attempt) {
+            $kind = $this->recorder->recordFailure(
+                'image_generation',
+                'google',
+                'gemini-3.1-flash-image',
+                ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP'),
+            );
+            self::assertSame(FailureKind::UserError, $kind);
+        }
+
+        self::assertTrue($this->recorder->snapshot(self::MODEL_ID)->isEmpty());
+        $this->recorder->recordSuccess('image_generation', 'google', 'gemini-3.1-flash-image');
+        self::assertSame(1, $this->recorder->snapshot(self::MODEL_ID)->successes);
+        self::assertSame(0, $this->recorder->snapshot(self::MODEL_ID)->failures);
+    }
+
     /**
      * A credential problem belongs to the provider. Charging it to whichever
      * model happened to be called first would frame an innocent model.

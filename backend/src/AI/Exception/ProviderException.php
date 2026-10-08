@@ -92,10 +92,14 @@ class ProviderException extends \RuntimeException
      * part and finishReason STOP. The message names the provider and quotes
      * the reply, so a REST caller learns what the model said.
      *
+     * Returns {@see NoImageException} so the circuit breaker and model-health
+     * monitor treat it as the request, not as an outage. It is still a
+     * {@see ProviderException}.
+     *
      * @param string|null $textResponse First text the provider returned, if any
      * @param string|null $finishReason Provider finish reason, if any
      */
-    public static function noImage(string $provider, string $model, ?string $textResponse, ?string $finishReason): self
+    public static function noImage(string $provider, string $model, ?string $textResponse, ?string $finishReason): NoImageException
     {
         $displayName = self::displayName($provider);
         $excerpt = null !== $textResponse ? mb_substr(trim($textResponse), 0, self::TEXT_EXCERPT_CHARS) : '';
@@ -104,7 +108,7 @@ class ProviderException extends \RuntimeException
             ? sprintf('%s returned text instead of an image (%s): "%s"', $displayName, $model, $excerpt)
             : sprintf('%s returned no image (%s%s)', $displayName, $model, null !== $finishReason ? ', finish reason '.$finishReason : '');
 
-        return new self($message, $provider, [
+        return new NoImageException($message, $provider, [
             'text_response' => '' !== $excerpt ? $excerpt : null,
             'finish_reason' => $finishReason,
             'model' => $model,
