@@ -156,7 +156,7 @@ export class ChatHelper {
   }
 
   /**
-   * Start a new chat. Supports V2 (sidebar plus button) and V1 (chat toggle + dropdown).
+   * Start a new chat from the sidebar New Chat button.
    *
    * Waits for the new chat to be fully committed by asserting the empty-state
    * marker (`state-empty`) is visible. This is required to avoid a race with
@@ -169,23 +169,25 @@ export class ChatHelper {
    */
   async startNewChat(): Promise<void> {
     const v2NewChatBtn = this.page.locator(selectors.nav.sidebarV2NewChat)
-    let usedSidebarButton = false
-    try {
-      await v2NewChatBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-      await v2NewChatBtn.click()
-      usedSidebarButton = true
-    } catch {
-      await this.page.locator(selectors.chat.chatBtnToggle).waitFor({ state: 'visible' })
-      await this.page.locator(selectors.chat.chatBtnToggle).click()
-      await this.page.locator(selectors.chat.newChatButton).waitFor({ state: 'visible' })
-      await this.page.locator(selectors.chat.newChatButton).click()
-    }
+    const v2Shell = this.page.locator(selectors.nav.sidebar)
 
-    if (usedSidebarButton) {
-      // The button stays disabled until the new chat is the active one. Until
-      // then a late boot list can still point the composer at the previous chat.
-      await expect(v2NewChatBtn).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
+    // page.goto() resolves on document load, before the Vue shell paints.
+    // A SHORT probe used to give up and look for the retired v1 chat toggle,
+    // which is no longer rendered. On a cold boot the chat list returns just
+    // past that window, so the step failed while New Chat was about to appear.
+    await v2Shell.or(v2NewChatBtn).first().waitFor({
+      state: 'visible',
+      timeout: TIMEOUTS.VERY_LONG,
+    })
+    if (!(await v2NewChatBtn.isVisible())) {
+      await this.page.locator(selectors.nav.sidebarV2ChatNav).click()
     }
+    await v2NewChatBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    await v2NewChatBtn.click()
+
+    // The button stays disabled until the new chat is the active one. Until
+    // then a late boot list can still point the composer at the previous chat.
+    await expect(v2NewChatBtn).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
 
     const textInput = this.page.locator(selectors.chat.textInput)
     await textInput.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
