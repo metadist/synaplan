@@ -86,6 +86,7 @@
     "pin": "Fijar chat",
     "unpin": "Quitar fijado",
     "pinSaveFailed": "No se pudo fijar el chat. El chat se queda donde estaba.",
+    "sendNeedsChat": "Este mensaje no se envió. No se pudo empezar el chat. Inténtalo de nuevo.",
     "stillGenerating": "Sigue respondiendo",
     "answerReady": "Respuesta lista",
     "listOrigin": {

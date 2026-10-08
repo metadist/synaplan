@@ -37,7 +37,7 @@ describe('canComposeChat', () => {
     ).toBe(true)
   })
 
-  it('shows the composer on the empty start page while access is still unresolved', () => {
+  it('keeps a selected chat locked until ownership is known', () => {
     expect(
       canComposeChat({
         guest: false,
@@ -45,9 +45,8 @@ describe('canComposeChat', () => {
         access: null,
         sharingEnabled: true,
         chatOpen: true,
-        emptyThread: true,
       })
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('keeps the composer hidden on an empty shared read-only thread', () => {
@@ -58,7 +57,6 @@ describe('canComposeChat', () => {
         access: 'read',
         sharingEnabled: true,
         chatOpen: true,
-        emptyThread: true,
       })
     ).toBe(false)
   })

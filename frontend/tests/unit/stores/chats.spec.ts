@@ -598,6 +598,25 @@ describe('Chats Store', () => {
       expect(store.activeChatId).toBeNull()
       expect(localStorage.getItem('synaplan_active_chat_id')).toBeNull()
     })
+
+    it('opens an owned chat after a stale id is dropped, so a send has somewhere to go', async () => {
+      incomingOpenableMock.mockReturnValue(true)
+      localStorage.setItem('synaplan_active_chat_id', '13')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [] })
+      await store.loadChats()
+
+      incomingOpenableMock.mockReturnValue(false)
+      incomingLoaded.value = true
+      await nextTick()
+      expect(store.activeChatId).toBeNull()
+
+      httpClientMock.mockResolvedValueOnce(chatPayload(21))
+      const chat = await store.findOrCreateEmptyChat()
+
+      expect(chat?.id).toBe(21)
+      expect(store.activeChatId).toBe(21)
+    })
   })
 
   describe('applyChatTitle', () => {

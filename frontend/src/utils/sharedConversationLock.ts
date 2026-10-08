@@ -19,21 +19,15 @@ export function canComposeChat(input: {
   access: ConversationAccess
   sharingEnabled: boolean
   /**
-   * False when no conversation is open. A blank chat belongs to the viewer.
-   * Session reset clears access back to null without changing an already
-   * empty selection, and sharing would otherwise hide the composer for good.
+   * False when no conversation is open. A blank page belongs to the viewer.
+   * A selected chat stays locked until ownership is known: an empty shared
+   * thread looks the same while its access lookup is still pending, and
+   * sending then would be rejected.
    */
   chatOpen?: boolean
-  /**
-   * The start page, with no messages loaded. A stored chat id can outlive
-   * the list (sharing keeps it while the incoming list is still loading),
-   * and an unresolved access answer must not hide the field there.
-   */
-  emptyThread?: boolean
 }): boolean {
   if (input.guest || input.incognito) return true
   if (input.chatOpen === false) return true
-  if (input.emptyThread && !isSharedConversationLocked(input.access, false)) return true
   if (isSharedConversationLocked(input.access, false)) return false
   if (input.access === 'owner') return true
   return !input.sharingEnabled

@@ -86,6 +86,7 @@
     "pin": "Sohbeti sabitle",
     "unpin": "Sabitlemeyi kaldır",
     "pinSaveFailed": "Sabitleme kaydedilemedi. Sohbet olduğu yerde kalır.",
+    "sendNeedsChat": "Bu mesaj gönderilmedi. Sohbet başlatılamadı. Tekrar dene.",
     "stillGenerating": "Hâlâ yanıtlıyor",
     "answerReady": "Yanıt hazır",
     "listOrigin": {

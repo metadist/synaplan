@@ -703,6 +703,7 @@ import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { shouldShowCompanionLinks, shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
 import { pickEmptyGreetingKey } from '@/utils/emptyGreeting'
+import { claimOwnedChatForSend } from '@/utils/claimOwnedChatForSend'
 import { showStoreCards } from '@/composables/useChatWelcome'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { createSmoothStream } from '@/utils/smoothStream'
@@ -870,9 +871,6 @@ const canComposeSharedChat = computed(() =>
     access: chatsStore.conversationAccess,
     sharingEnabled: isIamSharingEnabled(),
     chatOpen: chatsStore.activeChatId != null,
-    // Read lazily: isEmptyLanding is declared further down, and this getter
-    // only runs once setup has finished.
-    emptyThread: isEmptyLanding.value,
   })
 )
 // Owner-only writes (Again, Retry, Stop, task-plan controls). Unresolved
@@ -3071,6 +3069,37 @@ const handleSendMessage = async (
     return
   }
 
+  // A blank page has no chat yet. Open one before the message appears.
+  // The history load for that chat finishes first, so it cannot replace the
+  // message that follows.
+  if (!incognitoStore.active && !isGuestMode.value) {
+    const previousId = chatsStore.activeChatId
+    const chatId = await claimOwnedChatForSend({
+      activeChatId: previousId,
+      suppressHistoryLoad: () => {
+        suppressNextChatHistoryLoad = true
+      },
+      releaseHistoryLoad: () => {
+        suppressNextChatHistoryLoad = false
+      },
+      openOwnedChat: async () => {
+        await chatsStore.findOrCreateEmptyChat()
+      },
+      readActiveChatId: () => chatsStore.activeChatId,
+    })
+    if (chatId == null) {
+      showErrorToast(t('chat.sendNeedsChat'))
+      return
+    }
+    if (previousId == null) {
+      await historyStore.loadMessages(chatId)
+      if (chatsStore.activeChatId !== chatId) {
+        return
+      }
+      historyLoadedChatId = chatId
+    }
+  }
+
   autoScroll.value = true
   stickToBottom = false
 
@@ -3396,6 +3425,13 @@ const streamAIResponse = async (
     aiConfigStore.getCurrentModel('CHAT')
   const provider = currentModel?.service || modelsStore.selectedProvider
   const modelLabel = currentModel?.name || modelsStore.selectedModel
+
+  // No owned chat: stop before the placeholder. Leaving it here spins forever,
+  // because the request below returns without finishing the bubble.
+  if (!isGuestMode.value && !incognitoStore.active && chatsStore.activeChatId == null) {
+    console.error('No active chat selected')
+    return
+  }
 
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
@@ -3969,11 +4005,6 @@ const streamAIResponse = async (
       // Incognito turns belong to no chat — the backend processes them fully
       // in-memory and gets the conversation context from the history payload.
       const chatId = incognito ? undefined : (chatsStore.activeChatId ?? undefined)
-
-      if (!chatId && !incognito) {
-        console.error('No active chat selected')
-        return
-      }
 
       // Snapshot the in-memory transcript for the backend (prior turns only:
       // the current user message is sent separately, and the just-created

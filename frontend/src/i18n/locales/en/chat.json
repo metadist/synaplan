@@ -86,6 +86,7 @@
     "pin": "Pin chat",
     "unpin": "Unpin chat",
     "pinSaveFailed": "The pin could not be saved. The chat stays where it was.",
+    "sendNeedsChat": "This message was not sent. The chat could not be started. Try again.",
     "stillGenerating": "Still answering",
     "answerReady": "Answer ready",
     "listOrigin": {

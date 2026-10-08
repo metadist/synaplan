@@ -86,6 +86,7 @@
     "pin": "Épingler le chat",
     "unpin": "Retirer l'épingle",
     "pinSaveFailed": "L'épingle n'a pas pu être enregistrée. Le chat reste où il était.",
+    "sendNeedsChat": "Ce message n'a pas été envoyé. Le chat n'a pas pu être ouvert. Réessayez.",
     "stillGenerating": "Réponse en cours",
     "answerReady": "Réponse prête",
     "listOrigin": {

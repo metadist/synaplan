@@ -81,6 +81,7 @@
     "pin": "Chat anheften",
     "unpin": "Anheften aufheben",
     "pinSaveFailed": "Das Anheften konnte nicht gespeichert werden. Der Chat bleibt, wo er war.",
+    "sendNeedsChat": "Diese Nachricht wurde nicht gesendet. Der Chat konnte nicht gestartet werden. Versuch es noch einmal.",
     "stillGenerating": "Antwortet noch",
     "answerReady": "Antwort fertig",
     "listOrigin": {
