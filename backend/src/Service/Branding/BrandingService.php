@@ -157,6 +157,30 @@ final readonly class BrandingService
         ];
     }
 
+    /**
+     * Wordmark for one theme, resolved like the frontend's useBrandLogo: the
+     * dark logo only applies to a dark theme, the light logo covers both. Null
+     * means nothing is configured and the caller should use the bundled asset.
+     */
+    public function getLogoUrl(bool $dark): ?string
+    {
+        $darkLogo = $dark ? $this->value(self::KEY_LOGO_DARK_URL, '') : '';
+        $logo = '' !== $darkLogo ? $darkLogo : $this->value(self::KEY_LOGO_URL, '');
+
+        return '' !== $logo ? $logo : null;
+    }
+
+    /**
+     * Compact brand mark for one theme: the dedicated icon, else the wordmark,
+     * so a logo-only branding config still replaces the Synaplan bird.
+     */
+    public function getIconUrl(bool $dark): ?string
+    {
+        $icon = $this->value(self::KEY_ICON_URL, '');
+
+        return '' !== $icon ? $icon : $this->getLogoUrl($dark);
+    }
+
     private function value(string $setting, string $default): string
     {
         $raw = $this->configRepository->getValue(self::OWNER_ID, self::GROUP, $setting);

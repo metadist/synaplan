@@ -9,6 +9,7 @@ use App\Entity\Config;
 use App\Module\Gate\ModuleGateConfig;
 use App\Repository\ConfigRepository;
 use App\Service\Agent\AgentConfig;
+use App\Service\Branding\BrandingService;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\Feature\FeatureFlagEnv;
@@ -176,6 +177,81 @@ final class ConfigControllerTest extends WebTestCase
         $this->assertIsBool($data['features'][$feature]);
 
         return $data['features'][$feature];
+    }
+
+    /**
+     * Integrations read logo and icon from here instead of rebuilding the
+     * fallback chain, so the resolved fields must always carry a usable URL.
+     */
+    public function testRuntimeConfigResolvesLogoAndIconPerTheme(): void
+    {
+        $client = static::createClient();
+        $rows = [
+            [BrandingService::GROUP, BrandingService::KEY_ICON_URL],
+            [BrandingService::GROUP, BrandingService::KEY_LOGO_URL],
+            [BrandingService::GROUP, BrandingService::KEY_LOGO_DARK_URL],
+        ];
+        $restore = $this->rememberGlobalRows($rows);
+
+        try {
+            foreach ($rows as [$group, $setting]) {
+                $this->storeGlobalRow($group, $setting, '');
+            }
+            $this->assertSame(
+                [
+                    'resolvedLogoUrl' => '/synaplan-dark.svg',
+                    'resolvedLogoDarkUrl' => '/synaplan-light.svg',
+                    'resolvedIconUrl' => '/single_bird-dark.svg',
+                    'resolvedIconDarkUrl' => '/single_bird-light.svg',
+                ],
+                $this->fetchResolvedBrandImages($client),
+                'nothing configured: the bundled assets that contrast with the theme',
+            );
+
+            $this->storeGlobalRow(BrandingService::GROUP, BrandingService::KEY_LOGO_URL, 'https://brand.example/logo.svg');
+            $this->storeGlobalRow(BrandingService::GROUP, BrandingService::KEY_LOGO_DARK_URL, 'https://brand.example/logo-dark.svg');
+            $this->assertSame(
+                [
+                    'resolvedLogoUrl' => 'https://brand.example/logo.svg',
+                    'resolvedLogoDarkUrl' => 'https://brand.example/logo-dark.svg',
+                    'resolvedIconUrl' => 'https://brand.example/logo.svg',
+                    'resolvedIconDarkUrl' => 'https://brand.example/logo-dark.svg',
+                ],
+                $this->fetchResolvedBrandImages($client),
+                'only logos configured: the logo of the theme stands in for the icon',
+            );
+
+            $this->storeGlobalRow(BrandingService::GROUP, BrandingService::KEY_ICON_URL, 'https://brand.example/icon.svg');
+            $this->assertSame(
+                [
+                    'resolvedLogoUrl' => 'https://brand.example/logo.svg',
+                    'resolvedLogoDarkUrl' => 'https://brand.example/logo-dark.svg',
+                    'resolvedIconUrl' => 'https://brand.example/icon.svg',
+                    'resolvedIconDarkUrl' => 'https://brand.example/icon.svg',
+                ],
+                $this->fetchResolvedBrandImages($client),
+                'a configured icon wins on both themes and leaves the logos alone',
+            );
+        } finally {
+            $restore();
+        }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function fetchResolvedBrandImages(KernelBrowser $client): array
+    {
+        $client->request('GET', '/api/v1/config/runtime');
+        $this->assertResponseIsSuccessful();
+        $branding = json_decode($client->getResponse()->getContent(), true)['branding'];
+
+        return array_intersect_key($branding, array_flip([
+            'resolvedLogoUrl',
+            'resolvedLogoDarkUrl',
+            'resolvedIconUrl',
+            'resolvedIconDarkUrl',
+        ]));
     }
 
     private function storeGlobalRow(string $group, string $setting, string $value): void
