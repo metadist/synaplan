@@ -26,11 +26,14 @@ use Doctrine\Migrations\AbstractMigration;
  * update ({@see Version20260907120000}). Writing the full catalog snapshot with
  * a matching fingerprint keeps the row under catalog management.
  *
- * Guarded on the OLD state so an operator who deliberately re-priced a row in
- * the admin UI keeps their value, exactly as a re-seed would leave it: BJSON
- * still has no `cache_read_price_per_1M`, and BPRICEIN / BPRICEOUT still equal
- * the catalog rate (the snapshot writes every catalog-owned column, so without
- * this an operator's own input/output price would be reset).
+ * Guarded the way ModelSeeder decides it may manage a row: only a row that is
+ * still exactly the previous catalog snapshot is written. Its catalog-owned
+ * columns must hash to the previous catalog fingerprint, and a stored
+ * fingerprint must match them too, so an admin edit of any catalog-owned field
+ * (price, name, units, description, JSON) keeps the whole row as the operator
+ * left it, exactly as a re-seed would. A legacy row without a stored
+ * fingerprint is written only when it matches the previous snapshot
+ * bit-for-bit.
  *
  * Idempotent and Galera-safe: raw addSql, no Schema API access (see AGENTS.md —
  * the DBAL comparator throws on that cluster).
@@ -51,6 +54,10 @@ final class Version20261008120000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         foreach ($this->correctedRows() as $model) {
+            if (!$this->isStillThePreviousCatalogRow($model)) {
+                continue;
+            }
+
             $json = $model['json'];
             $json['__catalog_fingerprint'] = $this->fingerprint($model);
 
@@ -74,8 +81,6 @@ final class Version20261008120000 extends AbstractMigration
                        BJSON = :json
                  WHERE BID = :id
                    AND BPROVID = :providerId
-                   AND ABS(BPRICEIN - :priceIn) < 0.000001
-                   AND ABS(BPRICEOUT - :priceOut) < 0.000001
                    AND JSON_EXTRACT(BJSON, '$.cache_read_price_per_1M') IS NULL
                 SQL, [
                 'service' => $model['service'],
@@ -92,6 +97,53 @@ final class Version20261008120000 extends AbstractMigration
                 'id' => $model['id'],
             ]);
         }
+    }
+
+    /**
+     * Mirrors ModelSeeder::decideAction(): the row's catalog-owned columns hash
+     * to the previous catalog snapshot, and an admin has not edited them since
+     * they were seeded (stored fingerprint, when present, equals that hash).
+     *
+     * @param array<string, mixed> $model corrected catalog row
+     */
+    private function isStillThePreviousCatalogRow(array $model): bool
+    {
+        $row = $this->connection->fetchAssociative(
+            'SELECT BSERVICE, BNAME, BTAG, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BJSON FROM BMODELS WHERE BID = :id',
+            ['id' => $model['id']],
+        );
+        if (false === $row) {
+            return false;
+        }
+
+        $json = json_decode((string) $row['BJSON'], true);
+        if (!is_array($json)) {
+            return false;
+        }
+        $stored = $json['__catalog_fingerprint'] ?? null;
+        unset($json['__catalog_fingerprint']);
+
+        $current = $this->fingerprint([
+            'service' => (string) $row['BSERVICE'],
+            'name' => (string) $row['BNAME'],
+            'tag' => (string) $row['BTAG'],
+            'providerId' => (string) $row['BPROVID'],
+            'priceIn' => (float) $row['BPRICEIN'],
+            'inUnit' => (string) $row['BINUNIT'],
+            'priceOut' => (float) $row['BPRICEOUT'],
+            'outUnit' => (string) $row['BOUTUNIT'],
+            'quality' => (float) $row['BQUALITY'],
+            'rating' => (float) $row['BRATING'],
+            'json' => $json,
+        ]);
+        if (is_string($stored) && $stored !== $current) {
+            return false;
+        }
+
+        $previous = $model;
+        unset($previous['json']['cache_read_price_per_1M']);
+
+        return $current === $this->fingerprint($previous);
     }
 
     public function down(Schema $schema): void

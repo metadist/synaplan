@@ -14,8 +14,9 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
  * Executes the Claude Sonnet 5.5 cache-read correction against the test
- * database. Each case forces BIDs 379/380 into the state it needs inside a
- * rolled-back transaction, so the test does not depend on the seeded catalog.
+ * database. Each case seeds BIDs 379/380 the way ModelSeeder did before the
+ * correction (previous catalog snapshot plus its fingerprint) inside a
+ * rolled-back transaction, then applies the edit an operator might have made.
  */
 final class Version20261008120000Test extends KernelTestCase
 {
@@ -42,8 +43,8 @@ final class Version20261008120000Test extends KernelTestCase
 
     public function testItAuthorsTheRateWithTheFingerprintTheSeederExpects(): void
     {
-        $this->givenRow(self::CHAT_BID, 'chat', 2.0, '{"description":"old"}');
-        $this->givenRow(self::VISION_BID, 'pic2text', 2.0, '{"description":"old"}');
+        $this->givenPreviousCatalogRow(self::CHAT_BID);
+        $this->givenPreviousCatalogRow(self::VISION_BID);
 
         $this->runMigration();
 
@@ -58,27 +59,57 @@ final class Version20261008120000Test extends KernelTestCase
         }
     }
 
-    public function testAnOperatorInputPriceIsKept(): void
+    public function testANonPriceAdminEditKeepsTheWholeRow(): void
     {
-        $this->givenRow(self::CHAT_BID, 'chat', 3.0, '{"description":"operator"}');
+        $this->givenPreviousCatalogRow(self::CHAT_BID);
+        $this->connection->executeStatement("UPDATE BMODELS SET BNAME = 'Our Sonnet' WHERE BID = :id", ['id' => self::CHAT_BID]);
 
         $this->runMigration();
 
-        self::assertSame(['description' => 'operator'], $this->fetchJson(self::CHAT_BID));
+        self::assertSame('Our Sonnet', $this->connection->fetchOne('SELECT BNAME FROM BMODELS WHERE BID = :id', ['id' => self::CHAT_BID]));
+        self::assertArrayNotHasKey('cache_read_price_per_1M', $this->fetchJson(self::CHAT_BID));
+    }
+
+    public function testAnOperatorInputPriceIsKept(): void
+    {
+        $this->givenPreviousCatalogRow(self::CHAT_BID);
+        $this->connection->executeStatement('UPDATE BMODELS SET BPRICEIN = 3 WHERE BID = :id', ['id' => self::CHAT_BID]);
+
+        $this->runMigration();
+
+        self::assertEqualsWithDelta(3.0, (float) $this->connection->fetchOne('SELECT BPRICEIN FROM BMODELS WHERE BID = :id', ['id' => self::CHAT_BID]), 1e-9);
+        self::assertArrayNotHasKey('cache_read_price_per_1M', $this->fetchJson(self::CHAT_BID));
     }
 
     public function testAnAuthoredCacheRateIsKept(): void
     {
-        $this->givenRow(self::CHAT_BID, 'chat', 2.0, '{"cache_read_price_per_1M":0.15}');
+        $this->givenPreviousCatalogRow(self::CHAT_BID);
+        $this->connection->executeStatement(
+            "UPDATE BMODELS SET BJSON = JSON_SET(BJSON, '$.cache_read_price_per_1M', 0.15) WHERE BID = :id",
+            ['id' => self::CHAT_BID],
+        );
 
         $this->runMigration();
 
-        self::assertSame(['cache_read_price_per_1M' => 0.15], $this->fetchJson(self::CHAT_BID));
+        self::assertEqualsWithDelta(0.15, (float) $this->fetchJson(self::CHAT_BID)['cache_read_price_per_1M'], 1e-9);
+    }
+
+    public function testALegacyRowThatMatchesThePreviousSnapshotIsCorrected(): void
+    {
+        $this->givenPreviousCatalogRow(self::CHAT_BID);
+        $this->connection->executeStatement(
+            "UPDATE BMODELS SET BJSON = JSON_REMOVE(BJSON, '$.__catalog_fingerprint') WHERE BID = :id",
+            ['id' => self::CHAT_BID],
+        );
+
+        $this->runMigration();
+
+        self::assertEqualsWithDelta(0.10, (float) $this->fetchJson(self::CHAT_BID)['cache_read_price_per_1M'], 1e-9);
     }
 
     public function testItIsIdempotent(): void
     {
-        $this->givenRow(self::CHAT_BID, 'chat', 2.0, '{}');
+        $this->givenPreviousCatalogRow(self::CHAT_BID);
 
         $this->runMigration();
         $first = $this->fetchJson(self::CHAT_BID);
@@ -87,18 +118,15 @@ final class Version20261008120000Test extends KernelTestCase
         self::assertSame($first, $this->fetchJson(self::CHAT_BID));
     }
 
-    private function givenRow(int $bid, string $tag, float $priceIn, string $json): void
+    /**
+     * The row as ModelSeeder wrote it before the correction: the current
+     * catalog row without the cache-read key, plus its fingerprint.
+     */
+    private function givenPreviousCatalogRow(int $bid): void
     {
-        $this->connection->executeStatement(
-            <<<'SQL'
-                INSERT INTO BMODELS (BID, BSERVICE, BNAME, BTAG, BSELECTABLE, BACTIVE, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BISDEFAULT, BSHOWWHENFREE, BJSON)
-                VALUES (:id, 'Anthropic', 'Claude Sonnet 5.5', :tag, 1, 1, 'claude-sonnet-5-5', :priceIn, 'per1M', 10, 'per1M', 10, 1, 0, 0, :json)
-                ON DUPLICATE KEY UPDATE
-                    BSERVICE = VALUES(BSERVICE), BTAG = VALUES(BTAG), BPROVID = VALUES(BPROVID),
-                    BPRICEIN = VALUES(BPRICEIN), BPRICEOUT = VALUES(BPRICEOUT), BJSON = VALUES(BJSON)
-            SQL,
-            ['id' => $bid, 'tag' => $tag, 'priceIn' => $priceIn, 'json' => $json]
-        );
+        $previous = $this->catalogRow($bid);
+        unset($previous['json']['cache_read_price_per_1M']);
+        ModelCatalog::upsert($this->connection, $previous);
     }
 
     /**
