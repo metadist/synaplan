@@ -1,7 +1,10 @@
 <template>
   <div class="my-3" data-testid="section-message-image">
+    <!-- The fixed 16:9 box is only the placeholder. A loaded image keeps its own
+         aspect ratio inside the height cap, so no edge is ever cut off. -->
     <div
-      class="relative w-full aspect-video surface-card overflow-hidden cursor-pointer group border border-light-border/30 dark:border-dark-border/20 hover:border-light-border/50 dark:hover:border-dark-border/30 transition-all"
+      class="relative flex w-full items-center justify-center surface-card overflow-hidden cursor-pointer group border border-light-border/30 dark:border-dark-border/20 hover:border-light-border/50 dark:hover:border-dark-border/30 transition-all"
+      :class="{ 'aspect-video': !showsImage }"
       data-testid="btn-image-fullscreen"
       @click="openFullscreen"
     >
@@ -9,7 +12,8 @@
         v-if="imageSrc && !hasFailed"
         :src="imageSrc"
         :alt="alt"
-        class="w-full h-full object-cover transition-transform group-hover:scale-105"
+        class="block h-auto w-auto min-w-0 max-w-full max-h-[min(32rem,70vh)] object-contain"
+        data-testid="img-message-image"
         loading="lazy"
         @load="onLoaded"
         @error="onError"
@@ -170,6 +174,8 @@ const hasRetried = ref(false)
 // actually defers the request, and no decoded copy is pinned in JS memory.
 // On native the URL carries a purpose-scoped media credential (see mediaAuth).
 const imageSrc = computed(() => mediaSrc(props.url))
+
+const showsImage = computed(() => isLoaded.value && !hasFailed.value)
 
 const onLoaded = () => {
   isLoaded.value = true
