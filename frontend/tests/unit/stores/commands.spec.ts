@@ -105,6 +105,22 @@ describe('commands store saved prompts', () => {
     expect(savedNames(store)).toEqual([])
   })
 
+  it('reset forgets the list and drops a load still in flight', async () => {
+    let resolveLoad: (value: unknown) => void = () => {}
+    httpClient
+      .mockResolvedValueOnce({ success: true, prompts: [row(1, 'previous')] })
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveLoad = resolve)))
+    const store = useCommandsStore()
+    await store.loadSavedPrompts()
+
+    const load = store.loadSavedPrompts()
+    store.reset()
+    resolveLoad({ success: true, prompts: [row(1, 'previous')] })
+    await load
+
+    expect(savedNames(store)).toEqual([])
+  })
+
   it('setSavedPrompts replaces the list and wins over a load still in flight', async () => {
     let resolveLoad: (value: unknown) => void = () => {}
     httpClient.mockImplementationOnce(() => new Promise((resolve) => (resolveLoad = resolve)))

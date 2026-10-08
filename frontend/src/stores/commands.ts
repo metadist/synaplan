@@ -125,6 +125,12 @@ export const useCommandsStore = defineStore('commands', () => {
     savedPrompts.value = rows.filter((row) => row.command && row.body).map(savedPromptCommand)
   }
 
+  /** Forget the prompts of the previous principal (logout, login, impersonation swap). */
+  function reset(): void {
+    savedPromptsRequest += 1
+    savedPrompts.value = []
+  }
+
   /**
    * Fetch the saved prompts again. The composer calls this each time the
    * slash menu opens, so a prompt created or deleted on Prompts is listed
@@ -133,8 +139,7 @@ export const useCommandsStore = defineStore('commands', () => {
   async function loadSavedPrompts(): Promise<void> {
     // The endpoint is signed-in only; a 401 would send a guest to the login page.
     if (!useAuthStore().isAuthenticated) {
-      savedPromptsRequest += 1
-      savedPrompts.value = []
+      reset()
       return
     }
     const request = ++savedPromptsRequest
@@ -175,5 +180,6 @@ export const useCommandsStore = defineStore('commands', () => {
     getCommand,
     loadSavedPrompts,
     setSavedPrompts,
+    reset,
   }
 })
