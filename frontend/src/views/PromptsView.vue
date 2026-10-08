@@ -81,9 +81,9 @@
           class="surface-card flex flex-wrap items-center justify-between gap-3 p-4"
           data-testid="row-saved-prompt"
         >
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1 basis-40">
             <p class="truncate font-medium txt-primary">{{ prompt.name }}</p>
-            <p class="text-sm txt-secondary">/{{ prompt.command }}</p>
+            <p class="truncate text-sm txt-secondary">/{{ prompt.command }}</p>
           </div>
           <div class="flex flex-shrink-0 gap-2">
             <button
