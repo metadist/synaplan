@@ -118,6 +118,9 @@ final readonly class SyncMediaJobGenerator
             throw new \RuntimeException('Failed to save generated image to disk');
         }
 
+        $renderedSize = $images[0]['size'] ?? null;
+        $this->billRenderedSize($job, is_string($renderedSize) ? $renderedSize : null);
+
         return [
             'file' => [
                 'url' => '/api/v1/files/uploads/'.$relativePath,
@@ -127,6 +130,23 @@ final readonly class SyncMediaJobGenerator
             'provider' => is_string($result['provider'] ?? null) ? $result['provider'] : $job->getProvider(),
             'model' => is_string($result['model'] ?? null) ? $result['model'] : $job->getModel(),
         ];
+    }
+
+    /**
+     * The usage payload was stashed when the job was detached, before the
+     * model chose the output size of an edit. Bill the size it rendered; the
+     * job is saved with its result when it is marked completed.
+     */
+    private function billRenderedSize(MediaJob $job, ?string $renderedSize): void
+    {
+        $billedSize = RenderedImageSize::billingKey($renderedSize);
+        $options = $job->getOptions();
+        if (null === $billedSize || !is_array($options['media_usage'] ?? null)) {
+            return;
+        }
+
+        $options['media_usage']['size'] = $billedSize;
+        $job->setOptions($options);
     }
 
     /**
