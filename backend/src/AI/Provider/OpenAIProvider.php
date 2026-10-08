@@ -1394,10 +1394,11 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             }
 
             if (empty($images)) {
+                $exception = ProviderException::noImage('openai', (string) $model, $this->responsesMessageText($response['output']), null);
                 $this->logger->error('OpenAI Responses API: No images in output', [
                     'output_types' => array_column($response['output'] ?? [], 'type'),
-                ]);
-                throw new ProviderException('Responses API returned no generated images', 'openai');
+                ] + $exception->logContext());
+                throw $exception;
             }
 
             return $images;
@@ -1406,6 +1407,28 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI Responses API pic2pic error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    /**
+     * Text of the assistant `message` output item: what the model said when
+     * it answered in prose instead of calling the image tool.
+     *
+     * @param array<mixed> $output Responses API `output` list
+     */
+    private function responsesMessageText(array $output): ?string
+    {
+        foreach ($output as $item) {
+            if (!is_array($item) || 'message' !== ($item['type'] ?? null)) {
+                continue;
+            }
+            foreach ($item['content'] ?? [] as $part) {
+                if (is_array($part) && is_string($part['text'] ?? null) && '' !== trim($part['text'])) {
+                    return $part['text'];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

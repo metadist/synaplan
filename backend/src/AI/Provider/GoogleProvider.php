@@ -787,6 +787,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 }
             }
 
+            if ([] === $images) {
+                throw $this->geminiNoImage($data, $model);
+            }
+
             return $images;
         } catch (ProviderException $e) {
             throw $e;
@@ -872,12 +876,45 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 }
             }
 
+            if ([] === $images) {
+                throw $this->geminiNoImage($data, $model);
+            }
+
             return $images;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google Gemini pic2pic error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * A finish the content check lets through (STOP, MAX_TOKENS, …) can still
+     * carry no image, e.g. when the model answers a question about the photo
+     * in prose. The exception keeps that reply so callers can show it.
+     *
+     * @param array<string, mixed> $data generateContent response
+     */
+    private function geminiNoImage(array $data, string $model): ProviderException
+    {
+        $candidate = is_array($data['candidates'][0] ?? null) ? $data['candidates'][0] : [];
+        $finishReason = is_string($candidate['finishReason'] ?? null) ? $candidate['finishReason'] : null;
+
+        $textResponse = null;
+        foreach ($candidate['content']['parts'] ?? [] as $part) {
+            if (true === ($part['thought'] ?? false)) {
+                continue;
+            }
+            if (is_string($part['text'] ?? null) && '' !== trim($part['text'])) {
+                $textResponse = $part['text'];
+                break;
+            }
+        }
+
+        $exception = ProviderException::noImage('google', $model, $textResponse, $finishReason);
+        $this->logger->warning('Google Gemini: image model returned no image', $exception->logContext());
+
+        return $exception;
     }
 
     /**
@@ -988,7 +1025,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             'timeout' => 120,
         ]);
 
-        return $this->parseImagenResponse($response->toArray());
+        return $this->parseImagenResponse($response->toArray(), $model);
     }
 
     /**
@@ -1018,12 +1055,13 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             'timeout' => 120,
         ]);
 
-        return $this->parseImagenResponse($response->toArray());
+        return $this->parseImagenResponse($response->toArray(), $model);
     }
 
-    private function parseImagenResponse(array $data): array
+    private function parseImagenResponse(array $data, string $model): array
     {
         $images = [];
+        $filteredReason = null;
         foreach ($data['predictions'] ?? [] as $prediction) {
             if (isset($prediction['bytesBase64Encoded'])) {
                 $mimeType = $prediction['mimeType'] ?? 'image/png';
@@ -1031,7 +1069,16 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                     'url' => 'data:'.$mimeType.';base64,'.$prediction['bytesBase64Encoded'],
                     'revised_prompt' => null,
                 ];
+            } elseif (null === $filteredReason && is_string($prediction['raiFilteredReason'] ?? null)) {
+                $filteredReason = $prediction['raiFilteredReason'];
             }
+        }
+
+        if ([] === $images) {
+            $exception = ProviderException::noImage('google', $model, $filteredReason, null);
+            $this->logger->warning('Google Imagen: no image in response', $exception->logContext());
+
+            throw $exception;
         }
 
         return $images;

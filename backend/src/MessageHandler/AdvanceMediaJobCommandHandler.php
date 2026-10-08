@@ -531,11 +531,12 @@ final readonly class AdvanceMediaJobCommandHandler
             'job_key' => $job->getJobKey(),
             'status' => $job->getStatus(),
             'provider' => $job->getProvider(),
+            'model' => $job->getModel(),
             'provider_ref' => $job->getProviderRef(),
             'error' => $e->getMessage(),
             'exception' => $e::class,
             'previous' => $e->getPrevious()?->getMessage(),
-        ]);
+        ] + ($e instanceof ProviderException ? $e->logContext() : []));
 
         $this->jobService->markFailed($job, $message);
         $this->messageSync->syncTerminalState($job);

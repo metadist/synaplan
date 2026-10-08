@@ -655,6 +655,29 @@ class MediaGenerationServiceTest extends TestCase
         $this->service->generate($this->createUser(), 'sunset', 'image', 42);
     }
 
+    public function testATextOnlyImageReplyReachesTheCallerAsTheProviderException(): void
+    {
+        $this->allowRateLimit();
+        $model = $this->createModel('Google', 'gemini-3.1-flash-image', 'Nano Banana 2');
+        $this->setUpModelResolution(371, $model);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'pic2pic_test_');
+        file_put_contents($tmpFile, "\x89PNG\r\n\x1a\n".str_repeat("\0", 50));
+        $noImage = ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP');
+        $this->aiFacade->method('generateImage')->willThrowException($noImage);
+        $this->rateLimitService->expects(self::never())->method('recordUsage');
+
+        try {
+            $this->service->generateFromImages($this->createUser(), 'Wie viele Fenster?', [$tmpFile], 371);
+            self::fail('Expected the provider exception');
+        } catch (ProviderException $e) {
+            self::assertSame($noImage, $e);
+            self::assertSame('10', $e->getContext()['text_response'] ?? null);
+        } finally {
+            @unlink($tmpFile);
+        }
+    }
+
     public function testVideoGenerationCallsCorrectFacadeMethod(): void
     {
         $this->allowRateLimit();
