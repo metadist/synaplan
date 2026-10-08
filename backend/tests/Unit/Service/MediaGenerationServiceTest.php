@@ -849,6 +849,35 @@ class MediaGenerationServiceTest extends TestCase
         @unlink($tmpFile2);
     }
 
+    public function testPic2picBillsTheSizeTheModelRendered(): void
+    {
+        $this->allowRateLimit();
+        $model = $this->createModel('OpenAI', 'gpt-image-1.5', 'GPT Image 1.5');
+        $this->setUpModelResolution(151, $model);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'pic2pic_test_');
+        file_put_contents($tmpFile, "\x89PNG\r\n\x1a\n".str_repeat("\0", 50));
+
+        $pngData = "\x89PNG\r\n\x1a\n".str_repeat("\0", 100);
+        $this->aiFacade->method('generateImage')->willReturn([
+            'images' => [['url' => 'data:image/png;base64,'.base64_encode($pngData), 'size' => '1536x1024']],
+            'provider' => 'openai',
+            'model' => 'gpt-image-1.5',
+        ]);
+
+        $this->rateLimitService->expects(self::once())
+            ->method('recordUsage')
+            ->with(
+                self::anything(),
+                'IMAGES',
+                self::callback(static fn (array $meta): bool => ['images' => 1.0, 'quality' => 'high', 'size' => '1536x1024'] === $meta['media_usage']),
+            );
+
+        $this->service->generateFromImages($this->createUser(), 'add muntins to the left window', [$tmpFile], 151);
+
+        @unlink($tmpFile);
+    }
+
     public function testPic2picWithSingleImage(): void
     {
         $this->allowRateLimit();

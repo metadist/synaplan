@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Entity\Model;
+use App\Model\ModelCatalog;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
 use App\Service\CostCalculationService;
+use App\Service\Media\RenderedImageSize;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -253,6 +255,22 @@ class CostCalculationServiceTest extends TestCase
         $result = $this->service->calculateMediaCost(10, 0, 1.0, null, null, 'high', '1024x1024');
 
         $this->assertSame('0.167000', $result->totalCost);
+    }
+
+    public function testAFlareEditRenderedLandscapeCostsTheLandscapeHighPrice(): void
+    {
+        // #2404: the 4:3 edit comes back at 1448x1086, which is billed as the
+        // landscape tier, not as the high 1024² price that used to be recorded.
+        $flare = ModelCatalog::find('openai:gpt-image-2.5-flare:text2pic')[0];
+        $model = $this->createModelMock(348, 'OpenAI', 0.0, (float) $flare['priceOut'], 'perImage', 'perImage', $flare['json']);
+        $this->modelRepository->expects(self::any())->method('find')->with(348)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $size = RenderedImageSize::billingKey('1448x1086');
+        $result = $this->service->calculateMediaCost(348, 0, 1.0, null, null, 'high', $size);
+
+        $this->assertSame('1536x1024', $size);
+        $this->assertSame('0.041160', $result->totalCost);
     }
 
     public function testCalculateMediaCostImageLowQualityPortraitTier(): void

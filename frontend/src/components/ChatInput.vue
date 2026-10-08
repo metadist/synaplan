@@ -1230,7 +1230,6 @@ watch(
   message,
   (newValue) => {
     if (newValue.startsWith('/')) {
-      void commandsStore.loadSavedPrompts()
       // Only show palette if no space (still typing command) or only command without args
       const hasSpace = newValue.includes(' ')
       const parsed = parseCommand(newValue)
@@ -1279,6 +1278,12 @@ watch(
   },
   { immediate: false }
 )
+
+// Fetch on every open, not on every keystroke of the same command, so a
+// prompt saved or deleted on Prompts is in the next menu without a reload.
+watch(paletteVisible, (visible) => {
+  if (visible) void commandsStore.loadSavedPrompts()
+})
 
 /**
  * Stop Web Speech and the audio recorder.

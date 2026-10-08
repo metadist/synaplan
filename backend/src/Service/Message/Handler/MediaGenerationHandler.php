@@ -23,6 +23,7 @@ use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Media\RenderedImageSize;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\TtsScriptGuard;
@@ -1010,11 +1011,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $mediaUsage = [];
             if ('image' === $mediaType) {
                 $mediaUsage['images'] = $result['image_count'] ?? 1;
-                // Carry the requested quality/size so per-tier image models
-                // (gpt-image) bill the exact price (#1315). Mirrors the defaults
-                // used when building $imageOptions above.
+                // Carry the quality/size so per-tier image models (gpt-image)
+                // bill the exact price (#1315). The quality mirrors the default
+                // used when building $imageOptions above. An edit leaves the
+                // size to the model, so the size it rendered wins over the
+                // requested one when the provider reports it (#2404).
                 $mediaUsage['quality'] = $options['quality'] ?? ($isPic2Pic ? 'high' : 'standard');
-                $mediaUsage['size'] = $options['size'] ?? '1024x1024';
+                $mediaUsage['size'] = RenderedImageSize::billingKey($media[0]['size'] ?? null)
+                    ?? $options['size'] ?? '1024x1024';
             } elseif ('video' === $mediaType) {
                 $requestedDuration = $options['duration'] ?? $classification['duration'] ?? 8;
                 $duration = $result['duration_seconds'] ?? null;
@@ -2094,7 +2098,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // exact price when the async job is later recorded (#1315). Read
             // from the RESOLVED provider options, not the raw request options:
             // $imageOptions already applied the pic2pic default ('high'), and
-            // billing must follow what was actually sent to the provider.
+            // billing must follow what was actually sent to the provider. The
+            // size is the request's; SyncMediaJobGenerator replaces it with the
+            // size the model rendered when the provider reports one (#2404).
             default => [
                 'images' => 1,
                 'quality' => $mediaOptions['quality'] ?? $options['quality'] ?? 'standard',

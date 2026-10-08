@@ -994,6 +994,10 @@
     "name": "Name",
     "command": "Command",
     "body": "Prompt",
-    "saved": "Prompt saved."
+    "saved": "Prompt saved.",
+    "save": "Save prompt",
+    "edit": "Edit",
+    "editTitle": "Edit prompt",
+    "deleteFailed": "The prompt could not be deleted. It is still in your list."
   }
 }

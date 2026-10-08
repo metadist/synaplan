@@ -125,6 +125,7 @@ export const selectors = {
     flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
     flyoutLinkAiAccounts: '[data-testid="link-sidebar-v2-ai-accounts"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
+    flyoutLinkSavedPrompts: '[data-testid="link-sidebar-v2-saved-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
     flyoutLinkAdminPeople: '[data-testid="link-sidebar-v2-admin-people"]',
     flyoutLinkAdminSetup: '[data-testid="link-sidebar-v2-admin-setup"]',
@@ -162,6 +163,8 @@ export const selectors = {
     chatBtnToggle: '[data-testid="btn-chat-toggle"]',
     textInput: '[data-testid="input-chat-message"]',
     sendBtn: '[data-testid="btn-chat-send"]',
+    /** Slash-command menu, open while the composer text starts with "/" */
+    commandPalette: '[data-testid="comp-command-palette"]',
     /** "+" menu trigger in the composer (holds attach, tools and knowledge) */
     plusToggle: '[data-testid="btn-chat-plus"]',
     /** "+" menu panel (opens upward) */
@@ -558,6 +561,19 @@ export const selectors = {
     btnConfirmCreate: '[data-testid="btn-confirm-create"]',
     /** Header action on the editor of a custom prompt: turn it into a Saved Task */
     btnSaveAsTask: '[data-testid="btn-save-as-task"]',
+  },
+  savedPrompts: {
+    page: '[data-testid="page-prompts"]',
+    newBtn: '[data-testid="btn-prompt-new"]',
+    form: '[data-testid="form-saved-prompt"]',
+    nameInput: '[data-testid="input-saved-prompt-name"]',
+    commandInput: '[data-testid="input-saved-prompt-command"]',
+    bodyInput: '[data-testid="input-saved-prompt-body"]',
+    saveBtn: '[data-testid="btn-saved-prompt-save"]',
+    /** One row per saved prompt on /prompts */
+    row: '[data-testid="row-saved-prompt"]',
+    editBtn: '[data-testid="btn-saved-prompt-edit"]',
+    deleteBtn: '[data-testid="btn-saved-prompt-delete"]',
   },
   savedTasks: {
     page: '[data-testid="page-saved-tasks"]',
