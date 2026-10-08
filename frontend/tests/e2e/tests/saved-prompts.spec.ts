@@ -1,11 +1,13 @@
 import { test, expect, type Page } from '../test-setup'
-import { openApp } from '../helpers/auth'
+import { getAuthHeaders, openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
-import { TIMEOUTS } from '../config/config'
+import { TIMEOUTS, getApiUrl } from '../config/config'
 
 const NAV = selectors.nav
 const CHAT = selectors.chat
 const PROMPTS = selectors.savedPrompts
+/** Every command this spec saves starts with it, so cleanup can find them. */
+const COMMAND_PREFIX = 'e2enotiz'
 
 /** Client-side navigation keeps the Pinia stores, unlike page.goto(). */
 async function openPrompts(page: Page) {
@@ -16,9 +18,14 @@ async function openPrompts(page: Page) {
   await expect(page.locator(PROMPTS.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
+/**
+ * The Chats rail icon routes to the chat by itself. "New chat" would not do:
+ * it navigates only after the chat list has loaded, so on a slow stack it can
+ * pull the next step back from Prompts to the chat.
+ */
 async function backToChat(page: Page) {
   await page.locator(NAV.sidebarV2ChatNav).click()
-  await page.locator(NAV.sidebarV2NewChat).click()
+  await expect(page).toHaveURL(/\/(\?.*)?$/, { timeout: TIMEOUTS.STANDARD })
   await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
@@ -61,13 +68,27 @@ function promptRow(page: Page, command: string) {
 }
 
 test.describe('@ci Saved prompts and the / menu', () => {
+  // Prompts belong to the worker user; clean up through its session so a
+  // failed or retried run leaves nothing behind.
+  test.afterEach(async ({ request, credentials }) => {
+    const auth = await getAuthHeaders(request, credentials)
+    const res = await request.get(`${getApiUrl()}/api/v1/saved-prompts`, { headers: auth })
+    if (!res.ok()) return
+    const { prompts } = (await res.json()) as { prompts?: { id: number; command: string }[] }
+    for (const prompt of prompts ?? []) {
+      if (prompt.command.startsWith(COMMAND_PREFIX)) {
+        await request.delete(`${getApiUrl()}/api/v1/saved-prompts/${prompt.id}`, { headers: auth })
+      }
+    }
+  })
+
   test('the / menu follows prompts saved, changed and deleted in the same session', async ({
     page,
   }) => {
     const stamp = Date.now().toString(36)
-    const first = `notiz${stamp}`
-    const second = `notizb${stamp}`
-    const renamed = `notizc${stamp}`
+    const first = `${COMMAND_PREFIX}${stamp}`
+    const second = `${COMMAND_PREFIX}b${stamp}`
+    const renamed = `${COMMAND_PREFIX}c${stamp}`
 
     await test.step('Arrange: the menu has loaded once in this session', async () => {
       await openApp(page)
@@ -130,12 +151,6 @@ test.describe('@ci Saved prompts and the / menu', () => {
       await palette.getByText(`/${second}`).click()
       await expect(page.locator(CHAT.textInput)).toHaveValue(`Body of ${second}`)
       await page.locator(CHAT.textInput).fill('')
-    })
-
-    await test.step('Cleanup', async () => {
-      await openPrompts(page)
-      await promptRow(page, second).locator(PROMPTS.deleteBtn).click()
-      await expect(promptRow(page, second)).toHaveCount(0, { timeout: TIMEOUTS.STANDARD })
     })
   })
 })
