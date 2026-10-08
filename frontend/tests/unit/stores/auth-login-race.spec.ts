@@ -87,6 +87,11 @@ vi.mock('@/stores/userFeedback', () => ({
   useFeedbackStore: () => ({ $reset: vi.fn() }),
 }))
 
+const resetCommands = vi.hoisted(() => vi.fn())
+vi.mock('@/stores/commands', () => ({
+  useCommandsStore: () => ({ reset: resetCommands }),
+}))
+
 vi.mock('@/services/iapPostAuthRedemption', () => ({
   redeemPendingIapPurchaseAfterAuth: vi.fn(),
 }))
@@ -148,6 +153,21 @@ describe('useAuthStore — login cookie race', () => {
 
     expect(ok).toBe(true)
     expect(pick.selectedModelId).toBeNull()
+  })
+
+  it("forgets the previous account's saved prompts when another account logs in", async () => {
+    const httpClient = await import('@/services/api/httpClient')
+    vi.mocked(httpClient.getInFlightRefresh).mockReturnValue(null)
+    resetCommands.mockClear()
+
+    loginApiMock.mockImplementation(async () => {
+      const { authService } = await import('@/services/authService')
+      authService.getUser().value = { id: 3, email: 'second@example.com', level: 'NEW' }
+      return { success: true }
+    })
+
+    expect(await useAuthStore().login('second@example.com', 'secret')).toBe(true)
+    expect(resetCommands).toHaveBeenCalledTimes(1)
   })
 
   it('releases the lock when login is rejected', async () => {

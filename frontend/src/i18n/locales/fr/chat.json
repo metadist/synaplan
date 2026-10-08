@@ -994,6 +994,10 @@
     "name": "Nom",
     "command": "Commande",
     "body": "Prompt",
-    "saved": "Prompt enregistré."
+    "saved": "Prompt enregistré.",
+    "save": "Enregistrer le prompt",
+    "edit": "Modifier",
+    "editTitle": "Modifier le prompt",
+    "deleteFailed": "Le prompt n'a pas pu être supprimé. Il est toujours dans votre liste."
   }
 }

@@ -929,6 +929,10 @@
     "name": "Nombre",
     "command": "Comando",
     "body": "Prompt",
-    "saved": "Prompt guardado."
+    "saved": "Prompt guardado.",
+    "save": "Guardar prompt",
+    "edit": "Editar",
+    "editTitle": "Editar prompt",
+    "deleteFailed": "No se pudo eliminar el prompt. Sigue en tu lista."
   }
 }
