@@ -88,18 +88,20 @@
           <div class="flex flex-shrink-0 gap-2">
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 text-sm font-medium"
+              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
               data-testid="btn-saved-prompt-edit"
               @click="startEdit(prompt)"
             >
+              <PencilSquareIcon class="h-4 w-4" aria-hidden="true" />
               {{ t('savedPrompts.edit') }}
             </button>
             <button
               type="button"
-              class="btn-danger rounded-lg px-4 py-2.5 text-sm font-medium"
+              class="btn-danger inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
               data-testid="btn-saved-prompt-delete"
               @click="remove(prompt.id)"
             >
+              <TrashIcon class="h-4 w-4" aria-hidden="true" />
               {{ t('common.delete') }}
             </button>
           </div>
@@ -112,6 +114,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import MainLayout from '@/components/MainLayout.vue'
 import { useNotification } from '@/composables/useNotification'
 import { httpClient } from '@/services/api/httpClient'
@@ -133,13 +136,24 @@ const saving = ref(false)
 const errorText = ref('')
 const draft = ref({ name: '', command: '', body: '' })
 
+/** Show these rows and hand them to the slash menu and the command search. */
+function showPrompts(rows: SavedPromptRow[]): void {
+  prompts.value = rows
+  commandsStore.setSavedPrompts(rows)
+}
+
 async function load(): Promise<void> {
   const data = await httpClient('/api/v1/saved-prompts', {
     schema: GetApiSavedPromptsListResponseSchema,
   })
-  prompts.value = data.prompts ?? []
-  // The slash menu and the command search list the same prompts.
-  commandsStore.setSavedPrompts(prompts.value)
+  showPrompts(data.prompts ?? [])
+}
+
+/** The server lists prompts by name; keep that order for a saved row. */
+function withSavedRow(saved: SavedPromptRow): SavedPromptRow[] {
+  return [...prompts.value.filter((row) => row.id !== saved.id), saved].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  )
 }
 
 function openForm(id: number | null, values: { name: string; command: string; body: string }) {
@@ -162,22 +176,24 @@ function closeForm(): void {
   editingId.value = null
 }
 
-async function writeDraft(id: number | null): Promise<void> {
+/** Write the form and return the prompt as the server stored it. */
+async function writeDraft(id: number | null): Promise<SavedPromptRow> {
   if (id === null) {
-    await httpClient('/api/v1/saved-prompts', {
+    const created = await httpClient('/api/v1/saved-prompts', {
       method: 'POST',
       body: JSON.stringify(draft.value),
       schema: PostApiSavedPromptsCreateResponseSchema,
     })
-    return
+    return created.prompt
   }
   // An update replaces the tags too, so send back the ones the row has.
   const tags = prompts.value.find((row) => row.id === id)?.tags ?? []
-  await httpClient(`/api/v1/saved-prompts/${id}`, {
+  const updated = await httpClient(`/api/v1/saved-prompts/${id}`, {
     method: 'PUT',
     body: JSON.stringify({ ...draft.value, tags }),
     schema: PutApiSavedPromptsUpdateResponseSchema,
   })
+  return updated.prompt
 }
 
 async function save(): Promise<void> {
@@ -185,10 +201,10 @@ async function save(): Promise<void> {
   errorText.value = ''
   saving.value = true
   try {
-    await writeDraft(editingId.value)
+    const saved = await writeDraft(editingId.value)
+    showPrompts(withSavedRow(saved))
     closeForm()
     success(t('savedPrompts.saved'))
-    await load()
   } catch (err) {
     errorText.value = err instanceof Error ? err.message : t('taskPlan.askFailed')
     error(errorText.value)
@@ -205,7 +221,7 @@ async function remove(id: number): Promise<void> {
     return
   }
   if (editingId.value === id) closeForm()
-  await load()
+  showPrompts(prompts.value.filter((row) => row.id !== id))
 }
 
 onMounted(() => {

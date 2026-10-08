@@ -114,6 +114,8 @@ describe('PromptsView', () => {
       tags: ['work'],
     })
     expect(notify.success).toHaveBeenCalledWith('Prompt saved.')
+    // The stored row comes back on the write; a second request could only fail it.
+    expect(calls('GET')).toHaveLength(1)
   })
 
   it('shows the new name and command after an update and lists the command for /', async () => {
@@ -180,7 +182,42 @@ describe('PromptsView', () => {
     await flushPromises()
 
     expect(calls('DELETE')).toHaveLength(1)
+    expect(calls('GET')).toHaveLength(1)
     expect(wrapper.find('[data-testid="row-saved-prompt"]').exists()).toBe(false)
     expect(useCommandsStore().getCommand('notiz')).toBeUndefined()
+  })
+
+  it('keeps the prompt and says so when the delete fails', async () => {
+    httpClient.mockImplementation((endpoint: string, options: { method?: string } = {}) =>
+      options.method === 'DELETE' ? Promise.reject(new Error('HTTP 500')) : route(endpoint, options)
+    )
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="btn-saved-prompt-delete"]').trigger('click')
+    await flushPromises()
+
+    expect(notify.error).toHaveBeenCalledWith(
+      'The prompt could not be deleted. It is still in your list.'
+    )
+    expect(wrapper.find('[data-testid="row-saved-prompt"]').exists()).toBe(true)
+    expect(useCommandsStore().getCommand('notiz')).toBeDefined()
+  })
+
+  it('lists a new prompt in name order without reloading the list', async () => {
+    rows = [
+      { id: 1, name: 'Alpha', command: 'alpha', body: 'A', tags: [] },
+      { id: 2, name: 'Gamma', command: 'gamma', body: 'G', tags: [] },
+    ]
+    const wrapper = await mountView()
+    await wrapper.find('[data-testid="btn-prompt-new"]').trigger('click')
+    await wrapper.find('[data-testid="input-saved-prompt-name"]').setValue('Beta')
+    await wrapper.find('[data-testid="input-saved-prompt-command"]').setValue('beta')
+    await wrapper.find('[data-testid="input-saved-prompt-body"]').setValue('B')
+    await wrapper.find('[data-testid="form-saved-prompt"]').trigger('submit')
+    await flushPromises()
+
+    const names = wrapper.findAll('[data-testid="row-saved-prompt"]').map((row) => row.text())
+    expect(names.map((text) => text.split('/')[0].trim())).toEqual(['Alpha', 'Beta', 'Gamma'])
+    expect(calls('GET')).toHaveLength(1)
   })
 })
