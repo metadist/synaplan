@@ -129,6 +129,8 @@
     "notFound": "Der Chat existiert nicht mehr",
     "goneDeleted": "Dieser Chat wurde gelöscht.",
     "goneUnshared": "Dieser Chat ist nicht mehr für dich freigegeben.",
+    "accessFailed": "Dieser Chat konnte nicht geladen werden, deshalb kannst du noch nicht schreiben. Prüfe deine Verbindung und versuche es erneut.",
+    "accessRetry": "Erneut versuchen",
     "notFoundDesc": "Dieser Chat wurde gelöscht und ist nicht mehr verfügbar.",
     "browser": {
       "title": "Alle Chats",

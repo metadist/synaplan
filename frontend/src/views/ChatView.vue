@@ -383,6 +383,16 @@
           })
         "
       />
+      <ChatAccessErrorBanner
+        v-if="
+          !needsProviderSetup &&
+          !canComposeSharedChat &&
+          (chatsStore.conversationAccessFailed || retryingConversationAccess)
+        "
+        class="max-w-[70rem] mx-auto w-full px-4 mb-3"
+        :retrying="retryingConversationAccess"
+        @retry="retryConversationAccess"
+      />
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
@@ -607,6 +617,7 @@ import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
+import ChatAccessErrorBanner from '@/components/ChatAccessErrorBanner.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
 import CompanionLinks from '@/components/CompanionLinks.vue'
@@ -877,6 +888,17 @@ const canComposeSharedChat = computed(() =>
 // access stays null while the lookup is in flight or has failed, so it must
 // not count as owner — same rule as the composer.
 const canRewriteConversation = canComposeSharedChat
+
+const retryingConversationAccess = ref(false)
+const retryConversationAccess = async () => {
+  if (retryingConversationAccess.value) return
+  retryingConversationAccess.value = true
+  try {
+    await chatsStore.retryConversationAccess()
+  } finally {
+    retryingConversationAccess.value = false
+  }
+}
 
 const continueSharedConversation = async () => {
   const id = chatsStore.activeChatId
@@ -1823,7 +1845,9 @@ const handleVisibilityChangeForToken = () => {
   prefetchSseToken()
   const chatId = chatsStore.activeChatId
   const access = chatsStore.conversationAccess
-  if (chatId && (access === 'read' || access === 'use')) {
+  if (chatsStore.conversationAccessFailed) {
+    void retryConversationAccess()
+  } else if (chatId && (access === 'read' || access === 'use')) {
     void chatsStore.loadConversationAccess(chatId)
   }
 }

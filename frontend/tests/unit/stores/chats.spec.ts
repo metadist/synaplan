@@ -872,6 +872,41 @@ describe('Chats Store', () => {
       expect(store.conversationAccess).toBeNull()
     })
 
+    it('flags a failed probe so the view can explain the missing composer', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockRejectedValueOnce(new Error('network'))
+
+      await store.loadConversationAccess(5)
+
+      expect(store.conversationAccessFailed).toBe(true)
+    })
+
+    it('clears the failure once a retry for the open chat succeeds', async () => {
+      const store = useChatsStore()
+      store.activeChatId = 5
+      httpClientMock.mockRejectedValueOnce(new Error('network'))
+      await store.loadConversationAccess(5)
+
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 5, access: 'use' } })
+      await store.retryConversationAccess()
+
+      expect(httpClientMock).toHaveBeenLastCalledWith('/api/v1/chats/5')
+      expect(store.conversationAccessFailed).toBe(false)
+      expect(store.conversationAccess).toBe('use')
+    })
+
+    it('settles a retry as owned when no chat is open', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockRejectedValueOnce(new Error('network'))
+      await store.loadConversationAccess(5)
+      store.activeChatId = null
+
+      await store.retryConversationAccess()
+
+      expect(store.conversationAccessFailed).toBe(false)
+      expect(store.conversationAccess).toBe('owner')
+    })
+
     it("treats a chat from the viewer's own list as owned without asking", async () => {
       const store = useChatsStore()
       httpClientMock.mockResolvedValueOnce(chatPayload(9))
