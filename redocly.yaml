@@ -1,0 +1,5 @@
+# Lint rules for the OpenAPI spec dumped in CI (frontend-build job).
+# Only security-defined is enforced so far; enabling the recommended
+# ruleset is tracked in https://github.com/metadist/synaplan/issues/2411.
+rules:
+  security-defined: error
