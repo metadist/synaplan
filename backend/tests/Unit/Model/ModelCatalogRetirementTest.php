@@ -96,7 +96,12 @@ final class ModelCatalogRetirementTest extends TestCase
             self::assertSame($flare, ModelCatalog::successorBid($bid));
         }
 
-        $successorRow = array_values(array_filter(ModelCatalog::all(), static fn (array $row): bool => 348 === $row['id']))[0];
+        $successorRows = array_values(array_filter(
+            ModelCatalog::all(),
+            static fn (array $row): bool => 348 === $row['id'],
+        ));
+        self::assertNotEmpty($successorRows, 'GPT Image 2.5 Flare (BID 348) is missing from the catalog');
+        $successorRow = $successorRows[0];
         self::assertSame(1, $successorRow['active']);
         self::assertSame(1, $successorRow['selectable']);
         self::assertFalse(ModelCatalog::isRetired(348));
