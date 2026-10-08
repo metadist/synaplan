@@ -26,12 +26,6 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 {
     private const DEFAULT_MAX_TOKENS = 4096;
 
-    /**
-     * Image models that need `input_fidelity: high` to keep an attached photo
-     * on edits. gpt-image-2 and later always keep it and reject the key.
-     */
-    private const INPUT_FIDELITY_IMAGE_MODELS = ['gpt-image-1', 'gpt-image-1.5'];
-
     private ?OpenAI\Client $client = null;
 
     /** Key the cached client was built with (rebuild on key change). */
@@ -1314,16 +1308,14 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 $imageDataUrls[] = 'data:'.$mime.';base64,'.base64_encode($data);
             }
 
-            $requestBody = $this->buildImageEditRequest($prompt, $imageDataUrls, $options);
-            $imageTool = $requestBody['tools'][0];
+            $requestBody = $this->buildImageEditRequest($prompt, $model, $imageDataUrls, $options);
 
             $this->logger->info('OpenAI: Pic2pic via Responses API', [
                 'model' => $responsesModel,
                 'image_model' => $model,
                 'image_count' => \count($imagePaths),
                 'prompt_length' => \strlen($prompt),
-                'quality' => $imageTool['quality'] ?? null,
-                'input_fidelity' => $imageTool['input_fidelity'] ?? null,
+                'quality' => $requestBody['tools'][0]['quality'] ?? null,
             ]);
 
             $key = $this->resolveApiKey();
@@ -1395,20 +1387,17 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * Responses API body for an edit of attached images. Pure: the caller
      * reads and encodes the images.
      *
-     * gpt-image-1 and gpt-image-1.5 redraw the photo unless the tool asks
-     * for high input fidelity; gpt-image-2 and later always keep it and
-     * must not get the key. No `size` is sent, so the model keeps the
-     * orientation of the photo.
+     * No `size` is sent, so the model keeps the orientation of the photo.
+     * No `input_fidelity` either: gpt-image-2 and later always edit at high
+     * input fidelity and must not get the key.
      *
      * @param list<string>         $imageDataUrls `data:` URLs of the attached images
-     * @param array<string, mixed> $options       model, quality
+     * @param array<string, mixed> $options       quality
      *
      * @return array{model: string, input: list<array<string, mixed>>, tools: list<array<string, mixed>>}
      */
-    private function buildImageEditRequest(string $prompt, array $imageDataUrls, array $options): array
+    private function buildImageEditRequest(string $prompt, string $model, array $imageDataUrls, array $options): array
     {
-        $model = (string) ($options['model'] ?? 'gpt-image-1.5');
-
         $content = [['type' => 'input_text', 'text' => $prompt]];
         foreach ($imageDataUrls as $dataUrl) {
             $content[] = ['type' => 'input_image', 'image_url' => $dataUrl];
@@ -1421,9 +1410,6 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         $quality = $this->gptImageQuality($model, $options['quality'] ?? null);
         if (null !== $quality) {
             $tool['quality'] = $quality;
-        }
-        if ([] !== $imageDataUrls && in_array($model, self::INPUT_FIDELITY_IMAGE_MODELS, true)) {
-            $tool['input_fidelity'] = 'high';
         }
 
         return [
