@@ -20,6 +20,11 @@ nelmio_api_doc:
                     type: http
                     scheme: bearer
                     description: 'Bearer token for SSE connections. Get token from /api/v1/auth/token endpoint.'
+                ApiKey:
+                    type: apiKey
+                    in: header
+                    name: X-API-Key
+                    description: 'Synaplan API key (sk_...), sent in the X-API-Key header.'
     areas:
         path_patterns:
             - ^/api(?!/doc$) # Accepts all routes except /api/doc
