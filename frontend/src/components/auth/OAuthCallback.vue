@@ -110,6 +110,7 @@ const oauthErrorMessage = (
   }
   if (errorCode === 'oidc_access_denied') return t('auth.oidcAccessDenied')
   if (errorCode === 'oidc_auth_failed') return t('auth.oidcAuthFailed')
+  if (errorCode === 'oidc_not_authorized') return t('auth.oidcNotAuthorized')
   if (errorParam) return decodeURIComponent(errorParam)
   return t('auth.socialLoginError')
 }
