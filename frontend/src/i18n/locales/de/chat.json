@@ -992,6 +992,10 @@
     "name": "Name",
     "command": "Befehl",
     "body": "Prompt",
-    "saved": "Prompt gespeichert."
+    "saved": "Prompt gespeichert.",
+    "save": "Prompt speichern",
+    "edit": "Bearbeiten",
+    "editTitle": "Prompt bearbeiten",
+    "deleteFailed": "Der Prompt konnte nicht gelöscht werden. Er ist weiterhin in deiner Liste."
   }
 }

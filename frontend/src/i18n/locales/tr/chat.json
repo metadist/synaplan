@@ -929,6 +929,10 @@
     "name": "Ad",
     "command": "Komut",
     "body": "Prompt",
-    "saved": "Prompt kaydedildi."
+    "saved": "Prompt kaydedildi.",
+    "save": "Promptu kaydet",
+    "edit": "Düzenle",
+    "editTitle": "Promptu düzenle",
+    "deleteFailed": "Prompt silinemedi. Hâlâ listenizde."
   }
 }
