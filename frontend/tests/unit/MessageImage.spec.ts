@@ -85,6 +85,28 @@ describe('MessageImage', () => {
       expect(img.classes().some((name) => name.includes('scale-'))).toBe(false)
     })
 
+    it('returns to the fixed placeholder while a loaded image retries after an error', async () => {
+      const wrapper = mount(MessageImage, {
+        props: { url: 'https://example.com/image.jpg' },
+      })
+      await flushPromises()
+
+      const img = wrapper.find('[data-testid="img-message-image"]')
+      await img.trigger('load')
+      expect(box(wrapper).classes()).not.toContain('aspect-video')
+
+      // The first error retries with a fresh credential; the box must not collapse meanwhile.
+      await img.trigger('error')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(false)
+      expect(box(wrapper).classes()).toContain('aspect-video')
+      expect(wrapper.text()).toContain('Loading')
+
+      await wrapper.find('[data-testid="img-message-image"]').trigger('load')
+      expect(box(wrapper).classes()).not.toContain('aspect-video')
+    })
+
     it('keeps the fixed placeholder size after the image failed to load', async () => {
       const wrapper = mount(MessageImage, {
         props: { url: 'https://example.com/image.jpg' },

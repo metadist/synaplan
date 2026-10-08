@@ -189,6 +189,8 @@ const onLoaded = () => {
 // The most common cause of a rejected media URL is an aged-out credential, so
 // mint a fresh one and let the element try again before blaming the server.
 const onError = async () => {
+  // Back to the fixed placeholder: a broken image has no size to hold the box.
+  isLoaded.value = false
   if (hasRetried.value) {
     hasFailed.value = true
     return
