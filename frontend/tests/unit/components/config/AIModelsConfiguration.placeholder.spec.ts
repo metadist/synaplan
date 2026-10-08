@@ -96,8 +96,9 @@ describe('AIModelsConfiguration empty model row', () => {
     vi.clearAllMocks()
   })
 
-  const mountPage = async () => {
+  const mountPage = async (attachTo?: HTMLElement) => {
     wrapper = mount(AIModelsConfiguration, {
+      attachTo,
       global: {
         plugins: [createPinia()],
         stubs: {
@@ -247,6 +248,182 @@ describe('AIModelsConfiguration empty model row', () => {
     expect(wrapper!.find('[data-testid="section-models-load-error"]').exists()).toBe(false)
     expect(wrapper!.find('[data-testid="btn-model-dropdown"]').exists()).toBe(true)
     errorSpy.mockRestore()
+  })
+
+  it('filters a long model menu by name the way the chat menu does', async () => {
+    const chatModels = [
+      chatModel,
+      { ...chatModel, id: 43, name: 'Gemini Flash', providerId: 'gemini-flash', service: 'google' },
+      { ...chatModel, id: 44, name: 'Claude Sonnet', providerId: 'claude', service: 'anthropic' },
+      { ...chatModel, id: 45, name: 'GPT', providerId: 'gpt-4o', service: 'openai' },
+      { ...chatModel, id: 46, name: 'Mistral', providerId: 'mistral', service: 'mistral' },
+      { ...chatModel, id: 47, name: 'Qwen', providerId: 'qwen', service: 'groq' },
+    ]
+    getModels.mockResolvedValue({ success: true, models: { CHAT: chatModels }, providers: [] })
+
+    await mountPage()
+    const row = wrapper!
+      .findAll('[data-testid="item-capability"]')
+      .find((item) => item.text().includes('Chat / General AI'))!
+    await row.get('[data-testid="btn-model-dropdown"]').trigger('click')
+
+    const filter = row.get('[data-testid="input-model-choice-filter"]')
+    await filter.setValue('claude')
+
+    const names = row
+      .findAll('[data-testid="btn-model-option"]')
+      .map((option) => option.text())
+      .filter((text) => !text.includes('Select Model'))
+    expect(names).toHaveLength(1)
+    expect(names[0]).toContain('Claude Sonnet')
+    expect(names[0]).not.toContain('Gemini')
+
+    await filter.setValue('no-such-model')
+    expect(row.get('[data-testid="text-model-choice-filter-empty"]').text()).toContain(
+      'no-such-model'
+    )
+  })
+
+  const longChatModels = () => [
+    chatModel,
+    { ...chatModel, id: 43, name: 'Gemini Flash', providerId: 'gemini-flash', service: 'google' },
+    { ...chatModel, id: 44, name: 'Claude Sonnet', providerId: 'claude', service: 'anthropic' },
+    { ...chatModel, id: 45, name: 'GPT', providerId: 'gpt-4o', service: 'openai' },
+    { ...chatModel, id: 46, name: 'Mistral', providerId: 'mistral', service: 'mistral' },
+    { ...chatModel, id: 47, name: 'Qwen', providerId: 'qwen', service: 'groq' },
+  ]
+
+  const openChatMenu = async () => {
+    getModels.mockResolvedValue({
+      success: true,
+      models: { CHAT: longChatModels() },
+      providers: [],
+    })
+    await mountPage(document.body)
+    const row = wrapper!
+      .findAll('[data-testid="item-capability"]')
+      .find((item) => item.text().includes('Chat / General AI'))!
+    const trigger = row.get('[data-testid="btn-model-dropdown"]')
+    await trigger.trigger('click')
+    const filter = row.get('[data-testid="input-model-choice-filter"]')
+    return { row, trigger, filter }
+  }
+
+  it('ignores Enter while an input method is still composing', async () => {
+    const { row, filter } = await openChatMenu()
+    await filter.setValue('claude')
+
+    const composing = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+      isComposing: true,
+    })
+    filter.element.dispatchEvent(composing)
+    await flushPromises()
+
+    expect(composing.defaultPrevented).toBe(false)
+    expect(saveDefaultModels).not.toHaveBeenCalled()
+    expect(row.find('[data-testid="input-model-choice-filter"]').exists()).toBe(true)
+
+    const imeConfirm = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(imeConfirm, 'keyCode', { get: () => 229 })
+    filter.element.dispatchEvent(imeConfirm)
+    await flushPromises()
+
+    expect(imeConfirm.defaultPrevented).toBe(false)
+    expect(saveDefaultModels).not.toHaveBeenCalled()
+    expect(row.get('[data-testid="btn-model-dropdown"]').text()).not.toContain('Claude Sonnet')
+  })
+
+  it('focuses the menu button before Enter saves, and leaves a later dialog focused', async () => {
+    const dialog = document.createElement('button')
+    dialog.type = 'button'
+    document.body.appendChild(dialog)
+    let focusedWhenCheckStarted: Element | null = null
+    checkModelAvailability.mockImplementation(async () => {
+      focusedWhenCheckStarted = document.activeElement
+      dialog.focus()
+      return {
+        available: true,
+        provider_type: 'external',
+        model_name: 'Claude Sonnet',
+        service: 'anthropic',
+      }
+    })
+
+    try {
+      const { row, trigger, filter } = await openChatMenu()
+      await filter.setValue('claude')
+      ;(filter.element as HTMLInputElement).focus()
+      await filter.trigger('keydown.enter')
+      await flushPromises()
+
+      expect(focusedWhenCheckStarted).toBe(trigger.element)
+      expect(saveDefaultModels).toHaveBeenCalled()
+      expect(row.find('[data-testid="input-model-choice-filter"]').exists()).toBe(false)
+      expect(trigger.text()).toContain('Claude Sonnet')
+      expect(document.activeElement).toBe(dialog)
+    } finally {
+      dialog.remove()
+    }
+  })
+
+  it('puts focus back on the filter after Clear', async () => {
+    const { row, filter } = await openChatMenu()
+    await filter.setValue('claude')
+    const clear = row.get('[data-testid="btn-model-choice-filter-clear"]')
+    ;(clear.element as HTMLButtonElement).focus()
+    await clear.trigger('click')
+
+    const input = row.get('[data-testid="input-model-choice-filter"]')
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(document.activeElement).toBe(input.element)
+    expect(row.findAll('[data-testid="btn-model-option"]').length).toBeGreaterThan(2)
+  })
+
+  it('returns focus to the menu button when Escape is pressed from the page', async () => {
+    const { row, trigger } = await openChatMenu()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await wrapper!.vm.$nextTick()
+
+    expect(row.find('[data-testid="input-model-choice-filter"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(trigger.element)
+  })
+
+  it('returns focus to the menu button when Escape closes an empty filter', async () => {
+    const { row, trigger, filter } = await openChatMenu()
+    ;(filter.element as HTMLInputElement).focus()
+    await filter.trigger('keydown.escape')
+
+    expect(row.find('[data-testid="input-model-choice-filter"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(trigger.element)
+  })
+
+  it('clears the filter on Escape and leaves the menu open', async () => {
+    const { row, filter } = await openChatMenu()
+    await filter.setValue('claude')
+    ;(filter.element as HTMLInputElement).focus()
+    await filter.trigger('keydown.escape')
+
+    const input = row.get('[data-testid="input-model-choice-filter"]')
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(document.activeElement).toBe(input.element)
+    expect(row.findAll('[data-testid="btn-model-option"]').length).toBeGreaterThan(2)
+  })
+
+  it('does not move focus to the menu button when the menu closes from a click outside', async () => {
+    const { row, trigger, filter } = await openChatMenu()
+    ;(filter.element as HTMLInputElement).focus()
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await wrapper!.vm.$nextTick()
+
+    expect(row.find('[data-testid="input-model-choice-filter"]').exists()).toBe(false)
+    expect(document.activeElement).not.toBe(trigger.element)
   })
 
   it('shows a retry on the full list when the model list fails', async () => {
