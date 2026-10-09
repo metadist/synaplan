@@ -10,6 +10,7 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\AiResponseSanitizer;
 use App\Service\Chat\ChatDeletionService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
@@ -168,7 +169,7 @@ class WidgetSessionController extends AbstractController
                 // Use actual last message from database, truncated to 100 chars
                 $lastMessagePreview = null;
                 if ($chatId && isset($lastMessages[$chatId])) {
-                    $lastMessagePreview = mb_substr($lastMessages[$chatId], 0, 100);
+                    $lastMessagePreview = AiResponseSanitizer::preview($lastMessages[$chatId]);
                 }
 
                 return [
@@ -310,10 +311,18 @@ class WidgetSessionController extends AbstractController
                         ];
                     }
 
+                    $text = $message->getText();
+                    // The stored row keeps the scratchpad for the main chat's
+                    // reasoning panel. This transcript has no panel, so it
+                    // shows the same visible answer as the embedded widget.
+                    if ('ai' === $sender) {
+                        $text = AiResponseSanitizer::stripForDisplay($text);
+                    }
+
                     $result = [
                         'id' => $message->getId(),
                         'direction' => $message->getDirection(),
-                        'text' => $message->getText(),
+                        'text' => $text,
                         'timestamp' => $message->getUnixTimestamp(),
                         'sender' => $sender,
                     ];
@@ -333,7 +342,7 @@ class WidgetSessionController extends AbstractController
             // Messages array is ordered oldest first, so last element is newest
             $lastIndex = count($messages) - 1;
             if (isset($messages[$lastIndex]['text'])) {
-                $lastMessagePreview = mb_substr($messages[$lastIndex]['text'], 0, 100);
+                $lastMessagePreview = AiResponseSanitizer::preview((string) $messages[$lastIndex]['text']);
             }
         }
 

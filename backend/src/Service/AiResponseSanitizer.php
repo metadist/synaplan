@@ -53,4 +53,20 @@ final readonly class AiResponseSanitizer
 
         return trim($text);
     }
+
+    /**
+     * Visible answer, then the first $limit characters.
+     *
+     * The cut happens after the scratchpad is gone, so a long `<think>` block
+     * cannot fill a 100-character session preview and hide the reply.
+     */
+    public static function preview(string $text, int $limit = 100): string
+    {
+        $visible = self::stripForDisplay($text);
+        if ($limit < 1 || '' === $visible) {
+            return '';
+        }
+
+        return mb_substr($visible, 0, $limit);
+    }
 }

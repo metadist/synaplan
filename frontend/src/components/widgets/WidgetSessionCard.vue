@@ -29,7 +29,7 @@
     <!-- Preview -->
     <div v-if="session.lastMessagePreview" class="mb-3 p-2 surface-chip rounded-lg">
       <p class="text-xs txt-secondary line-clamp-2">
-        {{ session.lastMessagePreview }}
+        {{ visiblePreview(session.lastMessagePreview) }}
       </p>
     </div>
 
@@ -80,6 +80,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import type { WidgetSession } from '@/services/api/widgetSessionsApi'
+import { visiblePreview } from '@/utils/stripThinkingBlocks'
 
 const props = defineProps<{
   session: WidgetSession

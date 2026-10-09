@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\WidgetSessionRepository;
+use App\Service\AiResponseSanitizer;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: WidgetSessionRepository::class)]
@@ -349,6 +350,10 @@ class WidgetSession
      */
     private static function sanitizePreviewText(string $text, int $maxLength = 200): string
     {
+        // Drop a model scratchpad before Markdown conversion. strip_tags would
+        // remove the <think> markers and leave the reasoning in the preview.
+        $text = AiResponseSanitizer::stripForDisplay($text);
+
         // Convert Markdown → HTML → plaintext (handles all MD features correctly)
         $html = (new \Parsedown())->setSafeMode(true)->text($text);
         $text = strip_tags($html);
