@@ -359,9 +359,10 @@ const router = createRouter({
     },
     {
       path: '/channels/widgets/live-support',
-      name: 'live-support',
-      component: () => import('../views/LiveSupportView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.liveSupport', i18n: ['widgets'] },
+      redirect: (to) => ({
+        path: '/channels/widgets',
+        query: { ...to.query, tab: 'conversations' },
+      }),
     },
     {
       path: '/channels/widgets/:widgetId/chats',
@@ -469,7 +470,10 @@ const router = createRouter({
     // POST /api/v1/summary/generate stays (Nextcloud + plugin consumers).
     { path: '/tools', redirect: '/apps' },
     { path: '/tools/chat-widget', redirect: '/channels/widgets' },
-    { path: '/tools/chat-widget/live-support', redirect: '/channels/widgets/live-support' },
+    {
+      path: '/tools/chat-widget/live-support',
+      redirect: { path: '/channels/widgets', query: { tab: 'conversations' } },
+    },
     {
       path: '/tools/chat-widget/:widgetId/chats',
       redirect: (to) => ({

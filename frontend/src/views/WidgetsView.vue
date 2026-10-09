@@ -10,7 +10,11 @@
         >
           <template #actions>
             <button
-              v-if="iamSharingEnabled && (sharedWidgets.length > 0 || filterShared)"
+              v-if="
+                activeTab === 'widgets' &&
+                iamSharingEnabled &&
+                (sharedWidgets.length > 0 || filterShared)
+              "
               type="button"
               class="px-3 py-2 rounded-full text-sm font-medium"
               :class="
@@ -35,8 +39,39 @@
           </template>
         </PageHeader>
 
+        <TabNav
+          v-model="activeTab"
+          class="mb-6"
+          :tabs="pageTabs"
+          :aria-label="$t('widgets.title')"
+          testid="widgets-tabs"
+        />
+
+        <template v-if="activeTab === 'conversations'">
+          <div
+            v-if="loading"
+            class="surface-card p-8 text-center"
+            data-testid="state-conversations-loading"
+          >
+            <p class="txt-secondary text-sm">{{ $t('common.loading') }}</p>
+          </div>
+          <EmptyState
+            v-else-if="widgets.length === 0"
+            :title="$t('widgets.conversations.noWidgetsTitle')"
+            :hint="$t('widgets.conversations.noWidgetsHint')"
+            :action-label="$t('widgets.createFirst')"
+            data-testid="state-conversations-no-widgets"
+            @action="startCreation"
+          />
+          <WidgetConversations
+            v-else
+            :widgets="widgets"
+            @waiting-count="liveWaitingCount = $event"
+          />
+        </template>
+
         <!-- Content Area -->
-        <div data-testid="section-widgets-content">
+        <div v-else data-testid="section-widgets-content">
           <!-- Loading State -->
           <div
             v-if="loading"
@@ -446,6 +481,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
+import WidgetConversations from '@/components/widgets/WidgetConversations.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
@@ -497,6 +535,42 @@ const testWidget = ref<widgetsApi.Widget | null>(null)
 const overlayMode = ref<'test' | 'internal'>('internal')
 const internalSessionId = ref('')
 const chatWidgetKey = ref(0)
+
+type WidgetsPageTab = 'widgets' | 'conversations'
+
+const activeTab = computed<WidgetsPageTab>({
+  get: () => (route.query.tab === 'conversations' ? 'conversations' : 'widgets'),
+  set: (tab) => {
+    const query = { ...route.query }
+    if (tab === 'conversations') query.tab = tab
+    else delete query.tab
+    void router.replace({ query })
+  },
+})
+
+/** Live count once the Conversations tab has loaded; the widget stats cover the first paint. */
+const liveWaitingCount = ref<number | null>(null)
+const waitingCount = computed(
+  () =>
+    liveWaitingCount.value ??
+    widgets.value.reduce((sum, widget) => sum + (widget.stats?.waiting_sessions ?? 0), 0)
+)
+
+const pageTabs = computed<TabNavItem[]>(() => [
+  {
+    id: 'widgets',
+    label: t('widgets.tabs.widgets'),
+    icon: 'heroicons:chat-bubble-left-right',
+    testid: 'tab-widgets-list',
+  },
+  {
+    id: 'conversations',
+    label: t('widgets.tabs.conversations'),
+    icon: 'heroicons:chat-bubble-left-ellipsis',
+    testid: 'tab-widgets-conversations',
+    badge: waitingCount.value,
+  },
+])
 
 const testWidgetCustomFields = computed(() => testWidget.value?.config?.customFields ?? [])
 
