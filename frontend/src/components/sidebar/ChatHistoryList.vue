@@ -247,7 +247,6 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useChatsStore } from '@/stores/chats'
 import { parseTagLines } from '@/utils/chatTags'
-import { getErrorMessage } from '@/utils/errorMessage'
 import type { HistoryChat } from '@/composables/useChatHistory'
 
 const PREVIEW_ID = 'chat-row-preview'
@@ -545,7 +544,7 @@ const onTags = async () => {
   const chat = props.chats.find((row) => row.id === id)
   const edited = await dialog.prompt({
     title: t('chat.tags'),
-    message: t('chat.tags'),
+    message: t('chat.tagsHint'),
     defaultValue: (chat?.tags ?? []).join('\n'),
     confirmText: t('common.save'),
     cancelText: t('common.cancel'),
@@ -556,7 +555,8 @@ const onTags = async () => {
     await chatsStore.updateChatTags(id, parseTagLines(edited))
     success(t('chat.tagsSaved'))
   } catch (err: unknown) {
-    notifyError(getErrorMessage(err))
+    console.error('Saving chat tags failed', err)
+    notifyError(t('chat.tagsSaveFailed'))
   }
 }
 

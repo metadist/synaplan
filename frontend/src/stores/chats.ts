@@ -2,8 +2,8 @@ import { defineStore } from 'pinia'
 import { useNotification } from '@/composables/useNotification'
 import { i18n } from '@/i18n/instance'
 import { ref, computed, watch } from 'vue'
-import { z } from 'zod'
 import { httpClient } from '@/services/api/httpClient'
+import { PutApiChatsTagsResponseSchema } from '@/generated/api-schemas'
 import { chatApi } from '@/services/api/chatApi'
 import { isRecoverableStreamError } from '@/utils/streamError'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
@@ -1000,11 +1000,6 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
-  const ChatTagsResponseSchema = z.object({
-    success: z.boolean(),
-    tags: z.array(z.string()),
-  })
-
   async function updateChatTags(chatId: number, tags: string[]): Promise<string[]> {
     if (!checkAuthOrRedirect()) {
       throw new Error('Not signed in')
@@ -1014,14 +1009,15 @@ export const useChatsStore = defineStore('chats', () => {
     const saved = await httpClient(`/api/v1/chats/${chatId}/tags`, {
       method: 'PUT',
       body: JSON.stringify({ tags }),
-      schema: ChatTagsResponseSchema,
+      schema: PutApiChatsTagsResponseSchema,
     })
+    const stored = saved.tags ?? []
     const chat = chats.value.find((c) => c.id === chatId)
     if (chat) {
-      chat.tags = saved.tags
+      chat.tags = stored
     }
     invalidateInFlightChatsLoad()
-    return saved.tags
+    return stored
   }
 
   async function updateChatTitle(chatId: number, title: string) {

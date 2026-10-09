@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { reactive } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { parseTagLines } from '@/utils/chatTags'
 import ChatHistoryList from '@/components/sidebar/ChatHistoryList.vue'
@@ -36,12 +37,12 @@ vi.mock('@/services/api/nativeHaptics', () => ({
   triggerHapticImpact: vi.fn(),
 }))
 
-const chat = {
+const chat = reactive({
   id: 7,
   title: 'Rent letter',
   tags: ['alpha'],
   incoming: false,
-} as HistoryChat
+}) as HistoryChat
 
 const mountList = () => {
   document.body.innerHTML = '<div id="app"></div>'
@@ -73,10 +74,14 @@ describe('parseTagLines', () => {
 
 describe('ChatHistoryList tags', () => {
   beforeEach(() => {
+    chat.tags = ['alpha']
     updateChatTags.mockReset()
     prompt.mockReset()
     success.mockReset()
-    updateChatTags.mockResolvedValue(['alpha', 'beta'])
+    updateChatTags.mockImplementation(async () => {
+      chat.tags = ['alpha', 'beta']
+      return chat.tags
+    })
     prompt.mockResolvedValue('alpha\nbeta')
   })
 
@@ -93,12 +98,35 @@ describe('ChatHistoryList tags', () => {
     expect(prompt).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'chat.tags',
+        message: 'chat.tagsHint',
         defaultValue: 'alpha',
         multiline: true,
       })
     )
     expect(updateChatTags).toHaveBeenCalledWith(7, ['alpha', 'beta'])
     expect(success).toHaveBeenCalledWith('chat.tagsSaved')
+    await flushPromises()
+    const shown = wrapper.findAll('[data-testid="text-chat-tag"]').map((node) => node.text())
+    expect(shown).toEqual(['alpha', 'beta'])
+    wrapper.unmount()
+  })
+
+  it('removes the tags when the server stores an empty list', async () => {
+    updateChatTags.mockImplementation(async () => {
+      chat.tags = []
+      return []
+    })
+    prompt.mockResolvedValue('\n')
+    const wrapper = mountList()
+
+    await wrapper.get('[data-testid="btn-chat-v2-row-menu"]').trigger('click')
+    document
+      .querySelector('[data-testid="btn-chat-v2-tags"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
+    expect(updateChatTags).toHaveBeenCalledWith(7, [])
+    expect(wrapper.find('[data-testid="list-chat-tags"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })
