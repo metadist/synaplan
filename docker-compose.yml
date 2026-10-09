@@ -902,7 +902,7 @@ services:
   # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
     profiles: [local-ai]
-    image: ollama/ollama:latest@sha256:1bef639749741b375e9a1eb2c1346fb57ce52f5432de1f74846e44ccc18e1687
+    image: ollama/ollama:latest@sha256:b86366bb528bbf7f1424435d165028497a5b69bf6ddb4fa5a87102e2b79f44fb
     container_name: synaplan-ollama
     ports:
       - "${SYNAPLAN_OLLAMA_PORT:-11435}:11434"
