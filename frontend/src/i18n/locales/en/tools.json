@@ -822,20 +822,20 @@
       },
       "microsoft365": {
         "name": "Microsoft 365",
-        "tagline": "Mail, calendar and OneDrive files for your assistant.",
-        "about": "After you sign in with Microsoft, the AI can read and draft mail, see your calendar and open OneDrive files — only with the permissions you grant.",
+        "tagline": "Outlook mail and calendar for your assistant.",
+        "about": "After you sign in with Microsoft, the AI can read your Outlook mail, add events to your calendar and send results from your own mailbox.",
         "stop": "Remove the connection below. Access ends immediately."
       },
       "dropbox": {
         "name": "Dropbox",
-        "tagline": "Let the AI read and file documents in Dropbox.",
-        "about": "After you sign in with Dropbox, the AI can open files you point it to and save results into your Dropbox.",
+        "tagline": "Save AI results straight into Dropbox.",
+        "about": "After you sign in with Dropbox, tasks and chats can save files into a folder you choose. Synaplan does not browse your other files.",
         "stop": "Remove the connection below. Access ends immediately."
       },
       "webdav": {
         "name": "Cloud folders & calendar",
         "tagline": "Nextcloud, OpenCloud or any WebDAV folder.",
-        "about": "Connect a folder with an app password. The AI can read and save files there and, with Nextcloud, also use your calendar.",
+        "about": "Connect a folder with an app password. Tasks can save results there and, with Nextcloud, put meetings into your calendar.",
         "stop": "Remove the connection below. Access ends immediately."
       },
       "nextcloud": {
@@ -865,13 +865,13 @@
       "higgsfield": {
         "name": "Higgsfield",
         "tagline": "Create videos with your Higgsfield account.",
-        "about": "Save your Higgsfield key and video generation in chat runs on your account.",
+        "about": "Save your Higgsfield key and secret. Images and videos you create in chat are then billed to your Higgsfield account.",
         "stop": "Remove your key below."
       },
       "mcp": {
         "name": "Tool servers (MCP)",
         "tagline": "Give the AI tools from any MCP server.",
-        "about": "Add a server address. The AI can then call that server's tools in chat; risky actions ask you first.",
+        "about": "Add a server address. The AI can then use that server’s tools in chat.",
         "stop": "Turn the server off or delete it in the list below."
       },
       "customTools": {

@@ -748,20 +748,20 @@
       },
       "microsoft365": {
         "name": "Microsoft 365",
-        "tagline": "Asistanınız için e-posta, takvim ve OneDrive dosyaları.",
-        "about": "Microsoft ile oturum açtıktan sonra yapay zekâ e-postaları okuyup taslak hazırlayabilir, takviminizi görebilir ve OneDrive dosyalarını açabilir; yalnızca verdiğiniz izinlerle.",
+        "tagline": "Asistanınız için Outlook e-postası ve takvimi.",
+        "about": "Microsoft ile oturum açtıktan sonra yapay zeka Outlook e-postalarınızı okuyabilir, takviminize etkinlik ekleyebilir ve sonuçları kendi posta kutunuzdan gönderebilir.",
         "stop": "Aşağıdan bağlantıyı kaldırın. Erişim hemen sona erer."
       },
       "dropbox": {
         "name": "Dropbox",
-        "tagline": "Yapay zekâ Dropbox'taki belgeleri okusun ve kaydetsin.",
-        "about": "Dropbox ile oturum açtıktan sonra yapay zekâ gösterdiğiniz dosyaları açabilir ve sonuçları Dropbox'ınıza kaydedebilir.",
+        "tagline": "Yapay zeka sonuçlarını doğrudan Dropbox’a kaydedin.",
+        "about": "Dropbox ile oturum açtıktan sonra görevler ve sohbetler dosyaları seçtiğiniz bir klasöre kaydedebilir. Synaplan diğer dosyalarınıza göz atmaz.",
         "stop": "Aşağıdan bağlantıyı kaldırın. Erişim hemen sona erer."
       },
       "webdav": {
         "name": "Bulut klasörleri ve takvim",
         "tagline": "Nextcloud, OpenCloud veya herhangi bir WebDAV klasörü.",
-        "about": "Bir klasörü uygulama parolasıyla bağlayın. Yapay zekâ orada dosya okuyup kaydedebilir, Nextcloud ile takviminizi de kullanabilir.",
+        "about": "Bir klasörü uygulama parolasıyla bağlayın. Görevler sonuçları oraya kaydedebilir ve Nextcloud ile toplantıları takviminize ekleyebilir.",
         "stop": "Aşağıdan bağlantıyı kaldırın. Erişim hemen sona erer."
       },
       "nextcloud": {
@@ -791,13 +791,13 @@
       "higgsfield": {
         "name": "Higgsfield",
         "tagline": "Higgsfield hesabınızla video oluşturun.",
-        "about": "Higgsfield anahtarınızı kaydedin; sohbetteki video üretimi hesabınızdan çalışır.",
+        "about": "Higgsfield anahtarınızı ve gizli anahtarınızı kaydedin. Sohbette oluşturduğunuz görseller ve videolar Higgsfield hesabınıza faturalandırılır.",
         "stop": "Anahtarınızı aşağıdan kaldırın."
       },
       "mcp": {
         "name": "Araç sunucuları (MCP)",
         "tagline": "Yapay zekâya herhangi bir MCP sunucusundan araçlar verin.",
-        "about": "Bir sunucu adresi ekleyin. Yapay zekâ sohbette o sunucunun araçlarını kullanabilir; riskli işlemler önce size sorar.",
+        "about": "Bir sunucu adresi ekleyin. Yapay zeka sohbette o sunucunun araçlarını kullanabilir.",
         "stop": "Aşağıdaki listede sunucuyu kapatın veya silin."
       },
       "customTools": {

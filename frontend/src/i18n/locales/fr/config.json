@@ -659,7 +659,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Connectez-vous avec votre compte Microsoft professionnel ou personnel pour que Synaplan puisse lire vos e-mails Outlook. Lecture seule, et vous pouvez déconnecter à tout moment.",
+          "description": "Connectez-vous avec votre compte Microsoft professionnel ou personnel. Synaplan lit votre messagerie Outlook, peut ajouter des événements au calendrier et envoyer des résultats depuis votre boîte. Vous pouvez vous déconnecter à tout moment.",
           "connect": "Connecter Microsoft 365",
           "connectAnother": "Connecter un autre compte",
           "connectedAs": "Connecté en tant que {account}.",

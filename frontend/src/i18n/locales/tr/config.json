@@ -203,7 +203,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Synaplan’ın Outlook postalarını okuyabilmesi için iş veya kişisel Microsoft hesabınla oturum aç. Yalnızca okuma yapar ve istediğin an bağlantıyı kesebilirsin.",
+          "description": "İş veya kişisel Microsoft hesabınızla oturum açın. Synaplan Outlook e-postalarınızı okur, takvime etkinlik ekleyebilir ve sonuçları posta kutunuzdan gönderebilir. Bağlantıyı istediğiniz zaman kesebilirsiniz.",
           "connect": "Microsoft 365’i bağla",
           "connectAnother": "Başka bir hesap bağla",
           "connectedAs": "{account} olarak bağlandı.",

@@ -748,20 +748,20 @@
       },
       "microsoft365": {
         "name": "Microsoft 365",
-        "tagline": "Correo, calendario y archivos de OneDrive para tu asistente.",
-        "about": "Tras iniciar sesión con Microsoft, la IA puede leer y redactar correos, ver tu calendario y abrir archivos de OneDrive, solo con los permisos que concedas.",
+        "tagline": "Correo y calendario de Outlook para tu asistente.",
+        "about": "Tras iniciar sesión con Microsoft, la IA puede leer tu correo de Outlook, añadir eventos a tu calendario y enviar resultados desde tu propio buzón.",
         "stop": "Elimina la conexión abajo. El acceso termina al instante."
       },
       "dropbox": {
         "name": "Dropbox",
-        "tagline": "Deja que la IA lea y guarde documentos en Dropbox.",
-        "about": "Tras iniciar sesión con Dropbox, la IA puede abrir los archivos que le indiques y guardar resultados en tu Dropbox.",
+        "tagline": "Guarda los resultados de la IA directamente en Dropbox.",
+        "about": "Tras iniciar sesión con Dropbox, las tareas y los chats pueden guardar archivos en la carpeta que elijas. Synaplan no explora tus demás archivos.",
         "stop": "Elimina la conexión abajo. El acceso termina al instante."
       },
       "webdav": {
         "name": "Carpetas en la nube y calendario",
         "tagline": "Nextcloud, OpenCloud o cualquier carpeta WebDAV.",
-        "about": "Conecta una carpeta con una contraseña de aplicación. La IA puede leer y guardar archivos allí y, con Nextcloud, usar también tu calendario.",
+        "about": "Conecta una carpeta con una contraseña de aplicación. Las tareas pueden guardar resultados allí y, con Nextcloud, añadir reuniones a tu calendario.",
         "stop": "Elimina la conexión abajo. El acceso termina al instante."
       },
       "nextcloud": {
@@ -791,13 +791,13 @@
       "higgsfield": {
         "name": "Higgsfield",
         "tagline": "Crea vídeos con tu cuenta de Higgsfield.",
-        "about": "Guarda tu clave de Higgsfield y la generación de vídeo en el chat usará tu cuenta.",
+        "about": "Guarda tu clave y secreto de Higgsfield. Las imágenes y vídeos que crees en el chat se cobrarán a tu cuenta de Higgsfield.",
         "stop": "Elimina tu clave abajo."
       },
       "mcp": {
         "name": "Servidores de herramientas (MCP)",
         "tagline": "Da a la IA herramientas de cualquier servidor MCP.",
-        "about": "Añade la dirección de un servidor. La IA podrá usar sus herramientas en el chat; las acciones arriesgadas te preguntan antes.",
+        "about": "Añade la dirección de un servidor. La IA podrá usar las herramientas de ese servidor en el chat.",
         "stop": "Desactiva el servidor o elimínalo en la lista de abajo."
       },
       "customTools": {

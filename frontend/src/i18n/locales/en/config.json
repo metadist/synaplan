@@ -661,7 +661,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Sign in with your Microsoft work or personal account so Synaplan can read your Outlook mail. Read-only, and you can disconnect at any time.",
+          "description": "Sign in with your Microsoft work or personal account. Synaplan reads your Outlook mail, can add calendar events and send results from your mailbox. You can disconnect at any time.",
           "connect": "Connect Microsoft 365",
           "connectAnother": "Connect another account",
           "connectedAs": "Connected as {account}.",

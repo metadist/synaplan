@@ -646,7 +646,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Melde dich mit deinem geschäftlichen oder privaten Microsoft-Konto an, damit Synaplan deine Outlook-Mails lesen kann. Nur lesend, und du kannst die Verbindung jederzeit trennen.",
+          "description": "Melde dich mit deinem Microsoft-Arbeits- oder Privatkonto an. Synaplan liest deine Outlook-Mails, kann Kalendertermine anlegen und Ergebnisse aus deinem Postfach senden. Du kannst die Verbindung jederzeit trennen.",
           "connect": "Microsoft 365 verbinden",
           "connectAnother": "Weiteres Konto verbinden",
           "connectedAs": "Verbunden als {account}.",

@@ -203,7 +203,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Inicia sesión con tu cuenta de Microsoft (de trabajo o personal) para que Synaplan pueda leer tu correo de Outlook. Solo lectura, y puedes desconectarla cuando quieras.",
+          "description": "Inicia sesión con tu cuenta de Microsoft profesional o personal. Synaplan lee tu correo de Outlook, puede añadir eventos al calendario y enviar resultados desde tu buzón. Puedes desconectarte en cualquier momento.",
           "connect": "Conectar Microsoft 365",
           "connectAnother": "Conectar otra cuenta",
           "connectedAs": "Conectado como {account}.",

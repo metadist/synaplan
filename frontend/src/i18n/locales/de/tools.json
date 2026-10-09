@@ -745,20 +745,20 @@
       },
       "microsoft365": {
         "name": "Microsoft 365",
-        "tagline": "Mail, Kalender und OneDrive-Dateien für deinen Assistenten.",
-        "about": "Nach der Anmeldung bei Microsoft kann die KI Mails lesen und entwerfen, deinen Kalender sehen und OneDrive-Dateien öffnen — nur mit den Rechten, die du erteilst.",
+        "tagline": "Outlook-Mail und -Kalender für deinen Assistenten.",
+        "about": "Nach der Anmeldung bei Microsoft kann die KI deine Outlook-Mails lesen, Termine in deinen Kalender eintragen und Ergebnisse aus deinem eigenen Postfach senden.",
         "stop": "Entferne die Verbindung unten. Der Zugriff endet sofort."
       },
       "dropbox": {
         "name": "Dropbox",
-        "tagline": "Lass die KI Dokumente in Dropbox lesen und ablegen.",
-        "about": "Nach der Anmeldung bei Dropbox kann die KI Dateien öffnen, auf die du sie hinweist, und Ergebnisse in deiner Dropbox speichern.",
+        "tagline": "KI-Ergebnisse direkt in Dropbox speichern.",
+        "about": "Nach der Anmeldung bei Dropbox können Aufgaben und Chats Dateien in einem Ordner deiner Wahl speichern. Synaplan durchsucht deine übrigen Dateien nicht.",
         "stop": "Entferne die Verbindung unten. Der Zugriff endet sofort."
       },
       "webdav": {
         "name": "Cloud-Ordner & Kalender",
         "tagline": "Nextcloud, OpenCloud oder jeder WebDAV-Ordner.",
-        "about": "Verbinde einen Ordner mit einem App-Passwort. Die KI kann dort Dateien lesen und speichern und bei Nextcloud auch deinen Kalender nutzen.",
+        "about": "Verbinde einen Ordner mit einem App-Passwort. Aufgaben können dort Ergebnisse speichern und mit Nextcloud Termine in deinen Kalender eintragen.",
         "stop": "Entferne die Verbindung unten. Der Zugriff endet sofort."
       },
       "nextcloud": {
@@ -788,13 +788,13 @@
       "higgsfield": {
         "name": "Higgsfield",
         "tagline": "Erstelle Videos mit deinem Higgsfield-Konto.",
-        "about": "Speichere deinen Higgsfield-Schlüssel, dann läuft die Videoerstellung im Chat über dein Konto.",
+        "about": "Speichere deinen Higgsfield-Schlüssel und das Secret. Bilder und Videos, die du im Chat erstellst, werden dann über dein Higgsfield-Konto abgerechnet.",
         "stop": "Entferne unten deinen Schlüssel."
       },
       "mcp": {
         "name": "Tool-Server (MCP)",
         "tagline": "Gib der KI Werkzeuge von einem MCP-Server.",
-        "about": "Füge eine Server-Adresse hinzu. Die KI kann dann im Chat die Werkzeuge dieses Servers aufrufen; riskante Aktionen fragen dich vorher.",
+        "about": "Gib eine Serveradresse ein. Die KI kann dann im Chat die Werkzeuge dieses Servers nutzen.",
         "stop": "Schalte den Server in der Liste unten aus oder lösche ihn."
       },
       "customTools": {
