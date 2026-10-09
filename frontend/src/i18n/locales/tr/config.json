@@ -45,11 +45,10 @@
       "autoPauseBody": "Bu görev üst üste üç kez başarısız oldu. Sorunu gider, sonra devam et.",
       "createFailed": "Görev olarak kaydedilemedi.",
       "created": "Görev olarak kaydedildi. Şimdi çalıştırabilirsin.",
-      "overviewTitle": "Kayıtlı görevler",
-      "overviewSubtitle": "İstediğinde veya daha sonra bir zamanlamayla çalışan talimatlar.",
+      "overviewTitle": "Görevler",
+      "overviewSubtitle": "İstediğinizde veya bir zamanlamayla kendiliğinden çalışan talimatlar.",
       "overviewLoading": "Kayıtlı görevler yükleniyor…",
-      "overviewEmpty": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya özel bir talimat kaydet:",
-      "overviewEmptyAssistants": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya bir asistana zamanlama ekle:",
+      "overviewEmpty": "Henüz görev yok. Bir tane oluşturun ve örneğin her sabah çalışmasını sağlayın.",
       "loadFailed": "Kayıtlı görevler yüklenemedi.",
       "delete": "Sil",
       "deleteConfirm": "\"{name}\" kayıtlı görevi silinsin mi? Bu görevin paylaşımları da kaldırılır.",
@@ -142,6 +141,22 @@
       "tabs": {
         "tasks": "Kayıtlı görevler",
         "watches": "İzlenen sayfalar"
+      },
+      "overviewEmptyHint": "Tamamlanmış bir sohbet planını saat düğmesiyle görev olarak da kaydedebilirsiniz.",
+      "newTask": {
+        "open": "Yeni görev",
+        "title": "Yeni görev",
+        "name": "Ad",
+        "namePlaceholder": "Sabah haber özeti",
+        "instruction": "Yapay zeka ne yapmalı?",
+        "instructionPlaceholder": "Sektörümüzle ilgili en önemli üç haberi bul ve her birini iki cümlede özetle.",
+        "schedule": "Ne zaman",
+        "at": "Saat",
+        "hint": "Sonuç kendi sohbetinde görünür. Her şeyi daha sonra görev kartından değiştirebilirsiniz.",
+        "create": "Görevi oluştur",
+        "created": "Görev oluşturuldu.",
+        "createdWithoutSchedule": "Görev oluşturuldu ancak zamanlama olmadan. Saati kartından ayarlayın.",
+        "failed": "Görev oluşturulmadı. Hiçbir şey kaydedilmedi; tekrar deneyin."
       }
     },
     "connections": {

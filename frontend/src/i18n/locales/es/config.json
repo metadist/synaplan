@@ -45,11 +45,10 @@
       "autoPauseBody": "Esta tarea falló tres veces seguidas. Corrige el problema y reanúdala.",
       "createFailed": "No se pudo guardar como tarea.",
       "created": "Guardada como tarea. Ya puedes ejecutarla.",
-      "overviewTitle": "Tareas guardadas",
-      "overviewSubtitle": "Instrucciones que se ejecutan cuando las pides, o más tarde según un horario.",
+      "overviewTitle": "Tareas",
+      "overviewSubtitle": "Instrucciones que se ejecutan cuando las pides o solas según un horario.",
       "overviewLoading": "Cargando tareas guardadas…",
-      "overviewEmpty": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o guarda una instrucción propia en",
-      "overviewEmptyAssistants": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o añade una programación a un asistente en",
+      "overviewEmpty": "Aún no hay tareas. Crea una y haz que se ejecute, por ejemplo, cada mañana.",
       "loadFailed": "No se pudieron cargar las tareas guardadas.",
       "delete": "Eliminar",
       "deleteConfirm": "¿Eliminar la tarea guardada \"{name}\"? También se quitan los usos compartidos de esta tarea.",
@@ -142,6 +141,22 @@
       "tabs": {
         "tasks": "Tareas guardadas",
         "watches": "Páginas vigiladas"
+      },
+      "overviewEmptyHint": "También puedes guardar un plan de chat terminado como tarea con el botón del reloj.",
+      "newTask": {
+        "open": "Nueva tarea",
+        "title": "Nueva tarea",
+        "name": "Nombre",
+        "namePlaceholder": "Resumen de noticias de la mañana",
+        "instruction": "¿Qué debe hacer la IA?",
+        "instructionPlaceholder": "Busca las tres noticias más importantes de nuestro sector y resume cada una en dos frases.",
+        "schedule": "Cuándo",
+        "at": "A las",
+        "hint": "El resultado aparece en su propio chat. Puedes cambiarlo todo más tarde en la tarjeta de la tarea.",
+        "create": "Crear tarea",
+        "created": "Tarea creada.",
+        "createdWithoutSchedule": "La tarea se creó, pero sin horario. Fija la hora en su tarjeta.",
+        "failed": "La tarea no se creó. No se guardó nada; inténtalo de nuevo."
       }
     },
     "connections": {

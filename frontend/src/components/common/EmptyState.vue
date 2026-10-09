@@ -18,6 +18,7 @@ const props = withDefaults(
     /** Renders inside an existing card without its own surface. */
     bare?: boolean
     testId?: string
+    actionTestId?: string
   }>(),
   {
     hint: undefined,
@@ -27,6 +28,7 @@ const props = withDefaults(
     to: undefined,
     bare: false,
     testId: 'empty-state',
+    actionTestId: 'btn-empty-state-action',
   }
 )
 
@@ -56,7 +58,7 @@ const emit = defineEmits<{ action: [] }>()
         v-if="props.to"
         :to="props.to"
         class="btn-primary px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2 mt-1"
-        data-testid="btn-empty-state-action"
+        :data-testid="props.actionTestId"
       >
         <component :is="props.actionIcon" v-if="props.actionIcon" class="w-4 h-4" />
         {{ props.actionLabel }}
@@ -65,7 +67,7 @@ const emit = defineEmits<{ action: [] }>()
         v-else
         type="button"
         class="btn-primary px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2 mt-1"
-        data-testid="btn-empty-state-action"
+        :data-testid="props.actionTestId"
         @click="emit('action')"
       >
         <component :is="props.actionIcon" v-if="props.actionIcon" class="w-4 h-4" />

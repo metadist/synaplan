@@ -60,7 +60,7 @@
             :title="$t('widgets.conversations.noWidgetsTitle')"
             :hint="$t('widgets.conversations.noWidgetsHint')"
             :action-label="$t('widgets.createFirst')"
-            data-testid="state-conversations-no-widgets"
+            test-id="state-conversations-no-widgets"
             @action="startCreation"
           />
           <WidgetConversations

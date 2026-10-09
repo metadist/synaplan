@@ -501,11 +501,10 @@
       "autoPauseBody": "Cette tâche a échoué trois fois de suite. Corrigez le problème, puis reprenez.",
       "createFailed": "Impossible d’enregistrer ceci comme tâche.",
       "created": "Enregistrée comme tâche. Vous pouvez la lancer maintenant.",
-      "overviewTitle": "Tâches enregistrées",
-      "overviewSubtitle": "Instructions qui s’exécutent quand vous le demandez, ou plus tard selon un planning.",
+      "overviewTitle": "Tâches",
+      "overviewSubtitle": "Des instructions qui s’exécutent à la demande ou toutes seules selon un horaire.",
       "overviewLoading": "Chargement des tâches enregistrées…",
-      "overviewEmpty": "Rien n’est encore planifié. Après un plan de chat, utilisez l’horloge — ou enregistrez une instruction personnalisée sous",
-      "overviewEmptyAssistants": "Rien n’est encore planifié. Après un plan de chat, utilisez l’horloge — ou ajoutez une planification à un assistant sous",
+      "overviewEmpty": "Pas encore de tâches. Créez-en une et laissez-la tourner chaque matin, par exemple.",
       "loadFailed": "Impossible de charger les tâches enregistrées.",
       "delete": "Supprimer",
       "deleteConfirm": "Supprimer la tâche enregistrée « {name} » ? Les partages de cette tâche sont aussi retirés.",
@@ -598,6 +597,22 @@
       "tabs": {
         "tasks": "Tâches enregistrées",
         "watches": "Pages surveillées"
+      },
+      "overviewEmptyHint": "Vous pouvez aussi enregistrer un plan de chat terminé comme tâche avec le bouton horloge.",
+      "newTask": {
+        "open": "Nouvelle tâche",
+        "title": "Nouvelle tâche",
+        "name": "Nom",
+        "namePlaceholder": "Résumé des actualités du matin",
+        "instruction": "Que doit faire l’IA ?",
+        "instructionPlaceholder": "Trouve les trois actualités les plus importantes de notre secteur et résume chacune en deux phrases.",
+        "schedule": "Quand",
+        "at": "À",
+        "hint": "Le résultat apparaît dans un chat dédié. Tout se modifie plus tard sur la fiche de la tâche.",
+        "create": "Créer la tâche",
+        "created": "Tâche créée.",
+        "createdWithoutSchedule": "La tâche a été créée, mais sans horaire. Réglez l’heure sur sa fiche.",
+        "failed": "La tâche n’a pas été créée. Rien n’a été enregistré ; réessayez."
       }
     },
     "connections": {

@@ -2,15 +2,20 @@
   <div data-testid="section-assistant-gallery">
     <div class="flex flex-wrap items-center gap-2 mb-4">
       <button
-        v-for="chip in chips"
+        v-for="chip in visibleChips"
         :key="chip.id"
         type="button"
-        class="px-3 py-1.5 rounded-full text-sm font-medium"
+        class="px-3 py-1.5 rounded-full text-sm font-medium inline-flex items-center gap-1.5"
         :class="filter === chip.id ? 'btn-primary' : 'btn-secondary'"
+        :title="chip.hint"
+        :aria-pressed="filter === chip.id"
         :data-testid="`chip-gallery-${chip.id}`"
         @click="filter = chip.id"
       >
         {{ chip.label }}
+        <span class="text-xs opacity-80" :data-testid="`count-gallery-${chip.id}`">{{
+          chip.count
+        }}</span>
       </button>
       <input
         v-model="search"
@@ -25,20 +30,21 @@
       <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
     </div>
 
+    <EmptyState
+      v-else-if="visibleCards.length === 0 && filter === 'mine' && !search.trim()"
+      :title="$t('assistants.galleryEmpty')"
+      :action-label="$t('assistants.create')"
+      action-test-id="btn-create-assistant"
+      test-id="state-gallery-empty"
+      @action="$emit('create')"
+    />
+
     <div
-      v-else-if="visibleCards.length === 0 && filter === 'mine'"
-      class="surface-card rounded-lg p-12 text-center"
-      data-testid="state-gallery-empty"
+      v-else-if="visibleCards.length === 0 && search.trim()"
+      class="surface-card rounded-lg p-12 text-center txt-secondary"
+      data-testid="state-gallery-no-results"
     >
-      <p class="txt-secondary mb-4">{{ $t('assistants.galleryEmpty') }}</p>
-      <button
-        type="button"
-        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
-        data-testid="btn-create-assistant"
-        @click="$emit('create')"
-      >
-        {{ $t('assistants.create') }}
-      </button>
+      {{ $t('assistants.noResults', { query: search.trim() }) }}
     </div>
 
     <div
@@ -84,6 +90,7 @@ import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import AssistantCard from './AssistantCard.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { useAgentsStore } from '@/stores/agents'
 
 defineEmits<{
@@ -96,24 +103,42 @@ defineEmits<{
 
 const { t } = useI18n()
 const store = useAgentsStore()
+const CHIP_LABEL = {
+  mine: 'Mine',
+  shared: 'Shared',
+  plugin: 'Plugins',
+  archived: 'Archived',
+} as const
 const filter = ref<'mine' | 'shared' | 'plugin' | 'archived'>('mine')
 const search = ref('')
 
-const chips = computed(() => [
-  { id: 'mine' as const, label: t('assistants.filterMine') },
-  { id: 'shared' as const, label: t('assistants.filterShared') },
-  { id: 'plugin' as const, label: t('assistants.filterPlugins') },
-  { id: 'archived' as const, label: t('assistants.filterArchived') },
-])
+type GalleryFilter = 'mine' | 'shared' | 'plugin' | 'archived'
+type GalleryCard = (typeof store.gallery)[number]
+
+function inFilter(card: GalleryCard, id: GalleryFilter): boolean {
+  const origin = card.origin ?? 'mine'
+  if (id === 'archived') return card.status === 'archived' && origin === 'mine'
+  return card.status !== 'archived' && origin === id
+}
+
+const chips = computed(() =>
+  (['mine', 'shared', 'plugin', 'archived'] as const).map((id) => ({
+    id,
+    label: t(`assistants.filter${CHIP_LABEL[id]}`),
+    hint: t(`assistants.filterHint.${id}`),
+    count: store.gallery.filter((card) => inFilter(card, id)).length,
+  }))
+)
+
+/** Empty chips only add noise; Mine stays as the place to start, the active chip stays so it can be left. */
+const visibleChips = computed(() =>
+  chips.value.filter((chip) => chip.id === 'mine' || chip.id === filter.value || chip.count > 0)
+)
 
 const visibleCards = computed(() => {
   const q = search.value.trim().toLowerCase()
   return store.gallery.filter((card) => {
-    if (filter.value === 'archived') {
-      if (card.status !== 'archived' || (card.origin ?? 'mine') !== 'mine') {
-        return false
-      }
-    } else if (card.status === 'archived' || (card.origin ?? 'mine') !== filter.value) {
+    if (!inFilter(card, filter.value)) {
       return false
     }
     if (!q) {

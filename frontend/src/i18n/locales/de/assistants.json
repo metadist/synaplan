@@ -223,7 +223,15 @@
       "saturday": "Samstag",
       "sunday": "Sonntag"
     },
-    "shareDraftHint": "Dies ist ein Entwurf. Sie können ihn teilen, damit jemand ihn lesen oder in einem privaten Chat ausprobieren kann. Er ist nicht veröffentlicht, deshalb wählt die Weiterleitung ihn nicht aus."
+    "shareDraftHint": "Dies ist ein Entwurf. Sie können ihn teilen, damit jemand ihn lesen oder in einem privaten Chat ausprobieren kann. Er ist nicht veröffentlicht, deshalb wählt die Weiterleitung ihn nicht aus.",
+    "intro": "Ein Assistent ist eine KI mit eigenen Anweisungen, Dateien und Werkzeugen. Chatte mit einem oder baue deinen eigenen.",
+    "noResults": "Kein Assistent passt zu „{query}“.",
+    "filterHint": {
+      "mine": "Assistenten, die du gebaut hast.",
+      "shared": "Assistenten, die jemand mit dir geteilt hat. Du kannst mit ihnen chatten; ändern kann nur der Besitzer.",
+      "plugin": "Fertige Assistenten, die mit einem installierten Plugin kommen.",
+      "archived": "Assistenten, die du weggelegt hast. Sie erscheinen nicht mehr im Chat; stelle einen wieder her, um ihn zu nutzen."
+    }
   },
   "bundle": {
     "title": "Exportieren & importieren",

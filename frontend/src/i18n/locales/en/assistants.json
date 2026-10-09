@@ -223,7 +223,15 @@
       "saturday": "Saturday",
       "sunday": "Sunday"
     },
-    "shareDraftHint": "This is a draft. You can share it so someone can read it or try it in a private chat. It is not published, so the router will not pick it."
+    "shareDraftHint": "This is a draft. You can share it so someone can read it or try it in a private chat. It is not published, so the router will not pick it.",
+    "intro": "An assistant is an AI with its own instructions, files and tools. Chat with one, or build your own.",
+    "noResults": "No assistant matches “{query}”.",
+    "filterHint": {
+      "mine": "Assistants you built.",
+      "shared": "Assistants someone shared with you. You can chat with them; only the owner can change them.",
+      "plugin": "Ready-made assistants that come with an installed plugin.",
+      "archived": "Assistants you put away. They no longer appear in the chat; restore one to use it again."
+    }
   },
   "bundle": {
     "title": "Export & import",

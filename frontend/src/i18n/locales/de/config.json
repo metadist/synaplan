@@ -488,11 +488,10 @@
       "autoPauseBody": "Diese Aufgabe ist dreimal hintereinander fehlgeschlagen. Behebe das Problem und setze sie fort.",
       "createFailed": "Konnte nicht als Aufgabe gespeichert werden.",
       "created": "Als Aufgabe gespeichert. Du kannst sie jetzt ausführen.",
-      "overviewTitle": "Gespeicherte Aufgaben",
-      "overviewSubtitle": "Anweisungen, die auf Zuruf oder später nach Zeitplan laufen.",
+      "overviewTitle": "Aufgaben",
+      "overviewSubtitle": "Anweisungen, die laufen, wenn du sie startest, oder von selbst nach Zeitplan.",
       "overviewLoading": "Gespeicherte Aufgaben werden geladen…",
-      "overviewEmpty": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder eine eigene Anweisung speichern unter",
-      "overviewEmptyAssistants": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder einem Assistenten einen Zeitplan geben unter",
+      "overviewEmpty": "Noch keine Aufgaben. Lege eine an und lass sie zum Beispiel jeden Morgen laufen.",
       "loadFailed": "Gespeicherte Aufgaben konnten nicht geladen werden.",
       "delete": "Löschen",
       "deleteConfirm": "Die gespeicherte Aufgabe \"{name}\" löschen? Freigaben dieser Aufgabe werden ebenfalls entfernt.",
@@ -585,6 +584,22 @@
       "tabs": {
         "tasks": "Gespeicherte Aufgaben",
         "watches": "Beobachtete Seiten"
+      },
+      "overviewEmptyHint": "Du kannst auch einen fertigen Chat-Plan mit dem Uhr-Symbol als Aufgabe speichern.",
+      "newTask": {
+        "open": "Neue Aufgabe",
+        "title": "Neue Aufgabe",
+        "name": "Bezeichnung",
+        "namePlaceholder": "Morgendliche Nachrichtenübersicht",
+        "instruction": "Was soll die KI tun?",
+        "instructionPlaceholder": "Finde die drei wichtigsten Nachrichten zu unserer Branche und fasse jede in zwei Sätzen zusammen.",
+        "schedule": "Wann",
+        "at": "Um",
+        "hint": "Das Ergebnis erscheint in einem eigenen Chat. Alles lässt sich später auf der Aufgabenkarte ändern.",
+        "create": "Aufgabe anlegen",
+        "created": "Aufgabe angelegt.",
+        "createdWithoutSchedule": "Die Aufgabe wurde angelegt, aber ohne Zeitplan. Stelle die Zeit auf ihrer Karte ein.",
+        "failed": "Die Aufgabe wurde nicht angelegt. Es wurde nichts gespeichert; versuche es erneut."
       }
     },
     "connections": {

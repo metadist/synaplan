@@ -945,7 +945,7 @@
   },
   "approvals": {
     "title": "Approvals",
-    "subtitle": "Things that wait for you before they happen.",
+    "subtitle": "Before an assistant or a task sends mail, writes to a calendar, saves a file or calls an outside tool, it can wait here for your OK.",
     "pending": "Waiting",
     "decided": "Decided",
     "emptyPending": "Nothing needs your approval. Cards appear here when a saved task or a chat wants to change something.",
@@ -978,7 +978,8 @@
       "expired": "Expired",
       "executed": "Done",
       "failed": "Failed"
-    }
+    },
+    "openTasks": "Open tasks"
   },
   "knowledgeSources": {
     "title": "Sources",
@@ -989,16 +990,25 @@
     "unavailable": "This passage could not be opened."
   },
   "savedPrompts": {
-    "title": "Prompts",
-    "empty": "Save a prompt once, then insert it by typing /.",
-    "new": "New prompt",
+    "title": "Shortcuts",
+    "empty": "Save a text once, then insert it by typing /.",
+    "new": "New shortcut",
     "name": "Name",
     "command": "Command",
-    "body": "Prompt",
-    "saved": "Prompt saved.",
-    "save": "Save prompt",
+    "body": "Text",
+    "saved": "Shortcut saved.",
+    "save": "Save shortcut",
     "edit": "Edit",
-    "editTitle": "Edit prompt",
-    "deleteFailed": "The prompt could not be deleted. It is still in your list."
+    "editTitle": "Edit shortcut",
+    "deleteFailed": "The shortcut could not be deleted. It is still in your list.",
+    "intro": "Text you type often, saved once. Type / in the chat to insert it.",
+    "emptyExample": "For example /summary → “Summarise this in five bullet points for a manager.”",
+    "commandPlaceholder": "summary",
+    "commandHint": "In the chat you type /{command}.",
+    "bodyPlaceholder": "Summarise this in five bullet points for a manager.",
+    "saveFailed": "The shortcut was not saved. Check that the command is not used yet, then try again.",
+    "loadFailed": "Your shortcuts could not be loaded. They are still saved.",
+    "deleteTitle": "Delete shortcut?",
+    "deleteConfirm": "/{command} disappears from the chat menu. Messages you already sent stay as they are."
   }
 }

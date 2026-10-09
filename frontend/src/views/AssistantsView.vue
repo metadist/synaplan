@@ -3,7 +3,7 @@
     <div class="container mx-auto px-6 py-8 max-w-[80rem] overflow-x-hidden">
       <PageHeader
         :title="headerTitle"
-        :subtitle="builderMode ? currentName : undefined"
+        :subtitle="builderMode ? currentName : $t('assistants.intro')"
         icon="mdi:robot-outline"
       >
         <button

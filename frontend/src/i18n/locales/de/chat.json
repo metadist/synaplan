@@ -943,7 +943,7 @@
   },
   "approvals": {
     "title": "Freigaben",
-    "subtitle": "Dinge, die auf dich warten, bevor sie passieren.",
+    "subtitle": "Bevor ein Assistent oder eine Aufgabe eine Mail sendet, in einen Kalender schreibt, eine Datei speichert oder ein externes Werkzeug aufruft, kann sie hier auf dein OK warten.",
     "pending": "Wartend",
     "decided": "Entschieden",
     "emptyPending": "Nichts braucht deine Freigabe. Karten erscheinen hier, wenn eine gespeicherte Aufgabe oder ein Chat etwas ändern möchte.",
@@ -976,7 +976,8 @@
       "expired": "Abgelaufen",
       "executed": "Erledigt",
       "failed": "Fehlgeschlagen"
-    }
+    },
+    "openTasks": "Aufgaben öffnen"
   },
   "knowledgeSources": {
     "title": "Quellen",
@@ -987,16 +988,25 @@
     "unavailable": "Diese Textstelle konnte nicht geöffnet werden."
   },
   "savedPrompts": {
-    "title": "Prompts",
-    "empty": "Speichere einen Prompt und füge ihn mit / ein.",
-    "new": "Neuer Prompt",
+    "title": "Schnellbefehle",
+    "empty": "Speichere einen Text einmal und füge ihn mit / ein.",
+    "new": "Neuer Schnellbefehl",
     "name": "Name",
     "command": "Befehl",
-    "body": "Prompt",
-    "saved": "Prompt gespeichert.",
-    "save": "Prompt speichern",
+    "body": "Text",
+    "saved": "Schnellbefehl gespeichert.",
+    "save": "Schnellbefehl speichern",
     "edit": "Bearbeiten",
-    "editTitle": "Prompt bearbeiten",
-    "deleteFailed": "Der Prompt konnte nicht gelöscht werden. Er ist weiterhin in deiner Liste."
+    "editTitle": "Schnellbefehl bearbeiten",
+    "deleteFailed": "Der Schnellbefehl konnte nicht gelöscht werden. Er ist noch in deiner Liste.",
+    "intro": "Texte, die du oft tippst, einmal gespeichert. Tippe / im Chat, um sie einzufügen.",
+    "emptyExample": "Zum Beispiel /zusammenfassung → „Fasse das in fünf Stichpunkten für eine Führungskraft zusammen.“",
+    "commandPlaceholder": "zusammenfassung",
+    "commandHint": "Im Chat tippst du /{command}.",
+    "bodyPlaceholder": "Fasse das in fünf Stichpunkten für eine Führungskraft zusammen.",
+    "saveFailed": "Der Schnellbefehl wurde nicht gespeichert. Prüfe, ob der Befehl schon vergeben ist, und versuche es erneut.",
+    "loadFailed": "Deine Schnellbefehle konnten nicht geladen werden. Sie sind weiterhin gespeichert.",
+    "deleteTitle": "Schnellbefehl löschen?",
+    "deleteConfirm": "/{command} verschwindet aus dem Chat-Menü. Bereits gesendete Nachrichten bleiben unverändert."
   }
 }

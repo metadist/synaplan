@@ -223,7 +223,15 @@
       "saturday": "samedi",
       "sunday": "dimanche"
     },
-    "shareDraftHint": "Ceci est un brouillon. Vous pouvez le partager pour qu’une personne le lise ou l’essaie dans une discussion privée. Il n’est pas publié, donc le routeur ne le choisira pas."
+    "shareDraftHint": "Ceci est un brouillon. Vous pouvez le partager pour qu’une personne le lise ou l’essaie dans une discussion privée. Il n’est pas publié, donc le routeur ne le choisira pas.",
+    "intro": "Un assistant est une IA avec ses propres instructions, fichiers et outils. Discutez avec l’un d’eux ou créez le vôtre.",
+    "noResults": "Aucun assistant ne correspond à « {query} ».",
+    "filterHint": {
+      "mine": "Les assistants que vous avez créés.",
+      "shared": "Les assistants partagés avec vous. Vous pouvez discuter avec eux ; seul le propriétaire peut les modifier.",
+      "plugin": "Des assistants prêts à l’emploi fournis par un plugin installé.",
+      "archived": "Les assistants mis de côté. Ils n’apparaissent plus dans le chat ; restaurez-en un pour le réutiliser."
+    }
   },
   "bundle": {
     "title": "Exporter et importer",
