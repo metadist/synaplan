@@ -3,9 +3,15 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import MessageImage from '@/components/MessageImage.vue'
 
+const { mockNotifyError } = vi.hoisted(() => ({ mockNotifyError: vi.fn() }))
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({ success: vi.fn(), error: mockNotifyError }),
+}))
+
 describe('MessageImage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockNotifyError.mockClear()
     // Provide #app teleport target
     if (!document.getElementById('app')) {
       const app = document.createElement('div')
@@ -54,31 +60,76 @@ describe('MessageImage', () => {
     expect(wrapper.text()).toContain('Test image')
   })
 
-  it('should have aspect-video class for 16:9 ratio', async () => {
-    const wrapper = mount(MessageImage, {
-      props: {
-        url: 'https://example.com/image.jpg',
-      },
+  describe('preview box (issue #2405)', () => {
+    const box = (wrapper: ReturnType<typeof mount>) =>
+      wrapper.find('[data-testid="btn-image-fullscreen"]')
+
+    it('keeps a fixed 16:9 placeholder until the image has loaded', async () => {
+      const wrapper = mount(MessageImage, {
+        props: { url: 'https://example.com/image.jpg' },
+      })
+      await flushPromises()
+
+      expect(box(wrapper).classes()).toContain('aspect-video')
+      expect(wrapper.text()).toContain('Loading')
     })
 
-    // Wait for async loadImage() to complete
-    await flushPromises()
+    it('shows the loaded image whole, at its own aspect ratio inside a height cap', async () => {
+      const wrapper = mount(MessageImage, {
+        props: { url: 'https://example.com/image.jpg' },
+      })
+      await flushPromises()
 
-    expect(wrapper.find('.aspect-video').exists()).toBe(true)
-  })
+      const img = wrapper.find('[data-testid="img-message-image"]')
+      await img.trigger('load')
 
-  it('should have object-cover for image', async () => {
-    const wrapper = mount(MessageImage, {
-      props: {
-        url: 'https://example.com/image.jpg',
-      },
+      expect(box(wrapper).classes()).not.toContain('aspect-video')
+      expect(img.classes()).not.toContain('object-cover')
+      expect(img.classes()).toContain('object-contain')
+      expect(img.classes()).toContain('max-w-full')
+      expect(img.classes().some((name) => name.startsWith('max-h-'))).toBe(true)
+      expect(img.classes().some((name) => name.includes('scale-'))).toBe(false)
     })
 
-    // Wait for async loadImage() to complete
-    await flushPromises()
+    it('returns to the fixed placeholder while a loaded image retries after an error', async () => {
+      const wrapper = mount(MessageImage, {
+        props: { url: 'https://example.com/image.jpg' },
+      })
+      await flushPromises()
 
-    const img = wrapper.find('img')
-    expect(img.classes()).toContain('object-cover')
+      const img = wrapper.find('[data-testid="img-message-image"]')
+      await img.trigger('load')
+      expect(box(wrapper).classes()).not.toContain('aspect-video')
+
+      // The first error retries with a fresh credential; the box must not collapse meanwhile.
+      await img.trigger('error')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(false)
+      expect(box(wrapper).classes()).toContain('aspect-video')
+      expect(wrapper.text()).toContain('Loading')
+
+      await wrapper.find('[data-testid="img-message-image"]').trigger('load')
+      expect(box(wrapper).classes()).not.toContain('aspect-video')
+    })
+
+    it('keeps the fixed placeholder size after the image failed to load', async () => {
+      const wrapper = mount(MessageImage, {
+        props: { url: 'https://example.com/image.jpg' },
+      })
+      await flushPromises()
+
+      const img = wrapper.find('[data-testid="img-message-image"]')
+      await img.trigger('load')
+      // First error retries with a fresh credential, the second one gives up.
+      await img.trigger('error')
+      await flushPromises()
+      await wrapper.find('[data-testid="img-message-image"]').trigger('error')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="image-load-error"]').exists()).toBe(true)
+      expect(box(wrapper).classes()).toContain('aspect-video')
+    })
   })
 
   describe('download (issue #1071)', () => {
@@ -132,6 +183,31 @@ describe('MessageImage', () => {
       // The visible image is a plain `src`, so the download fetches its own
       // blob over the Bearer-authenticated path before saving it.
       expect(clickSpy).toHaveBeenCalledTimes(1)
+      expect(mockNotifyError).not.toHaveBeenCalled()
+    })
+
+    it('tells the user when the download failed', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.reject(new TypeError('Failed to fetch')))
+      )
+      const clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined)
+
+      const wrapper = mount(MessageImage, {
+        props: { url: '/api/v1/files/uploads/1/000/cat.png', alt: 'cat' },
+      })
+      await flushPromises()
+
+      await wrapper.find('[data-testid="btn-image-download"]').trigger('click')
+      await flushPromises()
+
+      expect(clickSpy).not.toHaveBeenCalled()
+      expect(mockNotifyError).toHaveBeenCalledWith(
+        'The image could not be downloaded. Please try again.'
+      )
     })
   })
 

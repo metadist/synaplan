@@ -799,6 +799,7 @@
     "thoughtFor": "Thought for {n} second | Thought for {n} seconds",
     "reasoning": "AI Reasoning",
     "downloadImage": "Download image",
+    "downloadImageFailed": "The image could not be downloaded. Please try again.",
     "fileGenerated": "I've created the file '{filename}' for you. You can now download it.",
     "documentChanges": "Changes in this file",
     "documentChangesTitle": "What changed",

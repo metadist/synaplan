@@ -798,6 +798,7 @@
     "thoughtFor": "{n} saniye düşündü",
     "reasoning": "AI Akıl Yürütme",
     "downloadImage": "Görseli indir",
+    "downloadImageFailed": "Görsel indirilemedi. Lütfen tekrar deneyin.",
     "fileGenerated": "Sizin için '{filename}' dosyasını oluşturdum. Şimdi indirebilirsiniz.",
     "documentChanges": "Bu dosyadaki değişiklikler",
     "documentChangesTitle": "Neler değişti",

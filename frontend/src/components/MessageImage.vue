@@ -1,7 +1,10 @@
 <template>
   <div class="my-3" data-testid="section-message-image">
+    <!-- The fixed 16:9 box is only the placeholder. A loaded image keeps its own
+         aspect ratio inside the height cap, so no edge is ever cut off. -->
     <div
-      class="relative w-full aspect-video surface-card overflow-hidden cursor-pointer group border border-light-border/30 dark:border-dark-border/20 hover:border-light-border/50 dark:hover:border-dark-border/30 transition-all"
+      class="relative flex w-full items-center justify-center surface-card overflow-hidden cursor-pointer group border border-light-border/30 dark:border-dark-border/20 hover:border-light-border/50 dark:hover:border-dark-border/30 transition-all"
+      :class="{ 'aspect-video': !showsImage }"
       data-testid="btn-image-fullscreen"
       @click="openFullscreen"
     >
@@ -9,7 +12,8 @@
         v-if="imageSrc && !hasFailed"
         :src="imageSrc"
         :alt="alt"
-        class="w-full h-full object-cover transition-transform group-hover:scale-105"
+        class="block h-auto w-auto min-w-0 max-w-full max-h-[min(32rem,70vh)] object-contain"
+        data-testid="img-message-image"
         loading="lazy"
         @load="onLoaded"
         @error="onError"
@@ -149,6 +153,8 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useNotification } from '@/composables/useNotification'
 import { fetchMediaBlob, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
 import { saveOrDownloadBlob } from '@/services/api/nativeDownload'
 
@@ -159,6 +165,8 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const { t } = useI18n()
+const { error: showError } = useNotification()
 const { mediaSrc, reloadMedia } = useMediaSrc()
 
 const isFullscreen = ref(false)
@@ -170,6 +178,8 @@ const hasRetried = ref(false)
 // actually defers the request, and no decoded copy is pinned in JS memory.
 // On native the URL carries a purpose-scoped media credential (see mediaAuth).
 const imageSrc = computed(() => mediaSrc(props.url))
+
+const showsImage = computed(() => isLoaded.value && !hasFailed.value)
 
 const onLoaded = () => {
   isLoaded.value = true
@@ -183,6 +193,8 @@ const onLoaded = () => {
 // The most common cause of a rejected media URL is an aged-out credential, so
 // mint a fresh one and let the element try again before blaming the server.
 const onError = async () => {
+  // Back to the fixed placeholder: a broken image has no size to hold the box.
+  isLoaded.value = false
   if (hasRetried.value) {
     hasFailed.value = true
     return
@@ -217,6 +229,7 @@ const downloadImage = async () => {
     await saveOrDownloadBlob(blob, downloadFilename())
   } catch (error) {
     console.error('Failed to download image:', error)
+    showError(t('message.downloadImageFailed'))
   }
 }
 
