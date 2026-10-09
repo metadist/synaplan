@@ -85,6 +85,20 @@
               </span>
             </span>
           </button>
+          <p
+            v-if="chat.tags && chat.tags.length > 0"
+            class="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5 px-1.5 pb-1"
+            data-testid="list-chat-tags"
+          >
+            <span
+              v-for="(tag, index) in chat.tags"
+              :key="`${chat.id}-${index}`"
+              class="max-w-full truncate text-[11px] leading-4 txt-secondary"
+              data-testid="text-chat-tag"
+            >
+              {{ tag }}
+            </span>
+          </p>
           <div
             v-if="!chat.incoming"
             class="chat-row-menu absolute inset-y-0 right-0 flex items-stretch"
@@ -182,6 +196,15 @@
           <button
             type="button"
             class="dropdown-item"
+            data-testid="btn-chat-v2-tags"
+            @click="onTags"
+          >
+            <Icon icon="mdi:tag" class="w-4 h-4" />
+            {{ $t('chat.tags') }}
+          </button>
+          <button
+            type="button"
+            class="dropdown-item"
             data-testid="btn-chat-v2-archive"
             @click="onArchive"
           >
@@ -220,7 +243,11 @@ import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { canExportChats, canShareChats } from '@/composables/useChatWelcome'
+import { useDialog } from '@/composables/useDialog'
+import { useNotification } from '@/composables/useNotification'
 import { useChatsStore } from '@/stores/chats'
+import { parseTagLines } from '@/utils/chatTags'
+import { getErrorMessage } from '@/utils/errorMessage'
 import type { HistoryChat } from '@/composables/useChatHistory'
 
 const PREVIEW_ID = 'chat-row-preview'
@@ -481,9 +508,10 @@ const toggleMenu = (chatId: number, event: MouseEvent) => {
     menuChatId.value = null
     return
   }
-  const btn = event.currentTarget as HTMLElement
+  const btn = (event.currentTarget ?? event.target) as HTMLElement | null
+  if (!(btn instanceof HTMLElement)) return
   const rect = btn.getBoundingClientRect()
-  const menuHeight = 140
+  const menuHeight = 176
   const menuWidth = 176
   const spaceBelow = window.innerHeight - rect.bottom
   const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4
@@ -506,6 +534,30 @@ const onShare = () => {
 const onRename = () => {
   const id = takeMenuId()
   if (id !== null) emit('rename', id)
+}
+
+const dialog = useDialog()
+const { success, error: notifyError } = useNotification()
+
+const onTags = async () => {
+  const id = takeMenuId()
+  if (id === null) return
+  const chat = props.chats.find((row) => row.id === id)
+  const edited = await dialog.prompt({
+    title: t('chat.tags'),
+    message: t('chat.tags'),
+    defaultValue: (chat?.tags ?? []).join('\n'),
+    confirmText: t('common.save'),
+    cancelText: t('common.cancel'),
+    multiline: true,
+  })
+  if (edited === null) return
+  try {
+    await chatsStore.updateChatTags(id, parseTagLines(edited))
+    success(t('chat.tagsSaved'))
+  } catch (err: unknown) {
+    notifyError(getErrorMessage(err))
+  }
 }
 
 const onDelete = () => {
