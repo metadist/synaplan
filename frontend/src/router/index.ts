@@ -323,7 +323,6 @@ const router = createRouter({
       component: () => import('@/views/WidgetsView.vue'),
       meta: {
         requiresAuth: true,
-        helpId: 'tools.chatWidget',
         titleKey: 'pageTitles.chatWidget',
         // The widget editor reuses the model capability labels (config).
         i18n: ['widgets', 'config'],
@@ -364,7 +363,6 @@ const router = createRouter({
       component: () => import('@/views/ToolsView.vue'),
       meta: {
         requiresAuth: true,
-        helpId: 'tools.mailHandler',
         titleKey: 'pageTitles.mailHandler',
         i18n: ['tools'],
       },

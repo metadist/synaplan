@@ -2176,3 +2176,82 @@ input[type='month']:not(:disabled)::-webkit-calendar-picker-indicator,
 input[type='week']:not(:disabled)::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
+
+/* Guided tours (driver.js) — themed from tokens so light, dark and V2 match. */
+.driver-popover.synaplan-tour {
+  background: var(--bg-card);
+  color: var(--txt-primary);
+  border-radius: 1rem;
+  padding: 1rem 1.125rem;
+  max-width: min(360px, calc(100vw - 2rem));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--txt-primary) 12%, transparent),
+    0 12px 32px rgb(0 0 0 / 0.25);
+  font-family: inherit;
+}
+.driver-popover.synaplan-tour .driver-popover-title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--txt-primary);
+}
+.driver-popover.synaplan-tour .driver-popover-description {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--txt-secondary);
+  margin-top: 0.375rem;
+}
+.driver-popover.synaplan-tour .driver-popover-progress-text {
+  font-size: 0.75rem;
+  color: var(--txt-secondary);
+}
+.driver-popover.synaplan-tour .driver-popover-footer {
+  margin-top: 1rem;
+  gap: 0.5rem;
+}
+.driver-popover.synaplan-tour .driver-popover-navigation-btns {
+  gap: 0.5rem;
+}
+.driver-popover.synaplan-tour .driver-popover-footer button {
+  text-shadow: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.4rem 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--txt-primary) 18%, transparent);
+  background: transparent;
+  color: var(--txt-primary);
+  margin: 0;
+}
+.driver-popover.synaplan-tour .driver-popover-footer button:hover,
+.driver-popover.synaplan-tour .driver-popover-footer button:focus-visible {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+.driver-popover.synaplan-tour .driver-popover-footer .driver-popover-next-btn {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--on-brand);
+}
+.driver-popover.synaplan-tour .driver-popover-footer .driver-popover-next-btn:hover,
+.driver-popover.synaplan-tour .driver-popover-footer .driver-popover-next-btn:focus-visible {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+.driver-popover.synaplan-tour .driver-popover-close-btn {
+  color: var(--txt-secondary);
+}
+.driver-popover.synaplan-tour .driver-popover-close-btn:hover {
+  color: var(--txt-primary);
+}
+.driver-popover.synaplan-tour .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: var(--bg-card);
+}
+.driver-popover.synaplan-tour .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: var(--bg-card);
+}
+.driver-popover.synaplan-tour .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: var(--bg-card);
+}
+.driver-popover.synaplan-tour .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: var(--bg-card);
+}

@@ -22,12 +22,21 @@ import { Icon } from '@iconify/vue'
  * - Tab bars (TabNav) go into the default slot so they always sit between the
  *   header and the content cards.
  */
-defineProps<{
+import { computed } from 'vue'
+import { QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
+import { useTour } from '@/composables/useTour'
+
+const props = defineProps<{
   title: string
   subtitle?: string
   /** Iconify icon name, e.g. "heroicons:chat-bubble-left-right". */
   icon?: string
+  /** Guided tour (src/tours) restarted by the `?` button next to the title. */
+  tourId?: string
 }>()
+
+const { startTour, hasTour } = useTour()
+const showTourButton = computed(() => hasTour(props.tourId))
 </script>
 
 <template>
@@ -44,7 +53,20 @@ defineProps<{
           </slot>
         </span>
         <div class="min-w-0">
-          <h1 class="text-2xl font-semibold txt-primary">{{ title }}</h1>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-2xl font-semibold txt-primary">{{ title }}</h1>
+            <button
+              v-if="showTourButton"
+              type="button"
+              class="icon-ghost p-1 rounded-lg"
+              :aria-label="$t('tours.common.start')"
+              :title="$t('tours.common.start')"
+              data-testid="btn-page-help"
+              @click="startTour(tourId as string)"
+            >
+              <QuestionMarkCircleIcon class="w-5 h-5" />
+            </button>
+          </div>
           <p v-if="subtitle || $slots.subtitle" class="txt-secondary text-sm mt-1">
             <slot name="subtitle">{{ subtitle }}</slot>
           </p>

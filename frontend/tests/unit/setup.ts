@@ -25,9 +25,7 @@ global.fetch = vi.fn((url) => {
             enabled: false,
             siteKey: '',
           },
-          features: {
-            help: false,
-          },
+          features: {},
         }),
     })
   }

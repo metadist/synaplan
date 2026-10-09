@@ -7,7 +7,7 @@ const RouterLinkStub = {
   template: '<a :href="to" data-router-link><slot /></a>',
 }
 
-const mountEmpty = (props: Record<string, unknown>) =>
+const mountEmpty = (props: { title: string } & Record<string, unknown>) =>
   mount(EmptyState, { props, global: { stubs: { RouterLink: RouterLinkStub } } })
 
 describe('EmptyState', () => {

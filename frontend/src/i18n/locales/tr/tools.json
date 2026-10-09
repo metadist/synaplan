@@ -64,13 +64,6 @@
     "searchCommands": "Komut ara...",
     "noCommandsFound": "Aramanızla eşleşen komut bulunamadı"
   },
-  "help": {
-    "title": "Yardım",
-    "openHelp": "Yardımı aç",
-    "close": "Kapat",
-    "gotIt": "Anladım!",
-    "noContent": "Bu sayfa için yardım içeriği mevcut değil"
-  },
   "aiProvider": {
     "error": {
       "visionModelHint": "Görüntü destekli model yapılandırılmamış",
@@ -688,5 +681,14 @@
     "useTemplateDone": "Kopya oluşturuldu. Siz açana kadar kapalı.",
     "useTemplateNeedsSetup": "Kopya oluşturuldu ve kapalı bırakıldı. Açmadan önce eksik asistanı, aracı veya bağlantıyı bağlayın.",
     "useTemplateNeedsSetupItems": "Kopya oluşturuldu ve kapalı bırakıldı. Hâlâ gerekli: {items}."
+  },
+  "tours": {
+    "common": {
+      "start": "Bana göster",
+      "next": "İleri",
+      "back": "Geri",
+      "done": "Bitti",
+      "progress": "{current} / {total}"
+    }
   }
 }

@@ -64,13 +64,6 @@
     "searchCommands": "Search commands...",
     "noCommandsFound": "No commands match your search"
   },
-  "help": {
-    "title": "Help",
-    "openHelp": "Open help",
-    "close": "Close",
-    "gotIt": "Got it!",
-    "noContent": "No help available for this page"
-  },
   "mail": {
     "title": "Mail Handler Configuration",
     "pickUpConfig": "Mail Pick Up Config",
@@ -762,5 +755,14 @@
     "useTemplateDone": "Copy created. It is off until you turn it on.",
     "useTemplateNeedsSetup": "Copy created and left off. Connect the missing assistant, tool, or connection before you turn it on.",
     "useTemplateNeedsSetupItems": "Copy created and left off. Still needed: {items}."
+  },
+  "tours": {
+    "common": {
+      "start": "Show me around",
+      "next": "Next",
+      "back": "Back",
+      "done": "Done",
+      "progress": "{current} of {total}"
+    }
   }
 }

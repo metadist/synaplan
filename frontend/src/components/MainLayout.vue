@@ -110,8 +110,7 @@
       <IncognitoToggle />
     </div>
 
-    <!-- Help system host -->
-    <HelpHost />
+    <TourHost />
 
     <!-- Global background-jobs tray (Release 4.0) — self-contained floating launcher -->
     <JobsTrayLauncher />
@@ -130,7 +129,7 @@ import { useConfigStore } from '../stores/config'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import SidebarV2 from './SidebarV2.vue'
 import MobileNav from './MobileNav.vue'
-import HelpHost from './help/HelpHost.vue'
+import TourHost from './help/TourHost.vue'
 import JobsTrayLauncher from './jobs/JobsTrayLauncher.vue'
 import IncognitoToggle from './IncognitoToggle.vue'
 import ModelMixControl from './chat/ModelMixControl.vue'

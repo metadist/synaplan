@@ -21,7 +21,7 @@ export type WidgetI18nNamespace = (typeof WIDGET_I18N_NAMESPACES)[number]
  * Sidebar / mobile-nav chrome. Loaded on every non-public route so shell
  * labels (`iam.incoming.*`, `settings.logout`, guest/auth, recent chats)
  * never render as raw keys. `core` is already implied by the loader.
- * `tools` covers the chrome-resident jobs tray + help (and the media-job
+ * `tools` covers the chrome-resident jobs tray + guided tours (and the media-job
  * store toasts, which can fire on any route and cannot be gated).
  */
 export const CHROME_I18N_NAMESPACES = ['chat', 'auth', 'admin', 'settings', 'tools'] as const
@@ -138,7 +138,6 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'channels',
     'compute',
     'customTools',
-    'help',
     'jobs',
     'linkedPlatforms',
     'mail',
@@ -146,6 +145,7 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'messagesGateway',
     'plugins',
     'tools',
+    'tours',
     'workflows',
   ],
 }

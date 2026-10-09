@@ -55,13 +55,6 @@
     "searchCommands": "Befehle suchen...",
     "noCommandsFound": "Keine Befehle entsprechen deiner Suche"
   },
-  "help": {
-    "title": "Hilfe",
-    "openHelp": "Hilfe öffnen",
-    "close": "Schließen",
-    "gotIt": "Verstanden!",
-    "noContent": "Keine Hilfe für diese Seite verfügbar"
-  },
   "aiProvider": {
     "error": {
       "visionModelHint": "Kein Vision-fähiges Modell konfiguriert",
@@ -685,5 +678,14 @@
     "useTemplateDone": "Kopie erstellt. Sie ist aus, bis Sie sie einschalten.",
     "useTemplateNeedsSetup": "Kopie erstellt und ausgeschaltet. Verbinden Sie den fehlenden Assistenten, das Werkzeug oder die Verbindung, bevor Sie sie einschalten.",
     "useTemplateNeedsSetupItems": "Kopie erstellt und ausgeschaltet. Noch nötig: {items}."
+  },
+  "tours": {
+    "common": {
+      "start": "Kurz erklären",
+      "next": "Weiter",
+      "back": "Zurück",
+      "done": "Fertig",
+      "progress": "{current} von {total}"
+    }
   }
 }

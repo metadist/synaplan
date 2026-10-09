@@ -64,13 +64,6 @@
     "searchCommands": "Buscar comandos...",
     "noCommandsFound": "No hay comandos que coincidan con tu búsqueda"
   },
-  "help": {
-    "title": "Ayuda",
-    "openHelp": "Abrir ayuda",
-    "close": "Cerrar",
-    "gotIt": "¡Entendido!",
-    "noContent": "No hay ayuda disponible para esta página"
-  },
   "aiProvider": {
     "error": {
       "visionModelHint": "No hay modelo con visión configurado",
@@ -688,5 +681,14 @@
     "useTemplateDone": "Copia creada. Está apagada hasta que la actives.",
     "useTemplateNeedsSetup": "Copia creada y dejada apagada. Conecta el asistente, la herramienta o la conexión que falte antes de activarla.",
     "useTemplateNeedsSetupItems": "Copia creada y dejada apagada. Aún falta: {items}."
+  },
+  "tours": {
+    "common": {
+      "start": "Muéstrame cómo funciona",
+      "next": "Siguiente",
+      "back": "Atrás",
+      "done": "Listo",
+      "progress": "{current} de {total}"
+    }
   }
 }

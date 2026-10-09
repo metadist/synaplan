@@ -64,13 +64,6 @@
     "searchCommands": "Rechercher des commandes…",
     "noCommandsFound": "Aucune commande ne correspond à votre recherche"
   },
-  "help": {
-    "title": "Aide",
-    "openHelp": "Ouvrir l’aide",
-    "close": "Fermer",
-    "gotIt": "Compris !",
-    "noContent": "Aucune aide disponible pour cette page"
-  },
   "mail": {
     "title": "Configuration du gestionnaire d’e-mails",
     "pickUpConfig": "Configuration de la collecte",
@@ -762,5 +755,14 @@
     "useTemplateDone": "Copie créée. Elle est désactivée jusqu’à ce que vous l’activiez.",
     "useTemplateNeedsSetup": "Copie créée et laissée désactivée. Reliez l’assistant, l’outil ou la connexion manquant avant de l’activer.",
     "useTemplateNeedsSetupItems": "Copie créée et laissée désactivée. Encore nécessaire : {items}."
+  },
+  "tours": {
+    "common": {
+      "start": "Faire la visite",
+      "next": "Suivant",
+      "back": "Retour",
+      "done": "Terminé",
+      "progress": "{current} sur {total}"
+    }
   }
 }

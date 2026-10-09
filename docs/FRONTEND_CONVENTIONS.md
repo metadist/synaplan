@@ -105,9 +105,9 @@ Put a new top-level key in the namespace that already owns its siblings. The map
 | `admin.json` | admin, adminModelStatus, aiInfra, iam, modules, people, platformConnect, providerHelp, statistics |
 | `config.json` | config |
 | `settings.json` | export, externalLink, limitReached, marketingNews, paywall, profile, settings, subscription, usageTaximeter |
-| `tools.json` | aiAccounts, aiProvider, channels, compute, customTools, help, jobs, linkedPlatforms, mail, mcpServers, messagesGateway, plugins, tools, workflows |
+| `tools.json` | aiAccounts, aiProvider, channels, compute, customTools, jobs, linkedPlatforms, mail, mcpServers, messagesGateway, plugins, tools, tours, workflows |
 
-Do not rename existing dotted keys when adding a file — `$t('config.savedTasks.saveAsTask')` must keep working. The embeddable widget only ships `core` + `chat` + `widgets`; never put widget-visible copy in `admin` / `config` / `tools`. Authenticated chrome (sidebar / mobile nav) always loads `chat` + `auth` + `admin` + `settings` + `tools` (jobs tray, help, media-job toasts) so Incoming and Logout never render as raw keys. Every route declares its namespaces in `meta.i18n`; `tests/unit/i18n/routeCoverage.spec.ts` locks the hand-triaged minimum per route and fails the build on keys absent from the EN catalog.
+Do not rename existing dotted keys when adding a file — `$t('config.savedTasks.saveAsTask')` must keep working. The embeddable widget only ships `core` + `chat` + `widgets`; never put widget-visible copy in `admin` / `config` / `tools`. Authenticated chrome (sidebar / mobile nav) always loads `chat` + `auth` + `admin` + `settings` + `tools` (jobs tray, guided tours, media-job toasts) so Incoming and Logout never render as raw keys. Every route declares its namespaces in `meta.i18n`; `tests/unit/i18n/routeCoverage.spec.ts` locks the hand-triaged minimum per route and fails the build on keys absent from the EN catalog.
 
 `tests/unit/i18n/localeParity.spec.ts` still gates full-tree key parity against `localeParityBaseline.json`, a frozen ledger of pre-existing drift. Add an English-only key and the suite fails, naming the key. When you translate a key that is listed in the ledger, remove it from the ledger in the same change — the comparison is exact, so the debt can only shrink.
 
