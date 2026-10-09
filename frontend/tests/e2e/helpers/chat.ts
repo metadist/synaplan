@@ -171,18 +171,17 @@ export class ChatHelper {
     const v2NewChatBtn = this.page.locator(selectors.nav.sidebarV2NewChat)
     const v2Shell = this.page.locator(selectors.nav.sidebar)
 
-    // page.goto() resolves on document load, before the Vue shell paints.
-    // A SHORT probe used to give up and look for the retired v1 chat toggle,
-    // which is no longer rendered. On a cold boot the chat list returns just
-    // past that window, so the step failed while New Chat was about to appear.
-    await v2Shell.or(v2NewChatBtn).first().waitFor({
-      state: 'visible',
-      timeout: TIMEOUTS.VERY_LONG,
-    })
-    if (!(await v2NewChatBtn.isVisible())) {
-      await this.page.locator(selectors.nav.sidebarV2ChatNav).click()
-    }
-    await v2NewChatBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    // page.goto() resolves before the Vue shell paints, so a cold boot needs
+    // the long wait. New Chat lives in the chats panel, which the Chats rail
+    // icon opens. A one-shot probe can race the panel paint, and in the overlay
+    // a second click on Chats closes the panel again — so retry until visible.
+    await v2Shell.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+    await expect(async () => {
+      if (!(await v2NewChatBtn.isVisible())) {
+        await this.page.locator(selectors.nav.sidebarV2ChatNav).click({ timeout: TIMEOUTS.SHORT })
+      }
+      await expect(v2NewChatBtn).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    }).toPass({ timeout: TIMEOUTS.LONG })
     await v2NewChatBtn.click()
 
     // The button stays disabled until the new chat is the active one. Until

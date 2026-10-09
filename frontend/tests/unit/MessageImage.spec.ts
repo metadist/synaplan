@@ -3,9 +3,15 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import MessageImage from '@/components/MessageImage.vue'
 
+const { mockNotifyError } = vi.hoisted(() => ({ mockNotifyError: vi.fn() }))
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({ success: vi.fn(), error: mockNotifyError }),
+}))
+
 describe('MessageImage', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockNotifyError.mockClear()
     // Provide #app teleport target
     if (!document.getElementById('app')) {
       const app = document.createElement('div')
@@ -177,6 +183,31 @@ describe('MessageImage', () => {
       // The visible image is a plain `src`, so the download fetches its own
       // blob over the Bearer-authenticated path before saving it.
       expect(clickSpy).toHaveBeenCalledTimes(1)
+      expect(mockNotifyError).not.toHaveBeenCalled()
+    })
+
+    it('tells the user when the download failed', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.reject(new TypeError('Failed to fetch')))
+      )
+      const clickSpy = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined)
+
+      const wrapper = mount(MessageImage, {
+        props: { url: '/api/v1/files/uploads/1/000/cat.png', alt: 'cat' },
+      })
+      await flushPromises()
+
+      await wrapper.find('[data-testid="btn-image-download"]').trigger('click')
+      await flushPromises()
+
+      expect(clickSpy).not.toHaveBeenCalled()
+      expect(mockNotifyError).toHaveBeenCalledWith(
+        'The image could not be downloaded. Please try again.'
+      )
     })
   })
 

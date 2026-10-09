@@ -797,6 +797,7 @@
     "thoughtFor": "{n} Sekunde nachgedacht | {n} Sekunden nachgedacht",
     "reasoning": "KI-Überlegung",
     "downloadImage": "Bild herunterladen",
+    "downloadImageFailed": "Das Bild konnte nicht heruntergeladen werden. Bitte versuche es erneut.",
     "fileGenerated": "Ich habe die Datei '{filename}' für dich erstellt. Du kannst sie jetzt herunterladen.",
     "documentChanges": "Änderungen in dieser Datei",
     "documentChangesTitle": "Was sich geändert hat",

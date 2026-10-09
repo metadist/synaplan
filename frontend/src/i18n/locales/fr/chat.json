@@ -799,6 +799,7 @@
     "thoughtFor": "A réfléchi pendant {n} seconde | A réfléchi pendant {n} secondes",
     "reasoning": "Raisonnement IA",
     "downloadImage": "Télécharger l’image",
+    "downloadImageFailed": "L’image n’a pas pu être téléchargée. Veuillez réessayer.",
     "fileGenerated": "J’ai créé le fichier « {filename} » pour vous. Vous pouvez maintenant le télécharger.",
     "documentChanges": "Modifications de ce fichier",
     "documentChangesTitle": "Ce qui a changé",

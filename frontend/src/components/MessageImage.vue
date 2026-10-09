@@ -153,6 +153,8 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useNotification } from '@/composables/useNotification'
 import { fetchMediaBlob, resolveMediaUrl, useMediaSrc } from '@/services/api/mediaAuth'
 import { saveOrDownloadBlob } from '@/services/api/nativeDownload'
 
@@ -163,6 +165,8 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const { t } = useI18n()
+const { error: showError } = useNotification()
 const { mediaSrc, reloadMedia } = useMediaSrc()
 
 const isFullscreen = ref(false)
@@ -225,6 +229,7 @@ const downloadImage = async () => {
     await saveOrDownloadBlob(blob, downloadFilename())
   } catch (error) {
     console.error('Failed to download image:', error)
+    showError(t('message.downloadImageFailed'))
   }
 }
 
