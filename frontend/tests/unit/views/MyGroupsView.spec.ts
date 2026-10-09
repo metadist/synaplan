@@ -193,12 +193,12 @@ describe('MyGroupsView', () => {
     expect(wrapper.find('[data-testid="hint-leave-directory-9"]').exists()).toBe(false)
   })
 
-  it('shows an empty state and a People link for admins', async () => {
+  it('shows an empty state and a Users link for admins', async () => {
     listMyGroups.mockResolvedValue([])
     const wrapper = mountView(true)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="my-groups-empty"]').text()).toContain('People')
+    expect(wrapper.get('[data-testid="my-groups-empty"]').text()).toContain('Users')
     expect(wrapper.get('[data-testid="link-my-groups-people"]').attributes('href')).toBe(
       '/admin/people'
     )

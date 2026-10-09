@@ -75,7 +75,7 @@
     "adminFeatures": "System-Status",
     "adminConfig": "Systemkonfiguration",
     "adminSetup": "KI-Infrastruktur",
-    "adminPeople": "Personen",
+    "adminPeople": "Benutzer",
     "adminPartners": "Partner",
     "myGroups": "Meine Gruppen",
     "incoming": "Eingehende Chats",
@@ -141,7 +141,7 @@
     "channels": "Kanäle",
     "channelsDescription": "Alles, was du mit Synaplan verbindest",
     "assistantsDescription": "Assistenten, Schnellbefehle, Aufgaben und KI-Einstellungen",
-    "operateDescription": "Personen, Status und Einstellungen",
+    "operateDescription": "Benutzer, Status und Einstellungen",
     "aiSetup": "KI-Setup & Tools",
     "aiSetupDescription": "Modelle, Anweisungen, Routing & Tools",
     "preferences": "Einstellungen",
@@ -161,7 +161,7 @@
     "adminFeatureStatus": "System-Status",
     "adminSystemConfig": "Systemkonfiguration",
     "adminProviderSetup": "KI-Infrastruktur",
-    "adminPeople": "Personen",
+    "adminPeople": "Benutzer",
     "adminPartners": "Partner",
     "more": "Mehr",
     "moreDescription": "Weitere Bereiche und Konto",
@@ -293,7 +293,7 @@
     "loadingMessages": "Nachrichten werden geladen…",
     "adminPreview": {
       "badge": "Admin-Vorschau",
-      "hint": "Nur Admins sehen das. Andere Personen sehen es erst, wenn es freigegeben ist."
+      "hint": "Nur Admins sehen das. Andere Benutzer sehen es erst, wenn es freigegeben ist."
     }
   },
   "search": {
@@ -447,8 +447,8 @@
           "off": "Damit wird {name} sofort für alle Nutzer dieser Synaplan-Instanz ausgeschaltet. Du kannst es in der Benachrichtigung rückgängig machen.",
           "select": "Damit wird {name} sofort für alle Nutzer dieser Synaplan-Instanz auf „{value}“ gesetzt. Du kannst es in der Benachrichtigung rückgängig machen.",
           "FEATURE_IAM_GROUPS_ENABLED": {
-            "true": "Administratoren sehen „Personen“ unter Verwalten und können Gruppen anlegen; Mitglieder sehen ihre Gruppen unter Konto. Du kannst es in der Benachrichtigung rückgängig machen.",
-            "false": "„Personen“ verschwindet aus Verwalten, und niemand kann Gruppen anlegen oder nutzen. Freigaben und Gruppenrichtlinien funktionieren nicht mehr. Du kannst es in der Benachrichtigung rückgängig machen."
+            "true": "Administratoren sehen „Benutzer“ unter Verwalten und können Gruppen anlegen; Mitglieder sehen ihre Gruppen unter Konto. Du kannst es in der Benachrichtigung rückgängig machen.",
+            "false": "„Benutzer“ verschwindet aus Verwalten, und niemand kann Gruppen anlegen oder nutzen. Freigaben und Gruppenrichtlinien funktionieren nicht mehr. Du kannst es in der Benachrichtigung rückgängig machen."
           }
         },
         "saved": "{name} ist jetzt für alle „{value}“.",

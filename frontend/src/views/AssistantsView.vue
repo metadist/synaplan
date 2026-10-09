@@ -1,42 +1,44 @@
 <template>
   <MainLayout data-testid="view-assistants">
-    <div class="container mx-auto px-6 py-8 max-w-[80rem] overflow-x-hidden">
-      <PageHeader
-        :title="headerTitle"
-        :subtitle="builderMode ? currentName : $t('assistants.intro')"
-        icon="mdi:robot-outline"
-        tour-id="assistants"
-      >
-        <button
-          v-if="!builderMode"
-          type="button"
-          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-2"
-          data-testid="btn-create-assistant-header"
-          data-tour="assistants-create"
-          @click="createAssistant"
+    <div class="min-h-screen overflow-x-hidden bg-chat px-3 py-4 sm:p-4 md:p-8">
+      <div class="mx-auto w-full max-w-[100rem]">
+        <PageHeader
+          :title="headerTitle"
+          :subtitle="builderMode ? currentName : $t('assistants.intro')"
+          icon="mdi:robot-outline"
+          tour-id="assistants"
         >
-          {{ $t('assistants.create') }}
-        </button>
-        <button
-          v-else
-          type="button"
-          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
-          data-testid="btn-back-gallery"
-          @click="router.push('/ai/assistants')"
-        >
-          {{ $t('assistants.title') }}
-        </button>
-      </PageHeader>
+          <button
+            v-if="!builderMode"
+            type="button"
+            class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-2"
+            data-testid="btn-create-assistant-header"
+            data-tour="assistants-create"
+            @click="createAssistant"
+          >
+            {{ $t('assistants.create') }}
+          </button>
+          <button
+            v-else
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+            data-testid="btn-back-gallery"
+            @click="router.push('/ai/assistants')"
+          >
+            {{ $t('assistants.title') }}
+          </button>
+        </PageHeader>
 
-      <AssistantBuilder v-if="builderMode && store.current" @deleted="onDeleted" />
-      <AssistantGallery
-        v-else-if="!builderMode"
-        @create="createAssistant"
-        @start-chat="startChat"
-        @clone="cloneAssistant"
-        @edit="editAssistant"
-        @delete="deleteAssistant"
-      />
+        <AssistantBuilder v-if="builderMode && store.current" @deleted="onDeleted" />
+        <AssistantGallery
+          v-else-if="!builderMode"
+          @create="createAssistant"
+          @start-chat="startChat"
+          @clone="cloneAssistant"
+          @edit="editAssistant"
+          @delete="deleteAssistant"
+        />
+      </div>
     </div>
   </MainLayout>
 </template>

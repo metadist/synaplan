@@ -308,8 +308,8 @@ onBeforeUnmount(() => {
 
 <template>
   <MainLayout data-testid="view-admin-config">
-    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
-      <div class="container mx-auto max-w-[90rem]">
+    <div class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin">
+      <div class="mx-auto w-full max-w-[100rem]">
         <RestartRequiredBanner
           :visible="systemConfig.restartRequired.value"
           @dismiss="systemConfig.dismissRestart"
@@ -377,12 +377,12 @@ onBeforeUnmount(() => {
           />
           <ul
             v-else
-            class="surface-card rounded-2xl divide-y divide-light-border/20 dark:divide-dark-border/10"
+            class="surface-card overflow-hidden rounded-2xl divide-y divide-light-border/20 dark:divide-dark-border/10"
           >
             <li v-for="hit in searchHits" :key="hit.id">
               <button
                 type="button"
-                class="w-full text-left px-4 py-3 hover-surface flex flex-col gap-0.5"
+                class="stack-row w-full text-left px-4 py-3 hover-surface flex flex-col gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]"
                 data-testid="item-admin-config-hit"
                 @click="openHit(hit)"
               >

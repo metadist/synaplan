@@ -43,7 +43,7 @@
     "disconnected": "Plattform getrennt.",
     "disconnectError": "Die Plattform konnte nicht getrennt werden.",
     "loadError": "Verknüpfte Plattformen konnten nicht geladen werden.",
-    "adminPointer": "Ganze Server gibst du unter Admin › Personen frei."
+    "adminPointer": "Ganze Server gibst du unter Admin › Benutzer frei."
   },
   "tools": {
     "title": "Verfügbare Tools",
@@ -747,7 +747,7 @@
     "admin": {
       "cards": {
         "title": "Dein Server auf einen Blick",
-        "body": "Personen, neue Registrierungen, abgeschaltete Funktionen und zu prüfende Modelle. Jede Karte öffnet die Seite dahinter."
+        "body": "Benutzer, neue Registrierungen, abgeschaltete Funktionen und zu prüfende Modelle. Jede Karte öffnet die Seite dahinter."
       },
       "attention": {
         "title": "Was dich braucht",
@@ -755,7 +755,7 @@
       },
       "sections": {
         "title": "Admin-Bereiche",
-        "body": "Systemstatus, KI-Infrastruktur, Personen und Systemkonfiguration. Die Konfiguration hat eine eigene Einstellungs-Suche."
+        "body": "Systemstatus, KI-Infrastruktur, Benutzer und Systemkonfiguration. Die Konfiguration hat eine eigene Einstellungs-Suche."
       }
     },
     "checklist": {

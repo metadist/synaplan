@@ -1,41 +1,43 @@
 <template>
   <MainLayout data-testid="view-people">
-    <div class="container mx-auto px-6 py-8 max-w-[100rem] overflow-x-hidden">
-      <button
-        type="button"
-        class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"
-        data-testid="link-people-back-operate"
-        @click="router.push({ name: 'admin' })"
-      >
-        <Icon icon="heroicons:arrow-left" class="w-3.5 h-3.5" />
-        {{ $t('people.backToOperate') }}
-      </button>
-      <PageHeader
-        :title="$t('people.title')"
-        :subtitle="$t('people.subtitle')"
-        icon="mdi:account-group"
-      >
-        <TabNav
-          v-if="tabNavItems.length > 1"
-          :model-value="activeTab"
-          :tabs="tabNavItems"
-          :aria-label="$t('people.title')"
-          mobile-trigger-testid="tab-people-mobile-trigger"
-          mobile-menu-testid="tab-people-mobile-menu"
-          @update:model-value="onTabNavChange"
-        />
-      </PageHeader>
+    <div class="min-h-screen overflow-x-hidden bg-chat px-3 py-4 sm:p-4 md:p-8">
+      <div class="mx-auto w-full max-w-[100rem]">
+        <button
+          type="button"
+          class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"
+          data-testid="link-people-back-operate"
+          @click="router.push({ name: 'admin' })"
+        >
+          <Icon icon="heroicons:arrow-left" class="w-3.5 h-3.5" />
+          {{ $t('people.backToOperate') }}
+        </button>
+        <PageHeader
+          :title="$t('people.title')"
+          :subtitle="$t('people.subtitle')"
+          icon="mdi:account-group"
+        >
+          <TabNav
+            v-if="tabNavItems.length > 1"
+            :model-value="activeTab"
+            :tabs="tabNavItems"
+            :aria-label="$t('people.title')"
+            mobile-trigger-testid="tab-people-mobile-trigger"
+            mobile-menu-testid="tab-people-mobile-menu"
+            @update:model-value="onTabNavChange"
+          />
+        </PageHeader>
 
-      <p v-if="peopleIntro" class="text-sm txt-secondary mb-4" data-testid="text-people-intro">
-        {{ peopleIntro }}
-      </p>
+        <p v-if="peopleIntro" class="text-sm txt-secondary mb-4" data-testid="text-people-intro">
+          {{ peopleIntro }}
+        </p>
 
-      <UsersTab v-if="activeTab === 'users'" :show-iam-columns="isIamGroupsEnabled()" />
-      <GroupsTab v-else-if="activeTab === 'groups'" />
-      <PoliciesTab v-else-if="activeTab === 'policies'" />
-      <PlatformInstancesTab v-else-if="activeTab === 'linked-platforms'" />
-      <AdminModerationPanel v-else-if="activeTab === 'moderation'" />
-      <AuditTab v-else-if="activeTab === 'audit'" />
+        <UsersTab v-if="activeTab === 'users'" :show-iam-columns="isIamGroupsEnabled()" />
+        <GroupsTab v-else-if="activeTab === 'groups'" />
+        <PoliciesTab v-else-if="activeTab === 'policies'" />
+        <PlatformInstancesTab v-else-if="activeTab === 'linked-platforms'" />
+        <AdminModerationPanel v-else-if="activeTab === 'moderation'" />
+        <AuditTab v-else-if="activeTab === 'audit'" />
+      </div>
     </div>
   </MainLayout>
 </template>

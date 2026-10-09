@@ -43,7 +43,7 @@
     "disconnected": "Platform bağlantısı kesildi.",
     "disconnectError": "Platformun bağlantısı kesilemedi.",
     "loadError": "Bağlı platformlar yüklenemedi.",
-    "adminPointer": "Sunucuların tamamı Yönetim › Kişiler bölümünde onaylanır."
+    "adminPointer": "Sunucuların tamamı Yönetim › Kullanıcılar bölümünde onaylanır."
   },
   "plugins": {
     "title": "Eklentiler",
@@ -750,7 +750,7 @@
     "admin": {
       "cards": {
         "title": "Sunucunuza bir bakışta",
-        "body": "Kişiler, yeni kayıtlar, kapalı özellikler ve kontrol edilecek modeller. Her kart ilgili sayfayı açar."
+        "body": "Kullanıcılar, yeni kayıtlar, kapalı özellikler ve kontrol edilecek modeller. Her kart ilgili sayfayı açar."
       },
       "attention": {
         "title": "Sizi bekleyenler",
@@ -758,7 +758,7 @@
       },
       "sections": {
         "title": "Yönetim bölümleri",
-        "body": "Sistem durumu, AI altyapısı, Kişiler ve Sistem yapılandırması. Yapılandırma sayfasının kendi ayar araması vardır."
+        "body": "Sistem durumu, AI altyapısı, Kullanıcılar ve Sistem yapılandırması. Yapılandırma sayfasının kendi ayar araması vardır."
       }
     },
     "checklist": {

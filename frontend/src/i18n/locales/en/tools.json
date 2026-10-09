@@ -43,7 +43,7 @@
     "disconnected": "Platform disconnected.",
     "disconnectError": "The platform could not be disconnected.",
     "loadError": "Linked platforms could not be loaded.",
-    "adminPointer": "Admins approve whole servers under Admin › People."
+    "adminPointer": "Admins approve whole servers under Admin › Users."
   },
   "plugins": {
     "title": "Plugins",
@@ -824,7 +824,7 @@
     "admin": {
       "cards": {
         "title": "Your server at a glance",
-        "body": "People, new sign-ups, switched-off features and models to check. Each card opens the page behind it."
+        "body": "Users, new sign-ups, switched-off features and models to check. Each card opens the page behind it."
       },
       "attention": {
         "title": "What needs you",
@@ -832,7 +832,7 @@
       },
       "sections": {
         "title": "Admin sections",
-        "body": "System status, AI infrastructure, People and System configuration. The configuration page has its own settings search."
+        "body": "System status, AI infrastructure, Users and System configuration. The configuration page has its own settings search."
       }
     },
     "checklist": {

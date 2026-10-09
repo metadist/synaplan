@@ -1,10 +1,10 @@
 <template>
   <MainLayout>
     <div
-      class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
+      class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin"
       :data-testid="`page-app-${appId}`"
     >
-      <div v-if="app" class="max-w-[64rem] mx-auto">
+      <div v-if="app" class="max-w-[100rem] mx-auto">
         <router-link
           to="/apps"
           class="inline-flex items-center gap-1.5 text-sm txt-secondary hover:txt-primary mb-4"

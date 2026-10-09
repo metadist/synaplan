@@ -68,7 +68,7 @@ test.describe('@ci Navigation journeys', () => {
     expect(usersRes.ok()).toBeTruthy()
     const body = (await usersRes.json()) as { users?: { id: number; email: string }[] }
     const worker = body.users?.find((u) => u.email === credentials.user)
-    expect(worker, `Worker ${credentials.user} must exist in People`).toBeTruthy()
+    expect(worker, `Worker ${credentials.user} must exist in Users`).toBeTruthy()
     const workerId = worker!.id
     const levelSelect = page.locator(ADMIN.userLevelSelect(workerId))
 

@@ -125,12 +125,12 @@ test.describe('Navigation: section panels (non-admin)', () => {
       await expect(panel.locator(NAV.flyoutLinkChatWidget)).toHaveCount(0)
     })
 
-    await test.step('Act+Assert: Apps lists the directory, connected apps and widgets', async () => {
+    await test.step('Act+Assert: Apps lists the directory and widgets', async () => {
       const panel = await openSection(page, NAV.sidebarV2Channels)
       await expect(panel.locator(NAV.panelGroup('apps'))).toBeVisible()
       await expect(panel.locator(NAV.flyoutLinkApps)).toBeVisible()
-      await expect(panel.locator(NAV.flyoutLinkAppsConnected)).toBeVisible()
       await expect(panel.locator(NAV.flyoutLinkChatWidget)).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkAppsConnected)).toHaveCount(0)
       await expect(panel.locator(NAV.flyoutLinkAiModels)).toHaveCount(0)
     })
   })

@@ -1,10 +1,10 @@
 <template>
   <MainLayout>
     <div
-      class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
+      class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-apps"
     >
-      <div class="max-w-[80rem] mx-auto">
+      <div class="max-w-[100rem] mx-auto">
         <PageHeader
           :title="$t('apps.title')"
           :subtitle="$t('apps.subtitle')"
@@ -15,7 +15,7 @@
             <label class="relative w-full sm:w-64">
               <span class="sr-only">{{ $t('apps.searchLabel') }}</span>
               <MagnifyingGlassIcon
-                class="w-4 h-4 txt-secondary absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                class="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 txt-secondary"
                 aria-hidden="true"
               />
               <input

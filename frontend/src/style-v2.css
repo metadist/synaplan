@@ -1369,6 +1369,15 @@
   border-radius: var(--radius-xl, 0.75rem);
 }
 
+/* A full-width row inside a rounded, clipped card. Its hover fill must not
+   carry the 12px button radius: the card clips the outer corners, so the
+   first row is round only on top, middle rows are square, and the last row
+   is round only on the bottom. */
+.design-v2 button.stack-row,
+.design-v2 a.stack-row {
+  border-radius: 0;
+}
+
 /* Same 12px on fields. Beats .design-v2 .surface-card (16px) when a field
    also wears that class. Excludes the bare composer and search inputs. */
 .design-v2

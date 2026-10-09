@@ -1,7 +1,7 @@
 <template>
   <MainLayout>
     <div
-      class="min-h-screen bg-chat p-2 md:p-4 lg:p-8 relative overflow-x-hidden"
+      class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 relative overflow-x-hidden"
       data-testid="page-memories"
     >
       <div class="max-w-[100rem] mx-auto h-full flex flex-col">

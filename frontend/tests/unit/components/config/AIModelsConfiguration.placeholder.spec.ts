@@ -114,7 +114,6 @@ describe('AIModelsConfiguration empty model row', () => {
           OpenAiCompatibleEndpointsPanel: { template: '<div />' },
           AccordionStack: { template: '<div><slot /></div>' },
           AccordionSection: { template: '<div><slot /></div>' },
-          SectionJumpNav: { template: '<div />' },
         },
       },
     })
@@ -476,7 +475,6 @@ describe('AIModelsConfiguration empty model row', () => {
           OpenAiCompatibleEndpointsPanel: { template: '<div />' },
           AccordionStack: { template: '<div><slot /></div>' },
           AccordionSection: { template: '<div><slot /></div>' },
-          SectionJumpNav: { template: '<div />' },
         },
       },
     })
@@ -539,7 +537,6 @@ describe('AIModelsConfiguration empty model row', () => {
           OpenAiCompatibleEndpointsPanel: { template: '<div />' },
           AccordionStack: { template: '<div><slot /></div>' },
           AccordionSection: { template: '<div><slot /></div>' },
-          SectionJumpNav: { template: '<div />' },
         },
       },
     })
@@ -623,7 +620,6 @@ describe('AIModelsConfiguration empty model row', () => {
           },
           AccordionStack: { template: '<div><slot /></div>' },
           AccordionSection: { template: '<div><slot /></div>' },
-          SectionJumpNav: { template: '<div />' },
         },
       },
     })

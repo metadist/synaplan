@@ -114,7 +114,7 @@ final readonly class SystemConfigService
     private function featureSections(): array
     {
         $sections = [
-            'people' => ['label' => 'People & sharing', 'fields' => [
+            'people' => ['label' => 'Users & sharing', 'fields' => [
                 'FEATURE_IAM_GROUPS_ENABLED',
                 'FEATURE_IAM_SHARING_ENABLED',
                 'FEATURE_IAM_USER_SEARCH_ENABLED',
@@ -302,7 +302,7 @@ final readonly class SystemConfigService
                 'sections' => [
                     'everyone' => ['label' => 'Everyone', 'fields' => ['IAM_EVERYONE_SHARES']],
                     'directory' => ['label' => 'Directory groups', 'fields' => ['IAM_DIRECTORY_GROUPS_CLAIM', 'IAM_DIRECTORY_GROUP_NAMES']],
-                    'audit' => ['label' => 'People & audit', 'fields' => ['IAM_ADMIN_IMPERSONATION', 'IAM_AUDIT_RETENTION_DAYS']],
+                    'audit' => ['label' => 'Users & audit', 'fields' => ['IAM_ADMIN_IMPERSONATION', 'IAM_AUDIT_RETENTION_DAYS']],
                 ],
             ],
             'routing' => [
@@ -1440,7 +1440,7 @@ final readonly class SystemConfigService
             'FEATURE_IAM_GROUPS_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'People & groups: show People under Operate and let administrators create groups. Members see their groups under Account. Sharing and group policies need this to be on.',
+                'description' => 'Users & groups: show Users under Operate and let administrators create groups. Members see their groups under Account. Sharing and group policies need this to be on.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
@@ -1449,7 +1449,7 @@ final readonly class SystemConfigService
             'FEATURE_IAM_SHARING_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Sharing: let owners share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Adds Share buttons and "Shared with me" filters. Requires People & groups.',
+                'description' => 'Sharing: let owners share a knowledge folder, chat, AI assistant, saved task or chat widget with a user, a group or everyone. Adds Share buttons and "Shared with me" filters. Requires Users & groups.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
@@ -1458,7 +1458,7 @@ final readonly class SystemConfigService
             'FEATURE_IAM_USER_SEARCH_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'User search in the share picker. Off: an owner can share with people in a group they share, and with a group. On: an owner can share with any account on the instance. Groups are always searchable. Adding a member under People → Groups still searches every account.',
+                'description' => 'User search in the share picker. Off: an owner can share with users in a group they share, and with a group. On: an owner can share with any account on the instance. Groups are always searchable. Adding a member under Users → Groups still searches every account.',
                 'default' => 'false',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
@@ -1467,7 +1467,7 @@ final readonly class SystemConfigService
             'FEATURE_IAM_GROUP_POLICIES_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Group policies: let administrators set default models, allowed models, feature flags and a rate-limit tier per group (People → Policies). Locked global defaults cannot be overridden. Requires People & groups.',
+                'description' => 'Group policies: let administrators set default models, allowed models, feature flags and a rate-limit tier per group (Users → Policies). Locked global defaults cannot be overridden. Requires Users & groups.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
@@ -1476,7 +1476,7 @@ final readonly class SystemConfigService
             'FEATURE_IAM_DIRECTORY_SYNC_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Directory groups: at sign-in, put people into groups from the company login (OIDC groups claim). Does nothing without OIDC. The claim path and display names live under Sharing → Directory groups.',
+                'description' => 'Directory groups: at sign-in, put users into groups from the company login (OIDC groups claim). Does nothing without OIDC. The claim path and display names live under Sharing → Directory groups.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
@@ -1575,7 +1575,7 @@ final readonly class SystemConfigService
             'FEATURE_PLATFORM_LINKS_ENABLED' => [
                 'tab' => 'features', 'section' => 'platforms', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Operate → People → Platform instances, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
+                'description' => 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Operate → Users → Platform instances, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => PlatformLinksConfig::CONFIG_GROUP,
@@ -1636,7 +1636,7 @@ final readonly class SystemConfigService
             'IAM_AUDIT_RETENTION_DAYS' => [
                 'tab' => 'sharing', 'section' => 'audit', 'type' => 'number',
                 'sensitive' => false,
-                'description' => 'Days to keep People audit rows. Default 365. 0 keeps them forever. Run app:iam:reap-audit on a schedule to apply this.',
+                'description' => 'Days to keep Users audit rows. Default 365. 0 keeps them forever. Run app:iam:reap-audit on a schedule to apply this.',
                 'default' => (string) IamConfig::DEFAULT_AUDIT_RETENTION_DAYS,
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,

@@ -8,37 +8,44 @@
     data-testid="section-sidebar-panel"
     @click="onPanelClick"
   >
-    <header class="flex h-14 flex-shrink-0 items-center gap-3 pl-4 pr-3">
-      <span
-        class="sidebar-panel-badge inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
-        aria-hidden="true"
-      >
-        <component :is="headerIcon" class="h-5 w-5" />
-      </span>
-      <div class="min-w-0 flex-1">
-        <h2 class="truncate text-[15px] font-semibold leading-5 txt-primary">
+    <header class="flex flex-shrink-0 flex-col py-2.5 pl-4 pr-3">
+      <div class="flex items-center gap-3">
+        <span
+          class="sidebar-panel-badge inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
+          aria-hidden="true"
+        >
+          <component :is="headerIcon" class="h-5 w-5" />
+        </span>
+        <h2 class="min-w-0 flex-1 truncate text-[15px] font-semibold leading-5 txt-primary">
           {{ onSettings ? $t('nav.profile') : activeSection.label }}
         </h2>
-        <p
-          v-if="headerDescription"
-          class="truncate text-xs leading-4 txt-secondary"
-          data-testid="text-sidebar-panel-description"
+        <button
+          type="button"
+          class="icon-ghost inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
+          :aria-label="$t('nav.collapseSidebar')"
+          :title="$t('nav.collapseSidebar')"
+          aria-controls="sidebar-v2-panel"
+          aria-expanded="true"
+          data-testid="btn-sidebar-v2-collapse"
+          @click="collapse"
         >
-          {{ headerDescription }}
-        </p>
+          <ChevronDoubleLeftIcon class="h-4 w-4" aria-hidden="true" />
+        </button>
       </div>
-      <button
-        type="button"
-        class="icon-ghost inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
-        :aria-label="$t('nav.collapseSidebar')"
-        :title="$t('nav.collapseSidebar')"
-        aria-controls="sidebar-v2-panel"
-        aria-expanded="true"
-        data-testid="btn-sidebar-v2-collapse"
-        @click="collapse"
+      <!--
+        Full panel width, two lines. A one-line cut next to the icon hid most
+        of the sentence. The title is only the leftover, when two lines still
+        cannot hold it.
+      -->
+      <p
+        v-if="headerDescription"
+        ref="descriptionEl"
+        class="mt-1 line-clamp-2 text-xs leading-4 txt-secondary"
+        data-testid="text-sidebar-panel-description"
+        :title="descriptionClipped ? headerDescription : undefined"
       >
-        <ChevronDoubleLeftIcon class="h-4 w-4" aria-hidden="true" />
-      </button>
+        {{ headerDescription }}
+      </p>
     </header>
 
     <!--
@@ -95,6 +102,14 @@ const headerDescription = computed(() => {
   if (onSettings.value) return t('nav.accountDescription')
   return activeKey.value === 'chats' ? null : activeSection.value.description
 })
+const descriptionEl = ref<HTMLElement | null>(null)
+/** True when line-clamp still hides the end of the sentence. */
+const descriptionClipped = ref(false)
+
+const measureDescription = () => {
+  const el = descriptionEl.value
+  descriptionClipped.value = el != null && el.scrollHeight - el.clientHeight > 1
+}
 const { closePanel } = useSidebarLayout()
 
 const chatsPanel = ref<{ showMoreChats: () => void } | null>(null)
@@ -143,6 +158,21 @@ const onPanelScroll = (event: Event) => {
   if (el.scrollHeight - el.scrollTop - el.clientHeight > 160) return
   return chatsPanel.value?.showMoreChats()
 }
+
+watch(headerDescription, () => {
+  void nextTick(measureDescription)
+})
+
+watch(descriptionEl, (el, _, onCleanup) => {
+  if (!el || typeof ResizeObserver === 'undefined') {
+    descriptionClipped.value = false
+    return
+  }
+  const observer = new ResizeObserver(() => measureDescription())
+  observer.observe(el)
+  measureDescription()
+  onCleanup(() => observer.disconnect())
+})
 
 watch([activeKey, onSettings], () => {
   void nextTick(() => observeContent())

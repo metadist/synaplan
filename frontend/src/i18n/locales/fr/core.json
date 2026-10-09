@@ -75,7 +75,7 @@
     "adminFeatures": "État du système",
     "adminConfig": "Configuration système",
     "adminSetup": "Infrastructure IA",
-    "adminPeople": "Personnes",
+    "adminPeople": "Utilisateurs",
     "adminPartners": "Partenaires",
     "myGroups": "Mes groupes",
     "incoming": "Chats reçus",
@@ -141,7 +141,7 @@
     "channels": "Canaux",
     "channelsDescription": "Tout ce que vous connectez à Synaplan",
     "assistantsDescription": "Assistants, raccourcis, tâches et réglages IA",
-    "operateDescription": "Personnes, état et réglages",
+    "operateDescription": "Utilisateurs, état et réglages",
     "aiSetup": "Configuration IA et outils",
     "aiSetupDescription": "Modèles, instructions, routage et outils",
     "preferences": "Préférences",
@@ -160,7 +160,7 @@
     "adminFeatureStatus": "État du système",
     "adminSystemConfig": "Configuration système",
     "adminProviderSetup": "Infrastructure IA",
-    "adminPeople": "Personnes",
+    "adminPeople": "Utilisateurs",
     "adminPartners": "Partenaires",
     "more": "Plus",
     "moreDescription": "Autres sections et compte",
@@ -240,7 +240,7 @@
     "loadingMessages": "Chargement des messages…",
     "adminPreview": {
       "badge": "Aperçu admin",
-      "hint": "Seuls les administrateurs voient ceci. Les autres personnes ne le verront qu'une fois la fonction publiée."
+      "hint": "Seuls les administrateurs voient ceci. Les autres utilisateurs ne le verront qu'une fois la fonction publiée."
     }
   },
   "search": {
@@ -394,8 +394,8 @@
           "off": "Cela désactive {name} pour tous les utilisateurs de cette instance Synaplan, immédiatement. Vous pouvez l’annuler depuis la notification.",
           "select": "Cela règle {name} sur « {value} » pour tous les utilisateurs de cette instance Synaplan, immédiatement. Vous pouvez l’annuler depuis la notification.",
           "FEATURE_IAM_GROUPS_ENABLED": {
-            "true": "Les administrateurs voient Personnes sous Gérer et peuvent créer des groupes ; les membres voient leurs groupes sous Compte. Vous pouvez l’annuler depuis la notification.",
-            "false": "Personnes disparaît de Gérer et personne ne peut créer ni utiliser de groupes. Les partages et les règles de groupe ne fonctionnent plus. Vous pouvez l’annuler depuis la notification."
+            "true": "Les administrateurs voient Utilisateurs sous Gérer et peuvent créer des groupes ; les membres voient leurs groupes sous Compte. Vous pouvez l’annuler depuis la notification.",
+            "false": "Utilisateurs disparaît de Gérer et personne ne peut créer ni utiliser de groupes. Les partages et les règles de groupe ne fonctionnent plus. Vous pouvez l’annuler depuis la notification."
           }
         },
         "saved": "{name} est désormais « {value} » pour tout le monde.",

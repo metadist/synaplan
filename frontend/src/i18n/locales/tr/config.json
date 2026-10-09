@@ -684,9 +684,9 @@
       "errorDeleting": "API anahtarı silinemedi",
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
       "scopes": {
-        "hint": "Tam erişim için işaretlemeyin. Kişiler kutusu bu anahtarı sınırlar. Dosya işi, betik çalıştırabilmek için sohbet ve dosya kapsamları ekler — yönetici erişimi vermez.",
-        "iamRead": "Kişiler — grupları görüntüle",
-        "iamManage": "Kişiler — grupları yönet",
+        "hint": "Tam erişim için işaretlemeyin. Kullanıcılar kutusu bu anahtarı sınırlar. Dosya işi, betik çalıştırabilmek için sohbet ve dosya kapsamları ekler — yönetici erişimi vermez.",
+        "iamRead": "Kullanıcılar — grupları görüntüle",
+        "iamManage": "Kullanıcılar — grupları yönet",
         "computeRun": "Dosya işi — dosyalarınızın kopyalarında kısa betikler çalıştır"
       }
     },

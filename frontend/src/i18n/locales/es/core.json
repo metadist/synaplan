@@ -73,7 +73,7 @@
     "adminFeatures": "Estado del sistema",
     "adminConfig": "Configuración del sistema",
     "adminSetup": "Infraestructura de IA",
-    "adminPeople": "Personas",
+    "adminPeople": "Usuarios",
     "adminPartners": "Socios",
     "myGroups": "Mis grupos",
     "incoming": "Chats entrantes",
@@ -140,7 +140,7 @@
     "channels": "Canales",
     "channelsDescription": "Todo lo que conectas con Synaplan",
     "assistantsDescription": "Asistentes, atajos, tareas y ajustes de IA",
-    "operateDescription": "Personas, estado y ajustes",
+    "operateDescription": "Usuarios, estado y ajustes",
     "aiSetup": "IA y herramientas",
     "aiSetupDescription": "Modelos, instrucciones, enrutamiento y herramientas",
     "preferences": "Preferencias",
@@ -159,7 +159,7 @@
     "adminFeatureStatus": "Estado del sistema",
     "adminSystemConfig": "Configuración del sistema",
     "adminProviderSetup": "Infraestructura de IA",
-    "adminPeople": "Personas",
+    "adminPeople": "Usuarios",
     "adminPartners": "Socios",
     "profile": "Perfil",
     "more": "Más",
@@ -229,7 +229,7 @@
     "loadingMessages": "Cargando mensajes…",
     "adminPreview": {
       "badge": "Vista previa de admin",
-      "hint": "Solo los administradores pueden ver esto. Las demás personas no lo verán hasta que se publique."
+      "hint": "Solo los administradores pueden ver esto. Los demás usuarios no lo verán hasta que se publique."
     }
   },
   "search": {
@@ -383,8 +383,8 @@
           "off": "Esto desactiva {name} para todos los usuarios de esta instancia de Synaplan, al instante. Puedes deshacerlo desde la notificación.",
           "select": "Esto pone {name} en «{value}» para todos los usuarios de esta instancia de Synaplan, al instante. Puedes deshacerlo desde la notificación.",
           "FEATURE_IAM_GROUPS_ENABLED": {
-            "true": "Los administradores ven Personas en Gestionar y pueden crear grupos; los miembros ven sus grupos en Cuenta. Puedes deshacerlo desde la notificación.",
-            "false": "Personas desaparece de Gestionar y nadie puede crear ni usar grupos. Las comparticiones y las políticas de grupo dejan de funcionar. Puedes deshacerlo desde la notificación."
+            "true": "Los administradores ven Usuarios en Gestionar y pueden crear grupos; los miembros ven sus grupos en Cuenta. Puedes deshacerlo desde la notificación.",
+            "false": "Usuarios desaparece de Gestionar y nadie puede crear ni usar grupos. Las comparticiones y las políticas de grupo dejan de funcionar. Puedes deshacerlo desde la notificación."
           }
         },
         "saved": "{name} ahora es «{value}» para todos.",

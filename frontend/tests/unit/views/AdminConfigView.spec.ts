@@ -236,11 +236,11 @@ describe('AdminConfigView — topics', () => {
     expect(wrapper.find('[data-testid="btn-config-test-mailer"]').exists()).toBe(true)
   })
 
-  it('folds sections and opens them from the header or jump nav', async () => {
+  it('folds sections and opens them from the header', async () => {
     const { wrapper } = await mountView('/admin/config?tab=auth')
 
     expect(wrapper.get('#config-section-access').attributes('data-open')).toBe('false')
-    expect(wrapper.find('[data-testid="btn-jump-section-google"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-jump-nav"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="btn-config-section-access"]').trigger('click')
     expect(wrapper.get('#config-section-access').attributes('data-open')).toBe('true')

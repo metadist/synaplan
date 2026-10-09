@@ -99,7 +99,7 @@
   },
   "admin": {
     "title": "Exploitation",
-    "description": "Votre serveur en un coup d’œil : personnes, inscriptions et utilisation.",
+    "description": "Votre serveur en un coup d’œil : utilisateurs, inscriptions et utilisation.",
     "tabs": {
       "overview": "Aperçu",
       "users": "Utilisateurs",
@@ -160,8 +160,8 @@
       "currentUser": "(Vous)",
       "verified": "Vérifié",
       "notVerified": "Non vérifié",
-      "notVerifiedHint": "Cette personne ne peut pas se connecter tant que le compte n'est pas vérifié.",
-      "addUser": "Ajouter une personne",
+      "notVerifiedHint": "Cet utilisateur ne peut pas se connecter tant que le compte n'est pas vérifié.",
+      "addUser": "Ajouter un utilisateur",
       "displayName": "Nom affiché",
       "password": "Mot de passe",
       "createUser": "Créer le compte",
@@ -175,7 +175,7 @@
       "resendVerificationConfirm": "Envoyer un autre e-mail de vérification à {email} ?",
       "resent": "E-mail de vérification envoyé.",
       "resendFailed": "L'e-mail de vérification n'a pas été envoyé.",
-      "registrationNoMail": "L'inscription est activée, mais l'e-mail n'est pas configuré. Les nouveaux comptes restent non vérifiés tant que vous ne les marquez pas dans Personnes. Définissez MAILER_DSN pour envoyer des e-mails.",
+      "registrationNoMail": "L'inscription est activée, mais l'e-mail n'est pas configuré. Les nouveaux comptes restent non vérifiés tant que vous ne les marquez pas dans Utilisateurs. Définissez MAILER_DSN pour envoyer des e-mails.",
       "unverified": "Non vérifié",
       "searchPlaceholder": "Rechercher par e-mail…",
       "noUsers": "Aucun utilisateur trouvé",
@@ -318,7 +318,7 @@
       "confirm": {
         "suspended": {
           "title": "Suspendre le compte ?",
-          "message": "Suspendre {user} ? Cette personne sera déconnectée et ne pourra pas utiliser la plateforme tant qu’elle n’aura pas été réactivée."
+          "message": "Suspendre {user} ? Cet utilisateur sera déconnecté et ne pourra pas utiliser la plateforme tant qu’elle n’aura pas été réactivée."
         },
         "banned": {
           "title": "Bannir le compte ?",
@@ -326,7 +326,7 @@
         },
         "active": {
           "title": "Réactiver le compte ?",
-          "message": "Réactiver {user} ? Cette personne pourra de nouveau se connecter et utiliser la plateforme."
+          "message": "Réactiver {user} ? Cet utilisateur pourra de nouveau se connecter et utiliser la plateforme."
         }
       }
     },
@@ -443,7 +443,7 @@
       },
       "tabIntro": {
         "auth": "Qui peut s’inscrire et se connecter, et quels fournisseurs de connexion sont proposés.",
-        "sharing": "Ce que les personnes peuvent partager avec tout le monde, quels groupes de connexion sont synchronisés et combien de temps le journal est conservé.",
+        "sharing": "Ce que les utilisateurs peuvent partager avec tout le monde, quels groupes de connexion sont synchronisés et combien de temps le journal est conservé.",
         "features": "Activez ou désactivez des fonctionnalités entières pour tout le monde sur ce serveur. Les changements s’appliquent immédiatement.",
         "web_search": "Choisissez qui cherche sur le web pour le chat, et testez-le avec une requête.",
         "tools": "Ce que l’IA peut faire seule : tâches enregistrées, règles d’approbation des outils et travail sur fichiers dans un bac à sable.",
@@ -553,7 +553,7 @@
       "openModelHealth": "Ouvrir l’état des modèles",
       "openStatus": "Ouvrir l’état du système",
       "cards": {
-        "people": "Personnes",
+        "people": "Utilisateurs",
         "peopleHint": "Comptes sur ce serveur",
         "signups": "Nouvelles inscriptions",
         "signupsHint": "Sur la période du graphique ci-dessous",
@@ -846,7 +846,7 @@
     }
   },
   "people": {
-    "title": "Personnes",
+    "title": "Utilisateurs",
     "subtitle": "Comptes, groupes, règles et contenus signalés sur ce serveur.",
     "tabs": {
       "users": "Utilisateurs",
@@ -856,12 +856,12 @@
       "moderation": "Modération",
       "audit": "Journal"
     },
-    "openPeople": "Ouvrir Personnes",
+    "openPeople": "Ouvrir Utilisateurs",
     "backToOperate": "Retour à Exploitation",
     "myGroups": {
       "subtitle": "Groupes auxquels vous appartenez sur cette instance.",
-      "emptyMember": "Vous n’êtes encore dans aucun groupe. Un administrateur peut vous ajouter sur la page Personnes.",
-      "emptyAdmin": "Aucun groupe pour le moment. Créez-en un sur la page Personnes.",
+      "emptyMember": "Vous n’êtes encore dans aucun groupe. Un administrateur peut vous ajouter sur la page Utilisateurs.",
+      "emptyAdmin": "Aucun groupe pour le moment. Créez-en un sur la page Utilisateurs.",
       "leave": "Quitter",
       "leaveConfirm": "Quitter le groupe « {name} » ? Vous perdez l’accès à ce que ce groupe peut voir. Ce que vous avez partagé avec ce groupe reste partagé avec les autres membres. Vous pourrez le retirer plus tard dans la fenêtre Partager de chaque élément.",
       "leaveConfirmWithShares": "Quitter le groupe « {name} » ? Vous perdez l’accès à ce que ce groupe peut voir. 1 élément que vous avez partagé avec ce groupe reste partagé avec les autres membres. Quitter conserve ce partage. Quitter et arrêter le partage le retire. | Quitter le groupe « {name} » ? Vous perdez l’accès à ce que ce groupe peut voir. {count} éléments que vous avez partagés avec ce groupe restent partagés avec les autres membres. Quitter conserve ce partage. Quitter et arrêter le partage les retire.",
@@ -873,7 +873,7 @@
       "ledBy": "Dirigé par {name}",
       "noLeader": "Personne ne dirige encore ce groupe.",
       "alsoIn": "Aussi dans ce groupe : {names}",
-      "onlyYou": "Vous êtes la seule personne dans ce groupe.",
+      "onlyYou": "Vous êtes le seul utilisateur dans ce groupe.",
       "sharedLine": "Partagé avec ce groupe : {items}",
       "youCanLeave": "Vous pouvez quitter. Vous perdez alors l’accès à ce que ce groupe peut voir.",
       "youLead": "Vous dirigez ce groupe. Vous pouvez le quitter, et vous perdez alors l’accès à ce que ce groupe peut voir."
@@ -895,10 +895,10 @@
       "rename": "Renommer",
       "renameTitle": "Renommer le groupe",
       "delete": "Supprimer",
-      "deleteConfirm": "Supprimer le groupe « {name} » ? Les personnes restent dans l’instance. {shares}, et {policies}.",
+      "deleteConfirm": "Supprimer le groupe « {name} » ? Les utilisateurs restent dans l’instance. {shares}, et {policies}.",
       "deleteConfirmShares": "1 partage vers ce groupe prend fin | {count} partages vers ce groupe prennent fin",
       "deleteConfirmPolicies": "1 règle est retirée | {count} règles sont retirées",
-      "deleteConfirmUnknown": "Supprimer le groupe « {name} » ? Les personnes restent dans l’instance. Les partages vers ce groupe prennent fin, et les règles du groupe sont retirées.",
+      "deleteConfirmUnknown": "Supprimer le groupe « {name} » ? Les utilisateurs restent dans l’instance. Les partages vers ce groupe prennent fin, et les règles du groupe sont retirées.",
       "empty": "Aucun groupe pour le moment. Créez-en un pour partager plus tard.",
       "loadError": "Impossible de charger les groupes.",
       "saveError": "Impossible d’enregistrer le groupe.",
@@ -906,16 +906,16 @@
       "renamed": "Groupe renommé.",
       "deleted": "Groupe supprimé.",
       "directoryReadOnly": "Ce groupe vient de votre connexion et ne peut pas être renommé ni supprimé ici.",
-      "directoryManagedHint": "Les appartenances issues de la connexion sont mises à jour à la prochaine connexion. Vous pouvez encore ajouter des personnes à la main.",
-      "addMember": "Ajouter une personne",
+      "directoryManagedHint": "Les appartenances issues de la connexion sont mises à jour à la prochaine connexion. Vous pouvez encore ajouter des utilisateurs à la main.",
+      "addMember": "Ajouter un utilisateur",
       "addMemberPlaceholder": "Rechercher par nom ou e-mail",
-      "addMemberNotFound": "Aucune personne ne correspond à ce nom ou à cet e-mail.",
+      "addMemberNotFound": "Aucun utilisateur ne correspond à ce nom ou à cet e-mail.",
       "removeMember": "Retirer",
       "removeConfirm": "Retirer {email} de ce groupe ? Ce qu’il a partagé avec ce groupe reste partagé.",
       "roleMember": "Membre",
       "roleManager": "Responsable",
-      "memberAdded": "Personne ajoutée au groupe.",
-      "memberRemoved": "Personne retirée du groupe.",
+      "memberAdded": "Utilisateur ajouté au groupe.",
+      "memberRemoved": "Utilisateur retiré du groupe.",
       "sharedWith": "Partagé avec ce groupe",
       "sharedEmpty": "Rien n’est encore partagé avec ce groupe.",
       "sharedLoading": "Chargement des éléments partagés…",
@@ -1050,7 +1050,7 @@
       "groupForcesOff": "Ce groupe le désactive pour ses membres.",
       "rateLimit": "Niveau de limite d’usage",
       "useGlobal": "Utiliser la valeur de l’instance",
-      "useBillingTier": "Utiliser l’offre de la personne",
+      "useBillingTier": "Utiliser l’offre de l’utilisateur",
       "conflict": "Un autre groupe définit une autre valeur. Le groupe au plus petit numéro l’emporte.",
       "locks": "Valeurs d’instance verrouillées",
       "locksHelper": "Ces verrous s’appliquent à toute l’instance, pas à un groupe. Tant qu’un verrou est actif, seule la valeur d’instance est utilisée. Les valeurs de groupe et personnelles restent enregistrées, mais sont ignorées. Désactivez le verrou pour les utiliser à nouveau.",
@@ -1096,10 +1096,10 @@
       }
     },
     "intro": {
-      "users": "Toutes les personnes ayant un compte ici. Changez un niveau, vérifiez une adresse ou désactivez un compte.",
-      "groups": "Les groupes réunissent des personnes pour partager des assistants et fixer des règles une seule fois pour tous.",
+      "users": "Tous les utilisateurs ayant un compte ici. Changez un niveau, vérifiez une adresse ou désactivez un compte.",
+      "groups": "Les groupes réunissent des utilisateurs pour partager des assistants et fixer des règles une seule fois pour tous.",
       "policies": "Les règles décident de ce qu’un groupe peut utiliser, par exemple quelles fonctions ou quels modèles.",
-      "moderation": "Contenus signalés par des personnes. Examinez-les, puis conservez-les ou supprimez-les.",
+      "moderation": "Contenus signalés par des utilisateurs. Examinez-les, puis conservez-les ou supprimez-les.",
       "audit": "Un journal de qui a modifié quoi sur ce serveur, les plus récents d’abord."
     }
   },
@@ -1114,7 +1114,7 @@
     "sharedWithMe": "Partagé avec moi",
     "incoming": {
       "title": "Chats reçus",
-      "subtitle": "Discussions que des personnes ou des groupes ont partagées avec vous",
+      "subtitle": "Discussions que des utilisateurs ou des groupes ont partagées avec vous",
       "menu": "Chats reçus",
       "purpose": "Partagés avec vous",
       "menuNew": "Nouveaux chats reçus",
@@ -1122,7 +1122,7 @@
       "newCount": "{count} nouveaux reçus",
       "owner": "de {name}",
       "sourceGroup": "Cette discussion appartient à {owner}. Elle vous est parvenue via le groupe \"{name}\".",
-      "sourceEveryone": "Cette discussion appartient à {owner}. Elle a été partagée avec toutes les personnes qui ont un compte.",
+      "sourceEveryone": "Cette discussion appartient à {owner}. Elle a été partagée avec tous les utilisateurs qui ont un compte.",
       "sourceDirect": "Cette discussion appartient à {owner}. Elle a été partagée avec vous personnellement.",
       "emptyText": "Aucun chat reçu",
       "filter": {
@@ -1141,7 +1141,7 @@
         "groupTitle": "Partagée avec le groupe « {name} »",
         "groupTitleGeneric": "Partagée avec un groupe",
         "everyone": "Tout le monde",
-        "everyoneTitle": "Partagée avec toutes les personnes qui ont un compte",
+        "everyoneTitle": "Partagée avec tous les utilisateurs qui ont un compte",
         "direct": "Partagée avec vous",
         "directTitle": "Partagée avec vous personnellement",
         "from": "De {name}",
@@ -1149,7 +1149,7 @@
         "widgetTitle": "Une conversation de visiteur issue de l'un de vos widgets de chat"
       }
     },
-    "everyone": "Toutes les personnes qui ont un compte",
+    "everyone": "Tous les utilisateurs qui ont un compte",
     "owner": "Propriétaire",
     "fileUnavailable": "Ce fichier n'est plus disponible.",
     "kind": {
@@ -1170,30 +1170,30 @@
     "banner": {
       "knowledge_folder": {
         "sourceGroup": "Ce dossier appartient à {owner}. Il vous a atteint par le groupe « {name} ».",
-        "sourceEveryone": "Ce dossier appartient à {owner}. Il a été partagé avec toutes les personnes qui ont un compte.",
+        "sourceEveryone": "Ce dossier appartient à {owner}. Il a été partagé avec tous les utilisateurs qui ont un compte.",
         "sourceDirect": "Ce dossier appartient à {owner}. Il a été partagé avec vous personnellement."
       },
       "assistant": {
         "sourceGroup": "Cet assistant appartient à {owner}. Il vous a atteint par le groupe « {name} ».",
-        "sourceEveryone": "Cet assistant appartient à {owner}. Il a été partagé avec toutes les personnes qui ont un compte.",
+        "sourceEveryone": "Cet assistant appartient à {owner}. Il a été partagé avec tous les utilisateurs qui ont un compte.",
         "sourceDirect": "Cet assistant appartient à {owner}. Il a été partagé avec vous personnellement."
       },
       "saved_task": {
         "sourceGroup": "Cette tâche enregistrée appartient à {owner}. Elle vous a atteint par le groupe « {name} ».",
-        "sourceEveryone": "Cette tâche enregistrée appartient à {owner}. Elle a été partagée avec toutes les personnes qui ont un compte.",
+        "sourceEveryone": "Cette tâche enregistrée appartient à {owner}. Elle a été partagée avec tous les utilisateurs qui ont un compte.",
         "sourceDirect": "Cette tâche enregistrée appartient à {owner}. Elle a été partagée avec vous personnellement."
       },
       "widget": {
         "sourceGroup": "Ce widget de chat appartient à {owner}. Il vous a atteint par le groupe « {name} ».",
-        "sourceEveryone": "Ce widget de chat appartient à {owner}. Il a été partagé avec toutes les personnes qui ont un compte.",
+        "sourceEveryone": "Ce widget de chat appartient à {owner}. Il a été partagé avec tous les utilisateurs qui ont un compte.",
         "sourceDirect": "Ce widget de chat appartient à {owner}. Il a été partagé avec vous personnellement."
       }
     },
     "dialog": {
       "title": "Partager « {name} »",
       "who": "Qui",
-      "searchPlaceholder": "Rechercher une personne ou un groupe…",
-      "searchPlaceholderSharedGroup": "Rechercher des personnes d’un groupe en commun, ou un groupe…",
+      "searchPlaceholder": "Rechercher un utilisateur ou un groupe…",
+      "searchPlaceholderSharedGroup": "Rechercher des utilisateurs d’un groupe en commun, ou un groupe…",
       "permission": "Autorisation",
       "sharedWith": "Partagé avec",
       "empty": "Vous seul pouvez voir ceci.",
@@ -1201,7 +1201,7 @@
       "remove": "Retirer",
       "removeTitle": "Arrêter le partage",
       "removeConfirm": "Retirer {name} ?",
-      "removeConfirmConversation": "Retirer {name} ? Cette personne perd ce chat et ne peut plus en faire sa propre copie.",
+      "removeConfirmConversation": "Retirer {name} ? Cet utilisateur perd ce chat et ne peut plus en faire sa propre copie.",
       "loadFailed": "Impossible de charger les partages.",
       "saveFailed": "Le partage a échoué. Veuillez réessayer.",
       "shared": "Partagé avec {name}.",
@@ -1209,9 +1209,9 @@
       "removed": "Partage avec {name} arrêté.",
       "removeFailed": "Impossible d'arrêter le partage. Veuillez réessayer.",
       "permissionFailed": "Impossible de changer l'autorisation. Veuillez réessayer.",
-      "noMatches": "Aucune personne ou groupe ne correspond.",
+      "noMatches": "Aucun utilisateur ou groupe ne correspond.",
       "noMatchesSharedGroup": "Personne dans un groupe en commun, ni aucun groupe, ne correspond à ce nom.",
-      "searchFailed": "Impossible de rechercher des personnes ou des groupes.",
+      "searchFailed": "Impossible de rechercher des utilisateurs ou des groupes.",
       "tryAgain": "Réessayer",
       "everyoneInactive": "Ce partage reste enregistré, mais personne d'autre ne peut l'utiliser tant que le partage avec tout le monde est désactivé. Vous pouvez le retirer ici.",
       "ownerLine": "Propriétaire · {name}",
@@ -1220,7 +1220,7 @@
       "managePublicLink": "Gérer le lien public",
       "openPublicLink": "Gérer le lien public",
       "subjectType": {
-        "user": "personne",
+        "user": "utilisateur",
         "group": "groupe"
       },
       "consequence": {

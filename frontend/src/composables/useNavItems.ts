@@ -11,7 +11,6 @@ import {
   CpuChipIcon,
   FolderIcon,
   IdentificationIcon,
-  LinkIcon,
   PuzzlePieceIcon,
   ShieldCheckIcon,
   Squares2X2Icon,
@@ -285,13 +284,6 @@ export function useNavItems() {
           path: '/apps',
           label: t('nav.allApps'),
           icon: Squares2X2Icon,
-          ...grouped('apps', apps),
-        },
-        {
-          key: 'apps-connected',
-          path: '/apps/connected',
-          label: t('nav.connectedApps'),
-          icon: LinkIcon,
           ...grouped('apps', apps),
         },
         {

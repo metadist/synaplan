@@ -684,9 +684,9 @@
       "errorDeleting": "Error al eliminar clave API",
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
       "scopes": {
-        "hint": "Déjelo sin marcar para acceso completo. Marcar Personas limita esta clave. El trabajo con archivos añade ámbitos de chat y archivos para ejecutar scripts — no otorga acceso de administrador.",
-        "iamRead": "Personas — ver grupos",
-        "iamManage": "Personas — administrar grupos",
+        "hint": "Déjelo sin marcar para acceso completo. Marcar Usuarios limita esta clave. El trabajo con archivos añade ámbitos de chat y archivos para ejecutar scripts — no otorga acceso de administrador.",
+        "iamRead": "Usuarios — ver grupos",
+        "iamManage": "Usuarios — administrar grupos",
         "computeRun": "Trabajo con archivos — ejecutar scripts cortos sobre copias de tus archivos"
       }
     },

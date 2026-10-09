@@ -95,7 +95,7 @@ const navMessages = {
     adminFeatureStatus: 'System status',
     adminProviderSetup: 'AI infrastructure',
     adminSystemConfig: 'System configuration',
-    adminPeople: 'People',
+    adminPeople: 'Users',
     adminPartners: 'Partners',
   },
   pageTitles: {
@@ -215,7 +215,6 @@ describe('useNavItems rail', () => {
       'ai-models',
       'saved-tasks',
       'apps',
-      'apps-connected',
       'chat-widget',
     ])
     expect(groupNavChildren(children).map((group) => group.key)).toEqual([
@@ -227,7 +226,7 @@ describe('useNavItems rail', () => {
     expect(children.find((child) => child.key === 'ai-models')?.label).toBe('AI settings')
     expect(children.find((child) => child.key === 'saved-tasks')?.path).toBe('/tasks')
     expect(children.find((child) => child.key === 'apps')?.path).toBe('/apps')
-    expect(children.find((child) => child.key === 'apps-connected')?.path).toBe('/apps/connected')
+    expect(children.find((child) => child.key === 'apps-connected')).toBeUndefined()
   })
 
   it('drops Tasks when Saved tasks is off and keeps the apps', () => {
@@ -261,12 +260,12 @@ describe('useNavItems rail', () => {
     expect(first?.path).toBe('/ai/assistants')
   })
 
-  it('lights up Connected, not All apps, on /apps/connected', () => {
+  it('keeps All apps highlighted on the connected filter and on an app page', () => {
     const all = { key: 'apps', path: '/apps', label: 'All apps' }
-    const connected = { key: 'apps-connected', path: '/apps/connected', label: 'Connected' }
+    const widgets = { key: 'chat-widget', path: '/channels/widgets', label: 'Chat widgets' }
+    expect(isNavChildActive(all, '/channels', '/apps/connected')).toBe(true)
     expect(isNavChildActive(all, '/channels', '/apps/telegram')).toBe(true)
-    expect(isNavChildActive(connected, '/channels', '/apps/telegram')).toBe(false)
-    expect(isNavChildActive(connected, '/channels', '/apps/connected')).toBe(true)
+    expect(isNavChildActive(widgets, '/channels', '/apps/connected')).toBe(false)
   })
 
   it('admin also sees Operate', () => {

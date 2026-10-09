@@ -73,7 +73,7 @@
     "adminFeatures": "Sistem durumu",
     "adminConfig": "Sistem yapılandırması",
     "adminSetup": "AI altyapısı",
-    "adminPeople": "Kişiler",
+    "adminPeople": "Kullanıcılar",
     "adminPartners": "İş ortakları",
     "myGroups": "Gruplarım",
     "incoming": "Gelen sohbetler",
@@ -140,7 +140,7 @@
     "channels": "Kanallar",
     "channelsDescription": "Synaplan'a bağladığınız her şey",
     "assistantsDescription": "Asistanlar, kısayollar, görevler ve AI ayarları",
-    "operateDescription": "Kişiler, durum ve ayarlar",
+    "operateDescription": "Kullanıcılar, durum ve ayarlar",
     "aiSetup": "AI Kurulumu ve Araçlar",
     "aiSetupDescription": "Modeller, talimatlar, yönlendirme ve araçlar",
     "preferences": "Tercihler",
@@ -159,7 +159,7 @@
     "adminFeatureStatus": "Sistem durumu",
     "adminSystemConfig": "Sistem yapılandırması",
     "adminProviderSetup": "AI altyapısı",
-    "adminPeople": "Kişiler",
+    "adminPeople": "Kullanıcılar",
     "adminPartners": "İş ortakları",
     "profile": "Profil",
     "more": "Daha fazla",
@@ -229,7 +229,7 @@
     "loadingMessages": "Mesajlar yükleniyor…",
     "adminPreview": {
       "badge": "Yönetici önizlemesi",
-      "hint": "Bunu yalnızca yöneticiler görür. Diğer kişiler, yayınlanana kadar bunu görmez."
+      "hint": "Bunu yalnızca yöneticiler görür. Diğer kullanıcılar, yayınlanana kadar bunu görmez."
     }
   },
   "search": {
@@ -383,8 +383,8 @@
           "off": "Bu, {name} ayarını bu Synaplan örneğindeki tüm kullanıcılar için hemen kapatır. Bildirimden geri alabilirsin.",
           "select": "Bu, {name} ayarını bu Synaplan örneğindeki tüm kullanıcılar için hemen “{value}” yapar. Bildirimden geri alabilirsin.",
           "FEATURE_IAM_GROUPS_ENABLED": {
-            "true": "Yöneticiler Yönet altında Kişiler’i görür ve grup oluşturabilir; üyeler gruplarını Hesap altında görür. Bildirimden geri alabilirsin.",
-            "false": "Kişiler Yönet menüsünden kaybolur ve kimse grup oluşturamaz ya da kullanamaz. Paylaşımlar ve grup politikaları çalışmayı durdurur. Bildirimden geri alabilirsin."
+            "true": "Yöneticiler Yönet altında Kullanıcılar’ı görür ve grup oluşturabilir; üyeler gruplarını Hesap altında görür. Bildirimden geri alabilirsin.",
+            "false": "Kullanıcılar Yönet menüsünden kaybolur ve kimse grup oluşturamaz ya da kullanamaz. Paylaşımlar ve grup politikaları çalışmayı durdurur. Bildirimden geri alabilirsin."
           }
         },
         "saved": "{name} artık herkes için “{value}”.",

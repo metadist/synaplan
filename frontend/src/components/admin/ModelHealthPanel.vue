@@ -99,12 +99,7 @@
           </select>
         </label>
 
-        <div v-if="visibleProviders.length > 1" class="flex flex-wrap items-center gap-3 ml-auto">
-          <SectionJumpNav
-            :items="providerJumpItems"
-            :nav-label="$t('admin.config.accordion.jumpTo')"
-            @select="jumpToProvider"
-          />
+        <div v-if="visibleProviders.length > 1" class="ml-auto">
           <button
             type="button"
             class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
@@ -264,12 +259,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
-import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import ModelHealthRetiredList from '@/components/admin/ModelHealthRetiredList.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import { useNotification } from '@/composables/useNotification'
@@ -373,16 +367,9 @@ const providerIds = computed(() => visibleProviders.value.map((provider) => prov
 const modelIds = computed(() =>
   visibleProviders.value.flatMap((provider) => provider.models.map((model) => String(model.id)))
 )
-const providerJumpItems = computed(() =>
-  visibleProviders.value.map((provider) => ({
-    id: provider.name,
-    label: provider.displayName,
-  }))
-)
 const {
   isOpen: isProviderOpen,
   toggle: toggleProvider,
-  open: openProvider,
   expandAll: expandAllProviders,
   collapseAll: collapseAllProviders,
   allOpen: allProvidersOpen,
@@ -391,14 +378,6 @@ const { isOpen: isModelOpen, toggle: toggleModel } = useAccordion(modelIds)
 
 function providerPanelId(name: string): string {
   return `model-status-provider-${name.replace(/[^a-zA-Z0-9_-]+/g, '-')}`
-}
-
-async function jumpToProvider(name: string): Promise<void> {
-  openProvider(name)
-  await nextTick()
-  document
-    .getElementById(providerPanelId(name))
-    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 /**

@@ -931,9 +931,9 @@
       "errorDeleting": "Failed to delete API key",
       "noKeys": "No API keys yet. Create your first key to get started.",
       "scopes": {
-        "hint": "Leave unchecked for full access. Checking People limits this key to People. File work adds chat and file scopes so the key can run scripts — it does not grant admin access.",
-        "iamRead": "People — view groups",
-        "iamManage": "People — manage groups",
+        "hint": "Leave unchecked for full access. Checking Users limits this key to Users. File work adds chat and file scopes so the key can run scripts — it does not grant admin access.",
+        "iamRead": "Users — view groups",
+        "iamManage": "Users — manage groups",
         "computeRun": "File work — run short scripts on copies of your files"
       }
     },

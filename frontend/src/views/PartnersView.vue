@@ -1,183 +1,185 @@
 <template>
   <MainLayout data-testid="view-partners">
-    <div class="container mx-auto px-4 sm:px-6 py-8 max-w-[60rem]">
-      <button
-        type="button"
-        class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"
-        data-testid="link-partners-back"
-        @click="router.push({ name: 'admin' })"
-      >
-        <Icon icon="heroicons:arrow-left" class="w-3.5 h-3.5" />
-        {{ $t('nav.admin') }}
-      </button>
-      <PageHeader
-        :title="$t('partners.title')"
-        :subtitle="$t('partners.subtitle')"
-        icon="mdi:handshake-outline"
-      />
-
-      <p v-if="loading" class="txt-secondary text-sm">{{ $t('common.loading') }}</p>
-      <p
-        v-else-if="errorText"
-        class="text-sm text-red-600 dark:text-red-400"
-        data-testid="partners-error"
-      >
-        {{ errorText }}
-      </p>
-
-      <section
-        v-if="membership && !membership.reachable"
-        class="surface-card p-6 space-y-3"
-        data-testid="partners-unreachable"
-      >
-        <p class="txt-primary text-sm">{{ $t('partners.unreachable') }}</p>
+    <div class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8">
+      <div class="mx-auto w-full max-w-[100rem]">
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium opacity-50 cursor-not-allowed"
-          disabled
-          data-testid="btn-partners-open"
+          class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"
+          data-testid="link-partners-back"
+          @click="router.push({ name: 'admin' })"
         >
-          {{ $t('partners.open') }}
+          <Icon icon="heroicons:arrow-left" class="w-3.5 h-3.5" />
+          {{ $t('nav.admin') }}
         </button>
-      </section>
+        <PageHeader
+          :title="$t('partners.title')"
+          :subtitle="$t('partners.subtitle')"
+          icon="mdi:handshake-outline"
+        />
 
-      <section
-        v-else-if="membership && !membership.opened"
-        class="surface-card p-6 space-y-4"
-        data-testid="partners-closed"
-      >
-        <p class="txt-primary text-sm">{{ $t('partners.empty') }}</p>
-        <label class="block text-sm txt-primary">
-          {{ $t('partners.companyName') }}
-          <input
-            v-model="companyName"
-            type="text"
-            maxlength="80"
-            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            data-testid="input-partners-name"
-          />
-        </label>
-        <button
-          type="button"
-          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
-          :disabled="busy || companyName.trim() === ''"
-          data-testid="btn-partners-open"
-          @click="openPartners"
+        <p v-if="loading" class="txt-secondary text-sm">{{ $t('common.loading') }}</p>
+        <p
+          v-else-if="errorText"
+          class="text-sm text-red-600 dark:text-red-400"
+          data-testid="partners-error"
         >
-          {{ $t('partners.open') }}
-        </button>
-      </section>
+          {{ errorText }}
+        </p>
 
-      <template v-else-if="membership?.opened">
-        <section class="surface-card p-6 space-y-3 mb-4" data-testid="partners-open">
-          <p class="txt-primary text-sm">
-            {{ $t('partners.openedLine', { name: membership.name }) }}
-          </p>
-          <p class="txt-secondary text-sm">
-            {{ $t('partners.fingerprint', { fingerprint: membership.fingerprint }) }}
-          </p>
+        <section
+          v-if="membership && !membership.reachable"
+          class="surface-card p-6 space-y-3"
+          data-testid="partners-unreachable"
+        >
+          <p class="txt-primary text-sm">{{ $t('partners.unreachable') }}</p>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
-            data-testid="btn-partners-close"
-            @click="closePartners"
+            class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium opacity-50 cursor-not-allowed"
+            disabled
+            data-testid="btn-partners-open"
           >
-            {{ $t('partners.close') }}
+            {{ $t('partners.open') }}
           </button>
         </section>
 
-        <section class="surface-card p-6 space-y-3 mb-4">
-          <button
-            type="button"
-            class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
-            :disabled="busy"
-            data-testid="btn-partners-invite"
-            @click="createInvite"
-          >
-            {{ $t('partners.invite') }}
-          </button>
-          <div v-if="pasteUrl" class="space-y-2" data-testid="partners-invite-url">
-            <p class="txt-secondary text-sm">{{ $t('partners.inviteHelp') }}</p>
-            <p class="txt-primary text-sm break-all">{{ pasteUrl }}</p>
-            <button
-              type="button"
-              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
-              @click="copyUrl"
-            >
-              {{ $t('partners.copy') }}
-            </button>
-          </div>
-        </section>
-
-        <section class="surface-card p-6 space-y-3 mb-4">
+        <section
+          v-else-if="membership && !membership.opened"
+          class="surface-card p-6 space-y-4"
+          data-testid="partners-closed"
+        >
+          <p class="txt-primary text-sm">{{ $t('partners.empty') }}</p>
           <label class="block text-sm txt-primary">
-            {{ $t('partners.pasteLabel') }}
+            {{ $t('partners.companyName') }}
             <input
-              v-model="inviteUrl"
-              type="url"
+              v-model="companyName"
+              type="text"
+              maxlength="80"
               class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-              :placeholder="$t('partners.pastePlaceholder')"
-              data-testid="input-partners-invite"
+              data-testid="input-partners-name"
             />
           </label>
           <button
             type="button"
             class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
-            :disabled="busy || inviteUrl.trim() === ''"
-            data-testid="btn-partners-connect"
-            @click="acceptInvite"
+            :disabled="busy || companyName.trim() === ''"
+            data-testid="btn-partners-open"
+            @click="openPartners"
           >
-            {{ $t('partners.connect') }}
+            {{ $t('partners.open') }}
           </button>
         </section>
 
-        <ul class="space-y-3" data-testid="partners-list">
-          <li
-            v-for="partner in partners"
-            :key="partner.id"
-            class="surface-card p-4 flex flex-col sm:flex-row sm:items-center gap-3"
-            :data-testid="`partners-row-${partner.id}`"
-          >
-            <div class="min-w-0 flex-1">
-              <p class="txt-primary text-sm font-medium">
-                {{
-                  partner.status === 'invited'
-                    ? $t('partners.pending')
-                    : partner.name || partner.domain
-                }}
-              </p>
-              <p class="txt-secondary text-sm">
-                {{ statusLabel(partner) }}
-              </p>
-            </div>
-            <div class="flex flex-wrap gap-2">
+        <template v-else-if="membership?.opened">
+          <section class="surface-card p-6 space-y-3 mb-4" data-testid="partners-open">
+            <p class="txt-primary text-sm">
+              {{ $t('partners.openedLine', { name: membership.name }) }}
+            </p>
+            <p class="txt-secondary text-sm">
+              {{ $t('partners.fingerprint', { fingerprint: membership.fingerprint }) }}
+            </p>
+            <button
+              type="button"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+              data-testid="btn-partners-close"
+              @click="closePartners"
+            >
+              {{ $t('partners.close') }}
+            </button>
+          </section>
+
+          <section class="surface-card p-6 space-y-3 mb-4">
+            <button
+              type="button"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
+              :disabled="busy"
+              data-testid="btn-partners-invite"
+              @click="createInvite"
+            >
+              {{ $t('partners.invite') }}
+            </button>
+            <div v-if="pasteUrl" class="space-y-2" data-testid="partners-invite-url">
+              <p class="txt-secondary text-sm">{{ $t('partners.inviteHelp') }}</p>
+              <p class="txt-primary text-sm break-all">{{ pasteUrl }}</p>
               <button
-                v-if="
-                  partner.status === 'active' ||
-                  partner.pausedBy === 'local' ||
-                  partner.pausedBy === 'both'
-                "
                 type="button"
                 class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
-                @click="partner.status === 'paused' ? resume(partner.id) : pause(partner.id)"
+                @click="copyUrl"
               >
-                {{ partner.status === 'paused' ? $t('partners.resume') : $t('partners.pause') }}
-              </button>
-              <button
-                type="button"
-                class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
-                @click="remove(partner)"
-              >
-                {{
-                  partner.status === 'invited'
-                    ? $t('partners.removeInvite')
-                    : $t('partners.disconnect')
-                }}
+                {{ $t('partners.copy') }}
               </button>
             </div>
-          </li>
-        </ul>
-      </template>
+          </section>
+
+          <section class="surface-card p-6 space-y-3 mb-4">
+            <label class="block text-sm txt-primary">
+              {{ $t('partners.pasteLabel') }}
+              <input
+                v-model="inviteUrl"
+                type="url"
+                class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                :placeholder="$t('partners.pastePlaceholder')"
+                data-testid="input-partners-invite"
+              />
+            </label>
+            <button
+              type="button"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
+              :disabled="busy || inviteUrl.trim() === ''"
+              data-testid="btn-partners-connect"
+              @click="acceptInvite"
+            >
+              {{ $t('partners.connect') }}
+            </button>
+          </section>
+
+          <ul class="space-y-3" data-testid="partners-list">
+            <li
+              v-for="partner in partners"
+              :key="partner.id"
+              class="surface-card p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+              :data-testid="`partners-row-${partner.id}`"
+            >
+              <div class="min-w-0 flex-1">
+                <p class="txt-primary text-sm font-medium">
+                  {{
+                    partner.status === 'invited'
+                      ? $t('partners.pending')
+                      : partner.name || partner.domain
+                  }}
+                </p>
+                <p class="txt-secondary text-sm">
+                  {{ statusLabel(partner) }}
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-if="
+                    partner.status === 'active' ||
+                    partner.pausedBy === 'local' ||
+                    partner.pausedBy === 'both'
+                  "
+                  type="button"
+                  class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+                  @click="partner.status === 'paused' ? resume(partner.id) : pause(partner.id)"
+                >
+                  {{ partner.status === 'paused' ? $t('partners.resume') : $t('partners.pause') }}
+                </button>
+                <button
+                  type="button"
+                  class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
+                  @click="remove(partner)"
+                >
+                  {{
+                    partner.status === 'invited'
+                      ? $t('partners.removeInvite')
+                      : $t('partners.disconnect')
+                  }}
+                </button>
+              </div>
+            </li>
+          </ul>
+        </template>
+      </div>
     </div>
   </MainLayout>
 </template>

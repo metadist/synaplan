@@ -24,20 +24,13 @@ vi.mock('@/composables/useLibraryLinks', async (importOriginal) => ({
   useLibraryLinks: () => ({ links }),
 }))
 
-const TabNavStub = {
-  props: ['modelValue', 'tabs'],
-  template:
-    '<nav><a v-for="tab in tabs" :key="tab.id" :href="tab.to" :data-testid="tab.testid" :data-active="tab.id === modelValue" :data-badge="tab.badge">{{ tab.label }}</a></nav>',
-}
-
-const mountTabs = () =>
+const mountHeader = () =>
   mount(FilesTabs, {
     global: {
       stubs: {
-        TabNav: TabNavStub,
         PageHeader: {
           props: ['title', 'subtitle'],
-          template: '<header><p data-testid="subtitle">{{ subtitle }}</p><slot /></header>',
+          template: '<header><p data-testid="subtitle">{{ subtitle }}</p></header>',
         },
       },
     },
@@ -48,24 +41,10 @@ describe('FilesTabs', () => {
     route.path = '/files'
   })
 
-  it('renders every Library destination as a tab with the inbox badge', () => {
-    const wrapper = mountTabs()
-    expect(wrapper.findAll('a').map((a) => a.attributes('href'))).toEqual([
-      '/files',
-      '/files/incoming',
-      '/files/generated',
-      '/files/search',
-    ])
-    expect(wrapper.get('[data-testid="tab-files-incoming"]').attributes('data-badge')).toBe('3')
-  })
-
-  it('marks the current tab and explains it in the subtitle', () => {
+  it('explains the current Library section and does not repeat the sidebar links', () => {
     route.path = '/files/generated'
-    const wrapper = mountTabs()
-    expect(wrapper.get('[data-testid="tab-files-generated"]').attributes('data-active')).toBe(
-      'true'
-    )
-    expect(wrapper.get('[data-testid="tab-files-browse"]').attributes('data-active')).toBe('false')
+    const wrapper = mountHeader()
     expect(wrapper.get('[data-testid="subtitle"]').text()).toContain('Finished results')
+    expect(wrapper.find('[data-testid="files-tabs"]').exists()).toBe(false)
   })
 })

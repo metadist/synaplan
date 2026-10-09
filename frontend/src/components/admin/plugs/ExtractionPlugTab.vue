@@ -20,12 +20,7 @@
     <template v-else>
       <ExtractionSidecarPanel :adapters="adapters" />
 
-      <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <SectionJumpNav
-          :items="extractionSectionItems"
-          :nav-label="$t('admin.config.accordion.jumpTo')"
-          @select="jumpToExtractionFamily"
-        />
+      <div class="flex justify-end mb-4">
         <button
           type="button"
           class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
@@ -162,12 +157,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
-import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import { useNotification } from '@/composables/useNotification'
 import ExtractionSidecarPanel from '@/components/admin/plugs/ExtractionSidecarPanel.vue'
@@ -183,29 +177,13 @@ const { t } = useI18n()
 const { success, error: showError } = useNotification()
 
 const families = ['document', 'text', 'image', 'audio', 'audio_no_cloud', 'video'] as const
-const extractionSectionItems = computed(() =>
-  families.map((family) => ({
-    id: family,
-    label: t(`aiInfra.extraction.family.${family}`),
-  }))
-)
 const {
   isOpen: isExtractionSectionOpen,
   toggle: toggleExtractionSection,
-  open: openExtractionSection,
   expandAll: expandAllExtractionSections,
   collapseAll: collapseAllExtractionSections,
   allOpen: allExtractionSectionsOpen,
 } = useAccordion(() => [...families])
-
-async function jumpToExtractionFamily(family: string) {
-  openExtractionSection(family)
-  await nextTick()
-  document.getElementById(`extraction-section-${family}`)?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start',
-  })
-}
 
 const loading = ref(true)
 const loadFailed = ref(false)

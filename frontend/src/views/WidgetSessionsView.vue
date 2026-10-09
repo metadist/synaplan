@@ -1,521 +1,560 @@
 <template>
   <MainLayout>
-    <div class="h-full flex flex-col bg-chat" data-testid="page-widget-sessions">
-      <!-- Header -->
-      <div class="px-4 lg:px-6 py-3 lg:py-4 bg-chat flex-shrink-0 space-y-2">
-        <!-- Row 1: Title + Stats (always visible) -->
-        <div class="flex items-center gap-2 lg:gap-3">
-          <button
-            class="p-2 rounded-xl hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-200 flex-shrink-0"
-            :title="$t('common.back')"
-            @click="goBack"
-          >
-            <Icon icon="heroicons:arrow-left" class="w-5 h-5 txt-secondary" />
-          </button>
-          <div
-            class="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center flex-shrink-0"
-          >
-            <Icon icon="heroicons:chat-bubble-left-right" class="w-4 h-4 text-white" />
+    <div class="h-full bg-chat">
+      <div
+        class="mx-auto flex h-full min-h-0 w-full max-w-[100rem] flex-col"
+        data-testid="page-widget-sessions"
+      >
+        <!-- Header -->
+        <div class="px-4 lg:px-6 py-3 lg:py-4 bg-chat flex-shrink-0 space-y-2">
+          <!-- Row 1: Title + Stats (always visible) -->
+          <div class="flex items-center gap-2 lg:gap-3">
+            <button
+              class="p-2 rounded-xl hover:bg-white/5 dark:hover:bg-white/5 transition-all duration-200 flex-shrink-0"
+              :title="$t('common.back')"
+              @click="goBack"
+            >
+              <Icon icon="heroicons:arrow-left" class="w-5 h-5 txt-secondary" />
+            </button>
+            <div
+              class="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center flex-shrink-0"
+            >
+              <Icon icon="heroicons:chat-bubble-left-right" class="w-4 h-4 text-white" />
+            </div>
+            <h1 class="text-base lg:text-lg font-semibold txt-primary truncate min-w-0">
+              {{ widget?.name || $t('widgetSessions.title') }}
+            </h1>
+
+            <!-- Realtime connection status (WS via Centrifugo) -->
+            <ConnectionStatusBadge class="hidden md:inline-flex flex-shrink-0" />
+
+            <!-- Stats (inline on desktop) -->
+            <div class="hidden md:flex items-center gap-3 text-xs txt-secondary flex-shrink-0">
+              <span class="flex items-center gap-1.5 font-medium txt-primary">
+                {{ totalSessions }} {{ $t('widgetSessions.totalShort') }}
+              </span>
+              <span class="txt-secondary">|</span>
+              <span class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
+                {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span
+                  class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"
+                ></span>
+                {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span
+                  class="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"
+                ></span>
+                {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
+              </span>
+              <span class="flex items-center gap-1.5">
+                <span
+                  class="w-2 h-2 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50"
+                ></span>
+                {{ stats.internal }} {{ $t('widgetSessions.internalShort') }}
+              </span>
+            </div>
+
+            <!-- Spacer -->
+            <div class="flex-1"></div>
+
+            <!-- Actions (inline on desktop) -->
+            <div class="hidden lg:flex items-center gap-2 flex-shrink-0">
+              <!-- Selection indicator & actions -->
+              <div
+                v-if="selectedSessionIds.size > 0"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--brand)]/10"
+              >
+                <span class="text-sm font-medium txt-brand">
+                  {{ selectedSessionIds.size }} {{ $t('widgetSessions.selected') }}
+                </span>
+                <button
+                  class="p-1 rounded-xl hover:bg-[var(--brand)]/20 transition-colors"
+                  :title="$t('common.clearSelection')"
+                  @click="clearSelection"
+                >
+                  <Icon icon="heroicons:x-mark" class="w-4 h-4 txt-brand" />
+                </button>
+              </div>
+              <!-- Delete Selected Button -->
+              <button
+                v-if="selectedSessionIds.size > 0"
+                class="flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 text-sm font-medium bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                :disabled="deletingSessions"
+                @click="confirmDeleteSelected"
+              >
+                <Icon
+                  :icon="deletingSessions ? 'heroicons:arrow-path' : 'heroicons:trash'"
+                  :class="['w-4 h-4', deletingSessions && 'animate-spin']"
+                />
+                <span>{{ $t('common.delete') }}</span>
+              </button>
+              <!-- Export Button -->
+              <button
+                :class="[
+                  'flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 text-sm font-medium',
+                  selectedSessionIds.size > 0
+                    ? 'bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)]'
+                    : 'bg-white/5 txt-secondary hover:bg-white/10',
+                ]"
+                @click="showExportDialog = true"
+              >
+                <Icon icon="heroicons:arrow-down-tray" class="w-4 h-4" />
+                <span>{{ $t('export.title') }}</span>
+              </button>
+              <button
+                :class="[
+                  'flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 text-sm font-medium',
+                  showSummaryPanel
+                    ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                    : 'bg-white/5 txt-secondary hover:bg-white/10',
+                ]"
+                @click="showSummaryPanel = !showSummaryPanel"
+              >
+                <Icon icon="heroicons:sparkles" class="w-4 h-4" />
+                <span>{{ $t('widgetSessions.summary') }}</span>
+              </button>
+            </div>
           </div>
-          <h1 class="text-base lg:text-lg font-semibold txt-primary truncate min-w-0">
-            {{ widget?.name || $t('widgetSessions.title') }}
-          </h1>
 
-          <!-- Realtime connection status (WS via Centrifugo) -->
-          <ConnectionStatusBadge class="hidden md:inline-flex flex-shrink-0" />
+          <!-- Row 2: Stats + Actions (mobile only) -->
+          <div class="flex lg:hidden items-center gap-2 flex-wrap">
+            <!-- Stats (mobile) -->
+            <div class="flex md:hidden items-center gap-2 text-[11px] txt-secondary mr-auto">
+              <span class="font-medium txt-primary">
+                {{ totalSessions }} {{ $t('widgetSessions.totalShort') }}
+              </span>
+              <span>|</span>
+              <span class="flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
+              </span>
+              <span class="flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
+              </span>
+              <span class="flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
+              </span>
+              <span class="flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                {{ stats.internal }} {{ $t('widgetSessions.internalShort') }}
+              </span>
+            </div>
 
-          <!-- Stats (inline on desktop) -->
-          <div class="hidden md:flex items-center gap-3 text-xs txt-secondary flex-shrink-0">
-            <span class="flex items-center gap-1.5 font-medium txt-primary">
-              {{ totalSessions }} {{ $t('widgetSessions.totalShort') }}
-            </span>
-            <span class="txt-secondary">|</span>
-            <span class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
-              {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
-            </span>
-            <span class="flex items-center gap-1.5">
-              <span
-                class="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"
-              ></span>
-              {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
-            </span>
-            <span class="flex items-center gap-1.5">
-              <span class="w-2 h-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span>
-              {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
-            </span>
-            <span class="flex items-center gap-1.5">
-              <span
-                class="w-2 h-2 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50"
-              ></span>
-              {{ stats.internal }} {{ $t('widgetSessions.internalShort') }}
-            </span>
-          </div>
-
-          <!-- Spacer -->
-          <div class="flex-1"></div>
-
-          <!-- Actions (inline on desktop) -->
-          <div class="hidden lg:flex items-center gap-2 flex-shrink-0">
-            <!-- Selection indicator & actions -->
+            <!-- Mobile action buttons -->
+            <!-- Selection indicator -->
             <div
               v-if="selectedSessionIds.size > 0"
-              class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--brand)]/10"
+              class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--brand)]/10"
             >
-              <span class="text-sm font-medium txt-brand">
-                {{ selectedSessionIds.size }} {{ $t('widgetSessions.selected') }}
+              <span class="text-xs font-medium txt-brand">
+                {{ selectedSessionIds.size }}
               </span>
               <button
-                class="p-1 rounded-xl hover:bg-[var(--brand)]/20 transition-colors"
+                class="p-0.5 rounded-xl hover:bg-[var(--brand)]/20 transition-colors"
                 :title="$t('common.clearSelection')"
                 @click="clearSelection"
               >
-                <Icon icon="heroicons:x-mark" class="w-4 h-4 txt-brand" />
+                <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5 txt-brand" />
               </button>
             </div>
-            <!-- Delete Selected Button -->
+            <!-- Delete -->
             <button
               v-if="selectedSessionIds.size > 0"
-              class="flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 text-sm font-medium bg-red-500/10 text-red-500 hover:bg-red-500/20"
+              class="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all"
               :disabled="deletingSessions"
+              :title="$t('common.delete')"
               @click="confirmDeleteSelected"
             >
               <Icon
                 :icon="deletingSessions ? 'heroicons:arrow-path' : 'heroicons:trash'"
                 :class="['w-4 h-4', deletingSessions && 'animate-spin']"
               />
-              <span>{{ $t('common.delete') }}</span>
             </button>
-            <!-- Export Button -->
+            <!-- Export -->
             <button
-              :class="[
-                'flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 text-sm font-medium',
+              class="p-2 rounded-xl transition-all"
+              :class="
                 selectedSessionIds.size > 0
-                  ? 'bg-[var(--brand)] text-white hover:bg-[var(--brand-dark)]'
-                  : 'bg-white/5 txt-secondary hover:bg-white/10',
-              ]"
+                  ? 'bg-[var(--brand)] text-white'
+                  : 'bg-white/5 txt-secondary hover:bg-white/10'
+              "
+              :title="$t('export.title')"
               @click="showExportDialog = true"
             >
               <Icon icon="heroicons:arrow-down-tray" class="w-4 h-4" />
-              <span>{{ $t('export.title') }}</span>
             </button>
+            <!-- Summary -->
             <button
-              :class="[
-                'flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 text-sm font-medium',
+              class="p-2 rounded-xl transition-all"
+              :class="
                 showSummaryPanel
                   ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
-                  : 'bg-white/5 txt-secondary hover:bg-white/10',
-              ]"
+                  : 'bg-white/5 txt-secondary hover:bg-white/10'
+              "
+              :title="$t('widgetSessions.summary')"
               @click="showSummaryPanel = !showSummaryPanel"
             >
               <Icon icon="heroicons:sparkles" class="w-4 h-4" />
-              <span>{{ $t('widgetSessions.summary') }}</span>
             </button>
           </div>
         </div>
 
-        <!-- Row 2: Stats + Actions (mobile only) -->
-        <div class="flex lg:hidden items-center gap-2 flex-wrap">
-          <!-- Stats (mobile) -->
-          <div class="flex md:hidden items-center gap-2 text-[11px] txt-secondary mr-auto">
-            <span class="font-medium txt-primary">
-              {{ totalSessions }} {{ $t('widgetSessions.totalShort') }}
-            </span>
-            <span>|</span>
-            <span class="flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-              {{ stats.ai }} {{ $t('widgetSessions.aiShort') }}
-            </span>
-            <span class="flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              {{ stats.human }} {{ $t('widgetSessions.humanShort') }}
-            </span>
-            <span class="flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-              {{ stats.waiting }} {{ $t('widgetSessions.waitingShort') }}
-            </span>
-            <span class="flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-              {{ stats.internal }} {{ $t('widgetSessions.internalShort') }}
-            </span>
-          </div>
-
-          <!-- Mobile action buttons -->
-          <!-- Selection indicator -->
+        <!-- Main Content: Split View -->
+        <div class="flex-1 flex overflow-hidden px-4 lg:px-6 pb-4 lg:pb-6">
+          <!-- Left: Session List -->
           <div
-            v-if="selectedSessionIds.size > 0"
-            class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--brand)]/10"
-          >
-            <span class="text-xs font-medium txt-brand">
-              {{ selectedSessionIds.size }}
-            </span>
-            <button
-              class="p-0.5 rounded-xl hover:bg-[var(--brand)]/20 transition-colors"
-              :title="$t('common.clearSelection')"
-              @click="clearSelection"
-            >
-              <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5 txt-brand" />
-            </button>
-          </div>
-          <!-- Delete -->
-          <button
-            v-if="selectedSessionIds.size > 0"
-            class="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all"
-            :disabled="deletingSessions"
-            :title="$t('common.delete')"
-            @click="confirmDeleteSelected"
-          >
-            <Icon
-              :icon="deletingSessions ? 'heroicons:arrow-path' : 'heroicons:trash'"
-              :class="['w-4 h-4', deletingSessions && 'animate-spin']"
-            />
-          </button>
-          <!-- Export -->
-          <button
-            class="p-2 rounded-xl transition-all"
-            :class="
-              selectedSessionIds.size > 0
-                ? 'bg-[var(--brand)] text-white'
-                : 'bg-white/5 txt-secondary hover:bg-white/10'
+            :class="[
+              'flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-sm',
+              selectedSession ? 'hidden lg:flex' : 'w-full lg:flex',
+            ]"
+            :style="
+              isLgScreen
+                ? { width: leftPanelWidth + 'px', minWidth: LEFT_PANEL_MIN + 'px', flexShrink: '1' }
+                : undefined
             "
-            :title="$t('export.title')"
-            @click="showExportDialog = true"
           >
-            <Icon icon="heroicons:arrow-down-tray" class="w-4 h-4" />
-          </button>
-          <!-- Summary -->
-          <button
-            class="p-2 rounded-xl transition-all"
-            :class="
-              showSummaryPanel
-                ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
-                : 'bg-white/5 txt-secondary hover:bg-white/10'
-            "
-            :title="$t('widgetSessions.summary')"
-            @click="showSummaryPanel = !showSummaryPanel"
-          >
-            <Icon icon="heroicons:sparkles" class="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      <!-- Main Content: Split View -->
-      <div class="flex-1 flex overflow-hidden px-4 lg:px-6 pb-4 lg:pb-6">
-        <!-- Left: Session List -->
-        <div
-          :class="[
-            'flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-sm',
-            selectedSession ? 'hidden lg:flex' : 'w-full lg:flex',
-          ]"
-          :style="
-            isLgScreen
-              ? { width: leftPanelWidth + 'px', minWidth: LEFT_PANEL_MIN + 'px', flexShrink: '1' }
-              : undefined
-          "
-        >
-          <!-- Filters -->
-          <div class="p-3 flex flex-wrap gap-2">
-            <!-- Select All Checkbox -->
-            <button
-              :class="[
-                'p-2 rounded-xl transition-all duration-200 flex-shrink-0',
-                allSelected
-                  ? 'bg-[var(--brand)]/20 text-[var(--brand)]'
-                  : 'bg-white/5 txt-secondary hover:text-[var(--brand)]',
-              ]"
-              :title="
-                allSelected ? $t('widgetSessions.deselectAll') : $t('widgetSessions.selectAll')
-              "
-              @click="toggleSelectAll"
-            >
-              <Icon
-                :icon="allSelected ? 'heroicons:check-circle' : 'heroicons:check-circle'"
-                :class="['w-4 h-4', !allSelected && 'opacity-50']"
-              />
-            </button>
-            <button
-              :class="[
-                'p-2 rounded-xl transition-all duration-200 flex-shrink-0',
-                filters.favorite
-                  ? 'bg-amber-500/20 text-amber-500'
-                  : 'bg-white/5 txt-secondary hover:text-amber-500',
-              ]"
-              :title="$t('widgetSessions.favorites')"
-              @click="toggleFavoriteFilter"
-            >
-              <Icon
-                :icon="filters.favorite ? 'heroicons:star-solid' : 'heroicons:star'"
-                class="w-4 h-4"
-              />
-            </button>
-            <select
-              v-model="filters.mode"
-              class="flex-1 px-3 py-2 rounded-xl bg-white/5 dark:bg-white/5 text-xs txt-primary border-0 focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
-              style="min-width: 80px"
-              @change="loadSessions"
-            >
-              <option value="">{{ $t('widgetSessions.allModes') }}</option>
-              <option value="ai">{{ $t('widgetSessions.modeAi') }}</option>
-              <option value="human">{{ $t('widgetSessions.modeHuman') }}</option>
-              <option value="waiting">{{ $t('widgetSessions.modeWaiting') }}</option>
-              <option value="internal">{{ $t('widgetSessions.modeInternal') }}</option>
-            </select>
-            <select
-              v-model="filters.status"
-              class="flex-1 px-3 py-2 rounded-xl bg-white/5 dark:bg-white/5 text-xs txt-primary border-0 focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
-              style="min-width: 80px"
-              @change="loadSessions"
-            >
-              <option value="">{{ $t('widgetSessions.allStatus') }}</option>
-              <option value="active">{{ $t('widgetSessions.active') }}</option>
-              <option value="expired">{{ $t('widgetSessions.expired') }}</option>
-            </select>
-          </div>
-
-          <!-- Session List -->
-          <div class="flex-1 overflow-y-auto scroll-thin px-2 pb-2">
-            <!-- Loading -->
-            <div v-if="loading" class="p-8 text-center">
-              <div
-                class="animate-spin w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full mx-auto"
-              ></div>
-            </div>
-
-            <!-- Empty State -->
-            <div v-else-if="sessions.length === 0" class="p-8 text-center">
-              <div
-                class="w-16 h-16 rounded-2xl bg-white/5 dark:bg-white/5 flex items-center justify-center mx-auto mb-4"
+            <!-- Filters -->
+            <div class="p-3 flex flex-wrap gap-2">
+              <!-- Select All Checkbox -->
+              <button
+                :class="[
+                  'p-2 rounded-xl transition-all duration-200 flex-shrink-0',
+                  allSelected
+                    ? 'bg-[var(--brand)]/20 text-[var(--brand)]'
+                    : 'bg-white/5 txt-secondary hover:text-[var(--brand)]',
+                ]"
+                :title="
+                  allSelected ? $t('widgetSessions.deselectAll') : $t('widgetSessions.selectAll')
+                "
+                @click="toggleSelectAll"
               >
                 <Icon
-                  icon="heroicons:chat-bubble-left-right"
-                  class="w-8 h-8 txt-secondary opacity-50"
+                  :icon="allSelected ? 'heroicons:check-circle' : 'heroicons:check-circle'"
+                  :class="['w-4 h-4', !allSelected && 'opacity-50']"
                 />
-              </div>
-              <p class="txt-secondary text-sm">{{ $t('widgetSessions.noSessions') }}</p>
+              </button>
+              <button
+                :class="[
+                  'p-2 rounded-xl transition-all duration-200 flex-shrink-0',
+                  filters.favorite
+                    ? 'bg-amber-500/20 text-amber-500'
+                    : 'bg-white/5 txt-secondary hover:text-amber-500',
+                ]"
+                :title="$t('widgetSessions.favorites')"
+                @click="toggleFavoriteFilter"
+              >
+                <Icon
+                  :icon="filters.favorite ? 'heroicons:star-solid' : 'heroicons:star'"
+                  class="w-4 h-4"
+                />
+              </button>
+              <select
+                v-model="filters.mode"
+                class="flex-1 px-3 py-2 rounded-xl bg-white/5 dark:bg-white/5 text-xs txt-primary border-0 focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
+                style="min-width: 80px"
+                @change="loadSessions"
+              >
+                <option value="">{{ $t('widgetSessions.allModes') }}</option>
+                <option value="ai">{{ $t('widgetSessions.modeAi') }}</option>
+                <option value="human">{{ $t('widgetSessions.modeHuman') }}</option>
+                <option value="waiting">{{ $t('widgetSessions.modeWaiting') }}</option>
+                <option value="internal">{{ $t('widgetSessions.modeInternal') }}</option>
+              </select>
+              <select
+                v-model="filters.status"
+                class="flex-1 px-3 py-2 rounded-xl bg-white/5 dark:bg-white/5 text-xs txt-primary border-0 focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
+                style="min-width: 80px"
+                @change="loadSessions"
+              >
+                <option value="">{{ $t('widgetSessions.allStatus') }}</option>
+                <option value="active">{{ $t('widgetSessions.active') }}</option>
+                <option value="expired">{{ $t('widgetSessions.expired') }}</option>
+              </select>
             </div>
 
-            <!-- Sessions -->
-            <div v-else class="space-y-1">
-              <button
-                v-for="session in sessions"
-                :key="session.id"
-                :class="[
-                  'w-full p-3 text-left rounded-xl transition-all duration-200 group',
-                  selectedSession?.id === session.id
-                    ? 'bg-[var(--brand)]/10 shadow-sm'
-                    : 'hover:bg-white/5 dark:hover:bg-white/5',
-                ]"
-                @click="viewSession(session)"
+            <!-- Session List -->
+            <div class="flex-1 overflow-y-auto scroll-thin px-2 pb-2">
+              <!-- Loading -->
+              <div v-if="loading" class="p-8 text-center">
+                <div
+                  class="animate-spin w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full mx-auto"
+                ></div>
+              </div>
+
+              <!-- Empty State -->
+              <div v-else-if="sessions.length === 0" class="p-8 text-center">
+                <div
+                  class="w-16 h-16 rounded-2xl bg-white/5 dark:bg-white/5 flex items-center justify-center mx-auto mb-4"
+                >
+                  <Icon
+                    icon="heroicons:chat-bubble-left-right"
+                    class="w-8 h-8 txt-secondary opacity-50"
+                  />
+                </div>
+                <p class="txt-secondary text-sm">{{ $t('widgetSessions.noSessions') }}</p>
+              </div>
+
+              <!-- Sessions -->
+              <div v-else class="space-y-1">
+                <button
+                  v-for="session in sessions"
+                  :key="session.id"
+                  :class="[
+                    'w-full p-3 text-left rounded-xl transition-all duration-200 group',
+                    selectedSession?.id === session.id
+                      ? 'bg-[var(--brand)]/10 shadow-sm'
+                      : 'hover:bg-white/5 dark:hover:bg-white/5',
+                  ]"
+                  @click="viewSession(session)"
+                >
+                  <div class="flex items-start gap-3">
+                    <!-- Mode Icon (clickable for selection) -->
+                    <div
+                      :class="[
+                        'w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm cursor-pointer transition-all duration-200 relative',
+                        selectedSessionIds.has(session.sessionId)
+                          ? 'bg-[var(--brand)] ring-2 ring-[var(--brand)] ring-offset-2 ring-offset-[var(--bg-card)]'
+                          : getModeGradient(session.mode),
+                      ]"
+                      :title="$t('widgetSessions.clickToSelect')"
+                      @click.stop="toggleSessionSelection(session)"
+                    >
+                      <Icon
+                        v-if="selectedSessionIds.has(session.sessionId)"
+                        icon="heroicons:check"
+                        class="w-5 h-5 text-white"
+                      />
+                      <Icon v-else :icon="getModeIcon(session.mode)" class="w-5 h-5 text-white" />
+                    </div>
+
+                    <!-- Content -->
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center justify-between mb-1 gap-2">
+                        <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span class="text-sm font-medium txt-primary truncate">
+                            {{ session.title || getModeLabel(session.mode) }}
+                          </span>
+                          <button
+                            class="p-0.5 rounded-xl transition-all duration-200 flex-shrink-0"
+                            :class="
+                              session.isFavorite
+                                ? 'text-amber-500'
+                                : 'txt-secondary opacity-0 group-hover:opacity-100 hover:text-amber-500'
+                            "
+                            :title="
+                              session.isFavorite
+                                ? $t('widgetSessions.unfavorite')
+                                : $t('widgetSessions.favorite')
+                            "
+                            @click.stop="toggleSessionFavorite(session)"
+                          >
+                            <Icon
+                              :icon="session.isFavorite ? 'heroicons:star-solid' : 'heroicons:star'"
+                              class="w-3.5 h-3.5"
+                            />
+                          </button>
+                        </div>
+                        <span class="text-[11px] txt-secondary flex-shrink-0 whitespace-nowrap">{{
+                          getTimeAgo(session.lastMessage)
+                        }}</span>
+                      </div>
+                      <p class="text-xs txt-secondary line-clamp-2 leading-relaxed">
+                        {{
+                          stripMarkdown(session.lastMessagePreview) ||
+                          $t('widgetSessions.noMessages')
+                        }}
+                      </p>
+                    </div>
+
+                    <!-- Waiting Indicator -->
+                    <div v-if="session.mode === 'waiting'" class="flex-shrink-0 mt-1">
+                      <span
+                        class="w-2.5 h-2.5 rounded-full bg-amber-500 block animate-pulse shadow-sm shadow-amber-500/50"
+                      ></span>
+                    </div>
+                  </div>
+                </button>
+
+                <!-- Load More -->
+                <div v-if="pagination.hasMore" class="pt-2 pb-1 text-center">
+                  <button
+                    class="text-xs txt-brand hover:underline px-4 py-2 rounded-xl hover:bg-[var(--brand)]/5 transition-colors"
+                    @click="loadMore"
+                  >
+                    {{ $t('common.loadMore') }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Left Resize Handle -->
+          <div
+            v-if="isLgScreen"
+            class="resize-handle group"
+            @mousedown="startResize('left', $event)"
+          >
+            <div
+              class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"
+            ></div>
+          </div>
+
+          <!-- Center: Chat View -->
+          <div
+            :class="[
+              'flex-1 flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-sm',
+              !selectedSession ? 'hidden lg:flex' : '',
+            ]"
+            :style="isLgScreen ? { minWidth: CHAT_MIN_WIDTH + 'px' } : undefined"
+          >
+            <!-- No Selection -->
+            <div v-if="!selectedSession" class="flex-1 flex items-center justify-center">
+              <div class="text-center p-8">
+                <div
+                  class="w-20 h-20 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 dark:from-white/5 dark:to-white/10 flex items-center justify-center mx-auto mb-5"
+                >
+                  <Icon
+                    icon="heroicons:chat-bubble-left-right"
+                    class="w-10 h-10 txt-secondary opacity-40"
+                  />
+                </div>
+                <h3 class="text-lg font-medium txt-primary mb-2">
+                  {{ $t('widgetSessions.selectSession') }}
+                </h3>
+                <p class="text-sm txt-secondary opacity-70 max-w-xs mx-auto">
+                  {{ $t('widgetSessions.selectSessionDescription') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Selected Session Chat -->
+            <template v-else>
+              <!-- Chat Header -->
+              <div
+                class="p-4 flex-shrink-0 space-y-2 border-b border-white/5 dark:border-white/5 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
               >
-                <div class="flex items-start gap-3">
-                  <!-- Mode Icon (clickable for selection) -->
+                <!-- Top row: back button, session info, and actions -->
+                <div class="flex items-center gap-3">
+                  <!-- Back button on mobile -->
+                  <button
+                    class="p-2 rounded-xl hover:bg-white/5 transition-all duration-200 lg:hidden flex-shrink-0"
+                    @click="closeSessionDetail"
+                  >
+                    <Icon icon="heroicons:arrow-left" class="w-5 h-5 txt-secondary" />
+                  </button>
+
                   <div
                     :class="[
-                      'w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm cursor-pointer transition-all duration-200 relative',
-                      selectedSessionIds.has(session.sessionId)
-                        ? 'bg-[var(--brand)] ring-2 ring-[var(--brand)] ring-offset-2 ring-offset-[var(--bg-card)]'
-                        : getModeGradient(session.mode),
+                      'w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0',
+                      getModeGradient(selectedSession.mode),
                     ]"
-                    :title="$t('widgetSessions.clickToSelect')"
-                    @click.stop="toggleSessionSelection(session)"
                   >
-                    <Icon
-                      v-if="selectedSessionIds.has(session.sessionId)"
-                      icon="heroicons:check"
-                      class="w-5 h-5 text-white"
-                    />
-                    <Icon v-else :icon="getModeIcon(session.mode)" class="w-5 h-5 text-white" />
+                    <Icon :icon="getModeIcon(selectedSession.mode)" class="w-5 h-5 text-white" />
                   </div>
-
-                  <!-- Content -->
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between mb-1 gap-2">
-                      <div class="flex items-center gap-1.5 min-w-0 flex-1">
-                        <span class="text-sm font-medium txt-primary truncate">
-                          {{ session.title || getModeLabel(session.mode) }}
-                        </span>
-                        <button
-                          class="p-0.5 rounded-xl transition-all duration-200 flex-shrink-0"
-                          :class="
-                            session.isFavorite
-                              ? 'text-amber-500'
-                              : 'txt-secondary opacity-0 group-hover:opacity-100 hover:text-amber-500'
-                          "
-                          :title="
-                            session.isFavorite
-                              ? $t('widgetSessions.unfavorite')
-                              : $t('widgetSessions.favorite')
-                          "
-                          @click.stop="toggleSessionFavorite(session)"
-                        >
-                          <Icon
-                            :icon="session.isFavorite ? 'heroicons:star-solid' : 'heroicons:star'"
-                            class="w-3.5 h-3.5"
-                          />
-                        </button>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <!-- Editable title -->
+                      <div v-if="isEditingTitle" class="flex items-center gap-2">
+                        <input
+                          ref="titleInputRef"
+                          v-model="editTitleValue"
+                          type="text"
+                          class="text-sm font-medium txt-primary bg-white/5 dark:bg-white/5 px-2 py-1 rounded-xl border border-white/10 focus:border-[var(--brand)]/50 focus:ring-1 focus:ring-[var(--brand)]/30 outline-none transition-all w-48"
+                          :placeholder="$t('chat.namePlaceholder')"
+                          maxlength="100"
+                          @keydown.enter="saveTitle"
+                          @keydown.escape="cancelEditTitle"
+                          @blur="saveTitle"
+                        />
                       </div>
-                      <span class="text-[11px] txt-secondary flex-shrink-0 whitespace-nowrap">{{
-                        getTimeAgo(session.lastMessage)
-                      }}</span>
+                      <template v-else>
+                        <p
+                          class="text-sm font-medium txt-primary truncate max-w-[150px] lg:max-w-[200px]"
+                        >
+                          {{ selectedSession.title || getModeLabel(selectedSession.mode) }}
+                        </p>
+                        <button
+                          class="p-1 rounded-xl hover:bg-white/10 transition-colors txt-secondary hover:text-[var(--brand)] flex-shrink-0"
+                          :title="$t('chat.rename')"
+                          @click="startEditTitle"
+                        >
+                          <Icon icon="heroicons:pencil" class="w-3.5 h-3.5" />
+                        </button>
+                      </template>
+                      <!-- Favorite star -->
+                      <button
+                        class="p-1 rounded-xl transition-all duration-200 flex-shrink-0"
+                        :class="
+                          selectedSession.isFavorite
+                            ? 'text-amber-500 hover:bg-amber-500/10'
+                            : 'txt-secondary hover:text-amber-500 hover:bg-white/5'
+                        "
+                        :title="
+                          selectedSession.isFavorite
+                            ? $t('widgetSessions.unfavorite')
+                            : $t('widgetSessions.favorite')
+                        "
+                        @click="toggleSessionFavorite(selectedSession)"
+                      >
+                        <Icon
+                          :icon="
+                            selectedSession.isFavorite ? 'heroicons:star-solid' : 'heroicons:star'
+                          "
+                          class="w-4 h-4"
+                        />
+                      </button>
+                      <span
+                        class="text-[10px] px-1.5 py-0.5 rounded-md flex-shrink-0"
+                        :class="getModeChipClass(selectedSession.mode)"
+                        >{{ getModeLabel(selectedSession.mode) }}</span
+                      >
                     </div>
-                    <p class="text-xs txt-secondary line-clamp-2 leading-relaxed">
-                      {{
-                        stripMarkdown(session.lastMessagePreview) || $t('widgetSessions.noMessages')
-                      }}
+                    <p class="text-xs txt-secondary truncate">
+                      <template v-if="selectedSession.country">
+                        {{ getCountryFlag(selectedSession.country) }}
+                        {{ getCountryName(selectedSession.country) }} ·
+                      </template>
+                      {{ $t('widgetSessions.lastActivity') }}:
+                      {{ getTimeAgo(selectedSession.lastMessage) }}
                     </p>
                   </div>
 
-                  <!-- Waiting Indicator -->
-                  <div v-if="session.mode === 'waiting'" class="flex-shrink-0 mt-1">
-                    <span
-                      class="w-2.5 h-2.5 rounded-full bg-amber-500 block animate-pulse shadow-sm shadow-amber-500/50"
-                    ></span>
-                  </div>
-                </div>
-              </button>
-
-              <!-- Load More -->
-              <div v-if="pagination.hasMore" class="pt-2 pb-1 text-center">
-                <button
-                  class="text-xs txt-brand hover:underline px-4 py-2 rounded-xl hover:bg-[var(--brand)]/5 transition-colors"
-                  @click="loadMore"
-                >
-                  {{ $t('common.loadMore') }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Left Resize Handle -->
-        <div v-if="isLgScreen" class="resize-handle group" @mousedown="startResize('left', $event)">
-          <div
-            class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"
-          ></div>
-        </div>
-
-        <!-- Center: Chat View -->
-        <div
-          :class="[
-            'flex-1 flex flex-col overflow-hidden rounded-2xl bg-[var(--bg-card)] shadow-sm',
-            !selectedSession ? 'hidden lg:flex' : '',
-          ]"
-          :style="isLgScreen ? { minWidth: CHAT_MIN_WIDTH + 'px' } : undefined"
-        >
-          <!-- No Selection -->
-          <div v-if="!selectedSession" class="flex-1 flex items-center justify-center">
-            <div class="text-center p-8">
-              <div
-                class="w-20 h-20 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 dark:from-white/5 dark:to-white/10 flex items-center justify-center mx-auto mb-5"
-              >
-                <Icon
-                  icon="heroicons:chat-bubble-left-right"
-                  class="w-10 h-10 txt-secondary opacity-40"
-                />
-              </div>
-              <h3 class="text-lg font-medium txt-primary mb-2">
-                {{ $t('widgetSessions.selectSession') }}
-              </h3>
-              <p class="text-sm txt-secondary opacity-70 max-w-xs mx-auto">
-                {{ $t('widgetSessions.selectSessionDescription') }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Selected Session Chat -->
-          <template v-else>
-            <!-- Chat Header -->
-            <div
-              class="p-4 flex-shrink-0 space-y-2 border-b border-white/5 dark:border-white/5 shadow-[0_1px_3px_rgba(0,0,0,0.08)]"
-            >
-              <!-- Top row: back button, session info, and actions -->
-              <div class="flex items-center gap-3">
-                <!-- Back button on mobile -->
-                <button
-                  class="p-2 rounded-xl hover:bg-white/5 transition-all duration-200 lg:hidden flex-shrink-0"
-                  @click="closeSessionDetail"
-                >
-                  <Icon icon="heroicons:arrow-left" class="w-5 h-5 txt-secondary" />
-                </button>
-
-                <div
-                  :class="[
-                    'w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0',
-                    getModeGradient(selectedSession.mode),
-                  ]"
-                >
-                  <Icon :icon="getModeIcon(selectedSession.mode)" class="w-5 h-5 text-white" />
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-1.5 flex-wrap">
-                    <!-- Editable title -->
-                    <div v-if="isEditingTitle" class="flex items-center gap-2">
-                      <input
-                        ref="titleInputRef"
-                        v-model="editTitleValue"
-                        type="text"
-                        class="text-sm font-medium txt-primary bg-white/5 dark:bg-white/5 px-2 py-1 rounded-xl border border-white/10 focus:border-[var(--brand)]/50 focus:ring-1 focus:ring-[var(--brand)]/30 outline-none transition-all w-48"
-                        :placeholder="$t('chat.namePlaceholder')"
-                        maxlength="100"
-                        @keydown.enter="saveTitle"
-                        @keydown.escape="cancelEditTitle"
-                        @blur="saveTitle"
-                      />
-                    </div>
-                    <template v-else>
-                      <p
-                        class="text-sm font-medium txt-primary truncate max-w-[150px] lg:max-w-[200px]"
-                      >
-                        {{ selectedSession.title || getModeLabel(selectedSession.mode) }}
-                      </p>
-                      <button
-                        class="p-1 rounded-xl hover:bg-white/10 transition-colors txt-secondary hover:text-[var(--brand)] flex-shrink-0"
-                        :title="$t('chat.rename')"
-                        @click="startEditTitle"
-                      >
-                        <Icon icon="heroicons:pencil" class="w-3.5 h-3.5" />
-                      </button>
-                    </template>
-                    <!-- Favorite star -->
+                  <!-- Actions (inline on desktop) -->
+                  <div class="hidden lg:flex items-center gap-2 flex-shrink-0">
                     <button
-                      class="p-1 rounded-xl transition-all duration-200 flex-shrink-0"
-                      :class="
-                        selectedSession.isFavorite
-                          ? 'text-amber-500 hover:bg-amber-500/10'
-                          : 'txt-secondary hover:text-amber-500 hover:bg-white/5'
-                      "
-                      :title="
-                        selectedSession.isFavorite
-                          ? $t('widgetSessions.unfavorite')
-                          : $t('widgetSessions.favorite')
-                      "
-                      @click="toggleSessionFavorite(selectedSession)"
+                      v-if="selectedSession.mode === 'ai'"
+                      class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-medium transition-all duration-200 shadow-sm shadow-emerald-500/25 flex items-center gap-1.5"
+                      @click="takeOver(selectedSession)"
                     >
-                      <Icon
-                        :icon="
-                          selectedSession.isFavorite ? 'heroicons:star-solid' : 'heroicons:star'
-                        "
-                        class="w-4 h-4"
-                      />
+                      <Icon icon="heroicons:hand-raised" class="w-4 h-4" />
+                      {{ $t('widgetSessions.takeOver') }}
                     </button>
-                    <span
-                      class="text-[10px] px-1.5 py-0.5 rounded-md flex-shrink-0"
-                      :class="getModeChipClass(selectedSession.mode)"
-                      >{{ getModeLabel(selectedSession.mode) }}</span
+                    <button
+                      v-if="selectedSession.mode === 'human' || selectedSession.mode === 'waiting'"
+                      class="px-4 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 text-xs font-medium transition-all duration-200 flex items-center gap-1.5"
+                      @click="handBack(selectedSession)"
                     >
+                      <Icon icon="heroicons:arrow-uturn-left" class="w-4 h-4" />
+                      {{ $t('widgetSessions.handBack') }}
+                    </button>
                   </div>
-                  <p class="text-xs txt-secondary truncate">
-                    <template v-if="selectedSession.country">
-                      {{ getCountryFlag(selectedSession.country) }}
-                      {{ getCountryName(selectedSession.country) }} ·
-                    </template>
-                    {{ $t('widgetSessions.lastActivity') }}:
-                    {{ getTimeAgo(selectedSession.lastMessage) }}
-                  </p>
                 </div>
 
-                <!-- Actions (inline on desktop) -->
-                <div class="hidden lg:flex items-center gap-2 flex-shrink-0">
+                <!-- Actions (separate row on mobile) -->
+                <div
+                  v-if="
+                    selectedSession.mode === 'ai' ||
+                    selectedSession.mode === 'human' ||
+                    selectedSession.mode === 'waiting'
+                  "
+                  class="flex lg:hidden items-center gap-2 pl-10"
+                >
                   <button
                     v-if="selectedSession.mode === 'ai'"
                     class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-medium transition-all duration-200 shadow-sm shadow-emerald-500/25 flex items-center gap-1.5"
@@ -535,439 +574,418 @@
                 </div>
               </div>
 
-              <!-- Actions (separate row on mobile) -->
-              <div
-                v-if="
-                  selectedSession.mode === 'ai' ||
-                  selectedSession.mode === 'human' ||
-                  selectedSession.mode === 'waiting'
-                "
-                class="flex lg:hidden items-center gap-2 pl-10"
-              >
-                <button
-                  v-if="selectedSession.mode === 'ai'"
-                  class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-medium transition-all duration-200 shadow-sm shadow-emerald-500/25 flex items-center gap-1.5"
-                  @click="takeOver(selectedSession)"
-                >
-                  <Icon icon="heroicons:hand-raised" class="w-4 h-4" />
-                  {{ $t('widgetSessions.takeOver') }}
-                </button>
-                <button
-                  v-if="selectedSession.mode === 'human' || selectedSession.mode === 'waiting'"
-                  class="px-4 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 text-xs font-medium transition-all duration-200 flex items-center gap-1.5"
-                  @click="handBack(selectedSession)"
-                >
-                  <Icon icon="heroicons:arrow-uturn-left" class="w-4 h-4" />
-                  {{ $t('widgetSessions.handBack') }}
-                </button>
-              </div>
-            </div>
-
-            <!-- Messages -->
-            <div ref="messagesContainer" class="flex-1 overflow-y-auto px-4 py-2 scroll-thin">
-              <div v-if="loadingDetail" class="text-center py-8">
-                <div
-                  class="animate-spin w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full mx-auto"
-                ></div>
-              </div>
-              <div v-else class="space-y-3">
-                <div
-                  v-for="message in sessionMessages"
-                  :key="message.id"
-                  :class="['max-w-[80%]', message.direction === 'OUT' ? 'ml-auto' : 'mr-auto']"
-                >
+              <!-- Messages -->
+              <div ref="messagesContainer" class="flex-1 overflow-y-auto px-4 py-2 scroll-thin">
+                <div v-if="loadingDetail" class="text-center py-8">
                   <div
-                    :class="[
-                      'px-4 py-3 shadow-sm',
-                      message.direction === 'OUT'
-                        ? 'bubble-user rounded-2xl rounded-br-md'
-                        : 'surface-chip border border-[var(--border-light)] rounded-2xl rounded-bl-md',
-                    ]"
-                    data-quotable
-                    :data-message-id="message.id"
-                    :data-message-role="message.direction === 'OUT' ? 'agent' : 'visitor'"
-                  >
-                    <MessageText
-                      :content="message.text"
-                      :readonly="true"
-                      :class="[
-                        'text-sm leading-relaxed',
-                        message.direction === 'OUT' ? 'text-white' : 'txt-primary',
-                      ]"
-                    />
-                    <!-- Attached Files -->
-                    <div v-if="message.files && message.files.length > 0" class="mt-2 space-y-1.5">
-                      <a
-                        v-for="file in message.files"
-                        :key="file.id"
-                        :href="`/api/v1/files/${file.id}/download`"
-                        target="_blank"
-                        :class="[
-                          'flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors text-xs',
-                          message.direction === 'OUT'
-                            ? 'bg-white/20 hover:bg-white/30 text-white'
-                            : 'bg-[var(--brand-alpha-light)] hover:bg-[var(--brand)]/20 txt-primary',
-                        ]"
-                      >
-                        <Icon :icon="getFileIcon(file.mimeType)" class="w-4 h-4 flex-shrink-0" />
-                        <span class="truncate max-w-[150px]" :title="file.filename">
-                          {{ file.filename }}
-                        </span>
-                        <span class="opacity-70 flex-shrink-0">
-                          {{ formatFileSize(file.size) }}
-                        </span>
-                        <Icon icon="heroicons:arrow-down-tray" class="w-3.5 h-3.5 flex-shrink-0" />
-                      </a>
-                    </div>
-                  </div>
-                  <p
-                    :class="[
-                      'text-[10px] mt-1.5 px-1 txt-secondary opacity-70',
-                      message.direction === 'OUT' ? 'text-right' : 'text-left',
-                    ]"
-                  >
-                    {{ getSenderLabel(message) }} · {{ formatTime(message.timestamp) }}
-                  </p>
+                    class="animate-spin w-6 h-6 border-2 border-[var(--brand)] border-t-transparent rounded-full mx-auto"
+                  ></div>
                 </div>
-
-                <!-- Typing Preview -->
-                <div v-if="typingPreview?.text" class="max-w-[80%] mr-auto animate-pulse">
+                <div v-else class="space-y-3">
                   <div
-                    class="px-4 py-3 shadow-sm surface-chip rounded-2xl rounded-bl-md border border-dashed border-[var(--border-light)]"
+                    v-for="message in sessionMessages"
+                    :key="message.id"
+                    :class="['max-w-[80%]', message.direction === 'OUT' ? 'ml-auto' : 'mr-auto']"
                   >
-                    <p class="text-sm leading-relaxed txt-secondary italic">
-                      {{ typingPreview.text }}
+                    <div
+                      :class="[
+                        'px-4 py-3 shadow-sm',
+                        message.direction === 'OUT'
+                          ? 'bubble-user rounded-2xl rounded-br-md'
+                          : 'surface-chip border border-[var(--border-light)] rounded-2xl rounded-bl-md',
+                      ]"
+                      data-quotable
+                      :data-message-id="message.id"
+                      :data-message-role="message.direction === 'OUT' ? 'agent' : 'visitor'"
+                    >
+                      <MessageText
+                        :content="message.text"
+                        :readonly="true"
+                        :class="[
+                          'text-sm leading-relaxed',
+                          message.direction === 'OUT' ? 'text-white' : 'txt-primary',
+                        ]"
+                      />
+                      <!-- Attached Files -->
+                      <div
+                        v-if="message.files && message.files.length > 0"
+                        class="mt-2 space-y-1.5"
+                      >
+                        <a
+                          v-for="file in message.files"
+                          :key="file.id"
+                          :href="`/api/v1/files/${file.id}/download`"
+                          target="_blank"
+                          :class="[
+                            'flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors text-xs',
+                            message.direction === 'OUT'
+                              ? 'bg-white/20 hover:bg-white/30 text-white'
+                              : 'bg-[var(--brand-alpha-light)] hover:bg-[var(--brand)]/20 txt-primary',
+                          ]"
+                        >
+                          <Icon :icon="getFileIcon(file.mimeType)" class="w-4 h-4 flex-shrink-0" />
+                          <span class="truncate max-w-[150px]" :title="file.filename">
+                            {{ file.filename }}
+                          </span>
+                          <span class="opacity-70 flex-shrink-0">
+                            {{ formatFileSize(file.size) }}
+                          </span>
+                          <Icon
+                            icon="heroicons:arrow-down-tray"
+                            class="w-3.5 h-3.5 flex-shrink-0"
+                          />
+                        </a>
+                      </div>
+                    </div>
+                    <p
+                      :class="[
+                        'text-[10px] mt-1.5 px-1 txt-secondary opacity-70',
+                        message.direction === 'OUT' ? 'text-right' : 'text-left',
+                      ]"
+                    >
+                      {{ getSenderLabel(message) }} · {{ formatTime(message.timestamp) }}
                     </p>
                   </div>
-                  <p class="text-[10px] mt-1.5 px-1 txt-secondary opacity-50 text-left">
-                    {{ $t('widgetSessions.typing') }}...
-                  </p>
-                </div>
 
-                <!-- AI Typing Indicator (Internal Mode) -->
-                <div v-if="internalAiTyping" class="max-w-[80%] ml-auto">
-                  <div
-                    class="px-4 py-3 shadow-sm bg-[var(--brand)] text-white rounded-2xl rounded-br-md"
-                  >
-                    <div class="flex items-center gap-1.5">
-                      <span
-                        class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
-                        style="animation-delay: 0ms"
-                      ></span>
-                      <span
-                        class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
-                        style="animation-delay: 150ms"
-                      ></span>
-                      <span
-                        class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
-                        style="animation-delay: 300ms"
-                      ></span>
+                  <!-- Typing Preview -->
+                  <div v-if="typingPreview?.text" class="max-w-[80%] mr-auto animate-pulse">
+                    <div
+                      class="px-4 py-3 shadow-sm surface-chip rounded-2xl rounded-bl-md border border-dashed border-[var(--border-light)]"
+                    >
+                      <p class="text-sm leading-relaxed txt-secondary italic">
+                        {{ typingPreview.text }}
+                      </p>
                     </div>
+                    <p class="text-[10px] mt-1.5 px-1 txt-secondary opacity-50 text-left">
+                      {{ $t('widgetSessions.typing') }}...
+                    </p>
                   </div>
-                  <p class="text-[10px] mt-1.5 px-1 txt-secondary opacity-50 text-right">
-                    AI {{ $t('widgetSessions.typing') }}...
-                  </p>
+
+                  <!-- AI Typing Indicator (Internal Mode) -->
+                  <div v-if="internalAiTyping" class="max-w-[80%] ml-auto">
+                    <div
+                      class="px-4 py-3 shadow-sm bg-[var(--brand)] text-white rounded-2xl rounded-br-md"
+                    >
+                      <div class="flex items-center gap-1.5">
+                        <span
+                          class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                          style="animation-delay: 0ms"
+                        ></span>
+                        <span
+                          class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                          style="animation-delay: 150ms"
+                        ></span>
+                        <span
+                          class="w-2 h-2 bg-white/60 rounded-full animate-bounce"
+                          style="animation-delay: 300ms"
+                        ></span>
+                      </div>
+                    </div>
+                    <p class="text-[10px] mt-1.5 px-1 txt-secondary opacity-50 text-right">
+                      AI {{ $t('widgetSessions.typing') }}...
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Custom Fields (Internal Mode) -->
-            <div
-              v-if="selectedSession.mode === 'internal' && widgetCustomFields.length > 0"
-              class="flex-shrink-0 border-t border-white/5 dark:border-white/5"
-            >
-              <button
-                class="w-full px-4 py-2.5 flex items-center justify-between text-xs font-medium txt-secondary hover:bg-white/5 transition-colors"
-                @click="showInternalCustomFields = !showInternalCustomFields"
+              <!-- Custom Fields (Internal Mode) -->
+              <div
+                v-if="selectedSession.mode === 'internal' && widgetCustomFields.length > 0"
+                class="flex-shrink-0 border-t border-white/5 dark:border-white/5"
               >
-                <span class="flex items-center gap-1.5">
-                  <Icon icon="heroicons:rectangle-stack" class="w-3.5 h-3.5 txt-brand" />
-                  {{ $t('widgets.customFields.panelTitle') }}
+                <button
+                  class="w-full px-4 py-2.5 flex items-center justify-between text-xs font-medium txt-secondary hover:bg-white/5 transition-colors"
+                  @click="showInternalCustomFields = !showInternalCustomFields"
+                >
+                  <span class="flex items-center gap-1.5">
+                    <Icon icon="heroicons:rectangle-stack" class="w-3.5 h-3.5 txt-brand" />
+                    {{ $t('widgets.customFields.panelTitle') }}
+                    <Icon
+                      v-if="savingCustomFields"
+                      icon="heroicons:arrow-path"
+                      class="w-3 h-3 txt-secondary animate-spin"
+                    />
+                  </span>
                   <Icon
-                    v-if="savingCustomFields"
-                    icon="heroicons:arrow-path"
-                    class="w-3 h-3 txt-secondary animate-spin"
-                  />
-                </span>
-                <Icon
-                  :icon="
-                    showInternalCustomFields ? 'heroicons:chevron-up' : 'heroicons:chevron-down'
-                  "
-                  class="w-3.5 h-3.5"
-                />
-              </button>
-              <div v-if="showInternalCustomFields" class="px-4 pb-3 space-y-3">
-                <div v-for="field in widgetCustomFields" :key="field.id">
-                  <label class="block text-xs font-medium txt-secondary mb-1">
-                    {{ field.name }}
-                  </label>
-                  <input
-                    v-if="field.type === 'text'"
-                    v-model="internalFieldValues[field.id]"
-                    type="text"
-                    class="w-full px-3 py-1.5 text-sm rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
-                    maxlength="256"
-                  />
-                  <select
-                    v-else-if="field.type === 'dropdown'"
-                    v-model="internalFieldValues[field.id]"
-                    class="w-full px-3 py-1.5 text-sm rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
-                  >
-                    <option value="">{{ $t('widgets.customFields.dropdownPlaceholder') }}</option>
-                    <option v-for="opt in field.options ?? []" :key="opt" :value="opt">
-                      {{ opt }}
-                    </option>
-                  </select>
-                  <button
-                    v-else
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm transition-colors w-full"
-                    :class="
-                      internalFieldValues[field.id]
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                        : 'surface-chip txt-secondary'
+                    :icon="
+                      showInternalCustomFields ? 'heroicons:chevron-up' : 'heroicons:chevron-down'
                     "
-                    @click="internalFieldValues[field.id] = !internalFieldValues[field.id]"
+                    class="w-3.5 h-3.5"
+                  />
+                </button>
+                <div v-if="showInternalCustomFields" class="px-4 pb-3 space-y-3">
+                  <div v-for="field in widgetCustomFields" :key="field.id">
+                    <label class="block text-xs font-medium txt-secondary mb-1">
+                      {{ field.name }}
+                    </label>
+                    <input
+                      v-if="field.type === 'text'"
+                      v-model="internalFieldValues[field.id]"
+                      type="text"
+                      class="w-full px-3 py-1.5 text-sm rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
+                      maxlength="256"
+                    />
+                    <select
+                      v-else-if="field.type === 'dropdown'"
+                      v-model="internalFieldValues[field.id]"
+                      class="w-full px-3 py-1.5 text-sm rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors"
+                    >
+                      <option value="">{{ $t('widgets.customFields.dropdownPlaceholder') }}</option>
+                      <option v-for="opt in field.options ?? []" :key="opt" :value="opt">
+                        {{ opt }}
+                      </option>
+                    </select>
+                    <button
+                      v-else
+                      class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm transition-colors w-full"
+                      :class="
+                        internalFieldValues[field.id]
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                          : 'surface-chip txt-secondary'
+                      "
+                      @click="internalFieldValues[field.id] = !internalFieldValues[field.id]"
+                    >
+                      <Icon
+                        :icon="
+                          internalFieldValues[field.id]
+                            ? 'heroicons:check-circle-solid'
+                            : 'heroicons:x-circle'
+                        "
+                        class="w-4 h-4"
+                      />
+                      {{ internalFieldValues[field.id] ? $t('common.yes') : $t('common.no') }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Message Input (Human/Waiting/Internal Mode) -->
+              <div
+                v-if="
+                  selectedSession.mode === 'human' ||
+                  selectedSession.mode === 'waiting' ||
+                  selectedSession.mode === 'internal'
+                "
+                class="p-4 flex-shrink-0 border-t border-white/5 dark:border-white/5 shadow-[0_-1px_3px_rgba(0,0,0,0.08)]"
+              >
+                <!-- Quoted reference chip -->
+                <QuoteChip
+                  v-if="quoting.pendingQuote.value"
+                  :quote="quoting.pendingQuote.value"
+                  class="mb-3"
+                  @remove="quoting.clearPendingQuote"
+                />
+                <!-- File Preview -->
+                <div v-if="selectedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
+                  <div
+                    v-for="(file, index) in selectedFiles"
+                    :key="index"
+                    class="relative group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 dark:bg-white/5"
                   >
                     <Icon
-                      :icon="
-                        internalFieldValues[field.id]
-                          ? 'heroicons:check-circle-solid'
-                          : 'heroicons:x-circle'
-                      "
-                      class="w-4 h-4"
+                      :icon="getFileIcon(file.type)"
+                      class="w-4 h-4 txt-secondary flex-shrink-0"
                     />
-                    {{ internalFieldValues[field.id] ? $t('common.yes') : $t('common.no') }}
-                  </button>
+                    <span class="text-xs txt-primary truncate max-w-[120px]" :title="file.name">
+                      {{ file.name }}
+                    </span>
+                    <span class="text-[10px] txt-secondary">
+                      {{ formatFileSize(file.size) }}
+                    </span>
+                    <button
+                      type="button"
+                      class="ml-1 p-0.5 rounded-full hover:bg-red-500/20 transition-colors"
+                      :title="$t('common.remove')"
+                      @click="removeFile(index)"
+                    >
+                      <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5 text-red-400" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- Message Input (Human/Waiting/Internal Mode) -->
-            <div
-              v-if="
-                selectedSession.mode === 'human' ||
-                selectedSession.mode === 'waiting' ||
-                selectedSession.mode === 'internal'
-              "
-              class="p-4 flex-shrink-0 border-t border-white/5 dark:border-white/5 shadow-[0_-1px_3px_rgba(0,0,0,0.08)]"
-            >
-              <!-- Quoted reference chip -->
-              <QuoteChip
-                v-if="quoting.pendingQuote.value"
-                :quote="quoting.pendingQuote.value"
-                class="mb-3"
-                @remove="quoting.clearPendingQuote"
-              />
-              <!-- File Preview -->
-              <div v-if="selectedFiles.length > 0" class="mb-3 flex flex-wrap gap-2">
-                <div
-                  v-for="(file, index) in selectedFiles"
-                  :key="index"
-                  class="relative group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 dark:bg-white/5"
-                >
-                  <Icon
-                    :icon="getFileIcon(file.type)"
-                    class="w-4 h-4 txt-secondary flex-shrink-0"
+                <!-- Upload Progress -->
+                <div v-if="uploadingFiles" class="mb-3">
+                  <div class="flex items-center gap-2 text-xs txt-secondary">
+                    <Icon icon="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
+                    {{ $t('widgetSessions.uploadingFiles') }}
+                  </div>
+                </div>
+                <form class="flex gap-3" @submit.prevent="sendMessage">
+                  <input
+                    ref="fileInputRef"
+                    type="file"
+                    multiple
+                    class="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.csv"
+                    @change="handleFileSelect"
                   />
-                  <span class="text-xs txt-primary truncate max-w-[120px]" :title="file.name">
-                    {{ file.name }}
-                  </span>
-                  <span class="text-[10px] txt-secondary">
-                    {{ formatFileSize(file.size) }}
-                  </span>
                   <button
                     type="button"
-                    class="ml-1 p-0.5 rounded-full hover:bg-red-500/20 transition-colors"
-                    :title="$t('common.remove')"
-                    @click="removeFile(index)"
+                    class="w-12 h-12 rounded-2xl bg-white/5 dark:bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all duration-200"
+                    :title="$t('widgetSessions.attachFile')"
+                    :disabled="sendingMessage || uploadingFiles"
+                    @click="triggerFileSelect"
                   >
-                    <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5 text-red-400" />
+                    <Icon icon="heroicons:paper-clip" class="w-5 h-5 txt-secondary" />
                   </button>
-                </div>
-              </div>
-              <!-- Upload Progress -->
-              <div v-if="uploadingFiles" class="mb-3">
-                <div class="flex items-center gap-2 text-xs txt-secondary">
-                  <Icon icon="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
-                  {{ $t('widgetSessions.uploadingFiles') }}
-                </div>
-              </div>
-              <form class="flex gap-3" @submit.prevent="sendMessage">
-                <input
-                  ref="fileInputRef"
-                  type="file"
-                  multiple
-                  class="hidden"
-                  accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.csv"
-                  @change="handleFileSelect"
-                />
-                <button
-                  type="button"
-                  class="w-12 h-12 rounded-2xl bg-white/5 dark:bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all duration-200"
-                  :title="$t('widgetSessions.attachFile')"
-                  :disabled="sendingMessage || uploadingFiles"
-                  @click="triggerFileSelect"
-                >
-                  <Icon icon="heroicons:paper-clip" class="w-5 h-5 txt-secondary" />
-                </button>
-                <input
-                  ref="messageInputRef"
-                  v-model="messageText"
-                  type="text"
-                  class="flex-1 px-5 py-3 rounded-xl bg-white/5 dark:bg-white/5 txt-primary text-sm placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
-                  :placeholder="$t('widgetSessions.typeMessage')"
-                  :disabled="sendingMessage || uploadingFiles"
-                />
-                <button
-                  type="submit"
-                  class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center disabled:opacity-50 transition-all duration-200 shadow-sm shadow-[var(--brand)]/25 hover:shadow-md hover:shadow-[var(--brand)]/30"
-                  :disabled="
-                    (!messageText.trim() && selectedFiles.length === 0) ||
-                    sendingMessage ||
-                    uploadingFiles
-                  "
-                >
-                  <Icon
-                    v-if="sendingMessage || uploadingFiles"
-                    icon="heroicons:arrow-path"
-                    class="w-5 h-5 text-white animate-spin"
+                  <input
+                    ref="messageInputRef"
+                    v-model="messageText"
+                    type="text"
+                    class="flex-1 px-5 py-3 rounded-xl bg-white/5 dark:bg-white/5 txt-primary text-sm placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
+                    :placeholder="$t('widgetSessions.typeMessage')"
+                    :disabled="sendingMessage || uploadingFiles"
                   />
-                  <Icon v-else icon="heroicons:arrow-up" class="w-5 h-5 text-white" />
-                </button>
-              </form>
-            </div>
-          </template>
-        </div>
-
-        <!-- Right Resize Handle -->
-        <div
-          v-if="showSummaryPanel && isXlScreen"
-          class="resize-handle group"
-          @mousedown="startResize('right', $event)"
-        >
-          <div
-            class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"
-          ></div>
-        </div>
-
-        <!-- AI Summary Slide Panel (desktop only, xl+) -->
-        <Transition
-          enter-active-class="transition-all duration-300 ease-out"
-          enter-from-class="opacity-0 translate-x-4"
-          enter-to-class="opacity-100 translate-x-0"
-          leave-active-class="transition-all duration-200 ease-in"
-          leave-from-class="opacity-100 translate-x-0"
-          leave-to-class="opacity-0 translate-x-4"
-        >
-          <div
-            v-if="showSummaryPanel"
-            class="hidden xl:flex rounded-2xl bg-[var(--bg-card)] shadow-sm overflow-hidden flex-col"
-            :style="{
-              width: rightPanelWidth + 'px',
-              minWidth: RIGHT_PANEL_MIN + 'px',
-              flexShrink: '1',
-            }"
-          >
-            <div class="p-4 flex items-center justify-between">
-              <h3 class="text-sm font-semibold txt-primary flex items-center gap-2">
-                <div
-                  class="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
-                >
-                  <Icon icon="heroicons:sparkles" class="w-4 h-4 text-white" />
-                </div>
-                {{ $t('widgetSessions.aiSummary') }}
-              </h3>
-              <button
-                class="p-1.5 rounded-xl hover:bg-white/5 transition-colors"
-                @click="showSummaryPanel = false"
-              >
-                <Icon icon="heroicons:x-mark" class="w-4 h-4 txt-secondary" />
-              </button>
-            </div>
-            <div class="flex-1 overflow-y-auto px-4 pb-4 scroll-thin">
-              <WidgetSummaryPanel
-                :widget-id="widgetId"
-                :compact="true"
-                :selected-session-ids="selectedSessionIdsArray"
-                @edit-prompt="showWidgetConfig = true"
-              />
-            </div>
+                  <button
+                    type="submit"
+                    class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-light)] flex items-center justify-center disabled:opacity-50 transition-all duration-200 shadow-sm shadow-[var(--brand)]/25 hover:shadow-md hover:shadow-[var(--brand)]/30"
+                    :disabled="
+                      (!messageText.trim() && selectedFiles.length === 0) ||
+                      sendingMessage ||
+                      uploadingFiles
+                    "
+                  >
+                    <Icon
+                      v-if="sendingMessage || uploadingFiles"
+                      icon="heroicons:arrow-path"
+                      class="w-5 h-5 text-white animate-spin"
+                    />
+                    <Icon v-else icon="heroicons:arrow-up" class="w-5 h-5 text-white" />
+                  </button>
+                </form>
+              </div>
+            </template>
           </div>
-        </Transition>
-      </div>
 
-      <!-- Mobile/Tablet Summary Panel Overlay (< xl) -->
-      <Teleport to="#app">
-        <Transition
-          enter-active-class="transition-all duration-300 ease-out"
-          enter-from-class="opacity-0"
-          enter-to-class="opacity-100"
-          leave-active-class="transition-all duration-200 ease-in"
-          leave-from-class="opacity-100"
-          leave-to-class="opacity-0"
-        >
+          <!-- Right Resize Handle -->
           <div
-            v-if="showSummaryPanel"
-            class="xl:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-            @click.self="showSummaryPanel = false"
+            v-if="showSummaryPanel && isXlScreen"
+            class="resize-handle group"
+            @mousedown="startResize('right', $event)"
           >
             <div
-              class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-[var(--bg-card)] shadow-2xl flex flex-col"
+              class="resize-handle-bar group-hover:bg-[var(--brand)] group-active:bg-[var(--brand)]"
+            ></div>
+          </div>
+
+          <!-- AI Summary Slide Panel (desktop only, xl+) -->
+          <Transition
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0 translate-x-4"
+            enter-to-class="opacity-100 translate-x-0"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100 translate-x-0"
+            leave-to-class="opacity-0 translate-x-4"
+          >
+            <div
+              v-if="showSummaryPanel"
+              class="hidden xl:flex rounded-2xl bg-[var(--bg-card)] shadow-sm overflow-hidden flex-col"
+              :style="{
+                width: rightPanelWidth + 'px',
+                minWidth: RIGHT_PANEL_MIN + 'px',
+                flexShrink: '1',
+              }"
             >
-              <div
-                class="p-4 flex items-center justify-between border-b border-light-border/30 dark:border-dark-border/20"
-              >
-                <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+              <div class="p-4 flex items-center justify-between">
+                <h3 class="text-sm font-semibold txt-primary flex items-center gap-2">
                   <div
-                    class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
+                    class="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
                   >
-                    <Icon icon="heroicons:sparkles" class="w-5 h-5 text-white" />
+                    <Icon icon="heroicons:sparkles" class="w-4 h-4 text-white" />
                   </div>
                   {{ $t('widgetSessions.aiSummary') }}
                 </h3>
                 <button
-                  class="p-2 rounded-xl hover:bg-white/5 transition-colors"
+                  class="p-1.5 rounded-xl hover:bg-white/5 transition-colors"
                   @click="showSummaryPanel = false"
                 >
-                  <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
+                  <Icon icon="heroicons:x-mark" class="w-4 h-4 txt-secondary" />
                 </button>
               </div>
-              <div class="flex-1 overflow-y-auto p-4 scroll-thin">
+              <div class="flex-1 overflow-y-auto px-4 pb-4 scroll-thin">
                 <WidgetSummaryPanel
                   :widget-id="widgetId"
-                  :compact="false"
+                  :compact="true"
                   :selected-session-ids="selectedSessionIdsArray"
                   @edit-prompt="showWidgetConfig = true"
                 />
               </div>
             </div>
-          </div>
-        </Transition>
-      </Teleport>
+          </Transition>
+        </div>
 
-      <!-- Export Dialog -->
-      <WidgetExportDialog
-        v-if="showExportDialog"
-        :widget-id="widgetId"
-        :selected-session-ids="selectedSessionIdsArray"
-        @close="handleExportDialogClose"
-      />
+        <!-- Mobile/Tablet Summary Panel Overlay (< xl) -->
+        <Teleport to="#app">
+          <Transition
+            enter-active-class="transition-all duration-300 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition-all duration-200 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+          >
+            <div
+              v-if="showSummaryPanel"
+              class="xl:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+              @click.self="showSummaryPanel = false"
+            >
+              <div
+                class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-[var(--bg-card)] shadow-2xl flex flex-col"
+              >
+                <div
+                  class="p-4 flex items-center justify-between border-b border-light-border/30 dark:border-dark-border/20"
+                >
+                  <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
+                    <div
+                      class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
+                    >
+                      <Icon icon="heroicons:sparkles" class="w-5 h-5 text-white" />
+                    </div>
+                    {{ $t('widgetSessions.aiSummary') }}
+                  </h3>
+                  <button
+                    class="p-2 rounded-xl hover:bg-white/5 transition-colors"
+                    @click="showSummaryPanel = false"
+                  >
+                    <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
+                  </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4 scroll-thin">
+                  <WidgetSummaryPanel
+                    :widget-id="widgetId"
+                    :compact="false"
+                    :selected-session-ids="selectedSessionIdsArray"
+                    @edit-prompt="showWidgetConfig = true"
+                  />
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </Teleport>
 
-      <!-- Widget Config Modal (for editing prompt) -->
-      <AdvancedWidgetConfig
-        v-if="showWidgetConfig && widget"
-        :widget="widget"
-        initial-tab="assistant"
-        :prompt-only="true"
-        @close="showWidgetConfig = false"
-        @saved="handleWidgetConfigSaved"
-      />
+        <!-- Export Dialog -->
+        <WidgetExportDialog
+          v-if="showExportDialog"
+          :widget-id="widgetId"
+          :selected-session-ids="selectedSessionIdsArray"
+          @close="handleExportDialogClose"
+        />
 
-      <QuoteSelectionButton
-        :visible="quoting.floatingVisible.value"
-        :position="quoting.floatingPosition.value"
-        @quote="quoting.confirmQuote"
-      />
+        <!-- Widget Config Modal (for editing prompt) -->
+        <AdvancedWidgetConfig
+          v-if="showWidgetConfig && widget"
+          :widget="widget"
+          initial-tab="assistant"
+          :prompt-only="true"
+          @close="showWidgetConfig = false"
+          @saved="handleWidgetConfigSaved"
+        />
+
+        <QuoteSelectionButton
+          :visible="quoting.floatingVisible.value"
+          :position="quoting.floatingPosition.value"
+          @quote="quoting.confirmQuote"
+        />
+      </div>
     </div>
   </MainLayout>
 </template>

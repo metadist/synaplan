@@ -629,12 +629,7 @@
     <AppPanelHost v-if="!isAdminScope && activeTab === 'topics'" :loader="loadTopics" />
 
     <div v-if="isAdminScope && authStore.isAdmin" class="space-y-4">
-      <div class="flex items-center justify-between gap-3 flex-wrap">
-        <SectionJumpNav
-          :items="editSectionItems"
-          :nav-label="$t('admin.config.accordion.jumpTo')"
-          @select="jumpToEditSection"
-        />
+      <div class="flex justify-end">
         <button
           type="button"
           class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
@@ -711,7 +706,6 @@ import {
 } from '@heroicons/vue/24/outline'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
-import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import AddModelForm from '@/components/config/AddModelForm.vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatibleEndpointsPanel.vue'
@@ -763,27 +757,13 @@ const { t } = useI18n()
 const activeTab = ref<ModelsTabId>('choice')
 const adminPanelRef = ref<InstanceType<typeof AIModelsAdminPanel> | null>(null)
 const editSectionIds = ['endpoints', 'add', 'catalog'] as const
-const editSectionItems = computed(() => [
-  { id: 'endpoints', label: t('config.openaiEndpoints.title') },
-  { id: 'add', label: t('config.aiModels.admin.addForm.title') },
-  { id: 'catalog', label: t('config.aiModels.admin.editModels') },
-])
 const {
   isOpen: isEditSectionOpen,
   toggle: toggleEditSection,
-  open: openEditSection,
   expandAll: expandAllEditSections,
   collapseAll: collapseAllEditSections,
   allOpen: allEditSectionsOpen,
 } = useAccordion(() => [...editSectionIds])
-
-async function jumpToEditSection(id: string) {
-  openEditSection(id)
-  await nextTick()
-  document
-    .getElementById(`ai-models-section-${id}`)
-    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 const MODELS_TABS = ['choice', 'list', 'topics'] as const
 
 function parseModelsTab(raw: unknown): ModelsTabId | null {

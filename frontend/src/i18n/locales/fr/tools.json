@@ -43,7 +43,7 @@
     "disconnected": "Plateforme déconnectée.",
     "disconnectError": "La plateforme n’a pas pu être déconnectée.",
     "loadError": "Les plateformes liées n’ont pas pu être chargées.",
-    "adminPointer": "Les serveurs entiers s'approuvent dans Administration › Personnes."
+    "adminPointer": "Les serveurs entiers s'approuvent dans Administration › Utilisateurs."
   },
   "plugins": {
     "title": "Extensions",
@@ -824,7 +824,7 @@
     "admin": {
       "cards": {
         "title": "Votre serveur en un coup d’œil",
-        "body": "Personnes, nouvelles inscriptions, fonctions désactivées et modèles à vérifier. Chaque carte ouvre sa page."
+        "body": "Utilisateurs, nouvelles inscriptions, fonctions désactivées et modèles à vérifier. Chaque carte ouvre sa page."
       },
       "attention": {
         "title": "Ce qui vous attend",
@@ -832,7 +832,7 @@
       },
       "sections": {
         "title": "Sections d’administration",
-        "body": "État du système, infrastructure IA, Personnes et Configuration du système. La configuration a sa propre recherche de paramètres."
+        "body": "État du système, infrastructure IA, Utilisateurs et Configuration du système. La configuration a sa propre recherche de paramètres."
       }
     },
     "checklist": {

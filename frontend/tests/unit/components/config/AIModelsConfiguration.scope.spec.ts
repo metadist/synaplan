@@ -76,7 +76,6 @@ const stubs = {
   OpenAiCompatibleEndpointsPanel: { template: '<div />' },
   AccordionStack: { template: '<div><slot /></div>' },
   AccordionSection: { template: '<div><slot /></div>' },
-  SectionJumpNav: { template: '<div />' },
 }
 
 describe('AIModelsConfiguration defaults scope', () => {

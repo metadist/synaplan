@@ -74,7 +74,7 @@
     "adminFeatures": "System status",
     "adminConfig": "System configuration",
     "adminSetup": "AI infrastructure",
-    "adminPeople": "People",
+    "adminPeople": "Users",
     "adminPartners": "Partners",
     "myGroups": "My groups",
     "incoming": "Incoming chats",
@@ -140,7 +140,7 @@
     "channels": "Channels",
     "channelsDescription": "Everything you connect to Synaplan",
     "assistantsDescription": "Assistants, shortcuts, tasks and AI settings",
-    "operateDescription": "People, status and settings",
+    "operateDescription": "Users, status and settings",
     "aiSetup": "AI Setup & Tools",
     "aiSetupDescription": "Models, instructions, routing & tools",
     "preferences": "Preferences",
@@ -159,7 +159,7 @@
     "adminFeatureStatus": "System status",
     "adminSystemConfig": "System configuration",
     "adminProviderSetup": "AI infrastructure",
-    "adminPeople": "People",
+    "adminPeople": "Users",
     "adminPartners": "Partners",
     "more": "More",
     "moreDescription": "More sections and account",
@@ -240,7 +240,7 @@
     "loadingMessages": "Loading messages…",
     "adminPreview": {
       "badge": "Admin preview",
-      "hint": "Only admins can see this. Other people will not see it until it is released."
+      "hint": "Only admins can see this. Other users will not see it until it is released."
     }
   },
   "search": {
@@ -394,8 +394,8 @@
           "off": "This turns {name} off for every user of this Synaplan instance, right away. You can undo it from the notification.",
           "select": "This sets {name} to “{value}” for every user of this Synaplan instance, right away. You can undo it from the notification.",
           "FEATURE_IAM_GROUPS_ENABLED": {
-            "true": "Administrators see People under Manage and can create groups; members see their groups under Account. You can undo it from the notification.",
-            "false": "People disappears from Manage and nobody can create or use groups. Sharing and group policies stop working. You can undo it from the notification."
+            "true": "Administrators see Users under Manage and can create groups; members see their groups under Account. You can undo it from the notification.",
+            "false": "Users disappears from Manage and nobody can create or use groups. Sharing and group policies stop working. You can undo it from the notification."
           }
         },
         "saved": "{name} is now “{value}” for everyone.",

@@ -1,6 +1,6 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-4 md:p-8" data-testid="page-widgets">
+    <div class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8" data-testid="page-widgets">
       <div class="max-w-[100rem] mx-auto">
         <PageHeader
           :title="$t('widgets.title')"

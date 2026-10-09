@@ -15,7 +15,7 @@ final class SettingLabelTest extends TestCase
      */
     public static function labels(): iterable
     {
-        yield 'head before a colon' => ['FEATURE_IAM_GROUPS_ENABLED', 'People & groups: show People under Operate.', 'People & groups'];
+        yield 'head before a colon' => ['FEATURE_IAM_GROUPS_ENABLED', 'Users & groups: show Users under Operate.', 'Users & groups'];
         yield 'first sentence' => ['DIGEST_ENABLED', 'Deep memory master switch. A daily job condenses messages.', 'Deep memory master switch'];
         yield 'range in brackets' => ['TOOLS_APPROVAL_EXPIRY_HOURS', 'Hours a pending approval waits before it expires (1–720). Default 72.', 'Hours a pending approval waits before it expires'];
         yield 'dash' => ['GOOGLE_GEMINI_API_KEY', 'Google Gemini API key — also unlocks Imagen.', 'Google Gemini API key'];

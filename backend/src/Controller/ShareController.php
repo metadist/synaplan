@@ -105,7 +105,7 @@ final class ShareController extends AbstractController
     #[OA\Post(
         path: '/api/v1/shares',
         operationId: 'grantShare',
-        summary: 'Share an item with a person, a group, or everyone',
+        summary: 'Share an item with a user, a group, or everyone',
         tags: ['IAM Sharing'],
         requestBody: new OA\RequestBody(
             required: true,
@@ -192,7 +192,7 @@ final class ShareController extends AbstractController
     #[OA\Delete(
         path: '/api/v1/shares',
         operationId: 'revokeShare',
-        summary: 'Stop sharing an item with a person, a group, or everyone',
+        summary: 'Stop sharing an item with a user, a group, or everyone',
         tags: ['IAM Sharing'],
         parameters: [
             new OA\Parameter(name: 'kind', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
@@ -262,7 +262,7 @@ final class ShareController extends AbstractController
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'People, groups, and everyone',
+                description: 'Users, groups, and everyone',
                 content: new OA\JsonContent(
                     required: ['subjects', 'personScope'],
                     properties: [

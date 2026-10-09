@@ -6,7 +6,7 @@ namespace App\Service\SmartSearch\Provider;
 
 /**
  * A readable title for a setting row. The config schema has no label per
- * field, but every description opens with one ("People & groups: …",
+ * field, but every description opens with one ("Users & groups: …",
  * "Deep memory master switch. …", "Hours a pending approval waits (1–720)").
  * The key stays visible in the breadcrumb for admins who search by it.
  */

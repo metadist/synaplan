@@ -52,9 +52,9 @@ describe('SubjectPicker', () => {
 
       expect(
         wrapper.get('[data-testid="input-iam-subject-search"]').attributes('placeholder')
-      ).toBe('Search a person or group…')
+      ).toBe('Search a user or group…')
       expect(wrapper.get('[data-testid="text-iam-no-matches"]').text()).toBe(
-        'No person or group matches.'
+        'No user or group matches.'
       )
       wrapper.unmount()
     } finally {
@@ -72,7 +72,7 @@ describe('SubjectPicker', () => {
       await flushPromises()
 
       expect(wrapper.get('[data-testid="text-iam-search-failed"]').text()).toContain(
-        "Couldn't search people or groups."
+        "Couldn't search users or groups."
       )
       vi.mocked(iamApi.searchSubjects).mockResolvedValueOnce({
         subjects: [{ type: 'group', id: 2, name: 'Sales', pinned: true }],

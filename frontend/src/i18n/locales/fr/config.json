@@ -929,9 +929,9 @@
       "errorDeleting": "Échec de la suppression de la clé API",
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
       "scopes": {
-        "hint": "Laissez décoché pour un accès complet. Cocher Personnes limite cette clé. Le travail sur fichiers ajoute les portées chat et fichiers pour exécuter des scripts — pas d’accès administrateur.",
-        "iamRead": "Personnes — voir les groupes",
-        "iamManage": "Personnes — gérer les groupes",
+        "hint": "Laissez décoché pour un accès complet. Cocher Utilisateurs limite cette clé. Le travail sur fichiers ajoute les portées chat et fichiers pour exécuter des scripts — pas d’accès administrateur.",
+        "iamRead": "Utilisateurs — voir les groupes",
+        "iamManage": "Utilisateurs — gérer les groupes",
         "computeRun": "Travail sur fichiers — exécuter de courts scripts sur des copies de vos fichiers"
       }
     },

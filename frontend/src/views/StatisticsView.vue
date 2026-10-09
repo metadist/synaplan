@@ -1,10 +1,10 @@
 <template>
   <MainLayout>
     <div
-      class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin"
+      class="flex h-full flex-col overflow-y-auto bg-chat px-3 py-4 sm:p-4 md:p-8 scroll-thin"
       data-testid="page-statistics"
     >
-      <div class="max-w-[100rem] mx-auto w-full px-4 md:px-6 py-4 md:py-8">
+      <div class="mx-auto w-full max-w-[100rem]">
         <PageHeader
           :title="$t('config.usage.title')"
           :subtitle="$t('config.usage.description')"
