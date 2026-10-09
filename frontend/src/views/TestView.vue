@@ -63,9 +63,9 @@
             >
             <router-link
               data-testid="link-route"
-              to="/channels/email"
+              to="/apps/mailbox"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/channels/email</router-link
+              >/apps/mailbox</router-link
             >
             <router-link
               data-testid="link-route"
@@ -75,9 +75,9 @@
             >
             <router-link
               data-testid="link-route"
-              to="/channels"
+              to="/apps"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/channels</router-link
+              >/apps</router-link
             >
             <router-link
               data-testid="link-route"
@@ -99,9 +99,9 @@
             >
             <router-link
               data-testid="link-route"
-              to="/channels/api"
+              to="/apps/api"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/channels/api</router-link
+              >/apps/api</router-link
             >
             <router-link
               data-testid="link-route"

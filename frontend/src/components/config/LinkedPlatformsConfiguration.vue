@@ -1,12 +1,5 @@
 <template>
   <div class="space-y-6" data-testid="page-config-platform-links">
-    <PageHeader
-      :title="$t('linkedPlatforms.title')"
-      :subtitle="$t('linkedPlatforms.description')"
-      icon="heroicons:link"
-      data-testid="section-header"
-    />
-
     <p
       v-if="authStore.isAdmin"
       class="txt-secondary text-sm"
@@ -50,7 +43,9 @@
       class="surface-card p-12 text-center"
       data-testid="section-empty"
     >
-      <p class="txt-secondary text-lg">{{ $t('linkedPlatforms.empty') }}</p>
+      <p class="txt-secondary">
+        {{ $t('apps.linkedEmpty', { client: clientLabel(client) }) }}
+      </p>
     </div>
 
     <div v-else class="surface-card overflow-hidden" data-testid="section-links-table">
@@ -132,12 +127,16 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import PageHeader from '@/components/PageHeader.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useAuthStore } from '@/stores/auth'
 import { platformLinksApi, type PlatformLink } from '@/services/api/platformLinksApi'
+
+/** The platform this panel serves inside its app page (`/apps/:appId`). */
+const props = defineProps<{
+  client: string
+}>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
@@ -164,7 +163,7 @@ async function loadLinks(): Promise<void> {
   loading.value = true
   error.value = null
   try {
-    links.value = await platformLinksApi.listMine()
+    links.value = (await platformLinksApi.listMine()).filter((link) => link.client === props.client)
   } catch (err) {
     error.value = err instanceof Error ? err.message : t('linkedPlatforms.loadError')
   } finally {

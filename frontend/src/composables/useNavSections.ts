@@ -4,8 +4,8 @@ import {
   ChatBubbleLeftRightIcon,
   FolderIcon,
   ShieldCheckIcon,
-  SignalIcon,
   SparklesIcon,
+  Squares2X2Icon,
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import {
@@ -33,7 +33,7 @@ export interface NavSection {
 }
 
 const ASSISTANT_GROUPS = new Set(['assistants', 'automations'])
-const CHANNEL_GROUPS = new Set(['channels', 'connections', 'developer'])
+const CHANNEL_GROUPS = new Set(['apps'])
 const LAST_SECTION_KEY = 'synaplan.nav.lastSection'
 
 /** Routes whose second sidebar is the profile list, not a rail section. */
@@ -151,9 +151,9 @@ export function useNavSections() {
       },
       {
         key: 'channels',
-        label: t('nav.channels'),
+        label: t('nav.apps'),
         description: t('nav.channelsDescription'),
-        icon: SignalIcon,
+        icon: Squares2X2Icon,
         testId: 'btn-sidebar-v2-nav-channels',
         requiresAuth: true,
         gateFeature: 'channels',
@@ -189,12 +189,21 @@ export function useNavSections() {
     // `/ai/instructions` while the route guard still serves `/ai/assistants`.
     if (
       path.startsWith('/ai/') ||
+      path === '/prompts' ||
+      path === '/tasks' ||
+      path === '/approvals' ||
       path.startsWith('/channels/tasks') ||
       path.startsWith('/channels/approvals')
     ) {
       return 'assistants'
     }
-    if (path.startsWith('/channels') || path.startsWith('/plugins') || path.startsWith('/tools')) {
+    if (
+      path === '/apps' ||
+      path.startsWith('/apps/') ||
+      path.startsWith('/channels') ||
+      path.startsWith('/plugins') ||
+      path.startsWith('/tools')
+    ) {
       return 'channels'
     }
 
@@ -265,7 +274,7 @@ export function useNavSections() {
     const children = groupsFor(key).flatMap((group) => group.items)
     const last = lastNavDestination('manage')
     if (last && longestMatch(children, managePath.value, last)) return last
-    return children[0]?.path ?? (key === 'assistants' ? '/ai/models' : '/channels')
+    return children[0]?.path ?? (key === 'assistants' ? '/prompts' : '/apps')
   }
 
   function selectSection(key: NavSectionKey) {

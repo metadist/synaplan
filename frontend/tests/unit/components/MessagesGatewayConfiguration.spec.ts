@@ -97,9 +97,9 @@ describe('MessagesGatewayConfiguration', () => {
       'ANTHROPIC_BASE_URL="http://localhost:8000"'
     )
     expect(wrapper.get('[data-testid="badge-gateway-enabled"]').text()).toContain('Not ready')
-    expect(wrapper.get('[data-testid="text-missing-key"]').text()).toContain('Your AI accounts')
+    expect(wrapper.get('[data-testid="text-missing-key"]').text()).toContain('Your Anthropic key')
     expect(wrapper.get('[data-testid="text-missing-key"]').text()).toContain('server key')
-    expect(wrapper.get('[data-testid="link-api-keys"]').attributes('href')).toBe('/channels/api')
+    expect(wrapper.get('[data-testid="link-api-keys"]').attributes('href')).toBe('/apps/api')
   })
 
   it('hides setup commands from a non-admin while the gateway is off', async () => {

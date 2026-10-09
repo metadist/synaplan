@@ -8,10 +8,20 @@ import { connectionsApi, type ConnectionItem } from '@/services/api/connectionsA
 import { dropboxApi } from '@/services/api/dropboxApi'
 import { m365Api } from '@/services/api/m365Api'
 import { useAuthStore } from '@/stores/auth'
-import PageHeader from '@/components/PageHeader.vue'
 import ConnectionStatusPill from '@/components/config/ConnectionStatusPill.vue'
 import DavConnectionForm from '@/components/config/DavConnectionForm.vue'
 import RegistryConnectionRow from '@/components/config/RegistryConnectionRow.vue'
+
+/** Which provider this panel serves inside its app page (`/apps/:appId`). */
+const props = defineProps<{
+  provider: 'm365' | 'dropbox' | 'dav'
+}>()
+
+const PROVIDER_TYPES: Record<typeof props.provider, readonly string[]> = {
+  m365: ['m365'],
+  dropbox: ['dropbox'],
+  dav: ['webdav', 'caldav'],
+}
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -27,8 +37,11 @@ const dropboxAvailable = ref(false)
 const dropboxConnecting = ref(false)
 
 const isAdmin = computed(() => auth.isAdmin)
-const registryItems = computed(() => items.value.filter((row) => row.source === 'registry'))
-const adapterItems = computed(() => items.value.filter((row) => row.source !== 'registry'))
+const providerItems = computed(() =>
+  items.value.filter((row) => PROVIDER_TYPES[props.provider].includes(row.type))
+)
+const registryItems = computed(() => providerItems.value.filter((row) => row.source === 'registry'))
+const adapterItems = computed(() => providerItems.value.filter((row) => row.source !== 'registry'))
 
 /** Healthy connections per OAuth provider — drive the "already connected" state on the provider cards. */
 const connectedAccounts = (type: string): string[] =>
@@ -151,24 +164,17 @@ const consumeConsentResult = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([load(), loadM365(), loadDropbox()])
+  await Promise.all([
+    load(),
+    props.provider === 'm365' ? loadM365() : null,
+    props.provider === 'dropbox' ? loadDropbox() : null,
+  ])
   await consumeConsentResult()
 })
 </script>
 
 <template>
   <div class="space-y-6" data-testid="page-connections">
-    <PageHeader
-      :title="$t('config.connections.title')"
-      icon="heroicons:link"
-      data-testid="section-header"
-    >
-      <template #subtitle>
-        {{ $t('config.connections.subtitle') }}
-        {{ $t('config.connections.explainer') }}
-      </template>
-    </PageHeader>
-
     <!-- What the user already has -->
     <section>
       <h3 class="text-sm font-semibold txt-primary mb-2 px-1">
@@ -179,7 +185,7 @@ onMounted(async () => {
         {{ $t('config.connections.loading') }}
       </div>
       <div
-        v-else-if="items.length === 0"
+        v-else-if="providerItems.length === 0"
         class="surface-card p-6 txt-secondary text-sm"
         data-testid="connections-empty"
       >
@@ -240,7 +246,11 @@ onMounted(async () => {
 
       <ul class="space-y-3">
         <!-- Microsoft 365 -->
-        <li class="surface-card p-4 sm:p-5 space-y-3" data-testid="provider-m365">
+        <li
+          v-if="provider === 'm365'"
+          class="surface-card p-4 sm:p-5 space-y-3"
+          data-testid="provider-m365"
+        >
           <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div class="flex items-center gap-3 min-w-0">
               <span
@@ -310,7 +320,11 @@ onMounted(async () => {
         </li>
 
         <!-- Dropbox -->
-        <li class="surface-card p-4 sm:p-5 space-y-3" data-testid="provider-dropbox">
+        <li
+          v-if="provider === 'dropbox'"
+          class="surface-card p-4 sm:p-5 space-y-3"
+          data-testid="provider-dropbox"
+        >
           <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <div class="flex items-center gap-3 min-w-0">
               <span
@@ -377,57 +391,7 @@ onMounted(async () => {
         </li>
 
         <!-- Nextcloud / WebDAV folder and calendar -->
-        <DavConnectionForm @created="load" />
-
-        <!-- Mailbox (IMAP) -->
-        <li class="surface-card p-4 sm:p-5 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div class="flex items-center gap-3 min-w-0">
-              <span
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-alpha-light)]"
-              >
-                <Icon icon="heroicons:envelope" class="w-5 h-5 text-[var(--brand)]" />
-              </span>
-              <p class="font-medium txt-primary">
-                {{ $t('config.connections.providers.mailbox.name') }}
-              </p>
-            </div>
-            <router-link
-              to="/channels/email"
-              class="btn-secondary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap shrink-0"
-            >
-              {{ $t('config.connections.providers.mailbox.action') }}
-            </router-link>
-          </div>
-          <p class="text-sm txt-secondary leading-relaxed w-full">
-            {{ $t('config.connections.providers.mailbox.description') }}
-          </p>
-        </li>
-
-        <!-- MCP server -->
-        <li class="surface-card p-4 sm:p-5 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <div class="flex items-center gap-3 min-w-0">
-              <span
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-alpha-light)]"
-              >
-                <Icon icon="heroicons:puzzle-piece" class="w-5 h-5 text-[var(--brand)]" />
-              </span>
-              <p class="font-medium txt-primary">
-                {{ $t('config.connections.providers.mcp.name') }}
-              </p>
-            </div>
-            <router-link
-              to="/channels/mcp"
-              class="btn-secondary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap shrink-0"
-            >
-              {{ $t('config.connections.providers.mcp.action') }}
-            </router-link>
-          </div>
-          <p class="text-sm txt-secondary leading-relaxed w-full">
-            {{ $t('config.connections.providers.mcp.description') }}
-          </p>
-        </li>
+        <DavConnectionForm v-if="provider === 'dav'" @created="load" />
       </ul>
     </section>
   </div>

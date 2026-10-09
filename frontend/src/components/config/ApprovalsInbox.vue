@@ -65,7 +65,7 @@ const openContext = (approval: Approval) => {
   }
   if (ref.kind === 'task_run' && ref.taskId) {
     void router.push({
-      path: '/channels/tasks',
+      path: '/tasks',
       query: { task: String(ref.taskId), run: String(ref.runId ?? '') },
     })
   }

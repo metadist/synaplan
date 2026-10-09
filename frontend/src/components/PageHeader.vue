@@ -21,10 +21,13 @@ import { Icon } from '@iconify/vue'
  *   spacing on mobile.
  * - Tab bars (TabNav) go into the default slot so they always sit between the
  *   header and the content cards.
+ * - Inside a host page (`provideEmbeddedPageHeader`) the header shrinks to an
+ *   h2 with its actions; the host owns the icon, h1 and explanation.
  */
 import { computed } from 'vue'
 import { QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
 import { useTour } from '@/composables/useTour'
+import { useEmbeddedPageHeader } from './pageHeaderEmbedding'
 
 const props = defineProps<{
   title: string
@@ -36,11 +39,23 @@ const props = defineProps<{
 }>()
 
 const { startTour, hasTour } = useTour()
-const showTourButton = computed(() => hasTour(props.tourId))
+const embedded = useEmbeddedPageHeader()
+const showTourButton = computed(() => !embedded && hasTour(props.tourId))
 </script>
 
 <template>
-  <header class="mb-6">
+  <header v-if="embedded" class="mb-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-lg font-semibold txt-primary">{{ title }}</h2>
+      <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2">
+        <slot name="actions" />
+      </div>
+    </div>
+    <div v-if="$slots.default" class="mt-4">
+      <slot />
+    </div>
+  </header>
+  <header v-else class="mb-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="flex items-start gap-3 min-w-0">
         <span

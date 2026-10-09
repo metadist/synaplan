@@ -35,8 +35,12 @@ import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { normalizeSettingsRoute, settingsLocationFor } from '@/composables/useSettingsSections'
 import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
-import { desktopRouteGuard, savedTasksRouteGuard } from '@/router/featureSurfaceGuards'
-import { aiAccountsRouteGuard } from '@/composables/useAiAccounts'
+import {
+  approvalsRouteGuard,
+  connectionsRedirect,
+  savedTasksRouteGuard,
+} from '@/router/featureSurfaceGuards'
+import { appRouteGuard } from '@/router/appGuards'
 import { groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
 import {
   adminDashboardRedirect,
@@ -305,17 +309,42 @@ const router = createRouter({
 
     // Protected routes (require authentication)
     //
-    // Canonical URL tree since the 2026-06 navigation IA cleanup (§4.6):
-    //   /channels/*  — ways conversations reach Synaplan (widgets, email, API)
-    //   /ai/*        — AI machinery (models, instructions, routing)
-    //   /files/*     — knowledge base (browse + search)
-    // The old /tools/* and /config/* paths redirect below (kept ≥ 2 releases
-    // for bookmarks/docs; see redirects.spec.ts).
+    // Canonical URL tree since the 2026-10 UX overhaul
+    // (_devextras/planning/20261009-ux-overhaul):
+    //   /apps/*                          — everything the user connects
+    //   /channels/widgets/*              — chat widgets (own editor)
+    //   /ai/*, /prompts, /tasks, /approvals — assistants and how they work
+    //   /files/*                         — library
+    // Older URLs redirect below (see redirects.spec.ts).
     {
-      path: '/channels',
-      name: 'channels',
+      path: '/apps',
+      name: 'apps',
+      component: () => import('@/views/AppsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.apps', i18n: ['tools'] },
+    },
+    {
+      path: '/apps/connected',
+      name: 'apps-connected',
+      component: () => import('@/views/AppsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.appsConnected', i18n: ['tools'] },
+    },
+    {
+      path: '/apps/api/docs',
+      name: 'apps-api-docs',
       component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configInbound', i18n: ['config', 'tools'] },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiDocs', i18n: ['config'] },
+    },
+    {
+      path: '/apps/:appId',
+      name: 'app-detail',
+      component: () => import('@/views/AppDetailView.vue'),
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.appDetail',
+        // App panels reuse the channel, connection, key and assistant pickers.
+        i18n: ['tools', 'config', 'assistants'],
+      },
+      beforeEnter: appRouteGuard,
     },
     {
       path: '/channels/widgets',
@@ -358,88 +387,24 @@ const router = createRouter({
       },
     },
     {
-      path: '/channels/email',
-      name: 'channels-email',
-      component: () => import('@/views/ToolsView.vue'),
-      meta: {
-        requiresAuth: true,
-        titleKey: 'pageTitles.mailHandler',
-        i18n: ['tools'],
-      },
-    },
-    {
-      path: '/channels/mcp',
-      name: 'channels-mcp',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.mcpServers', i18n: ['tools'] },
-    },
-    {
-      path: '/channels/connections',
-      name: 'channels-connections',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.connections', i18n: ['config'] },
-    },
-    {
-      path: '/channels/tasks',
-      name: 'channels-saved-tasks',
+      path: '/tasks',
+      name: 'saved-tasks',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.savedTasks', i18n: ['config'] },
       beforeEnter: savedTasksRouteGuard,
     },
     {
-      path: '/channels/approvals',
-      name: 'channels-approvals',
+      path: '/approvals',
+      name: 'approvals',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.approvals', i18n: ['chat', 'config'] },
-    },
-    {
-      path: '/channels/agents',
-      name: 'channels-agents',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.aiAgents', i18n: ['config', 'tools'] },
-    },
-    {
-      path: '/channels/desktop',
-      name: 'channels-desktop',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.desktop', i18n: ['config'] },
-      beforeEnter: desktopRouteGuard,
-    },
-    {
-      path: '/channels/platform-links',
-      name: 'channels-platform-links',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.linkedPlatforms', i18n: ['tools'] },
-    },
-    {
-      path: '/channels/api',
-      name: 'channels-api',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiKeys', i18n: ['config'] },
-    },
-    {
-      path: '/channels/api/docs',
-      name: 'channels-api-docs',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiDocs', i18n: ['config'] },
+      beforeEnter: approvalsRouteGuard,
     },
     {
       path: '/ai/models',
       name: 'ai-models',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels', i18n: ['config'] },
-    },
-    {
-      path: '/ai/providers',
-      name: 'ai-accounts',
-      component: () => import('@/views/AiAccountsView.vue'),
-      meta: {
-        requiresAuth: true,
-        titleKey: 'pageTitles.aiAccounts',
-        // Provider cards reuse the provider labels (config).
-        i18n: ['tools', 'config'],
-      },
-      beforeEnter: aiAccountsRouteGuard,
     },
     {
       path: '/prompts',
@@ -480,10 +445,29 @@ const router = createRouter({
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configSortingPrompt', i18n: ['config'] },
     },
+    // --- Redirects from the 2026-06 tree (UX overhaul; keep ≥ 2 releases) ---
+    { path: '/channels', redirect: '/apps' },
+    { path: '/channels/email', redirect: '/apps/mailbox' },
+    // OAuth callbacks still land here with `?m365=` / `?dropbox=`.
+    { path: '/channels/connections', redirect: connectionsRedirect },
+    { path: '/channels/mcp', redirect: (to) => ({ path: '/apps/mcp', query: to.query }) },
+    { path: '/channels/platform-links', redirect: '/apps/connected' },
+    { path: '/channels/agents', redirect: '/apps/claude-code' },
+    { path: '/channels/desktop', redirect: '/apps/desktop' },
+    { path: '/channels/api', redirect: '/apps/api' },
+    { path: '/channels/api/docs', redirect: '/apps/api/docs' },
+    { path: '/channels/tasks', redirect: (to) => ({ path: '/tasks', query: to.query }) },
+    { path: '/channels/approvals', redirect: (to) => ({ path: '/approvals', query: to.query }) },
+    {
+      path: '/ai/providers',
+      redirect: (to) =>
+        to.query.section === 'anthropic' ? '/apps/claude-code' : '/apps/higgsfield',
+    },
+    { path: '/ai/providers/higgsfield', redirect: '/apps/higgsfield' },
     // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
     // The Summarizer page now arms Tools › Summarize a document in chat.
     // POST /api/v1/summary/generate stays (Nextcloud + plugin consumers).
-    { path: '/tools', redirect: '/channels' },
+    { path: '/tools', redirect: '/apps' },
     { path: '/tools/chat-widget', redirect: '/channels/widgets' },
     { path: '/tools/chat-widget/live-support', redirect: '/channels/widgets/live-support' },
     {
@@ -497,13 +481,9 @@ const router = createRouter({
       path: '/tools/chat-widget/:widgetId',
       redirect: (to) => ({ path: `/channels/widgets/${to.params.widgetId}`, query: to.query }),
     },
-    { path: '/tools/mail-handler', redirect: '/channels/email' },
+    { path: '/tools/mail-handler', redirect: '/apps/mailbox' },
     { path: '/ai/summarizer', redirect: { path: '/', query: { tool: 'summarize' } } },
     { path: '/tools/doc-summary', redirect: { path: '/', query: { tool: 'summarize' } } },
-    {
-      path: '/ai/providers/higgsfield',
-      redirect: { path: '/ai/providers', query: { section: 'higgsfield' } },
-    },
     {
       path: '/plugins/:pluginName',
       name: 'plugin-view',
@@ -588,13 +568,13 @@ const router = createRouter({
 
     // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
     { path: '/rag', redirect: '/files/search' },
-    { path: '/config', redirect: '/channels' },
-    { path: '/config/inbound', redirect: '/channels' },
+    { path: '/config', redirect: '/apps' },
+    { path: '/config/inbound', redirect: '/apps' },
     { path: '/config/ai-models', redirect: '/ai/models' },
     { path: '/config/task-prompts', redirect: '/ai/instructions' },
     { path: '/config/sorting-prompt', redirect: '/ai/routing' },
-    { path: '/config/api-keys', redirect: '/channels/api' },
-    { path: '/config/api-documentation', redirect: '/channels/api/docs' },
+    { path: '/config/api-keys', redirect: '/apps/api' },
+    { path: '/config/api-documentation', redirect: '/apps/api/docs' },
     {
       path: '/statistics',
       name: 'statistics',

@@ -43,7 +43,7 @@
     "disconnected": "Platform disconnected.",
     "disconnectError": "The platform could not be disconnected.",
     "loadError": "Linked platforms could not be loaded.",
-    "adminPointer": "Approving whole servers happens under Operate › People › Platform instances."
+    "adminPointer": "Admins approve whole servers under Admin › People."
   },
   "plugins": {
     "title": "Plugins",
@@ -245,27 +245,13 @@
     }
   },
   "channels": {
-    "title": "Channels",
-    "description": "You can reach this platform via different channels. Different channels offer different features, if you set those up. Please take a look at the channels listed below:",
-    "whatsappChannels": "WhatsApp Channel(s)",
     "whatsappAssistant": "Assistant for WhatsApp",
     "whatsappAssistantHint": "Incoming WhatsApp messages are answered by this published assistant.",
     "whatsappAssistantNone": "No assistant — use the usual chat",
     "whatsappAssistantSaved": "WhatsApp now uses this assistant",
     "whatsappAssistantFailed": "Could not save the WhatsApp assistant",
-    "emailChannels": "Email Channel(s)",
-    "apiChannel": "API Channel",
-    "webWidget": "Web Widget",
-    "defaultHandling": "default handling",
-    "personalKeyword": "personal keyword",
     "keywordSaved": "Email keyword saved successfully",
-    "addKeyword": "Check for a free keyword to add your own handling:",
     "keywordPlaceholder": "keyword",
-    "yourEmailAddress": "Your email address: {email}",
-    "noKeywordSet": "You have not set a personal keyword yet. You can only write anonymously to the default handler!",
-    "apiDescription": "Simple API calls with your personal API key:",
-    "apiDocumentationInfo": "For detailed API documentation including all available endpoints, request/response formats, and authentication methods, please visit our comprehensive API documentation.",
-    "viewApiDocumentation": "View API Documentation",
     "apiDocumentation": {
       "title": "API Documentation",
       "description": "Complete API reference for integrating with Synaplan. All endpoints are documented with request/response examples.",
@@ -471,23 +457,17 @@
     "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",
     "writeBadge": "Writes allowed"
   },
-  "aiAccounts": {
-    "title": "Your AI accounts",
-    "subtitle": "Use your own provider accounts instead of the server's. Keys are stored encrypted and only you can see them.",
-    "sectionHiggsfield": "Higgsfield — video generation",
-    "sectionAnthropic": "Anthropic — coding clients"
-  },
   "messagesGateway": {
-    "title": "Coding clients",
+    "title": "Connect your coding tool",
     "description": "Connect Claude Code and other Anthropic-compatible agent tools to your Synaplan workspace. Requests go to POST /v1/messages and are metered against your Synaplan budget.",
     "statusTitle": "Gateway status",
     "statusEnabled": "Enabled",
     "statusNotReady": "Not ready",
     "statusDisabled": "Disabled",
-    "missingKey": "No provider key will pay for these requests. Save one under {accounts}. Nothing is sent until a key is saved.",
+    "missingKey": "No provider key will pay for these requests. Save one in {accounts}. Nothing is sent until a key is saved.",
     "missingKeyAdmin": "An admin can also allow the server key.",
-    "yourAiAccounts": "Your AI accounts",
-    "gatewayOff": "Coding clients are turned off, so nothing is sent. An admin can turn the gateway on.",
+    "yourAiAccounts": "Your Anthropic key",
+    "gatewayOff": "Coding tools are turned off, so nothing is sent. An admin can turn the gateway on.",
     "apiKeyStep": "Create a Synaplan API key under {keys}, then paste it in place of sk_your_synaplan_api_key.",
     "apiKeysLink": "Manage → Developer & devices → API Keys",
     "firstStartHint": "The first time Claude Code starts, it asks whether to use this API key and whether to trust the folder. The suggested answer is no. Choose yes for both, or the key is rejected and nothing is sent.",
@@ -505,8 +485,7 @@
     "saveKey": "Save key",
     "clearKey": "Remove key",
     "clearKeyConfirmTitle": "Remove Anthropic key?",
-    "clearKeyConfirm": "Remove key — coding clients use the server's key again if one is configured.",
-    "byokPointer": "Using your own Anthropic key? Manage it under Your AI accounts.",
+    "clearKeyConfirm": "Remove key — coding tools use the server's key again if one is configured.",
     "saveKeySuccess": "API key saved",
     "saveKeyError": "Could not save API key",
     "clearKeySuccess": "API key removed",
@@ -626,7 +605,7 @@
       },
       "requiresMcpTools": "Available once your tools are switched on above."
     },
-    "loadError": "Could not load Coding clients settings",
+    "loadError": "Could not load the Claude Code settings.",
     "source": {
       "user": "Your key",
       "operator": "Operator key",
@@ -763,6 +742,156 @@
       "back": "Back",
       "done": "Done",
       "progress": "{current} of {total}"
+    }
+  },
+  "apps": {
+    "title": "Apps",
+    "subtitle": "Connect Synaplan to the tools you already use.",
+    "searchLabel": "Search apps",
+    "searchPlaceholder": "Search apps…",
+    "tabAll": "All",
+    "tabConnected": "Connected",
+    "connected": "Connected",
+    "connectedEmpty": "No app is connected yet.",
+    "browseAll": "Browse all apps",
+    "noResults": "No app matches \"{query}\".",
+    "clearSearch": "Clear search",
+    "pluginTagline": "Added by your administrator.",
+    "backToAll": "All apps",
+    "factWhat": "What it does",
+    "factWho": "Who can see it",
+    "factStop": "How to stop it",
+    "ownerOnly": "Only you. Others in your organisation do not see this connection.",
+    "linkedEmpty": "Nothing is linked yet. Start the connection in {client} — you will not type a key here.",
+    "categories": {
+      "messengers": "Messengers",
+      "website": "Website",
+      "email": "E-mail",
+      "files": "Files & documents",
+      "ai": "AI & media",
+      "developer": "Tools & developers",
+      "extensions": "Plugins"
+    },
+    "email": {
+      "addressesTitle": "Your addresses",
+      "baseHint": "Send or forward an e-mail here and Synaplan answers you.",
+      "personalHint": "Your personal address with your keyword.",
+      "keywordTitle": "Personal keyword",
+      "keywordHint": "Optional: a keyword gives you your own address, for example for a project.",
+      "copy": "Copy",
+      "copied": "Address copied.",
+      "copyFailed": "The address could not be copied. Select it and copy it by hand.",
+      "saveFailed": "The keyword was not saved. Try again."
+    },
+    "mailbox": {
+      "loadFailed": "Your mailboxes could not be loaded. Reload the page.",
+      "saveFailed": "The mailbox was not saved. Nothing was changed."
+    },
+    "claudeCode": {
+      "keyTitle": "Your Anthropic key",
+      "keyHint": "Optional. With your own key, usage is billed to your Anthropic account."
+    },
+    "items": {
+      "telegram": {
+        "name": "Telegram",
+        "tagline": "Chat with your assistant in Telegram.",
+        "about": "Your own Telegram bot answers with your assistant. Only your messages reach Synaplan; nobody else can use the bot.",
+        "stop": "Disconnect below. The bot stops answering at once."
+      },
+      "whatsapp": {
+        "name": "WhatsApp",
+        "tagline": "Ask Synaplan from WhatsApp.",
+        "about": "Verify your phone number, then message the Synaplan number. The assistant you pick below answers.",
+        "stop": "Pick no assistant below or remove your verified number."
+      },
+      "widgets": {
+        "name": "Chat widgets",
+        "tagline": "Put an AI assistant on your website."
+      },
+      "email": {
+        "name": "Email to Synaplan",
+        "tagline": "Forward an e-mail and get an answer back.",
+        "about": "Write or forward to your Synaplan address. Synaplan reads the message and replies to you by e-mail.",
+        "stop": "Simply stop sending mail. Clear the keyword to retire your personal address."
+      },
+      "mailbox": {
+        "name": "Mailbox automation",
+        "tagline": "Let the AI sort and answer a mailbox.",
+        "about": "Synaplan checks an IMAP mailbox on a schedule, sends each new mail to the right department and can reply via SMTP.",
+        "stop": "Set the mailbox to inactive or delete it in the list below."
+      },
+      "microsoft365": {
+        "name": "Microsoft 365",
+        "tagline": "Mail, calendar and OneDrive files for your assistant.",
+        "about": "After you sign in with Microsoft, the AI can read and draft mail, see your calendar and open OneDrive files — only with the permissions you grant.",
+        "stop": "Remove the connection below. Access ends immediately."
+      },
+      "dropbox": {
+        "name": "Dropbox",
+        "tagline": "Let the AI read and file documents in Dropbox.",
+        "about": "After you sign in with Dropbox, the AI can open files you point it to and save results into your Dropbox.",
+        "stop": "Remove the connection below. Access ends immediately."
+      },
+      "webdav": {
+        "name": "Cloud folders & calendar",
+        "tagline": "Nextcloud, OpenCloud or any WebDAV folder.",
+        "about": "Connect a folder with an app password. The AI can read and save files there and, with Nextcloud, also use your calendar.",
+        "stop": "Remove the connection below. Access ends immediately."
+      },
+      "nextcloud": {
+        "name": "Synaplan in Nextcloud",
+        "tagline": "Use your assistants inside Nextcloud.",
+        "about": "Install the Synaplan app in Nextcloud and sign in there. Nextcloud then uses this account; you never copy a key.",
+        "stop": "Disconnect the server in the list below."
+      },
+      "owncloud": {
+        "name": "Synaplan in ownCloud",
+        "tagline": "Use your assistants inside ownCloud.",
+        "about": "Install the Synaplan app in ownCloud and sign in there. ownCloud then uses this account; you never copy a key.",
+        "stop": "Disconnect the server in the list below."
+      },
+      "outlook": {
+        "name": "Synaplan in Outlook",
+        "tagline": "Answer and summarise mail with your assistant in Outlook.",
+        "about": "Add the Synaplan add-in in Outlook and sign in there. The add-in then uses this account.",
+        "stop": "Disconnect it in the list below."
+      },
+      "claudeCode": {
+        "name": "Claude Code & coding tools",
+        "tagline": "Run Claude Code through Synaplan with your knowledge and budget.",
+        "about": "Point Claude Code at Synaplan with an API key. Requests then use your Synaplan tools and count against your budget.",
+        "stop": "Revoke the API key under API & developers."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "tagline": "Create videos with your Higgsfield account.",
+        "about": "Save your Higgsfield key and video generation in chat runs on your account.",
+        "stop": "Remove your key below."
+      },
+      "mcp": {
+        "name": "Tool servers (MCP)",
+        "tagline": "Give the AI tools from any MCP server.",
+        "about": "Add a server address. The AI can then call that server's tools in chat; risky actions ask you first.",
+        "stop": "Turn the server off or delete it in the list below."
+      },
+      "customTools": {
+        "name": "Custom tools",
+        "tagline": "Connect any web API as a tool.",
+        "about": "Describe an HTTP call once (or import an OpenAPI file). The AI can then use it in chat.",
+        "stop": "Delete the tool in the list below."
+      },
+      "desktop": {
+        "name": "Synaplan Desktop",
+        "tagline": "Let your assistant work with files on your computer.",
+        "about": "Pair the desktop app with a code. It runs jobs you start from chat on your own machine.",
+        "stop": "Remove the device below. Running jobs are cancelled."
+      },
+      "api": {
+        "name": "API & developers",
+        "tagline": "API keys and documentation for your own integrations.",
+        "about": "Create a key for scripts and other apps. Every call acts as you and counts against your limits.",
+        "stop": "Revoke the key below. It stops working immediately."
+      }
     }
   }
 }

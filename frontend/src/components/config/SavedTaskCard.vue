@@ -461,7 +461,7 @@ const onRunCopy = async () => {
       type="button"
       class="pill text-sm font-medium"
       data-testid="saved-task-waiting-approval"
-      @click="router.push({ path: '/channels/approvals', query: { task: String(task.id) } })"
+      @click="router.push({ path: '/approvals', query: { task: String(task.id) } })"
     >
       {{ $t('config.savedTasks.waitingApproval') }}
       <span class="txt-secondary">{{ task.waitingApprovalCount }}</span>

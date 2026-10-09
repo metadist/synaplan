@@ -43,7 +43,7 @@
     "disconnected": "Plateforme déconnectée.",
     "disconnectError": "La plateforme n’a pas pu être déconnectée.",
     "loadError": "Les plateformes liées n’ont pas pu être chargées.",
-    "adminPointer": "L’approbation des serveurs se fait sous Exploitation › Personnes › Instances de plateforme."
+    "adminPointer": "Les serveurs entiers s'approuvent dans Administration › Personnes."
   },
   "plugins": {
     "title": "Extensions",
@@ -245,27 +245,13 @@
     }
   },
   "channels": {
-    "title": "Canaux",
-    "description": "Vous pouvez joindre cette plateforme via différents canaux. Chaque canal offre des fonctionnalités différentes, si vous les configurez. Consultez les canaux listés ci-dessous :",
-    "whatsappChannels": "Canal(aux) WhatsApp",
     "whatsappAssistant": "Assistant pour WhatsApp",
     "whatsappAssistantHint": "Les messages WhatsApp sont répondus par cet assistant publié.",
     "whatsappAssistantNone": "Aucun assistant — discussion habituelle",
     "whatsappAssistantSaved": "WhatsApp utilise maintenant cet assistant",
     "whatsappAssistantFailed": "Impossible d’enregistrer l’assistant WhatsApp",
-    "emailChannels": "Canal(aux) e-mail",
-    "apiChannel": "Canal API",
-    "webWidget": "Widget web",
-    "defaultHandling": "traitement par défaut",
-    "personalKeyword": "mot-clé personnel",
     "keywordSaved": "Mot-clé e-mail enregistré avec succès",
-    "addKeyword": "Vérifiez un mot-clé libre pour ajouter votre propre traitement :",
     "keywordPlaceholder": "mot-clé",
-    "yourEmailAddress": "Votre adresse e-mail : {email}",
-    "noKeywordSet": "Vous n’avez pas encore défini de mot-clé personnel. Vous ne pouvez écrire qu’anonymement au gestionnaire par défaut !",
-    "apiDescription": "Appels API simples avec votre clé API personnelle :",
-    "apiDocumentationInfo": "Pour une documentation API détaillée, y compris tous les points de terminaison, les formats requête/réponse et les méthodes d’authentification, consultez notre documentation API complète.",
-    "viewApiDocumentation": "Voir la documentation API",
     "apiDocumentation": {
       "title": "Documentation API",
       "description": "Référence API complète pour l’intégration avec Synaplan. Tous les points de terminaison sont documentés avec des exemples de requête/réponse.",
@@ -471,22 +457,16 @@
     "allowWriteHint": "Lorsqu’elles sont activées, l’assistant peut créer ou mettre à jour du contenu dans ce système lorsque vous le demandez. Les actions de suppression ne sont jamais autorisées.",
     "writeBadge": "Écritures autorisées"
   },
-  "aiAccounts": {
-    "title": "Vos comptes IA",
-    "subtitle": "Utilisez vos propres comptes fournisseur à la place de ceux du serveur. Les clés sont stockées chiffrées et vous seul pouvez les voir.",
-    "sectionHiggsfield": "Higgsfield — génération vidéo",
-    "sectionAnthropic": "Anthropic — clients de codage"
-  },
   "messagesGateway": {
-    "title": "Clients de codage",
+    "title": "Connecter votre outil de code",
     "description": "Connectez Claude Code et d’autres outils d’agent compatibles Anthropic à votre espace Synaplan. Les requêtes vont vers POST /v1/messages et sont comptabilisées sur votre budget Synaplan.",
     "statusTitle": "État de la passerelle",
     "statusEnabled": "Activée",
     "statusNotReady": "Pas prête",
-    "missingKey": "Aucune clé de fournisseur ne paiera ces demandes. Enregistrez-en une sous {accounts}. Rien n’est envoyé tant qu’une clé n’est pas enregistrée.",
+    "missingKey": "Aucune clé de fournisseur ne paiera ces demandes. Enregistrez-en une dans {accounts}. Rien n'est envoyé tant qu'une clé n'est pas enregistrée.",
     "missingKeyAdmin": "Un administrateur peut aussi autoriser la clé du serveur.",
-    "yourAiAccounts": "Vos comptes IA",
-    "gatewayOff": "Les clients de codage sont arrêtés, donc rien n’est envoyé. Un administrateur peut activer la passerelle.",
+    "yourAiAccounts": "Votre clé Anthropic",
+    "gatewayOff": "Les outils de code sont désactivés, donc rien n'est envoyé. Un administrateur peut activer la passerelle.",
     "apiKeyStep": "Créez une clé API Synaplan sous {keys}, puis collez-la à la place de sk_your_synaplan_api_key.",
     "apiKeysLink": "Gérer → Développeurs et appareils → Clés API",
     "firstStartHint": "Au premier démarrage, Claude Code demande s’il faut utiliser cette clé API et s’il faut faire confiance au dossier. La réponse proposée est non. Choisissez oui pour les deux, sinon la clé est refusée et rien n’est envoyé.",
@@ -505,8 +485,7 @@
     "saveKey": "Enregistrer la clé",
     "clearKey": "Retirer la clé",
     "clearKeyConfirmTitle": "Retirer la clé Anthropic ?",
-    "clearKeyConfirm": "Retirer la clé — les clients de codage utilisent à nouveau la clé du serveur si elle est configurée.",
-    "byokPointer": "Vous utilisez votre propre clé Anthropic ? Gérez-la sous Vos comptes IA.",
+    "clearKeyConfirm": "Supprimer la clé — les outils de code réutilisent la clé du serveur si elle est configurée.",
     "saveKeySuccess": "Clé API enregistrée",
     "saveKeyError": "Impossible d’enregistrer la clé API",
     "clearKeySuccess": "Clé API retirée",
@@ -626,7 +605,7 @@
       },
       "requiresMcpTools": "Disponible une fois vos outils activés ci-dessus."
     },
-    "loadError": "Impossible de charger les réglages des Clients de codage",
+    "loadError": "Impossible de charger les réglages de Claude Code.",
     "source": {
       "user": "Votre clé",
       "operator": "Clé opérateur",
@@ -763,6 +742,156 @@
       "back": "Retour",
       "done": "Terminé",
       "progress": "{current} sur {total}"
+    }
+  },
+  "apps": {
+    "title": "Apps",
+    "subtitle": "Connectez Synaplan aux outils que vous utilisez déjà.",
+    "searchLabel": "Rechercher des apps",
+    "searchPlaceholder": "Rechercher des apps…",
+    "tabAll": "Toutes",
+    "tabConnected": "Connectées",
+    "connected": "Connectée",
+    "connectedEmpty": "Aucune app n'est encore connectée.",
+    "browseAll": "Voir toutes les apps",
+    "noResults": "Aucune app ne correspond à « {query} ».",
+    "clearSearch": "Effacer la recherche",
+    "pluginTagline": "Ajouté par votre administrateur.",
+    "backToAll": "Toutes les apps",
+    "factWhat": "Ce qu'elle fait",
+    "factWho": "Qui la voit",
+    "factStop": "Comment l'arrêter",
+    "ownerOnly": "Vous seul. Les autres membres de votre organisation ne voient pas cette connexion.",
+    "linkedEmpty": "Rien n'est encore lié. Lancez la connexion depuis {client} — vous ne saisirez aucune clé ici.",
+    "categories": {
+      "messengers": "Messageries",
+      "website": "Site web",
+      "email": "E-mail",
+      "files": "Fichiers et documents",
+      "ai": "IA et médias",
+      "developer": "Outils et développeurs",
+      "extensions": "Plugins"
+    },
+    "email": {
+      "addressesTitle": "Vos adresses",
+      "baseHint": "Envoyez ou transférez un e-mail ici et Synaplan vous répond.",
+      "personalHint": "Votre adresse personnelle avec votre mot-clé.",
+      "keywordTitle": "Mot-clé personnel",
+      "keywordHint": "Facultatif : un mot-clé vous donne votre propre adresse, par exemple pour un projet.",
+      "copy": "Copier",
+      "copied": "Adresse copiée.",
+      "copyFailed": "L'adresse n'a pas pu être copiée. Sélectionnez-la et copiez-la manuellement.",
+      "saveFailed": "Le mot-clé n'a pas été enregistré. Réessayez."
+    },
+    "mailbox": {
+      "loadFailed": "Vos boîtes mail n'ont pas pu être chargées. Rechargez la page.",
+      "saveFailed": "La boîte mail n'a pas été enregistrée. Rien n'a été modifié."
+    },
+    "claudeCode": {
+      "keyTitle": "Votre clé Anthropic",
+      "keyHint": "Facultatif. Avec votre propre clé, l'utilisation est facturée sur votre compte Anthropic."
+    },
+    "items": {
+      "telegram": {
+        "name": "Telegram",
+        "tagline": "Discutez avec votre assistant dans Telegram.",
+        "about": "Votre propre bot Telegram répond avec votre assistant. Seuls vos messages arrivent dans Synaplan ; personne d'autre ne peut utiliser le bot.",
+        "stop": "Déconnectez-le ci-dessous. Le bot cesse aussitôt de répondre."
+      },
+      "whatsapp": {
+        "name": "WhatsApp",
+        "tagline": "Interrogez Synaplan depuis WhatsApp.",
+        "about": "Vérifiez votre numéro de téléphone, puis écrivez au numéro de Synaplan. L'assistant choisi ci-dessous répond.",
+        "stop": "Ne choisissez aucun assistant ci-dessous ou supprimez votre numéro vérifié."
+      },
+      "widgets": {
+        "name": "Widgets de chat",
+        "tagline": "Placez un assistant IA sur votre site web."
+      },
+      "email": {
+        "name": "E-mail vers Synaplan",
+        "tagline": "Transférez un e-mail et recevez une réponse.",
+        "about": "Écrivez ou transférez à votre adresse Synaplan. Synaplan lit le message et vous répond par e-mail.",
+        "stop": "Il suffit de ne plus envoyer d'e-mails. Effacez le mot-clé pour abandonner votre adresse personnelle."
+      },
+      "mailbox": {
+        "name": "Automatisation de boîte mail",
+        "tagline": "Laissez l’IA trier une boîte mail et y répondre.",
+        "about": "Synaplan consulte régulièrement une boîte IMAP, classe chaque nouveau message dans le bon service et peut répondre par SMTP.",
+        "stop": "Désactivez la boîte mail ou supprimez-la dans la liste ci-dessous."
+      },
+      "microsoft365": {
+        "name": "Microsoft 365",
+        "tagline": "Messagerie, calendrier et fichiers OneDrive pour votre assistant.",
+        "about": "Après votre connexion Microsoft, l'IA peut lire et rédiger des e-mails, voir votre calendrier et ouvrir des fichiers OneDrive — uniquement avec les droits que vous accordez.",
+        "stop": "Supprimez la connexion ci-dessous. L'accès prend fin immédiatement."
+      },
+      "dropbox": {
+        "name": "Dropbox",
+        "tagline": "Laissez l'IA lire et classer des documents dans Dropbox.",
+        "about": "Après votre connexion Dropbox, l'IA peut ouvrir les fichiers que vous lui indiquez et enregistrer des résultats dans votre Dropbox.",
+        "stop": "Supprimez la connexion ci-dessous. L'accès prend fin immédiatement."
+      },
+      "webdav": {
+        "name": "Dossiers cloud et calendrier",
+        "tagline": "Nextcloud, OpenCloud ou tout dossier WebDAV.",
+        "about": "Connectez un dossier avec un mot de passe d'application. L'IA peut y lire et enregistrer des fichiers et, avec Nextcloud, utiliser aussi votre calendrier.",
+        "stop": "Supprimez la connexion ci-dessous. L'accès prend fin immédiatement."
+      },
+      "nextcloud": {
+        "name": "Synaplan dans Nextcloud",
+        "tagline": "Utilisez vos assistants dans Nextcloud.",
+        "about": "Installez l'app Synaplan dans Nextcloud et connectez-vous-y. Nextcloud utilise alors ce compte ; vous ne copiez jamais de clé.",
+        "stop": "Déconnectez le serveur dans la liste ci-dessous."
+      },
+      "owncloud": {
+        "name": "Synaplan dans ownCloud",
+        "tagline": "Utilisez vos assistants dans ownCloud.",
+        "about": "Installez l'app Synaplan dans ownCloud et connectez-vous-y. ownCloud utilise alors ce compte ; vous ne copiez jamais de clé.",
+        "stop": "Déconnectez le serveur dans la liste ci-dessous."
+      },
+      "outlook": {
+        "name": "Synaplan dans Outlook",
+        "tagline": "Répondez aux e-mails et résumez-les avec votre assistant dans Outlook.",
+        "about": "Ajoutez le complément Synaplan dans Outlook et connectez-vous-y. Le complément utilise alors ce compte.",
+        "stop": "Déconnectez-le dans la liste ci-dessous."
+      },
+      "claudeCode": {
+        "name": "Claude Code et outils de code",
+        "tagline": "Utilisez Claude Code via Synaplan avec vos connaissances et votre budget.",
+        "about": "Pointez Claude Code vers Synaplan avec une clé API. Les requêtes utilisent alors vos outils Synaplan et sont décomptées de votre budget.",
+        "stop": "Révoquez la clé API dans API et développeurs."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "tagline": "Créez des vidéos avec votre compte Higgsfield.",
+        "about": "Enregistrez votre clé Higgsfield et la génération de vidéos dans le chat utilisera votre compte.",
+        "stop": "Supprimez votre clé ci-dessous."
+      },
+      "mcp": {
+        "name": "Serveurs d'outils (MCP)",
+        "tagline": "Donnez à l'IA les outils de n'importe quel serveur MCP.",
+        "about": "Ajoutez l'adresse d'un serveur. L'IA peut alors utiliser ses outils dans le chat ; les actions risquées vous demandent d'abord.",
+        "stop": "Désactivez le serveur ou supprimez-le dans la liste ci-dessous."
+      },
+      "customTools": {
+        "name": "Outils personnalisés",
+        "tagline": "Connectez n'importe quelle API web comme outil.",
+        "about": "Décrivez un appel HTTP une fois (ou importez un fichier OpenAPI). L'IA peut ensuite l'utiliser dans le chat.",
+        "stop": "Supprimez l'outil dans la liste ci-dessous."
+      },
+      "desktop": {
+        "name": "Synaplan Desktop",
+        "tagline": "Laissez votre assistant travailler avec les fichiers de votre ordinateur.",
+        "about": "Associez l'application de bureau avec un code. Elle exécute sur votre machine les tâches lancées depuis le chat.",
+        "stop": "Supprimez l'appareil ci-dessous. Les tâches en cours sont annulées."
+      },
+      "api": {
+        "name": "API et développeurs",
+        "tagline": "Clés API et documentation pour vos intégrations.",
+        "about": "Créez une clé pour des scripts et d'autres apps. Chaque appel agit en votre nom et compte dans vos limites.",
+        "stop": "Révoquez la clé ci-dessous. Elle cesse immédiatement de fonctionner."
+      }
     }
   }
 }

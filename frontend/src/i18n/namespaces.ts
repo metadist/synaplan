@@ -133,8 +133,8 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'usageTaximeter',
   ],
   tools: [
-    'aiAccounts',
     'aiProvider',
+    'apps',
     'channels',
     'compute',
     'customTools',

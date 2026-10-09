@@ -43,13 +43,13 @@
         <p v-if="missingKey" class="txt-secondary text-sm mt-3" data-testid="text-missing-key">
           <i18n-t keypath="messagesGateway.missingKey" tag="span">
             <template #accounts>
-              <RouterLink
-                to="/ai/providers?section=anthropic"
+              <a
+                href="#anthropic-key"
                 class="text-[var(--brand)] hover:underline font-medium"
                 data-testid="link-missing-key-accounts"
               >
                 {{ $t('messagesGateway.yourAiAccounts') }}
-              </RouterLink>
+              </a>
             </template>
           </i18n-t>
           <span v-if="!status.is_admin"> {{ $t('messagesGateway.missingKeyAdmin') }}</span>
@@ -86,7 +86,7 @@
           <i18n-t keypath="messagesGateway.apiKeyStep" tag="span">
             <template #keys>
               <RouterLink
-                to="/channels/api"
+                to="/apps/api"
                 class="text-[var(--brand)] hover:underline font-medium"
                 data-testid="link-api-keys"
               >
@@ -111,16 +111,6 @@
           {{ $t('messagesGateway.copySetup') }}
         </button>
       </div>
-
-      <p class="txt-secondary text-sm" data-testid="text-ai-accounts-pointer">
-        <RouterLink
-          to="/ai/providers?section=anthropic"
-          class="text-[var(--brand)] hover:underline font-medium"
-          data-testid="link-ai-accounts-byok"
-        >
-          {{ $t('messagesGateway.byokPointer') }}
-        </RouterLink>
-      </p>
 
       <MessagesGatewayAdminSettings v-if="status.is_admin" :status="status" @saved="load(true)" />
     </template>

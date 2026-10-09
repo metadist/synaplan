@@ -5,19 +5,8 @@
       data-testid="page-config"
     >
       <div class="max-w-[100rem] mx-auto" data-testid="section-config">
-        <div v-if="currentPage === 'inbound'" data-testid="section-inbound">
-          <InboundConfiguration />
-        </div>
-
-        <div v-else-if="currentPage === 'ai-models'" data-testid="section-ai-models">
+        <div v-if="currentPage === 'ai-models'" data-testid="section-ai-models">
           <AIModelsConfiguration />
-        </div>
-
-        <div
-          v-else-if="currentPage === 'ai-provider-higgsfield'"
-          data-testid="section-ai-provider-higgsfield"
-        >
-          <HiggsfieldConnection />
         </div>
 
         <div v-else-if="currentPage === 'task-prompts'" data-testid="section-task-prompts">
@@ -28,37 +17,12 @@
           <SortingPromptConfiguration />
         </div>
 
-        <div v-else-if="currentPage === 'api-keys'" data-testid="section-api-keys">
-          <APIKeysConfiguration />
-        </div>
-
-        <div v-else-if="currentPage === 'mcp-servers'" data-testid="section-mcp-servers">
-          <McpServersConfiguration />
-        </div>
-
-        <div v-else-if="currentPage === 'connections'" data-testid="section-connections">
-          <ConnectionsConfiguration />
-          <CustomToolsConfiguration class="mt-8" />
-        </div>
-
         <div v-else-if="currentPage === 'saved-tasks'" data-testid="section-saved-tasks">
           <SavedTasksOverview />
         </div>
 
         <div v-else-if="currentPage === 'approvals'" data-testid="section-approvals">
           <ApprovalsInbox />
-        </div>
-
-        <div v-else-if="currentPage === 'ai-agents'" data-testid="section-ai-agents">
-          <MessagesGatewayConfiguration />
-        </div>
-
-        <div v-else-if="currentPage === 'desktop'" data-testid="section-desktop">
-          <DesktopConfiguration />
-        </div>
-
-        <div v-else-if="currentPage === 'platform-links'" data-testid="section-platform-links">
-          <LinkedPlatformsConfiguration />
         </div>
 
         <div
@@ -76,43 +40,24 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import MainLayout from '@/components/MainLayout.vue'
-import InboundConfiguration from '@/components/config/InboundConfiguration.vue'
 import AIModelsConfiguration from '@/components/config/AIModelsConfiguration.vue'
-import HiggsfieldConnection from '@/components/config/HiggsfieldConnection.vue'
 import TaskPromptsConfiguration from '@/components/config/TaskPromptsConfiguration.vue'
 import SortingPromptConfiguration from '@/components/config/SortingPromptConfiguration.vue'
-import APIKeysConfiguration from '@/components/config/APIKeysConfiguration.vue'
 import ApiDocumentation from '@/components/config/ApiDocumentation.vue'
-import McpServersConfiguration from '@/components/config/McpServersConfiguration.vue'
-import ConnectionsConfiguration from '@/components/config/ConnectionsConfiguration.vue'
 import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
 import ApprovalsInbox from '@/components/config/ApprovalsInbox.vue'
-import CustomToolsConfiguration from '@/components/config/CustomToolsConfiguration.vue'
-import MessagesGatewayConfiguration from '@/components/config/MessagesGatewayConfiguration.vue'
-import DesktopConfiguration from '@/components/config/DesktopConfiguration.vue'
-import LinkedPlatformsConfiguration from '@/components/config/LinkedPlatformsConfiguration.vue'
 
 const route = useRoute()
 
-// Canonical paths per the §4.6 URL map; legacy /config/* arrives here only
-// via router redirects, so matching the new tree is sufficient.
+// Canonical paths only; older URLs arrive here through router redirects.
 const currentPage = computed(() => {
   const path = route.path
-  if (path.startsWith('/channels/api/docs')) return 'api-documentation'
-  if (path.startsWith('/channels/api')) return 'api-keys'
-  if (path.startsWith('/channels/agents')) return 'ai-agents'
-  if (path.startsWith('/channels/mcp')) return 'mcp-servers'
-  if (path.startsWith('/channels/connections')) return 'connections'
-  if (path.startsWith('/channels/tasks')) return 'saved-tasks'
-  if (path.startsWith('/channels/approvals')) return 'approvals'
-  if (path.startsWith('/channels/desktop')) return 'desktop'
-  if (path.startsWith('/channels/platform-links')) return 'platform-links'
-  if (path.startsWith('/channels')) return 'inbound'
-  if (path.startsWith('/ai/providers/higgsfield')) return 'ai-provider-higgsfield'
-  if (path.startsWith('/ai/models')) return 'ai-models'
+  if (path.startsWith('/apps/api/docs')) return 'api-documentation'
+  if (path === '/tasks') return 'saved-tasks'
+  if (path === '/approvals') return 'approvals'
   if (path.startsWith('/ai/instructions') || path.startsWith('/ai/task-prompts'))
     return 'task-prompts'
   if (path.startsWith('/ai/routing')) return 'sorting-prompt'
-  return 'inbound'
+  return 'ai-models'
 })
 </script>
