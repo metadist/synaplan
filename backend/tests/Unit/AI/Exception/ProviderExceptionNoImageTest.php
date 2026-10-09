@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Exception;
 
+use App\AI\Exception\NoImageException;
 use App\AI\Exception\ProviderException;
 use PHPUnit\Framework\TestCase;
 
@@ -36,6 +37,18 @@ final class ProviderExceptionNoImageTest extends TestCase
         self::assertSame('gemini-3.1-flash-image', $context['model']);
         self::assertSame('STOP', $context['finish_reason']);
         self::assertSame(300, mb_strlen($context['text_response']));
+    }
+
+    public function testAFilteredImageCarriesASafetyBlockReasonAndStaysOutOfTheOutageCounters(): void
+    {
+        $e = ProviderException::imageFiltered('google', 'imagen-4.0-generate-001', ' The image was filtered. ');
+
+        self::assertInstanceOf(NoImageException::class, $e);
+        self::assertSame('Google filtered the generated image (imagen-4.0-generate-001): "The image was filtered."', $e->getMessage());
+        self::assertSame(
+            ['block_reason' => 'SAFETY', 'text_response' => 'The image was filtered.', 'model' => 'imagen-4.0-generate-001'],
+            $e->getContext(),
+        );
     }
 
     public function testTheLogContextOfAPlainProviderErrorHasOnlyTheProvider(): void

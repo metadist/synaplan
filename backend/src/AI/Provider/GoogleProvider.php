@@ -1075,7 +1075,9 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         }
 
         if ([] === $images) {
-            $exception = ProviderException::noImage('google', $model, $filteredReason, null);
+            $exception = null !== $filteredReason && '' !== trim($filteredReason)
+                ? ProviderException::imageFiltered('google', $model, $filteredReason)
+                : ProviderException::noImage('google', $model, null, null);
             $this->logger->warning('Google Imagen: no image in response', $exception->logContext());
 
             throw $exception;

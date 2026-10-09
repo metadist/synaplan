@@ -267,29 +267,62 @@ class MediaErrorMessageBuilder
      */
     private function buildTextInsteadOfMediaMessage(string $providerName, string $textResponse, string $mediaType, string $lang): string
     {
-        $displayName = ProviderException::displayName($providerName);
-        $preview = mb_substr(trim($textResponse), 0, 300);
-        $quote = '> '.str_replace("\n", "\n> ", $preview);
+        $name = ProviderException::displayName($providerName);
+        $quote = $this->quote($textResponse);
 
-        if ('de' === $lang) {
-            $mediaLabel = match ($mediaType) {
-                'audio' => 'kein Audio',
-                'video' => 'kein Video',
-                default => 'kein Bild',
-            };
-
-            return "{$displayName} hat {$mediaLabel} erstellt, sondern mit Text geantwortet:\n\n{$quote}\n\n"
-                .'Formuliere die Anfrage als Bildanweisung um oder wähle ein anderes Bildmodell.';
-        }
-
-        $mediaLabel = match ($mediaType) {
-            'audio' => 'audio',
-            'video' => 'video',
-            default => 'image',
+        return match ($lang) {
+            'de' => match ($mediaType) {
+                'audio' => "{$name} hat kein Audio erstellt, sondern mit Text geantwortet:\n\n{$quote}\n\n"
+                    .'Formuliere die Anfrage als Audioanweisung um oder wähle ein anderes Audiomodell.',
+                'video' => "{$name} hat kein Video erstellt, sondern mit Text geantwortet:\n\n{$quote}\n\n"
+                    .'Formuliere die Anfrage als Videoanweisung um oder wähle ein anderes Videomodell.',
+                default => "{$name} hat kein Bild erstellt, sondern mit Text geantwortet:\n\n{$quote}\n\n"
+                    .'Formuliere die Anfrage als Bildanweisung um oder wähle ein anderes Bildmodell.',
+            },
+            'es' => match ($mediaType) {
+                'audio' => "{$name} no generó ningún audio y respondió con texto:\n\n{$quote}\n\n"
+                    .'Reformula la solicitud como una instrucción de audio o elige otro modelo de audio.',
+                'video' => "{$name} no generó ningún vídeo y respondió con texto:\n\n{$quote}\n\n"
+                    .'Reformula la solicitud como una instrucción de vídeo o elige otro modelo de vídeo.',
+                default => "{$name} no generó ninguna imagen y respondió con texto:\n\n{$quote}\n\n"
+                    .'Reformula la solicitud como una instrucción de imagen o elige otro modelo de imagen.',
+            },
+            'fr' => match ($mediaType) {
+                'audio' => "{$name} n'a généré aucun audio et a répondu par du texte :\n\n{$quote}\n\n"
+                    .'Reformulez la demande comme une instruction audio ou choisissez un autre modèle audio.',
+                'video' => "{$name} n'a généré aucune vidéo et a répondu par du texte :\n\n{$quote}\n\n"
+                    .'Reformulez la demande comme une instruction vidéo ou choisissez un autre modèle vidéo.',
+                default => "{$name} n'a généré aucune image et a répondu par du texte :\n\n{$quote}\n\n"
+                    ."Reformulez la demande comme une instruction d'image ou choisissez un autre modèle d'image.",
+            },
+            'tr' => match ($mediaType) {
+                'audio' => "{$name} ses oluşturmadı, bunun yerine metinle yanıt verdi:\n\n{$quote}\n\n"
+                    .'İsteği bir ses talimatı olarak yeniden yaz veya başka bir ses modeli seç.',
+                'video' => "{$name} video oluşturmadı, bunun yerine metinle yanıt verdi:\n\n{$quote}\n\n"
+                    .'İsteği bir video talimatı olarak yeniden yaz veya başka bir video modeli seç.',
+                default => "{$name} görsel oluşturmadı, bunun yerine metinle yanıt verdi:\n\n{$quote}\n\n"
+                    .'İsteği bir görsel talimatı olarak yeniden yaz veya başka bir görsel modeli seç.',
+            },
+            default => match ($mediaType) {
+                'audio' => "{$name} returned no audio and answered with text instead:\n\n{$quote}\n\n"
+                    .'Rephrase the request as an audio instruction or choose a different audio model.',
+                'video' => "{$name} returned no video and answered with text instead:\n\n{$quote}\n\n"
+                    .'Rephrase the request as a video instruction or choose a different video model.',
+                default => "{$name} returned no image and answered with text instead:\n\n{$quote}\n\n"
+                    .'Rephrase the request as an image instruction or choose a different image model.',
+            },
         };
+    }
 
-        return "{$displayName} returned no {$mediaLabel} and answered with text instead:\n\n{$quote}\n\n"
-            .'Rephrase the request as an image instruction or choose a different image model.';
+    /**
+     * Provider text as a Markdown blockquote, cut to the excerpt length. Every
+     * line keeps the marker so a multi-line reply cannot end the quote early.
+     */
+    private function quote(string $text): string
+    {
+        $lines = preg_split('/\R/u', mb_substr(trim($text), 0, ProviderException::TEXT_EXCERPT_CHARS)) ?: [];
+
+        return '> '.implode("\n> ", $lines);
     }
 
     private function buildContentBlockedMessage(string $providerName, string $reason, ?string $textResponse, string $mediaType, string $lang): string
@@ -297,7 +330,7 @@ class MediaErrorMessageBuilder
         $reasonExplanations = $this->getBlockReasonExplanations($lang);
         $explanation = $reasonExplanations[$reason] ?? $reasonExplanations['OTHER'];
 
-        $displayName = ucfirst($providerName);
+        $displayName = ProviderException::displayName($providerName);
 
         if ('de' === $lang) {
             $mediaLabel = match ($mediaType) {
@@ -315,9 +348,8 @@ class MediaErrorMessageBuilder
             $msg = "{$displayName} refused to generate the {$mediaLabel} with code **{$reason}**.\n\n{$explanation}";
         }
 
-        if ($textResponse) {
-            $preview = mb_substr($textResponse, 0, 300);
-            $msg .= "\n\n> ".str_replace("\n", "\n> ", $preview);
+        if (null !== $textResponse && '' !== trim($textResponse)) {
+            $msg .= "\n\n".$this->quote($textResponse);
         }
 
         return $msg;

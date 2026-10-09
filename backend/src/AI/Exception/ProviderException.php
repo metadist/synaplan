@@ -7,8 +7,11 @@ class ProviderException extends \RuntimeException
     private const HTTP_STATUS_MIN = 400;
     private const HTTP_STATUS_MAX = 599;
 
-    /** Longest provider reply kept in a message, context or log line. */
-    private const TEXT_EXCERPT_CHARS = 300;
+    /** Longest provider reply kept in a message, context, log line or chat quote. */
+    public const TEXT_EXCERPT_CHARS = 300;
+
+    /** Block reason for an image the provider's safety filter discarded. */
+    private const FILTERED_BLOCK_REASON = 'SAFETY';
 
     /** Provider names whose spelling ucfirst() gets wrong. */
     private const DISPLAY_NAMES = ['openai' => 'OpenAI', 'xai' => 'xAI'];
@@ -113,6 +116,30 @@ class ProviderException extends \RuntimeException
             'finish_reason' => $finishReason,
             'model' => $model,
         ]);
+    }
+
+    /**
+     * The provider's safety filter discarded every generated image, e.g.
+     * Imagen with only `raiFilteredReason` in its predictions. The filter
+     * note is not a model reply, so it carries a block reason and the chat
+     * explains the filter instead of asking for an image instruction.
+     *
+     * Returns {@see NoImageException}: a filtered prompt is the request, not
+     * an outage, and must not open the circuit.
+     */
+    public static function imageFiltered(string $provider, string $model, string $filterNote): NoImageException
+    {
+        $excerpt = mb_substr(trim($filterNote), 0, self::TEXT_EXCERPT_CHARS);
+
+        return new NoImageException(
+            sprintf('%s filtered the generated image (%s): "%s"', self::displayName($provider), $model, $excerpt),
+            $provider,
+            [
+                'block_reason' => self::FILTERED_BLOCK_REASON,
+                'text_response' => '' !== $excerpt ? $excerpt : null,
+                'model' => $model,
+            ],
+        );
     }
 
     /** Provider name as people read it: "OpenAI", not "Openai". */

@@ -245,8 +245,23 @@ class GoogleProviderBlockedContentTest extends TestCase
         ));
 
         $this->assertSame('google', $e->getProviderName());
+        $this->assertSame('SAFETY', $e->getContext()['block_reason'] ?? null);
         $this->assertSame('The image was filtered.', $e->getContext()['text_response'] ?? null);
         $this->assertSame('imagen-4.0-generate-001', $e->getContext()['model'] ?? null);
+    }
+
+    public function testAnImagenResponseWithoutImagesOrFilterNoteThrowsWithoutAReply(): void
+    {
+        $provider = $this->createProviderWithMockResponse(['predictions' => []]);
+
+        $e = $this->captureProviderException(fn () => $provider->generateImage(
+            'A lighthouse',
+            ['model' => 'imagen-4.0-generate-001', 'modelConfig' => ['api' => 'imagen']],
+        ));
+
+        $this->assertNull($e->getContext()['block_reason'] ?? null);
+        $this->assertNull($e->getContext()['text_response'] ?? null);
+        $this->assertSame('Google returned no image (imagen-4.0-generate-001)', $e->getMessage());
     }
 
     private function captureProviderException(callable $call): ProviderException
