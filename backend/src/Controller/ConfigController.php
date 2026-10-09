@@ -208,7 +208,6 @@ class ConfigController extends AbstractController
                     property: 'features',
                     type: 'object',
                     properties: [
-                        new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
                         new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Qdrant vector database availability'),
                         new OA\Property(property: 'savedTasks', type: 'boolean', example: false, description: 'When true, AI Instructions shows Saved Task chrome. Widget chat never runs Saved Tasks.'),
                         new OA\Property(property: 'selfAware', type: 'boolean', example: true, description: 'When true, the web chat can answer what this installation can do and cite official documentation. Off restores the previous chat behaviour.'),
@@ -571,7 +570,6 @@ class ConfigController extends AbstractController
         // still run the full probe. A client that gives up on this response
         // reads every missing flag as off (nav, billing, groups).
         $features = [
-            'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
             'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
             'savedTasks' => $this->savedTaskConfig->isEnabled($user?->getId()),
             'desktopAgentEnabled' => $this->desktopAgentConfig->isEnabled($user?->getId()),
