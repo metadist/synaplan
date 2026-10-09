@@ -116,7 +116,7 @@
                 </span>
               </div>
               <p class="text-sm txt-primary line-clamp-2 mb-1">
-                {{ visiblePreview(session.lastMessagePreview) || $t('liveSupport.noMessages') }}
+                {{ session.lastMessagePreview || $t('liveSupport.noMessages') }}
               </p>
               <p class="text-xs txt-secondary">
                 {{ formatTime(session.lastMessage) }}
@@ -238,7 +238,6 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { visiblePreview } from '@/utils/stripThinkingBlocks'
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'

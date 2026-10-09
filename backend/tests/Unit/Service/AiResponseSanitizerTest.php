@@ -110,4 +110,14 @@ class AiResponseSanitizerTest extends TestCase
         $this->assertSame('Hello! How can I assist you today?', AiResponseSanitizer::preview($hello));
         $this->assertSame('Hello', AiResponseSanitizer::preview($hello, 5));
     }
+
+    public function testPreviewLeavesVisitorAndOperatorThinkTagsInPlace(): void
+    {
+        $literal = '<think>example</think> keep me';
+
+        $this->assertSame($literal, AiResponseSanitizer::transcriptText($literal, 'IN', ''));
+        $this->assertSame($literal, AiResponseSanitizer::preview($literal, 100, 'IN', ''));
+        $this->assertSame($literal, AiResponseSanitizer::preview($literal, 100, 'OUT', 'HUMAN_OPERATOR'));
+        $this->assertSame($literal, AiResponseSanitizer::preview($literal, 100, 'OUT', 'SYSTEM'));
+    }
 }

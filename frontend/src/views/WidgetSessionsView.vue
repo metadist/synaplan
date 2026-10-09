@@ -986,7 +986,7 @@ import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
-import { stripThinkingBlocks, visiblePreview } from '@/utils/stripThinkingBlocks'
+import { stripThinkingBlocks } from '@/utils/stripThinkingBlocks'
 import { useDialog } from '@/composables/useDialog'
 import { getErrorMessage } from '@/utils/errorMessage'
 import {
@@ -1486,7 +1486,7 @@ const handleSessionEvent = (event: WidgetEvent) => {
 
     if (selectedSession.value) {
       // Always update last message preview with the newest message
-      const previewText = visiblePreview(text)
+      const previewText = text.substring(0, 100)
       selectedSession.value.lastMessagePreview = previewText
 
       // Only count user messages for message limit
@@ -2232,7 +2232,7 @@ const displayMessageText = (message: { text: string; sender: string }): string =
 const stripMarkdown = (text: string | null): string => {
   if (!text) return ''
   return (
-    stripThinkingBlocks(text)
+    text
       // Remove headers
       .replace(/^#{1,6}\s+/gm, '')
       // Remove bold/italic

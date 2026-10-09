@@ -169,7 +169,13 @@ class WidgetSessionController extends AbstractController
                 // Use actual last message from database, truncated to 100 chars
                 $lastMessagePreview = null;
                 if ($chatId && isset($lastMessages[$chatId])) {
-                    $lastMessagePreview = AiResponseSanitizer::preview($lastMessages[$chatId]);
+                    $last = $lastMessages[$chatId];
+                    $lastMessagePreview = AiResponseSanitizer::preview(
+                        $last['text'],
+                        100,
+                        $last['direction'],
+                        $last['provider'],
+                    );
                 }
 
                 return [
@@ -311,13 +317,15 @@ class WidgetSessionController extends AbstractController
                         ];
                     }
 
-                    $text = $message->getText();
                     // The stored row keeps the scratchpad for the main chat's
-                    // reasoning panel. This transcript has no panel, so it
-                    // shows the same visible answer as the embedded widget.
-                    if ('ai' === $sender) {
-                        $text = AiResponseSanitizer::stripForDisplay($text);
-                    }
+                    // reasoning panel. This transcript has no panel, so an AI
+                    // reply shows the same visible answer as the embedded widget.
+                    // Visitor and operator text is left unchanged.
+                    $text = AiResponseSanitizer::transcriptText(
+                        $message->getText(),
+                        $message->getDirection(),
+                        $providerIndex,
+                    );
 
                     $result = [
                         'id' => $message->getId(),
@@ -342,7 +350,8 @@ class WidgetSessionController extends AbstractController
             // Messages array is ordered oldest first, so last element is newest
             $lastIndex = count($messages) - 1;
             if (isset($messages[$lastIndex]['text'])) {
-                $lastMessagePreview = AiResponseSanitizer::preview((string) $messages[$lastIndex]['text']);
+                // Already role-aware: AI text was stripped above, other senders were not.
+                $lastMessagePreview = mb_substr((string) $messages[$lastIndex]['text'], 0, 100);
             }
         }
 
