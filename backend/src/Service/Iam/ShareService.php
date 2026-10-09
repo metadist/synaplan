@@ -562,7 +562,7 @@ final readonly class ShareService
     }
 
     /**
-     * People and groups the actor may share with. "Everyone" is pinned first
+     * Users and groups the actor may share with. "Everyone" is pinned first
      * only when {@see IamConfig::canShareWithEveryone()} allows this actor.
      * With user search on, every account matches. With it off, only people
      * who share a group with the actor match (#2106). Groups stay searchable

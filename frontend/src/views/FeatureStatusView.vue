@@ -1,10 +1,10 @@
 <template>
   <MainLayout>
     <div
-      class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
+      class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-feature-status"
     >
-      <div class="max-w-[90rem] mx-auto space-y-6">
+      <div class="max-w-[100rem] mx-auto space-y-6">
         <!-- Header -->
         <PageHeader
           :title="$t('settings.features.title')"
@@ -120,15 +120,7 @@
             @retry="loadFeatures"
           />
 
-          <div
-            v-if="featureCategoryItems.length > 1"
-            class="flex items-center justify-between gap-3 flex-wrap"
-          >
-            <SectionJumpNav
-              :items="featureCategoryItems"
-              :nav-label="$t('admin.config.accordion.jumpTo')"
-              @select="jumpToFeatureCategory"
-            />
+          <div v-if="featureCategoryIds.length > 1" class="flex justify-end">
             <button
               type="button"
               class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
@@ -248,13 +240,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
-import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
 import ComputeStatusCard from '@/components/admin/ComputeStatusCard.vue'
 import SchedulerStatusCard from '@/components/admin/SchedulerStatusCard.vue'
@@ -318,25 +309,13 @@ function categorySlug(name: string): string {
 }
 
 const featureCategoryIds = computed(() => Object.keys(featuresByCategory.value))
-const featureCategoryItems = computed(() =>
-  featureCategoryIds.value.map((id) => ({ id, label: id }))
-)
 const {
   isOpen: isFeatureCategoryOpen,
   toggle: toggleFeatureCategory,
-  open: openFeatureCategory,
   expandAll: expandAllFeatureCategories,
   collapseAll: collapseAllFeatureCategories,
   allOpen: allFeatureCategoriesOpen,
 } = useAccordion(featureCategoryIds)
-
-async function jumpToFeatureCategory(categoryName: string) {
-  openFeatureCategory(categoryName)
-  await nextTick()
-  document
-    .getElementById(`feature-category-${categorySlug(categoryName)}`)
-    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
 
 const getStatusClass = (status: string) => {
   switch (status) {

@@ -24,7 +24,7 @@
             state.effective_source === 'user'
               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
               : state.effective_source === 'platform'
-                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
           "
           data-testid="badge-effective-source"

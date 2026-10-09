@@ -40,6 +40,11 @@ export function inferNavContext(path: string, meta: Record<string, unknown> = {}
   }
 
   if (
+    path === '/apps' ||
+    path.startsWith('/apps/') ||
+    path === '/prompts' ||
+    path === '/tasks' ||
+    path === '/approvals' ||
     path.startsWith('/channels') ||
     path.startsWith('/ai') ||
     path.startsWith('/plugins') ||

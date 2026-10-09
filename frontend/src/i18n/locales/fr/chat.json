@@ -945,7 +945,7 @@
   },
   "approvals": {
     "title": "Approbations",
-    "subtitle": "Actions qui vous attendent avant d’avoir lieu.",
+    "subtitle": "Avant qu’un assistant ou une tâche n’envoie un mail, n’écrive dans un calendrier, n’enregistre un fichier ou n’appelle un outil externe, il peut attendre ici votre accord.",
     "pending": "En attente",
     "decided": "Décidées",
     "emptyPending": "Rien n’attend votre accord. Des cartes apparaissent ici lorsqu’une tâche enregistrée ou un chat veut modifier quelque chose.",
@@ -978,7 +978,8 @@
       "expired": "Expiré",
       "executed": "Terminé",
       "failed": "Échoué"
-    }
+    },
+    "openTasks": "Ouvrir les tâches"
   },
   "knowledgeSources": {
     "title": "Sources",
@@ -989,16 +990,25 @@
     "unavailable": "Ce passage n’a pas pu être ouvert."
   },
   "savedPrompts": {
-    "title": "Prompts",
-    "empty": "Enregistrez un prompt, puis insérez-le en tapant /.",
-    "new": "Nouveau prompt",
+    "title": "Raccourcis",
+    "empty": "Enregistrez un texte une fois, puis insérez-le en tapant /.",
+    "new": "Nouveau raccourci",
     "name": "Nom",
     "command": "Commande",
-    "body": "Prompt",
-    "saved": "Prompt enregistré.",
-    "save": "Enregistrer le prompt",
+    "body": "Texte",
+    "saved": "Raccourci enregistré.",
+    "save": "Enregistrer le raccourci",
     "edit": "Modifier",
-    "editTitle": "Modifier le prompt",
-    "deleteFailed": "Le prompt n'a pas pu être supprimé. Il est toujours dans votre liste."
+    "editTitle": "Modifier le raccourci",
+    "deleteFailed": "Le raccourci n’a pas pu être supprimé. Il est toujours dans votre liste.",
+    "intro": "Les textes que vous tapez souvent, enregistrés une fois. Tapez / dans le chat pour les insérer.",
+    "emptyExample": "Par exemple /resume → « Résume ceci en cinq points pour un responsable. »",
+    "commandPlaceholder": "resume",
+    "commandHint": "Dans le chat, vous tapez /{command}.",
+    "bodyPlaceholder": "Résume ceci en cinq points pour un responsable.",
+    "saveFailed": "Le raccourci n’a pas été enregistré. Vérifiez que la commande n’est pas déjà utilisée, puis réessayez.",
+    "loadFailed": "Vos raccourcis n’ont pas pu être chargés. Ils sont toujours enregistrés.",
+    "deleteTitle": "Supprimer le raccourci ?",
+    "deleteConfirm": "/{command} disparaît du menu du chat. Les messages déjà envoyés restent inchangés."
   }
 }

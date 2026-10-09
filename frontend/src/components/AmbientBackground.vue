@@ -67,12 +67,20 @@ const birdStyle = computed(() => ({
 .ambient-spotlight {
   position: absolute;
   inset: -25vmax;
-  background: radial-gradient(circle at 50% 42%, rgba(0, 63, 199, 0.04), transparent 60%);
+  background: radial-gradient(
+    circle at 50% 42%,
+    color-mix(in srgb, var(--brand) 8%, transparent),
+    transparent 60%
+  );
   animation: ambient-spotlight-wander 80s linear infinite;
   will-change: transform;
 }
 .dark .ambient-spotlight {
-  background: radial-gradient(circle at 50% 42%, rgba(147, 197, 253, 0.05), transparent 60%);
+  background: radial-gradient(
+    circle at 50% 42%,
+    color-mix(in srgb, var(--brand) 10%, transparent),
+    transparent 60%
+  );
 }
 @keyframes ambient-spotlight-wander {
   0% {

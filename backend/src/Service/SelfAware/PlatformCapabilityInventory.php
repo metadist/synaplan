@@ -434,7 +434,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $sharingOn,
             $sharingOn ? 'share folders, chats, assistants, tasks, widgets' : 'sharing is off',
             'send a copy instead, or ask your administrator to switch sharing on',
-            'Operate → System configuration → Features → People & sharing',
+            'Operate → System configuration → Features → Users & sharing',
             'people-and-groups',
         );
 

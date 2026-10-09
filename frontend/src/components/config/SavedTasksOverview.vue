@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { PlusIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import UrlWatchPanel from '@/components/config/UrlWatchPanel.vue'
+import NewTaskDialog from '@/components/config/NewTaskDialog.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { iamApi, type IamSharedItem } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
-import { isAgentsEnabled } from '@/composables/useAgentsFeature'
 import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
 
 type OverviewTab = 'tasks' | 'watches'
@@ -33,8 +35,6 @@ const activeTab = ref<OverviewTab>('tasks')
 const watchesAvailable = ref(true)
 const watchCount = ref(0)
 const iamSharingEnabled = computed(() => isIamSharingEnabled())
-/** With Assistants on, tasks are born from assistant triggers, not the Instructions page. */
-const agentsEnabled = computed(() => isAgentsEnabled())
 
 const tabs = computed<TabNavItem[]>(() => {
   const items: TabNavItem[] = [
@@ -113,6 +113,14 @@ const onCopied = (task: SavedTask) => {
   filterShared.value = false
 }
 
+const newTaskOpen = ref(false)
+
+const onCreated = (task: SavedTask) => {
+  tasks.value = [task, ...tasks.value.filter((row) => row.id !== task.id)]
+  filterShared.value = false
+  activeTab.value = 'tasks'
+}
+
 const onDeleted = (id: number) => {
   tasks.value = tasks.value.filter((row) => row.id !== id)
 }
@@ -158,8 +166,21 @@ watch(highlightedTaskId, () => {
       :title="$t('config.savedTasks.overviewTitle')"
       :subtitle="$t('config.savedTasks.overviewSubtitle')"
       icon="heroicons:clock"
+      tour-id="tasks"
       data-testid="section-header"
     >
+      <template #actions>
+        <button
+          type="button"
+          class="btn-primary px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2"
+          data-testid="btn-new-task"
+          data-tour="tasks-new"
+          @click="newTaskOpen = true"
+        >
+          <PlusIcon class="w-4 h-4" aria-hidden="true" />
+          {{ $t('config.savedTasks.newTask.open') }}
+        </button>
+      </template>
       <TabNav
         v-if="watchesAvailable"
         :model-value="activeTab"
@@ -195,24 +216,15 @@ watch(highlightedTaskId, () => {
           <span class="ml-1 text-xs">{{ sharedItems.length }}</span>
         </button>
 
-        <p
+        <EmptyState
           v-if="!filterShared && tasks.length === 0"
-          class="surface-card p-5 txt-secondary text-sm"
-          data-testid="saved-tasks-empty"
-        >
-          <template v-if="agentsEnabled">
-            {{ $t('config.savedTasks.overviewEmptyAssistants') }}
-            <RouterLink to="/ai/assistants" class="txt-primary underline">
-              {{ $t('nav.assistants') }}
-            </RouterLink>
-          </template>
-          <template v-else>
-            {{ $t('config.savedTasks.overviewEmpty') }}
-            <RouterLink to="/ai/instructions" class="txt-primary underline">
-              {{ $t('nav.configTaskPrompts') }}
-            </RouterLink>
-          </template>
-        </p>
+          :title="$t('config.savedTasks.overviewEmpty')"
+          :hint="$t('config.savedTasks.overviewEmptyHint')"
+          :action-label="$t('config.savedTasks.newTask.open')"
+          test-id="saved-tasks-empty"
+          action-test-id="btn-new-task-empty"
+          @action="newTaskOpen = true"
+        />
 
         <ul v-else-if="filterShared" class="space-y-4" data-testid="section-shared-tasks">
           <li v-for="row in sharedTasks" :key="row.task.id">
@@ -240,6 +252,8 @@ watch(highlightedTaskId, () => {
         </ul>
       </template>
     </div>
+
+    <NewTaskDialog :open="newTaskOpen" @close="newTaskOpen = false" @created="onCreated" />
 
     <div v-show="activeTab === 'watches'" data-testid="watched-pages-pane">
       <UrlWatchPanel

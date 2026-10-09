@@ -49,7 +49,7 @@
       <button
         v-if="hiddenCount > 0 && !showAll"
         type="button"
-        class="w-full px-4 py-2 text-xs font-medium txt-secondary hover-surface"
+        class="stack-row w-full px-4 py-2 text-xs font-medium txt-secondary hover-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]"
         data-testid="btn-json-show-more"
         @click="showAll = true"
       >
@@ -58,7 +58,7 @@
       <button
         v-else-if="showAll && hiddenCount > 0"
         type="button"
-        class="w-full px-4 py-2 text-xs font-medium txt-secondary hover-surface"
+        class="stack-row w-full px-4 py-2 text-xs font-medium txt-secondary hover-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]"
         data-testid="btn-json-show-less"
         @click="showAll = false"
       >
@@ -84,7 +84,7 @@
     >
       <button
         type="button"
-        class="flex w-full items-center justify-between px-4 py-2 text-xs font-medium txt-secondary hover-surface"
+        class="stack-row flex w-full items-center justify-between px-4 py-2 text-xs font-medium txt-secondary hover-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]"
         data-testid="btn-toggle-json"
         :aria-expanded="showRaw"
         @click="showRaw = !showRaw"

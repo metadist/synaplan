@@ -82,7 +82,7 @@ final class AdminGroupConfigController extends AbstractController
 
         // JsonResponse + json_encode keeps an empty conflicts stdClass as {}.
         // AbstractController::json() runs the serializer, which flattens that
-        // back to [] and the People → Policies Zod schema then rejects the 200.
+        // back to [] and the Users → Policies Zod schema then rejects the 200.
         return new JsonResponse($this->groupPolicyService->getGroupConfig($id, $user));
     }
 

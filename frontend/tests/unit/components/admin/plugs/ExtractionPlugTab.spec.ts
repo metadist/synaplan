@@ -121,7 +121,7 @@ describe('ExtractionPlugTab', () => {
     )
   })
 
-  it('folds later families and opens them from the header or jump nav', async () => {
+  it('folds later families and opens them from the header', async () => {
     const wrapper = mount(ExtractionPlugTab, {
       global: {
         stubs: {
@@ -134,7 +134,7 @@ describe('ExtractionPlugTab', () => {
 
     expect(wrapper.get('#extraction-section-document').attributes('data-open')).toBe('false')
     expect(wrapper.get('#extraction-section-video').attributes('data-open')).toBe('false')
-    expect(wrapper.find('[data-testid="btn-jump-section-video"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-jump-nav"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="btn-extraction-section-video"]').trigger('click')
     expect(wrapper.get('#extraction-section-video').attributes('data-open')).toBe('true')

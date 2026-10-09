@@ -6,7 +6,7 @@
       "tabs": {
         "choice": "Modellwahl",
         "list": "Alle Modelle",
-        "runs": "Vektor-Läufe",
+        "runs": "Embedding-Läufe",
         "edit": "Modelle bearbeiten"
       },
       "defaultConfigTitle": "Standard-Modellkonfiguration",
@@ -308,15 +308,15 @@
       }
     },
     "taskPrompts": {
-      "title": "KI-Anweisungen",
+      "title": "Themen",
       "description": "Verwalten Sie Ihre Prompts",
-      "subtitle": "auch System-Prompts genannt — legen fest, wie die KI einzelne Aufgaben bearbeitet",
+      "subtitle": "Jedes Thema sagt der KI, wie sie eine Art von Anfrage beantworten soll. Für jede Nachricht wird das passende Thema automatisch gewählt.",
       "selectPrompt": "Prompt auswählen",
-      "selectPromptTitle": "Prompt auswählen",
-      "selectPromptDescription": "Wählen Sie einen vorhandenen Prompt zum Anzeigen oder Bearbeiten",
+      "selectPromptTitle": "Thema auswählen",
+      "selectPromptDescription": "Wähle links ein Thema, um es anzusehen oder zu ändern.",
       "selectPlaceholder": "Task-Prompt auswählen...",
       "searchPlaceholder": "Topics, Beschreibungen, Keywords suchen...",
-      "noPromptsMatch": "Keine Prompts entsprechen der aktuellen Suche/Filter.",
+      "noPromptsMatch": "Keine Themen passen zu deiner Suche.",
       "filterAll": "Alle",
       "filterSystem": "System",
       "filterCustom": "Eigene",
@@ -342,21 +342,21 @@
       "contentPlaceholder": "Geben Sie Ihren System-Prompt hier ein...",
       "contentHelp": "Diese System-Nachricht steuert das Verhalten der KI.",
       "promptContentPlaceholder": "Geben Sie den System-Prompt ein, der das Verhalten der KI für diese Aufgabe steuert...",
-      "createNew": "Neuen Prompt erstellen",
+      "createNew": "Neues Thema",
       "loadTemplate": "Vorlage laden",
       "topic": "Thema",
       "topicPlaceholder": "z.B. custom-analyzer",
       "name": "Name",
       "namePlaceholder": "z.B. Eigener Datei-Analyzer",
-      "createButton": "Neuen Prompt erstellen",
+      "createButton": "Neues Thema",
       "dangerZone": "Gefahrenzone",
       "deleteWarning": "Das Löschen dieses Prompts ist dauerhaft und kann nicht rückgängig gemacht werden.",
       "deletePrompt": "Prompt löschen",
       "saveChanges": "Änderungen speichern",
-      "noPrompts": "Keine Prompts verfügbar",
+      "noPrompts": "Noch keine Themen.",
       "language": "Sprache",
       "workingLanguage": "Arbeitssprache: {language}",
-      "workingLanguageHint": "Die angezeigten Prompts basieren auf Ihrer aktuellen Oberflächensprache. Eigene Prompts, die Sie hier erstellen, erscheinen nur in dieser Sprache.",
+      "workingLanguageHint": "Themen werden in deiner Oberflächensprache angezeigt. Selbst angelegte Themen erscheinen nur in dieser Sprache.",
       "systemPromptAdminTitle": "System-Prompt (Admin-Bearbeitung)",
       "systemPromptAdminDesc": "Sie haben Admin-Zugriff. Änderungen aktualisieren diesen System-Prompt für ALLE Benutzer in allen Sprachen.",
       "systemPromptLanguageFixed": "System-Prompt — die Sprache ist auf den Originalwert festgelegt und kann nicht geändert werden.",
@@ -488,11 +488,10 @@
       "autoPauseBody": "Diese Aufgabe ist dreimal hintereinander fehlgeschlagen. Behebe das Problem und setze sie fort.",
       "createFailed": "Konnte nicht als Aufgabe gespeichert werden.",
       "created": "Als Aufgabe gespeichert. Du kannst sie jetzt ausführen.",
-      "overviewTitle": "Gespeicherte Aufgaben",
-      "overviewSubtitle": "Anweisungen, die auf Zuruf oder später nach Zeitplan laufen.",
+      "overviewTitle": "Aufgaben",
+      "overviewSubtitle": "Anweisungen, die laufen, wenn du sie startest, oder von selbst nach Zeitplan.",
       "overviewLoading": "Gespeicherte Aufgaben werden geladen…",
-      "overviewEmpty": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder eine eigene Anweisung speichern unter",
-      "overviewEmptyAssistants": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder einem Assistenten einen Zeitplan geben unter",
+      "overviewEmpty": "Noch keine Aufgaben. Lege eine an und lass sie zum Beispiel jeden Morgen laufen.",
       "loadFailed": "Gespeicherte Aufgaben konnten nicht geladen werden.",
       "delete": "Löschen",
       "deleteConfirm": "Die gespeicherte Aufgabe \"{name}\" löschen? Freigaben dieser Aufgabe werden ebenfalls entfernt.",
@@ -585,6 +584,22 @@
       "tabs": {
         "tasks": "Gespeicherte Aufgaben",
         "watches": "Beobachtete Seiten"
+      },
+      "overviewEmptyHint": "Du kannst auch einen fertigen Chat-Plan mit dem Uhr-Symbol als Aufgabe speichern.",
+      "newTask": {
+        "open": "Neue Aufgabe",
+        "title": "Neue Aufgabe",
+        "name": "Bezeichnung",
+        "namePlaceholder": "Morgendliche Nachrichtenübersicht",
+        "instruction": "Was soll die KI tun?",
+        "instructionPlaceholder": "Finde die drei wichtigsten Nachrichten zu unserer Branche und fasse jede in zwei Sätzen zusammen.",
+        "schedule": "Wann",
+        "at": "Um",
+        "hint": "Das Ergebnis erscheint in einem eigenen Chat. Alles lässt sich später auf der Aufgabenkarte ändern.",
+        "create": "Aufgabe anlegen",
+        "created": "Aufgabe angelegt.",
+        "createdWithoutSchedule": "Die Aufgabe wurde angelegt, aber ohne Zeitplan. Stelle die Zeit auf ihrer Karte ein.",
+        "failed": "Die Aufgabe wurde nicht angelegt. Es wurde nichts gespeichert; versuche es erneut."
       }
     },
     "connections": {
@@ -646,7 +661,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Melde dich mit deinem geschäftlichen oder privaten Microsoft-Konto an, damit Synaplan deine Outlook-Mails lesen kann. Nur lesend, und du kannst die Verbindung jederzeit trennen.",
+          "description": "Melde dich mit deinem Microsoft-Arbeits- oder Privatkonto an. Synaplan liest deine Outlook-Mails, kann Kalendertermine anlegen und Ergebnisse aus deinem Postfach senden. Du kannst die Verbindung jederzeit trennen.",
           "connect": "Microsoft 365 verbinden",
           "connectAnother": "Weiteres Konto verbinden",
           "connectedAs": "Verbunden als {account}.",
@@ -888,9 +903,9 @@
       "errorDeleting": "Fehler beim Löschen des API-Schlüssels",
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
       "scopes": {
-        "hint": "Leer lassen für vollen Zugriff. Ein Häkchen bei Personen begrenzt diesen Schlüssel. Dateiarbeit fügt Chat- und Dateiberechtigungen hinzu, damit Skripte laufen können — kein Admin-Zugriff.",
-        "iamRead": "Personen — Gruppen ansehen",
-        "iamManage": "Personen — Gruppen verwalten",
+        "hint": "Leer lassen für vollen Zugriff. Ein Häkchen bei Benutzer begrenzt diesen Schlüssel. Dateiarbeit fügt Chat- und Dateiberechtigungen hinzu, damit Skripte laufen können — kein Admin-Zugriff.",
+        "iamRead": "Benutzer — Gruppen ansehen",
+        "iamManage": "Benutzer — Gruppen verwalten",
         "computeRun": "Dateiarbeit — kurze Skripte auf Kopien Ihrer Dateien ausführen"
       }
     },
@@ -898,11 +913,11 @@
       "title": "Synaplan Desktop",
       "description": "Synaplan Desktop ist eine separate App für diesen Computer. Sie nutzt dein Synaplan-Konto und kann Skills ausführen, die du installierst.",
       "chatGate": {
-        "gatewayAdmin": "Die App kann erst chatten, wenn du das KI-Gateway unter Coding-Clients einschaltest und ein Anbieterschlüssel verfügbar ist. Verbinden funktioniert weiterhin.",
-        "gatewayUser": "Die App kann erst chatten, wenn ein Admin das KI-Gateway unter Coding-Clients einschaltet. Verbinden funktioniert weiterhin.",
-        "keyAdmin": "Das KI-Gateway ist an, aber kein Anbieterschlüssel bezahlt den App-Chat. Erlaube den Instanz-Schlüssel unter Coding-Clients oder speichere deinen eigenen.",
+        "gatewayAdmin": "Die App kann erst chatten, wenn du das Coding-Gateway unter Admin › KI einschaltest und ein Anbieterschlüssel verfügbar ist. Das Koppeln funktioniert trotzdem.",
+        "gatewayUser": "Die App kann erst chatten, wenn ein Admin das KI-Gateway einschaltet. Verbinden funktioniert weiterhin.",
+        "keyAdmin": "Das Coding-Gateway ist an, aber kein Anbieterschlüssel bezahlt den App-Chat. Erlaube den Instanzschlüssel unter Admin › KI oder speichere deinen eigenen.",
         "keyUser": "Für den App-Chat gibt es noch keinen Anbieterschlüssel. Bitte einen Admin, den Instanz-Schlüssel zu erlauben, oder speichere deinen eigenen. Verbinden funktioniert weiterhin.",
-        "openCodingClients": "Coding-Clients öffnen"
+        "openCodingClients": "Gateway-Einstellungen öffnen"
       },
       "pairButton": "Diesen Computer verbinden",
       "loadFailed": "Die verbundenen Computer konnten nicht geladen werden.",
@@ -1035,8 +1050,8 @@
       "errorRemoving": "Fehler beim Entfernen der Telefonnummer"
     },
     "usage": {
-      "title": "Nutzungsstatistiken",
-      "description": "Verfolgen Sie Ihre API-Nutzung über alle Kanäle und Funktionen",
+      "title": "Meine Nutzung",
+      "description": "Wie viel du Chat, Dateien und andere Funktionen genutzt hast und was es gekostet hat.",
       "export": "CSV Exportieren",
       "exportSuccess": "Nutzungsdaten erfolgreich exportiert",
       "errorLoading": "Fehler beim Laden der Nutzungsstatistiken",
@@ -1137,6 +1152,14 @@
       }
     },
     "setByAdmin": "Von Ihrer Verwaltung festgelegt",
-    "fromGroup": "Vorgabe Ihrer Gruppe"
+    "fromGroup": "Vorgabe Ihrer Gruppe",
+    "aiSettings": {
+      "title": "KI-Einstellungen",
+      "subtitle": "Lege fest, welches KI-Modell welche Arbeit übernimmt, und schreibe Themen, die der KI sagen, wie sie antworten soll.",
+      "tabs": {
+        "defaults": "Standardmodelle",
+        "topics": "Themen"
+      }
+    }
   }
 }

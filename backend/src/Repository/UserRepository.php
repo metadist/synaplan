@@ -79,7 +79,7 @@ class UserRepository extends ServiceEntityRepository
     private const SEARCHABLE_NAME_KEYS = ['full_name', 'first_name', 'last_name', 'firstName', 'lastName', 'display_name'];
 
     /**
-     * People picker: match the email address or one of the name fields.
+     * User picker: match the email address or one of the name fields.
      *
      * @param list<int>|null $onlyUserIds when set, only these accounts can match.
      *                                    An empty list matches nobody.

@@ -27,19 +27,19 @@
       <p class="text-sm txt-primary flex-1">{{ chatGateMessage }}</p>
       <RouterLink
         v-if="chatGateAdmin"
-        to="/channels/agents"
+        to="/admin/setup?tab=gateway"
         class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center justify-center shrink-0"
         data-testid="link-coding-clients"
       >
         {{ $t('config.desktop.chatGate.openCodingClients') }}
       </RouterLink>
       <RouterLink
-        v-else-if="chatGate === 'key' && isAiAccountsEnabled()"
-        to="/ai/providers"
+        v-else-if="chatGate === 'key' && isAnthropicAccountsEnabled()"
+        to="/apps/claude-code#anthropic-key"
         class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center justify-center shrink-0"
         data-testid="link-ai-accounts"
       >
-        {{ $t('nav.aiAccounts') }}
+        {{ $t('apps.claudeCode.keyTitle') }}
       </RouterLink>
     </div>
 
@@ -408,7 +408,7 @@ import {
   type DesktopPresence,
 } from '@/utils/desktopPresence'
 import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
-import { isAiAccountsEnabled, rememberGatewayEnabled } from '@/composables/useAiAccounts'
+import { isAnthropicAccountsEnabled, rememberGatewayEnabled } from '@/composables/useAiAccounts'
 
 const { t } = useI18n()
 const dialog = useDialog()

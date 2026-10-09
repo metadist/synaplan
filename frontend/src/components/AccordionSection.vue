@@ -35,11 +35,11 @@ const bodyId = computed(() => `${props.panelId}-body`)
     :data-testid="testid"
     :data-open="open ? 'true' : 'false'"
   >
-    <div class="flex items-stretch">
+    <div class="accordion-row flex items-stretch hover-surface transition-colors">
       <h3 class="m-0 flex-1 min-w-0">
         <button
           type="button"
-          class="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover-surface transition-colors"
+          class="stack-row w-full flex items-center justify-between gap-3 bg-transparent px-5 py-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]"
           :aria-expanded="open"
           :aria-controls="bodyId"
           :data-testid="headerTestid"
@@ -62,7 +62,7 @@ const bodyId = computed(() => `${props.panelId}-body`)
         <slot name="actions" />
         <button
           type="button"
-          class="p-2 rounded-xl hover-surface"
+          class="bg-transparent p-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]"
           :aria-expanded="open"
           :aria-controls="bodyId"
           :aria-label="title"
@@ -76,8 +76,19 @@ const bodyId = computed(() => `${props.panelId}-body`)
         </button>
       </div>
     </div>
-    <div v-show="open" :id="bodyId" class="px-5 pb-5">
+    <div v-show="open" :id="bodyId" class="p-5">
       <slot />
     </div>
   </section>
 </template>
+
+<style scoped>
+/* The row owns the highlight. Action buttons keep their border, but a fill
+   of their own would stop the wash short of the right edge — including while
+   the pointer is on Edit, refresh, or the chevron. */
+.accordion-row:hover :deep(.btn-secondary),
+.accordion-row:hover :deep(.btn-secondary:hover) {
+  background: transparent;
+  box-shadow: none;
+}
+</style>

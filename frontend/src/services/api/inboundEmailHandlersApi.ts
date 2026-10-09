@@ -7,7 +7,7 @@
 import { httpClient } from './httpClient'
 import { PostApiInboundEmailHandlersTestConnectionPreviewResponseSchema } from '@/generated/api-schemas'
 
-/** Backend masked secret placeholder (must match ToolsView and API). */
+/** Backend masked secret placeholder (must match the mailbox app panel and API). */
 export const MASKED_MAIL_PASSWORD_PLACEHOLDER = '••••••••' as const
 
 // Backend Response Types

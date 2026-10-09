@@ -880,7 +880,7 @@
   },
   "approvals": {
     "title": "Aprobaciones",
-    "subtitle": "Cosas que esperan tu visto bueno antes de ocurrir.",
+    "subtitle": "Antes de que un asistente o una tarea envíe un correo, escriba en un calendario, guarde un archivo o use una herramienta externa, puede esperar aquí tu aprobación.",
     "pending": "En espera",
     "decided": "Decididas",
     "emptyPending": "Nada necesita tu aprobación. Aquí aparecen tarjetas cuando una tarea guardada o un chat quiere cambiar algo.",
@@ -913,7 +913,8 @@
       "expired": "Caducado",
       "executed": "Hecho",
       "failed": "Fallido"
-    }
+    },
+    "openTasks": "Abrir tareas"
   },
   "knowledgeSources": {
     "title": "Fuentes",
@@ -924,16 +925,25 @@
     "unavailable": "No se pudo abrir este pasaje."
   },
   "savedPrompts": {
-    "title": "Prompts",
-    "empty": "Guarda un prompt y luego insértalo escribiendo /.",
-    "new": "Nuevo prompt",
+    "title": "Atajos",
+    "empty": "Guarda un texto una vez e insértalo escribiendo /.",
+    "new": "Nuevo atajo",
     "name": "Nombre",
     "command": "Comando",
-    "body": "Prompt",
-    "saved": "Prompt guardado.",
-    "save": "Guardar prompt",
+    "body": "Texto",
+    "saved": "Atajo guardado.",
+    "save": "Guardar atajo",
     "edit": "Editar",
-    "editTitle": "Editar prompt",
-    "deleteFailed": "No se pudo eliminar el prompt. Sigue en tu lista."
+    "editTitle": "Editar atajo",
+    "deleteFailed": "No se pudo eliminar el atajo. Sigue en tu lista.",
+    "intro": "Textos que escribes a menudo, guardados una vez. Escribe / en el chat para insertarlos.",
+    "emptyExample": "Por ejemplo /resumen → «Resume esto en cinco puntos para un directivo».",
+    "commandPlaceholder": "resumen",
+    "commandHint": "En el chat escribes /{command}.",
+    "bodyPlaceholder": "Resume esto en cinco puntos para un directivo.",
+    "saveFailed": "El atajo no se guardó. Comprueba que el comando no esté ya en uso e inténtalo de nuevo.",
+    "loadFailed": "No se pudieron cargar tus atajos. Siguen guardados.",
+    "deleteTitle": "¿Eliminar atajo?",
+    "deleteConfirm": "/{command} desaparece del menú del chat. Los mensajes ya enviados no cambian."
   }
 }

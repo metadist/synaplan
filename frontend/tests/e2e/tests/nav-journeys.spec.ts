@@ -11,7 +11,7 @@ import { test, expect, type Page } from '../test-setup'
 import { login, loginViaApi, openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
-import { getRuntimeFeatures } from '../helpers/features'
+import { getRuntimeFeatures, isModuleConfigured } from '../helpers/features'
 import { ChatHelper, nameActiveChat, openChatManager } from '../helpers/chat'
 import { FIXTURE_PATHS } from '../config/test-data'
 import { TIMEOUTS, getApiUrl } from '../config/config'
@@ -49,24 +49,6 @@ async function openManageGroup(page: Page, groupKey: string) {
   return group
 }
 
-/**
- * Same rule as `isAiAccountsEnabled()` in the app: Higgsfield counts as on
- * when the module key is missing; Anthropic BYO follows GET /messages-gateway.
- */
-async function isAiAccountsNavEnabled(page: Page): Promise<boolean> {
-  const runtime = (await page.request.get('/api/v1/config/runtime').then((r) => r.json())) as {
-    modules?: { higgsfield?: { configured?: boolean } }
-  }
-  const higgsfield = runtime.modules?.higgsfield?.configured
-  const higgsfieldOn = typeof higgsfield === 'boolean' ? higgsfield : true
-  const gatewayRes = await page.request.get('/api/v1/messages-gateway')
-  if (!gatewayRes.ok()) {
-    return higgsfieldOn
-  }
-  const gateway = (await gatewayRes.json()) as { enabled?: boolean }
-  return higgsfieldOn || gateway.enabled === true
-}
-
 test.describe('@ci Navigation journeys', () => {
   test('J-NV-1 One place for people', async ({ page, request, credentials }) => {
     await login(page, CREDENTIALS.getAdminCredentials())
@@ -86,7 +68,7 @@ test.describe('@ci Navigation journeys', () => {
     expect(usersRes.ok()).toBeTruthy()
     const body = (await usersRes.json()) as { users?: { id: number; email: string }[] }
     const worker = body.users?.find((u) => u.email === credentials.user)
-    expect(worker, `Worker ${credentials.user} must exist in People`).toBeTruthy()
+    expect(worker, `Worker ${credentials.user} must exist in Users`).toBeTruthy()
     const workerId = worker!.id
     const levelSelect = page.locator(ADMIN.userLevelSelect(workerId))
 
@@ -224,23 +206,21 @@ test.describe('@ci Navigation journeys', () => {
     })
 
     await login(page, credentials)
-    if (!(await isAiAccountsNavEnabled(page))) {
+    if (!(await isModuleConfigured(page.request, 'higgsfield'))) {
       return
     }
 
-    await test.step('Manage › Your AI accounts; bookmark lands on Higgsfield', async () => {
-      const sub = await openManageGroup(page, 'assistants')
-      await sub.locator(NAV.flyoutLinkAiAccounts).click()
-      await expect(page).toHaveURL(/\/ai\/providers/, { timeout: TIMEOUTS.STANDARD })
-      await expect(page.locator(selectors.pages.aiAccounts)).toBeVisible()
-      await expect(page.locator('[data-testid="section-higgsfield"]')).toBeVisible()
-      await page.locator('[data-testid="btn-ai-accounts-higgsfield"]').click()
-      await expect(page.locator('[data-testid="btn-higgsfield-test"]')).toBeVisible()
-
-      await page.goto('/ai/providers/higgsfield', { waitUntil: 'commit' })
-      await expect(page).toHaveURL(/\/ai\/providers\?section=higgsfield/, {
+    await test.step('Apps › Higgsfield holds the personal key; the old bookmark lands there', async () => {
+      const apps = await openManageGroup(page, 'apps')
+      await apps.locator(NAV.flyoutLinkApps).click()
+      await page.locator(selectors.apps.card('higgsfield')).click()
+      await expect(page).toHaveURL(/\/apps\/higgsfield$/, { timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator('[data-testid="btn-higgsfield-test"]')).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
+
+      await page.goto('/ai/providers/higgsfield', { waitUntil: 'commit' })
+      await expect(page).toHaveURL(/\/apps\/higgsfield$/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator('[data-testid="btn-higgsfield-test"]')).toBeVisible()
     })
   })

@@ -71,7 +71,7 @@ const mountPage = async () => {
       stubs: {
         Icon: true,
         PageHeader: true,
-        MessagesGatewayAdminSettings: true,
+        AnthropicByokSection: true,
         RouterLink: {
           props: ['to'],
           template: "<a :href=\"typeof to === 'string' ? to : ''\"><slot /></a>",
@@ -97,9 +97,9 @@ describe('MessagesGatewayConfiguration', () => {
       'ANTHROPIC_BASE_URL="http://localhost:8000"'
     )
     expect(wrapper.get('[data-testid="badge-gateway-enabled"]').text()).toContain('Not ready')
-    expect(wrapper.get('[data-testid="text-missing-key"]').text()).toContain('Your AI accounts')
+    expect(wrapper.get('[data-testid="text-missing-key"]').text()).toContain('Your Anthropic key')
     expect(wrapper.get('[data-testid="text-missing-key"]').text()).toContain('server key')
-    expect(wrapper.get('[data-testid="link-api-keys"]').attributes('href')).toBe('/channels/api')
+    expect(wrapper.get('[data-testid="link-api-keys"]').attributes('href')).toBe('/apps/api')
   })
 
   it('hides setup commands from a non-admin while the gateway is off', async () => {
@@ -130,5 +130,38 @@ describe('MessagesGatewayConfiguration', () => {
     expect(wrapper.get('[data-testid="badge-gateway-enabled"]').text()).toContain('Enabled')
     expect(wrapper.find('[data-testid="text-missing-key"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-copy-setup"]').exists()).toBe(true)
+  })
+
+  it('walks the user through key, API key and setup in three numbered steps', async () => {
+    mockGetStatus.mockResolvedValue(status())
+    const wrapper = await mountPage()
+
+    const steps = wrapper.findAll('[data-testid="section-agents-steps"] > li')
+    expect(steps).toHaveLength(3)
+    expect(steps[0]!.attributes('id')).toBe('anthropic-key')
+    expect(steps[2]!.find('[data-testid="btn-copy-setup"]').exists()).toBe(true)
+  })
+
+  it('sends an admin to Admin › AI for the gateway settings', async () => {
+    mockGetStatus.mockResolvedValue(status({ enabled: false, is_admin: true }))
+    const wrapper = await mountPage()
+
+    expect(wrapper.get('[data-testid="text-gateway-admin"]').text()).toContain(
+      'The gateway is off for everyone.'
+    )
+    expect(wrapper.get('[data-testid="link-gateway-admin"]').attributes('href')).toBe(
+      '/admin/setup?tab=gateway'
+    )
+  })
+
+  it('offers a retry instead of an empty page when the status cannot load', async () => {
+    mockGetStatus.mockRejectedValue(new Error('boom'))
+    const wrapper = await mountPage()
+
+    expect(wrapper.find('[data-testid="section-agents-load-error"]').exists()).toBe(true)
+    mockGetStatus.mockResolvedValue(status())
+    await wrapper.get('[data-testid="btn-agents-retry"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="section-agents-status"]').exists()).toBe(true)
   })
 })

@@ -228,6 +228,7 @@
                 :rows="1"
                 class="flex-1 min-w-0"
                 data-testid="input-chat-message"
+                data-tour="chat-input"
                 @keydown="handleKeyDown"
                 @focus="isFocused = true"
                 @blur="isFocused = false"
@@ -293,6 +294,7 @@
                 :aria-expanded="plusMenuOpen"
                 :disabled="uploading"
                 data-testid="btn-chat-plus"
+                data-tour="chat-plus"
                 @click="togglePlusMenu"
               >
                 <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
@@ -423,6 +425,7 @@
             <div
               class="ml-auto flex min-w-0 max-w-full items-center gap-1.5"
               data-testid="section-chat-primary-actions"
+              data-tour="chat-model"
             >
               <ModelDropdown
                 v-model="selectedModelId"

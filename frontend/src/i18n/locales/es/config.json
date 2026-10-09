@@ -45,11 +45,10 @@
       "autoPauseBody": "Esta tarea falló tres veces seguidas. Corrige el problema y reanúdala.",
       "createFailed": "No se pudo guardar como tarea.",
       "created": "Guardada como tarea. Ya puedes ejecutarla.",
-      "overviewTitle": "Tareas guardadas",
-      "overviewSubtitle": "Instrucciones que se ejecutan cuando las pides, o más tarde según un horario.",
+      "overviewTitle": "Tareas",
+      "overviewSubtitle": "Instrucciones que se ejecutan cuando las pides o solas según un horario.",
       "overviewLoading": "Cargando tareas guardadas…",
-      "overviewEmpty": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o guarda una instrucción propia en",
-      "overviewEmptyAssistants": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o añade una programación a un asistente en",
+      "overviewEmpty": "Aún no hay tareas. Crea una y haz que se ejecute, por ejemplo, cada mañana.",
       "loadFailed": "No se pudieron cargar las tareas guardadas.",
       "delete": "Eliminar",
       "deleteConfirm": "¿Eliminar la tarea guardada \"{name}\"? También se quitan los usos compartidos de esta tarea.",
@@ -142,6 +141,22 @@
       "tabs": {
         "tasks": "Tareas guardadas",
         "watches": "Páginas vigiladas"
+      },
+      "overviewEmptyHint": "También puedes guardar un plan de chat terminado como tarea con el botón del reloj.",
+      "newTask": {
+        "open": "Nueva tarea",
+        "title": "Nueva tarea",
+        "name": "Nombre",
+        "namePlaceholder": "Resumen de noticias de la mañana",
+        "instruction": "¿Qué debe hacer la IA?",
+        "instructionPlaceholder": "Busca las tres noticias más importantes de nuestro sector y resume cada una en dos frases.",
+        "schedule": "Cuándo",
+        "at": "A las",
+        "hint": "El resultado aparece en su propio chat. Puedes cambiarlo todo más tarde en la tarjeta de la tarea.",
+        "create": "Crear tarea",
+        "created": "Tarea creada.",
+        "createdWithoutSchedule": "La tarea se creó, pero sin horario. Fija la hora en su tarjeta.",
+        "failed": "La tarea no se creó. No se guardó nada; inténtalo de nuevo."
       }
     },
     "connections": {
@@ -203,7 +218,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Inicia sesión con tu cuenta de Microsoft (de trabajo o personal) para que Synaplan pueda leer tu correo de Outlook. Solo lectura, y puedes desconectarla cuando quieras.",
+          "description": "Inicia sesión con tu cuenta de Microsoft profesional o personal. Synaplan lee tu correo de Outlook, puede añadir eventos al calendario y enviar resultados desde tu buzón. Puedes desconectarte en cualquier momento.",
           "connect": "Conectar Microsoft 365",
           "connectAnother": "Conectar otra cuenta",
           "connectedAs": "Conectado como {account}.",
@@ -289,8 +304,8 @@
       "description": "Configura y administra tus modelos de IA",
       "tabs": {
         "choice": "Elección de modelo",
-        "list": "Lista completa",
-        "runs": "Ejecuciones vectoriales",
+        "list": "Todos los modelos",
+        "runs": "Ejecuciones de embedding",
         "edit": "Editar modelos"
       },
       "defaultConfigTitle": "Configuración de Modelo Predeterminado",
@@ -458,11 +473,11 @@
       }
     },
     "taskPrompts": {
-      "title": "Instrucciones de IA",
-      "subtitle": "también llamadas system prompts: definen cómo la IA gestiona cada tarea",
+      "title": "Temas",
+      "subtitle": "Cada tema indica a la IA cómo responder a un tipo de petición. Para cada mensaje se elige automáticamente el tema adecuado.",
       "selectPrompt": "Seleccionar Prompt",
-      "selectPromptTitle": "Selecciona un Prompt",
-      "selectPromptDescription": "Elige un prompt existente para ver o editar",
+      "selectPromptTitle": "Elige un tema",
+      "selectPromptDescription": "Elige un tema a la izquierda para verlo o cambiarlo.",
       "selectPromptHelp": "Elige un prompt existente para editar o usar como plantilla",
       "promptDetails": "Detalles del Prompt",
       "rulesForSelection": "Reglas de Selección",
@@ -482,18 +497,20 @@
       "contentPlaceholder": "Ingresa tu prompt del sistema aquí...",
       "promptContentPlaceholder": "Ingresa el prompt del sistema que guiará el comportamiento de la IA para esta tarea...",
       "contentHelp": "Este es el mensaje del sistema que guía el comportamiento de la IA",
-      "createNew": "Crear Nuevo Prompt",
+      "createNew": "Nuevo tema",
       "loadTemplate": "Cargar Plantilla",
       "topic": "Tema",
       "topicPlaceholder": "ej. analizador-personalizado",
       "name": "Nombre",
       "namePlaceholder": "ej. Analizador de Archivos Personalizado",
-      "createButton": "Crear Nuevo Prompt",
+      "createButton": "Nuevo tema",
       "dangerZone": "Zona de Peligro",
       "deleteWarning": "Eliminar este prompt es permanente y no se puede deshacer.",
       "deletePrompt": "Eliminar Prompt",
       "saveChanges": "Guardar Cambios",
-      "noPrompts": "No hay prompts disponibles"
+      "noPrompts": "Aún no hay temas.",
+      "noPromptsMatch": "Ningún tema coincide con tu búsqueda.",
+      "workingLanguageHint": "Los temas se muestran en el idioma de la interfaz. Los temas que crees solo aparecen en este idioma."
     },
     "routing": {
       "title": "Enrutamiento",
@@ -667,9 +684,9 @@
       "errorDeleting": "Error al eliminar clave API",
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
       "scopes": {
-        "hint": "Déjelo sin marcar para acceso completo. Marcar Personas limita esta clave. El trabajo con archivos añade ámbitos de chat y archivos para ejecutar scripts — no otorga acceso de administrador.",
-        "iamRead": "Personas — ver grupos",
-        "iamManage": "Personas — administrar grupos",
+        "hint": "Déjelo sin marcar para acceso completo. Marcar Usuarios limita esta clave. El trabajo con archivos añade ámbitos de chat y archivos para ejecutar scripts — no otorga acceso de administrador.",
+        "iamRead": "Usuarios — ver grupos",
+        "iamManage": "Usuarios — administrar grupos",
         "computeRun": "Trabajo con archivos — ejecutar scripts cortos sobre copias de tus archivos"
       }
     },
@@ -677,11 +694,11 @@
       "title": "Synaplan Desktop",
       "description": "Synaplan Desktop es una app independiente para este equipo. Usa tu cuenta de Synaplan y puede ejecutar skills que instales.",
       "chatGate": {
-        "gatewayAdmin": "La app no puede chatear hasta que actives la puerta de enlace de IA en Clientes de programación y haya una clave de proveedor. Vincular sigue funcionando.",
-        "gatewayUser": "La app no puede chatear hasta que un administrador active la puerta de enlace de IA en Clientes de programación. Vincular sigue funcionando.",
-        "keyAdmin": "La puerta de enlace de IA está activa, pero ninguna clave de proveedor paga el chat de la app. Permite la clave de la instancia en Clientes de programación o guarda la tuya.",
+        "gatewayAdmin": "La app no puede chatear hasta que actives la pasarela de programación en Admin › IA y haya una clave de proveedor disponible. El emparejamiento sigue funcionando.",
+        "gatewayUser": "La app no puede chatear hasta que un administrador active la pasarela de IA. La vinculación sigue funcionando.",
+        "keyAdmin": "La pasarela de programación está activa, pero ninguna clave de proveedor pagará el chat de la app. Permite la clave de la instancia en Admin › IA o guarda la tuya.",
         "keyUser": "El chat de la app aún no tiene clave de proveedor. Pide a un administrador que permita la clave de la instancia, o guarda la tuya. Vincular sigue funcionando.",
-        "openCodingClients": "Abrir Clientes de programación"
+        "openCodingClients": "Abrir ajustes de la pasarela"
       },
       "pairButton": "Vincular este equipo",
       "loadFailed": "No se pudieron cargar los equipos conectados.",
@@ -814,8 +831,8 @@
       "errorRemoving": "Error al eliminar número de teléfono"
     },
     "usage": {
-      "title": "Estadísticas de Uso",
-      "description": "Rastrea tu uso de API en todos los canales y funciones",
+      "title": "Mi uso",
+      "description": "Cuánto has usado el chat, los archivos y otras funciones, y lo que ha costado.",
       "export": "Exportar CSV",
       "exportSuccess": "Datos de uso exportados exitosamente",
       "errorLoading": "Error al cargar estadísticas de uso",
@@ -892,6 +909,14 @@
     "embeddingSwitch": {
       "scopes": {
         "search": "Índice de Smart Search"
+      }
+    },
+    "aiSettings": {
+      "title": "Ajustes de IA",
+      "subtitle": "Elige qué modelo de IA hace cada tipo de trabajo y escribe temas que indiquen a la IA cómo responder.",
+      "tabs": {
+        "defaults": "Modelos predeterminados",
+        "topics": "Temas"
       }
     }
   }

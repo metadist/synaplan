@@ -13,7 +13,7 @@ use App\Service\MailerConfig;
 use App\Service\UserLifecycleService;
 
 /**
- * Accounts an administrator creates or unblocks from People.
+ * Accounts an administrator creates or unblocks from Users.
  *
  * Distinct from {@see AdminUserProvisioningService}, which maps an external
  * identity and sets provider "external". A person added here signs in with

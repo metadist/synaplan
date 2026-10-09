@@ -160,8 +160,7 @@ function loadedNamespacesFor(route: ParsedRoute): Set<I18nNamespace> {
  * Minimum namespaces per route, triaged by hand (PR #2032 review). A fully
  * automatic "every statically reachable key must load" check is unsound here:
  * ConfigView statically imports 15 sections but renders one per route behind
- * v-if, ToolsView keeps a legacy dual-view branch that its route can never
- * reach, and shared components carry prop-gated branches (UnsavedChangesBar's
+ * v-if, the app detail page loads one panel per app, and shared components carry prop-gated branches (UnsavedChangesBar's
  * preview button has no passer). Each entry below names UI its route really
  * renders — shrinking any of them reintroduces raw keys on first paint.
  */
@@ -209,9 +208,9 @@ const EXPECTED_MINIMUM: readonly ExpectedMinimum[] = [
     reason: 'usage tables reuse the action labels (config)',
   },
   {
-    path: '/ai/providers',
-    namespaces: ['tools', 'config'],
-    reason: 'provider cards reuse the provider labels (config)',
+    path: '/apps/:appId',
+    namespaces: ['tools', 'config', 'assistants'],
+    reason: 'app panels reuse connection/key labels (config) and the assistant picker (assistants)',
   },
 ]
 

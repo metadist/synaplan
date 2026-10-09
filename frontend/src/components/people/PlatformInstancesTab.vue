@@ -15,13 +15,15 @@
       <p class="txt-secondary">{{ $t('common.loading') }}</p>
     </div>
 
-    <div
+    <EmptyState
       v-else-if="instances.length === 0"
-      class="surface-card p-12 text-center"
-      data-testid="section-empty"
-    >
-      <p class="txt-secondary">{{ $t('people.linkedPlatforms.empty') }}</p>
-    </div>
+      :title="$t('people.linkedPlatforms.empty')"
+      :hint="$t('people.linkedPlatforms.emptyHint')"
+      :action-label="$t('people.linkedPlatforms.emptyAction')"
+      to="/apps/connected"
+      test-id="section-empty"
+      action-test-id="btn-platform-instances-steps"
+    />
 
     <div v-else class="surface-card overflow-hidden">
       <div class="overflow-x-auto">
@@ -94,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from '@/components/common/EmptyState.vue'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'

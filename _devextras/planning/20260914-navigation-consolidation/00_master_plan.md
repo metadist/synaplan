@@ -1,5 +1,9 @@
 # Navigation consolidation — duplicates, reachability, wording, Operate stacked UI
 
+> **Replaced 2026-10-09:** the open steps NV10–NV23 are superseded by
+> [`../20261009-ux-overhaul/00_master_plan.md`](../20261009-ux-overhaul/00_master_plan.md).
+> NV01–NV09 stay as shipped history.
+
 **Status:** 2026-09-16 — Sprint A NV01–NV07 **merged** on `main`
 ([#1921](https://github.com/metadist/synaplan/pull/1921) closed NV07).
 **Next: NV08** (one Memories page). Decisions in §3 stay locked.

@@ -341,7 +341,7 @@ describe('DesktopConfiguration', () => {
     }
   })
 
-  it('tells an admin how to turn on app chat and links to Coding clients', async () => {
+  it('tells an admin how to turn on app chat and links to the gateway settings', async () => {
     mockGatewayStatus.mockResolvedValue({
       ...readyGateway,
       enabled: false,
@@ -349,11 +349,11 @@ describe('DesktopConfiguration', () => {
     })
     const wrapper = await mountPage()
     const alert = wrapper.get('[data-testid="alert-chat-gate"]')
-    expect(alert.text()).toContain('turn on the AI gateway under Coding clients')
+    expect(alert.text()).toContain('turn on the coding gateway under Admin › AI')
     expect(alert.text()).toContain('Pairing still works')
     const link = wrapper.get('[data-testid="link-coding-clients"]')
-    expect(link.attributes('href')).toBe('/channels/agents')
-    expect(link.text()).toBe('Open Coding clients')
+    expect(link.attributes('href')).toBe('/admin/setup?tab=gateway')
+    expect(link.text()).toBe('Open gateway settings')
   })
 
   it('tells a regular user to ask an admin when the gateway is off', async () => {
@@ -386,11 +386,11 @@ describe('DesktopConfiguration', () => {
       'no provider key will pay for app chat'
     )
     expect(wrapper.get('[data-testid="link-coding-clients"]').attributes('href')).toBe(
-      '/channels/agents'
+      '/admin/setup?tab=gateway'
     )
   })
 
-  it('links a member with no provider key to Your AI accounts', async () => {
+  it('links a member with no provider key to their Anthropic key', async () => {
     mockGatewayStatus.mockResolvedValue({
       ...readyGateway,
       is_admin: false,
@@ -404,8 +404,8 @@ describe('DesktopConfiguration', () => {
     const wrapper = await mountPage()
     expect(wrapper.find('[data-testid="link-coding-clients"]').exists()).toBe(false)
     const link = wrapper.get('[data-testid="link-ai-accounts"]')
-    expect(link.attributes('href')).toBe('/ai/providers')
-    expect(link.text()).toBe('Your AI accounts')
+    expect(link.attributes('href')).toBe('/apps/claude-code#anthropic-key')
+    expect(link.text()).toBe('Your Anthropic key')
     expect(mockGatewayStatus).toHaveBeenCalledTimes(1)
   })
 
@@ -417,7 +417,9 @@ describe('DesktopConfiguration', () => {
     })
     mockGatewayStatus.mockRejectedValueOnce(new Error('offline'))
     const wrapper = await mountPage()
-    expect(wrapper.get('[data-testid="link-ai-accounts"]').attributes('href')).toBe('/ai/providers')
+    expect(wrapper.get('[data-testid="link-ai-accounts"]').attributes('href')).toBe(
+      '/apps/claude-code#anthropic-key'
+    )
     expect(mockGatewayStatus).toHaveBeenCalledTimes(1)
   })
 

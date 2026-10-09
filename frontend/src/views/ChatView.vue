@@ -196,6 +196,9 @@
               @pick="handleExamplePick"
             />
             <CompanionLinks v-else-if="showCompanionLinks" />
+            <GettingStartedChecklist
+              v-if="authStore.isAuthenticated && !incognitoStore.active && !pinnedAgentId"
+            />
             <SelfAwareEmptyHint v-if="showSelfAwareEmptyHint" @ask="handleExamplePick" />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
@@ -716,6 +719,7 @@ import { shouldShowCompanionLinks, shouldShowSelfAwareEmptyHint } from '@/utils/
 import { pickEmptyGreetingKey } from '@/utils/emptyGreeting'
 import { claimOwnedChatForSend } from '@/utils/claimOwnedChatForSend'
 import { showStoreCards } from '@/composables/useChatWelcome'
+import GettingStartedChecklist from '@/components/chat/GettingStartedChecklist.vue'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { createSmoothStream } from '@/utils/smoothStream'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'

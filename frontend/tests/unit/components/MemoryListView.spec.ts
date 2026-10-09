@@ -17,6 +17,17 @@ function makeMemory(id: number, category: string, key: string): UserMemory {
 }
 
 describe('MemoryListView', () => {
+  it('offers to add the first memory when there are none', async () => {
+    const wrapper = mount(MemoryListView, {
+      props: { memories: [], availableCategories: [] },
+      global: { mocks: { $t: (key: string) => key }, stubs: { Icon: true } },
+    })
+    const empty = wrapper.get('[data-testid="state-memories-empty"]')
+    expect(empty.text()).toContain('memories.empty')
+    await empty.get('[data-testid="btn-memories-empty-create"]').trigger('click')
+    expect(wrapper.emitted('create')).toHaveLength(1)
+  })
+
   it('should render all memories in the mobile card list (no accidental limit)', () => {
     const memories: UserMemory[] = [
       makeMemory(1, 'personal', 'name'),

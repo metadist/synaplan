@@ -106,8 +106,8 @@
     "messages": "Mensajes",
     "tokens": "Tokens",
     "cost": "Coste",
-    "users": "Personas",
-    "includeUserFiles": "También buscar en los archivos de la persona",
+    "users": "Usuarios",
+    "includeUserFiles": "También buscar en los archivos del usuario",
     "includeUserFilesHint": "Desactivado por defecto. La IA solo usa las carpetas de este asistente.",
     "sharedFolders": "Carpetas compartidas que la IA puede usar",
     "sharedFoldersHint": "La IA también puede usar carpetas compartidas contigo: solo puedes añadir carpetas a las que tengas acceso.",
@@ -223,7 +223,15 @@
       "saturday": "sábado",
       "sunday": "domingo"
     },
-    "shareDraftHint": "Esto es un borrador. Puede compartirlo para que alguien lo lea o lo pruebe en un chat privado. No está publicado, así que el enrutador no lo elegirá."
+    "shareDraftHint": "Esto es un borrador. Puede compartirlo para que alguien lo lea o lo pruebe en un chat privado. No está publicado, así que el enrutador no lo elegirá.",
+    "intro": "Un asistente es una IA con sus propias instrucciones, archivos y herramientas. Chatea con uno o crea el tuyo.",
+    "noResults": "Ningún asistente coincide con «{query}».",
+    "filterHint": {
+      "mine": "Asistentes que has creado.",
+      "shared": "Asistentes que alguien compartió contigo. Puedes chatear con ellos; solo su propietario puede cambiarlos.",
+      "plugin": "Asistentes listos que vienen con un plugin instalado.",
+      "archived": "Asistentes que has guardado. Ya no aparecen en el chat; restaura uno para volver a usarlo."
+    }
   },
   "bundle": {
     "title": "Exportar e importar",

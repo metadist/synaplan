@@ -99,7 +99,7 @@
   },
   "admin": {
     "title": "İşlet",
-    "description": "Sunucunuza genel bakış: kişiler, kayıtlar ve kullanım.",
+    "description": "Sunucunuza genel bakış: kullanıcılar, kayıtlar ve kullanım.",
     "tabs": {
       "overview": "Genel Bakış",
       "users": "Kullanıcılar",
@@ -159,8 +159,8 @@
       "currentUser": "(Sen)",
       "verified": "Doğrulanmış",
       "notVerified": "Doğrulanmadı",
-      "notVerifiedHint": "Hesap doğrulanana kadar bu kişi oturum açamaz.",
-      "addUser": "Kişi ekle",
+      "notVerifiedHint": "Hesap doğrulanana kadar bu kullanıcı oturum açamaz.",
+      "addUser": "Kullanıcı ekle",
       "displayName": "Görünen ad",
       "password": "Parola",
       "createUser": "Hesap oluştur",
@@ -174,7 +174,7 @@
       "resendVerificationConfirm": "{email} adresine başka bir doğrulama e-postası gönderilsin mi?",
       "resent": "Doğrulama e-postası gönderildi.",
       "resendFailed": "Doğrulama e-postası gönderilmedi.",
-      "registrationNoMail": "Kayıt açık, ancak e-posta yapılandırılmamış. Yeni hesaplar, Kişiler'de doğrulayana kadar doğrulanmamış kalır. E-posta göndermek için MAILER_DSN ayarla.",
+      "registrationNoMail": "Kayıt açık, ancak e-posta yapılandırılmamış. Yeni hesaplar, Kullanıcılar'da doğrulayana kadar doğrulanmamış kalır. E-posta göndermek için MAILER_DSN ayarla.",
       "unverified": "Doğrulanmamış",
       "searchPlaceholder": "E-posta ile ara...",
       "noUsers": "Kullanıcı bulunamadı",
@@ -399,8 +399,8 @@
         "step3": "“API izinleri” → “İzin ekle” → “Microsoft Graph” → “Temsilci izinleri” yolunu izle ve şu izinlerin tümünü ekle:",
         "step3Note": "offline_access isteğe bağlı değildir: onsuz Microsoft yenileme belirteci vermez ve zamanlanmış her çalışma bir saat sonra durur.",
         "step4": "“Sertifikalar ve gizli diziler” → “Yeni istemci gizli dizisi” yolunu izle ve Değer sütununu kopyala — Gizli Dizi Kimliğini değil. Yalnızca bu bir kez gösterilir.",
-        "step5": "İstemci kimliğini ve gizli diziyi aşağıdaki alanlara yapıştır, kiracıyı ayarla ve M365_ENABLED seçeneğini aç. Kullanıcılar sonra kendi hesaplarını Yönet → Bağlantılar altından bağlar.",
-        "ready": "Hazır — kullanıcılar Microsoft 365 hesaplarını Yönet → Bağlantılar altından bağlayabilir.",
+        "step5": "İstemci kimliğini ve gizli diziyi aşağıdaki alanlara yapıştır, kiracıyı ayarla ve M365_ENABLED seçeneğini aç. Kullanıcılar sonra kendi hesaplarını Uygulamalar › Microsoft 365 altından bağlar.",
+        "ready": "Hazır — kullanıcılar Microsoft 365 hesaplarını Uygulamalar › Microsoft 365 altından bağlayabilir.",
         "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve M365_ENABLED seçeneğini aç.",
         "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala."
       },
@@ -412,8 +412,8 @@
         "step2": "“Permissions” sekmesinde şu iki izni etkinleştir ve “Submit”e tıkla:",
         "step3": "“Settings” sekmesinde “OAuth 2 → Redirect URIs” altına tam olarak bu adresi ekle:",
         "step4": "Yine “Settings” sekmesinde App key ve App secret değerlerini kopyala (“Show”a tıkla).",
-        "step5": "App key ve secret’ı aşağıdaki alanlara yapıştır ve DROPBOX_ENABLED seçeneğini aç. Kullanıcılar hesaplarını Yönet → Bağlantılar altında bağlar.",
-        "ready": "Hazır — kullanıcılar Dropbox hesaplarını Yönet → Bağlantılar altında bağlayabilir.",
+        "step5": "App key ve secret’ı aşağıdaki alanlara yapıştır ve DROPBOX_ENABLED seçeneğini aç. Kullanıcılar hesaplarını Uygulamalar › Dropbox altında bağlar.",
+        "ready": "Hazır — kullanıcılar Dropbox hesaplarını Uygulamalar › Dropbox altında bağlayabilir.",
         "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve DROPBOX_ENABLED seçeneğini aç.",
         "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala.",
         "resetTitle": "Tüm Dropbox bağlantılarını sıfırla",
@@ -439,7 +439,7 @@
       },
       "tabIntro": {
         "auth": "Kimlerin kayıt olup oturum açabileceği ve hangi oturum açma sağlayıcılarının sunulduğu.",
-        "sharing": "Kişilerin herkesle neleri paylaşabileceği, hangi oturum açma gruplarının eşitlendiği ve denetim kaydının ne kadar süre saklandığı.",
+        "sharing": "Kullanıcıların herkesle neleri paylaşabileceği, hangi oturum açma gruplarının eşitlendiği ve denetim kaydının ne kadar süre saklandığı.",
         "features": "Bu sunucudaki herkes için özellikleri tamamen açın veya kapatın. Değişiklikler hemen geçerli olur.",
         "web_search": "Sohbet için web'de kimin arama yapacağını seçin ve bir sorguyla test edin.",
         "tools": "AI'ın kendi başına yapabilecekleri: kayıtlı görevler, araçlar için onay kuralları ve korumalı alanda dosya çalışması.",
@@ -510,7 +510,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Sahip oradayken (sohbet veya canlı bir API çağrısı): dosya çalışmasını otomatik çalıştır, önce sor veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
         "COMPUTE_POLICY_UNATTENDED": "Kayıtlı bir görev dosya çalışmasını kendi başına çalıştırdığında: önce sor (varsayılan), otomatik çalıştır veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Bir dosya çalışması klasörünün temizlik onu kaldırmadan önce kaç gün kullanılmadan durabileceği. Varsayılan 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Kanallar → Synaplan Desktop altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Uygulamalar › Synaplan Desktop altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir.",
         "FEATURE_SEARCH_AI_ENABLED": "Arama paletinde AI yardımı (Ctrl/Cmd+K): Günlük dilde sorulan bir soruda araç modeli en uygun sonucu seçer ve nedenini tek cümleyle söyler. Kendi başına hiçbir şeyi değiştirmez. Her kullanım kısa bir AI çağrısıdır. Kapalıyken anahtar kelime ve anlam araması çalışmaya devam eder."
       },
       "fieldOptions": {
@@ -531,7 +531,33 @@
         }
       },
       "valueSet": "Bu ayarın kayıtlı bir değeri var.",
-      "valueEmpty": "Bu ayar hâlâ boş."
+      "valueEmpty": "Bu ayar hâlâ boş.",
+      "search": {
+        "label": "Ayarlarda ara",
+        "placeholder": "Ada veya anahtara göre arayın, örn. kayıt veya SMTP",
+        "noHits": "“{query}” ile eşleşen ayar yok.",
+        "clear": "Aramayı temizle"
+      }
+    },
+    "attention": {
+      "title": "İlgi gerekiyor",
+      "allGood": "Şu anda ilginizi gerektiren bir şey yok.",
+      "loadFailed": "Sunucu durumu yüklenemedi. Tekrar deneyin.",
+      "models": "{count} model ilgi gerektiriyor.",
+      "unhealthy": "{name} açık ama yanıt vermiyor.",
+      "needsSetup": "{name} açık ama henüz kurulmadı.",
+      "openModelHealth": "Model sağlığını aç",
+      "openStatus": "Sistem durumunu aç",
+      "cards": {
+        "people": "Kullanıcılar",
+        "peopleHint": "Bu sunucudaki hesaplar",
+        "signups": "Yeni kayıtlar",
+        "signupsHint": "Aşağıdaki grafiğin döneminde",
+        "features": "Kapalı özellikler",
+        "featuresHint": "Kapalı veya kurulmamış",
+        "models": "Kontrol edilecek modeller",
+        "modelsHint": "Çevrimdışı, hatalı veya kullanımdan kalkmış"
+      }
     }
   },
   "statistics": {
@@ -816,7 +842,7 @@
     }
   },
   "people": {
-    "title": "Kişiler",
+    "title": "Kullanıcılar",
     "subtitle": "Bu sunucudaki hesaplar, gruplar, kurallar ve bildirilen içerikler.",
     "tabs": {
       "users": "Kullanıcılar",
@@ -826,12 +852,12 @@
       "moderation": "Moderasyon",
       "audit": "Kayıt"
     },
-    "openPeople": "Kişiler’i aç",
+    "openPeople": "Kullanıcılar’ı aç",
     "backToOperate": "İşlet’e dön",
     "myGroups": {
       "subtitle": "Bu kuruluşta üye olduğunuz gruplar.",
-      "emptyMember": "Henüz bir grupta değilsiniz. Bir yönetici sizi Kişiler sayfasından ekleyebilir.",
-      "emptyAdmin": "Henüz grup yok. Kişiler sayfasından bir tane oluşturun.",
+      "emptyMember": "Henüz bir grupta değilsiniz. Bir yönetici sizi Kullanıcılar sayfasından ekleyebilir.",
+      "emptyAdmin": "Henüz grup yok. Kullanıcılar sayfasından bir tane oluşturun.",
       "leave": "Ayrıl",
       "leaveConfirm": "\"{name}\" grubundan ayrılmak istiyor musunuz? Bu grubun görebildiklerine erişiminizi kaybedersiniz. Bu grupla paylaştıklarınız diğer üyelerle paylaşılmış kalır. Bunları daha sonra her öğenin Paylaş penceresinden geri alabilirsiniz.",
       "leaveConfirmWithShares": "\"{name}\" grubundan ayrılmak istiyor musunuz? Bu grubun görebildiklerine erişiminizi kaybedersiniz. Bu grupla paylaştığınız {count} öğe diğer üyelerle paylaşılmış kalır. Ayrılmak bunu korur. Ayrıl ve paylaşımları kaldır bunları siler.",
@@ -843,7 +869,7 @@
       "ledBy": "Yöneten: {name}",
       "noLeader": "Bu grubu henüz kimse yönetmiyor.",
       "alsoIn": "Bu grupta ayrıca: {names}",
-      "onlyYou": "Bu gruptaki tek kişi sizsiniz.",
+      "onlyYou": "Bu gruptaki tek kullanıcı sizsiniz.",
       "sharedLine": "Bu grupla paylaşılanlar: {items}",
       "youCanLeave": "Ayrılabilirsiniz. O zaman bu grubun görebildiklerine erişiminizi kaybedersiniz.",
       "youLead": "Bu grubu siz yönetiyorsunuz. Ayrılabilirsiniz; o zaman bu grubun görebildiklerine erişiminizi kaybedersiniz."
@@ -865,10 +891,10 @@
       "rename": "Yeniden adlandır",
       "renameTitle": "Grubu yeniden adlandır",
       "delete": "Sil",
-      "deleteConfirm": "\"{name}\" grubunu silmek istiyor musunuz? Kişiler kurulumda kalır. {shares}. {policies}.",
+      "deleteConfirm": "\"{name}\" grubunu silmek istiyor musunuz? Kullanıcılar kurulumda kalır. {shares}. {policies}.",
       "deleteConfirmShares": "Bu grupla {count} paylaşım sona erer",
       "deleteConfirmPolicies": "Grubun {count} kuralı kaldırılır",
-      "deleteConfirmUnknown": "\"{name}\" grubunu silmek istiyor musunuz? Kişiler kurulumda kalır. Bu grupla paylaşımlar sona erer ve grubun kuralları kaldırılır.",
+      "deleteConfirmUnknown": "\"{name}\" grubunu silmek istiyor musunuz? Kullanıcılar kurulumda kalır. Bu grupla paylaşımlar sona erer ve grubun kuralları kaldırılır.",
       "empty": "Henüz grup yok. Daha sonra paylaşmak için bir tane oluşturun.",
       "loadError": "Gruplar yüklenemedi.",
       "saveError": "Grup kaydedilemedi.",
@@ -876,16 +902,16 @@
       "renamed": "Grup yeniden adlandırıldı.",
       "deleted": "Grup silindi.",
       "directoryReadOnly": "Bu grup girişinizden gelir; burada yeniden adlandırılamaz veya silinemez.",
-      "directoryManagedHint": "Girişten gelen üyelikler bir sonraki oturumda güncellenir. Yine de kişileri elle ekleyebilirsiniz.",
-      "addMember": "Kişi ekle",
+      "directoryManagedHint": "Girişten gelen üyelikler bir sonraki oturumda güncellenir. Yine de kullanıcıları elle ekleyebilirsiniz.",
+      "addMember": "Kullanıcı ekle",
       "addMemberPlaceholder": "Ad veya e-posta ile ara",
-      "addMemberNotFound": "Bu ad veya e-posta ile eşleşen kişi yok.",
+      "addMemberNotFound": "Bu ad veya e-posta ile eşleşen kullanıcı yok.",
       "removeMember": "Kaldır",
-      "removeConfirm": "{email} bu gruptan kaldırılsın mı? Bu kişinin grupla paylaştıkları paylaşılmış kalır.",
+      "removeConfirm": "{email} bu gruptan kaldırılsın mı? Bu kullanıcının grupla paylaştıkları paylaşılmış kalır.",
       "roleMember": "Üye",
       "roleManager": "Yönetici",
-      "memberAdded": "Kişi gruba eklendi.",
-      "memberRemoved": "Kişi gruptan kaldırıldı.",
+      "memberAdded": "Kullanıcı gruba eklendi.",
+      "memberRemoved": "Kullanıcı gruptan kaldırıldı.",
       "sharedWith": "Bu grupla paylaşılanlar",
       "sharedEmpty": "Bu grupla henüz hiçbir şey paylaşılmadı.",
       "sharedLoading": "Paylaşılan öğeler yükleniyor…",
@@ -976,7 +1002,7 @@
       }
     },
     "linkedPlatforms": {
-      "intro": "Bu Synaplan’ı kullanmak isteyen Nextcloud, ownCloud ve Outlook sunucuları. Kullanıcılarının hesaplarını Yönet › Bağlantılar › Bağlı platformlar altında bağlayabilmesi için birini onaylayın.",
+      "intro": "Bu Synaplan’ı kullanmak isteyen Nextcloud, ownCloud ve Outlook sunucuları. Kullanıcılarının hesaplarını Uygulamalar altında bağlayabilmesi için birini onaylayın.",
       "empty": "Henüz kayıtlı platform yok.",
       "client": "Platform",
       "host": "Adres",
@@ -995,7 +1021,9 @@
         "active": "Etkin",
         "pending": "Onay bekliyor",
         "revoked": "İptal edildi"
-      }
+      },
+      "emptyHint": "Biri Nextcloud, ownCloud veya Outlook’a Synaplan eklentisini kurup bu sunucunun adresini girdiğinde sunucu kaydolur.",
+      "emptyAction": "Kurulum adımlarını göster"
     },
     "policies": {
       "group": "Grup",
@@ -1018,7 +1046,7 @@
       "groupForcesOff": "Bu grup, üyeleri için bunu kapatır.",
       "rateLimit": "Kullanım sınırı düzeyi",
       "useGlobal": "Kurulum varsayılanını kullan",
-      "useBillingTier": "Kişinin planını kullan",
+      "useBillingTier": "Kullanıcının planını kullan",
       "conflict": "Başka bir grup farklı bir varsayılan belirlemiş. En küçük numaralı grup kazanır.",
       "locks": "Kilitli kurulum varsayılanları",
       "locksHelper": "Bu kilitler bir gruba değil, tüm kuruluma uygulanır. Kilit açıkken yalnızca kurulum varsayılanı kullanılır. Grup ve kişisel değerler kayıtlı kalır ama yok sayılır. Yeniden kullanmak için kilidi kapatın.",
@@ -1062,6 +1090,13 @@
         "CHAT_EXPORT_ENABLED": "Sohbetleri dışa aktar",
         "CHAT_SHARE_ENABLED": "Sohbetleri paylaş"
       }
+    },
+    "intro": {
+      "users": "Burada hesabı olan herkes. Seviye değiştirin, adres doğrulayın veya bir hesabı kapatın.",
+      "groups": "Gruplar kullanıcıları bir araya getirir; asistanları paylaşır ve kuralları herkes için bir kez belirlersiniz.",
+      "policies": "Politikalar bir grubun neleri kullanabileceğini belirler, örneğin hangi özellikleri veya modelleri.",
+      "moderation": "Kullanıcıların bildirdiği içerikler. İnceleyin, sonra tutun veya kaldırın.",
+      "audit": "Bu sunucuda kimin neyi değiştirdiğinin kaydı, en yenisi önce."
     }
   },
   "iam": {
@@ -1075,7 +1110,7 @@
     "sharedWithMe": "Benimle paylaşılan",
     "incoming": {
       "title": "Gelen sohbetler",
-      "subtitle": "Kişilerin veya grupların sizinle paylaştığı sohbetler",
+      "subtitle": "Kullanıcıların veya grupların sizinle paylaştığı sohbetler",
       "menu": "Gelen sohbetler",
       "purpose": "Sizinle paylaşılan",
       "menuNew": "Yeni gelen sohbetler",
@@ -1153,8 +1188,8 @@
     "dialog": {
       "title": "\"{name}\" paylaş",
       "who": "Kim",
-      "searchPlaceholder": "Kişi veya grup ara…",
-      "searchPlaceholderSharedGroup": "Ortak bir gruptaki kişileri veya bir grubu ara…",
+      "searchPlaceholder": "Kullanıcı veya grup ara…",
+      "searchPlaceholderSharedGroup": "Ortak bir gruptaki kullanıcıları veya bir grubu ara…",
       "permission": "İzin",
       "sharedWith": "Paylaşılan",
       "empty": "Bunu yalnızca siz görebilirsiniz.",
@@ -1172,7 +1207,7 @@
       "permissionFailed": "İzin değiştirilemedi. Lütfen tekrar deneyin.",
       "noMatches": "Eşleşen kişi veya grup yok.",
       "noMatchesSharedGroup": "Ortak bir gruptaki hiç kimse ve hiçbir grup bu adla eşleşmiyor.",
-      "searchFailed": "Kişi veya gruplar aranamadı.",
+      "searchFailed": "Kullanıcı veya gruplar aranamadı.",
       "tryAgain": "Tekrar dene",
       "everyoneInactive": "Bu paylaşım kayıtlı kalır, ancak herkesle paylaşım kapalıyken başkası bunu kullanamaz. Buradan kaldırabilirsiniz.",
       "ownerLine": "Sahip · {name}",
@@ -1181,7 +1216,7 @@
       "managePublicLink": "Herkese açık bağlantıyı yönet",
       "openPublicLink": "Herkese açık bağlantıyı yönet",
       "subjectType": {
-        "user": "kişi",
+        "user": "kullanıcı",
         "group": "grup"
       },
       "consequence": {

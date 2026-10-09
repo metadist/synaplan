@@ -695,7 +695,7 @@
                     <div v-if="topic" class="flex items-center justify-between gap-2">
                       <span class="text-xs txt-tertiary">{{ t('chatMessage.infoTopic') }}</span>
                       <router-link
-                        :to="`/ai/instructions?topic=${topic}`"
+                        :to="`/ai/models?tab=topics&topic=${topic}`"
                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                         @click="closeInfoPopover"
                       >

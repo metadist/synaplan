@@ -34,6 +34,7 @@
           v-if="!openSharedFolder"
           class="surface-card p-4 sm:p-5 relative"
           data-testid="section-upload-form"
+          data-tour="library-upload"
           @dragenter.prevent="handleDragEnter"
           @dragover.prevent="handleDragOver"
           @dragleave="handleDragLeave"

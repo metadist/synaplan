@@ -1,12 +1,14 @@
 <template>
   <MainLayout data-testid="page-chats">
-    <div class="container mx-auto px-6 py-8 max-w-[100rem] overflow-x-hidden">
-      <PageHeader
-        :title="$t('pageTitles.allChats')"
-        :subtitle="$t('chat.browser.description')"
-        icon="mdi:forum-outline"
-      />
-      <ChatBrowser hide-header />
+    <div class="min-h-screen overflow-x-hidden bg-chat px-3 py-4 sm:p-4 md:p-8">
+      <div class="mx-auto w-full max-w-[100rem]">
+        <PageHeader
+          :title="$t('pageTitles.allChats')"
+          :subtitle="$t('chat.browser.description')"
+          icon="mdi:forum-outline"
+        />
+        <ChatBrowser hide-header />
+      </div>
     </div>
   </MainLayout>
 </template>

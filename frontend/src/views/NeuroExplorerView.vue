@@ -961,7 +961,7 @@ async function openNode(node: CategoryNode) {
       panelItems.value = [{ id: 'open', name: t('neuroExplorer.openRag'), route: '/files/search' }]
     } else if (node.id === 'settings') {
       panelItems.value = [
-        { id: 'inbound', name: t('neuroExplorer.settingsInbound'), route: '/channels' },
+        { id: 'inbound', name: t('neuroExplorer.settingsInbound'), route: '/apps' },
         { id: 'ai', name: t('neuroExplorer.settingsAi'), route: '/ai/models' },
         { id: 'users', name: t('neuroExplorer.settingsUsers'), route: '/config/users' },
       ]

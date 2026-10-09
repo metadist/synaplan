@@ -745,7 +745,7 @@ final class MessagesGatewayController extends AbstractController
     }
 
     /**
-     * One People → Audit row for a gateway settings write. Values are setting
+     * One Users → Audit row for a gateway settings write. Values are setting
      * names and model ids, never provider keys.
      *
      * @param array<string, mixed> $changes

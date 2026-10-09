@@ -142,7 +142,7 @@
         {{ $t('config.apiKeys.docsDesc') }}
       </p>
       <router-link
-        to="/channels/api/docs"
+        to="/apps/api/docs"
         class="btn-primary px-6 py-3 rounded-xl font-medium inline-flex items-center gap-2"
       >
         <CommandLineIcon class="w-4 h-4" />
@@ -428,7 +428,6 @@
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, onMounted, onUnmounted, onActivated, watch, computed, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
 import {
   PlusIcon,
   KeyIcon,
@@ -453,7 +452,6 @@ const dialog = useDialog()
 const { success, error: showError } = useNotification()
 const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
-const route = useRoute()
 
 interface UIApiKey {
   id: number
@@ -744,14 +742,4 @@ onUnmounted(() => {
 onActivated(() => {
   loadAPIKeys()
 })
-
-// Watch for route changes within ConfigView (same component instance kept alive)
-watch(
-  () => route.path,
-  (newPath, oldPath) => {
-    if (newPath === '/channels/api' && oldPath !== '/channels/api') {
-      loadAPIKeys()
-    }
-  }
-)
 </script>

@@ -7,8 +7,8 @@
       "description": "Configure and manage your AI models",
       "tabs": {
         "choice": "Model Choice",
-        "list": "List Of All",
-        "runs": "Vector Runs",
+        "list": "All models",
+        "runs": "Embedding runs",
         "edit": "Edit Models"
       },
       "defaultConfigTitle": "Default Model Configuration",
@@ -323,15 +323,15 @@
       }
     },
     "taskPrompts": {
-      "title": "AI Instructions",
-      "subtitle": "aka system prompts — define how the AI handles each task",
+      "title": "Topics",
+      "subtitle": "Each topic tells the AI how to answer one kind of request. For every message, the matching topic is picked automatically.",
       "selectPrompt": "Select Prompt",
-      "selectPromptTitle": "Select a Prompt",
-      "selectPromptDescription": "Choose an existing prompt to view or edit",
+      "selectPromptTitle": "Select a topic",
+      "selectPromptDescription": "Pick a topic on the left to view or change it.",
       "selectPromptHelp": "Choose an existing prompt to edit or use as template",
       "selectPlaceholder": "Select a task prompt...",
       "searchPlaceholder": "Search topics, descriptions, keywords...",
-      "noPromptsMatch": "No prompts match the current search/filter.",
+      "noPromptsMatch": "No topics match your search.",
       "filterAll": "All",
       "filterSystem": "System",
       "filterCustom": "Custom",
@@ -357,21 +357,21 @@
       "contentPlaceholder": "Enter your system prompt here...",
       "promptContentPlaceholder": "Enter the system prompt that will guide the AI's behavior for this task...",
       "contentHelp": "This is the system message that guides the AI's behavior",
-      "createNew": "Create New Prompt",
+      "createNew": "New topic",
       "loadTemplate": "Load Template",
       "topic": "Topic",
       "topicPlaceholder": "e.g., custom-analyzer",
       "name": "Name",
       "namePlaceholder": "e.g., Custom File Analyzer",
-      "createButton": "Create New Prompt",
+      "createButton": "New topic",
       "dangerZone": "Danger Zone",
       "deleteWarning": "Deleting this prompt is permanent and cannot be undone.",
       "deletePrompt": "Delete Prompt",
       "saveChanges": "Save Changes",
-      "noPrompts": "No prompts available",
+      "noPrompts": "No topics yet.",
       "language": "Language",
       "workingLanguage": "Working in: {language}",
-      "workingLanguageHint": "Prompts shown are based on your current interface language. Custom prompts you create will only appear in this language.",
+      "workingLanguageHint": "Topics are shown in your interface language. Topics you create appear only in this language.",
       "systemPromptAdminTitle": "System Prompt (Admin Edit)",
       "systemPromptAdminDesc": "You have admin access. Changes will update this system prompt for ALL users across all languages.",
       "systemPromptLanguageFixed": "System prompt — language is locked to the original value and cannot be changed.",
@@ -503,11 +503,10 @@
       "autoPauseBody": "This task failed three times in a row. Fix the issue, then resume.",
       "createFailed": "Could not save this as a task.",
       "created": "Saved as a task. You can run it now.",
-      "overviewTitle": "Saved Tasks",
-      "overviewSubtitle": "Instructions that run when you ask, or later on a schedule.",
+      "overviewTitle": "Tasks",
+      "overviewSubtitle": "Instructions that run when you ask, or by themselves on a schedule.",
       "overviewLoading": "Loading saved tasks…",
-      "overviewEmpty": "Nothing scheduled yet. After a chat plan finishes, use the clock — or save a custom instruction under",
-      "overviewEmptyAssistants": "Nothing scheduled yet. After a chat plan finishes, use the clock — or add a schedule to an assistant under",
+      "overviewEmpty": "No tasks yet. Create one and let it run every morning, for example.",
       "loadFailed": "Could not load saved tasks.",
       "delete": "Delete",
       "deleteConfirm": "Delete the saved task \"{name}\"? Shares of this task are removed too.",
@@ -600,6 +599,22 @@
       "tabs": {
         "tasks": "Saved tasks",
         "watches": "Watched pages"
+      },
+      "overviewEmptyHint": "You can also save a finished chat plan as a task with the clock button.",
+      "newTask": {
+        "open": "New task",
+        "title": "New task",
+        "name": "Name",
+        "namePlaceholder": "Morning news summary",
+        "instruction": "What should the AI do?",
+        "instructionPlaceholder": "Find the three most important news items about our industry and summarise each in two sentences.",
+        "schedule": "When",
+        "at": "At",
+        "hint": "The result appears in a chat of its own. You can change everything later on the task card.",
+        "create": "Create task",
+        "created": "Task created.",
+        "createdWithoutSchedule": "The task was created, but without a schedule. Set the time on its card.",
+        "failed": "The task was not created. Nothing was saved; try again."
       }
     },
     "connections": {
@@ -661,7 +676,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Sign in with your Microsoft work or personal account so Synaplan can read your Outlook mail. Read-only, and you can disconnect at any time.",
+          "description": "Sign in with your Microsoft work or personal account. Synaplan reads your Outlook mail, can add calendar events and send results from your mailbox. You can disconnect at any time.",
           "connect": "Connect Microsoft 365",
           "connectAnother": "Connect another account",
           "connectedAs": "Connected as {account}.",
@@ -916,9 +931,9 @@
       "errorDeleting": "Failed to delete API key",
       "noKeys": "No API keys yet. Create your first key to get started.",
       "scopes": {
-        "hint": "Leave unchecked for full access. Checking People limits this key to People. File work adds chat and file scopes so the key can run scripts — it does not grant admin access.",
-        "iamRead": "People — view groups",
-        "iamManage": "People — manage groups",
+        "hint": "Leave unchecked for full access. Checking Users limits this key to Users. File work adds chat and file scopes so the key can run scripts — it does not grant admin access.",
+        "iamRead": "Users — view groups",
+        "iamManage": "Users — manage groups",
         "computeRun": "File work — run short scripts on copies of your files"
       }
     },
@@ -926,11 +941,11 @@
       "title": "Synaplan Desktop",
       "description": "Synaplan Desktop is a separate app for this computer. It uses your Synaplan account and can run skills you install.",
       "chatGate": {
-        "gatewayAdmin": "The app cannot chat until you turn on the AI gateway under Coding clients and a provider key is available. Pairing still works.",
-        "gatewayUser": "The app cannot chat until an admin turns on the AI gateway under Coding clients. Pairing still works.",
-        "keyAdmin": "The AI gateway is on, but no provider key will pay for app chat. Allow the instance key under Coding clients, or save your own.",
+        "gatewayAdmin": "The app cannot chat until you turn on the coding gateway under Admin › AI and a provider key is available. Pairing still works.",
+        "gatewayUser": "The app cannot chat until an admin turns on the AI gateway. Pairing still works.",
+        "keyAdmin": "The coding gateway is on, but no provider key will pay for app chat. Allow the instance key under Admin › AI, or save your own.",
         "keyUser": "App chat has no provider key yet. Ask an admin to allow the instance key, or save your own. Pairing still works.",
-        "openCodingClients": "Open Coding clients"
+        "openCodingClients": "Open gateway settings"
       },
       "pairButton": "Pair this computer",
       "loadFailed": "The connected computers could not be loaded.",
@@ -1063,8 +1078,8 @@
       "errorRemoving": "Failed to remove phone number"
     },
     "usage": {
-      "title": "Usage Statistics",
-      "description": "Track your API usage across all channels and features",
+      "title": "My usage",
+      "description": "How much you used chat, files and other features, and what it cost.",
       "export": "Export CSV",
       "exportSuccess": "Usage data exported successfully",
       "errorLoading": "Failed to load usage statistics",
@@ -1162,6 +1177,14 @@
         "today": "Today",
         "this_week": "This Week",
         "this_month": "This Month"
+      }
+    },
+    "aiSettings": {
+      "title": "AI settings",
+      "subtitle": "Choose which AI model does each kind of work, and write topics that tell the AI how to answer.",
+      "tabs": {
+        "defaults": "Default models",
+        "topics": "Topics"
       }
     }
   }

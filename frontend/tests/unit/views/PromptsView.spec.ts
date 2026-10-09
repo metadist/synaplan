@@ -13,6 +13,8 @@ vi.mock('@/stores/auth', () => ({
 }))
 
 const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+const dialog = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }))
+vi.mock('@/composables/useDialog', () => ({ useDialog: () => dialog }))
 vi.mock('@/composables/useNotification', () => ({
   useNotification: () => notify,
 }))
@@ -83,8 +85,8 @@ describe('PromptsView', () => {
     await wrapper.find('[data-testid="btn-prompt-new"]').trigger('click')
 
     const submit = wrapper.find('[data-testid="btn-saved-prompt-save"]')
-    expect(submit.text()).toBe('Save prompt')
-    expect(submit.text()).not.toBe('Prompt saved.')
+    expect(submit.text()).toBe('Save shortcut')
+    expect(submit.text()).not.toBe('Shortcut saved.')
   })
 
   it('saves an existing row with PUT and the edited fields, never with POST', async () => {
@@ -95,7 +97,9 @@ describe('PromptsView', () => {
     expect(
       (wrapper.find('[data-testid="input-saved-prompt-command"]').element as HTMLInputElement).value
     ).toBe('notiz')
-    expect(wrapper.find('[data-testid="text-saved-prompt-form-title"]').text()).toBe('Edit prompt')
+    expect(wrapper.find('[data-testid="text-saved-prompt-form-title"]').text()).toBe(
+      'Edit shortcut'
+    )
 
     await wrapper.find('[data-testid="input-saved-prompt-name"]').setValue('Note 2')
     await wrapper.find('[data-testid="input-saved-prompt-command"]').setValue('notiz2')
@@ -113,7 +117,7 @@ describe('PromptsView', () => {
       body: 'Write a better note',
       tags: ['work'],
     })
-    expect(notify.success).toHaveBeenCalledWith('Prompt saved.')
+    expect(notify.success).toHaveBeenCalledWith('Shortcut saved.')
     // The stored row comes back on the write; a second request could only fail it.
     expect(calls('GET')).toHaveLength(1)
   })
@@ -139,7 +143,7 @@ describe('PromptsView', () => {
   it('creates a new prompt with POST', async () => {
     const wrapper = await mountView()
     await wrapper.find('[data-testid="btn-prompt-new"]').trigger('click')
-    expect(wrapper.find('[data-testid="text-saved-prompt-form-title"]').text()).toBe('New prompt')
+    expect(wrapper.find('[data-testid="text-saved-prompt-form-title"]').text()).toBe('New shortcut')
 
     await wrapper.find('[data-testid="input-saved-prompt-name"]').setValue('Second')
     await wrapper.find('[data-testid="input-saved-prompt-command"]').setValue('second')
@@ -197,10 +201,22 @@ describe('PromptsView', () => {
     await flushPromises()
 
     expect(notify.error).toHaveBeenCalledWith(
-      'The prompt could not be deleted. It is still in your list.'
+      'The shortcut could not be deleted. It is still in your list.'
     )
     expect(wrapper.find('[data-testid="row-saved-prompt"]').exists()).toBe(true)
     expect(useCommandsStore().getCommand('notiz')).toBeDefined()
+  })
+
+  it('asks before deleting and keeps the shortcut when the person cancels', async () => {
+    dialog.confirm.mockResolvedValueOnce(false)
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="btn-saved-prompt-delete"]').trigger('click')
+    await flushPromises()
+
+    expect(dialog.confirm).toHaveBeenCalled()
+    expect(calls('DELETE')).toHaveLength(0)
+    expect(wrapper.find('[data-testid="row-saved-prompt"]').exists()).toBe(true)
   })
 
   it('lists a new prompt in name order without reloading the list', async () => {

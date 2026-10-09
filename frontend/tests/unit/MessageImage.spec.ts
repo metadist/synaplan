@@ -152,7 +152,7 @@ describe('MessageImage', () => {
             json: () =>
               Promise.resolve({
                 recaptcha: { enabled: false, siteKey: '' },
-                features: { help: false },
+                features: {},
               }),
           })
         }

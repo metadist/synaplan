@@ -1,11 +1,10 @@
 <template>
   <div data-testid="incoming-inbox">
-    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
-      <div class="min-w-0">
-        <h2 class="text-xl font-semibold txt-primary">{{ $t('files.incoming.title') }}</h2>
-        <p class="text-sm txt-secondary">{{ $t('files.incoming.subtitle') }}</p>
-      </div>
-      <div v-if="files.length > 0" class="flex items-center gap-2 sm:ml-auto">
+    <div
+      v-if="files.length > 0"
+      class="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 mb-4"
+    >
+      <div class="flex items-center gap-2">
         <select
           v-model="bulkGroup"
           class="px-2 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
@@ -48,19 +47,16 @@
       </div>
     </div>
 
-    <!-- Empty state -->
-    <div
+    <EmptyState
       v-else-if="files.length === 0"
-      class="flex flex-col items-center justify-center py-16 px-4 text-center"
-      data-testid="incoming-empty"
-    >
-      <div
-        class="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4"
-      >
-        <Icon icon="mdi:inbox-arrow-down-outline" class="w-8 h-8 text-gray-400" />
-      </div>
-      <p class="text-sm txt-secondary max-w-sm">{{ $t('files.empty.incomingBody') }}</p>
-    </div>
+      bare
+      :icon="InboxArrowDownIcon"
+      :title="$t('files.empty.incomingBody')"
+      :action-label="$t('files.empty.incomingAction')"
+      to="/apps/connected"
+      test-id="incoming-empty"
+      action-test-id="btn-incoming-empty-action"
+    />
 
     <!-- Incoming rows -->
     <div v-else class="space-y-2">
@@ -143,6 +139,8 @@ import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { refreshIncomingCount } from '@/composables/useLibraryLinks'
+import { InboxArrowDownIcon } from '@heroicons/vue/24/outline'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import FileVectorPill from './FileVectorPill.vue'
 import FileSourceBadge from './FileSourceBadge.vue'

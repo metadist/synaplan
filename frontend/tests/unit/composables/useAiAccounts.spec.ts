@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  isAiAccountsEnabled,
+  isAnthropicAccountsEnabled,
   loadGatewayEnabled,
   rememberGatewayEnabled,
   resetAiAccountsGatewayCache,
@@ -26,7 +26,7 @@ describe('rememberGatewayEnabled', () => {
     rememberGatewayEnabled(true)
     getMessagesGatewayStatus.mockRejectedValue(new Error('offline'))
 
-    expect(isAiAccountsEnabled()).toBe(true)
+    expect(isAnthropicAccountsEnabled()).toBe(true)
     await expect(loadGatewayEnabled()).resolves.toBe(true)
     expect(getMessagesGatewayStatus).not.toHaveBeenCalled()
   })
@@ -34,7 +34,7 @@ describe('rememberGatewayEnabled', () => {
   it('records a disabled gateway without another request', async () => {
     rememberGatewayEnabled(false)
 
-    expect(isAiAccountsEnabled()).toBe(false)
+    expect(isAnthropicAccountsEnabled()).toBe(false)
     await expect(loadGatewayEnabled()).resolves.toBe(false)
     expect(getMessagesGatewayStatus).not.toHaveBeenCalled()
   })

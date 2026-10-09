@@ -1,9 +1,14 @@
 <template>
   <div class="space-y-6" data-testid="page-config-ai-models">
+    <p v-if="isAdminScope" class="text-sm txt-secondary" data-testid="text-ai-models-admin-intro">
+      {{ $t('adminSetup.intro.catalog') }}
+    </p>
     <PageHeader
-      :title="$t('config.aiModels.title')"
-      :subtitle="$t('config.aiModels.description')"
+      v-else
+      :title="$t('config.aiSettings.title')"
+      :subtitle="$t('config.aiSettings.subtitle')"
       icon="heroicons:cpu-chip"
+      tour-id="ai-settings"
       data-testid="section-header"
     >
       <!-- Reset applies to the default-model choices, so it only shows on that tab.
@@ -40,6 +45,7 @@
 
     <div
       v-show="activeTab === 'choice'"
+      v-if="!isAdminScope"
       class="surface-card p-6 relative"
       :class="openDropdown ? 'z-20' : 'z-0'"
       data-testid="section-default-config"
@@ -313,7 +319,9 @@
       </div>
     </div>
 
-    <div v-show="activeTab === 'list'" class="space-y-6">
+    <PlannerModelCard v-if="!isAdminScope && activeTab === 'choice'" />
+
+    <div v-if="!isAdminScope" v-show="activeTab === 'list'" class="space-y-6">
       <div class="surface-card p-6" data-testid="section-purpose-filters">
         <h2 class="text-xl font-semibold txt-primary mb-4 flex items-center gap-2">
           <FunnelIcon class="w-5 h-5" />
@@ -618,17 +626,10 @@
       </div>
     </div>
 
-    <div v-if="authStore.isAdmin && activeTab === 'runs'">
-      <EmbeddingRunsPanel ref="runsPanelRef" />
-    </div>
+    <AppPanelHost v-if="!isAdminScope && activeTab === 'topics'" :loader="loadTopics" />
 
-    <div v-if="authStore.isAdmin && activeTab === 'edit'" class="space-y-4">
-      <div class="flex items-center justify-between gap-3 flex-wrap">
-        <SectionJumpNav
-          :items="editSectionItems"
-          :nav-label="$t('admin.config.accordion.jumpTo')"
-          @select="jumpToEditSection"
-        />
+    <div v-if="isAdminScope && authStore.isAdmin" class="space-y-4">
+      <div class="flex justify-end">
         <button
           type="button"
           class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
@@ -673,6 +674,8 @@
       </AccordionStack>
     </div>
 
+    <EmbeddingRunsPanel v-if="isAdminScope && authStore.isAdmin" ref="runsPanelRef" />
+
     <EmbeddingSwitchModal
       :open="switchModalOpen"
       :to-model-id="switchModalTargetId"
@@ -703,11 +706,12 @@ import {
 } from '@heroicons/vue/24/outline'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
-import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import AddModelForm from '@/components/config/AddModelForm.vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatibleEndpointsPanel.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppPanelHost from '@/components/apps/AppPanelHost.vue'
+import PlannerModelCard from '@/components/config/PlannerModelCard.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
@@ -738,7 +742,12 @@ import {
 import { useI18n } from 'vue-i18n'
 
 type ModelsData = Partial<Record<Capability, AIModel[]>>
-type ModelsTabId = 'choice' | 'list' | 'runs' | 'edit'
+type ModelsTabId = 'choice' | 'list' | 'topics'
+
+const props = withDefaults(defineProps<{ scope?: 'user' | 'admin' }>(), { scope: 'user' })
+/** Admin › AI › Model catalog: catalog editing and embedding runs, no personal defaults. */
+const isAdminScope = computed(() => props.scope === 'admin')
+const loadTopics = () => import('@/components/config/TaskPromptsConfiguration.vue')
 
 const authStore = useAuthStore()
 const route = useRoute()
@@ -748,28 +757,14 @@ const { t } = useI18n()
 const activeTab = ref<ModelsTabId>('choice')
 const adminPanelRef = ref<InstanceType<typeof AIModelsAdminPanel> | null>(null)
 const editSectionIds = ['endpoints', 'add', 'catalog'] as const
-const editSectionItems = computed(() => [
-  { id: 'endpoints', label: t('config.openaiEndpoints.title') },
-  { id: 'add', label: t('config.aiModels.admin.addForm.title') },
-  { id: 'catalog', label: t('config.aiModels.admin.editModels') },
-])
 const {
   isOpen: isEditSectionOpen,
   toggle: toggleEditSection,
-  open: openEditSection,
   expandAll: expandAllEditSections,
   collapseAll: collapseAllEditSections,
   allOpen: allEditSectionsOpen,
 } = useAccordion(() => [...editSectionIds])
-
-async function jumpToEditSection(id: string) {
-  openEditSection(id)
-  await nextTick()
-  document
-    .getElementById(`ai-models-section-${id}`)
-    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-const MODELS_TABS = ['choice', 'list', 'runs', 'edit'] as const
+const MODELS_TABS = ['choice', 'list', 'topics'] as const
 
 function parseModelsTab(raw: unknown): ModelsTabId | null {
   if (typeof raw !== 'string') return null
@@ -777,11 +772,11 @@ function parseModelsTab(raw: unknown): ModelsTabId | null {
 }
 
 function canOpenModelsTab(tab: ModelsTabId): boolean {
-  if (tab === 'edit' || tab === 'runs') return authStore.isAdmin
-  return true
+  return MODELS_TABS.includes(tab)
 }
 
 function applyTabFromQuery(): void {
+  if (isAdminScope.value) return
   const tab = parseModelsTab(route.query.tab)
   if (!tab || !canOpenModelsTab(tab)) return
   const previous = activeTab.value
@@ -790,6 +785,7 @@ function applyTabFromQuery(): void {
 }
 
 function syncTabToUrl(tab: ModelsTabId): void {
+  if (isAdminScope.value) return
   const query = { ...route.query }
   if (tab === 'choice') {
     delete query.tab
@@ -802,39 +798,26 @@ function syncTabToUrl(tab: ModelsTabId): void {
   void router.replace({ query })
 }
 
-const tabNavItems = computed<TabNavItem[]>(() => {
-  const items: TabNavItem[] = [
-    {
-      id: 'choice',
-      label: t('config.aiModels.tabs.choice'),
-      icon: 'mdi:tune-variant',
-      testid: 'tab-ai-models-choice',
-    },
-    {
-      id: 'list',
-      label: t('config.aiModels.tabs.list'),
-      icon: 'mdi:format-list-bulleted',
-      testid: 'tab-ai-models-list',
-    },
-  ]
-  if (authStore.isAdmin) {
-    items.push(
-      {
-        id: 'runs',
-        label: t('config.aiModels.tabs.runs'),
-        icon: 'mdi:vector-polyline',
-        testid: 'tab-ai-models-runs',
-      },
-      {
-        id: 'edit',
-        label: t('config.aiModels.tabs.edit'),
-        icon: 'mdi:pencil-ruler',
-        testid: 'tab-ai-models-edit',
-      }
-    )
-  }
-  return items
-})
+const tabNavItems = computed<TabNavItem[]>(() => [
+  {
+    id: 'choice',
+    label: t('config.aiSettings.tabs.defaults'),
+    icon: 'mdi:tune-variant',
+    testid: 'tab-ai-models-choice',
+  },
+  {
+    id: 'list',
+    label: t('config.aiModels.tabs.list'),
+    icon: 'mdi:format-list-bulleted',
+    testid: 'tab-ai-models-list',
+  },
+  {
+    id: 'topics',
+    label: t('config.aiSettings.tabs.topics'),
+    icon: 'heroicons:document-text',
+    testid: 'tab-ai-models-topics',
+  },
+])
 
 function onModelsTabChange(id: string) {
   const tab = id as ModelsTabId
@@ -1491,11 +1474,13 @@ const onEmbeddingSwitchSuccess = async (runId: number) => {
   switchModalTargetId.value = null
   success(t('config.embeddingSwitch.queued', { runId }))
   await loadEmbeddingGuard()
-  if (authStore.isAdmin) {
-    activeTab.value = 'runs'
-    await nextTick()
+  if (!authStore.isAdmin) return
+  if (isAdminScope.value) {
     await runsPanelRef.value?.refresh()
+    return
   }
+  // The run's progress lives on Admin › AI › Model catalog.
+  void router.push({ path: '/admin/setup', query: { tab: 'catalog' } })
 }
 
 const loadEmbeddingGuard = async () => {

@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
+import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import { useApprovalsStore } from '@/stores/approvals'
 import { useNotification } from '@/composables/useNotification'
@@ -65,7 +67,7 @@ const openContext = (approval: Approval) => {
   }
   if (ref.kind === 'task_run' && ref.taskId) {
     void router.push({
-      path: '/channels/tasks',
+      path: '/tasks',
       query: { task: String(ref.taskId), run: String(ref.runId ?? '') },
     })
   }
@@ -115,6 +117,7 @@ const decidedLine = (row: Approval): string => {
       :title="$t('approvals.title')"
       :subtitle="$t('approvals.subtitle')"
       icon="heroicons:check-badge"
+      tour-id="approvals"
     />
 
     <label class="block text-sm txt-primary max-w-md">
@@ -158,13 +161,14 @@ const decidedLine = (row: Approval): string => {
       </button>
     </div>
 
-    <p
+    <EmptyState
       v-if="tab === 'pending' && rows.length === 0 && !store.loading"
-      class="txt-secondary text-sm"
-      data-testid="approvals-empty"
-    >
-      {{ $t('approvals.emptyPending') }}
-    </p>
+      :title="$t('approvals.emptyPending')"
+      :action-label="isSavedTasksEnabled() ? $t('approvals.openTasks') : undefined"
+      to="/tasks"
+      test-id="approvals-empty"
+      action-test-id="btn-approvals-open-tasks"
+    />
     <p
       v-else-if="tab === 'decided' && rows.length === 0 && !store.loading"
       class="txt-secondary text-sm"

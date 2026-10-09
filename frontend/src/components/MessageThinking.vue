@@ -5,7 +5,7 @@
     data-testid="section-message-thinking"
   >
     <button
-      class="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 hover-surface transition-colors"
+      class="stack-row w-full px-3.5 py-2.5 flex items-center justify-between gap-2 hover-surface transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]"
       type="button"
       :aria-expanded="isExpanded"
       data-testid="btn-thinking-toggle"

@@ -21,17 +21,41 @@ import { Icon } from '@iconify/vue'
  *   spacing on mobile.
  * - Tab bars (TabNav) go into the default slot so they always sit between the
  *   header and the content cards.
+ * - Inside a host page (`provideEmbeddedPageHeader`) the header shrinks to an
+ *   h2 with its actions; the host owns the icon, h1 and explanation.
  */
-defineProps<{
+import { computed } from 'vue'
+import { QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
+import { useTour } from '@/composables/useTour'
+import { useEmbeddedPageHeader } from './pageHeaderEmbedding'
+
+const props = defineProps<{
   title: string
   subtitle?: string
   /** Iconify icon name, e.g. "heroicons:chat-bubble-left-right". */
   icon?: string
+  /** Guided tour (src/tours) restarted by the `?` button next to the title. */
+  tourId?: string
 }>()
+
+const { startTour, hasTour } = useTour()
+const embedded = useEmbeddedPageHeader()
+const showTourButton = computed(() => !embedded && hasTour(props.tourId))
 </script>
 
 <template>
-  <header class="mb-6">
+  <header v-if="embedded" class="mb-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-lg font-semibold txt-primary">{{ title }}</h2>
+      <div v-if="$slots.actions" class="flex flex-wrap items-center gap-2">
+        <slot name="actions" />
+      </div>
+    </div>
+    <div v-if="$slots.default" class="mt-4">
+      <slot />
+    </div>
+  </header>
+  <header v-else class="mb-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div class="flex items-start gap-3 min-w-0">
         <span
@@ -44,7 +68,20 @@ defineProps<{
           </slot>
         </span>
         <div class="min-w-0">
-          <h1 class="text-2xl font-semibold txt-primary">{{ title }}</h1>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-2xl font-semibold txt-primary">{{ title }}</h1>
+            <button
+              v-if="showTourButton"
+              type="button"
+              class="icon-ghost p-1 rounded-lg"
+              :aria-label="$t('tours.common.start')"
+              :title="$t('tours.common.start')"
+              data-testid="btn-page-help"
+              @click="startTour(tourId as string)"
+            >
+              <QuestionMarkCircleIcon class="w-5 h-5" />
+            </button>
+          </div>
           <p v-if="subtitle || $slots.subtitle" class="txt-secondary text-sm mt-1">
             <slot name="subtitle">{{ subtitle }}</slot>
           </p>

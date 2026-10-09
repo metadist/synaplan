@@ -43,7 +43,7 @@
     "disconnected": "Platform bağlantısı kesildi.",
     "disconnectError": "Platformun bağlantısı kesilemedi.",
     "loadError": "Bağlı platformlar yüklenemedi.",
-    "adminPointer": "Sunucuların onayı İşlet › Kişiler › Platform örnekleri altında yapılır."
+    "adminPointer": "Sunucuların tamamı Yönetim › Kullanıcılar bölümünde onaylanır."
   },
   "plugins": {
     "title": "Eklentiler",
@@ -63,13 +63,6 @@
     "noCommands": "Mevcut komut yok",
     "searchCommands": "Komut ara...",
     "noCommandsFound": "Aramanızla eşleşen komut bulunamadı"
-  },
-  "help": {
-    "title": "Yardım",
-    "openHelp": "Yardımı aç",
-    "close": "Kapat",
-    "gotIt": "Anladım!",
-    "noContent": "Bu sayfa için yardım içeriği mevcut değil"
   },
   "aiProvider": {
     "error": {
@@ -92,27 +85,13 @@
     "findInFiles": "Dosyalar → Oluşturulanlar'da bul"
   },
   "channels": {
-    "title": "Kanallar",
-    "description": "Bu platforma farklı kanallardan ulaşabilirsiniz. Farklı kanallar, kurarsanız farklı özellikler sunar. Lütfen aşağıda listelenen kanallara bakın:",
-    "whatsappChannels": "WhatsApp Kanalları",
     "whatsappAssistant": "WhatsApp asistanı",
     "whatsappAssistantHint": "Gelen WhatsApp iletilerini bu yayımlanmış asistan yanıtlar.",
     "whatsappAssistantNone": "Asistan yok — olağan sohbet",
     "whatsappAssistantSaved": "WhatsApp artık bu asistanı kullanıyor",
     "whatsappAssistantFailed": "WhatsApp asistanı kaydedilemedi",
-    "emailChannels": "E-posta Kanalları",
-    "apiChannel": "API Kanalı",
-    "webWidget": "Web Widget",
-    "defaultHandling": "varsayılan işlem",
-    "personalKeyword": "kişisel anahtar kelime",
     "keywordSaved": "E-posta anahtar kelimesi başarıyla kaydedildi",
-    "addKeyword": "Kendi işleminizi eklemek için boş bir anahtar kelime kontrol edin:",
     "keywordPlaceholder": "anahtar kelime",
-    "yourEmailAddress": "E-posta adresiniz: {email}",
-    "noKeywordSet": "Henüz kişisel anahtar kelime belirlemediniz. Yalnızca varsayılan işleyiciye anonim olarak yazabilirsiniz!",
-    "apiDescription": "Kişisel API anahtarınızla basit API çağrıları:",
-    "apiDocumentationInfo": "Tüm mevcut uç noktalar, istek/yanıt formatları ve kimlik doğrulama yöntemleri dahil detaylı API dokümantasyonu için kapsamlı API dokümantasyonumuzu ziyaret edin.",
-    "viewApiDocumentation": "API Dokümantasyonunu Görüntüle",
     "apiDocumentation": {
       "title": "API Dokümantasyonu",
       "description": "Synaplan ile entegrasyon için tam API referansı. Tüm uç noktalar istek/yanıt örnekleriyle belgelenmiştir.",
@@ -404,29 +383,23 @@
     "allowWriteHint": "Etkinleştirildiğinde asistan, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",
     "writeBadge": "Yazma izinli"
   },
-  "aiAccounts": {
-    "title": "Yapay zeka hesaplarınız",
-    "subtitle": "Sunucunun hesapları yerine kendi sağlayıcı hesaplarınızı kullanın. Anahtarlar şifreli saklanır ve yalnızca siz görebilirsiniz.",
-    "sectionHiggsfield": "Higgsfield — video üretimi",
-    "sectionAnthropic": "Anthropic — kodlama istemcileri"
-  },
   "messagesGateway": {
-    "title": "Kodlama istemcileri",
+    "title": "Kodlama aracınızı bağlayın",
     "description": "Claude Code ve diğer Anthropic uyumlu ajan araçlarını Synaplan çalışma alanınıza bağlayın. İstekler POST /v1/messages üzerinden gider ve Synaplan bütçenize yazılır.",
     "statusTitle": "Ağ geçidi durumu",
     "statusEnabled": "Etkin",
     "statusNotReady": "Hazır değil",
-    "missingKey": "Bu istekleri ödeyecek bir sağlayıcı anahtarı yok. Bir anahtarı {accounts} altına kaydedin. Bir anahtar kaydedilene kadar hiçbir şey gönderilmez.",
+    "missingKey": "Bu istekleri ödeyecek bir sağlayıcı anahtarı yok. {accounts} bölümüne bir anahtar kaydedin. Bir anahtar kaydedilene kadar hiçbir şey gönderilmez.",
     "missingKeyAdmin": "Bir yönetici sunucu anahtarına da izin verebilir.",
-    "yourAiAccounts": "Yapay zeka hesaplarınız",
-    "gatewayOff": "Kodlama istemcileri kapalı, bu yüzden hiçbir şey gönderilmez. Bir yönetici ağ geçidini açabilir.",
+    "yourAiAccounts": "Anthropic anahtarınız",
+    "gatewayOff": "Kodlama araçları kapalı, bu yüzden hiçbir şey gönderilmez. Bir yönetici ağ geçidini açabilir.",
     "apiKeyStep": "{keys} altında bir Synaplan API anahtarı oluşturun ve sk_your_synaplan_api_key yerine yapıştırın.",
-    "apiKeysLink": "Yönet → Geliştirici ve cihazlar → API Anahtarları",
+    "apiKeysLink": "Uygulamalar › API ve geliştiriciler",
     "firstStartHint": "Claude Code ilk açıldığında bu API anahtarını kullanmak isteyip istemediğinizi ve klasöre güvenip güvenmediğinizi sorar. Önerilen yanıt hayırdır. İkisi için de evet seçin; aksi halde anahtar reddedilir ve hiçbir şey gönderilmez.",
     "statusDisabled": "Devre dışı",
     "budgetLine": "Kullanılan bütçe: %{percent} ({used} / {budget})",
     "budgetLineUnlimited": "Kullanılan bütçe: {used} (aylık bütçe limiti yok)",
-    "setupTitle": "Claude Code kurulumu",
+    "setupTitle": "Kurulumu terminalinize yapıştırın",
     "setupHint": "Claude Code'u bu Synaplan örneğine yönlendirin. Tam olarak bir kimlik bilgisi değişkeni kullanın — ANTHROPIC_API_KEY (x-api-key) veya ANTHROPIC_AUTH_TOKEN (Bearer).",
     "copySetup": "Kurulum komutlarını kopyala",
     "copySuccess": "Kurulum komutları kopyalandı",
@@ -438,8 +411,7 @@
     "saveKey": "Anahtarı kaydet",
     "clearKey": "Anahtarı kaldır",
     "clearKeyConfirmTitle": "Anthropic anahtarı kaldırılsın mı?",
-    "clearKeyConfirm": "Anahtarı kaldır — kodlama istemcileri, yapılandırılmışsa yeniden sunucunun anahtarını kullanır.",
-    "byokPointer": "Kendi Anthropic anahtarınızı mı kullanıyorsunuz? Yapay zeka hesaplarınız altında yönetin.",
+    "clearKeyConfirm": "Anahtarı kaldır — yapılandırılmışsa kodlama araçları yeniden sunucunun anahtarını kullanır.",
     "saveKeySuccess": "API anahtarı kaydedildi",
     "saveKeyError": "API anahtarı kaydedilemedi",
     "clearKeySuccess": "API anahtarı kaldırıldı",
@@ -522,7 +494,7 @@
       "mcpTools": {
         "label": "AI asistanlarının araçlarınızı kullanmasına izin ver",
         "description": "Synaplan, bağlı araç sunucularınızın araçlarını kendisi çalıştırır ve sonucu asistana geri verir.",
-        "noneConfigured": "Henüz bağlı bir araç sunucusu yok. Yönet → Bağlantılar → MCP Sunucuları bölümünden ekleyebilirsiniz."
+        "noneConfigured": "Henüz bağlı bir araç sunucusu yok. Uygulamalar › Araç sunucuları (MCP) bölümünden ekleyebilirsiniz."
       },
       "mcpWithClientTools": {
         "label": "Aracı aracının kendi araçları olsa da sizinkileri sun",
@@ -559,7 +531,7 @@
       },
       "requiresMcpTools": "Yukarıda araçlarınızı açtığınızda kullanılabilir."
     },
-    "loadError": "Kodlama istemcileri ayarları yüklenemedi",
+    "loadError": "Claude Code ayarları yüklenemedi.",
     "source": {
       "user": "Sizin anahtarınız",
       "operator": "Operatör anahtarı",
@@ -688,5 +660,293 @@
     "useTemplateDone": "Kopya oluşturuldu. Siz açana kadar kapalı.",
     "useTemplateNeedsSetup": "Kopya oluşturuldu ve kapalı bırakıldı. Açmadan önce eksik asistanı, aracı veya bağlantıyı bağlayın.",
     "useTemplateNeedsSetupItems": "Kopya oluşturuldu ve kapalı bırakıldı. Hâlâ gerekli: {items}."
+  },
+  "tours": {
+    "common": {
+      "start": "Bana göster",
+      "next": "İleri",
+      "back": "Geri",
+      "done": "Bitti",
+      "progress": "{current} / {total}"
+    },
+    "chats": {
+      "rail": {
+        "title": "Beş alan",
+        "body": "Bu çubuk Sohbetler, Kütüphane, Asistanlar, Uygulamalar ve Yönetim arasında geçiş yapar. Her alan yanında kendi menüsünü açar."
+      },
+      "new": {
+        "title": "Yeni sohbet başlatın",
+        "body": "Her sohbet aşağıdaki listeye kaydedilir; daha sonra geri dönebilirsiniz."
+      },
+      "input": {
+        "title": "İstediğinizi sorun",
+        "body": "Sorunuzu yazıp Enter’a basın. Synaplan uygun bir model seçer; dosyalarınızı ve anılarınızı kullanabilir."
+      },
+      "plus": {
+        "title": "Dosyalar ve araçlar",
+        "body": "Bir dosya veya fotoğraf ekleyin ya da bu mesaj için web araması gibi bir aracı açın."
+      },
+      "model": {
+        "title": "Modeli seçin",
+        "body": "Otomatikte bırakın veya kendiniz bir model seçin. Varsayılanlarınız Asistanlar › AI ayarları altında."
+      },
+      "search": {
+        "title": "Her şeyi bulun",
+        "body": "Sohbetleri, dosyaları, asistanları ve sayfaları her yerden arayın; Ctrl+K veya ⌘K ile de."
+      }
+    },
+    "library": {
+      "tabs": {
+        "title": "Sakladığınız her şey",
+        "body": "Dosyalarınız, uygulamalardan gelenler, yapay zekânın ürettikleri, ayrıca arama ve anılar — her biri bir sekmede."
+      },
+      "upload": {
+        "title": "Dosya ekleyin",
+        "body": "Dosyaları buraya bırakın. Synaplan onları okur; sohbetler ve asistanlar içeriklerinden yanıt verebilir."
+      },
+      "use": {
+        "title": "Sohbette kullanın",
+        "body": "Sohbette bir klasörden yanıt için + › Bilgi klasörü’nü seçin ya da sadece sorun — ilgili dosyalar kendiliğinden bulunur."
+      }
+    },
+    "assistants": {
+      "create": {
+        "title": "Asistan oluşturun",
+        "body": "Bir asistan talimatlarını, dosyalarını ve araçlarını hatırlar; her sohbette tekrarlamanız gerekmez."
+      },
+      "gallery": {
+        "title": "Asistanlarınız",
+        "body": "Biriyle sohbet başlatın, düzenleyin, bir şablonu kopyalayın veya ekibinizle paylaşın."
+      },
+      "more": {
+        "title": "Görevler ve onaylar",
+        "body": "Asistanlar menüsünde zamanlanmış Görevler, sizi bekleyen Onaylar ve AI ayarlarınız da bulunur."
+      }
+    },
+    "tasks": {
+      "new": {
+        "title": "Görev oluşturun",
+        "body": "Yapay zekânın ne yapacağını ve isterseniz ne zaman yapacağını yazın. Sonra kendi kendine çalışır."
+      },
+      "approvals": {
+        "title": "Kontrol sizde",
+        "body": "Bir görev e-posta göndermeden veya bir şeyi değiştirmeden önce Onaylar altında size sorar. Sonuçlar görevin çalıştırmalarında görünür."
+      }
+    },
+    "apps": {
+      "search": {
+        "title": "Uygulama bulun",
+        "body": "Ada veya yapmak istediğinize göre arayın, örneğin e-posta veya takvim."
+      },
+      "tabs": {
+        "title": "Tümü veya bağlı",
+        "body": "Bağlı, yalnızca zaten kullandıklarınızı gösterir; hızlıca kontrol edebilir veya bağlantıyı kesebilirsiniz."
+      },
+      "list": {
+        "title": "Bir uygulama açın",
+        "body": "Her uygulama ne yapabildiğini açıklar, birkaç adımda bağlanır ve aynı sayfadan kapatılabilir."
+      }
+    },
+    "admin": {
+      "cards": {
+        "title": "Sunucunuza bir bakışta",
+        "body": "Kullanıcılar, yeni kayıtlar, kapalı özellikler ve kontrol edilecek modeller. Her kart ilgili sayfayı açar."
+      },
+      "attention": {
+        "title": "Sizi bekleyenler",
+        "body": "Sorunlar burada, sizi doğrudan çözüme götüren bir düğmeyle listelenir."
+      },
+      "sections": {
+        "title": "Yönetim bölümleri",
+        "body": "Sistem durumu, AI altyapısı, Kullanıcılar ve Sistem yapılandırması. Yapılandırma sayfasının kendi ayar araması vardır."
+      }
+    },
+    "checklist": {
+      "title": "Başlarken",
+      "progress": "{total} adımdan {done} tamam",
+      "dismiss": "Listeyi gizle",
+      "doneLabel": "(tamam)",
+      "items": {
+        "provider": {
+          "title": "Bir AI sağlayıcısı kurun",
+          "where": "Yönetim › AI altyapısı altında"
+        },
+        "file": {
+          "title": "Dosya yükleyin",
+          "where": "Sonra Kütüphane › Dosyalar altında bulursunuz"
+        },
+        "assistant": {
+          "title": "Asistan oluşturun",
+          "where": "Asistanlar altında görünür"
+        },
+        "app": {
+          "title": "Bir uygulama bağlayın",
+          "where": "Bağlı uygulamalar Uygulamalar › Bağlı altında listelenir"
+        }
+      }
+    }
+  },
+  "apps": {
+    "title": "Uygulamalar",
+    "subtitle": "Synaplan'ı zaten kullandığınız araçlara bağlayın.",
+    "searchLabel": "Uygulama ara",
+    "searchPlaceholder": "Uygulama ara…",
+    "tabAll": "Tümü",
+    "tabConnected": "Bağlı",
+    "connected": "Bağlı",
+    "connectedEmpty": "Henüz bağlı uygulama yok.",
+    "browseAll": "Tüm uygulamalara göz at",
+    "noResults": "\"{query}\" ile eşleşen uygulama yok.",
+    "clearSearch": "Aramayı temizle",
+    "pluginTagline": "Yöneticiniz tarafından eklendi.",
+    "backToAll": "Tüm uygulamalar",
+    "factWhat": "Ne yapar",
+    "factWho": "Kim görebilir",
+    "factStop": "Nasıl durdurulur",
+    "ownerOnly": "Yalnızca siz. Kuruluşunuzdaki diğer kişiler bu bağlantıyı görmez.",
+    "linkedEmpty": "Henüz bağlantı yok. Bağlantıyı {client} içinden başlatın; burada anahtar girmezsiniz.",
+    "categories": {
+      "messengers": "Mesajlaşma",
+      "website": "Web sitesi",
+      "email": "E-posta",
+      "files": "Dosyalar ve belgeler",
+      "ai": "Yapay zekâ ve medya",
+      "developer": "Araçlar ve geliştiriciler",
+      "extensions": "Eklentiler"
+    },
+    "email": {
+      "addressesTitle": "Adresleriniz",
+      "baseHint": "Buraya e-posta gönderin veya iletin, Synaplan size yanıt verir.",
+      "personalHint": "Anahtar kelimenizle kişisel adresiniz.",
+      "keywordTitle": "Kişisel anahtar kelime",
+      "keywordHint": "İsteğe bağlı: Anahtar kelimeyle örneğin bir proje için kendi adresinizi alırsınız.",
+      "copy": "Kopyala",
+      "copied": "Adres kopyalandı.",
+      "copyFailed": "Adres kopyalanamadı. Seçip elle kopyalayın.",
+      "saveFailed": "Anahtar kelime kaydedilmedi. Tekrar deneyin."
+    },
+    "mailbox": {
+      "loadFailed": "Posta kutularınız yüklenemedi. Sayfayı yenileyin.",
+      "saveFailed": "Posta kutusu kaydedilmedi. Hiçbir şey değiştirilmedi."
+    },
+    "claudeCode": {
+      "keyTitle": "Anthropic anahtarınız",
+      "keyHint": "İsteğe bağlı. Kendi anahtarınızla kullanım Anthropic hesabınıza faturalanır.",
+      "apiKeyTitle": "Bir Synaplan API anahtarı oluşturun",
+      "adminOff": "Ağ geçidi herkes için kapalı. ",
+      "adminLink": "Yönetici › Yapay zeka altında ağ geçidi ayarları"
+    },
+    "items": {
+      "telegram": {
+        "name": "Telegram",
+        "tagline": "Telegram'da asistanınızla sohbet edin.",
+        "about": "Kendi Telegram botunuz asistanınızla yanıt verir. Yalnızca sizin mesajlarınız Synaplan'a ulaşır; botu başka kimse kullanamaz.",
+        "stop": "Aşağıdan bağlantıyı kesin. Bot hemen yanıt vermeyi bırakır."
+      },
+      "whatsapp": {
+        "name": "WhatsApp",
+        "tagline": "Synaplan'a WhatsApp'tan sorun.",
+        "about": "Telefon numaranızı doğrulayın, ardından Synaplan numarasına yazın. Aşağıda seçtiğiniz asistan yanıt verir.",
+        "stop": "Aşağıda asistan seçmeyin veya doğrulanmış numaranızı kaldırın."
+      },
+      "widgets": {
+        "name": "Sohbet widget'ları",
+        "tagline": "Web sitenize bir AI asistanı ekleyin."
+      },
+      "email": {
+        "name": "Synaplan'a e-posta",
+        "tagline": "Bir e-postayı iletin, yanıtını alın.",
+        "about": "Synaplan adresinize yazın veya iletin. Synaplan mesajı okur ve size e-postayla yanıt verir.",
+        "stop": "E-posta göndermeyi bırakmanız yeterli. Kişisel adresinizi kaldırmak için anahtar kelimeyi silin."
+      },
+      "mailbox": {
+        "name": "Posta kutusu otomasyonu",
+        "tagline": "Bir posta kutusunu yapay zekâ sıralasın ve yanıtlasın.",
+        "about": "Synaplan bir IMAP posta kutusunu düzenli olarak kontrol eder, her yeni e-postayı doğru departmana yönlendirir ve SMTP ile yanıt verebilir.",
+        "stop": "Aşağıdaki listede posta kutusunu pasif yapın veya silin."
+      },
+      "microsoft365": {
+        "name": "Microsoft 365",
+        "tagline": "Asistanınız için Outlook e-postası ve takvimi.",
+        "about": "Microsoft ile oturum açtıktan sonra yapay zeka Outlook e-postalarınızı okuyabilir, takviminize etkinlik ekleyebilir ve sonuçları kendi posta kutunuzdan gönderebilir.",
+        "stop": "Aşağıdan bağlantıyı kaldırın. Erişim hemen sona erer."
+      },
+      "dropbox": {
+        "name": "Dropbox",
+        "tagline": "Yapay zeka sonuçlarını doğrudan Dropbox’a kaydedin.",
+        "about": "Dropbox ile oturum açtıktan sonra görevler ve sohbetler dosyaları seçtiğiniz bir klasöre kaydedebilir. Synaplan diğer dosyalarınıza göz atmaz.",
+        "stop": "Aşağıdan bağlantıyı kaldırın. Erişim hemen sona erer."
+      },
+      "webdav": {
+        "name": "Bulut klasörleri ve takvim",
+        "tagline": "Nextcloud, OpenCloud veya herhangi bir WebDAV klasörü.",
+        "about": "Bir klasörü uygulama parolasıyla bağlayın. Görevler sonuçları oraya kaydedebilir ve Nextcloud ile toplantıları takviminize ekleyebilir.",
+        "stop": "Aşağıdan bağlantıyı kaldırın. Erişim hemen sona erer."
+      },
+      "nextcloud": {
+        "name": "Nextcloud'da Synaplan",
+        "tagline": "Asistanlarınızı Nextcloud içinde kullanın.",
+        "about": "Nextcloud'a Synaplan uygulamasını kurun ve orada oturum açın. Nextcloud bu hesabı kullanır; hiçbir zaman anahtar kopyalamazsınız.",
+        "stop": "Aşağıdaki listede sunucunun bağlantısını kesin."
+      },
+      "owncloud": {
+        "name": "ownCloud'da Synaplan",
+        "tagline": "Asistanlarınızı ownCloud içinde kullanın.",
+        "about": "ownCloud'a Synaplan uygulamasını kurun ve orada oturum açın. ownCloud bu hesabı kullanır; hiçbir zaman anahtar kopyalamazsınız.",
+        "stop": "Aşağıdaki listede sunucunun bağlantısını kesin."
+      },
+      "outlook": {
+        "name": "Outlook'ta Synaplan",
+        "tagline": "Outlook'ta asistanınızla e-postaları yanıtlayın ve özetleyin.",
+        "about": "Outlook'a Synaplan eklentisini ekleyin ve orada oturum açın. Eklenti bu hesabı kullanır.",
+        "stop": "Aşağıdaki listeden bağlantısını kesin."
+      },
+      "claudeCode": {
+        "name": "Claude Code ve kodlama araçları",
+        "tagline": "Claude Code'u bilginiz ve bütçenizle Synaplan üzerinden kullanın.",
+        "about": "Claude Code'u bir API anahtarıyla Synaplan'a yönlendirin. İstekler Synaplan araçlarınızı kullanır ve bütçenizden düşülür.",
+        "stop": "API anahtarını API ve geliştiriciler bölümünde iptal edin."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "tagline": "Higgsfield hesabınızla video oluşturun.",
+        "about": "Higgsfield anahtarınızı ve gizli anahtarınızı kaydedin. Sohbette oluşturduğunuz görseller ve videolar Higgsfield hesabınıza faturalandırılır.",
+        "stop": "Anahtarınızı aşağıdan kaldırın."
+      },
+      "mcp": {
+        "name": "Araç sunucuları (MCP)",
+        "tagline": "Yapay zekâya herhangi bir MCP sunucusundan araçlar verin.",
+        "about": "Bir sunucu adresi ekleyin. Yapay zeka sohbette o sunucunun araçlarını kullanabilir.",
+        "stop": "Aşağıdaki listede sunucuyu kapatın veya silin."
+      },
+      "customTools": {
+        "name": "Özel araçlar",
+        "tagline": "Herhangi bir web API'sini araç olarak bağlayın.",
+        "about": "Bir HTTP çağrısını bir kez tanımlayın (veya bir OpenAPI dosyası içe aktarın). Yapay zekâ bunu sohbette kullanabilir.",
+        "stop": "Aşağıdaki listede aracı silin."
+      },
+      "desktop": {
+        "name": "Synaplan Desktop",
+        "tagline": "Asistanınız bilgisayarınızdaki dosyalarla çalışsın.",
+        "about": "Masaüstü uygulamasını bir kodla eşleyin. Sohbetten başlattığınız işleri kendi bilgisayarınızda çalıştırır.",
+        "stop": "Aşağıdan cihazı kaldırın. Çalışan işler iptal edilir."
+      },
+      "api": {
+        "name": "API ve geliştiriciler",
+        "tagline": "Kendi entegrasyonlarınız için API anahtarları ve belgeler.",
+        "about": "Betikler ve diğer uygulamalar için bir anahtar oluşturun. Her çağrı sizin adınıza işler ve limitlerinizden düşülür.",
+        "stop": "Aşağıdan anahtarı iptal edin. Hemen çalışmayı bırakır."
+      }
+    },
+    "linkedSteps": {
+      "title": "Nasıl bağlanır",
+      "install": "Synaplan uygulamasını {client} içine yükleyin.",
+      "installOutlook": "Outlook’ta Synaplan eklentisini ekleyin.",
+      "address": "Orada bu sunucu adresini girin:",
+      "signIn": "Synaplan hesabınızla oturum açıp onaylayın. Bağlantı ardından aşağıda görünür.",
+      "copy": "Adresi kopyala",
+      "copied": "Adres kopyalandı",
+      "copyFailed": "Adres kopyalanamadı. Seçip elle kopyalayın."
+    }
   }
 }

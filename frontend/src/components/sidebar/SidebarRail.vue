@@ -32,6 +32,7 @@
     </button>
 
     <nav
+      data-tour="rail"
       class="flex-1 flex flex-col items-center gap-1 py-1 w-full overflow-y-auto sidebar-scroll"
       :aria-label="$t('nav.menu')"
       @scroll="hideTipNow"
@@ -46,6 +47,7 @@
         :aria-describedby="tip?.key === section.key ? TOOLTIP_ID : undefined"
         :aria-current="activeKey === section.key ? 'page' : undefined"
         :data-testid="section.testId"
+        :data-tour="`rail-${section.key}`"
         @pointerenter="scheduleTip(section, $event)"
         @pointerleave="hideTipSoon"
         @focus="scheduleTip(section, $event, true)"
