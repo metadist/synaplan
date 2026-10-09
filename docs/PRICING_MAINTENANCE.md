@@ -206,6 +206,17 @@ OpenAI announced by email on 2026-10-02 that `gpt-5.4-nano`, `gpt-5.1` and `gpt-
 
 GPT-5.6 Luna is the suggested successor `app:models:check-availability` would print for BID 234 and the same price tier ($0.20 in both, $1.20 vs $1.25 out) on the same Responses API, with vision on top. Retired via the registry, no migration. No shipped `DEFAULTMODEL` binding or `ProviderDefaultsService` recommendation names BID 234; any binding an operator or user stored (`DEFAULTMODEL`, a widget's `aiModelId`, a prompt's `aiModel`) follows `BSUCCESSORID` to Luna at resolution time.
 
+### OpenAI image model shutdowns (2026-10-23 / 2026-12-01)
+
+The OpenAI image guide ([image prompting](https://developers.openai.com/api/docs/guides/image-prompting), model reference) states that `gpt-image-1` is scheduled to shut down on **2026-10-23** and `gpt-image-1.5` on **2026-12-01**. Both were active and selectable catalog rows, so every binding to them would have failed with a provider error after those dates (#2413).
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 29 | gpt-image-1 | `gpt-image-1` | `openai:gpt-image-2.5-flare:text2pic` (GPT Image 2.5 Flare, BID 348) |
+| 151 | gpt-image-1.5 | `gpt-image-1.5` | `openai:gpt-image-2.5-flare:text2pic` (GPT Image 2.5 Flare, BID 348) |
+
+**Retired ahead of the shutdown**, for the same reason as BID 234: the availability check only reports a model once OpenAI stops serving it. Flare is the same provider and key on the same Responses API edit path, ranks above both on the public image-edit boards (LMArena image edit 2026-10-06: Flare 1481, `gpt-image-1.5` 1370, `gpt-image-1` 1139) and is cheaper per image (`quality_prices.high` 1024²: $0.05268 vs $0.133 / $0.167). Retired via the registry, no migration: `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` and switches both rows off on deploy, and any stored binding (`DEFAULTMODEL`, a task prompt's pinned `aiModel`, an "Again" pick in chat, an explicit `modelId` on the media API) follows `BSUCCESSORID` to Flare at resolution time (`ModelConfigService::replacementForRetiredModel()`). When neither the successor nor any capability default can serve, the request is refused instead of reaching the shut-down id. No shipped `DEFAULTMODEL` binding or `ProviderDefaultsService` recommendation names either BID. The edit path's fallback model id in `OpenAIProvider` moved to `gpt-image-2.5-flare`.
+
 ## Maintenance links
 
 **Official provider price pages** (use these first — step 2 of the playbook):

@@ -69,7 +69,7 @@ final class MediaController extends AbstractController
                     ]
                 ),
                 new OA\Property(property: 'provider', type: 'string', example: 'openai'),
-                new OA\Property(property: 'model', type: 'string', example: 'gpt-image-1.5'),
+                new OA\Property(property: 'model', type: 'string', example: 'gpt-image-2.5-flare'),
             ]
         )
     )]

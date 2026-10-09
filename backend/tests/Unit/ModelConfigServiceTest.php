@@ -9,6 +9,7 @@ use App\Entity\Config;
 use App\Entity\GroupConfig;
 use App\Entity\GroupMember;
 use App\Entity\Model;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use App\Repository\GroupConfigRepository;
 use App\Repository\GroupMemberRepository;
@@ -647,6 +648,67 @@ class ModelConfigServiceTest extends TestCase
         self::assertSame(332, $this->service->getDefaultModel('CHAT', 1));
     }
 
+    /**
+     * #2413: a user who picked gpt-image-1.5 for image edits lands on the
+     * successor the retirement records, GPT Image 2.5 Flare.
+     */
+    public function testAUserLevelPic2PicBindingToGptImage15ResolvesToFlare(): void
+    {
+        $flare = ModelCatalog::successorBid(151);
+        self::assertSame(348, $flare);
+        $this->givenModels(
+            [151 => 'OpenAI', 348 => 'OpenAI', 371 => 'Google'],
+            inactiveModelIds: [151],
+            successorByModelId: [151 => $flare],
+        );
+        $this->givenUsableProviders(['openai', 'google']);
+        $this->givenDefaultModelRows([1 => 151, 0 => 371]);
+
+        self::assertSame(348, $this->service->getDefaultModel('PIC2PIC', 1));
+    }
+
+    public function testReplacementForRetiredModelFollowsTheSuccessor(): void
+    {
+        $this->givenModels(
+            [151 => 'OpenAI', 348 => 'OpenAI'],
+            inactiveModelIds: [151],
+            successorByModelId: [151 => 348],
+            retiredModelIds: [151],
+        );
+        $this->givenUsableProviders(['openai']);
+
+        self::assertSame(348, $this->service->replacementForRetiredModel(151, 'TEXT2PIC', 1));
+    }
+
+    /**
+     * An operator who switched a retired row back on makes it look usable;
+     * the provider has still shut it down, so it must never be handed back.
+     */
+    public function testReplacementForRetiredModelNeverReturnsTheRetiredIdItself(): void
+    {
+        $this->givenModels([29 => 'OpenAI'], retiredModelIds: [29]);
+        $this->givenUsableProviders(['openai']);
+
+        self::assertNull($this->service->replacementForRetiredModel(29, 'TEXT2PIC', 1));
+    }
+
+    /**
+     * With no usable successor and no usable default, getDefaultModel() hands
+     * back the configured binding — here another retired row.
+     */
+    public function testReplacementForRetiredModelRejectsARetiredFallback(): void
+    {
+        $this->givenModels(
+            [29 => 'OpenAI', 151 => 'OpenAI'],
+            inactiveModelIds: [29, 151],
+            retiredModelIds: [29, 151],
+        );
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([1 => 151]);
+
+        self::assertNull($this->service->replacementForRetiredModel(29, 'TEXT2PIC', 1));
+    }
+
     public function testResolveUsableModelIdKeepsAnOverrideThatStillWorks(): void
     {
         $this->givenModels([255 => 'OpenAI']);
@@ -671,16 +733,18 @@ class ModelConfigServiceTest extends TestCase
      * @param array<int, string> $providerIdsByModelId
      * @param list<int>          $inactiveModelIds     BIDs to hand back with BACTIVE = 0
      * @param array<int, int>    $successorByModelId
+     * @param list<int>          $retiredModelIds      BIDs whose row carries BRETIREDON
      */
     private function givenModels(
         array $servicesByModelId,
         array $providerIdsByModelId = [],
         array $inactiveModelIds = [],
         array $successorByModelId = [],
+        array $retiredModelIds = [],
     ): void {
         $this->modelRepository
             ->method('find')
-            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds, $successorByModelId): ?Model {
+            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds, $successorByModelId, $retiredModelIds): ?Model {
                 if (!isset($servicesByModelId[$modelId])) {
                     return null;
                 }
@@ -690,6 +754,7 @@ class ModelConfigServiceTest extends TestCase
                 $model->method('getProviderId')->willReturn($providerIdsByModelId[$modelId] ?? '');
                 $model->method('getActive')->willReturn(in_array($modelId, $inactiveModelIds, true) ? 0 : 1);
                 $model->method('getSuccessorId')->willReturn($successorByModelId[$modelId] ?? null);
+                $model->method('isRetired')->willReturn(in_array($modelId, $retiredModelIds, true));
 
                 return $model;
             });
@@ -1657,7 +1722,7 @@ class ModelConfigServiceTest extends TestCase
             'ollama:bge-m3:vectorize' => 'Ollama',
         ];
         foreach ($keyToService as $key => $service) {
-            $bid = \App\Model\ModelCatalog::findBidByKey($key);
+            $bid = ModelCatalog::findBidByKey($key);
             $this->assertNotNull($bid, "catalog key $key must resolve");
             $servicesById[$bid] = $service;
         }

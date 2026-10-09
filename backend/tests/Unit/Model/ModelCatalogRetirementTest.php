@@ -80,6 +80,34 @@ final class ModelCatalogRetirementTest extends TestCase
     }
 
     /**
+     * #2413: OpenAI shuts gpt-image-1 down on 2026-10-23 and gpt-image-1.5 on
+     * 2026-12-01; both retire to GPT Image 2.5 Flare ahead of the shutdown.
+     */
+    public function testTheGptImage1RowsRetireToGptImage25Flare(): void
+    {
+        $flare = ModelCatalog::findBidByKey('openai:gpt-image-2.5-flare:text2pic');
+        self::assertSame(348, $flare);
+
+        foreach ([29 => 'gpt-image-1', 151 => 'gpt-image-1.5'] as $bid => $providerId) {
+            $record = ModelCatalog::retirement($bid);
+            self::assertNotNull($record, $providerId.' must be retired');
+            self::assertSame($providerId, $record['providerId']);
+            self::assertSame('openai:gpt-image-2.5-flare:text2pic', $record['successor']);
+            self::assertSame($flare, ModelCatalog::successorBid($bid));
+        }
+
+        $successorRows = array_values(array_filter(
+            ModelCatalog::all(),
+            static fn (array $row): bool => 348 === $row['id'],
+        ));
+        self::assertNotEmpty($successorRows, 'GPT Image 2.5 Flare (BID 348) is missing from the catalog');
+        $successorRow = $successorRows[0];
+        self::assertSame(1, $successorRow['active']);
+        self::assertSame(1, $successorRow['selectable']);
+        self::assertFalse(ModelCatalog::isRetired(348));
+    }
+
+    /**
      * A retirement whose row is still active is worse than no retirement: the
      * registry claims the model is dead while the seeder keeps shipping it as
      * usable. The catalog derives the flags from the registry, so this asserts

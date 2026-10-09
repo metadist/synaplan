@@ -473,12 +473,12 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
      */
     private function resolveModel(User $user, string $type, ?int $modelId): array
     {
+        $capability = match ($type) {
+            'pic2pic' => 'PIC2PIC',
+            'video' => 'TEXT2VID',
+            default => 'TEXT2PIC',
+        };
         if (null === $modelId) {
-            $capability = match ($type) {
-                'pic2pic' => 'PIC2PIC',
-                'video' => 'TEXT2VID',
-                default => 'TEXT2PIC',
-            };
             $modelId = $this->modelConfigService->getDefaultModel($capability, $user->getId());
         }
 
@@ -489,6 +489,18 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $model = $this->em->getRepository(Model::class)->find($modelId);
         if (null === $model) {
             throw new NoModelAvailableException('Model not found: '.$modelId);
+        }
+
+        // An id the provider shut down follows the retirement record (its
+        // catalog successor) instead of failing at the provider.
+        if ($model->isRetired()) {
+            $replacementId = $this->modelConfigService->replacementForRetiredModel($modelId, $capability, $user->getId());
+            $replacement = null !== $replacementId ? $this->em->getRepository(Model::class)->find($replacementId) : null;
+            if (null === $replacement) {
+                throw new NoModelAvailableException(sprintf('The selected model (%s) has been retired by its provider and no replacement is available. Choose another model in Settings.', $model->getName()));
+            }
+            $model = $replacement;
+            $modelId = $replacementId;
         }
 
         return [

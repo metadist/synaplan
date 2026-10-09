@@ -417,6 +417,25 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $modelConfig = [];
         if ($modelId) {
             $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
+
+            // An "Again" pick or a task prompt's pinned aiModel is a stored copy
+            // of a BID and is read ahead of the default chain, so a retired one
+            // must follow its successor here or it reaches a provider that has
+            // shut the model down.
+            if ($model?->isRetired()) {
+                $replacementId = $this->modelConfigService->replacementForRetiredModel(
+                    (int) $modelId,
+                    $this->capabilityForMediaRequest($mediaType, $isPic2Pic, $hasVideoReferenceImage),
+                    $this->modelConfigService->getEffectiveUserIdForMessage($message),
+                );
+                $model = null !== $replacementId ? $this->em->getRepository(\App\Entity\Model::class)->find($replacementId) : null;
+                $modelId = null !== $model ? $replacementId : null;
+                if (null === $model) {
+                    $provider = null;
+                    $modelName = null;
+                }
+            }
+
             if ($model) {
                 $provider = strtolower($model->getService());
                 $modelName = $model->getProviderId() ?: $model->getName();
@@ -1662,6 +1681,15 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         ]);
 
         return null;
+    }
+
+    private function capabilityForMediaRequest(string $mediaType, bool $isPic2Pic, bool $hasVideoReferenceImage): string
+    {
+        return match ($mediaType) {
+            'video' => $hasVideoReferenceImage ? 'IMG2VID' : 'TEXT2VID',
+            'audio' => 'TEXT2SOUND',
+            default => $isPic2Pic ? 'PIC2PIC' : 'TEXT2PIC',
+        };
     }
 
     /**

@@ -622,6 +622,32 @@ final readonly class ModelConfigService
     }
 
     /**
+     * The model that serves a retired id now: its usable catalog successor,
+     * else the capability default. Null when nothing that is not itself
+     * retired can take over — the caller must refuse rather than send the id
+     * to a provider that shut it down.
+     *
+     * {@see resolveUsableModelId()} alone is not enough here: its last resort
+     * hands back the configured binding even when that binding is the retired
+     * id (or another retired one), and an operator re-enabling a retired row
+     * makes it look usable until the next seed switches it off again.
+     */
+    public function replacementForRetiredModel(int $modelId, string $capability, ?int $userId = null): ?int
+    {
+        $replacementId = $this->resolveUsableModelId($modelId, $capability, $userId);
+        if (null === $replacementId || $replacementId === $modelId) {
+            return null;
+        }
+
+        $replacement = $this->modelRepository->find($replacementId);
+        if (!$replacement instanceof Model || $replacement->isRetired()) {
+            return null;
+        }
+
+        return $replacementId;
+    }
+
+    /**
      * Yields configured model ids in precedence order (user, then group, then
      * global). Lazy so an early usable hit does not read later owners — existing
      * unit tests pin that findOneBy count.
