@@ -371,8 +371,8 @@ test.describe('@ci @layout UI guard — chat surface', () => {
       for (let i = 0; i < count; i++) {
         const name = (await options.nth(i).innerText()).trim()
         if (
-          chosenName === ''
-          || (preferLong ? name.length > chosenName.length : name.length < chosenName.length)
+          chosenName === '' ||
+          (preferLong ? name.length > chosenName.length : name.length < chosenName.length)
         ) {
           chosen = i
           chosenName = name
@@ -399,7 +399,10 @@ test.describe('@ci @layout UI guard — chat surface', () => {
       expect(overflow, `control bar overflows @${width}`).toBeLessThanOrEqual(1)
 
       const toggle = page.locator(CHAT.modelToggle)
-      await expect(toggle).toHaveAttribute('aria-label', new RegExp(modelName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+      await expect(toggle).toHaveAttribute(
+        'aria-label',
+        new RegExp(modelName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      )
       const box = await toggle.boundingBox()
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(MIN_TARGET_PX)
       for (const selector of [CHAT.plusToggle, CHAT.sendBtn]) {

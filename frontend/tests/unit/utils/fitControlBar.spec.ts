@@ -10,9 +10,10 @@ describe('chooseControlBarFit', () => {
   })
 
   it('hides the tools summary before it collapses the model name', () => {
-    expect(
-      chooseControlBarFit((hideSummary) => hideSummary)
-    ).toEqual({ hideToolsSummary: true, collapseModelName: false })
+    expect(chooseControlBarFit((hideSummary) => hideSummary)).toEqual({
+      hideToolsSummary: true,
+      collapseModelName: false,
+    })
   })
 
   it('collapses the model name only after the summary is already gone', () => {
