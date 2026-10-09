@@ -535,7 +535,33 @@
         }
       },
       "valueSet": "Ce réglage a une valeur enregistrée.",
-      "valueEmpty": "Ce réglage est encore vide."
+      "valueEmpty": "Ce réglage est encore vide.",
+      "search": {
+        "label": "Rechercher des paramètres",
+        "placeholder": "Rechercher par nom ou clé, p. ex. inscription ou SMTP",
+        "noHits": "Aucun paramètre ne correspond à « {query} ».",
+        "clear": "Effacer la recherche"
+      }
+    },
+    "attention": {
+      "title": "À traiter",
+      "allGood": "Rien ne demande votre attention pour le moment.",
+      "loadFailed": "Impossible de charger l’état du serveur. Réessayez.",
+      "models": "{count} modèle demande votre attention. | {count} modèles demandent votre attention.",
+      "unhealthy": "{name} est activé mais ne répond pas.",
+      "needsSetup": "{name} est activé mais pas encore configuré.",
+      "openModelHealth": "Ouvrir l’état des modèles",
+      "openStatus": "Ouvrir l’état du système",
+      "cards": {
+        "people": "Personnes",
+        "peopleHint": "Comptes sur ce serveur",
+        "signups": "Nouvelles inscriptions",
+        "signupsHint": "Sur la période du graphique ci-dessous",
+        "features": "Fonctions désactivées",
+        "featuresHint": "Désactivées ou non configurées",
+        "models": "Modèles à vérifier",
+        "modelsHint": "Hors ligne, en échec ou retirés"
+      }
     }
   },
   "statistics": {
@@ -999,7 +1025,9 @@
         "active": "Active",
         "pending": "En attente d’approbation",
         "revoked": "Révoquée"
-      }
+      },
+      "emptyHint": "Un serveur s’enregistre quand quelqu’un installe le module Synaplan dans Nextcloud, ownCloud ou Outlook et saisit l’adresse de ce serveur.",
+      "emptyAction": "Voir les étapes de configuration"
     },
     "policies": {
       "group": "Groupe",
@@ -1066,6 +1094,13 @@
         "CHAT_EXPORT_ENABLED": "Exporter les chats",
         "CHAT_SHARE_ENABLED": "Partager les chats"
       }
+    },
+    "intro": {
+      "users": "Toutes les personnes ayant un compte ici. Changez un niveau, vérifiez une adresse ou désactivez un compte.",
+      "groups": "Les groupes réunissent des personnes pour partager des assistants et fixer des règles une seule fois pour tous.",
+      "policies": "Les règles décident de ce qu’un groupe peut utiliser, par exemple quelles fonctions ou quels modèles.",
+      "moderation": "Contenus signalés par des personnes. Examinez-les, puis conservez-les ou supprimez-les.",
+      "audit": "Un journal de qui a modifié quoi sur ce serveur, les plus récents d’abord."
     }
   },
   "iam": {

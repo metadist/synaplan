@@ -26,6 +26,10 @@
         />
       </PageHeader>
 
+      <p v-if="peopleIntro" class="text-sm txt-secondary mb-4" data-testid="text-people-intro">
+        {{ peopleIntro }}
+      </p>
+
       <UsersTab v-if="activeTab === 'users'" :show-iam-columns="isIamGroupsEnabled()" />
       <GroupsTab v-else-if="activeTab === 'groups'" />
       <PoliciesTab v-else-if="activeTab === 'policies'" />
@@ -72,6 +76,12 @@ function isPeopleTab(id: string): id is PeopleTab {
     id === 'audit'
   )
 }
+
+/** One sentence per tab; Platform instances carries its own intro. */
+const PEOPLE_INTRO_TABS = new Set(['users', 'groups', 'policies', 'moderation', 'audit'])
+const peopleIntro = computed(() =>
+  PEOPLE_INTRO_TABS.has(activeTab.value) ? t(`people.intro.${activeTab.value}`) : ''
+)
 
 const tabNavItems = computed<TabNavItem[]>(() => {
   const tabs: TabNavItem[] = [

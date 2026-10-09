@@ -535,7 +535,33 @@
         }
       },
       "valueSet": "Für diese Einstellung ist ein Wert gespeichert.",
-      "valueEmpty": "Diese Einstellung ist noch leer."
+      "valueEmpty": "Diese Einstellung ist noch leer.",
+      "search": {
+        "label": "Einstellungen durchsuchen",
+        "placeholder": "Nach Name oder Schlüssel suchen, z. B. Registrierung oder SMTP",
+        "noHits": "Keine Einstellung passt zu „{query}“.",
+        "clear": "Suche löschen"
+      }
+    },
+    "attention": {
+      "title": "Braucht Aufmerksamkeit",
+      "allGood": "Gerade braucht nichts deine Aufmerksamkeit.",
+      "loadFailed": "Der Serverstatus konnte nicht geladen werden. Versuche es erneut.",
+      "models": "{count} Modell braucht Aufmerksamkeit. | {count} Modelle brauchen Aufmerksamkeit.",
+      "unhealthy": "{name} ist eingeschaltet, antwortet aber nicht.",
+      "needsSetup": "{name} ist eingeschaltet, aber noch nicht eingerichtet.",
+      "openModelHealth": "Modellzustand öffnen",
+      "openStatus": "Systemstatus öffnen",
+      "cards": {
+        "people": "Personen",
+        "peopleHint": "Konten auf diesem Server",
+        "signups": "Neue Registrierungen",
+        "signupsHint": "Im Zeitraum des Diagramms unten",
+        "features": "Funktionen aus",
+        "featuresHint": "Abgeschaltet oder nicht eingerichtet",
+        "models": "Zu prüfende Modelle",
+        "modelsHint": "Offline, fehlerhaft oder eingestellt"
+      }
     }
   },
   "statistics": {
@@ -999,7 +1025,9 @@
         "active": "Aktiv",
         "pending": "Wartet auf Freigabe",
         "revoked": "Widerrufen"
-      }
+      },
+      "emptyHint": "Ein Server meldet sich, wenn jemand das Synaplan-Add-in in Nextcloud, ownCloud oder Outlook installiert und die Adresse dieses Servers einträgt.",
+      "emptyAction": "Einrichtungsschritte zeigen"
     },
     "policies": {
       "group": "Gruppe",
@@ -1066,6 +1094,13 @@
         "CHAT_EXPORT_ENABLED": "Chats exportieren",
         "CHAT_SHARE_ENABLED": "Chats teilen"
       }
+    },
+    "intro": {
+      "users": "Alle mit einem Konto hier. Stufe ändern, Adresse bestätigen oder ein Konto abschalten.",
+      "groups": "Gruppen fassen Personen zusammen, damit du Assistenten teilen und Regeln einmal für alle festlegen kannst.",
+      "policies": "Richtlinien legen fest, was eine Gruppe nutzen darf, zum Beispiel welche Funktionen oder Modelle.",
+      "moderation": "Von Personen gemeldete Inhalte. Prüfe sie und behalte oder entferne sie.",
+      "audit": "Ein Protokoll, wer was auf diesem Server geändert hat, neueste zuerst."
     }
   },
   "iam": {

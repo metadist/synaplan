@@ -531,7 +531,33 @@
         }
       },
       "valueSet": "Este ajuste tiene un valor guardado.",
-      "valueEmpty": "Este ajuste sigue vacío."
+      "valueEmpty": "Este ajuste sigue vacío.",
+      "search": {
+        "label": "Buscar ajustes",
+        "placeholder": "Busca por nombre o clave, p. ej. registro o SMTP",
+        "noHits": "Ningún ajuste coincide con «{query}».",
+        "clear": "Borrar búsqueda"
+      }
+    },
+    "attention": {
+      "title": "Requiere atención",
+      "allGood": "Ahora mismo nada requiere tu atención.",
+      "loadFailed": "No se pudo cargar el estado del servidor. Inténtalo de nuevo.",
+      "models": "{count} modelo requiere atención. | {count} modelos requieren atención.",
+      "unhealthy": "{name} está activado pero no responde.",
+      "needsSetup": "{name} está activado pero aún no está configurado.",
+      "openModelHealth": "Abrir estado de modelos",
+      "openStatus": "Abrir estado del sistema",
+      "cards": {
+        "people": "Personas",
+        "peopleHint": "Cuentas en este servidor",
+        "signups": "Nuevos registros",
+        "signupsHint": "En el periodo del gráfico de abajo",
+        "features": "Funciones desactivadas",
+        "featuresHint": "Desactivadas o sin configurar",
+        "models": "Modelos por revisar",
+        "modelsHint": "Sin conexión, con fallos o retirados"
+      }
     }
   },
   "statistics": {
@@ -995,7 +1021,9 @@
         "active": "Activa",
         "pending": "En espera de aprobación",
         "revoked": "Revocada"
-      }
+      },
+      "emptyHint": "Un servidor se registra cuando alguien instala el complemento de Synaplan en Nextcloud, ownCloud u Outlook e introduce la dirección de este servidor.",
+      "emptyAction": "Ver los pasos de configuración"
     },
     "policies": {
       "group": "Grupo",
@@ -1062,6 +1090,13 @@
         "CHAT_EXPORT_ENABLED": "Exportar chats",
         "CHAT_SHARE_ENABLED": "Compartir chats"
       }
+    },
+    "intro": {
+      "users": "Todas las personas con cuenta aquí. Cambia un nivel, verifica una dirección o desactiva una cuenta.",
+      "groups": "Los grupos reúnen personas para compartir asistentes y fijar reglas una sola vez para todas.",
+      "policies": "Las políticas deciden qué puede usar un grupo, por ejemplo qué funciones o modelos.",
+      "moderation": "Contenido que la gente ha denunciado. Revísalo y consérvalo o elimínalo.",
+      "audit": "Un registro de quién cambió qué en este servidor, lo más reciente primero."
     }
   },
   "iam": {

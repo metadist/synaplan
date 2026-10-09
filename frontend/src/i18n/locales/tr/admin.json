@@ -531,7 +531,33 @@
         }
       },
       "valueSet": "Bu ayarın kayıtlı bir değeri var.",
-      "valueEmpty": "Bu ayar hâlâ boş."
+      "valueEmpty": "Bu ayar hâlâ boş.",
+      "search": {
+        "label": "Ayarlarda ara",
+        "placeholder": "Ada veya anahtara göre arayın, örn. kayıt veya SMTP",
+        "noHits": "“{query}” ile eşleşen ayar yok.",
+        "clear": "Aramayı temizle"
+      }
+    },
+    "attention": {
+      "title": "İlgi gerekiyor",
+      "allGood": "Şu anda ilginizi gerektiren bir şey yok.",
+      "loadFailed": "Sunucu durumu yüklenemedi. Tekrar deneyin.",
+      "models": "{count} model ilgi gerektiriyor.",
+      "unhealthy": "{name} açık ama yanıt vermiyor.",
+      "needsSetup": "{name} açık ama henüz kurulmadı.",
+      "openModelHealth": "Model sağlığını aç",
+      "openStatus": "Sistem durumunu aç",
+      "cards": {
+        "people": "Kişiler",
+        "peopleHint": "Bu sunucudaki hesaplar",
+        "signups": "Yeni kayıtlar",
+        "signupsHint": "Aşağıdaki grafiğin döneminde",
+        "features": "Kapalı özellikler",
+        "featuresHint": "Kapalı veya kurulmamış",
+        "models": "Kontrol edilecek modeller",
+        "modelsHint": "Çevrimdışı, hatalı veya kullanımdan kalkmış"
+      }
     }
   },
   "statistics": {
@@ -995,7 +1021,9 @@
         "active": "Etkin",
         "pending": "Onay bekliyor",
         "revoked": "İptal edildi"
-      }
+      },
+      "emptyHint": "Biri Nextcloud, ownCloud veya Outlook’a Synaplan eklentisini kurup bu sunucunun adresini girdiğinde sunucu kaydolur.",
+      "emptyAction": "Kurulum adımlarını göster"
     },
     "policies": {
       "group": "Grup",
@@ -1062,6 +1090,13 @@
         "CHAT_EXPORT_ENABLED": "Sohbetleri dışa aktar",
         "CHAT_SHARE_ENABLED": "Sohbetleri paylaş"
       }
+    },
+    "intro": {
+      "users": "Burada hesabı olan herkes. Seviye değiştirin, adres doğrulayın veya bir hesabı kapatın.",
+      "groups": "Gruplar kişileri bir araya getirir; asistanları paylaşır ve kuralları herkes için bir kez belirlersiniz.",
+      "policies": "Politikalar bir grubun neleri kullanabileceğini belirler, örneğin hangi özellikleri veya modelleri.",
+      "moderation": "Kişilerin bildirdiği içerikler. İnceleyin, sonra tutun veya kaldırın.",
+      "audit": "Bu sunucuda kimin neyi değiştirdiğinin kaydı, en yenisi önce."
     }
   },
   "iam": {

@@ -18,6 +18,18 @@ import { resetAiAccountsGatewayCache } from '@/composables/useAiAccounts'
 
 const getMessagesGatewayStatus = vi.fn()
 
+vi.mock('@/services/featuresService', () => ({
+  getFeaturesStatus: vi.fn().mockResolvedValue({ features: {} }),
+}))
+
+vi.mock('@/services/api/adminModelStatusApi', () => ({
+  modelStatusApi: { getStatus: vi.fn().mockResolvedValue({ summary: { needsAttention: 0 } }) },
+}))
+
+vi.mock('@/services/api/partnersApi', () => ({
+  partnersApi: { membership: vi.fn().mockResolvedValue({ reachable: true, opened: false }) },
+}))
+
 vi.mock('@/services/api/messagesGatewayApi', () => ({
   getMessagesGatewayStatus: () => getMessagesGatewayStatus(),
 }))
@@ -286,11 +298,22 @@ describe('useNavItems rail', () => {
       'admin-features',
       'admin-setup',
       'admin-people',
-      'admin-partners',
       'admin-config',
     ])
     expect(children.find((child) => child.key === 'admin-features')?.label).toBe('System status')
     expect(children.some((child) => child.path === '/admin/model-status')).toBe(false)
+  })
+
+  it('lists Partners only once the server is publicly reachable', async () => {
+    const wrapper = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
+    const keys = () =>
+      (
+        wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')?.children ?? []
+      ).map((child: { key: string }) => child.key)
+    expect(keys()).not.toContain('admin-partners')
+    await wrapper.vm.loadFeatureStatus()
+    await flushPromises()
+    expect(keys()).toContain('admin-partners')
   })
 
   it('shows models that need attention as a badge on AI infrastructure', async () => {

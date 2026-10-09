@@ -21,6 +21,11 @@
       <div class="space-y-6">
         <!-- Overview Tab -->
         <div v-if="activeTab === 'overview'" data-testid="section-overview">
+          <AdminAttentionPanel
+            class="mb-6"
+            :total-users="overview?.totalUsers ?? null"
+            :signups="signupCount"
+          />
           <AdminSystemInfoPanel class="mb-6" />
           <div v-if="overviewLoading" class="text-center py-12">
             <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
@@ -420,6 +425,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AdminAttentionPanel from '@/components/admin/AdminAttentionPanel.vue'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
@@ -523,6 +529,11 @@ const recentUsers = computed(() => overview.value?.recentUsers ?? [])
 
 // Registration Analytics
 const registrationAnalytics = ref<RegistrationAnalytics | null>(null)
+const signupCount = computed(() =>
+  registrationAnalytics.value
+    ? registrationAnalytics.value.timeline.reduce((sum, point) => sum + point.count, 0)
+    : null
+)
 const analyticsPeriod = ref<'7d' | '30d' | '90d' | '1y' | 'all'>('30d')
 const analyticsGroupBy = ref<'day' | 'week' | 'month'>('day')
 

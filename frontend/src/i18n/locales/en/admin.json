@@ -535,7 +535,33 @@
         }
       },
       "valueSet": "This setting has a saved value.",
-      "valueEmpty": "This setting is still empty."
+      "valueEmpty": "This setting is still empty.",
+      "search": {
+        "label": "Search settings",
+        "placeholder": "Search by name or key, e.g. registration or SMTP",
+        "noHits": "No setting matches “{query}”.",
+        "clear": "Clear search"
+      }
+    },
+    "attention": {
+      "title": "Needs attention",
+      "allGood": "Nothing needs your attention right now.",
+      "loadFailed": "The server status could not be loaded. Try again.",
+      "models": "{count} model needs attention. | {count} models need attention.",
+      "unhealthy": "{name} is switched on but not responding.",
+      "needsSetup": "{name} is switched on but not set up yet.",
+      "openModelHealth": "Open model health",
+      "openStatus": "Open system status",
+      "cards": {
+        "people": "People",
+        "peopleHint": "Accounts on this server",
+        "signups": "New sign-ups",
+        "signupsHint": "In the period of the chart below",
+        "features": "Features off",
+        "featuresHint": "Switched off or not set up",
+        "models": "Models to check",
+        "modelsHint": "Offline, failing or retired"
+      }
     }
   },
   "statistics": {
@@ -999,7 +1025,9 @@
         "active": "Active",
         "pending": "Waiting for approval",
         "revoked": "Revoked"
-      }
+      },
+      "emptyHint": "A server registers when someone installs the Synaplan add-in in Nextcloud, ownCloud or Outlook and enters this server’s address.",
+      "emptyAction": "Show the setup steps"
     },
     "policies": {
       "group": "Group",
@@ -1066,6 +1094,13 @@
         "CHAT_EXPORT_ENABLED": "Export chats",
         "CHAT_SHARE_ENABLED": "Share chats"
       }
+    },
+    "intro": {
+      "users": "Everyone with an account here. Change a level, verify an address or turn an account off.",
+      "groups": "Groups bundle people so you can share assistants and set rules once for all of them.",
+      "policies": "Policies decide what a group may use, for example which features or models.",
+      "moderation": "Content people reported. Review it, then keep or remove it.",
+      "audit": "A record of who changed what on this server, newest first."
     }
   },
   "iam": {

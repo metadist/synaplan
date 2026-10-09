@@ -24,6 +24,7 @@ import { useConfigStore } from '../stores/config'
 import { useApprovalsStore } from '../stores/approvals'
 import { getFeaturesStatus } from '../services/featuresService'
 import { modelStatusApi } from '../services/api/adminModelStatusApi'
+import { partnersApi } from '../services/api/partnersApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
 import { isApprovalsEnabled } from './useApprovalsFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
@@ -108,6 +109,8 @@ export interface NavItem {
 // Module-scoped so the desktop rail and the mobile nav share one fetch.
 const disabledFeaturesCount = ref(0)
 const offlineModelsCount = ref(0)
+/** Partners needs a public https address; an opened membership stays listed so it can be closed. */
+const partnersListed = ref(false)
 let featureStatusRequested = false
 
 /** Model health reports its latest count so the Operate badge never lags behind the page. */
@@ -186,6 +189,13 @@ export function useNavItems() {
       offlineModelsCount.value = status.summary.needsAttention
     } catch {
       offlineModelsCount.value = 0
+    }
+
+    try {
+      const membership = await partnersApi.membership()
+      partnersListed.value = membership.reachable || membership.opened
+    } catch {
+      partnersListed.value = false
     }
   }
 
@@ -358,12 +368,16 @@ export function useNavItems() {
           label: t('nav.adminPeople'),
           icon: UsersIcon,
         },
-        {
-          key: 'admin-partners',
-          path: '/admin/partners',
-          label: t('nav.adminPartners'),
-          icon: BuildingOffice2Icon,
-        },
+        ...(partnersListed.value
+          ? [
+              {
+                key: 'admin-partners',
+                path: '/admin/partners',
+                label: t('nav.adminPartners'),
+                icon: BuildingOffice2Icon,
+              },
+            ]
+          : []),
         {
           key: 'admin-config',
           path: '/admin/config',
