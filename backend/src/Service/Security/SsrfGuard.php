@@ -121,11 +121,16 @@ final readonly class SsrfGuard
         // reachable — shared address space 100.64/10 (CGNAT, overlay VPNs),
         // 192.0.0/24, benchmarking 198.18/15, documentation prefixes and
         // 6to4 2002::/16, which the two older flags let through.
-        return false === filter_var(
-            $ip,
-            \FILTER_VALIDATE_IP,
-            \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE | \FILTER_FLAG_GLOBAL_RANGE,
-        );
+        // The flags stay behind a method call. Inlined, PHPStan 2.3 on PHP 8.4
+        // treats FILTER_FLAG_GLOBAL_RANGE as FILTER_THROW_ON_FAILURE, because
+        // those constants share a numeric value across the 8.4/8.5 polyfill,
+        // and then drops false from filter_var()'s return type.
+        return false === filter_var($ip, \FILTER_VALIDATE_IP, $this->blockedIpFlags());
+    }
+
+    private function blockedIpFlags(): int
+    {
+        return \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE | \FILTER_FLAG_GLOBAL_RANGE;
     }
 
     /**
