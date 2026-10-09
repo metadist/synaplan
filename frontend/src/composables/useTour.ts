@@ -172,9 +172,12 @@ function startTour(id: string): boolean {
     stageRadius: 12,
     allowClose: true,
     smoothScroll: true,
-    onDestroyed: () => {
+    // driver.js skips onDestroyed when the tour closes before its first
+    // highlight has settled, so every user close is handled here instead.
+    onDestroyStarted: () => {
       activeTour.value = null
       void markSeen(id)
+      instance.destroy()
     },
   })
   instance.drive()

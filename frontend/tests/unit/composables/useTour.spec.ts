@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const driveSpy = vi.fn()
-let lastConfig: { steps: Array<{ element?: Element }>; onDestroyed?: () => void } | null = null
+const destroySpy = vi.fn()
+let lastConfig: { steps: Array<{ element?: Element }>; onDestroyStarted?: () => void } | null = null
 vi.mock('driver.js', () => ({
   driver: (config: typeof lastConfig) => {
     lastConfig = config
-    return { drive: driveSpy }
+    return { drive: driveSpy, destroy: destroySpy }
   },
 }))
 vi.mock('driver.js/dist/driver.css', () => ({}))
@@ -43,6 +44,7 @@ describe('useTour', () => {
   beforeEach(() => {
     localStorage.clear()
     driveSpy.mockReset()
+    destroySpy.mockReset()
     httpClient.mockReset()
     lastConfig = null
     authenticated = false
@@ -53,7 +55,22 @@ describe('useTour', () => {
     expect(useTour().startTour('demo')).toBe(true)
     expect(driveSpy).toHaveBeenCalledOnce()
     expect(lastConfig?.steps).toHaveLength(1)
-    lastConfig?.onDestroyed?.()
+    lastConfig?.onDestroyStarted?.()
+  })
+
+  it('marks the tour seen and frees the slot however it is closed', async () => {
+    useTour().startTour('demo')
+    expect(useTour().activeTour.value).toBe('demo')
+
+    lastConfig?.onDestroyStarted?.()
+
+    expect(destroySpy).toHaveBeenCalledOnce()
+    expect(useTour().activeTour.value).toBeNull()
+    await vi.waitFor(() =>
+      expect(JSON.parse(localStorage.getItem('synaplan.toursSeen') ?? '[]')).toEqual(['demo'])
+    )
+    expect(useTour().startTour('demo')).toBe(true)
+    lastConfig?.onDestroyStarted?.()
   })
 
   it('refuses an unknown tour', () => {
