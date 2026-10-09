@@ -40,6 +40,8 @@ export interface NavChild {
   group?: string
   /** Stable group id (`assistants`, `channels`, …) for testids and nesting */
   groupKey?: string
+  /** Sub-pages opened from this entry that keep it highlighted. */
+  alsoActiveOn?: string[]
 }
 
 export interface NavChildGroup {
@@ -85,6 +87,7 @@ export function hasNestedNavGroups(children: NavChild[] | undefined): boolean {
  * every other child uses prefix match.
  */
 export function isNavChildActive(child: NavChild, sectionPath: string, routePath: string): boolean {
+  if (child.alsoActiveOn?.some((path) => routePath.startsWith(path))) return true
   return child.path === sectionPath ? routePath === child.path : routePath.startsWith(child.path)
 }
 
@@ -347,6 +350,7 @@ export function useNavItems() {
           label: t('nav.adminProviderSetup'),
           icon: CpuChipIcon,
           badge: badge(offlineModelsCount.value),
+          alsoActiveOn: ['/admin/vectors'],
         },
         {
           key: 'admin-people',

@@ -1,7 +1,6 @@
 import { computed, ref, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-  CircleStackIcon,
   FolderIcon,
   FolderPlusIcon,
   InboxArrowDownIcon,
@@ -13,7 +12,7 @@ import { getConfigSync } from '@/services/api/httpClient'
 import filesService from '@/services/filesService'
 
 export interface LibraryLink {
-  id: 'browse' | 'incoming' | 'generated' | 'workspace' | 'search' | 'vectors'
+  id: 'browse' | 'incoming' | 'generated' | 'workspace' | 'search'
   to: string
   label: string
   icon: Component
@@ -121,17 +120,6 @@ export function useLibraryLinks() {
       sidebarTestId: 'link-sidebar-v2-files-search',
       mobileTestId: 'link-mobile-files-search',
     })
-
-    if (authStore.isAdmin) {
-      items.push({
-        id: 'vectors',
-        to: '/files/vectors',
-        label: t('files.tabVectors'),
-        icon: CircleStackIcon,
-        sidebarTestId: 'link-sidebar-v2-files-vectors',
-        mobileTestId: 'link-mobile-files-vectors',
-      })
-    }
 
     return items
   })

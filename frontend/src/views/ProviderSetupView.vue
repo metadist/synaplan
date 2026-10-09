@@ -68,7 +68,19 @@
 
       <div v-else-if="activeTab === 'search'" class="space-y-8" data-testid="ai-tab-search">
         <section class="space-y-3">
-          <p class="text-sm txt-secondary">{{ $t('adminSetup.intro.search') }}</p>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <p class="text-sm txt-secondary flex-1 min-w-[16rem]">
+              {{ $t('adminSetup.intro.search') }}
+            </p>
+            <RouterLink
+              to="/admin/vectors"
+              class="btn-secondary px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2"
+              data-testid="link-admin-vector-storage"
+            >
+              <CircleStackIcon class="w-4 h-4" aria-hidden="true" />
+              {{ $t('adminSetup.openVectorStorage') }}
+            </RouterLink>
+          </div>
           <ConfigSectionStack
             :config="systemConfig"
             :sections="AI_TAB_SECTIONS.search"
@@ -114,7 +126,8 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { CircleStackIcon } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'

@@ -235,7 +235,6 @@
     "tabGenerated": "Üretilen",
     "tabWorkspace": "Çalışma alanı",
     "workspace": {
-      "title": "Çalışma alanı",
       "subtitle": "Yapay zekânın dosya çalışması için çalışma klasörü — dosyaları burada okur, yazar ve çalıştırmalar arasında yeniden kullanır. Tamamlanan sonuçlar Üretilen bölümüne kaydedilir.",
       "empty": "Yapay zekâdan dosyalar üzerinde çalıştırmalar arasında çalışmaya devam etmesini istediğinizde burada görünür. Tek seferlik sonuçlar Üretilen bölümüne kaydedilir.",
       "emptyAction": "Sohbete dön",
@@ -368,7 +367,6 @@
       "dismissConfirm": "Çıkar"
     },
     "incoming": {
-      "title": "Gelen",
       "subtitle": "Bilgi tabanınız için gönderilen dosyalar — inceleyin, sonra saklayın veya çıkarın.",
       "keep": "Sakla",
       "keepAll": "Tümünü sakla",
@@ -383,7 +381,6 @@
       "open": "Önizleme"
     },
     "generated": {
-      "title": "Üretilen",
       "subtitle": "Sohbetlerinizden ve görevlerinizden gelen tamamlanmış sonuçlar — görseller, ses, belgeler ve kodla oluşturulan dosyalar — arama, yeniden kullanma ve indirme için bilgi tabanınıza kaydedilir.",
       "kinds": {
         "all": "Tümü",
@@ -405,7 +402,8 @@
       "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. Asistan, yapay zekâ ile aranabilir işaretli dosyaları kullanabilir. Fotoğraflar, kayıtlar ve yapay zekânın ürettiği dosyalar için önce aranabilir yapmanız gerekir.",
       "dismiss": "Anladım",
       "reopen": "Bu nedir?"
-    }
+    },
+    "searchIntro": "Kendi sözlerinizle bir soru sorun ve dosyalarınızdaki hangi bölümlerin yanıt verdiğini görün."
   },
   "vectorStorage": {
     "intro": "Vektör deponuza genel bir bakış — kaç dosyanın dizinlendiği ve anlamsal arama için kaç vektörün (parça) saklandığı.",

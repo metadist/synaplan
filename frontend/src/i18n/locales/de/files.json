@@ -222,7 +222,6 @@
     "tabGenerated": "Erzeugt",
     "tabWorkspace": "Arbeitsbereich",
     "workspace": {
-      "title": "Arbeitsbereich",
       "subtitle": "Der Arbeitsordner der KI für die Dateiarbeit – hier liest und schreibt sie Dateien und verwendet sie über mehrere Läufe hinweg wieder. Fertige Ergebnisse werden unter „Erzeugt“ gespeichert.",
       "empty": "Erscheint, wenn du die KI bittest, über mehrere Läufe hinweg an Dateien weiterzuarbeiten. Einmalige Ergebnisse werden stattdessen unter „Erzeugt“ gespeichert.",
       "emptyAction": "Zurück zum Chat",
@@ -355,7 +354,6 @@
       "dismissConfirm": "Verwerfen"
     },
     "incoming": {
-      "title": "Eingang",
       "subtitle": "Dateien, die für deine Wissensbasis eingeliefert wurden – prüfen, dann behalten oder verwerfen.",
       "keep": "Behalten",
       "keepAll": "Alle behalten",
@@ -370,7 +368,6 @@
       "open": "Vorschau"
     },
     "generated": {
-      "title": "Erzeugt",
       "subtitle": "Fertige Ergebnisse aus deinen Chats und Aufgaben – Bilder, Audio, Dokumente und von Code erzeugte Dateien – in deiner Wissensbasis gespeichert, zum Suchen, Wiederverwenden und Herunterladen.",
       "kinds": {
         "all": "Alle",
@@ -392,7 +389,8 @@
       "text": "Alles, was du hochlädst oder erstellst, liegt hier. Der Assistent nutzt Dateien, die als „KI-durchsuchbar“ markiert sind. Fotos, Aufnahmen und KI-erzeugte Dateien musst du zuerst durchsuchbar machen.",
       "dismiss": "Verstanden",
       "reopen": "Was ist das?"
-    }
+    },
+    "searchIntro": "Stelle eine Frage in eigenen Worten und sieh, welche Stellen in deinen Dateien sie beantworten."
   },
   "vectorStorage": {
     "intro": "Ein Überblick über deinen Vektorspeicher — wie viele Dateien indexiert sind und wie viele Vektoren (Chunks) für die semantische Suche gespeichert werden.",

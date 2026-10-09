@@ -553,14 +553,7 @@ const router = createRouter({
       component: () => import('@/views/WorkspaceView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.filesWorkspace', i18n: ['files'] },
     },
-    {
-      // Vector storage (Qdrant/MariaDB) inventory: how many files and vectors
-      // are stored for the user, plus a global admin view.
-      path: '/files/vectors',
-      name: 'files-vectors',
-      component: () => import('@/views/VectorStorageView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.vectorStorage', i18n: ['files'] },
-    },
+    { path: '/files/vectors', redirect: '/admin/vectors' },
 
     // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
     { path: '/rag', redirect: '/files/search' },
@@ -689,6 +682,17 @@ const router = createRouter({
         i18n: ['admin', 'config', ...BUNDLE_PANEL_I18N_NAMESPACES],
       },
       beforeEnter: systemConfigRedirect,
+    },
+    {
+      path: '/admin/vectors',
+      name: 'admin-vectors',
+      component: () => import('@/views/VectorStorageView.vue'),
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.vectorStorage',
+        i18n: ['files', 'admin'],
+      },
     },
     {
       path: '/admin/setup',

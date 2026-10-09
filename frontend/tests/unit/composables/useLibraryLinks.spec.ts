@@ -98,11 +98,8 @@ describe('useLibraryLinks', () => {
     )
   })
 
-  it('shows Vectors only for admins', () => {
-    const member = mountLinks({ level: 'PRO' })
-    expect(member.find('[data-testid="link-sidebar-v2-files-vectors"]').exists()).toBe(false)
-
+  it('keeps vector storage out of the Library, even for admins', () => {
     const admin = mountLinks({ level: 'ADMIN', isAdmin: true })
-    expect(admin.find('[data-testid="link-sidebar-v2-files-vectors"]').exists()).toBe(true)
+    expect(admin.find('[data-testid="link-sidebar-v2-files-vectors"]').exists()).toBe(false)
   })
 })
