@@ -334,7 +334,7 @@
       "availableToolsHelp": "Aktivieren Sie Agents, die für diesen Prompt verfügbar sein sollen.",
       "internetSearch": {
         "label": "Internetsuche",
-        "help": "Die KI sucht nur im Web, wenn eine Nachricht aktuelle Informationen braucht, etwa Wetter, Preise oder Nachrichten. Für eine einzelne Nachricht wählst du im Chat Tools → Web-Suche. „Aus“ schaltet die Websuche für diesen Prompt ab.",
+        "help": "Die KI sucht nur im Web, wenn eine Nachricht aktuelle Informationen braucht, etwa Wetter, Preise oder Nachrichten. Für eine einzelne Nachricht wählen Sie im Chat Tools → Web-Suche. „Aus“ schaltet die Websuche für diesen Prompt ab.",
         "auto": "Automatisch (KI entscheidet)",
         "off": "Aus"
       },
