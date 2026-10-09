@@ -6,7 +6,7 @@
       "tabs": {
         "choice": "Modellwahl",
         "list": "Alle Modelle",
-        "runs": "Vektor-Läufe",
+        "runs": "Embedding-Läufe",
         "edit": "Modelle bearbeiten"
       },
       "defaultConfigTitle": "Standard-Modellkonfiguration",
@@ -308,15 +308,15 @@
       }
     },
     "taskPrompts": {
-      "title": "KI-Anweisungen",
+      "title": "Themen",
       "description": "Verwalten Sie Ihre Prompts",
-      "subtitle": "auch System-Prompts genannt — legen fest, wie die KI einzelne Aufgaben bearbeitet",
+      "subtitle": "Jedes Thema sagt der KI, wie sie eine Art von Anfrage beantworten soll. Für jede Nachricht wird das passende Thema automatisch gewählt.",
       "selectPrompt": "Prompt auswählen",
-      "selectPromptTitle": "Prompt auswählen",
-      "selectPromptDescription": "Wählen Sie einen vorhandenen Prompt zum Anzeigen oder Bearbeiten",
+      "selectPromptTitle": "Thema auswählen",
+      "selectPromptDescription": "Wähle links ein Thema, um es anzusehen oder zu ändern.",
       "selectPlaceholder": "Task-Prompt auswählen...",
       "searchPlaceholder": "Topics, Beschreibungen, Keywords suchen...",
-      "noPromptsMatch": "Keine Prompts entsprechen der aktuellen Suche/Filter.",
+      "noPromptsMatch": "Keine Themen passen zu deiner Suche.",
       "filterAll": "Alle",
       "filterSystem": "System",
       "filterCustom": "Eigene",
@@ -342,21 +342,21 @@
       "contentPlaceholder": "Geben Sie Ihren System-Prompt hier ein...",
       "contentHelp": "Diese System-Nachricht steuert das Verhalten der KI.",
       "promptContentPlaceholder": "Geben Sie den System-Prompt ein, der das Verhalten der KI für diese Aufgabe steuert...",
-      "createNew": "Neuen Prompt erstellen",
+      "createNew": "Neues Thema",
       "loadTemplate": "Vorlage laden",
       "topic": "Thema",
       "topicPlaceholder": "z.B. custom-analyzer",
       "name": "Name",
       "namePlaceholder": "z.B. Eigener Datei-Analyzer",
-      "createButton": "Neuen Prompt erstellen",
+      "createButton": "Neues Thema",
       "dangerZone": "Gefahrenzone",
       "deleteWarning": "Das Löschen dieses Prompts ist dauerhaft und kann nicht rückgängig gemacht werden.",
       "deletePrompt": "Prompt löschen",
       "saveChanges": "Änderungen speichern",
-      "noPrompts": "Keine Prompts verfügbar",
+      "noPrompts": "Noch keine Themen.",
       "language": "Sprache",
       "workingLanguage": "Arbeitssprache: {language}",
-      "workingLanguageHint": "Die angezeigten Prompts basieren auf Ihrer aktuellen Oberflächensprache. Eigene Prompts, die Sie hier erstellen, erscheinen nur in dieser Sprache.",
+      "workingLanguageHint": "Themen werden in deiner Oberflächensprache angezeigt. Selbst angelegte Themen erscheinen nur in dieser Sprache.",
       "systemPromptAdminTitle": "System-Prompt (Admin-Bearbeitung)",
       "systemPromptAdminDesc": "Sie haben Admin-Zugriff. Änderungen aktualisieren diesen System-Prompt für ALLE Benutzer in allen Sprachen.",
       "systemPromptLanguageFixed": "System-Prompt — die Sprache ist auf den Originalwert festgelegt und kann nicht geändert werden.",
@@ -1152,6 +1152,14 @@
       }
     },
     "setByAdmin": "Von Ihrer Verwaltung festgelegt",
-    "fromGroup": "Vorgabe Ihrer Gruppe"
+    "fromGroup": "Vorgabe Ihrer Gruppe",
+    "aiSettings": {
+      "title": "KI-Einstellungen",
+      "subtitle": "Lege fest, welches KI-Modell welche Arbeit übernimmt, und schreibe Themen, die der KI sagen, wie sie antworten soll.",
+      "tabs": {
+        "defaults": "Standardmodelle",
+        "topics": "Themen"
+      }
+    }
   }
 }

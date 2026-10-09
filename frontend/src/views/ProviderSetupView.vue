@@ -47,6 +47,8 @@
 
       <ModelHealthPanel v-else-if="activeTab === 'health'" />
 
+      <AIModelsConfiguration v-else-if="activeTab === 'catalog'" scope="admin" />
+
       <div v-else-if="activeTab === 'documents'" class="space-y-8" data-testid="ai-tab-documents">
         <ExtractionPlugTab />
         <section class="space-y-3" aria-labelledby="ai-documents-services">
@@ -89,6 +91,9 @@
           :sections="AI_TAB_SECTIONS.behavior"
           testid="ai-behavior-accordion"
         />
+        <div class="pt-5" data-testid="ai-behavior-routing">
+          <AppPanelHost :loader="loadRouting" />
+        </div>
       </div>
 
       <!-- Stays mounted after the first visit so an unsaved prompt draft survives a tab switch. -->
@@ -114,6 +119,7 @@ import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
+import AppPanelHost from '@/components/apps/AppPanelHost.vue'
 import ConfigSectionStack from '@/components/admin/ConfigSectionStack.vue'
 import ModelHealthPanel from '@/components/admin/ModelHealthPanel.vue'
 import RestartRequiredBanner from '@/components/admin/RestartRequiredBanner.vue'
@@ -129,6 +135,10 @@ import { aiInfrastructureRedirect } from '@/router/operateRedirects'
 const AdminPromptsPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminPromptsPanel.vue')
 )
+const AIModelsConfiguration = defineAsyncComponent(
+  () => import('@/components/config/AIModelsConfiguration.vue')
+)
+const loadRouting = () => import('@/components/config/SortingPromptConfiguration.vue')
 const CodingGatewayAdminTab = defineAsyncComponent(
   () => import('@/components/admin/CodingGatewayAdminTab.vue')
 )
@@ -166,6 +176,12 @@ const tabs = computed<TabNavItem[]>(() => [
     icon: 'mdi:heart-pulse',
     testid: 'admin-setup-tab-health',
     badge: modelsNeedingAttention.value,
+  },
+  {
+    id: 'catalog',
+    label: t('adminSetup.tabs.catalog'),
+    icon: 'mdi:pencil-ruler',
+    testid: 'admin-setup-tab-catalog',
   },
   {
     id: 'documents',

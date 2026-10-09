@@ -5,8 +5,8 @@
       "description": "Configurez et gérez vos modèles IA",
       "tabs": {
         "choice": "Choix du modèle",
-        "list": "Liste complète",
-        "runs": "Exécutions vectorielles",
+        "list": "Tous les modèles",
+        "runs": "Exécutions d’embedding",
         "edit": "Modifier les modèles"
       },
       "defaultConfigTitle": "Configuration des modèles par défaut",
@@ -321,15 +321,15 @@
       }
     },
     "taskPrompts": {
-      "title": "Instructions IA",
-      "subtitle": "aussi appelées messages système — définissent comment l’IA traite chaque tâche",
+      "title": "Thèmes",
+      "subtitle": "Chaque thème indique à l’IA comment répondre à un type de demande. Pour chaque message, le thème adapté est choisi automatiquement.",
       "selectPrompt": "Sélectionner une instruction",
-      "selectPromptTitle": "Sélectionner une instruction",
-      "selectPromptDescription": "Choisissez une instruction existante à consulter ou à modifier",
+      "selectPromptTitle": "Choisissez un thème",
+      "selectPromptDescription": "Choisissez un thème à gauche pour le voir ou le modifier.",
       "selectPromptHelp": "Choisissez une instruction existante à modifier ou à utiliser comme modèle",
       "selectPlaceholder": "Sélectionnez une instruction de tâche…",
       "searchPlaceholder": "Rechercher des sujets, descriptions, mots-clés…",
-      "noPromptsMatch": "Aucune instruction ne correspond à la recherche ou au filtre actuel.",
+      "noPromptsMatch": "Aucun thème ne correspond à votre recherche.",
       "filterAll": "Toutes",
       "filterSystem": "Système",
       "filterCustom": "Personnalisées",
@@ -355,21 +355,21 @@
       "contentPlaceholder": "Saisissez votre message système ici…",
       "promptContentPlaceholder": "Saisissez le message système qui guidera le comportement de l’IA pour cette tâche…",
       "contentHelp": "C’est le message système qui guide le comportement de l’IA",
-      "createNew": "Créer une nouvelle instruction",
+      "createNew": "Nouveau thème",
       "loadTemplate": "Charger un modèle",
       "topic": "Sujet",
       "topicPlaceholder": "p. ex. analyseur-personnalise",
       "name": "Nom",
       "namePlaceholder": "p. ex. Analyseur de fichiers personnalisé",
-      "createButton": "Créer une nouvelle instruction",
+      "createButton": "Nouveau thème",
       "dangerZone": "Zone de danger",
       "deleteWarning": "La suppression de cette instruction est définitive et irréversible.",
       "deletePrompt": "Supprimer l’instruction",
       "saveChanges": "Enregistrer les modifications",
-      "noPrompts": "Aucune instruction disponible",
+      "noPrompts": "Pas encore de thèmes.",
       "language": "Langue",
       "workingLanguage": "Travail en : {language}",
-      "workingLanguageHint": "Les instructions affichées dépendent de la langue actuelle de l’interface. Les instructions personnalisées que vous créez n’apparaîtront que dans cette langue.",
+      "workingLanguageHint": "Les thèmes s’affichent dans la langue de l’interface. Ceux que vous créez n’apparaissent que dans cette langue.",
       "systemPromptAdminTitle": "Instruction système (modification admin)",
       "systemPromptAdminDesc": "Vous avez un accès administrateur. Les modifications mettront à jour cette instruction système pour TOUS les utilisateurs, dans toutes les langues.",
       "systemPromptLanguageFixed": "Instruction système — la langue est verrouillée sur la valeur d’origine et ne peut pas être changée.",
@@ -1178,6 +1178,14 @@
       }
     },
     "setByAdmin": "Défini par votre administrateur",
-    "fromGroup": "Valeur par défaut de votre groupe"
+    "fromGroup": "Valeur par défaut de votre groupe",
+    "aiSettings": {
+      "title": "Paramètres IA",
+      "subtitle": "Choisissez quel modèle IA fait chaque type de travail et rédigez des thèmes qui indiquent à l’IA comment répondre.",
+      "tabs": {
+        "defaults": "Modèles par défaut",
+        "topics": "Thèmes"
+      }
+    }
   }
 }

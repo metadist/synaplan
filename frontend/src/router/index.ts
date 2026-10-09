@@ -34,7 +34,8 @@ import {
 import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { normalizeSettingsRoute, settingsLocationFor } from '@/composables/useSettingsSections'
-import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
+import { assistantsRouteGuard } from '@/router/assistantGuards'
+import { aiModelsTabRedirect, routingRedirect, topicsRedirect } from '@/router/aiSettingsRedirects'
 import {
   approvalsRouteGuard,
   connectionsRedirect,
@@ -406,25 +407,13 @@ const router = createRouter({
       name: 'ai-models',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels', i18n: ['config'] },
+      beforeEnter: aiModelsTabRedirect,
     },
     {
       path: '/prompts',
       name: 'prompts',
       component: () => import('@/views/PromptsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.prompts', i18n: ['chat'] },
-    },
-    {
-      path: '/ai/task-prompts',
-      name: 'ai-task-prompts',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configTaskPrompts', i18n: ['config'] },
-    },
-    {
-      path: '/ai/instructions',
-      name: 'ai-instructions',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configTaskPrompts', i18n: ['config'] },
-      beforeEnter: instructionsRouteGuard,
     },
     {
       path: '/ai/assistants',
@@ -440,14 +429,17 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.assistantBuilder', i18n: ['assistants'] },
       beforeEnter: assistantsRouteGuard,
     },
-    {
-      path: '/ai/routing',
-      name: 'ai-routing',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configSortingPrompt', i18n: ['config'] },
-    },
     // --- Redirects from the 2026-06 tree (UX overhaul; keep ≥ 2 releases) ---
     { path: '/channels', redirect: '/apps' },
+    { path: '/ai/task-prompts', redirect: topicsRedirect },
+    { path: '/ai/instructions', redirect: topicsRedirect },
+    // A guard, not a redirect: it must run after auth has loaded who is an admin.
+    {
+      path: '/ai/routing',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true },
+      beforeEnter: routingRedirect,
+    },
     { path: '/channels/email', redirect: '/apps/mailbox' },
     // OAuth callbacks still land here with `?m365=` / `?dropbox=`.
     { path: '/channels/connections', redirect: connectionsRedirect },
@@ -575,7 +567,7 @@ const router = createRouter({
     { path: '/config', redirect: '/apps' },
     { path: '/config/inbound', redirect: '/apps' },
     { path: '/config/ai-models', redirect: '/ai/models' },
-    { path: '/config/task-prompts', redirect: '/ai/instructions' },
+    { path: '/config/task-prompts', redirect: topicsRedirect },
     { path: '/config/sorting-prompt', redirect: '/ai/routing' },
     { path: '/config/api-keys', redirect: '/apps/api' },
     { path: '/config/api-documentation', redirect: '/apps/api/docs' },

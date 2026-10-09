@@ -7,8 +7,8 @@
       "description": "Configure and manage your AI models",
       "tabs": {
         "choice": "Model Choice",
-        "list": "List Of All",
-        "runs": "Vector Runs",
+        "list": "All models",
+        "runs": "Embedding runs",
         "edit": "Edit Models"
       },
       "defaultConfigTitle": "Default Model Configuration",
@@ -323,15 +323,15 @@
       }
     },
     "taskPrompts": {
-      "title": "AI Instructions",
-      "subtitle": "aka system prompts — define how the AI handles each task",
+      "title": "Topics",
+      "subtitle": "Each topic tells the AI how to answer one kind of request. For every message, the matching topic is picked automatically.",
       "selectPrompt": "Select Prompt",
-      "selectPromptTitle": "Select a Prompt",
-      "selectPromptDescription": "Choose an existing prompt to view or edit",
+      "selectPromptTitle": "Select a topic",
+      "selectPromptDescription": "Pick a topic on the left to view or change it.",
       "selectPromptHelp": "Choose an existing prompt to edit or use as template",
       "selectPlaceholder": "Select a task prompt...",
       "searchPlaceholder": "Search topics, descriptions, keywords...",
-      "noPromptsMatch": "No prompts match the current search/filter.",
+      "noPromptsMatch": "No topics match your search.",
       "filterAll": "All",
       "filterSystem": "System",
       "filterCustom": "Custom",
@@ -357,21 +357,21 @@
       "contentPlaceholder": "Enter your system prompt here...",
       "promptContentPlaceholder": "Enter the system prompt that will guide the AI's behavior for this task...",
       "contentHelp": "This is the system message that guides the AI's behavior",
-      "createNew": "Create New Prompt",
+      "createNew": "New topic",
       "loadTemplate": "Load Template",
       "topic": "Topic",
       "topicPlaceholder": "e.g., custom-analyzer",
       "name": "Name",
       "namePlaceholder": "e.g., Custom File Analyzer",
-      "createButton": "Create New Prompt",
+      "createButton": "New topic",
       "dangerZone": "Danger Zone",
       "deleteWarning": "Deleting this prompt is permanent and cannot be undone.",
       "deletePrompt": "Delete Prompt",
       "saveChanges": "Save Changes",
-      "noPrompts": "No prompts available",
+      "noPrompts": "No topics yet.",
       "language": "Language",
       "workingLanguage": "Working in: {language}",
-      "workingLanguageHint": "Prompts shown are based on your current interface language. Custom prompts you create will only appear in this language.",
+      "workingLanguageHint": "Topics are shown in your interface language. Topics you create appear only in this language.",
       "systemPromptAdminTitle": "System Prompt (Admin Edit)",
       "systemPromptAdminDesc": "You have admin access. Changes will update this system prompt for ALL users across all languages.",
       "systemPromptLanguageFixed": "System prompt — language is locked to the original value and cannot be changed.",
@@ -1177,6 +1177,14 @@
         "today": "Today",
         "this_week": "This Week",
         "this_month": "This Month"
+      }
+    },
+    "aiSettings": {
+      "title": "AI settings",
+      "subtitle": "Choose which AI model does each kind of work, and write topics that tell the AI how to answer.",
+      "tabs": {
+        "defaults": "Default models",
+        "topics": "Topics"
       }
     }
   }

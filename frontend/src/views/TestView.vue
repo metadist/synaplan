@@ -87,15 +87,15 @@
             >
             <router-link
               data-testid="link-route"
-              to="/ai/instructions"
+              to="/ai/models?tab=topics"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/ai/instructions</router-link
+              >/ai/models?tab=topics</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/ai/routing"
+              to="/admin/setup?tab=behavior"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/ai/routing</router-link
+              >/admin/setup?tab=behavior</router-link
             >
             <router-link
               data-testid="link-route"

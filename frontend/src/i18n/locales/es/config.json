@@ -304,8 +304,8 @@
       "description": "Configura y administra tus modelos de IA",
       "tabs": {
         "choice": "Elección de modelo",
-        "list": "Lista completa",
-        "runs": "Ejecuciones vectoriales",
+        "list": "Todos los modelos",
+        "runs": "Ejecuciones de embedding",
         "edit": "Editar modelos"
       },
       "defaultConfigTitle": "Configuración de Modelo Predeterminado",
@@ -473,11 +473,11 @@
       }
     },
     "taskPrompts": {
-      "title": "Instrucciones de IA",
-      "subtitle": "también llamadas system prompts: definen cómo la IA gestiona cada tarea",
+      "title": "Temas",
+      "subtitle": "Cada tema indica a la IA cómo responder a un tipo de petición. Para cada mensaje se elige automáticamente el tema adecuado.",
       "selectPrompt": "Seleccionar Prompt",
-      "selectPromptTitle": "Selecciona un Prompt",
-      "selectPromptDescription": "Elige un prompt existente para ver o editar",
+      "selectPromptTitle": "Elige un tema",
+      "selectPromptDescription": "Elige un tema a la izquierda para verlo o cambiarlo.",
       "selectPromptHelp": "Elige un prompt existente para editar o usar como plantilla",
       "promptDetails": "Detalles del Prompt",
       "rulesForSelection": "Reglas de Selección",
@@ -497,18 +497,20 @@
       "contentPlaceholder": "Ingresa tu prompt del sistema aquí...",
       "promptContentPlaceholder": "Ingresa el prompt del sistema que guiará el comportamiento de la IA para esta tarea...",
       "contentHelp": "Este es el mensaje del sistema que guía el comportamiento de la IA",
-      "createNew": "Crear Nuevo Prompt",
+      "createNew": "Nuevo tema",
       "loadTemplate": "Cargar Plantilla",
       "topic": "Tema",
       "topicPlaceholder": "ej. analizador-personalizado",
       "name": "Nombre",
       "namePlaceholder": "ej. Analizador de Archivos Personalizado",
-      "createButton": "Crear Nuevo Prompt",
+      "createButton": "Nuevo tema",
       "dangerZone": "Zona de Peligro",
       "deleteWarning": "Eliminar este prompt es permanente y no se puede deshacer.",
       "deletePrompt": "Eliminar Prompt",
       "saveChanges": "Guardar Cambios",
-      "noPrompts": "No hay prompts disponibles"
+      "noPrompts": "Aún no hay temas.",
+      "noPromptsMatch": "Ningún tema coincide con tu búsqueda.",
+      "workingLanguageHint": "Los temas se muestran en el idioma de la interfaz. Los temas que crees solo aparecen en este idioma."
     },
     "routing": {
       "title": "Enrutamiento",
@@ -907,6 +909,14 @@
     "embeddingSwitch": {
       "scopes": {
         "search": "Índice de Smart Search"
+      }
+    },
+    "aiSettings": {
+      "title": "Ajustes de IA",
+      "subtitle": "Elige qué modelo de IA hace cada tipo de trabajo y escribe temas que indiquen a la IA cómo responder.",
+      "tabs": {
+        "defaults": "Modelos predeterminados",
+        "topics": "Temas"
       }
     }
   }

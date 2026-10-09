@@ -304,8 +304,8 @@
       "description": "AI modellerinizi yapılandırın ve yönetin",
       "tabs": {
         "choice": "Model seçimi",
-        "list": "Tüm liste",
-        "runs": "Vektör çalıştırmaları",
+        "list": "Tüm modeller",
+        "runs": "Embedding çalıştırmaları",
         "edit": "Modelleri düzenle"
       },
       "defaultConfigTitle": "Varsayılan Model Yapılandırması",
@@ -473,11 +473,11 @@
       }
     },
     "taskPrompts": {
-      "title": "AI Talimatları",
-      "subtitle": "sistem promptları olarak da bilinir — AI'nın her görevi nasıl ele alacağını belirler",
+      "title": "Konular",
+      "subtitle": "Her konu, yapay zekaya bir istek türüne nasıl yanıt vereceğini söyler. Her mesaj için uygun konu otomatik olarak seçilir.",
       "selectPrompt": "Prompt Seç",
-      "selectPromptTitle": "Bir Prompt Seçin",
-      "selectPromptDescription": "Görüntülemek veya düzenlemek için mevcut bir prompt seçin",
+      "selectPromptTitle": "Bir konu seçin",
+      "selectPromptDescription": "Görüntülemek veya değiştirmek için soldan bir konu seçin.",
       "selectPromptHelp": "Düzenlemek veya şablon olarak kullanmak için mevcut bir prompt seçin",
       "promptDetails": "Prompt Detayları",
       "rulesForSelection": "Seçim Kuralları",
@@ -497,18 +497,20 @@
       "contentPlaceholder": "Sistem promptunuzu buraya girin...",
       "promptContentPlaceholder": "Bu görev için AI'ın davranışını yönlendirecek sistem promptunu girin...",
       "contentHelp": "Bu, AI'ın davranışını yönlendiren sistem mesajıdır",
-      "createNew": "Yeni Prompt Oluştur",
+      "createNew": "Yeni konu",
       "loadTemplate": "Şablon Yükle",
       "topic": "Konu",
       "topicPlaceholder": "ör. özel-analizci",
       "name": "Ad",
       "namePlaceholder": "ör. Özel Dosya Analizci",
-      "createButton": "Yeni Prompt Oluştur",
+      "createButton": "Yeni konu",
       "dangerZone": "Tehlikeli Bölge",
       "deleteWarning": "Bu promptu silmek kalıcıdır ve geri alınamaz.",
       "deletePrompt": "Promptu Sil",
       "saveChanges": "Değişiklikleri Kaydet",
-      "noPrompts": "Prompt yok"
+      "noPrompts": "Henüz konu yok.",
+      "noPromptsMatch": "Aramanızla eşleşen konu yok.",
+      "workingLanguageHint": "Konular arayüz dilinizde gösterilir. Oluşturduğunuz konular yalnızca bu dilde görünür."
     },
     "routing": {
       "title": "Yönlendirme",
@@ -907,6 +909,14 @@
     "embeddingSwitch": {
       "scopes": {
         "search": "Smart Search dizini"
+      }
+    },
+    "aiSettings": {
+      "title": "AI ayarları",
+      "subtitle": "Her iş türünü hangi yapay zeka modelinin yapacağını seçin ve yapay zekaya nasıl yanıt vereceğini anlatan konular yazın.",
+      "tabs": {
+        "defaults": "Varsayılan modeller",
+        "topics": "Konular"
       }
     }
   }

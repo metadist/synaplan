@@ -185,8 +185,7 @@ export function useNavSections() {
     }
     if (path.startsWith('/files')) return 'library'
     if (path.startsWith('/admin') || path === '/setup') return 'operate'
-    // Prefixes, not the live child list: a flag can point the link at
-    // `/ai/instructions` while the route guard still serves `/ai/assistants`.
+    // Prefixes, not the live child list, so a hidden child still lights its section.
     if (
       path.startsWith('/ai/') ||
       path === '/prompts' ||
