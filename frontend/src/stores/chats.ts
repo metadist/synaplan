@@ -3,6 +3,7 @@ import { useNotification } from '@/composables/useNotification'
 import { i18n } from '@/i18n/instance'
 import { ref, computed, watch } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
+import { PutApiChatsTagsResponseSchema } from '@/generated/api-schemas'
 import { chatApi } from '@/services/api/chatApi'
 import { isRecoverableStreamError } from '@/utils/streamError'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
@@ -999,6 +1000,26 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  async function updateChatTags(chatId: number, tags: string[]): Promise<string[]> {
+    if (!checkAuthOrRedirect()) {
+      throw new Error('Not signed in')
+    }
+
+    invalidateInFlightChatsLoad()
+    const saved = await httpClient(`/api/v1/chats/${chatId}/tags`, {
+      method: 'PUT',
+      body: JSON.stringify({ tags }),
+      schema: PutApiChatsTagsResponseSchema,
+    })
+    const stored = saved.tags ?? []
+    const chat = chats.value.find((c) => c.id === chatId)
+    if (chat) {
+      chat.tags = stored
+    }
+    invalidateInFlightChatsLoad()
+    return stored
+  }
+
   async function updateChatTitle(chatId: number, title: string) {
     if (!checkAuthOrRedirect()) return
 
@@ -1459,6 +1480,7 @@ export const useChatsStore = defineStore('chats', () => {
     createChat,
     findOrCreateEmptyChat,
     updateChatTitle,
+    updateChatTags,
     toggleChatPin,
     applyChatTitle,
     deleteChat,

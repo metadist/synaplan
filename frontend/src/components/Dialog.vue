@@ -53,8 +53,18 @@
           </p>
 
           <!-- Input for prompt -->
+          <textarea
+            v-if="dialog.type === 'prompt' && dialog.multiline"
+            ref="inputRef"
+            v-model="inputValue"
+            rows="5"
+            :placeholder="dialog.placeholder"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-dialog-prompt"
+            @keydown.esc="handleCancel"
+          />
           <input
-            v-if="dialog.type === 'prompt'"
+            v-else-if="dialog.type === 'prompt'"
             ref="inputRef"
             v-model="inputValue"
             type="text"
@@ -113,7 +123,7 @@ import {
 const { dialog, close } = useDialog()
 const { teleportTarget } = useFullscreenTeleportTarget()
 const inputValue = ref('')
-const inputRef = ref<HTMLInputElement>()
+const inputRef = ref<HTMLInputElement | HTMLTextAreaElement>()
 const panelRef = ref<HTMLElement>()
 let previouslyFocused: HTMLElement | null = null
 let restoreFocusTimer: ReturnType<typeof setTimeout> | null = null
