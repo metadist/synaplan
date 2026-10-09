@@ -3,6 +3,7 @@
 namespace App\Service\Message\Handler;
 
 use App\AI\Exception\ProviderCancelledException;
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Entity\File;
@@ -1114,7 +1115,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'model' => $modelName,
                 'media_type' => $mediaType,
                 'exception' => $e,
-            ]);
+            ] + ($e instanceof ProviderException ? $e->logContext() : []));
 
             $lang = $classification['language'] ?? 'en';
             // Admins get the raw provider error/cause appended for diagnosis;

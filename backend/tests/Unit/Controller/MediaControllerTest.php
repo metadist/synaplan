@@ -287,6 +287,58 @@ class MediaControllerTest extends TestCase
         self::assertSame('gpt-image-1.5', $data['model']);
     }
 
+    public function testPic2picTextOnlyReplyReachesTheErrorAndTheLog(): void
+    {
+        $this->mediaService->method('generateFromImages')
+            ->willThrowException(ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP'));
+
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects(self::once())->method('error')->with(
+            'Pic2pic generation provider error',
+            self::callback(static fn (array $context): bool => 'google' === $context['provider']
+                && 'gemini-3.1-flash-image' === $context['model']
+                && 'STOP' === $context['finish_reason']
+                && '10' === $context['text_response']),
+        );
+        $controller = new MediaController($this->mediaService, $logger);
+        $controller->setContainer($this->containerWithSerializer());
+
+        $response = $controller->generateFromImages($this->makePic2picRequest('Wie viele Fenster hat dieses Haus?'), $this->createUser());
+
+        self::assertSame(500, $response->getStatusCode());
+        $data = json_decode((string) $response->getContent(), true);
+        self::assertSame('Google returned text instead of an image (gemini-3.1-flash-image): "10"', $data['error']);
+    }
+
+    public function testTextOnlyReplyOfAGenerationReachesTheError(): void
+    {
+        $this->mediaService->method('generate')
+            ->willThrowException(ProviderException::noImage('google', 'gemini-3.1-flash-image', 'I can only describe it.', 'STOP'));
+
+        $response = $this->controller->generate(
+            $this->makeRequest(['prompt' => 'a lighthouse', 'type' => 'image']),
+            $this->createUser(),
+        );
+
+        self::assertSame(500, $response->getStatusCode());
+        $data = json_decode((string) $response->getContent(), true);
+        self::assertStringContainsString('"I can only describe it."', $data['error']);
+        self::assertStringNotContainsString('Provider returned no media', $data['error']);
+    }
+
+    private function containerWithSerializer(): Container
+    {
+        $container = new Container();
+        $container->set('serializer', new class {
+            public function serialize(mixed $data, string $format): string
+            {
+                return json_encode($data, JSON_THROW_ON_ERROR);
+            }
+        });
+
+        return $container;
+    }
+
     public function testPic2picProviderErrorReturns500(): void
     {
         $this->mediaService->method('generateFromImages')

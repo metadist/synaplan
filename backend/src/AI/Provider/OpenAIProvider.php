@@ -1140,6 +1140,11 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             }
 
             return $images;
+        } catch (ProviderException $e) {
+            // A text-only reply (and any other provider outcome) already
+            // carries its context. Wrapping it here drops the quoted reply
+            // and the model, so the chat shows the generic generation error.
+            throw $e;
         } catch (\Exception $e) {
             // Check for content policy violations
             if (false !== stripos($e->getMessage(), 'content_policy')
@@ -1320,26 +1325,15 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
             $key = $this->resolveApiKey();
 
-            $ch = curl_init('https://api.openai.com/v1/responses');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer '.$key,
+            $response = $this->httpClient->request('POST', 'https://api.openai.com/v1/responses', [
+                'headers' => [
+                    'Authorization' => 'Bearer '.$key,
                 ],
-                CURLOPT_POSTFIELDS => json_encode($requestBody),
-                CURLOPT_TIMEOUT => 180,
+                'json' => $requestBody,
+                'timeout' => 180,
             ]);
-
-            $responseBody = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($curlError) {
-                throw new \Exception('cURL error: '.$curlError);
-            }
+            $httpCode = $response->getStatusCode();
+            $responseBody = $response->getContent(false);
 
             if (200 !== $httpCode) {
                 $this->logger->error('OpenAI Responses API: HTTP error', [
@@ -1369,10 +1363,11 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             }
 
             if (empty($images)) {
+                $exception = ProviderException::noImage('openai', (string) $model, $this->responsesMessageText($response['output']), null);
                 $this->logger->error('OpenAI Responses API: No images in output', [
                     'output_types' => array_column($response['output'] ?? [], 'type'),
-                ]);
-                throw new ProviderException('Responses API returned no generated images', 'openai');
+                ] + $exception->logContext());
+                throw $exception;
             }
 
             return $images;
@@ -1381,6 +1376,28 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI Responses API pic2pic error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    /**
+     * Text of the assistant `message` output item: what the model said when
+     * it answered in prose instead of calling the image tool.
+     *
+     * @param array<mixed> $output Responses API `output` list
+     */
+    private function responsesMessageText(array $output): ?string
+    {
+        foreach ($output as $item) {
+            if (!is_array($item) || 'message' !== ($item['type'] ?? null)) {
+                continue;
+            }
+            foreach ($item['content'] ?? [] as $part) {
+                if (is_array($part) && is_string($part['text'] ?? null) && '' !== trim($part['text'])) {
+                    return $part['text'];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

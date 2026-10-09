@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Exception\NoImageException;
 use App\AI\Exception\StructuredOutputViolationException;
 use App\Service\Exception\StreamCancelledException;
 use Psr\Cache\CacheItemPoolInterface;
@@ -95,6 +96,11 @@ final readonly class CircuitBreaker
             // The provider was up and answered; it rejected the model's own
             // JSON against our schema. AiFacade heals that in-process — a
             // handful of them must not fail every other call fast for a minute.
+            throw $e;
+        } catch (NoImageException $e) {
+            // The image model answered in text. The provider completed the
+            // request, so a burst of those replies must not open the circuit
+            // for the next image request.
             throw $e;
         } catch (\Exception $e) {
             // Failure

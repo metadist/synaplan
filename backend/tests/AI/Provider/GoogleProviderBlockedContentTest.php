@@ -167,6 +167,113 @@ class GoogleProviderBlockedContentTest extends TestCase
         $this->assertSame('Normal response', $response['content']);
     }
 
+    public function testATextOnlyImageReplyThrowsWithTheReply(): void
+    {
+        $provider = $this->createProviderWithMockResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'content' => ['parts' => [
+                    ['text' => 'Counting the windows first.', 'thought' => true],
+                    ['text' => '10'],
+                ]],
+            ]],
+        ]);
+
+        $e = $this->captureProviderException(fn () => $provider->generateImage(
+            'Wie viele Fenster hat dieses Haus?',
+            ['model' => 'gemini-3.1-flash-image'],
+        ));
+
+        $this->assertSame('google', $e->getProviderName());
+        $this->assertSame([
+            'text_response' => '10',
+            'finish_reason' => 'STOP',
+            'model' => 'gemini-3.1-flash-image',
+        ], $e->getContext());
+        $this->assertSame('Google returned text instead of an image (gemini-3.1-flash-image): "10"', $e->getMessage());
+    }
+
+    public function testATextOnlyEditReplyThrowsWithTheReply(): void
+    {
+        $photo = tempnam(sys_get_temp_dir(), 'gemini-edit-');
+        file_put_contents($photo, "\x89PNG\r\n\x1a\n".str_repeat("\0", 32));
+        $provider = $this->createProviderWithMockResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'content' => ['parts' => [['text' => '10']]],
+            ]],
+        ]);
+
+        try {
+            $e = $this->captureProviderException(fn () => $provider->generateImage(
+                'Wie viele Fenster hat dieses Haus? Antworte nur mit einer Zahl.',
+                ['model' => 'gemini-3.1-flash-image', 'images' => [$photo]],
+            ));
+        } finally {
+            @unlink($photo);
+        }
+
+        $this->assertSame('10', $e->getContext()['text_response'] ?? null);
+        $this->assertSame('STOP', $e->getContext()['finish_reason'] ?? null);
+    }
+
+    public function testAStopWithNeitherTextNorImageThrowsWithoutAReply(): void
+    {
+        $provider = $this->createProviderWithMockResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'content' => ['parts' => []],
+            ]],
+        ]);
+
+        $e = $this->captureProviderException(fn () => $provider->generateImage('A lighthouse', ['model' => 'gemini-3.1-flash-image']));
+
+        $this->assertNull($e->getContext()['text_response'] ?? null);
+        $this->assertSame('STOP', $e->getContext()['finish_reason'] ?? null);
+        $this->assertSame('Google returned no image (gemini-3.1-flash-image, finish reason STOP)', $e->getMessage());
+    }
+
+    public function testAnImagenResponseWithoutImageBytesThrows(): void
+    {
+        $provider = $this->createProviderWithMockResponse([
+            'predictions' => [['raiFilteredReason' => 'The image was filtered.']],
+        ]);
+
+        $e = $this->captureProviderException(fn () => $provider->generateImage(
+            'A lighthouse',
+            ['model' => 'imagen-4.0-generate-001', 'modelConfig' => ['api' => 'imagen']],
+        ));
+
+        $this->assertSame('google', $e->getProviderName());
+        $this->assertSame('SAFETY', $e->getContext()['block_reason'] ?? null);
+        $this->assertSame('The image was filtered.', $e->getContext()['text_response'] ?? null);
+        $this->assertSame('imagen-4.0-generate-001', $e->getContext()['model'] ?? null);
+    }
+
+    public function testAnImagenResponseWithoutImagesOrFilterNoteThrowsWithoutAReply(): void
+    {
+        $provider = $this->createProviderWithMockResponse(['predictions' => []]);
+
+        $e = $this->captureProviderException(fn () => $provider->generateImage(
+            'A lighthouse',
+            ['model' => 'imagen-4.0-generate-001', 'modelConfig' => ['api' => 'imagen']],
+        ));
+
+        $this->assertNull($e->getContext()['block_reason'] ?? null);
+        $this->assertNull($e->getContext()['text_response'] ?? null);
+        $this->assertSame('Google returned no image (imagen-4.0-generate-001)', $e->getMessage());
+    }
+
+    private function captureProviderException(callable $call): ProviderException
+    {
+        try {
+            $call();
+        } catch (ProviderException $e) {
+            return $e;
+        }
+        $this->fail('Expected ProviderException was not thrown');
+    }
+
     public function testBlockedResponsePreservesTextResponse(): void
     {
         $longText = str_repeat('A', 500);

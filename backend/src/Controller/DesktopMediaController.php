@@ -86,7 +86,7 @@ final class DesktopMediaController extends AbstractController
                 'user_id' => $user->getId(),
                 'type' => $type,
                 'error' => $e->getMessage(),
-            ]);
+            ] + $e->logContext());
 
             return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (\RuntimeException $e) {
