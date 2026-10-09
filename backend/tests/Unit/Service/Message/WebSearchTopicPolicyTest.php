@@ -247,6 +247,11 @@ final class WebSearchTopicPolicyTest extends TestCase
     public static function explicitSearchRequestProvider(): iterable
     {
         yield 'de_such_im_internet' => ['Such im Internet nach dem Wetter', true];
+        yield 'en_code_found_on_the_internet' => ['Find the bug in this script I got from the internet', false];
+        yield 'request_after_long_pasted_text' => [str_repeat('Lorem ipsum dolor sit amet. ', 100).'Bitte such im Internet nach Updates dazu.', true];
+        // The 500-char tail window starts inside "versuche"; the cut word is dropped.
+        yield 'versuche_cut_at_scan_window' => [str_repeat('a ', 300).'versuche das online '.str_repeat('b ', 241).'b', false];
+        yield 'crafted_clause_flood' => [str_repeat(', kannst du mal ', 5000), false];
         yield 'de_im_internet_nachschauen' => ['Kannst du im Internet nachschauen, wann Ikea öffnet?', true];
         yield 'de_google_mal' => ['google mal den Bitcoin-Kurs', true];
         yield 'de_recherchiere_online' => ['Recherchiere online, was das kostet', true];
@@ -288,6 +293,20 @@ final class WebSearchTopicPolicyTest extends TestCase
             WebSearchTopicPolicy::isExplicitSearchRequest($text),
             sprintf('text=%s', var_export($text, true)),
         );
+    }
+
+    public function testCraftedMessageCannotStallTheExplicitRequestCheck(): void
+    {
+        // Unbounded spans took ~5 s with JIT (~28 s without) on this input.
+        $text = str_repeat(', suche a', 9000);
+
+        $start = hrtime(true);
+        $result = WebSearchTopicPolicy::isExplicitSearchRequest($text);
+        $elapsedMs = (hrtime(true) - $start) / 1_000_000;
+
+        self::assertFalse($result);
+        self::assertSame(PREG_NO_ERROR, preg_last_error(), preg_last_error_msg());
+        self::assertLessThan(500, $elapsedMs, sprintf('explicit request check took %.0f ms', $elapsedMs));
     }
 
     #[DataProvider('trivialConversationProvider')]
