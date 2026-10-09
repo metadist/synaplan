@@ -399,8 +399,8 @@
         "step3": "Ve a «Permisos de API» → «Agregar un permiso» → «Microsoft Graph» → «Permisos delegados» y añade todos estos:",
         "step3Note": "offline_access no es opcional: sin él Microsoft no emite un token de actualización y toda ejecución programada deja de funcionar al cabo de una hora.",
         "step4": "Ve a «Certificados y secretos» → «Nuevo secreto de cliente» y copia la columna Valor, no el Id. de secreto. Solo se muestra esta vez.",
-        "step5": "Pega el ID de cliente y el secreto en los campos de abajo, indica el inquilino y activa M365_ENABLED. Después, cada persona conecta su cuenta en Gestionar → Conexiones.",
-        "ready": "Listo: ya se puede conectar una cuenta de Microsoft 365 en Gestionar → Conexiones.",
+        "step5": "Pega el ID de cliente y el secreto en los campos de abajo, indica el inquilino y activa M365_ENABLED. Después, cada persona conecta su cuenta en Apps › Microsoft 365.",
+        "ready": "Listo: ya se puede conectar una cuenta de Microsoft 365 en Apps › Microsoft 365.",
         "notReady": "Todavía no está activo. Rellena los campos de abajo y activa M365_ENABLED.",
         "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente."
       },
@@ -412,8 +412,8 @@
         "step2": "En la pestaña «Permissions», activa estos dos permisos y haz clic en «Submit»:",
         "step3": "En la pestaña «Settings», en «OAuth 2 → Redirect URIs», añade exactamente esta dirección:",
         "step4": "También en la pestaña «Settings», copia el App key y el App secret (haz clic en «Show»).",
-        "step5": "Pega la clave y el secreto en los campos de abajo y activa DROPBOX_ENABLED. Después, los usuarios conectan su cuenta en Gestionar → Conexiones.",
-        "ready": "Listo: los usuarios pueden conectar su cuenta de Dropbox en Gestionar → Conexiones.",
+        "step5": "Pega la clave y el secreto en los campos de abajo y activa DROPBOX_ENABLED. Después, los usuarios conectan su cuenta en Apps › Dropbox.",
+        "ready": "Listo: los usuarios pueden conectar su cuenta de Dropbox en Apps › Dropbox.",
         "notReady": "Todavía no está activo. Rellena los campos de abajo y activa DROPBOX_ENABLED.",
         "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente.",
         "resetTitle": "Restablecer todas las conexiones de Dropbox",
@@ -510,7 +510,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Cuando la persona propietaria está presente (chat o una llamada API en vivo): ejecutar el trabajo automáticamente, preguntar primero o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_POLICY_UNATTENDED": "Cuando una tarea guardada ejecuta trabajo con archivos por su cuenta: preguntar primero (predeterminado), ejecutar automáticamente o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Cuántos días puede permanecer sin uso una carpeta de trabajo con archivos antes de que la limpieza la elimine. Predeterminado: 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Canales → Synaplan Desktop. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Apps › Synaplan Desktop. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código.",
         "FEATURE_SEARCH_AI_ENABLED": "Ayuda de IA en la paleta de búsqueda (Ctrl/Cmd+K): ante una pregunta en lenguaje normal, el modelo de herramientas elige el resultado que mejor encaja y lo explica en una frase. Nunca cambia nada por sí mismo. Cada uso es una llamada breve a la IA. Desactivado: se mantienen la búsqueda por palabras clave y por significado."
       },
       "fieldOptions": {
@@ -976,7 +976,7 @@
       }
     },
     "linkedPlatforms": {
-      "intro": "Servidores de Nextcloud, ownCloud y Outlook que pidieron usar este Synaplan. Aprueba uno para que sus usuarios puedan conectar sus propias cuentas en Gestionar › Conexiones › Plataformas vinculadas.",
+      "intro": "Servidores de Nextcloud, ownCloud y Outlook que pidieron usar este Synaplan. Aprueba uno para que sus usuarios puedan conectar sus propias cuentas en Apps.",
       "empty": "Aún no se ha registrado ninguna plataforma.",
       "client": "Plataforma",
       "host": "Dirección",

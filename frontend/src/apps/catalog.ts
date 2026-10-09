@@ -134,8 +134,9 @@ export const APPS: readonly AppDefinition[] = [
     id: 'claude-code',
     category: 'ai',
     icon: 'simple-icons:anthropic',
-    available: () => loadGatewayEnabled(),
-    panel: () => import('@/components/apps/panels/ClaudeCodeAppPanel.vue'),
+    // Admins reach the user view while the gateway is off so they can check it before turning it on.
+    available: () => useAuthStore().isAdmin || loadGatewayEnabled(),
+    panel: () => import('@/components/config/MessagesGatewayConfiguration.vue'),
   },
   {
     id: 'higgsfield',

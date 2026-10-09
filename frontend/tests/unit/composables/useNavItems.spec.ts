@@ -64,7 +64,6 @@ const navMessages = {
     groupTools: 'Tools',
     channels: 'Channels',
     connections: 'Connections',
-    groupDeveloper: 'Developer & devices',
     desktop: 'Synaplan Desktop',
     groupApi: 'API',
     myGroups: 'My groups',

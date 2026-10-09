@@ -341,7 +341,7 @@ describe('DesktopConfiguration', () => {
     }
   })
 
-  it('tells an admin how to turn on app chat and links to the Claude Code app', async () => {
+  it('tells an admin how to turn on app chat and links to the gateway settings', async () => {
     mockGatewayStatus.mockResolvedValue({
       ...readyGateway,
       enabled: false,
@@ -349,11 +349,11 @@ describe('DesktopConfiguration', () => {
     })
     const wrapper = await mountPage()
     const alert = wrapper.get('[data-testid="alert-chat-gate"]')
-    expect(alert.text()).toContain('turn on the AI gateway under Claude Code & coding tools')
+    expect(alert.text()).toContain('turn on the coding gateway under Admin › AI')
     expect(alert.text()).toContain('Pairing still works')
     const link = wrapper.get('[data-testid="link-coding-clients"]')
-    expect(link.attributes('href')).toBe('/apps/claude-code')
-    expect(link.text()).toBe('Open Claude Code & coding tools')
+    expect(link.attributes('href')).toBe('/admin/setup?tab=gateway')
+    expect(link.text()).toBe('Open gateway settings')
   })
 
   it('tells a regular user to ask an admin when the gateway is off', async () => {
@@ -386,7 +386,7 @@ describe('DesktopConfiguration', () => {
       'no provider key will pay for app chat'
     )
     expect(wrapper.get('[data-testid="link-coding-clients"]').attributes('href')).toBe(
-      '/apps/claude-code'
+      '/admin/setup?tab=gateway'
     )
   })
 

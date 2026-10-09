@@ -399,8 +399,8 @@
         "step3": "“API izinleri” → “İzin ekle” → “Microsoft Graph” → “Temsilci izinleri” yolunu izle ve şu izinlerin tümünü ekle:",
         "step3Note": "offline_access isteğe bağlı değildir: onsuz Microsoft yenileme belirteci vermez ve zamanlanmış her çalışma bir saat sonra durur.",
         "step4": "“Sertifikalar ve gizli diziler” → “Yeni istemci gizli dizisi” yolunu izle ve Değer sütununu kopyala — Gizli Dizi Kimliğini değil. Yalnızca bu bir kez gösterilir.",
-        "step5": "İstemci kimliğini ve gizli diziyi aşağıdaki alanlara yapıştır, kiracıyı ayarla ve M365_ENABLED seçeneğini aç. Kullanıcılar sonra kendi hesaplarını Yönet → Bağlantılar altından bağlar.",
-        "ready": "Hazır — kullanıcılar Microsoft 365 hesaplarını Yönet → Bağlantılar altından bağlayabilir.",
+        "step5": "İstemci kimliğini ve gizli diziyi aşağıdaki alanlara yapıştır, kiracıyı ayarla ve M365_ENABLED seçeneğini aç. Kullanıcılar sonra kendi hesaplarını Uygulamalar › Microsoft 365 altından bağlar.",
+        "ready": "Hazır — kullanıcılar Microsoft 365 hesaplarını Uygulamalar › Microsoft 365 altından bağlayabilir.",
         "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve M365_ENABLED seçeneğini aç.",
         "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala."
       },
@@ -412,8 +412,8 @@
         "step2": "“Permissions” sekmesinde şu iki izni etkinleştir ve “Submit”e tıkla:",
         "step3": "“Settings” sekmesinde “OAuth 2 → Redirect URIs” altına tam olarak bu adresi ekle:",
         "step4": "Yine “Settings” sekmesinde App key ve App secret değerlerini kopyala (“Show”a tıkla).",
-        "step5": "App key ve secret’ı aşağıdaki alanlara yapıştır ve DROPBOX_ENABLED seçeneğini aç. Kullanıcılar hesaplarını Yönet → Bağlantılar altında bağlar.",
-        "ready": "Hazır — kullanıcılar Dropbox hesaplarını Yönet → Bağlantılar altında bağlayabilir.",
+        "step5": "App key ve secret’ı aşağıdaki alanlara yapıştır ve DROPBOX_ENABLED seçeneğini aç. Kullanıcılar hesaplarını Uygulamalar › Dropbox altında bağlar.",
+        "ready": "Hazır — kullanıcılar Dropbox hesaplarını Uygulamalar › Dropbox altında bağlayabilir.",
         "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve DROPBOX_ENABLED seçeneğini aç.",
         "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala.",
         "resetTitle": "Tüm Dropbox bağlantılarını sıfırla",
@@ -510,7 +510,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Sahip oradayken (sohbet veya canlı bir API çağrısı): dosya çalışmasını otomatik çalıştır, önce sor veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
         "COMPUTE_POLICY_UNATTENDED": "Kayıtlı bir görev dosya çalışmasını kendi başına çalıştırdığında: önce sor (varsayılan), otomatik çalıştır veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Bir dosya çalışması klasörünün temizlik onu kaldırmadan önce kaç gün kullanılmadan durabileceği. Varsayılan 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Kanallar → Synaplan Desktop altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Uygulamalar › Synaplan Desktop altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir.",
         "FEATURE_SEARCH_AI_ENABLED": "Arama paletinde AI yardımı (Ctrl/Cmd+K): Günlük dilde sorulan bir soruda araç modeli en uygun sonucu seçer ve nedenini tek cümleyle söyler. Kendi başına hiçbir şeyi değiştirmez. Her kullanım kısa bir AI çağrısıdır. Kapalıyken anahtar kelime ve anlam araması çalışmaya devam eder."
       },
       "fieldOptions": {
@@ -976,7 +976,7 @@
       }
     },
     "linkedPlatforms": {
-      "intro": "Bu Synaplan’ı kullanmak isteyen Nextcloud, ownCloud ve Outlook sunucuları. Kullanıcılarının hesaplarını Yönet › Bağlantılar › Bağlı platformlar altında bağlayabilmesi için birini onaylayın.",
+      "intro": "Bu Synaplan’ı kullanmak isteyen Nextcloud, ownCloud ve Outlook sunucuları. Kullanıcılarının hesaplarını Uygulamalar altında bağlayabilmesi için birini onaylayın.",
       "empty": "Henüz kayıtlı platform yok.",
       "client": "Platform",
       "host": "Adres",

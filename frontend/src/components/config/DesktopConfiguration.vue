@@ -27,7 +27,7 @@
       <p class="text-sm txt-primary flex-1">{{ chatGateMessage }}</p>
       <RouterLink
         v-if="chatGateAdmin"
-        to="/apps/claude-code"
+        to="/admin/setup?tab=gateway"
         class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center justify-center shrink-0"
         data-testid="link-coding-clients"
       >

@@ -14,6 +14,38 @@
       </RouterLink>
     </p>
 
+    <section class="surface-card p-6" data-testid="section-linked-steps">
+      <h3 class="text-lg font-semibold txt-primary mb-3">{{ $t('apps.linkedSteps.title') }}</h3>
+      <ol class="space-y-3 text-sm txt-secondary list-decimal pl-5">
+        <li>
+          {{
+            client === 'outlook'
+              ? $t('apps.linkedSteps.installOutlook')
+              : $t('apps.linkedSteps.install', { client: clientLabel(client) })
+          }}
+        </li>
+        <li>
+          <span>{{ $t('apps.linkedSteps.address') }}</span>
+          <span class="mt-2 flex flex-wrap items-center gap-2">
+            <code
+              class="px-3 py-1.5 rounded-lg surface-chip txt-primary font-mono text-xs break-all"
+              data-testid="text-server-address"
+              >{{ serverAddress }}</code
+            >
+            <button
+              type="button"
+              class="btn-secondary px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-copy-server-address"
+              @click="copyAddress"
+            >
+              {{ $t('apps.linkedSteps.copy') }}
+            </button>
+          </span>
+        </li>
+        <li>{{ $t('apps.linkedSteps.signIn') }}</li>
+      </ol>
+    </section>
+
     <div
       v-if="error"
       class="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-start gap-3"
@@ -124,13 +156,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 import { platformLinksApi, type PlatformLink } from '@/services/api/platformLinksApi'
 
 /** The platform this panel serves inside its app page (`/apps/:appId`). */
@@ -140,6 +173,7 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const configStore = useConfigStore()
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
 const { formatDateTime } = useDateFormat()
@@ -147,6 +181,17 @@ const { formatDateTime } = useDateFormat()
 const links = ref<PlatformLink[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+const serverAddress = computed(() => configStore.apiBaseUrl || window.location.origin)
+
+async function copyAddress(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(serverAddress.value)
+    success(t('apps.linkedSteps.copied'))
+  } catch {
+    showError(t('apps.linkedSteps.copyFailed'))
+  }
+}
 
 function clientLabel(client: string): string {
   const key = `platformConnect.clients.${client}`
@@ -164,8 +209,8 @@ async function loadLinks(): Promise<void> {
   error.value = null
   try {
     links.value = (await platformLinksApi.listMine()).filter((link) => link.client === props.client)
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : t('linkedPlatforms.loadError')
+  } catch {
+    error.value = t('linkedPlatforms.loadError')
   } finally {
     loading.value = false
   }

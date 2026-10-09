@@ -101,6 +101,8 @@
         <p class="text-sm txt-secondary">{{ $t('adminSetup.intro.prompts') }}</p>
         <AdminPromptsPanel />
       </div>
+
+      <CodingGatewayAdminTab v-if="activeTab === 'gateway'" />
     </div>
   </MainLayout>
 </template>
@@ -126,6 +128,9 @@ import { aiInfrastructureRedirect } from '@/router/operateRedirects'
 
 const AdminPromptsPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminPromptsPanel.vue')
+)
+const CodingGatewayAdminTab = defineAsyncComponent(
+  () => import('@/components/admin/CodingGatewayAdminTab.vue')
 )
 
 const DEFAULT_TAB: AiTabId = 'providers'
@@ -185,6 +190,12 @@ const tabs = computed<TabNavItem[]>(() => [
     label: t('adminSetup.tabs.prompts'),
     icon: 'mdi:text-box-multiple',
     testid: 'admin-setup-tab-prompts',
+  },
+  {
+    id: 'gateway',
+    label: t('adminSetup.tabs.gateway'),
+    icon: 'heroicons:command-line',
+    testid: 'admin-setup-tab-gateway',
   },
 ])
 

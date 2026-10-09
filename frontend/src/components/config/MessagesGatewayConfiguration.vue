@@ -14,8 +14,23 @@
       <p class="mt-2 txt-secondary text-sm">{{ $t('common.loading') }}</p>
     </div>
 
+    <div
+      v-else-if="loadFailed"
+      class="surface-card p-6 flex flex-wrap items-center justify-between gap-3"
+      data-testid="section-agents-load-error"
+    >
+      <p class="text-sm txt-secondary">{{ $t('messagesGateway.loadError') }}</p>
+      <button
+        type="button"
+        class="btn-secondary px-4 py-2.5 text-sm font-medium"
+        data-testid="btn-agents-retry"
+        @click="load()"
+      >
+        {{ $t('common.retry') }}
+      </button>
+    </div>
+
     <template v-else-if="status">
-      <!-- Status -->
       <div class="surface-card p-6" data-testid="section-agents-status">
         <h3 class="text-lg font-semibold txt-primary mb-3">
           {{ $t('messagesGateway.statusTitle') }}
@@ -25,8 +40,8 @@
             class="inline-flex items-center gap-2 px-3 py-1 rounded-full"
             :class="
               gatewayReady
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                ? 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
+                : 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]'
             "
             data-testid="badge-gateway-enabled"
           >
@@ -74,45 +89,65 @@
                 })
           }}
         </p>
+        <p v-if="status.is_admin" class="text-sm mt-3" data-testid="text-gateway-admin">
+          <span v-if="!status.enabled" class="txt-secondary">
+            {{ $t('apps.claudeCode.adminOff') }}
+          </span>
+          <RouterLink
+            :to="ADMIN_GATEWAY_PATH"
+            class="text-[var(--brand)] hover:underline font-medium"
+            data-testid="link-gateway-admin"
+          >
+            {{ $t('apps.claudeCode.adminLink') }}
+          </RouterLink>
+        </p>
       </div>
 
-      <!-- Setup snippet. Hidden from non-admins while the gateway is off. -->
-      <div v-if="showSetup" class="surface-card p-6" data-testid="section-agents-setup">
-        <h3 class="text-lg font-semibold txt-primary mb-2">
-          {{ $t('messagesGateway.setupTitle') }}
-        </h3>
-        <p class="txt-secondary text-sm mb-3">{{ $t('messagesGateway.setupHint') }}</p>
-        <p class="txt-secondary text-sm mb-3" data-testid="text-api-key-step">
-          <i18n-t keypath="messagesGateway.apiKeyStep" tag="span">
-            <template #keys>
-              <RouterLink
-                to="/apps/api"
-                class="text-[var(--brand)] hover:underline font-medium"
-                data-testid="link-api-keys"
-              >
-                {{ $t('messagesGateway.apiKeysLink') }}
-              </RouterLink>
-            </template>
-          </i18n-t>
-        </p>
-        <p class="txt-secondary text-sm mb-4" data-testid="text-first-start">
-          {{ $t('messagesGateway.firstStartHint') }}
-        </p>
-        <pre
-          class="p-4 rounded-lg surface-chip txt-primary text-xs font-mono overflow-x-auto whitespace-pre-wrap"
-          data-testid="text-setup-snippet"
-          >{{ setupSnippet }}</pre>
-        <button
-          type="button"
-          class="btn-primary mt-3 px-4 py-2.5 rounded-xl text-sm font-medium"
-          data-testid="btn-copy-setup"
-          @click="copySetup"
-        >
-          {{ $t('messagesGateway.copySetup') }}
-        </button>
-      </div>
+      <!-- Hidden from non-admins while the gateway is off. -->
+      <ol v-if="showSetup" class="space-y-6" data-testid="section-agents-steps">
+        <li id="anthropic-key" class="surface-card p-6" data-testid="section-anthropic">
+          <StepHeading :number="1" :title="$t('apps.claudeCode.keyTitle')" />
+          <p class="text-sm txt-secondary mb-4">{{ $t('apps.claudeCode.keyHint') }}</p>
+          <AnthropicByokSection @changed="load(true)" />
+        </li>
 
-      <MessagesGatewayAdminSettings v-if="status.is_admin" :status="status" @saved="load(true)" />
+        <li class="surface-card p-6" data-testid="text-api-key-step">
+          <StepHeading :number="2" :title="$t('apps.claudeCode.apiKeyTitle')" />
+          <p class="txt-secondary text-sm">
+            <i18n-t keypath="messagesGateway.apiKeyStep" tag="span">
+              <template #keys>
+                <RouterLink
+                  to="/apps/api"
+                  class="text-[var(--brand)] hover:underline font-medium"
+                  data-testid="link-api-keys"
+                >
+                  {{ $t('messagesGateway.apiKeysLink') }}
+                </RouterLink>
+              </template>
+            </i18n-t>
+          </p>
+        </li>
+
+        <li class="surface-card p-6" data-testid="section-agents-setup">
+          <StepHeading :number="3" :title="$t('messagesGateway.setupTitle')" />
+          <p class="txt-secondary text-sm mb-3">{{ $t('messagesGateway.setupHint') }}</p>
+          <pre
+            class="p-4 rounded-lg surface-chip txt-primary text-xs font-mono overflow-x-auto whitespace-pre-wrap"
+            data-testid="text-setup-snippet"
+            >{{ setupSnippet }}</pre>
+          <button
+            type="button"
+            class="btn-primary mt-3 px-4 py-2.5 text-sm font-medium"
+            data-testid="btn-copy-setup"
+            @click="copySetup"
+          >
+            {{ $t('messagesGateway.copySetup') }}
+          </button>
+          <p class="txt-secondary text-sm mt-4" data-testid="text-first-start">
+            {{ $t('messagesGateway.firstStartHint') }}
+          </p>
+        </li>
+      </ol>
     </template>
   </div>
 </template>
@@ -125,6 +160,8 @@ import { RouterLink } from 'vue-router'
 import { useNotification } from '@/composables/useNotification'
 import { useConfigStore } from '@/stores/config'
 import PageHeader from '@/components/PageHeader.vue'
+import StepHeading from '@/components/common/StepHeading.vue'
+import AnthropicByokSection from '@/components/config/AnthropicByokSection.vue'
 import {
   getMessagesGatewayStatus,
   type MessagesGatewayStatus,
@@ -134,13 +171,15 @@ import {
   codingClientSetupSnippet,
   providerKeyReady,
 } from '@/utils/codingClientSetup'
-import MessagesGatewayAdminSettings from './messagesGateway/MessagesGatewayAdminSettings.vue'
+
+const ADMIN_GATEWAY_PATH = '/admin/setup?tab=gateway'
 
 const { t } = useI18n()
 const { success, error } = useNotification()
 const configStore = useConfigStore()
 
 const loading = ref(true)
+const loadFailed = ref(false)
 const status = ref<MessagesGatewayStatus | null>(null)
 
 // A budget of 0 means "no monthly budget configured" (unlimited), not "exhausted".
@@ -174,19 +213,16 @@ const setupSnippet = computed(() => {
   return codingClientSetupSnippet(base)
 })
 
-/**
- * `silent` keeps the rendered page in place while a settings change is written
- * back — swapping the whole panel for a spinner after every toggle would make
- * the settings feel like they reload rather than save.
- */
+/** `silent` refreshes the status after a key change without swapping the page for a spinner. */
 async function load(silent = false) {
   if (!silent) {
     loading.value = true
   }
   try {
     status.value = await getMessagesGatewayStatus()
-  } catch (err) {
-    error((err as Error).message || t('messagesGateway.loadError'))
+    loadFailed.value = false
+  } catch {
+    if (!status.value) loadFailed.value = true
   } finally {
     loading.value = false
   }

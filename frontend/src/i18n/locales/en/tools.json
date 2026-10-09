@@ -469,11 +469,11 @@
     "yourAiAccounts": "Your Anthropic key",
     "gatewayOff": "Coding tools are turned off, so nothing is sent. An admin can turn the gateway on.",
     "apiKeyStep": "Create a Synaplan API key under {keys}, then paste it in place of sk_your_synaplan_api_key.",
-    "apiKeysLink": "Manage → Developer & devices → API Keys",
+    "apiKeysLink": "Apps › API & developers",
     "firstStartHint": "The first time Claude Code starts, it asks whether to use this API key and whether to trust the folder. The suggested answer is no. Choose yes for both, or the key is rejected and nothing is sent.",
     "budgetLine": "Budget used: {percent}% ({used} of {budget})",
     "budgetLineUnlimited": "Budget used: {used} (no monthly budget limit)",
-    "setupTitle": "Claude Code setup",
+    "setupTitle": "Paste the setup into your terminal",
     "setupHint": "Point Claude Code at this Synaplan instance. Use exactly one credential variable — ANTHROPIC_API_KEY (x-api-key) or ANTHROPIC_AUTH_TOKEN (Bearer).",
     "copySetup": "Copy setup commands",
     "copySuccess": "Setup commands copied",
@@ -568,7 +568,7 @@
       "mcpTools": {
         "label": "Let AI assistants use your tools",
         "description": "Synaplan runs the tools of your connected tool servers itself and passes the result back to the assistant.",
-        "noneConfigured": "No tool server is connected yet. You can add one under Manage → Connections → MCP Servers."
+        "noneConfigured": "No tool server is connected yet. You can add one under Apps › Tool servers (MCP)."
       },
       "mcpWithClientTools": {
         "label": "Offer your tools even when the agent tool brings its own",
@@ -789,7 +789,10 @@
     },
     "claudeCode": {
       "keyTitle": "Your Anthropic key",
-      "keyHint": "Optional. With your own key, usage is billed to your Anthropic account."
+      "keyHint": "Optional. With your own key, usage is billed to your Anthropic account.",
+      "apiKeyTitle": "Create a Synaplan API key",
+      "adminOff": "The gateway is off for everyone. ",
+      "adminLink": "Gateway settings in Admin › AI"
     },
     "items": {
       "telegram": {
@@ -892,6 +895,16 @@
         "about": "Create a key for scripts and other apps. Every call acts as you and counts against your limits.",
         "stop": "Revoke the key below. It stops working immediately."
       }
+    },
+    "linkedSteps": {
+      "title": "How to connect",
+      "install": "Install the Synaplan app in {client}.",
+      "installOutlook": "Add the Synaplan add-in in Outlook.",
+      "address": "Enter this server address there:",
+      "signIn": "Sign in with your Synaplan account and confirm. The connection then appears below.",
+      "copy": "Copy address",
+      "copied": "Address copied",
+      "copyFailed": "The address could not be copied. Select it and copy it by hand."
     }
   }
 }

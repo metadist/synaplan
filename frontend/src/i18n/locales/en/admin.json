@@ -403,8 +403,8 @@
         "step3": "Go to “API permissions” → “Add a permission” → “Microsoft Graph” → “Delegated permissions” and add all of these:",
         "step3Note": "offline_access is not optional: without it Microsoft issues no refresh token and every scheduled run stops working after an hour.",
         "step4": "Go to “Certificates & secrets” → “New client secret” and copy the Value column — not the Secret ID. It is shown only this once.",
-        "step5": "Paste the client ID and the secret into the fields below, set the tenant, and switch M365_ENABLED on. Users then connect their own account under Manage → Connections.",
-        "ready": "Ready — users can connect their Microsoft 365 account under Manage → Connections.",
+        "step5": "Paste the client ID and the secret into the fields below, set the tenant, and switch M365_ENABLED on. Users then connect their own account under Apps › Microsoft 365.",
+        "ready": "Ready — users can connect their Microsoft 365 account under Apps › Microsoft 365.",
         "notReady": "Not active yet. Fill in the fields below and switch M365_ENABLED on.",
         "copyFailed": "Could not copy. Select the text and copy it manually."
       },
@@ -416,8 +416,8 @@
         "step2": "On the “Permissions” tab, enable both of these and click “Submit”:",
         "step3": "On the “Settings” tab, under “OAuth 2 → Redirect URIs”, add this address exactly:",
         "step4": "Still on the “Settings” tab, copy the App key and the App secret (click “Show”).",
-        "step5": "Paste the app key and the secret into the fields below and switch DROPBOX_ENABLED on. Users then connect their own account under Manage → Connections.",
-        "ready": "Ready — users can connect their Dropbox account under Manage → Connections.",
+        "step5": "Paste the app key and the secret into the fields below and switch DROPBOX_ENABLED on. Users then connect their own account under Apps › Dropbox.",
+        "ready": "Ready — users can connect their Dropbox account under Apps › Dropbox.",
         "notReady": "Not active yet. Fill in the fields below and switch DROPBOX_ENABLED on.",
         "copyFailed": "Could not copy. Select the text and copy it manually.",
         "resetTitle": "Reset all Dropbox connections",
@@ -514,7 +514,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "When the owner is present (chat or a live API call): run file work automatically, ask first, or never run it. An assistant cannot loosen this.",
         "COMPUTE_POLICY_UNATTENDED": "When a saved task runs file work on its own: ask the owner first (default), run automatically, or never run it. An assistant cannot loosen this.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "How many days a file-work folder may sit unused before cleanup can remove it. Default 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Channels → Synaplan Desktop. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Apps › Synaplan Desktop. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository.",
         "FEATURE_SEARCH_AI_ENABLED": "AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why in one sentence. It never changes anything by itself. Each use is one short AI call. Off keeps keyword and meaning search."
       },
       "fieldOptions": {
@@ -980,7 +980,7 @@
       }
     },
     "linkedPlatforms": {
-      "intro": "Nextcloud, ownCloud and Outlook servers that asked to use this Synaplan. Approve one so its users can connect their own accounts under Manage › Connections › Linked platforms.",
+      "intro": "Nextcloud, ownCloud and Outlook servers that asked to use this Synaplan. Approve one so its users can connect their own accounts under Apps.",
       "empty": "No platforms have registered yet.",
       "client": "Platform",
       "host": "Address",

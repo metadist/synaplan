@@ -403,8 +403,8 @@
         "step3": "Allez dans « API permissions » → « Add a permission » → « Microsoft Graph » → « Delegated permissions » et ajoutez toutes celles-ci :",
         "step3Note": "offline_access n’est pas facultatif : sans lui, Microsoft n’émet pas de jeton de renouvellement et chaque exécution planifiée cesse de fonctionner au bout d’une heure.",
         "step4": "Allez dans « Certificates & secrets » → « New client secret » et copiez la colonne Value — pas le Secret ID. Elle n’est affichée qu’une seule fois.",
-        "step5": "Collez l’identifiant client et le secret dans les champs ci-dessous, définissez le locataire, puis activez M365_ENABLED. Les utilisateurs connectent ensuite leur propre compte sous Gérer → Connexions.",
-        "ready": "Prêt — les utilisateurs peuvent connecter leur compte Microsoft 365 sous Gérer → Connexions.",
+        "step5": "Collez l’identifiant client et le secret dans les champs ci-dessous, définissez le locataire, puis activez M365_ENABLED. Les utilisateurs connectent ensuite leur propre compte sous Apps › Microsoft 365.",
+        "ready": "Prêt — les utilisateurs peuvent connecter leur compte Microsoft 365 sous Apps › Microsoft 365.",
         "notReady": "Pas encore actif. Remplissez les champs ci-dessous et activez M365_ENABLED.",
         "copyFailed": "Impossible de copier. Sélectionnez le texte et copiez-le manuellement."
       },
@@ -416,8 +416,8 @@
         "step2": "Dans l’onglet « Permissions », activez ces deux options puis cliquez sur « Submit » :",
         "step3": "Dans l’onglet « Settings », sous « OAuth 2 → Redirect URIs », ajoutez cette adresse exactement :",
         "step4": "Toujours dans l’onglet « Settings », copiez l’App key et l’App secret (cliquez sur « Show »).",
-        "step5": "Collez la clé d’application et le secret dans les champs ci-dessous et activez DROPBOX_ENABLED. Les utilisateurs connectent ensuite leur propre compte sous Gérer → Connexions.",
-        "ready": "Prêt — les utilisateurs peuvent connecter leur compte Dropbox sous Gérer → Connexions.",
+        "step5": "Collez la clé d’application et le secret dans les champs ci-dessous et activez DROPBOX_ENABLED. Les utilisateurs connectent ensuite leur propre compte sous Apps › Dropbox.",
+        "ready": "Prêt — les utilisateurs peuvent connecter leur compte Dropbox sous Apps › Dropbox.",
         "notReady": "Pas encore actif. Remplissez les champs ci-dessous et activez DROPBOX_ENABLED.",
         "copyFailed": "Impossible de copier. Sélectionnez le texte et copiez-le manuellement.",
         "resetTitle": "Réinitialiser toutes les connexions Dropbox",
@@ -514,7 +514,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Lorsque la personne propriétaire est présente (chat ou un appel API en direct) : exécuter automatiquement, demander d’abord, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
         "COMPUTE_POLICY_UNATTENDED": "Lorsqu’une tâche enregistrée exécute un travail sur fichiers toute seule : demander d’abord (défaut), exécuter automatiquement, ou ne jamais exécuter. Un assistant ne peut pas assouplir cela.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Combien de jours un dossier de travail sur fichiers peut rester inutilisé avant que le nettoyage le supprime. Valeur par défaut : 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, sous Canaux → Synaplan Desktop. Un ordinateur associé peut discuter dans l’app et prendre les tâches en attente. Si c’est désactivé, cette page est masquée, l’association s’arrête, l’app ne peut pas discuter et les tâches en attente ne sont pas prises tant que vous ne le réactivez pas. Il n’y a pas encore d’installateur — l’app se construit à partir du dépôt source.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, sous Apps › Synaplan Desktop. Un ordinateur associé peut discuter dans l’app et prendre les tâches en attente. Si c’est désactivé, cette page est masquée, l’association s’arrête, l’app ne peut pas discuter et les tâches en attente ne sont pas prises tant que vous ne le réactivez pas. Il n’y a pas encore d’installateur — l’app se construit à partir du dépôt source.",
         "FEATURE_SEARCH_AI_ENABLED": "Aide IA dans la palette de recherche (Ctrl/Cmd+K) : pour une question en langage courant, le modèle d’outils choisit le résultat le plus pertinent et l’explique en une phrase. Il ne modifie jamais rien de lui-même. Chaque utilisation est un court appel à l’IA. Désactivé : la recherche par mots-clés et par sens reste disponible."
       },
       "fieldOptions": {
@@ -980,7 +980,7 @@
       }
     },
     "linkedPlatforms": {
-      "intro": "Serveurs Nextcloud, ownCloud et Outlook qui ont demandé à utiliser ce Synaplan. Approuvez-en un pour que ses utilisateurs puissent connecter leurs propres comptes sous Gérer › Connexions › Plateformes liées.",
+      "intro": "Serveurs Nextcloud, ownCloud et Outlook qui ont demandé à utiliser ce Synaplan. Approuvez-en un pour que ses utilisateurs puissent connecter leurs propres comptes sous Apps.",
       "empty": "Aucune plateforme ne s’est encore enregistrée.",
       "client": "Plateforme",
       "host": "Adresse",

@@ -403,8 +403,8 @@
         "step3": "Gehe zu „API-Berechtigungen“ → „Berechtigung hinzufügen“ → „Microsoft Graph“ → „Delegierte Berechtigungen“ und füge alle diese hinzu:",
         "step3Note": "offline_access ist Pflicht: Ohne diese Berechtigung stellt Microsoft kein Refresh-Token aus, und jeder geplante Lauf hört nach einer Stunde auf zu funktionieren.",
         "step4": "Gehe zu „Zertifikate & Geheimnisse“ → „Neuer Geheimer Clientschlüssel“ und kopiere die Spalte Wert – nicht die Geheimnis-ID. Sie wird nur dieses eine Mal angezeigt.",
-        "step5": "Trage Client-ID und Secret unten ein, setze den Mandanten und schalte M365_ENABLED ein. Danach verbinden die Nutzer ihr eigenes Konto unter Verwalten → Verbindungen.",
-        "ready": "Fertig eingerichtet – Nutzer können ihr Microsoft-365-Konto unter Verwalten → Verbindungen verbinden.",
+        "step5": "Trage Client-ID und Secret unten ein, setze den Mandanten und schalte M365_ENABLED ein. Danach verbinden die Nutzer ihr eigenes Konto unter Apps › Microsoft 365.",
+        "ready": "Fertig eingerichtet – Nutzer können ihr Microsoft-365-Konto unter Apps › Microsoft 365 verbinden.",
         "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte M365_ENABLED ein.",
         "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell."
       },
@@ -416,8 +416,8 @@
         "step2": "Aktiviere im Tab „Permissions“ diese beiden Berechtigungen und klicke auf „Submit“:",
         "step3": "Füge im Tab „Settings“ unter „OAuth 2 → Redirect URIs“ genau diese Adresse hinzu:",
         "step4": "Kopiere ebenfalls im Tab „Settings“ den App key und das App secret (auf „Show“ klicken).",
-        "step5": "Trage App key und Secret in die Felder unten ein und schalte DROPBOX_ENABLED ein. Nutzer verbinden ihr Konto dann unter Verwalten → Verbindungen.",
-        "ready": "Fertig eingerichtet – Nutzer können ihr Dropbox-Konto unter Verwalten → Verbindungen verbinden.",
+        "step5": "Trage App key und Secret in die Felder unten ein und schalte DROPBOX_ENABLED ein. Nutzer verbinden ihr Konto dann unter Apps › Dropbox.",
+        "ready": "Fertig eingerichtet – Nutzer können ihr Dropbox-Konto unter Apps › Dropbox verbinden.",
         "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte DROPBOX_ENABLED ein.",
         "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell.",
         "resetTitle": "Alle Dropbox-Verbindungen zurücksetzen",
@@ -514,7 +514,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Assistent kann das nicht lockern.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Kanäle → Synaplan Desktop. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Apps › Synaplan Desktop. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut.",
         "FEATURE_SEARCH_AI_ENABLED": "KI-Hilfe in der Suchpalette (Strg/Cmd+K): Bei einer Frage in normalen Worten wählt das Tools-Modell den passendsten Treffer und begründet ihn in einem Satz. Es ändert selbst nichts. Jede Nutzung ist ein kurzer KI-Aufruf. Aus: Stichwort- und Bedeutungssuche bleiben."
       },
       "fieldOptions": {
@@ -980,7 +980,7 @@
       }
     },
     "linkedPlatforms": {
-      "intro": "Nextcloud-, ownCloud- und Outlook-Server, die dieses Synaplan nutzen möchten. Gib einen frei, damit die Nutzer ihre eigenen Konten unter Verwalten › Verbindungen › Verknüpfte Plattformen verbinden können.",
+      "intro": "Nextcloud-, ownCloud- und Outlook-Server, die dieses Synaplan nutzen möchten. Gib einen frei, damit die Nutzer ihre eigenen Konten unter Apps verbinden können.",
       "empty": "Es hat sich noch keine Plattform registriert.",
       "client": "Plattform",
       "host": "Adresse",

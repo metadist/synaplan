@@ -394,12 +394,12 @@
     "yourAiAccounts": "Anthropic anahtarınız",
     "gatewayOff": "Kodlama araçları kapalı, bu yüzden hiçbir şey gönderilmez. Bir yönetici ağ geçidini açabilir.",
     "apiKeyStep": "{keys} altında bir Synaplan API anahtarı oluşturun ve sk_your_synaplan_api_key yerine yapıştırın.",
-    "apiKeysLink": "Yönet → Geliştirici ve cihazlar → API Anahtarları",
+    "apiKeysLink": "Uygulamalar › API ve geliştiriciler",
     "firstStartHint": "Claude Code ilk açıldığında bu API anahtarını kullanmak isteyip istemediğinizi ve klasöre güvenip güvenmediğinizi sorar. Önerilen yanıt hayırdır. İkisi için de evet seçin; aksi halde anahtar reddedilir ve hiçbir şey gönderilmez.",
     "statusDisabled": "Devre dışı",
     "budgetLine": "Kullanılan bütçe: %{percent} ({used} / {budget})",
     "budgetLineUnlimited": "Kullanılan bütçe: {used} (aylık bütçe limiti yok)",
-    "setupTitle": "Claude Code kurulumu",
+    "setupTitle": "Kurulumu terminalinize yapıştırın",
     "setupHint": "Claude Code'u bu Synaplan örneğine yönlendirin. Tam olarak bir kimlik bilgisi değişkeni kullanın — ANTHROPIC_API_KEY (x-api-key) veya ANTHROPIC_AUTH_TOKEN (Bearer).",
     "copySetup": "Kurulum komutlarını kopyala",
     "copySuccess": "Kurulum komutları kopyalandı",
@@ -494,7 +494,7 @@
       "mcpTools": {
         "label": "AI asistanlarının araçlarınızı kullanmasına izin ver",
         "description": "Synaplan, bağlı araç sunucularınızın araçlarını kendisi çalıştırır ve sonucu asistana geri verir.",
-        "noneConfigured": "Henüz bağlı bir araç sunucusu yok. Yönet → Bağlantılar → MCP Sunucuları bölümünden ekleyebilirsiniz."
+        "noneConfigured": "Henüz bağlı bir araç sunucusu yok. Uygulamalar › Araç sunucuları (MCP) bölümünden ekleyebilirsiniz."
       },
       "mcpWithClientTools": {
         "label": "Aracı aracının kendi araçları olsa da sizinkileri sun",
@@ -715,7 +715,10 @@
     },
     "claudeCode": {
       "keyTitle": "Anthropic anahtarınız",
-      "keyHint": "İsteğe bağlı. Kendi anahtarınızla kullanım Anthropic hesabınıza faturalanır."
+      "keyHint": "İsteğe bağlı. Kendi anahtarınızla kullanım Anthropic hesabınıza faturalanır.",
+      "apiKeyTitle": "Bir Synaplan API anahtarı oluşturun",
+      "adminOff": "Ağ geçidi herkes için kapalı. ",
+      "adminLink": "Yönetici › Yapay zeka altında ağ geçidi ayarları"
     },
     "items": {
       "telegram": {
@@ -818,6 +821,16 @@
         "about": "Betikler ve diğer uygulamalar için bir anahtar oluşturun. Her çağrı sizin adınıza işler ve limitlerinizden düşülür.",
         "stop": "Aşağıdan anahtarı iptal edin. Hemen çalışmayı bırakır."
       }
+    },
+    "linkedSteps": {
+      "title": "Nasıl bağlanır",
+      "install": "Synaplan uygulamasını {client} içine yükleyin.",
+      "installOutlook": "Outlook’ta Synaplan eklentisini ekleyin.",
+      "address": "Orada bu sunucu adresini girin:",
+      "signIn": "Synaplan hesabınızla oturum açıp onaylayın. Bağlantı ardından aşağıda görünür.",
+      "copy": "Adresi kopyala",
+      "copied": "Adres kopyalandı",
+      "copyFailed": "Adres kopyalanamadı. Seçip elle kopyalayın."
     }
   }
 }

@@ -77,6 +77,7 @@ describe('apps catalog', () => {
     const ids = (await availableApps()).map((app) => app.id)
     expect(ids).toContain('microsoft365')
     expect(ids).toContain('dropbox')
+    expect(ids).toContain('claude-code')
   })
 
   it('treats unknown and switched-off apps as unknown URLs', async () => {

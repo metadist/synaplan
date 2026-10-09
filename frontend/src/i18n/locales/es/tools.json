@@ -394,12 +394,12 @@
     "yourAiAccounts": "Tu clave de Anthropic",
     "gatewayOff": "Las herramientas de programación están desactivadas, así que no se envía nada. Un administrador puede activar la pasarela.",
     "apiKeyStep": "Cree una clave API de Synaplan en {keys} y péguela en lugar de sk_your_synaplan_api_key.",
-    "apiKeysLink": "Gestionar → Desarrolladores y dispositivos → Claves API",
+    "apiKeysLink": "Apps › API y desarrolladores",
     "firstStartHint": "La primera vez que Claude Code se inicia, pregunta si quiere usar esta clave API y si confía en la carpeta. La respuesta sugerida es no. Elija sí en ambas, o la clave se rechaza y no se envía nada.",
     "statusDisabled": "Desactivada",
     "budgetLine": "Presupuesto usado: {percent}% ({used} de {budget})",
     "budgetLineUnlimited": "Presupuesto usado: {used} (sin límite de presupuesto mensual)",
-    "setupTitle": "Configuración de Claude Code",
+    "setupTitle": "Pega la configuración en tu terminal",
     "setupHint": "Apunte Claude Code a esta instancia de Synaplan. Use exactamente una variable de credencial: ANTHROPIC_API_KEY (x-api-key) o ANTHROPIC_AUTH_TOKEN (Bearer).",
     "copySetup": "Copiar comandos de configuración",
     "copySuccess": "Comandos copiados",
@@ -494,7 +494,7 @@
       "mcpTools": {
         "label": "Permitir que los asistentes de IA usen sus herramientas",
         "description": "Synaplan ejecuta las herramientas de sus servidores conectados y devuelve el resultado al asistente.",
-        "noneConfigured": "Aún no hay ningún servidor de herramientas conectado. Puede añadir uno en Gestionar → Conexiones → Servidores MCP."
+        "noneConfigured": "Aún no hay ningún servidor de herramientas conectado. Puede añadir uno en Apps › Servidores de herramientas (MCP)."
       },
       "mcpWithClientTools": {
         "label": "Ofrecer sus herramientas aunque la herramienta de agente traiga las suyas",
@@ -715,7 +715,10 @@
     },
     "claudeCode": {
       "keyTitle": "Tu clave de Anthropic",
-      "keyHint": "Opcional. Con tu propia clave, el uso se factura a tu cuenta de Anthropic."
+      "keyHint": "Opcional. Con tu propia clave, el uso se factura a tu cuenta de Anthropic.",
+      "apiKeyTitle": "Crea una clave API de Synaplan",
+      "adminOff": "La pasarela está desactivada para todos. ",
+      "adminLink": "Ajustes de la pasarela en Admin › IA"
     },
     "items": {
       "telegram": {
@@ -818,6 +821,16 @@
         "about": "Crea una clave para scripts y otras apps. Cada llamada actúa en tu nombre y cuenta para tus límites.",
         "stop": "Revoca la clave abajo. Deja de funcionar al instante."
       }
+    },
+    "linkedSteps": {
+      "title": "Cómo conectar",
+      "install": "Instala la app de Synaplan en {client}.",
+      "installOutlook": "Añade el complemento de Synaplan en Outlook.",
+      "address": "Introduce allí esta dirección del servidor:",
+      "signIn": "Inicia sesión con tu cuenta de Synaplan y confirma. La conexión aparecerá abajo.",
+      "copy": "Copiar dirección",
+      "copied": "Dirección copiada",
+      "copyFailed": "No se pudo copiar la dirección. Selecciónala y cópiala a mano."
     }
   }
 }

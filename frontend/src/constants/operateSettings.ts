@@ -23,7 +23,8 @@ const sectionRef = (tab: string, section: string): ConfigSectionRef => ({ tab, s
 export const AI_INFRA_PATH = '/admin/setup'
 export const SYSTEM_CONFIG_PATH = '/admin/config'
 
-export type AiTabId = 'providers' | 'health' | 'documents' | 'search' | 'behavior' | 'prompts'
+export type AiTabId =
+  'providers' | 'health' | 'documents' | 'search' | 'behavior' | 'prompts' | 'gateway'
 
 export const AI_TAB_IDS: readonly AiTabId[] = [
   'providers',
@@ -32,6 +33,7 @@ export const AI_TAB_IDS: readonly AiTabId[] = [
   'search',
   'behavior',
   'prompts',
+  'gateway',
 ]
 
 export function isAiTabId(value: unknown): value is AiTabId {
@@ -71,6 +73,7 @@ export const AI_TAB_SECTIONS: Record<AiTabId, readonly ConfigSectionRef[]> = {
     sectionRef('processing', 'media'),
   ],
   prompts: [],
+  gateway: [],
 }
 
 export type SystemGroupId = 'access' | 'features' | 'channels' | 'appearance' | 'more'
