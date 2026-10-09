@@ -1,5 +1,5 @@
 <template>
-  <div data-testid="section-assistant-gallery">
+  <div data-testid="section-assistant-gallery" data-tour="assistants-gallery">
     <div class="flex flex-wrap items-center gap-2 mb-4">
       <button
         v-for="chip in visibleChips"

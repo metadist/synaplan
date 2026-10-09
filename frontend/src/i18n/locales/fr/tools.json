@@ -742,6 +742,122 @@
       "back": "Retour",
       "done": "Terminé",
       "progress": "{current} sur {total}"
+    },
+    "chats": {
+      "rail": {
+        "title": "Cinq espaces",
+        "body": "Cette barre bascule entre Chats, Bibliothèque, Assistants, Apps et Administration. Chaque espace ouvre son propre menu à côté."
+      },
+      "new": {
+        "title": "Démarrer un nouveau chat",
+        "body": "Chaque chat est enregistré dans la liste ci-dessous pour y revenir plus tard."
+      },
+      "input": {
+        "title": "Posez votre question",
+        "body": "Saisissez votre question et appuyez sur Entrée. Synaplan choisit un modèle adapté et peut utiliser vos fichiers et souvenirs."
+      },
+      "plus": {
+        "title": "Fichiers et outils",
+        "body": "Joignez un fichier ou une photo, ou activez un outil comme la recherche web pour ce message."
+      },
+      "model": {
+        "title": "Choisir le modèle",
+        "body": "Laissez-le en automatique ou choisissez un modèle. Vos réglages par défaut sont sous Assistants › Paramètres IA."
+      },
+      "search": {
+        "title": "Tout retrouver",
+        "body": "Recherchez chats, fichiers, assistants et pages depuis n’importe où, aussi avec Ctrl+K ou ⌘K."
+      }
+    },
+    "library": {
+      "tabs": {
+        "title": "Tout ce que vous conservez",
+        "body": "Vos fichiers, ce qui arrive des apps, ce que l’IA a généré, plus la recherche et les souvenirs — un onglet chacun."
+      },
+      "upload": {
+        "title": "Ajouter des fichiers",
+        "body": "Déposez des fichiers ici. Synaplan les lit pour que chats et assistants répondent à partir de leur contenu."
+      },
+      "use": {
+        "title": "Les utiliser dans un chat",
+        "body": "Dans un chat, choisissez + › Dossier de connaissances pour répondre depuis un dossier, ou posez simplement la question — les fichiers utiles sont trouvés seuls."
+      }
+    },
+    "assistants": {
+      "create": {
+        "title": "Créer un assistant",
+        "body": "Un assistant retient ses instructions, fichiers et outils pour que vous n’ayez pas à les répéter à chaque chat."
+      },
+      "gallery": {
+        "title": "Vos assistants",
+        "body": "Démarrez un chat avec l’un d’eux, modifiez-le, copiez un modèle ou partagez-le avec votre équipe."
+      },
+      "more": {
+        "title": "Tâches et approbations",
+        "body": "Le menu Assistants contient aussi les Tâches planifiées, les Approbations en attente et vos paramètres IA."
+      }
+    },
+    "tasks": {
+      "new": {
+        "title": "Créer une tâche",
+        "body": "Décrivez ce que l’IA doit faire et, si vous le souhaitez, quand. Elle s’exécute ensuite seule."
+      },
+      "approvals": {
+        "title": "Vous gardez la main",
+        "body": "Avant qu’une tâche n’envoie un mail ou ne modifie quelque chose, elle vous le demande sous Approbations. Les résultats figurent dans les exécutions de la tâche."
+      }
+    },
+    "apps": {
+      "search": {
+        "title": "Trouver une app",
+        "body": "Recherchez par nom ou par usage, par exemple mail ou calendrier."
+      },
+      "tabs": {
+        "title": "Toutes ou connectées",
+        "body": "Connectées n’affiche que ce que vous utilisez déjà, pour le vérifier ou le déconnecter vite."
+      },
+      "list": {
+        "title": "Ouvrir une app",
+        "body": "Chaque app explique ce qu’elle fait, se connecte en quelques étapes et se désactive sur la même page."
+      }
+    },
+    "admin": {
+      "cards": {
+        "title": "Votre serveur en un coup d’œil",
+        "body": "Personnes, nouvelles inscriptions, fonctions désactivées et modèles à vérifier. Chaque carte ouvre sa page."
+      },
+      "attention": {
+        "title": "Ce qui vous attend",
+        "body": "Les problèmes sont listés ici avec un bouton qui mène directement à la solution."
+      },
+      "sections": {
+        "title": "Sections d’administration",
+        "body": "État du système, infrastructure IA, Personnes et Configuration du système. La configuration a sa propre recherche de paramètres."
+      }
+    },
+    "checklist": {
+      "title": "Premiers pas",
+      "progress": "{done} sur {total} faits",
+      "dismiss": "Masquer la liste",
+      "doneLabel": "(fait)",
+      "items": {
+        "provider": {
+          "title": "Configurer un fournisseur IA",
+          "where": "Sous Administration › Infrastructure IA"
+        },
+        "file": {
+          "title": "Téléverser un fichier",
+          "where": "Vous le retrouvez ensuite sous Bibliothèque › Fichiers"
+        },
+        "assistant": {
+          "title": "Créer un assistant",
+          "where": "Il apparaît sous Assistants"
+        },
+        "app": {
+          "title": "Connecter une app",
+          "where": "Les apps connectées figurent sous Apps › Connectées"
+        }
+      }
     }
   },
   "apps": {

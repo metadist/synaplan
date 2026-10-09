@@ -300,6 +300,7 @@ const router = createRouter({
         requiresAuth: false,
         allowGuest: true,
         titleKey: 'pageTitles.chat',
+        tour: 'chats',
         // Chat renders message badges (knowledge: memories/feedback), media-job
         // and plugin states (tools), the assistant banner (assistants) and the
         // model sorting label + desktop-run panel (config). All must be present
@@ -321,7 +322,7 @@ const router = createRouter({
       path: '/apps',
       name: 'apps',
       component: () => import('@/views/AppsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.apps', i18n: ['tools'] },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.apps', i18n: ['tools'], tour: 'apps' },
     },
     {
       path: '/apps/connected',
@@ -392,7 +393,12 @@ const router = createRouter({
       path: '/tasks',
       name: 'saved-tasks',
       component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.savedTasks', i18n: ['config'] },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.savedTasks',
+        i18n: ['config'],
+        tour: 'tasks',
+      },
       beforeEnter: savedTasksRouteGuard,
     },
     {
@@ -419,7 +425,12 @@ const router = createRouter({
       path: '/ai/assistants',
       name: 'ai-assistants',
       component: () => import('@/views/AssistantsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.assistants', i18n: ['assistants'] },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.assistants',
+        i18n: ['assistants'],
+        tour: 'assistants',
+      },
       beforeEnter: assistantsRouteGuard,
     },
     {
@@ -490,7 +501,7 @@ const router = createRouter({
       path: '/files',
       name: 'files',
       component: () => import('@/views/FilesView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.files', i18n: ['files'] },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.files', i18n: ['files'], tour: 'library' },
     },
     {
       path: '/memories',
@@ -655,6 +666,7 @@ const router = createRouter({
         requiresAdmin: true,
         titleKey: 'pageTitles.admin',
         i18n: ['admin', 'config'],
+        tour: 'admin',
       },
       beforeEnter: adminDashboardRedirect,
     },

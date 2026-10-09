@@ -742,6 +742,122 @@
       "back": "Back",
       "done": "Done",
       "progress": "{current} of {total}"
+    },
+    "chats": {
+      "rail": {
+        "title": "Five areas",
+        "body": "This bar switches between Chats, Library, Assistants, Apps and Admin. Each area opens its own menu next to it."
+      },
+      "new": {
+        "title": "Start a new chat",
+        "body": "Every chat is saved in the list below, so you can come back to it later."
+      },
+      "input": {
+        "title": "Ask anything",
+        "body": "Type your question and press Enter. Synaplan picks a suitable model and can use your files and memories."
+      },
+      "plus": {
+        "title": "Files and tools",
+        "body": "Attach a file or a photo, or turn on a tool such as web search for this message."
+      },
+      "model": {
+        "title": "Choose the model",
+        "body": "Leave it on automatic or pick a model yourself. Your defaults live under Assistants › AI settings."
+      },
+      "search": {
+        "title": "Find anything",
+        "body": "Search chats, files, assistants and pages from anywhere, also with Ctrl+K or ⌘K."
+      }
+    },
+    "library": {
+      "tabs": {
+        "title": "Everything you keep",
+        "body": "Your files, what arrived from apps, what the AI generated, plus search and memories — one tab each."
+      },
+      "upload": {
+        "title": "Add files",
+        "body": "Drop files here. Synaplan reads them so chats and assistants can answer from their content."
+      },
+      "use": {
+        "title": "Use them in a chat",
+        "body": "In a chat, choose + › Knowledge folder to answer from a folder, or simply ask — relevant files are found on their own."
+      }
+    },
+    "assistants": {
+      "create": {
+        "title": "Create an assistant",
+        "body": "An assistant remembers its instructions, files and tools, so you do not repeat them in every chat."
+      },
+      "gallery": {
+        "title": "Your assistants",
+        "body": "Start a chat with one, edit it, copy a template or share it with your team."
+      },
+      "more": {
+        "title": "Tasks and approvals",
+        "body": "The Assistants menu also holds Tasks that run on a schedule, Approvals waiting for you, and your AI settings."
+      }
+    },
+    "tasks": {
+      "new": {
+        "title": "Create a task",
+        "body": "Describe what the AI should do and, if you like, when. It then runs on its own."
+      },
+      "approvals": {
+        "title": "You stay in control",
+        "body": "Before a task sends a mail or changes something, it asks you under Approvals. Results show up in the task’s runs."
+      }
+    },
+    "apps": {
+      "search": {
+        "title": "Find an app",
+        "body": "Search by name or what you want to do, for example mail or calendar."
+      },
+      "tabs": {
+        "title": "All or connected",
+        "body": "Connected shows only what you already use, so you can check or disconnect it quickly."
+      },
+      "list": {
+        "title": "Open an app",
+        "body": "Each app explains what it can do, connects in a few steps and can be turned off on the same page."
+      }
+    },
+    "admin": {
+      "cards": {
+        "title": "Your server at a glance",
+        "body": "People, new sign-ups, switched-off features and models to check. Each card opens the page behind it."
+      },
+      "attention": {
+        "title": "What needs you",
+        "body": "Problems are listed here with a button that takes you straight to the fix."
+      },
+      "sections": {
+        "title": "Admin sections",
+        "body": "System status, AI infrastructure, People and System configuration. The configuration page has its own settings search."
+      }
+    },
+    "checklist": {
+      "title": "Getting started",
+      "progress": "{done} of {total} done",
+      "dismiss": "Hide the checklist",
+      "doneLabel": "(done)",
+      "items": {
+        "provider": {
+          "title": "Set up an AI provider",
+          "where": "Under Admin › AI infrastructure"
+        },
+        "file": {
+          "title": "Upload a file",
+          "where": "You find it later under Library › Files"
+        },
+        "assistant": {
+          "title": "Create an assistant",
+          "where": "It appears under Assistants"
+        },
+        "app": {
+          "title": "Connect an app",
+          "where": "Connected apps are listed under Apps › Connected"
+        }
+      }
     }
   },
   "apps": {

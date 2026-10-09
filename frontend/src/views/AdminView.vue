@@ -6,6 +6,7 @@
         :title="$t('admin.title')"
         :subtitle="$t('admin.description')"
         icon="mdi:shield-crown"
+        tour-id="admin"
       >
         <TabNav
           :model-value="activeTab"

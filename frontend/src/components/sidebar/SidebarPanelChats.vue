@@ -20,6 +20,7 @@
         class="btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium min-h-11"
         :disabled="isCreatingChat"
         data-testid="btn-sidebar-v2-new-chat"
+        data-tour="chat-new"
         @click="createChat()"
       >
         <Icon

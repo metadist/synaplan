@@ -1,6 +1,6 @@
 <template>
   <section class="space-y-4" data-testid="section-admin-attention">
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-tour="admin-cards">
       <RouterLink
         v-for="card in cards"
         :key="card.id"
@@ -17,7 +17,11 @@
       </RouterLink>
     </div>
 
-    <div class="surface-card rounded-2xl p-5" data-testid="section-needs-attention">
+    <div
+      class="surface-card rounded-2xl p-5"
+      data-testid="section-needs-attention"
+      data-tour="admin-attention"
+    >
       <h2 class="text-lg font-semibold txt-primary mb-3">
         {{ $t('admin.attention.title') }}
       </h2>

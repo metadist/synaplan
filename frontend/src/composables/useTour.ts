@@ -10,6 +10,8 @@ import type { TourDefinition } from '@/tours/types'
 
 const GUEST_STORAGE_KEY = 'synaplan.toursSeen'
 const TARGET_WAIT_MS = 4000
+/** Later steps may sit in content that loads after the first target. */
+const LATER_TARGET_WAIT_MS = 1500
 
 const seen = ref<string[]>([])
 const activeTour = ref<string | null>(null)
@@ -110,7 +112,7 @@ function findTarget(target: string): HTMLElement | null {
 }
 
 /** Resolves once the element is in the DOM and visible, or null after the wait. */
-function waitForTarget(target: string): Promise<HTMLElement | null> {
+function waitForTarget(target: string, timeoutMs = TARGET_WAIT_MS): Promise<HTMLElement | null> {
   const found = findTarget(target)
   if (found) return Promise.resolve(found)
   return new Promise((resolve) => {
@@ -125,7 +127,7 @@ function waitForTarget(target: string): Promise<HTMLElement | null> {
     const timer = window.setTimeout(() => {
       observer.disconnect()
       resolve(null)
-    }, TARGET_WAIT_MS)
+    }, timeoutMs)
     observer.observe(document.body, { childList: true, subtree: true, attributes: true })
   })
 }
@@ -189,8 +191,12 @@ async function maybeAutoStart(id: string): Promise<void> {
   if (!tour || activeTour.value) return
   await ensureLoaded()
   if (seen.value.includes(id)) return
-  const firstTarget = tour.steps.find((step) => step.target)?.target
+  const [firstTarget, ...laterTargets] = tour.steps.flatMap((step) =>
+    step.target ? [step.target] : []
+  )
   if (firstTarget && !(await waitForTarget(firstTarget))) return
+  await Promise.all(laterTargets.map((target) => waitForTarget(target, LATER_TARGET_WAIT_MS)))
+  if (firstTarget && !findTarget(firstTarget)) return
   startTour(id)
 }
 

@@ -5,12 +5,14 @@
         :title="headerTitle"
         :subtitle="builderMode ? currentName : $t('assistants.intro')"
         icon="mdi:robot-outline"
+        tour-id="assistants"
       >
         <button
           v-if="!builderMode"
           type="button"
           class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center gap-2"
           data-testid="btn-create-assistant-header"
+          data-tour="assistants-create"
           @click="createAssistant"
         >
           {{ $t('assistants.create') }}

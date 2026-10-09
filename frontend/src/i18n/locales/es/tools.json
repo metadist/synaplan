@@ -668,6 +668,122 @@
       "back": "Atrás",
       "done": "Listo",
       "progress": "{current} de {total}"
+    },
+    "chats": {
+      "rail": {
+        "title": "Cinco áreas",
+        "body": "Esta barra cambia entre Chats, Biblioteca, Asistentes, Apps y Administración. Cada área abre su propio menú al lado."
+      },
+      "new": {
+        "title": "Empieza un chat nuevo",
+        "body": "Cada chat se guarda en la lista de abajo para que puedas volver más tarde."
+      },
+      "input": {
+        "title": "Pregunta lo que quieras",
+        "body": "Escribe tu pregunta y pulsa Intro. Synaplan elige un modelo adecuado y puede usar tus archivos y recuerdos."
+      },
+      "plus": {
+        "title": "Archivos y herramientas",
+        "body": "Adjunta un archivo o una foto, o activa una herramienta como la búsqueda web para este mensaje."
+      },
+      "model": {
+        "title": "Elige el modelo",
+        "body": "Déjalo en automático o elige tú un modelo. Tus valores predeterminados están en Asistentes › Ajustes de IA."
+      },
+      "search": {
+        "title": "Encuentra cualquier cosa",
+        "body": "Busca chats, archivos, asistentes y páginas desde cualquier lugar, también con Ctrl+K o ⌘K."
+      }
+    },
+    "library": {
+      "tabs": {
+        "title": "Todo lo que guardas",
+        "body": "Tus archivos, lo que llegó desde apps, lo que generó la IA, además de búsqueda y recuerdos: una pestaña cada uno."
+      },
+      "upload": {
+        "title": "Añade archivos",
+        "body": "Suelta archivos aquí. Synaplan los lee para que los chats y asistentes respondan con su contenido."
+      },
+      "use": {
+        "title": "Úsalos en un chat",
+        "body": "En un chat, elige + › Carpeta de conocimiento para responder desde una carpeta, o simplemente pregunta: los archivos relevantes se encuentran solos."
+      }
+    },
+    "assistants": {
+      "create": {
+        "title": "Crea un asistente",
+        "body": "Un asistente recuerda sus instrucciones, archivos y herramientas para que no los repitas en cada chat."
+      },
+      "gallery": {
+        "title": "Tus asistentes",
+        "body": "Inicia un chat con uno, edítalo, copia una plantilla o compártelo con tu equipo."
+      },
+      "more": {
+        "title": "Tareas y aprobaciones",
+        "body": "El menú Asistentes también contiene Tareas programadas, Aprobaciones pendientes y tus ajustes de IA."
+      }
+    },
+    "tasks": {
+      "new": {
+        "title": "Crea una tarea",
+        "body": "Describe qué debe hacer la IA y, si quieres, cuándo. Después se ejecuta sola."
+      },
+      "approvals": {
+        "title": "Tú mantienes el control",
+        "body": "Antes de que una tarea envíe un correo o cambie algo, te pregunta en Aprobaciones. Los resultados aparecen en las ejecuciones de la tarea."
+      }
+    },
+    "apps": {
+      "search": {
+        "title": "Busca una app",
+        "body": "Busca por nombre o por lo que quieres hacer, por ejemplo correo o calendario."
+      },
+      "tabs": {
+        "title": "Todas o conectadas",
+        "body": "Conectadas muestra solo lo que ya usas, para revisarlo o desconectarlo rápido."
+      },
+      "list": {
+        "title": "Abre una app",
+        "body": "Cada app explica lo que hace, se conecta en pocos pasos y se puede desactivar en la misma página."
+      }
+    },
+    "admin": {
+      "cards": {
+        "title": "Tu servidor de un vistazo",
+        "body": "Personas, nuevos registros, funciones desactivadas y modelos por revisar. Cada tarjeta abre su página."
+      },
+      "attention": {
+        "title": "Lo que te necesita",
+        "body": "Los problemas aparecen aquí con un botón que te lleva directamente a la solución."
+      },
+      "sections": {
+        "title": "Secciones de administración",
+        "body": "Estado del sistema, infraestructura de IA, Personas y Configuración del sistema. La configuración tiene su propia búsqueda de ajustes."
+      }
+    },
+    "checklist": {
+      "title": "Primeros pasos",
+      "progress": "{done} de {total} hechos",
+      "dismiss": "Ocultar la lista",
+      "doneLabel": "(hecho)",
+      "items": {
+        "provider": {
+          "title": "Configura un proveedor de IA",
+          "where": "En Administración › Infraestructura de IA"
+        },
+        "file": {
+          "title": "Sube un archivo",
+          "where": "Después lo encuentras en Biblioteca › Archivos"
+        },
+        "assistant": {
+          "title": "Crea un asistente",
+          "where": "Aparece en Asistentes"
+        },
+        "app": {
+          "title": "Conecta una app",
+          "where": "Las apps conectadas aparecen en Apps › Conectadas"
+        }
+      }
     }
   },
   "apps": {

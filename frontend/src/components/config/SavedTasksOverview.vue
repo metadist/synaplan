@@ -174,6 +174,7 @@ watch(highlightedTaskId, () => {
           type="button"
           class="btn-primary px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2"
           data-testid="btn-new-task"
+          data-tour="tasks-new"
           @click="newTaskOpen = true"
         >
           <PlusIcon class="w-4 h-4" aria-hidden="true" />

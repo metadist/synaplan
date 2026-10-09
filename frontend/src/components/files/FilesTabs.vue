@@ -11,6 +11,7 @@
         :tabs="tabs"
         :aria-label="$t('nav.files')"
         testid="files-tabs"
+        data-tour="library-tabs"
         mobile-trigger-testid="files-tabs-mobile-trigger"
         mobile-menu-testid="files-tabs-mobile-menu"
       />

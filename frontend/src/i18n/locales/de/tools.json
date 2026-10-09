@@ -665,6 +665,122 @@
       "back": "Zurück",
       "done": "Fertig",
       "progress": "{current} von {total}"
+    },
+    "chats": {
+      "rail": {
+        "title": "Fünf Bereiche",
+        "body": "Diese Leiste wechselt zwischen Chats, Bibliothek, Assistenten, Apps und Admin. Jeder Bereich öffnet daneben sein eigenes Menü."
+      },
+      "new": {
+        "title": "Neuen Chat starten",
+        "body": "Jeder Chat wird in der Liste darunter gespeichert, damit du später zurückkehren kannst."
+      },
+      "input": {
+        "title": "Frag einfach",
+        "body": "Schreib deine Frage und drücke Enter. Synaplan wählt ein passendes Modell und kann deine Dateien und Erinnerungen nutzen."
+      },
+      "plus": {
+        "title": "Dateien und Werkzeuge",
+        "body": "Hänge eine Datei oder ein Foto an oder schalte für diese Nachricht ein Werkzeug wie die Websuche ein."
+      },
+      "model": {
+        "title": "Modell wählen",
+        "body": "Lass es auf Automatik oder wähle selbst ein Modell. Deine Standards findest du unter Assistenten › KI-Einstellungen."
+      },
+      "search": {
+        "title": "Alles finden",
+        "body": "Durchsuche Chats, Dateien, Assistenten und Seiten von überall, auch mit Strg+K oder ⌘K."
+      }
+    },
+    "library": {
+      "tabs": {
+        "title": "Alles, was du aufbewahrst",
+        "body": "Deine Dateien, was aus Apps ankam, was die KI erzeugt hat, dazu Suche und Erinnerungen — je ein Tab."
+      },
+      "upload": {
+        "title": "Dateien hinzufügen",
+        "body": "Leg Dateien hier ab. Synaplan liest sie, damit Chats und Assistenten aus ihrem Inhalt antworten können."
+      },
+      "use": {
+        "title": "Im Chat verwenden",
+        "body": "Wähle im Chat + › Wissensordner, um aus einem Ordner zu antworten, oder frag einfach — passende Dateien werden selbst gefunden."
+      }
+    },
+    "assistants": {
+      "create": {
+        "title": "Assistenten erstellen",
+        "body": "Ein Assistent merkt sich Anweisungen, Dateien und Werkzeuge, damit du sie nicht in jedem Chat wiederholst."
+      },
+      "gallery": {
+        "title": "Deine Assistenten",
+        "body": "Starte einen Chat damit, bearbeite ihn, kopiere eine Vorlage oder teile ihn mit deinem Team."
+      },
+      "more": {
+        "title": "Aufgaben und Freigaben",
+        "body": "Im Menü Assistenten findest du auch Aufgaben, die nach Zeitplan laufen, wartende Freigaben und deine KI-Einstellungen."
+      }
+    },
+    "tasks": {
+      "new": {
+        "title": "Aufgabe erstellen",
+        "body": "Beschreibe, was die KI tun soll und auf Wunsch wann. Sie läuft dann von selbst."
+      },
+      "approvals": {
+        "title": "Du behältst die Kontrolle",
+        "body": "Bevor eine Aufgabe eine Mail sendet oder etwas ändert, fragt sie dich unter Freigaben. Ergebnisse stehen in den Läufen der Aufgabe."
+      }
+    },
+    "apps": {
+      "search": {
+        "title": "App finden",
+        "body": "Suche nach Name oder Vorhaben, zum Beispiel Mail oder Kalender."
+      },
+      "tabs": {
+        "title": "Alle oder verbunden",
+        "body": "Verbunden zeigt nur, was du schon nutzt, damit du es schnell prüfen oder trennen kannst."
+      },
+      "list": {
+        "title": "App öffnen",
+        "body": "Jede App erklärt, was sie kann, verbindet sich in wenigen Schritten und lässt sich auf derselben Seite abschalten."
+      }
+    },
+    "admin": {
+      "cards": {
+        "title": "Dein Server auf einen Blick",
+        "body": "Personen, neue Registrierungen, abgeschaltete Funktionen und zu prüfende Modelle. Jede Karte öffnet die Seite dahinter."
+      },
+      "attention": {
+        "title": "Was dich braucht",
+        "body": "Probleme stehen hier, jeweils mit einem Knopf, der dich direkt zur Lösung bringt."
+      },
+      "sections": {
+        "title": "Admin-Bereiche",
+        "body": "Systemstatus, KI-Infrastruktur, Personen und Systemkonfiguration. Die Konfiguration hat eine eigene Einstellungs-Suche."
+      }
+    },
+    "checklist": {
+      "title": "Erste Schritte",
+      "progress": "{done} von {total} erledigt",
+      "dismiss": "Checkliste ausblenden",
+      "doneLabel": "(erledigt)",
+      "items": {
+        "provider": {
+          "title": "KI-Anbieter einrichten",
+          "where": "Unter Admin › KI-Infrastruktur"
+        },
+        "file": {
+          "title": "Datei hochladen",
+          "where": "Du findest sie danach unter Bibliothek › Dateien"
+        },
+        "assistant": {
+          "title": "Assistenten erstellen",
+          "where": "Er erscheint unter Assistenten"
+        },
+        "app": {
+          "title": "App verbinden",
+          "where": "Verbundene Apps stehen unter Apps › Verbunden"
+        }
+      }
     }
   },
   "apps": {

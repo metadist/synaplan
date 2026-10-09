@@ -12,6 +12,7 @@
       :aria-label="searchHint"
       aria-keyshortcuts="Control+K Meta+K"
       data-testid="btn-sidebar-v2-search"
+      data-tour="search"
       @click="smartSearchStore.open()"
     >
       <MagnifyingGlassIcon class="w-4 h-4 flex-shrink-0" aria-hidden="true" />

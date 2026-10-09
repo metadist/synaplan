@@ -668,6 +668,122 @@
       "back": "Geri",
       "done": "Bitti",
       "progress": "{current} / {total}"
+    },
+    "chats": {
+      "rail": {
+        "title": "Beş alan",
+        "body": "Bu çubuk Sohbetler, Kütüphane, Asistanlar, Uygulamalar ve Yönetim arasında geçiş yapar. Her alan yanında kendi menüsünü açar."
+      },
+      "new": {
+        "title": "Yeni sohbet başlatın",
+        "body": "Her sohbet aşağıdaki listeye kaydedilir; daha sonra geri dönebilirsiniz."
+      },
+      "input": {
+        "title": "İstediğinizi sorun",
+        "body": "Sorunuzu yazıp Enter’a basın. Synaplan uygun bir model seçer; dosyalarınızı ve anılarınızı kullanabilir."
+      },
+      "plus": {
+        "title": "Dosyalar ve araçlar",
+        "body": "Bir dosya veya fotoğraf ekleyin ya da bu mesaj için web araması gibi bir aracı açın."
+      },
+      "model": {
+        "title": "Modeli seçin",
+        "body": "Otomatikte bırakın veya kendiniz bir model seçin. Varsayılanlarınız Asistanlar › AI ayarları altında."
+      },
+      "search": {
+        "title": "Her şeyi bulun",
+        "body": "Sohbetleri, dosyaları, asistanları ve sayfaları her yerden arayın; Ctrl+K veya ⌘K ile de."
+      }
+    },
+    "library": {
+      "tabs": {
+        "title": "Sakladığınız her şey",
+        "body": "Dosyalarınız, uygulamalardan gelenler, yapay zekânın ürettikleri, ayrıca arama ve anılar — her biri bir sekmede."
+      },
+      "upload": {
+        "title": "Dosya ekleyin",
+        "body": "Dosyaları buraya bırakın. Synaplan onları okur; sohbetler ve asistanlar içeriklerinden yanıt verebilir."
+      },
+      "use": {
+        "title": "Sohbette kullanın",
+        "body": "Sohbette bir klasörden yanıt için + › Bilgi klasörü’nü seçin ya da sadece sorun — ilgili dosyalar kendiliğinden bulunur."
+      }
+    },
+    "assistants": {
+      "create": {
+        "title": "Asistan oluşturun",
+        "body": "Bir asistan talimatlarını, dosyalarını ve araçlarını hatırlar; her sohbette tekrarlamanız gerekmez."
+      },
+      "gallery": {
+        "title": "Asistanlarınız",
+        "body": "Biriyle sohbet başlatın, düzenleyin, bir şablonu kopyalayın veya ekibinizle paylaşın."
+      },
+      "more": {
+        "title": "Görevler ve onaylar",
+        "body": "Asistanlar menüsünde zamanlanmış Görevler, sizi bekleyen Onaylar ve AI ayarlarınız da bulunur."
+      }
+    },
+    "tasks": {
+      "new": {
+        "title": "Görev oluşturun",
+        "body": "Yapay zekânın ne yapacağını ve isterseniz ne zaman yapacağını yazın. Sonra kendi kendine çalışır."
+      },
+      "approvals": {
+        "title": "Kontrol sizde",
+        "body": "Bir görev e-posta göndermeden veya bir şeyi değiştirmeden önce Onaylar altında size sorar. Sonuçlar görevin çalıştırmalarında görünür."
+      }
+    },
+    "apps": {
+      "search": {
+        "title": "Uygulama bulun",
+        "body": "Ada veya yapmak istediğinize göre arayın, örneğin e-posta veya takvim."
+      },
+      "tabs": {
+        "title": "Tümü veya bağlı",
+        "body": "Bağlı, yalnızca zaten kullandıklarınızı gösterir; hızlıca kontrol edebilir veya bağlantıyı kesebilirsiniz."
+      },
+      "list": {
+        "title": "Bir uygulama açın",
+        "body": "Her uygulama ne yapabildiğini açıklar, birkaç adımda bağlanır ve aynı sayfadan kapatılabilir."
+      }
+    },
+    "admin": {
+      "cards": {
+        "title": "Sunucunuza bir bakışta",
+        "body": "Kişiler, yeni kayıtlar, kapalı özellikler ve kontrol edilecek modeller. Her kart ilgili sayfayı açar."
+      },
+      "attention": {
+        "title": "Sizi bekleyenler",
+        "body": "Sorunlar burada, sizi doğrudan çözüme götüren bir düğmeyle listelenir."
+      },
+      "sections": {
+        "title": "Yönetim bölümleri",
+        "body": "Sistem durumu, AI altyapısı, Kişiler ve Sistem yapılandırması. Yapılandırma sayfasının kendi ayar araması vardır."
+      }
+    },
+    "checklist": {
+      "title": "Başlarken",
+      "progress": "{total} adımdan {done} tamam",
+      "dismiss": "Listeyi gizle",
+      "doneLabel": "(tamam)",
+      "items": {
+        "provider": {
+          "title": "Bir AI sağlayıcısı kurun",
+          "where": "Yönetim › AI altyapısı altında"
+        },
+        "file": {
+          "title": "Dosya yükleyin",
+          "where": "Sonra Kütüphane › Dosyalar altında bulursunuz"
+        },
+        "assistant": {
+          "title": "Asistan oluşturun",
+          "where": "Asistanlar altında görünür"
+        },
+        "app": {
+          "title": "Bir uygulama bağlayın",
+          "where": "Bağlı uygulamalar Uygulamalar › Bağlı altında listelenir"
+        }
+      }
     }
   },
   "apps": {

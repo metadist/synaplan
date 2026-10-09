@@ -24,6 +24,7 @@
                 class="w-full pl-9 pr-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :placeholder="$t('apps.searchPlaceholder')"
                 data-testid="input-apps-search"
+                data-tour="apps-search"
               />
             </label>
           </template>
@@ -32,6 +33,7 @@
             :model-value="connectedOnly ? 'connected' : 'all'"
             :aria-label="$t('apps.title')"
             testid="tabs-apps"
+            data-tour="apps-tabs"
           />
         </PageHeader>
 
@@ -57,7 +59,7 @@
           @action="query = ''"
         />
 
-        <div v-else class="space-y-8">
+        <div v-else class="space-y-8" data-tour="apps-list">
           <section
             v-for="section in sections"
             :key="section.id"
