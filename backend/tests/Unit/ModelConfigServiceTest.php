@@ -667,6 +667,48 @@ class ModelConfigServiceTest extends TestCase
         self::assertSame(348, $this->service->getDefaultModel('PIC2PIC', 1));
     }
 
+    public function testReplacementForRetiredModelFollowsTheSuccessor(): void
+    {
+        $this->givenModels(
+            [151 => 'OpenAI', 348 => 'OpenAI'],
+            inactiveModelIds: [151],
+            successorByModelId: [151 => 348],
+            retiredModelIds: [151],
+        );
+        $this->givenUsableProviders(['openai']);
+
+        self::assertSame(348, $this->service->replacementForRetiredModel(151, 'TEXT2PIC', 1));
+    }
+
+    /**
+     * An operator who switched a retired row back on makes it look usable;
+     * the provider has still shut it down, so it must never be handed back.
+     */
+    public function testReplacementForRetiredModelNeverReturnsTheRetiredIdItself(): void
+    {
+        $this->givenModels([29 => 'OpenAI'], retiredModelIds: [29]);
+        $this->givenUsableProviders(['openai']);
+
+        self::assertNull($this->service->replacementForRetiredModel(29, 'TEXT2PIC', 1));
+    }
+
+    /**
+     * With no usable successor and no usable default, getDefaultModel() hands
+     * back the configured binding — here another retired row.
+     */
+    public function testReplacementForRetiredModelRejectsARetiredFallback(): void
+    {
+        $this->givenModels(
+            [29 => 'OpenAI', 151 => 'OpenAI'],
+            inactiveModelIds: [29, 151],
+            retiredModelIds: [29, 151],
+        );
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([1 => 151]);
+
+        self::assertNull($this->service->replacementForRetiredModel(29, 'TEXT2PIC', 1));
+    }
+
     public function testResolveUsableModelIdKeepsAnOverrideThatStillWorks(): void
     {
         $this->givenModels([255 => 'OpenAI']);
@@ -691,16 +733,18 @@ class ModelConfigServiceTest extends TestCase
      * @param array<int, string> $providerIdsByModelId
      * @param list<int>          $inactiveModelIds     BIDs to hand back with BACTIVE = 0
      * @param array<int, int>    $successorByModelId
+     * @param list<int>          $retiredModelIds      BIDs whose row carries BRETIREDON
      */
     private function givenModels(
         array $servicesByModelId,
         array $providerIdsByModelId = [],
         array $inactiveModelIds = [],
         array $successorByModelId = [],
+        array $retiredModelIds = [],
     ): void {
         $this->modelRepository
             ->method('find')
-            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds, $successorByModelId): ?Model {
+            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds, $successorByModelId, $retiredModelIds): ?Model {
                 if (!isset($servicesByModelId[$modelId])) {
                     return null;
                 }
@@ -710,6 +754,7 @@ class ModelConfigServiceTest extends TestCase
                 $model->method('getProviderId')->willReturn($providerIdsByModelId[$modelId] ?? '');
                 $model->method('getActive')->willReturn(in_array($modelId, $inactiveModelIds, true) ? 0 : 1);
                 $model->method('getSuccessorId')->willReturn($successorByModelId[$modelId] ?? null);
+                $model->method('isRetired')->willReturn(in_array($modelId, $retiredModelIds, true));
 
                 return $model;
             });

@@ -526,7 +526,7 @@ class MediaGenerationServiceTest extends TestCase
         });
         $this->em->expects(self::any())->method('getRepository')->with(Model::class)->willReturn($repo);
         $this->modelConfigService->expects(self::once())
-            ->method('resolveUsableModelId')
+            ->method('replacementForRetiredModel')
             ->with(151, 'TEXT2PIC', self::anything())
             ->willReturn(348);
 
@@ -547,7 +547,7 @@ class MediaGenerationServiceTest extends TestCase
         $retired = $this->createModel('OpenAI', 'gpt-image-1', 'gpt-image-1');
         $retired->method('isRetired')->willReturn(true);
         $this->setUpModelResolution(29, $retired);
-        $this->modelConfigService->method('resolveUsableModelId')->willReturn(null);
+        $this->modelConfigService->method('replacementForRetiredModel')->willReturn(null);
         $this->aiFacade->expects(self::never())->method('generateImage');
 
         $this->expectException(NoModelAvailableException::class);

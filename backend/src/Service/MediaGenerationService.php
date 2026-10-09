@@ -487,16 +487,16 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             throw new NoModelAvailableException('Model not found: '.$modelId);
         }
 
-        // An explicit id the provider shut down follows the retirement record
-        // (its catalog successor) instead of failing at the provider.
+        // An id the provider shut down follows the retirement record (its
+        // catalog successor) instead of failing at the provider.
         if ($model->isRetired()) {
-            $successorId = $this->modelConfigService->resolveUsableModelId($modelId, $capability, $user->getId());
-            $successor = null !== $successorId ? $this->em->getRepository(Model::class)->find($successorId) : null;
-            if (null === $successor) {
-                throw new NoModelAvailableException('Model '.$modelId.' is retired and has no usable successor');
+            $replacementId = $this->modelConfigService->replacementForRetiredModel($modelId, $capability, $user->getId());
+            $replacement = null !== $replacementId ? $this->em->getRepository(Model::class)->find($replacementId) : null;
+            if (null === $replacement) {
+                throw new NoModelAvailableException(sprintf('The selected model (%s) has been retired by its provider and no replacement is available. Choose another model in Settings.', $model->getName()));
             }
-            $model = $successor;
-            $modelId = $successorId;
+            $model = $replacement;
+            $modelId = $replacementId;
         }
 
         return [
