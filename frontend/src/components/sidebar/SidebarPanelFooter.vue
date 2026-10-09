@@ -268,17 +268,15 @@ onBeforeUnmount(() => {
     );
 }
 
-/* White on the light end of the gradient (#3b6fe0) is 4.6:1. The dark theme
-   uses the light brand blue, so it takes dark ink (#0b1220 on #6d9ae0 is 6.5:1). */
+/* Ink is --on-brand so it stays readable on the light-mode blue and on the
+   light dark and OLED accents. */
 .sidebar-avatar {
-  color: #fff;
-  background: linear-gradient(135deg, #003fc7, #3b6fe0);
-  box-shadow: 0 2px 8px rgba(0, 63, 199, 0.25);
+  color: var(--on-brand);
+  background: linear-gradient(135deg, var(--brand), var(--brand-light));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .dark .sidebar-avatar {
-  color: #0b1220;
-  background: linear-gradient(135deg, #6d9ae0, #93b8e8);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 </style>

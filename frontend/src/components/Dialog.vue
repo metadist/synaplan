@@ -28,9 +28,7 @@
                 'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
                 dialog.danger
                   ? 'bg-red-500/10 text-red-500'
-                  : dialog.type === 'confirm' || dialog.type === 'choice'
-                    ? 'bg-blue-500/10 text-blue-500'
-                    : 'bg-[var(--brand)]/10 text-[var(--brand)]',
+                  : 'bg-[var(--brand)]/10 text-[var(--brand)]',
               ]"
             >
               <ExclamationTriangleIcon v-if="dialog.danger" class="w-6 h-6" />

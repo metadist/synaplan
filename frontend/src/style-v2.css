@@ -106,6 +106,10 @@
   --v2-glow-strong: transparent;
   --v2-border: rgba(255, 255, 255, 0.14);
   --v2-border-hover: rgba(255, 255, 255, 0.28);
+  --brand-alpha-light: rgba(255, 255, 255, 0.12);
+  --usage-track: rgba(255, 255, 255, 0.16);
+  --usage-epoch-a: #d4d4d4;
+  --usage-epoch-b: #f5f5f5;
 }
 
 /* ----------------------------------------------------------
@@ -1467,4 +1471,110 @@
   border-color: color-mix(in srgb, var(--brand) 55%, transparent);
   color: var(--brand);
   background: color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+/* OLED Black keeps the silver accent. The rules above paint the navy wash
+   onto hover, active and focus states; restated here so they follow the
+   black and grey page. */
+.design-v2.dark.theme-oled .nav-item {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.design-v2.dark.theme-oled .nav-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.design-v2.dark.theme-oled .nav-item--active {
+  background: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22) !important;
+}
+.design-v2.dark.theme-oled .btn-primary,
+.design-v2.dark.theme-oled .btn-primary:hover {
+  border-color: rgba(20, 20, 20, 0.2);
+  box-shadow: none;
+}
+.design-v2.dark.theme-oled .hover-surface:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.design-v2.dark.theme-oled .v2-rail-icon:hover,
+.design-v2.dark.theme-oled .v2-rail-icon--active {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+.design-v2.dark.theme-oled .pill:hover,
+.design-v2.dark.theme-oled .pill--active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
+}
+.design-v2.dark.theme-oled .v2-new-chat-btn,
+.design-v2.dark.theme-oled .v2-new-chat-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+}
+.design-v2.dark.theme-oled input[type='text']:focus,
+.design-v2.dark.theme-oled input[type='email']:focus,
+.design-v2.dark.theme-oled input[type='password']:focus,
+.design-v2.dark.theme-oled input[type='search']:focus,
+.design-v2.dark.theme-oled input[type='number']:focus,
+.design-v2.dark.theme-oled input[type='url']:focus,
+.design-v2.dark.theme-oled input[type='tel']:focus,
+.design-v2.dark.theme-oled textarea:focus {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+.design-v2.dark.theme-oled .checkbox-brand:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.design-v2.dark.theme-oled [data-testid='comp-chat-input-shell'] [data-testid='btn-model-toggle'].pill:hover,
+.design-v2.dark.theme-oled
+  [data-testid='comp-chat-input-shell']
+  [data-testid='btn-model-toggle'].pill:focus-visible,
+.design-v2.dark.theme-oled [data-testid='comp-chat-input-shell'] .pill--active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+/* Panels, menus and modals hardcode the navy glass of dark mode. On OLED
+   they sit a step above the black page so text stays readable. */
+.design-v2.dark.theme-oled .surface-elevated,
+.design-v2.dark.theme-oled .dropdown-panel,
+.design-v2.dark.theme-oled .dropdown-up,
+.design-v2.dark.theme-oled .surface-card.shadow-2xl,
+.design-v2.dark.theme-oled select option {
+  background: #161616;
+}
+.design-v2.dark.theme-oled .bubble-ai {
+  background: rgba(22, 22, 22, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+.design-v2.dark.theme-oled .bubble-ai:hover {
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+}
+.design-v2.dark.theme-oled .bubble-user,
+.design-v2.dark.theme-oled .bubble-user:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+.dark.theme-oled .dark\:bg-gray-900 {
+  background-color: #161616;
+}
+.design-v2.dark.theme-oled [data-testid='modal-file-selection'],
+.design-v2.dark.theme-oled [data-testid='modal-pasted-text'],
+.design-v2.dark.theme-oled [data-testid='modal-chat-manager'],
+.design-v2.dark.theme-oled [data-testid='comp-file-mention-palette'] {
+  background: #161616 !important;
+}
+.design-v2.dark.theme-oled .dropdown-item:hover,
+.design-v2.dark.theme-oled .dropdown-item--active,
+.design-v2.dark.theme-oled .icon-ghost:hover,
+.design-v2.dark.theme-oled .icon-ghost:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+/* Fills that say "text-white" assume the deep blue brand. On the light OLED
+   accent that ink disappears, so it follows --on-brand instead. */
+.dark.theme-oled [class~='bg-[var(--brand)]'],
+.dark.theme-oled [class~='hover:bg-[var(--brand)]']:hover,
+.dark.theme-oled .mode-toggle-active {
+  color: var(--on-brand) !important;
 }

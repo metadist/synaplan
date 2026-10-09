@@ -312,6 +312,18 @@
     --txt-model-placeholder-hover: #d4d4d4;
     --border-light: rgba(255, 255, 255, 0.16);
     --divider: rgba(255, 255, 255, 0.14);
+    /* Silver, not the navy brand. A blue accent sits on a second hue next to
+       a black and grey page. Buttons and icons are near-white; a user
+       message stays charcoal so its white text still holds (about 13:1). */
+    --brand: #f2f2f2;
+    --brand-light: #ffffff;
+    --brand-hover: #ffffff;
+    --brand-fill: #2a2a2a;
+    --on-brand: #141414;
+    --brand-alpha-light: rgba(255, 255, 255, 0.12);
+    --usage-track: rgba(255, 255, 255, 0.16);
+    --usage-epoch-a: #d4d4d4;
+    --usage-epoch-b: #f5f5f5;
   }
 
   .dark {
@@ -2254,4 +2266,50 @@ input[type='week']:not(:disabled)::-webkit-calendar-picker-indicator {
 }
 .driver-popover.synaplan-tour .driver-popover-arrow-side-bottom.driver-popover-arrow {
   border-bottom-color: var(--bg-card);
+}
+
+/* OLED chrome. These washes are hardcoded brand blue on `.dark`, so the
+   silver accent token alone would leave blue hovers, tabs and pills. */
+.dark.theme-oled .nav-item {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.dark.theme-oled .nav-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.dark.theme-oled .nav-item--active {
+  background: rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+}
+.dark.theme-oled .hover-surface:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.dark.theme-oled .dropdown-panel {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 1px 2px rgb(0 0 0 / 0.05);
+}
+.dark.theme-oled .dropdown-trigger:hover,
+.dark.theme-oled .dropdown-item:hover,
+.dark.theme-oled .dropdown-item:focus,
+.dark.theme-oled [data-testid='dropdown-model-panel'] .dropdown-item:focus,
+.dark.theme-oled .dropdown-item--active,
+.dark.theme-oled .dropdown-item--active:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.dark.theme-oled .tab-nav-item:hover,
+.dark.theme-oled .tab-nav-item--active,
+.dark.theme-oled .tab-nav-item--active:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.dark.theme-oled .pill:hover,
+.dark.theme-oled .pill--active {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }

@@ -186,16 +186,17 @@ onBeforeUnmount(() => contentObserver?.disconnect())
 /* Mirrors the active rail icon, so the panel reads as that icon's page. */
 .sidebar-panel-badge {
   color: var(--brand);
-  background: linear-gradient(135deg, rgba(0, 63, 199, 0.18), rgba(0, 63, 199, 0.08));
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 63, 199, 0.16),
-    0 2px 10px rgba(0, 63, 199, 0.12);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand) 18%, transparent),
+    color-mix(in srgb, var(--brand) 8%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 16%, transparent);
 }
 
 .dark .sidebar-panel-badge {
-  background: linear-gradient(135deg, rgba(107, 143, 214, 0.24), rgba(107, 143, 214, 0.1));
   box-shadow:
-    inset 0 0 0 1px rgba(107, 143, 214, 0.22),
+    inset 0 0 0 1px color-mix(in srgb, var(--brand) 22%, transparent),
     0 2px 12px rgba(0, 0, 0, 0.35);
 }
 </style>
