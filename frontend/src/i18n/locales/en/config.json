@@ -1078,8 +1078,8 @@
       "errorRemoving": "Failed to remove phone number"
     },
     "usage": {
-      "title": "Usage Statistics",
-      "description": "Track your API usage across all channels and features",
+      "title": "My usage",
+      "description": "How much you used chat, files and other features, and what it cost.",
       "export": "Export CSV",
       "exportSuccess": "Usage data exported successfully",
       "errorLoading": "Failed to load usage statistics",

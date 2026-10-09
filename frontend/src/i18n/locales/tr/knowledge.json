@@ -70,7 +70,8 @@
     "userDisabled": {
       "title": "Hesabınız için anılar devre dışı",
       "message": "AI, anıları kullanmayacak veya otomatik olarak güncellemeyecek. Bunu profil ayarlarınızdan istediğiniz zaman etkinleştirebilirsiniz.",
-      "enable": "Anıları etkinleştir"
+      "enable": "Anıları etkinleştir",
+      "openSettings": "Sohbet ayarlarını aç"
     },
     "unavailable": {
       "title": "Anılar yapılandırılıyor",
@@ -399,7 +400,8 @@
       "editSuccess": "Geri bildirim güncellendi",
       "editError": "Geri bildirim güncellenemedi",
       "deleteSuccess": "Geri bildirim silindi",
-      "deleteError": "Geri bildirim silinemedi"
+      "deleteError": "Geri bildirim silinemedi",
+      "emptyAction": "Sohbet aç"
     }
   }
 }

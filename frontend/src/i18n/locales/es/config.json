@@ -831,8 +831,8 @@
       "errorRemoving": "Error al eliminar número de teléfono"
     },
     "usage": {
-      "title": "Estadísticas de Uso",
-      "description": "Rastrea tu uso de API en todos los canales y funciones",
+      "title": "Mi uso",
+      "description": "Cuánto has usado el chat, los archivos y otras funciones, y lo que ha costado.",
       "export": "Exportar CSV",
       "exportSuccess": "Datos de uso exportados exitosamente",
       "errorLoading": "Error al cargar estadísticas de uso",

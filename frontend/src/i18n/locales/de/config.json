@@ -1050,8 +1050,8 @@
       "errorRemoving": "Fehler beim Entfernen der Telefonnummer"
     },
     "usage": {
-      "title": "Nutzungsstatistiken",
-      "description": "Verfolgen Sie Ihre API-Nutzung über alle Kanäle und Funktionen",
+      "title": "Meine Nutzung",
+      "description": "Wie viel du Chat, Dateien und andere Funktionen genutzt hast und was es gekostet hat.",
       "export": "CSV Exportieren",
       "exportSuccess": "Nutzungsdaten erfolgreich exportiert",
       "errorLoading": "Fehler beim Laden der Nutzungsstatistiken",

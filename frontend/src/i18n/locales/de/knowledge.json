@@ -70,7 +70,8 @@
     "userDisabled": {
       "title": "Erinnerungen sind für dein Konto deaktiviert",
       "message": "Die KI nutzt keine Erinnerungen und aktualisiert sie nicht automatisch. Du kannst das jederzeit in den Profileinstellungen aktivieren.",
-      "enable": "Erinnerungen aktivieren"
+      "enable": "Erinnerungen aktivieren",
+      "openSettings": "Chat-Einstellungen öffnen"
     },
     "unavailable": {
       "title": "Erinnerungen werden eingerichtet",
@@ -400,7 +401,8 @@
       "editSuccess": "Feedback aktualisiert",
       "editError": "Feedback konnte nicht aktualisiert werden",
       "deleteSuccess": "Feedback gelöscht",
-      "deleteError": "Feedback konnte nicht gelöscht werden"
+      "deleteError": "Feedback konnte nicht gelöscht werden",
+      "emptyAction": "Chat öffnen"
     }
   }
 }

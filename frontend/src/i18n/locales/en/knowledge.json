@@ -70,7 +70,8 @@
     "userDisabled": {
       "title": "Memories are disabled for your account",
       "message": "The AI will not use or automatically update memories. You can enable this in your profile settings at any time.",
-      "enable": "Enable memories"
+      "enable": "Enable memories",
+      "openSettings": "Open chat settings"
     },
     "unavailable": {
       "title": "Memories are being set up",
@@ -400,7 +401,8 @@
       "editSuccess": "Feedback updated",
       "editError": "Failed to update feedback",
       "deleteSuccess": "Feedback deleted",
-      "deleteError": "Failed to delete feedback"
+      "deleteError": "Failed to delete feedback",
+      "emptyAction": "Open a chat"
     }
   }
 }

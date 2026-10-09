@@ -125,11 +125,11 @@ describe('UsageStatistics', () => {
     vi.clearAllMocks()
   })
 
-  it('should render header and export button', async () => {
+  it('leaves the page title to the page and renders the export button', async () => {
     const wrapper = mount(UsageStatistics, mountOptions)
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="section-header"]').exists()).toBe(true)
+    expect(wrapper.find('h2').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-export"]').exists()).toBe(true)
   })
 

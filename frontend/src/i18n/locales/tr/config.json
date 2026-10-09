@@ -831,8 +831,8 @@
       "errorRemoving": "Telefon numarası kaldırılamadı"
     },
     "usage": {
-      "title": "Kullanım İstatistikleri",
-      "description": "Tüm kanal ve özelliklerdeki API kullanımınızı takip edin",
+      "title": "Kullanımım",
+      "description": "Sohbeti, dosyaları ve diğer özellikleri ne kadar kullandığınız ve bunun maliyeti.",
       "export": "CSV Dışa Aktar",
       "exportSuccess": "Kullanım verileri başarıyla dışa aktarıldı",
       "errorLoading": "Kullanım istatistikleri yüklenemedi",

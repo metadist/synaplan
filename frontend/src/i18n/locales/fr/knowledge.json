@@ -70,7 +70,8 @@
     "userDisabled": {
       "title": "Les mémoires sont désactivées pour votre compte",
       "message": "L’IA n’utilisera ni ne mettra à jour automatiquement les mémoires. Vous pouvez activer ceci dans les réglages de votre profil à tout moment.",
-      "enable": "Activer les mémoires"
+      "enable": "Activer les mémoires",
+      "openSettings": "Ouvrir les paramètres du chat"
     },
     "unavailable": {
       "title": "Les mémoires sont en cours de configuration",
@@ -400,7 +401,8 @@
       "editSuccess": "Retour mis à jour",
       "editError": "Échec de la mise à jour du retour",
       "deleteSuccess": "Retour supprimé",
-      "deleteError": "Échec de la suppression du retour"
+      "deleteError": "Échec de la suppression du retour",
+      "emptyAction": "Ouvrir un chat"
     }
   }
 }

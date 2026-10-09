@@ -1076,8 +1076,8 @@
       "errorRemoving": "Échec du retrait du numéro de téléphone"
     },
     "usage": {
-      "title": "Statistiques d’utilisation",
-      "description": "Suivez votre utilisation de l’API sur tous les canaux et fonctionnalités",
+      "title": "Mon utilisation",
+      "description": "Combien vous avez utilisé le chat, les fichiers et les autres fonctions, et ce que cela a coûté.",
       "export": "Exporter CSV",
       "exportSuccess": "Données d’utilisation exportées avec succès",
       "errorLoading": "Échec du chargement des statistiques d’utilisation",

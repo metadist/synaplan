@@ -89,23 +89,15 @@
           <Icon icon="mdi:loading" class="w-8 h-8 animate-spin txt-secondary" />
         </div>
 
-        <!-- Empty State (no feedbacks at all) -->
-        <div
+        <EmptyState
           v-else-if="feedbackStore.feedbacks.length === 0"
-          class="surface-card rounded-2xl p-8 text-center"
-        >
-          <div
-            class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-brand/20 to-orange-500/20 flex items-center justify-center"
-          >
-            <Icon icon="mdi:comment-check-outline" class="w-8 h-8 text-brand" />
-          </div>
-          <h3 class="text-lg font-medium txt-primary mb-2">
-            {{ $t('feedback.list.empty') }}
-          </h3>
-          <p class="txt-secondary text-sm">
-            {{ $t('feedback.list.emptyHint') }}
-          </p>
-        </div>
+          :title="$t('feedback.list.empty')"
+          :hint="$t('feedback.list.emptyHint')"
+          :action-label="$t('feedback.list.emptyAction')"
+          to="/"
+          test-id="state-feedback-empty"
+          action-test-id="btn-feedback-empty-chat"
+        />
 
         <!-- No Search Results -->
         <div
@@ -397,6 +389,7 @@ import { useDateFormat } from '@/composables/useDateFormat'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import type { Feedback } from '@/services/api/userFeedbackApi'
 

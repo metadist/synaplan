@@ -6,7 +6,7 @@
     >
       <div class="max-w-[100rem] mx-auto w-full px-4 md:px-6 py-4 md:py-8">
         <PageHeader
-          :title="$t('statistics.title')"
+          :title="$t('config.usage.title')"
           :subtitle="$t('config.usage.description')"
           icon="heroicons:chart-bar"
           data-testid="section-header"

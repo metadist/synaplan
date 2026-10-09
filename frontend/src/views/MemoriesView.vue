@@ -178,12 +178,12 @@
         </div>
       </div>
 
-      <!-- Fullscreen Overlay wenn Memories für User deaktiviert sind -->
+      <!-- Full-screen overlay while memories are turned off for this user -->
       <Teleport to="#app">
         <div
           v-if="!memoriesEnabledForUser && viewMode !== 'longterm'"
           class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
-          @click.self="router.push('/settings/profile')"
+          @click.self="router.push(CHAT_SETTINGS_MEMORIES)"
         >
           <div
             class="surface-elevated max-w-md w-full p-8 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-300"
@@ -226,13 +226,14 @@
               >
                 {{ $t('memories.longTerm.tab') }}
               </button>
-              <button
-                class="w-full surface-chip py-3 rounded-xl font-medium txt-secondary hover:txt-primary transition-colors flex items-center justify-center gap-2"
-                @click="router.push('/settings#memories')"
+              <RouterLink
+                :to="CHAT_SETTINGS_MEMORIES"
+                class="w-full btn-secondary px-4 py-2.5 text-sm font-medium inline-flex items-center justify-center gap-2"
+                data-testid="link-memories-chat-settings"
               >
                 <Icon icon="mdi:cog" class="w-5 h-5" />
-                {{ $t('pageTitles.profile') }}
-              </button>
+                {{ $t('memories.userDisabled.openSettings') }}
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -280,6 +281,7 @@ import type {
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const CHAT_SETTINGS_MEMORIES = { path: '/settings/chat', query: { highlight: 'memories' } }
 const authStore = useAuthStore()
 const memoriesStore = useMemoriesStore()
 const { success, error, warning } = useNotification()
