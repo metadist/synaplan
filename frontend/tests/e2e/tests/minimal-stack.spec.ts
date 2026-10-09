@@ -109,10 +109,12 @@ test.describe('@minimal @ci Minimal stack', () => {
     })
 
     await openApp(page)
-    await page.goto('/channels')
-    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
+    await page.goto('/apps')
+    await expect(page.locator(selectors.apps.card('email'))).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
+    await expect(page.locator(selectors.apps.card('telegram'))).toHaveCount(0)
+    await page.goto('/apps/telegram')
     await expect(page.locator(selectors.inboundConfig.telegramSection)).toHaveCount(0)
   })
 
@@ -128,15 +130,19 @@ test.describe('@minimal @ci Minimal stack', () => {
     })
   })
 
-  test('Channels shows the WhatsApp notice and hides the card', async ({ page }) => {
+  test('Apps hides WhatsApp while the email address stays available', async ({ page }) => {
     await openApp(page)
-    await page.goto('/channels')
-    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
+    await page.goto('/apps')
+    await expect(page.locator(selectors.apps.card('email'))).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
-    await expect(page.locator(selectors.inboundConfig.whatsappNotice)).toBeVisible()
+    await expect(page.locator(selectors.apps.card('whatsapp'))).toHaveCount(0)
+    await page.goto('/apps/whatsapp')
     await expect(page.locator(selectors.inboundConfig.whatsappSection)).toHaveCount(0)
-    await expect(page.locator(selectors.inboundConfig.emailSection)).toBeVisible()
+    await page.goto('/apps/email')
+    await expect(page.locator(selectors.inboundConfig.emailSection)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
   })
 
   test('runtime config reports every module unconfigured and gated', async ({ request }) => {

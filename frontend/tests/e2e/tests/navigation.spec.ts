@@ -34,9 +34,7 @@ async function openSection(page: Page, railItemSelector: string) {
 const GROUP_RAIL: Record<string, string> = {
   assistants: NAV.sidebarV2Assistants,
   automations: NAV.sidebarV2Assistants,
-  channels: NAV.sidebarV2Channels,
-  connections: NAV.sidebarV2Channels,
-  developer: NAV.sidebarV2Channels,
+  apps: NAV.sidebarV2Channels,
 }
 
 /** Open the rail section that owns a group and return that group's block. */
@@ -45,24 +43,6 @@ async function openManageGroup(page: Page, groupKey: string) {
   const group = page.locator(NAV.panelGroup(groupKey))
   await expect(group).toBeVisible({ timeout: TIMEOUTS.SHORT })
   return group
-}
-
-/**
- * Same rule as `isAiAccountsEnabled()`: Higgsfield counts as on when the
- * module key is missing; Anthropic BYO follows GET /messages-gateway.
- */
-async function isAiAccountsNavEnabled(page: Page): Promise<boolean> {
-  const runtime = (await page.request.get('/api/v1/config/runtime').then((r) => r.json())) as {
-    modules?: { higgsfield?: { configured?: boolean } }
-  }
-  const higgsfield = runtime.modules?.higgsfield?.configured
-  const higgsfieldOn = typeof higgsfield === 'boolean' ? higgsfield : true
-  const gatewayRes = await page.request.get('/api/v1/messages-gateway')
-  if (!gatewayRes.ok()) {
-    return higgsfieldOn
-  }
-  const gateway = (await gatewayRes.json()) as { enabled?: boolean }
-  return higgsfieldOn || gateway.enabled === true
 }
 
 test.describe('Navigation: Sidebar basics (non-admin)', () => {
@@ -129,134 +109,68 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
 })
 
 test.describe('Navigation: section panels (non-admin)', () => {
-  test('@ci Assistants and Channels panels keep their pages apart', async ({ page }) => {
+  test('@ci Assistants and Apps panels keep their pages apart', async ({ page }) => {
     await test.step('Arrange: login and wait for nav', async () => {
       await openApp(page)
       await ensureNavReady(page)
     })
 
-    await test.step('Act+Assert: Assistants lists models and automations, not channels', async () => {
+    await test.step('Act+Assert: Assistants lists assistants, prompts, AI settings and automations', async () => {
       const panel = await openSection(page, NAV.sidebarV2Assistants)
       await expect(panel.locator(NAV.panelGroup('assistants'))).toBeVisible()
       await expect(panel.locator(NAV.panelGroup('automations'))).toBeVisible()
       await expect(panel.locator(NAV.flyoutLinkAiModels)).toBeVisible()
-      await expect(panel.locator(NAV.flyoutLinkInbound)).toHaveCount(0)
+      await expect(panel.locator(NAV.flyoutLinkSavedPrompts)).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkApps)).toHaveCount(0)
       await expect(panel.locator(NAV.flyoutLinkChatWidget)).toHaveCount(0)
-      await expect(panel.locator('[data-testid="link-sidebar-v2-doc-summary"]')).toHaveCount(0)
     })
 
-    await test.step('Act+Assert: Channels lists inbound, widgets, live support and API docs', async () => {
+    await test.step('Act+Assert: Apps lists the directory, connected apps and widgets', async () => {
       const panel = await openSection(page, NAV.sidebarV2Channels)
-      await expect(panel.locator(NAV.panelGroup('channels'))).toBeVisible()
-      await expect(panel.locator(NAV.panelGroup('connections'))).toBeVisible()
-      await expect(panel.locator(NAV.panelGroup('developer'))).toBeVisible()
-      await expect(panel.locator(NAV.flyoutLinkInbound)).toBeVisible()
+      await expect(panel.locator(NAV.panelGroup('apps'))).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkApps)).toBeVisible()
+      await expect(panel.locator(NAV.flyoutLinkAppsConnected)).toBeVisible()
       await expect(panel.locator(NAV.flyoutLinkChatWidget)).toBeVisible()
-      await expect(panel.locator(NAV.flyoutLinkLiveSupport)).toBeVisible()
-      await expect(panel.locator(NAV.flyoutLinkApiDocs)).toBeVisible()
       await expect(panel.locator(NAV.flyoutLinkAiModels)).toHaveCount(0)
     })
   })
 
-  // Connected apps is always in the Connections group (D5 ungate). Saved
-  // Tasks stays behind features.savedTasks (SAVEDTASKS.ENABLED) under
-  // Automations. The test stack seeds that flag ON, so both must render.
-  test('@ci Saved Tasks and Connections appear in Manage when enabled', async ({ page }) => {
-    await test.step('Arrange: login and wait for nav', async () => {
-      await openApp(page)
-      await ensureNavReady(page)
-    })
+  // Saved Tasks stays behind features.savedTasks (SAVEDTASKS.ENABLED); the
+  // test stack seeds that flag ON.
+  test('@ci Tasks live under Automations and navigate', async ({ page }) => {
+    await openApp(page)
+    await ensureNavReady(page)
+    const automations = await openManageGroup(page, 'automations')
+    await expect(automations.locator(NAV.flyoutLinkSavedTasks)).toBeVisible()
+    await automations.locator(NAV.flyoutLinkSavedTasks).click()
+    await expect(page).toHaveURL(/\/tasks$/, { timeout: TIMEOUTS.STANDARD })
+  })
 
-    await test.step('Assert: Connections lives under the Connections group', async () => {
-      const connections = await openManageGroup(page, 'connections')
-      await expect(connections.locator(NAV.flyoutLinkConnections)).toBeVisible()
-      await expect(connections.locator(NAV.flyoutLinkApiDocs)).toHaveCount(0)
-    })
+  test('@ci Apps panel opens the apps directory', async ({ page }) => {
+    await openApp(page)
+    await ensureNavReady(page)
+    const apps = await openManageGroup(page, 'apps')
+    await apps.locator(NAV.flyoutLinkApps).click()
+    await expect(page.locator(selectors.apps.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  })
 
-    await test.step('Assert: Saved Tasks lives under Automations and navigates', async () => {
-      const automations = await openManageGroup(page, 'automations')
-      await expect(automations.locator(NAV.flyoutLinkSavedTasks)).toBeVisible()
-      await automations.locator(NAV.flyoutLinkSavedTasks).click()
-      await expect(page).toHaveURL(/\/channels\/tasks/, { timeout: TIMEOUTS.STANDARD })
+  test('@ci Apps panel navigates to Chat Widget page', async ({ page }) => {
+    await openApp(page)
+    await ensureNavReady(page)
+    const apps = await openManageGroup(page, 'apps')
+    await apps.locator(NAV.flyoutLinkChatWidget).click()
+    await expect(page.locator(selectors.widgets.page)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
     })
   })
 
-  test('@ci Manage flyout includes models, instructions and email handler', async ({ page }) => {
-    await test.step('Arrange: login', async () => {
-      await openApp(page)
-      await ensureNavReady(page)
-    })
-
-    await test.step('Act+Assert: Assistants submenu shows models and instructions', async () => {
-      const assistants = await openManageGroup(page, 'assistants')
-      await expect(assistants.locator(NAV.flyoutLinkAiModels)).toBeVisible()
-      await expect(assistants.locator(NAV.flyoutLinkTaskPrompts)).toBeVisible()
-      // U11: hide Your AI accounts when Higgsfield and the gateway are both off
-      // (the default CI image). Require the link only when a provider is on.
-      if (await isAiAccountsNavEnabled(page)) {
-        await expect(assistants.locator(NAV.flyoutLinkAiAccounts)).toBeVisible()
-      } else {
-        await expect(assistants.locator(NAV.flyoutLinkAiAccounts)).toHaveCount(0)
-      }
-    })
-
-    await test.step('Act+Assert: Channels panel shows email handler', async () => {
-      const channels = await openManageGroup(page, 'channels')
-      await expect(channels.locator(NAV.flyoutLinkMailHandler)).toBeVisible()
-    })
-  })
-
-  test('@ci Manage flyout navigates to Chat Widget page', async ({ page }) => {
-    await test.step('Arrange: login, open Channels submenu', async () => {
-      await openApp(page)
-      await ensureNavReady(page)
-      await openManageGroup(page, 'channels')
-    })
-
-    await test.step('Act: click Chat Widget link', async () => {
-      await page.locator(NAV.flyoutLinkChatWidget).click()
-    })
-
-    await test.step('Assert: Widgets page visible', async () => {
-      await expect(page.locator(selectors.widgets.page)).toBeVisible({
-        timeout: TIMEOUTS.STANDARD,
-      })
-    })
-  })
-
-  test('@ci Manage flyout navigates to Live support', async ({ page }) => {
-    await test.step('Arrange: login, open Channels submenu', async () => {
-      await openApp(page)
-      await ensureNavReady(page)
-      await openManageGroup(page, 'channels')
-    })
-
-    await test.step('Act: click Live support', async () => {
-      await page.locator(NAV.flyoutLinkLiveSupport).click()
-    })
-
-    await test.step('Assert: live support URL resolves', async () => {
-      await expect(page).toHaveURL(/\/channels\/widgets\/live-support/, {
-        timeout: TIMEOUTS.STANDARD,
-      })
-    })
-  })
-
-  test('@ci Manage flyout navigates to AI Models page', async ({ page }) => {
-    await test.step('Arrange: login, open Assistants submenu', async () => {
-      await openApp(page)
-      await ensureNavReady(page)
-      await openManageGroup(page, 'assistants')
-    })
-
-    await test.step('Act: click AI Models link', async () => {
-      await page.locator(NAV.flyoutLinkAiModels).click()
-    })
-
-    await test.step('Assert: AI Models page visible', async () => {
-      await expect(page.locator(selectors.models.page)).toBeVisible({
-        timeout: TIMEOUTS.STANDARD,
-      })
+  test('@ci Assistants panel navigates to AI settings', async ({ page }) => {
+    await openApp(page)
+    await ensureNavReady(page)
+    const assistants = await openManageGroup(page, 'assistants')
+    await assistants.locator(NAV.flyoutLinkAiModels).click()
+    await expect(page.locator(selectors.models.page)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
     })
   })
 })

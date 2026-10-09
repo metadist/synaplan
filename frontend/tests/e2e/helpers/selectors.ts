@@ -83,7 +83,7 @@ export const selectors = {
     mobileMoreAccountSection: '[data-testid="section-mobile-more-account"]',
     mobileMoreChannels: '[data-testid="btn-mobile-more-manage"]',
     mobileMoreManage: '[data-testid="btn-mobile-more-manage"]',
-    mobileMoreInbound: '[data-testid="link-mobile-more-inbound"]',
+    mobileMoreApps: '[data-testid="link-mobile-more-apps"]',
     mobileMorePreferences: '[data-testid="btn-mobile-more-preferences"]',
     /** In-drawer chat history (paginated, infinite scroll) */
     mobileHistorySection: '[data-testid="section-mobile-history"]',
@@ -121,7 +121,9 @@ export const selectors = {
     /** Channels flyout children shown only when Saved Tasks is enabled (features.savedTasks) */
     flyoutLinkConnections: '[data-testid="link-sidebar-v2-connections"]',
     flyoutLinkSavedTasks: '[data-testid="link-sidebar-v2-saved-tasks"]',
-    flyoutLinkLiveSupport: '[data-testid="link-sidebar-v2-live-support"]',
+    /** Apps panel: directory and connected apps */
+    flyoutLinkApps: '[data-testid="link-sidebar-v2-apps"]',
+    flyoutLinkAppsConnected: '[data-testid="link-sidebar-v2-apps-connected"]',
     flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
     flyoutLinkAiAccounts: '[data-testid="link-sidebar-v2-ai-accounts"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
@@ -506,12 +508,17 @@ export const selectors = {
     textNewLevel: '[data-testid="text-new-level"]',
   },
   inboundConfig: {
-    page: '[data-testid="page-config-inbound"]',
-    resetDefaults: '[data-testid="btn-reset-defaults"]',
     whatsappSection: '[data-testid="section-whatsapp"]',
     telegramSection: '[data-testid="section-telegram"]',
-    whatsappNotice: '[data-testid="notice-feature-not-configured"][data-module="whatsapp"]',
     emailSection: '[data-testid="section-email"]',
+  },
+  apps: {
+    page: '[data-testid="page-apps"]',
+    search: '[data-testid="input-apps-search"]',
+    card: (id: string) => `[data-testid="card-app-${id}"]`,
+    tabConnected: '[data-testid="tab-apps-connected"]',
+    connectedEmpty: '[data-testid="apps-connected-empty"]',
+    noResults: '[data-testid="apps-no-results"]',
   },
   assistants: {
     /** Gallery rendered by /ai/assistants (and by /ai/instructions while AGENTS.ENABLED is on) */
@@ -578,7 +585,7 @@ export const selectors = {
   savedTasks: {
     page: '[data-testid="page-saved-tasks"]',
     emptyState: '[data-testid="saved-tasks-empty"]',
-    /** One card per task; rendered on /channels/tasks and inline on the prompt editor */
+    /** One card per task; rendered on /tasks and inline on the prompt editor */
     card: '[data-testid="saved-task-card"]',
     runNow: '[data-testid="btn-run-now"]',
     delete: '[data-testid="btn-delete-saved-task"]',
@@ -588,6 +595,11 @@ export const selectors = {
     /** Run history list, visible after clicking "View runs" */
     runsList: '[data-testid="saved-task-runs"]',
     lastRun: '[data-testid="saved-task-last-run"]',
+    btnNew: '[data-testid="btn-new-task"]',
+    newModal: '[data-testid="modal-new-task"]',
+    newName: '[data-testid="input-new-task-name"]',
+    newInstruction: '[data-testid="input-new-task-instruction"]',
+    newCreate: '[data-testid="btn-new-task-create"]',
   },
   pages: {
     chat: '[data-testid="page-chat"]',

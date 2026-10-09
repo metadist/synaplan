@@ -30,8 +30,9 @@ test.describe('@ci @smoke Inbound-Email-Handler UI', () => {
     await test.step('Arrange: login and navigate to mail handler page', async () => {
       await login(page)
       await page.goto('/channels/email')
+      await expect(page).toHaveURL(/\/apps\/mailbox$/, { timeout: TIMEOUTS.STANDARD })
       await page
-        .locator(selectors.pages.tools)
+        .locator('[data-testid="page-app-mailbox"]')
         .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
     })
 

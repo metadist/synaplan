@@ -37,15 +37,14 @@ test.describe('@ci Operate topics', () => {
     await test.step('Operate lists one entry per topic', async () => {
       const flyout = await openOperatePanel(page)
       const links = flyout.locator('[data-testid^="link-sidebar-v2-admin-"]')
-      await expect(links).toHaveCount(6)
-      expect(
-        await links.evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')))
-      ).toEqual([
+      await expect(links.last()).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      // Partners is listed only when the install has a public https address.
+      const ids = await links.evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')))
+      expect(ids.filter((id) => id !== 'link-sidebar-v2-admin-partners')).toEqual([
         'link-sidebar-v2-admin-dashboard',
         'link-sidebar-v2-admin-features',
         'link-sidebar-v2-admin-setup',
         'link-sidebar-v2-admin-people',
-        'link-sidebar-v2-admin-partners',
         'link-sidebar-v2-admin-config',
       ])
       await flyout.locator(NAV.flyoutLinkAdminSetup).click()

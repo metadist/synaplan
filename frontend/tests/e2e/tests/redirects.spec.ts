@@ -1,6 +1,7 @@
 /**
- * Transitional-redirect watchdog — §4.6 of the navigation IA cleanup and
- * Sprint A of 20260914-navigation-consolidation.
+ * Transitional-redirect watchdog — §4.6 of the navigation IA cleanup,
+ * Sprint A of 20260914-navigation-consolidation and the 2026-10 UX overhaul
+ * (_devextras/planning/20261009-ux-overhaul).
  *
  * Every legacy path must land on its canonical successor (bookmarks, docs,
  * support articles). The redirects stay for at least 2 releases; when they
@@ -8,72 +9,63 @@
  *
  * A moved route adds a row in the same PR that retires the old path.
  *
- * Sprint A successors live as dedicated tests below (not this path-equality
- * loop): admin bookmarks need an admin session; Higgsfield keeps a query
- * string the loop regex does not escape; Summarizer bookmarks arm a tool
- * and then strip `?tool=`.
- *   /admin?tab=users            → /admin/people
- *   /statistics#chats           → /chats
- *   /ai/providers/higgsfield    → /ai/providers?section=higgsfield
- *   /ai/summarizer              → / with Summarize armed
- *   /tools/doc-summary          → / with Summarize armed
+ * Successors that need an admin session or arm a chat tool live as dedicated
+ * tests below, not in the path-equality loop.
  */
 import { test, expect } from '../test-setup'
 import { login, openApp } from '../helpers/auth'
 import { CREDENTIALS } from '../config/credentials'
-import { isAgentsEnabled } from '../helpers/features'
 import { TIMEOUTS } from '../config/config'
+import { isModuleConfigured } from '../helpers/features'
 
-/**
- * /ai/instructions itself is a transitional surface: with AGENTS.ENABLED on
- * (the seeded default) `instructionsRouteGuard` forwards it to the Assistants
- * gallery, so the legacy Instructions bookmark lands one hop further.
- */
-const instructionsSuccessor = (agentsEnabled: boolean): string =>
-  agentsEnabled ? '/ai/assistants' : '/ai/instructions'
+const TOPICS = '/ai/models?tab=topics'
 
-/** old path → canonical path (§4.6 URL map) */
-const redirects = (agentsEnabled: boolean): Array<[string, string]> => [
+/** old path → canonical path for a regular user */
+const redirects: Array<[string, string]> = [
   ['/rag', '/files/search'],
-  ['/config', '/channels'],
-  ['/config/inbound', '/channels'],
+  ['/config', '/apps'],
+  ['/config/inbound', '/apps'],
   ['/config/ai-models', '/ai/models'],
-  ['/config/task-prompts', instructionsSuccessor(agentsEnabled)],
-  ['/config/sorting-prompt', '/ai/routing'],
-  ['/config/api-keys', '/channels/api'],
-  ['/config/api-documentation', '/channels/api/docs'],
-  ['/tools', '/channels'],
+  ['/config/task-prompts', TOPICS],
+  ['/config/sorting-prompt', '/ai/models'],
+  ['/config/api-keys', '/apps/api'],
+  ['/config/api-documentation', '/apps/api/docs'],
+  ['/tools', '/apps'],
   ['/tools/chat-widget', '/channels/widgets'],
-  ['/tools/chat-widget/live-support', '/channels/widgets/live-support'],
+  ['/tools/chat-widget/live-support', '/channels/widgets?tab=conversations'],
   ['/tools/chat-widget/42', '/channels/widgets/42'],
   ['/tools/chat-widget/42/chats', '/channels/widgets/42/chats'],
-  ['/tools/mail-handler', '/channels/email'],
+  ['/channels', '/apps'],
+  ['/channels/connections', '/apps/connected'],
+  ['/channels/platform-links', '/apps/connected'],
+  ['/channels/api', '/apps/api'],
+  ['/channels/api/docs', '/apps/api/docs'],
+  ['/ai/instructions', TOPICS],
+  ['/ai/task-prompts', TOPICS],
+  ['/ai/routing', '/ai/models'],
 ]
 
+const endsWith = (path: string): RegExp =>
+  new RegExp(`${path.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`)
+
 test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
-  test('@ci every legacy path redirects to its successor', async ({
-    page,
-    request,
-    credentials,
-  }) => {
-    // Fourteen full page boots in one test: every legacy bookmark reloads the
-    // whole SPA (~4s in CI), so the loop needs ~65s end to end — past the 60s
-    // default, which killed healthy runs mid-boot on whatever row was last
+  test('@ci every legacy path redirects to its successor', async ({ page }) => {
+    // About twenty full page boots in one test: every legacy bookmark reloads
+    // the whole SPA (~4s in CI), so the loop needs ~95s end to end — past the
+    // 60s default, which killed healthy runs mid-boot on whatever row was last
     // (blank page, legacy URL, "Test timeout exceeded"). A genuinely broken
     // redirect still fails fast: each row below asserts on its own STANDARD
     // budget, so only the sum gets headroom here.
-    test.setTimeout(120_000)
-    const agentsEnabled = await isAgentsEnabled(request, credentials)
+    test.setTimeout(180_000)
     await openApp(page)
 
-    for (const [oldPath, newPath] of redirects(agentsEnabled)) {
+    for (const [oldPath, newPath] of redirects) {
       await test.step(`${oldPath} → ${newPath}`, async () => {
         // Resolve on document commit, not `load`: the app boots and immediately
         // redirects to the canonical path, which aborts a `load`-gated goto
         // (NS_BINDING_ABORTED on firefox). toHaveURL below is the real assertion.
         await page.goto(oldPath, { waitUntil: 'commit' })
-        const expected = new RegExp(`${newPath.replace(/[/]/g, '\\/')}$`)
-        await expect(page, `${oldPath} should land on ${newPath}`).toHaveURL(expected, {
+        await expect(page, `${oldPath} should land on ${newPath}`).toHaveURL(endsWith(newPath), {
           timeout: TIMEOUTS.STANDARD,
         })
       })
@@ -82,10 +74,9 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
 
   test('@ci redirect preserves the query string', async ({ page }) => {
     await openApp(page)
-    // /config/sorting-prompt → /ai/routing has no further flag-dependent hop,
-    // so it shows the query string surviving the legacy redirect itself.
-    await page.goto('/config/sorting-prompt?topic=mail', { waitUntil: 'commit' })
-    await expect(page).toHaveURL(/\/ai\/routing\?topic=mail$/, {
+    // A topic bookmark keeps the topic it pointed at.
+    await page.goto('/ai/task-prompts?topic=mail', { waitUntil: 'commit' })
+    await expect(page).toHaveURL(/\/ai\/models\?topic=mail&tab=topics$/, {
       timeout: TIMEOUTS.STANDARD,
     })
   })
@@ -124,10 +115,14 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
       .toBe(true)
   })
 
-  test('@ci /ai/providers/higgsfield lands on Your AI accounts', async ({ page }) => {
+  test('@ci /ai/providers/higgsfield lands on its app page', async ({ page }) => {
     await openApp(page)
+    test.skip(
+      !(await isModuleConfigured(page.request, 'higgsfield')),
+      'Higgsfield is off: the app and its page are absent'
+    )
     await page.goto('/ai/providers/higgsfield', { waitUntil: 'commit' })
-    await expect(page).toHaveURL(/\/ai\/providers\?section=higgsfield/, {
+    await expect(page).toHaveURL(/\/apps\/higgsfield$/, {
       timeout: TIMEOUTS.STANDARD,
     })
   })
@@ -174,6 +169,9 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
         '/admin/config?tab=processing&section=compute',
         /\/admin\/config\?tab=tools&section=compute$/,
       ],
+      ['/ai/routing', /\/admin\/setup\?tab=behavior$/],
+      ['/ai/models?tab=runs', /\/admin\/setup\?tab=catalog$/],
+      ['/files/vectors', /\/admin\/vectors$/],
     ]
 
     for (const [oldPath, expected] of operateRedirects) {

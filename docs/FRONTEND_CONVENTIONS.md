@@ -155,6 +155,46 @@ const { success, error, warning } = useNotification()
 
 **Modals**: Use `<Teleport to="body">` with backdrop and `surface-card`
 
+**Empty states**: Use `components/common/EmptyState.vue` — one sentence (`title`),
+an optional `hint`, and one primary action (`actionLabel` + `to` for a link, or
+`@action` for a click). Pass `test-id` / `action-test-id` for E2E. A list that
+filters to nothing shows the query and a _Clear search_ action, never a blank card.
+
+```vue
+<EmptyState
+  :title="$t('files.empty.generatedBody')"
+  :action-label="$t('files.empty.generatedAction')"
+  to="/"
+  test-id="grid-empty"
+/>
+```
+
+**Page header and help**: Every page starts with `PageHeader`. Pass `tour-id`
+when a tour exists for the page; the header then shows the `?` button
+(`btn-page-help`) that replays it. Embedded panels (`AppPanelHost`,
+`provideEmbeddedPageHeader`) never render a second header.
+
+**Guided tours** (driver.js):
+
+- One definition per area in `src/tours/index.ts`: `{ id, steps: [{ target, stepKey, side }] }`,
+  2–6 steps. A step without `target` is centered.
+- Targets are `data-tour="…"` attributes on stable elements, never test ids or
+  classes. A step whose target is absent (flag off, empty list) is skipped.
+- Copy lives in the `tools` namespace under `tours.<id>.<stepKey>.title|body`, in
+  all five locales. `tests/unit/tours/registry.spec.ts` checks targets and copy.
+- Auto-start: set `meta.tour` on the route; `TourHost` starts it once per account.
+  Finished or skipped tours are stored in the profile (`toursSeen`), so they do not
+  return on another device. Browser automation (`navigator.webdriver`) never
+  auto-starts a tour.
+- Non-tour flags that should follow the account (for example the dismissed
+  getting-started checklist, `checklist.dismissed`) reuse `markSeen()`.
+
+**Apps directory**: Everything a user connects is an entry in `src/apps/catalog.ts`
+(`id`, `category`, `icon`, `available()`, `panel` or `to`). `available()` returning
+false removes the card and the `/apps/:appId` URL — no teaser. Connection state
+comes from `src/apps/status.ts`; a failed status request means "unknown", never
+"connected". Card copy lives under `apps.items.<id>.name|tagline` in `tools`.
+
 ## Vue Component Example
 
 ```vue

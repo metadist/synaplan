@@ -253,17 +253,15 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     expect(await sections.count(), 'more section renders section rows').toBeGreaterThanOrEqual(2)
     await expect(sheet.locator(NAV.mobileMoreAccountSection)).toBeVisible()
 
-    // Accordion: tapping Manage expands five groups; Channels reveals Inbound.
+    // Accordion: tapping Manage expands three groups; Apps reveals the directory.
     await sheet.locator(NAV.mobileMoreManage).click()
     await expect(sheet.locator(NAV.mobileMoreGroup('assistants'))).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
     await expect(sheet.locator(NAV.mobileMoreGroup('automations'))).toBeVisible()
-    await expect(sheet.locator(NAV.mobileMoreGroup('channels'))).toBeVisible()
-    await expect(sheet.locator(NAV.mobileMoreGroup('connections'))).toBeVisible()
-    await expect(sheet.locator(NAV.mobileMoreGroup('developer'))).toBeVisible()
-    await sheet.locator(NAV.mobileMoreGroup('channels')).click()
-    await expect(sheet.locator(NAV.mobileMoreInbound)).toBeVisible({
+    await expect(sheet.locator(NAV.mobileMoreGroup('apps'))).toBeVisible()
+    await sheet.locator(NAV.mobileMoreGroup('apps')).click()
+    await expect(sheet.locator(NAV.mobileMoreApps)).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
 
@@ -376,13 +374,13 @@ test.describe('@ci @layout UI guard — key pages', () => {
     }
   })
 
-  test('channels page (inbound config) has no overflow', async ({ page }) => {
+  test('apps directory has no overflow', async ({ page }) => {
     await openApp(page)
-    await page.goto('/channels')
-    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
+    await page.goto('/apps')
+    await expect(page.locator(selectors.apps.page)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
-    await expectNoHorizontalOverflow(page, 'channels (inbound)')
+    await expectNoHorizontalOverflow(page, 'apps')
   })
 
   test('AI models page header stays inside the card (B1 regression)', async ({ page }) => {
