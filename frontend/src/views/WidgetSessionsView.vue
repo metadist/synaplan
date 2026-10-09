@@ -588,7 +588,7 @@
                     :data-message-role="message.direction === 'OUT' ? 'agent' : 'visitor'"
                   >
                     <MessageText
-                      :content="message.text"
+                      :content="displayMessageText(message)"
                       :readonly="true"
                       :class="[
                         'text-sm leading-relaxed',
@@ -986,6 +986,7 @@ import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
+import { stripThinkingBlocks } from '@/utils/stripThinkingBlocks'
 import { useDialog } from '@/composables/useDialog'
 import { getErrorMessage } from '@/utils/errorMessage'
 import {
@@ -1466,10 +1467,13 @@ const handleSessionEvent = (event: WidgetEvent) => {
       return
     }
 
+    const rawText = (event.text as string) ?? ''
+    const text = sender === 'ai' ? stripThinkingBlocks(rawText) : rawText
+
     sessionMessages.value.push({
       id: messageId,
       direction,
-      text: event.text as string,
+      text,
       timestamp: event.timestamp as number,
       sender,
       files: event.files as widgetSessionsApi.SessionMessageFile[] | undefined,
@@ -1482,7 +1486,7 @@ const handleSessionEvent = (event: WidgetEvent) => {
 
     if (selectedSession.value) {
       // Always update last message preview with the newest message
-      const previewText = (event.text as string)?.substring(0, 100)
+      const previewText = text.substring(0, 100)
       selectedSession.value.lastMessagePreview = previewText
 
       // Only count user messages for message limit
@@ -2222,6 +2226,9 @@ const getModeChipClass = (mode: string) => {
 /**
  * Strip markdown formatting for plain text preview.
  */
+const displayMessageText = (message: { text: string; sender: string }): string =>
+  message.sender === 'ai' ? stripThinkingBlocks(message.text) : message.text
+
 const stripMarkdown = (text: string | null): string => {
   if (!text) return ''
   return (

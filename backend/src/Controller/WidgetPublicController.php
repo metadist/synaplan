@@ -9,6 +9,7 @@ use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Service\AiResponseSanitizer;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Chat\Run\ChatRun;
@@ -1052,14 +1053,16 @@ class WidgetPublicController extends AbstractController
                     // Re-fetch session to ensure it's managed by the EntityManager
                     $currentSession = $this->sessionService->getOrCreateSession($widgetId, $session->getSessionId());
                     $currentSession->setLastMessage(time());
-                    $currentSession->setLastMessagePreview($responseText);
+                    $visibleAnswer = AiResponseSanitizer::stripForDisplay($responseText);
+                    $currentSession->setLastMessagePreview($visibleAnswer);
                     $this->em->flush();
 
                     // Publish AI response on the session channel so the admin
                     // dashboard receives it in real time via Centrifugo.
+                    // The stored message keeps the scratchpad; this event does not.
                     $this->broadcaster->publishSessionEvent($widgetId, $session->getSessionId(), 'message', [
                         'direction' => 'OUT',
-                        'text' => $responseText,
+                        'text' => $visibleAnswer,
                         'messageId' => $outgoingMessage->getId(),
                         'timestamp' => $outgoingMessage->getUnixTimestamp(),
                         'sender' => 'ai',

@@ -828,11 +828,13 @@ class MessageRepository extends ServiceEntityRepository
 
     /**
      * Get the last message for each of the given chat IDs.
-     * Returns an array keyed by chatId with the message text.
+     *
+     * Direction and provider let the session list hide an AI scratchpad
+     * without rewriting a visitor or operator message.
      *
      * @param int[] $chatIds
      *
-     * @return array<int, string>
+     * @return array<int, array{text: string, direction: string, provider: string}>
      */
     public function getLastMessageTextForChats(array $chatIds): array
     {
@@ -845,7 +847,7 @@ class MessageRepository extends ServiceEntityRepository
 
         // Use MAX(BID) to get the actual last message (BID is auto-increment)
         $sql = '
-            SELECT m.BCHATID as chat_id, m.BTEXT as text
+            SELECT m.BCHATID as chat_id, m.BTEXT as text, m.BDIRECT as direction, m.BPROVIDX as provider
             FROM BMESSAGES m
             INNER JOIN (
                 SELECT BCHATID, MAX(BID) as max_id
@@ -864,7 +866,11 @@ class MessageRepository extends ServiceEntityRepository
 
         $messages = [];
         foreach ($result->fetchAllAssociative() as $row) {
-            $messages[(int) $row['chat_id']] = (string) $row['text'];
+            $messages[(int) $row['chat_id']] = [
+                'text' => (string) $row['text'],
+                'direction' => (string) $row['direction'],
+                'provider' => (string) $row['provider'],
+            ];
         }
 
         return $messages;
