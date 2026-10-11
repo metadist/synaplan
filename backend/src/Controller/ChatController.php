@@ -22,6 +22,7 @@ use App\Service\Iam\ShareService;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
 use App\Service\PastedContentText;
+use App\Service\RAG\VectorSearchService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -54,6 +55,7 @@ class ChatController extends AbstractController
         private UserRepository $userRepository,
         private ConversationFileHistory $conversationFileHistory,
         private ChatActionPolicy $chatActionPolicy,
+        private VectorSearchService $vectorSearchService,
     ) {
     }
 
@@ -940,6 +942,62 @@ class ChatController extends AbstractController
             ],
             'messages' => $messageData,
         ]);
+    }
+
+    /**
+     * Passage for a source this shared chat already cited.
+     * An unknown token and an uncited chunk id are the same not-found.
+     */
+    #[Route('/shared/{token}/rag/chunks/{chunkId}', name: 'shared_rag_chunk', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/chats/shared/{token}/rag/chunks/{chunkId}',
+        operationId: 'getSharedChatRagChunk',
+        summary: 'Load a cited knowledge passage for a shared chat',
+        description: 'Returns the passage only when this share token is public and a message of that chat cites the chunk id. The chat list stores ids only.',
+        security: [],
+        tags: ['Chats'],
+        parameters: [
+            new OA\Parameter(name: 'token', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'chunkId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Passage text',
+                content: new OA\JsonContent(
+                    required: ['success', 'chunkId', 'fileId', 'text', 'startLine', 'endLine'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'chunkId', type: 'string'),
+                        new OA\Property(property: 'fileId', type: 'integer'),
+                        new OA\Property(property: 'fileName', type: 'string', nullable: true),
+                        new OA\Property(property: 'groupKey', type: 'string'),
+                        new OA\Property(property: 'text', type: 'string'),
+                        new OA\Property(property: 'startLine', type: 'integer'),
+                        new OA\Property(property: 'endLine', type: 'integer'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: 'Share token or cited passage not found'),
+        ]
+    )]
+    public function sharedRagChunk(string $token, string $chunkId): JsonResponse
+    {
+        $chat = $this->chatRepository->findPublicByShareToken($token);
+        if (!$chat instanceof Chat) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+        $chatId = $chat->getId();
+        if (null === $chatId || !$this->messageRepository->chatCitesChunk($chatId, $chunkId)) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $passage = $this->vectorSearchService->passage($chat->getUserId(), $chunkId);
+        if (null === $passage) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json(['success' => true] + $passage);
     }
 
     #[Route('/{id}/continue', name: 'continue', methods: ['POST'])]

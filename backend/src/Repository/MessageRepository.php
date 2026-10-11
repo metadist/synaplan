@@ -189,6 +189,45 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * True when a message of this chat cites the chunk id in rag_sources.
+     * A substring hit is not enough: the id must be that source's chunkId.
+     */
+    public function chatCitesChunk(int $chatId, string $chunkId): bool
+    {
+        if ($chatId <= 0 || '' === $chunkId) {
+            return false;
+        }
+
+        $values = $this->getEntityManager()->createQueryBuilder()
+            ->select('meta.metaValue')
+            ->from(MessageMeta::class, 'meta')
+            ->innerJoin(Message::class, 'message', 'WITH', 'message.id = meta.messageId')
+            ->where('message.chatId = :chatId')
+            ->andWhere('meta.metaKey = :metaKey')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('metaKey', 'rag_sources')
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        foreach ($values as $raw) {
+            if (!is_string($raw) || !str_contains($raw, $chunkId)) {
+                continue;
+            }
+            $decoded = json_decode($raw, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            foreach ($decoded as $row) {
+                if (is_array($row) && (string) ($row['chunkId'] ?? '') === $chunkId) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Id of the newest message in a chat that sits strictly before the given
      * one in the {@see findChatHistory()} ordering (unixTimestamp, then id).
      *
