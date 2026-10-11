@@ -22,7 +22,11 @@
         class="flex-shrink-0"
       />
       <Icon v-else icon="mdi:robot-outline" class="h-4 w-4 flex-shrink-0" />
-      <span class="min-w-0 truncate text-xs font-medium" data-testid="model-chip-name">
+      <span
+        v-if="!collapseName"
+        class="min-w-0 truncate text-xs font-medium"
+        data-testid="model-chip-name"
+      >
         {{ triggerModelName }}
       </span>
       <span
@@ -206,11 +210,13 @@ const props = withDefaults(
     levels?: string[]
     reasoningEffort?: string
     guest?: boolean
+    collapseName?: boolean
   }>(),
   {
     levels: () => [],
     reasoningEffort: '',
     guest: false,
+    collapseName: false,
   }
 )
 

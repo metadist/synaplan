@@ -719,10 +719,10 @@ AUTH_COOKIE_SECURE=
 
 ---
 
-## People, sharing and directory (`IAM`)
+## Users, sharing and directory (`IAM`)
 
 The four feature switches live in **Operate → System configuration → Features
-→ People & sharing**, the remaining settings under **Access → Sharing & audit**
+→ Users & sharing**, the remaining settings under **Access → Sharing & audit**
 (`BCONFIG` group `IAM`, owner 0). They take effect immediately — no restart.
 The switches are **on by default**; pin one off for an automated deployment
 with its `FEATURE_*` environment variable (see
@@ -730,20 +730,20 @@ with its `FEATURE_*` environment variable (see
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
-| `IAM.GROUPS_ENABLED` | `1` | People page, groups, audit tab (`FEATURE_IAM_GROUPS_ENABLED`) |
+| `IAM.GROUPS_ENABLED` | `1` | Users page, groups, audit tab (`FEATURE_IAM_GROUPS_ENABLED`) |
 | `IAM.SHARING_ENABLED` | `1` | Share dialog and “Shared with me” (requires groups; `FEATURE_IAM_SHARING_ENABLED`) |
-| `IAM.GROUP_POLICIES_ENABLED` | `1` | People → Policies and group-layer defaults (requires groups; `FEATURE_IAM_GROUP_POLICIES_ENABLED`) |
-| `IAM.EVERYONE_SHARES` | `disabled` when anyone can sign up, otherwise `any_owner` | Who may share with everyone who has an account (`any_owner` / `admins_only` / `disabled`). `disabled` removes that audience, including shares people created earlier, until you pick another value; those shares are kept and come back when you switch. A public instance (open self-registration) runs `disabled`. A missing row fails closed while sign-up is open. System assistants and plugin-pack assistants stay available to every account on every value. |
-| `IAM.DIRECTORY_SYNC_ENABLED` | `1` | Put people into groups from the OIDC groups claim at sign-in (`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`) |
+| `IAM.GROUP_POLICIES_ENABLED` | `1` | Users → Policies and group-layer defaults (requires groups; `FEATURE_IAM_GROUP_POLICIES_ENABLED`) |
+| `IAM.EVERYONE_SHARES` | `disabled` when anyone can sign up, otherwise `any_owner` | Who may share with everyone who has an account (`any_owner` / `admins_only` / `disabled`). `disabled` removes that audience, including shares users created earlier, until you pick another value; those shares are kept and come back when you switch. A public instance (open self-registration) runs `disabled`. A missing row fails closed while sign-up is open. System assistants and plugin-pack assistants stay available to every account on every value. |
+| `IAM.DIRECTORY_SYNC_ENABLED` | `1` | Put users into groups from the OIDC groups claim at sign-in (`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`) |
 | `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path for directory groups |
 | `IAM.DIRECTORY_GROUP_NAMES` | `{}` | JSON map of claim value → display name |
 | `IAM.ADMIN_IMPERSONATION` | `audited` | `audited` writes an audit row; `disabled` blocks “View as user” |
-| `IAM.AUDIT_RETENTION_DAYS` | `365` | Days to keep People audit rows; `0` keeps them forever |
+| `IAM.AUDIT_RETENTION_DAYS` | `365` | Days to keep Users audit rows; `0` keeps them forever |
 
 Group policy rows live in `BGROUPCONFIG`. Only this allow-list is read from
 the group layer (`IAM.GROUP_POLICIES_ENABLED` must be on):
 
-| Key | Type | Merge across a person's groups |
+| Key | Type | Merge across a user's groups |
 | --- | ---- | ------------------------------ |
 | `DEFAULTMODEL.{CHAT,VECTORIZE,PIC2TEXT,SOUND2TEXT,MEM,TOOLS}` | catalog key | First group by `BGROUPS.BID` |
 | `MODELS.ALLOWED` | JSON list of catalog keys | Union; empty = no restriction |
@@ -751,11 +751,11 @@ the group layer (`IAM.GROUP_POLICIES_ENABLED` must be on):
 | `RATELIMITS.TIER` | `NEW` / `PRO` / `TEAM` / `BUSINESS` | Highest |
 
 A locked global row (`BCONFIG.BLOCKED = 1`) wins alone and is instance-wide —
-the People → Policies lock panel is not scoped to the selected group. Keys
+the Users → Policies lock panel is not scoped to the selected group. Keys
 outside this list never consult `BGROUPCONFIG`. See
 [Group policies and locked defaults](ADMIN.md#group-policies-and-locked-defaults).
 
-See [People and groups](ADMIN.md#people-and-groups) in the admin guide.
+See [Users and groups](ADMIN.md#users-and-groups) in the admin guide.
 
 ---
 

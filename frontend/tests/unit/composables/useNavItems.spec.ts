@@ -14,9 +14,21 @@ import {
   useNavItems,
 } from '@/composables/useNavItems'
 import { useAuthStore, type User } from '@/stores/auth'
-import { loadGatewayEnabled, resetAiAccountsGatewayCache } from '@/composables/useAiAccounts'
+import { resetAiAccountsGatewayCache } from '@/composables/useAiAccounts'
 
 const getMessagesGatewayStatus = vi.fn()
+
+vi.mock('@/services/featuresService', () => ({
+  getFeaturesStatus: vi.fn().mockResolvedValue({ features: {} }),
+}))
+
+vi.mock('@/services/api/adminModelStatusApi', () => ({
+  modelStatusApi: { getStatus: vi.fn().mockResolvedValue({ summary: { needsAttention: 0 } }) },
+}))
+
+vi.mock('@/services/api/partnersApi', () => ({
+  partnersApi: { membership: vi.fn().mockResolvedValue({ reachable: true, opened: false }) },
+}))
 
 vi.mock('@/services/api/messagesGatewayApi', () => ({
   getMessagesGatewayStatus: () => getMessagesGatewayStatus(),
@@ -64,33 +76,26 @@ const navMessages = {
     groupTools: 'Tools',
     channels: 'Channels',
     connections: 'Connections',
-    groupDeveloper: 'Developer & devices',
     desktop: 'Synaplan Desktop',
     groupApi: 'API',
     myGroups: 'My groups',
     configInbound: 'Inbound',
     toolsChatWidget: 'Chat widgets',
-    toolsMailHandler: 'Email handler',
-    configConnections: 'Connected apps',
-    mcpServers: 'MCP Servers',
-    configApiKeys: 'API Keys',
-    savedTasks: 'Saved tasks',
+    groupApps: 'Apps',
+    allApps: 'All apps',
+    connectedApps: 'Connected',
+    prompts: 'Shortcuts',
+    savedTasks: 'Tasks',
     approvals: 'Approvals',
-    aiAgents: 'Coding clients',
     assistants: 'Assistants',
-    linkedPlatforms: 'Linked platforms',
-    configAiModels: 'Models',
-    aiAccounts: 'Your AI accounts',
-    configTaskPrompts: 'Instructions',
-    configSortingPrompt: 'Routing',
-    liveSupport: 'Live support',
+    configAiModels: 'AI settings',
     plugins: 'Plugins',
-    admin: 'Operate',
+    admin: 'Admin',
     adminDashboard: 'Overview',
     adminFeatureStatus: 'System status',
     adminProviderSetup: 'AI infrastructure',
     adminSystemConfig: 'System configuration',
-    adminPeople: 'People',
+    adminPeople: 'Users',
     adminPartners: 'Partners',
   },
   pageTitles: {
@@ -196,146 +201,71 @@ describe('useNavItems rail', () => {
     expect(keys).toContain('manage')
     expect(keys).not.toContain('admin')
     expect(keys).not.toContain('channels')
-    expect(keys).not.toContain('ai-setup')
 
     const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
-    expect(manage?.children).toBeDefined()
     expect(hasNestedNavGroups(manage?.children)).toBe(true)
-    const childKeys = (manage?.children ?? []).map((child: { key: string }) => child.key)
-    expect(childKeys).toContain('mail-handler')
-    expect(childKeys).toContain('saved-tasks')
-    expect(childKeys).not.toContain('approvals')
-    expect(childKeys).toContain('live-support')
-    expect(childKeys).toContain('chat-widget')
-    expect(childKeys).not.toContain('doc-summary')
-    expect(childKeys).toContain('ai-accounts')
-    expect(childKeys).toContain('api-docs')
-    expect(childKeys).toContain('api-keys')
-    expect(childKeys).toContain('ai-agents')
-    expect(childKeys).toContain('connections')
-    expect(childKeys).not.toContain('linked-platforms')
-    expect(childKeys).not.toContain('desktop')
-    const promptChild = (manage?.children ?? []).find(
-      (child: { key: string }) => child.key === 'task-prompts'
-    )
-    expect(promptChild?.label).toBe('Instructions')
-    expect(promptChild?.path).toBe('/ai/instructions')
-    const manageGroups = groupNavChildren(manage?.children ?? [])
-    expect(manageGroups.map((group: { key: string | null }) => group.key)).toEqual([
+    const children = (manage?.children ?? []) as Array<{
+      key: string
+      path: string
+      label: string
+      groupKey?: string
+    }>
+    expect(children.map((child) => child.key)).toEqual([
+      'saved-prompts',
+      'ai-models',
+      'saved-tasks',
+      'apps',
+      'chat-widget',
+    ])
+    expect(groupNavChildren(children).map((group) => group.key)).toEqual([
       'assistants',
       'automations',
-      'channels',
-      'connections',
-      'developer',
+      'apps',
     ])
-    const connectionsChild = (manage?.children ?? []).find(
-      (child: { key: string }) => child.key === 'connections'
-    )
-    expect(connectionsChild?.label).toBe('Connected apps')
-    expect(connectionsChild?.groupKey).toBe('connections')
-    const codingClients = (manage?.children ?? []).find(
-      (child: { key: string }) => child.key === 'ai-agents'
-    )
-    expect(codingClients?.groupKey).toBe('developer')
-    expect(
-      (manage?.children ?? [])
-        .filter((child: { groupKey?: string }) => child.groupKey === 'developer')
-        .map((child: { key: string }) => child.key)
-    ).toEqual(['api-keys', 'api-docs', 'ai-agents'])
+    expect(children.find((child) => child.key === 'saved-prompts')?.label).toBe('Shortcuts')
+    expect(children.find((child) => child.key === 'ai-models')?.label).toBe('AI settings')
+    expect(children.find((child) => child.key === 'saved-tasks')?.path).toBe('/tasks')
+    expect(children.find((child) => child.key === 'apps')?.path).toBe('/apps')
+    expect(children.find((child) => child.key === 'apps-connected')).toBeUndefined()
   })
 
-  it('keeps Connected apps visible when Saved tasks is off', () => {
+  it('drops Tasks when Saved tasks is off and keeps the apps', () => {
     runtimeFeatures.savedTasks = false
     const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
     const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
     const childKeys = (manage?.children ?? []).map((child: { key: string }) => child.key)
-    expect(childKeys).toContain('connections')
+    expect(childKeys).toContain('apps')
     expect(childKeys).not.toContain('saved-tasks')
     expect(
       new Set((manage?.children ?? []).map((child: { groupKey?: string }) => child.groupKey))
-    ).toEqual(new Set(['assistants', 'channels', 'connections', 'developer']))
+    ).toEqual(new Set(['assistants', 'apps']))
   })
 
-  it('shows Synaplan Desktop under Channels only when the flag is on', () => {
-    const off = mountNav({ email: 'user@test.com', level: 'PRO' })
-    const offManage = off.vm.navItems.find((item: { key: string }) => item.key === 'manage')
-    expect((offManage?.children ?? []).map((child: { key: string }) => child.key)).not.toContain(
-      'desktop'
-    )
-
-    runtimeFeatures.desktopAgentEnabled = true
-    const on = mountNav({ email: 'user@test.com', level: 'PRO' })
-    const onManage = on.vm.navItems.find((item: { key: string }) => item.key === 'manage')
-    const desktop = (onManage?.children ?? []).find(
-      (child: { key: string }) => child.key === 'desktop'
-    )
-    expect(desktop?.label).toBe('Synaplan Desktop')
-    expect(desktop?.groupKey).toBe('channels')
-    expect(desktop?.path).toBe('/channels/desktop')
-    expect(
-      (onManage?.children ?? [])
-        .filter((child: { groupKey?: string }) => child.groupKey === 'developer')
-        .map((child: { key: string }) => child.key)
-    ).not.toContain('desktop')
-  })
-
-  it('shows Approvals under Automations when the flag is on', () => {
+  it('shows Approvals under Automations at /approvals when the flag is on', () => {
     runtimeFeatures.toolsApprovalsEnabled = true
     const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
     const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
     const child = (manage?.children ?? []).find((item: { key: string }) => item.key === 'approvals')
     expect(child?.label).toBe('Approvals')
-    expect(child?.path).toBe('/channels/approvals')
+    expect(child?.path).toBe('/approvals')
     expect(child?.groupKey).toBe('automations')
   })
 
-  it('hides Linked platforms when the flag is off and shows it when on', () => {
-    const off = mountNav({ email: 'user@test.com', level: 'PRO' })
-    const offManage = off.vm.navItems.find((item: { key: string }) => item.key === 'manage')
-    expect((offManage?.children ?? []).map((child: { key: string }) => child.key)).not.toContain(
-      'linked-platforms'
-    )
-
-    runtimeFeatures.platformLinksEnabled = true
-    const on = mountNav({ email: 'user@test.com', level: 'PRO' })
-    const onManage = on.vm.navItems.find((item: { key: string }) => item.key === 'manage')
-    expect((onManage?.children ?? []).map((child: { key: string }) => child.key)).toContain(
-      'linked-platforms'
-    )
-  })
-
-  it('hides Your AI accounts when Higgsfield and the gateway are both off', () => {
-    runtimeModules.higgsfield = { configured: false }
-    getMessagesGatewayStatus.mockResolvedValue({ enabled: false })
-    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
-    const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
-    expect((manage?.children ?? []).map((child: { key: string }) => child.key)).not.toContain(
-      'ai-accounts'
-    )
-  })
-
-  it('shows Your AI accounts when only the gateway is enabled', async () => {
-    runtimeModules.higgsfield = { configured: false }
-    getMessagesGatewayStatus.mockResolvedValue({ enabled: true })
-    resetAiAccountsGatewayCache()
-    await loadGatewayEnabled()
-    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
-    await flushPromises()
-    const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
-    expect((manage?.children ?? []).map((child: { key: string }) => child.key)).toContain(
-      'ai-accounts'
-    )
-  })
-
-  it('replaces Instructions with Assistants when the flag is on', () => {
+  it('leads with Assistants when the flag is on', () => {
     runtimeFeatures.agentsEnabled = true
     const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
     const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
-    const promptChild = (manage?.children ?? []).find(
-      (child: { key: string }) => child.key === 'task-prompts'
-    )
-    expect(promptChild?.label).toBe('Assistants')
-    expect(promptChild?.path).toBe('/ai/assistants')
+    const first = (manage?.children ?? [])[0] as { key: string; path: string } | undefined
+    expect(first?.key).toBe('assistants')
+    expect(first?.path).toBe('/ai/assistants')
+  })
+
+  it('keeps All apps highlighted on the connected filter and on an app page', () => {
+    const all = { key: 'apps', path: '/apps', label: 'All apps' }
+    const widgets = { key: 'chat-widget', path: '/channels/widgets', label: 'Chat widgets' }
+    expect(isNavChildActive(all, '/channels', '/apps/connected')).toBe(true)
+    expect(isNavChildActive(all, '/channels', '/apps/telegram')).toBe(true)
+    expect(isNavChildActive(widgets, '/channels', '/apps/connected')).toBe(false)
   })
 
   it('admin also sees Operate', () => {
@@ -344,7 +274,7 @@ describe('useNavItems rail', () => {
     expect(keys).toContain('manage')
     expect(keys).toContain('admin')
     const operate = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')
-    expect(operate?.label).toBe('Operate')
+    expect(operate?.label).toBe('Admin')
     const children = operate?.children ?? []
     const childKeys = children.map((child: { key: string }) => child.key)
     expect(childKeys).toContain('admin-people')
@@ -367,11 +297,22 @@ describe('useNavItems rail', () => {
       'admin-features',
       'admin-setup',
       'admin-people',
-      'admin-partners',
       'admin-config',
     ])
     expect(children.find((child) => child.key === 'admin-features')?.label).toBe('System status')
     expect(children.some((child) => child.path === '/admin/model-status')).toBe(false)
+  })
+
+  it('lists Partners only once the server is publicly reachable', async () => {
+    const wrapper = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
+    const keys = () =>
+      (
+        wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')?.children ?? []
+      ).map((child: { key: string }) => child.key)
+    expect(keys()).not.toContain('admin-partners')
+    await wrapper.vm.loadFeatureStatus()
+    await flushPromises()
+    expect(keys()).toContain('admin-partners')
   })
 
   it('shows models that need attention as a badge on AI infrastructure', async () => {

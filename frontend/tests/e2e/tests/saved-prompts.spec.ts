@@ -56,7 +56,7 @@ async function fillPromptForm(page: Page, values: { name: string; command: strin
 
 async function createPrompt(page: Page, command: string) {
   await page.locator(PROMPTS.newBtn).click()
-  await expect(page.locator(PROMPTS.saveBtn)).toHaveText('Save prompt')
+  await expect(page.locator(PROMPTS.saveBtn)).toHaveText('Save shortcut')
   await fillPromptForm(page, { name: `Note ${command}`, command, body: `Body of ${command}` })
   await expect(page.locator(PROMPTS.row).filter({ hasText: `/${command}` })).toBeVisible({
     timeout: TIMEOUTS.STANDARD,
@@ -136,6 +136,7 @@ test.describe('@ci Saved prompts and the / menu', () => {
     await test.step('A deleted prompt leaves the menu', async () => {
       await openPrompts(page)
       await promptRow(page, renamed).locator(PROMPTS.deleteBtn).click()
+      await page.getByTestId('btn-dialog-confirm').click()
       await expect(promptRow(page, renamed)).toHaveCount(0, { timeout: TIMEOUTS.STANDARD })
       await backToChat(page)
       const palette = await openSlashMenu(page)

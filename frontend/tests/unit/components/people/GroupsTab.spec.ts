@@ -79,7 +79,7 @@ describe('GroupsTab delete confirmation', () => {
     expect(confirmDelete).toHaveBeenCalledWith(
       expect.objectContaining({
         message:
-          'Delete the group "Sales"? People stay in the instance. 2 shares to this group end, and 1 policy is removed.',
+          'Delete the group "Sales"? Users stay in the instance. 2 shares to this group end, and 1 policy is removed.',
       })
     )
     expect(deleteGroup).not.toHaveBeenCalled()
@@ -99,7 +99,7 @@ describe('GroupsTab delete confirmation', () => {
     expect(confirmDelete).toHaveBeenCalledWith(
       expect.objectContaining({
         message:
-          'Delete the group "Sales"? People stay in the instance. Shares to this group end, and the group\'s policies are removed.',
+          'Delete the group "Sales"? Users stay in the instance. Shares to this group end, and the group\'s policies are removed.',
       })
     )
     expect(deleteGroup).not.toHaveBeenCalled()
@@ -119,7 +119,7 @@ describe('GroupsTab delete confirmation', () => {
     expect(confirmDelete).toHaveBeenCalledWith(
       expect.objectContaining({
         message:
-          'Delete the group "Sales"? People stay in the instance. Shares to this group end, and the group\'s policies are removed.',
+          'Delete the group "Sales"? Users stay in the instance. Shares to this group end, and the group\'s policies are removed.',
       })
     )
     expect(deleteGroup).not.toHaveBeenCalled()

@@ -140,7 +140,7 @@ class ExternalIdentity
     }
 
     /**
-     * Short badge label for the People page (OIDC / Nextcloud / …).
+     * Short badge label for the Users page (OIDC / Nextcloud / …).
      */
     public function badge(): string
     {

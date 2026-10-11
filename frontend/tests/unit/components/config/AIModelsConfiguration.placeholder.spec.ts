@@ -102,6 +102,7 @@ describe('AIModelsConfiguration empty model row', () => {
       global: {
         plugins: [createPinia()],
         stubs: {
+          PlannerModelCard: true,
           PageHeader: { template: '<div><slot /><slot name="actions" /></div>' },
           TabNav: { template: '<div />' },
           ServiceIcon: { template: '<span />' },
@@ -113,7 +114,6 @@ describe('AIModelsConfiguration empty model row', () => {
           OpenAiCompatibleEndpointsPanel: { template: '<div />' },
           AccordionStack: { template: '<div><slot /></div>' },
           AccordionSection: { template: '<div><slot /></div>' },
-          SectionJumpNav: { template: '<div />' },
         },
       },
     })
@@ -463,6 +463,7 @@ describe('AIModelsConfiguration empty model row', () => {
       global: {
         plugins: [createPinia()],
         stubs: {
+          PlannerModelCard: true,
           PageHeader: { template: '<div><slot /><slot name="actions" /></div>' },
           TabNav: { template: '<div />' },
           ServiceIcon: { template: '<span />' },
@@ -474,7 +475,6 @@ describe('AIModelsConfiguration empty model row', () => {
           OpenAiCompatibleEndpointsPanel: { template: '<div />' },
           AccordionStack: { template: '<div><slot /></div>' },
           AccordionSection: { template: '<div><slot /></div>' },
-          SectionJumpNav: { template: '<div />' },
         },
       },
     })
@@ -520,6 +520,7 @@ describe('AIModelsConfiguration empty model row', () => {
       global: {
         plugins: [pinia],
         stubs: {
+          PlannerModelCard: true,
           PageHeader: { template: '<div><slot /><slot name="actions" /></div>' },
           TabNav: {
             props: ['modelValue'],
@@ -536,7 +537,6 @@ describe('AIModelsConfiguration empty model row', () => {
           OpenAiCompatibleEndpointsPanel: { template: '<div />' },
           AccordionStack: { template: '<div><slot /></div>' },
           AccordionSection: { template: '<div><slot /></div>' },
-          SectionJumpNav: { template: '<div />' },
         },
       },
     })
@@ -580,7 +580,7 @@ describe('AIModelsConfiguration empty model row', () => {
     expect(saved.defaults.CHAT).toBe(42)
   })
 
-  it('reloads the picker when an endpoint changes and when the choice tab is opened again', async () => {
+  it('reloads the models when an endpoint or the catalog changes in the admin catalog', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
     useAuthStore().user = {
@@ -591,9 +591,11 @@ describe('AIModelsConfiguration empty model row', () => {
     }
 
     wrapper = mount(AIModelsConfiguration, {
+      props: { scope: 'admin' },
       global: {
         plugins: [pinia],
         stubs: {
+          PlannerModelCard: true,
           PageHeader: { template: '<div><slot /><slot name="actions" /></div>' },
           TabNav: {
             props: ['modelValue'],
@@ -618,16 +620,13 @@ describe('AIModelsConfiguration empty model row', () => {
           },
           AccordionStack: { template: '<div><slot /></div>' },
           AccordionSection: { template: '<div><slot /></div>' },
-          SectionJumpNav: { template: '<div />' },
         },
       },
     })
     await flushPromises()
     expect(getModels).toHaveBeenCalledTimes(1)
 
-    await wrapper.get('[data-testid="stub-tab-edit"]').trigger('click')
-    await flushPromises()
-    expect(getModels).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="section-default-config"]').exists()).toBe(false)
 
     const qwen: AIModel = {
       ...chatModel,
@@ -649,17 +648,5 @@ describe('AIModelsConfiguration empty model row', () => {
     await wrapper.get('[data-testid="stub-catalog-changed"]').trigger('click')
     await flushPromises()
     expect(getModels).toHaveBeenCalledTimes(3)
-
-    await wrapper.get('[data-testid="stub-tab-choice"]').trigger('click')
-    await flushPromises()
-    expect(getModels).toHaveBeenCalledTimes(4)
-
-    const row = wrapper
-      .findAll('[data-testid="item-capability"]')
-      .find((item) => item.text().includes('Chat / General AI'))
-    expect(row).toBeTruthy()
-    await row!.get('[data-testid="btn-model-dropdown"]').trigger('click')
-    expect(row!.text()).toContain('qwen3.6:27b')
-    expect(wrapper.find('[data-testid="section-loading"]').exists()).toBe(false)
   })
 })

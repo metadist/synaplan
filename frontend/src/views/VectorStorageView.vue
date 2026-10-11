@@ -5,9 +5,22 @@
       data-testid="page-vector-storage"
     >
       <div class="max-w-[100rem] mx-auto space-y-6">
-        <FilesTabs />
-
-        <p class="text-sm txt-secondary">{{ $t('vectorStorage.intro') }}</p>
+        <PageHeader
+          :title="$t('pageTitles.vectorStorage')"
+          :subtitle="$t('vectorStorage.intro')"
+          icon="heroicons:circle-stack"
+        >
+          <template #actions>
+            <RouterLink
+              to="/admin/setup?tab=search"
+              class="btn-secondary px-4 py-2.5 text-sm font-medium inline-flex items-center gap-2"
+              data-testid="link-vectors-back-to-search"
+            >
+              <ArrowLeftIcon class="w-4 h-4" aria-hidden="true" />
+              {{ $t('adminSetup.tabs.search') }}
+            </RouterLink>
+          </template>
+        </PageHeader>
 
         <!-- Loading -->
         <div v-if="isLoading" class="surface-card p-8 flex items-center justify-center">
@@ -220,7 +233,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
-import FilesTabs from '@/components/files/FilesTabs.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import { ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { useAuth } from '@/composables/useAuth'
 import {
   vectorStatsApi,

@@ -1,12 +1,12 @@
 {
   "liveSupport": {
     "title": "Live Support",
-    "subtitle": "Respond to visitors in real-time",
+    "subtitle": "Visitors who asked for a person wait here. Reply to take over; hand back to the AI when you are done.",
     "allWidgets": "All Widgets",
-    "waiting": "Waiting",
+    "waiting": "Waiting for you",
     "myChats": "My Chats",
     "active": "Active",
-    "noSessions": "No sessions waiting",
+    "noSessions": "No visitor is waiting. When someone asks for a person, they appear here.",
     "noMessages": "No messages yet",
     "chatWith": "Chat with",
     "messagesCount": "messages",
@@ -16,7 +16,15 @@
     "typePlaceholder": "Type your message...",
     "messageSent": "Message sent",
     "visitor": "Visitor",
-    "you": "You"
+    "you": "You",
+    "noMine": "You have not taken over a conversation. Reply to a waiting visitor to start.",
+    "loadFailed": "Conversations could not be loaded. Visitors still get AI answers in the meantime.",
+    "loadMessagesFailed": "This conversation could not be opened. Try again in a moment.",
+    "sendFailed": "Your reply was not sent and the AI is still answering. Try again.",
+    "sendFailedTakenOver": "You took over the conversation, but your reply was not sent. Try again.",
+    "handBackFailed": "The conversation is still with you. Try handing it back again.",
+    "backToList": "Back to conversations",
+    "send": "Send reply"
   },
   "widgetSessions": {
     "title": "Sessions",
@@ -884,6 +892,14 @@
       "support": "Support"
     },
     "listTitle": "Chat widgets",
-    "listEmpty": "No widgets yet. Create a chat widget to get started."
+    "listEmpty": "No widgets yet. Create a chat widget to get started.",
+    "tabs": {
+      "widgets": "Widgets",
+      "conversations": "Conversations"
+    },
+    "conversations": {
+      "noWidgetsTitle": "No conversations yet",
+      "noWidgetsHint": "Create a chat widget first. When a visitor asks for a person, the conversation waits here for you."
+    }
   }
 }

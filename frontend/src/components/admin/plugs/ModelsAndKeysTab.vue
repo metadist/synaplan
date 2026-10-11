@@ -50,12 +50,7 @@
     </div>
 
     <template v-else>
-      <div class="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <SectionJumpNav
-          :items="setupSectionItems"
-          :nav-label="$t('admin.config.accordion.jumpTo')"
-          @select="jumpToSetupSection"
-        />
+      <div class="flex justify-end mb-4">
         <button
           type="button"
           class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
@@ -199,7 +194,6 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
-import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import ConfigSectionBody from '@/components/admin/ConfigSectionBody.vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import ProviderKeyCard from '@/components/admin/ProviderKeyCard.vue'
@@ -268,12 +262,6 @@ const setupSectionIds = computed(() => [
   'local-ai',
   ...extraSettings.value.map((section) => section.id),
   'own-service',
-])
-const setupSectionItems = computed(() => [
-  { id: 'providers', label: t('adminSetup.cloudProviders') },
-  { id: 'local-ai', label: t('adminSetup.localAi.title') },
-  ...extraSettings.value.map((section) => ({ id: section.id, label: section.label })),
-  { id: 'own-service', label: t('adminSetup.ownService.title') },
 ])
 const {
   isOpen: isSetupSectionOpen,

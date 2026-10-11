@@ -253,17 +253,15 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     expect(await sections.count(), 'more section renders section rows').toBeGreaterThanOrEqual(2)
     await expect(sheet.locator(NAV.mobileMoreAccountSection)).toBeVisible()
 
-    // Accordion: tapping Manage expands five groups; Channels reveals Inbound.
+    // Accordion: tapping Manage expands three groups; Apps reveals the directory.
     await sheet.locator(NAV.mobileMoreManage).click()
     await expect(sheet.locator(NAV.mobileMoreGroup('assistants'))).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
     await expect(sheet.locator(NAV.mobileMoreGroup('automations'))).toBeVisible()
-    await expect(sheet.locator(NAV.mobileMoreGroup('channels'))).toBeVisible()
-    await expect(sheet.locator(NAV.mobileMoreGroup('connections'))).toBeVisible()
-    await expect(sheet.locator(NAV.mobileMoreGroup('developer'))).toBeVisible()
-    await sheet.locator(NAV.mobileMoreGroup('channels')).click()
-    await expect(sheet.locator(NAV.mobileMoreInbound)).toBeVisible({
+    await expect(sheet.locator(NAV.mobileMoreGroup('apps'))).toBeVisible()
+    await sheet.locator(NAV.mobileMoreGroup('apps')).click()
+    await expect(sheet.locator(NAV.mobileMoreApps)).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
 
@@ -354,6 +352,79 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     const overflow = await controls.evaluate((el) => el.scrollWidth - el.clientWidth)
     expect(overflow, 'composer controls overflow @320px').toBeLessThanOrEqual(1)
   })
+
+  test('composer control bar stays one row for a long and a short model name', async ({ page }) => {
+    await openApp(page)
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+    const pickModel = async (preferLong: boolean): Promise<string> => {
+      await page.locator(CHAT.modelToggle).click()
+      const panel = page.locator('[data-testid="dropdown-model-panel"]')
+      await expect(panel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      const options = panel.locator('.model-option__name')
+      const count = await options.count()
+      expect(count).toBeGreaterThan(0)
+      let chosen = 0
+      let chosenName = ''
+      for (let i = 0; i < count; i++) {
+        const name = (await options.nth(i).innerText()).trim()
+        if (
+          chosenName === '' ||
+          (preferLong ? name.length > chosenName.length : name.length < chosenName.length)
+        ) {
+          chosen = i
+          chosenName = name
+        }
+      }
+      await options.nth(chosen).click()
+      await expect(panel).toBeHidden({ timeout: TIMEOUTS.SHORT })
+      return chosenName
+    }
+
+    const assertBar = async (width: number, modelName: string) => {
+      await page.setViewportSize({ width, height: 800 })
+      const controls = page.locator('[data-testid="section-chat-controls"]')
+      await expect(controls).toBeVisible()
+      const spread = await controls.evaluate((el) => {
+        const centers = [...el.children].map((child) => {
+          const box = child.getBoundingClientRect()
+          return box.top + box.height / 2
+        })
+        return Math.max(...centers) - Math.min(...centers)
+      })
+      expect(spread, `control bar wraps @${width} for ${modelName}`).toBeLessThanOrEqual(2)
+      const overflow = await controls.evaluate((el) => el.scrollWidth - el.clientWidth)
+      expect(overflow, `control bar overflows @${width}`).toBeLessThanOrEqual(1)
+
+      const toggle = page.locator(CHAT.modelToggle)
+      await expect(toggle).toHaveAttribute(
+        'aria-label',
+        new RegExp(modelName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      )
+      const box = await toggle.boundingBox()
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+      for (const selector of [CHAT.plusToggle, CHAT.sendBtn]) {
+        const target = await page.locator(selector).boundingBox()
+        expect(target?.height ?? 0, selector).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+        expect(target?.width ?? 0, selector).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+      }
+      const files = page.locator('[data-testid="conversation-files-toggle"]')
+      if (await files.count()) {
+        const filesBox = await files.boundingBox()
+        expect(filesBox?.height ?? 0).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+      }
+      const summary = page.locator('[data-testid="chip-tools-summary"]')
+      const badge = page.locator('[data-testid="badge-plus-tools-count"]')
+      expect((await summary.isVisible()) || (await badge.isVisible())).toBeTruthy()
+    }
+
+    const longName = await pickModel(true)
+    for (const width of [320, 390]) {
+      await assertBar(width, longName)
+    }
+    const shortName = await pickModel(false)
+    await assertBar(390, shortName)
+  })
 })
 
 test.describe('@ci @layout UI guard — key pages', () => {
@@ -376,13 +447,13 @@ test.describe('@ci @layout UI guard — key pages', () => {
     }
   })
 
-  test('channels page (inbound config) has no overflow', async ({ page }) => {
+  test('apps directory has no overflow', async ({ page }) => {
     await openApp(page)
-    await page.goto('/channels')
-    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
+    await page.goto('/apps')
+    await expect(page.locator(selectors.apps.page)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
-    await expectNoHorizontalOverflow(page, 'channels (inbound)')
+    await expectNoHorizontalOverflow(page, 'apps')
   })
 
   test('AI models page header stays inside the card (B1 regression)', async ({ page }) => {

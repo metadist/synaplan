@@ -741,7 +741,7 @@ function handleAdvancedSubmit() {
 
 .mode-toggle-active {
   background-color: var(--brand);
-  color: white;
+  color: var(--on-brand);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 </style>

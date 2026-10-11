@@ -10,9 +10,7 @@
         <div class="surface-card p-4 sm:p-6 space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
-              <h2 class="text-xl font-semibold txt-primary">{{ $t('files.workspace.title') }}</h2>
-              <p class="text-sm txt-secondary mt-1">{{ $t('files.workspace.subtitle') }}</p>
-              <p v-if="info?.exists" class="text-xs txt-muted mt-2">
+              <p v-if="info?.exists" class="text-xs txt-muted">
                 {{ $t('files.workspace.usage', { used: info.usedMb, quota: info.quotaMb }) }}
               </p>
             </div>

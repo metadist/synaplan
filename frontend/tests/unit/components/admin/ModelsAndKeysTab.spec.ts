@@ -84,14 +84,14 @@ describe('ModelsAndKeysTab local AI', () => {
     wrapper.unmount()
   })
 
-  it('folds later sections and opens them from the header or jump nav', async () => {
+  it('folds later sections and opens them from the header', async () => {
     const wrapper = mountTab()
     await flushPromises()
 
     expect(wrapper.get('#setup-section-providers').attributes('data-open')).toBe('false')
     expect(wrapper.get('#setup-section-own-service').attributes('data-open')).toBe('false')
     expect(wrapper.get('#setup-section-local-ai').attributes('data-open')).toBe('false')
-    expect(wrapper.find('[data-testid="btn-jump-section-local-ai"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-jump-nav"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="btn-setup-section-local-ai"]').trigger('click')
     expect(wrapper.get('#setup-section-local-ai').attributes('data-open')).toBe('true')
@@ -146,7 +146,7 @@ describe('ModelsAndKeysTab local AI', () => {
     )
     expect(wrapper.get('[data-testid="setup-local-ai-settings"]').text()).toContain('ollama')
     expect(wrapper.get('#setup-section-tts').attributes('data-open')).toBe('true')
-    expect(wrapper.find('[data-testid="btn-jump-section-tts"]').text()).toContain('Speech output')
+    expect(wrapper.get('[data-testid="btn-setup-section-tts"]').text()).toContain('Speech output')
     wrapper.unmount()
   })
 

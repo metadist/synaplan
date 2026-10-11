@@ -1,45 +1,23 @@
 import { test, expect } from '../test-setup'
 import { login, openApp } from '../helpers/auth'
-import { isAgentsEnabled } from '../helpers/features'
 import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS } from '../config/config'
 
-const PAGE = '/ai/instructions'
+const PAGE = '/ai/models?tab=topics'
 const SEL = selectors.taskPrompts
-const LEGACY_PAGE_REPLACED =
-  'AGENTS.ENABLED is on: /ai/instructions forwards to the Assistants gallery, so the legacy Instructions editor is not reachable'
 
 test.describe('@ci Task Prompts', () => {
-  /**
-   * The Instructions editor only exists while the Assistants flag is off
-   * (`instructionsRouteGuard`). With the flag on — the seeded default — the
-   * one thing left to guard is that the legacy URL lands on the gallery
-   * instead of a dead page.
-   */
-  test('with Assistants on, /ai/instructions lands on the Assistants gallery', async ({
-    page,
-    request,
-    credentials,
-  }) => {
-    test.skip(
-      !(await isAgentsEnabled(request, credentials)),
-      'the legacy Instructions page is served directly'
-    )
-
+  /** Topics live under Assistants › AI settings; the old Instructions URL follows them. */
+  test('/ai/instructions lands on the Topics tab of AI settings', async ({ page }) => {
     await openApp(page)
-    await page.goto(PAGE)
-    await expect(page).toHaveURL(/\/ai\/assistants$/, { timeout: TIMEOUTS.STANDARD })
-    await expect(page.locator(selectors.assistants.gallery)).toBeVisible({
-      timeout: TIMEOUTS.STANDARD,
-    })
+    await page.goto('/ai/instructions')
+    await expect(page).toHaveURL(/\/ai\/models\?tab=topics$/, { timeout: TIMEOUTS.STANDARD })
+    await expect(page.locator(SEL.overview)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
   })
 
-  test('admin can edit AI model, rules and content on system prompt', async ({ page, request }) => {
-    // The flag resolves per user (per-user and group rows win over the global
-    // row), so probe with the account this test actually browses as.
+  test('admin can edit AI model, rules and content on system prompt', async ({ page }) => {
     const admin = CREDENTIALS.getAdminCredentials()
-    test.skip(await isAgentsEnabled(request, admin), LEGACY_PAGE_REPLACED)
 
     await test.step('Arrange: login as admin and pick the first card', async () => {
       await login(page, admin)
@@ -65,13 +43,7 @@ test.describe('@ci Task Prompts', () => {
     })
   })
 
-  test('non-admin can edit AI model, rules and content on system prompt', async ({
-    page,
-    request,
-    credentials,
-  }) => {
-    test.skip(await isAgentsEnabled(request, credentials), LEGACY_PAGE_REPLACED)
-
+  test('non-admin can edit AI model, rules and content on system prompt', async ({ page }) => {
     await test.step('Arrange: login and pick the first card', async () => {
       await openApp(page)
       await page.goto(PAGE)
@@ -93,9 +65,7 @@ test.describe('@ci Task Prompts', () => {
     })
   })
 
-  test('overview shows stats and search filters cards', async ({ page, request, credentials }) => {
-    test.skip(await isAgentsEnabled(request, credentials), LEGACY_PAGE_REPLACED)
-
+  test('overview shows stats and search filters cards', async ({ page }) => {
     await test.step('Arrange: login and open task prompts page', async () => {
       await openApp(page)
       await page.goto(PAGE)
@@ -126,13 +96,7 @@ test.describe('@ci Task Prompts', () => {
     })
   })
 
-  test('user can create a custom prompt, reload, and delete it', async ({
-    page,
-    request,
-    credentials,
-  }) => {
-    test.skip(await isAgentsEnabled(request, credentials), LEGACY_PAGE_REPLACED)
-
+  test('user can create a custom prompt, reload, and delete it', async ({ page }) => {
     // Lowercase without spaces so the topic passes the create-normalization
     // unchanged and the card testid is predictable (card-prompt-<topic>).
     const topic = `e2e-prompt-${Date.now()}`

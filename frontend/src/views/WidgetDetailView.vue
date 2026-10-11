@@ -1,1201 +1,1203 @@
 <template>
   <MainLayout>
-    <div class="h-full flex flex-col bg-chat" data-testid="page-widget-detail">
-      <!-- Header -->
-      <div class="px-4 lg:px-6 py-4 border-b border-light-border/30 dark:border-dark-border/20">
-        <button
-          class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"
-          @click="router.push({ name: 'channels-widgets' })"
-        >
-          <Icon icon="heroicons:arrow-left" class="w-3.5 h-3.5" />
-          {{ $t('widgets.detail.back') }}
-        </button>
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 class="text-2xl lg:text-3xl font-bold txt-primary truncate">
-            {{ widget?.name || '...' }}
-          </h1>
-          <div class="flex gap-2">
-            <button
-              v-if="widget"
-              :class="[
-                'px-4 py-2.5 rounded-xl border text-sm transition-colors inline-flex items-center gap-2',
-                showAiPanel
-                  ? 'border-[var(--brand)]/40 bg-[var(--brand-alpha-light)] txt-brand'
-                  : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary',
-              ]"
-              data-testid="btn-toggle-ai-panel"
-              @click="showAiPanel = !showAiPanel"
-            >
-              <Icon icon="heroicons:sparkles" class="w-4 h-4" />
-              <span class="hidden sm:inline">{{ $t('widgets.setupChat.title') }}</span>
-            </button>
-            <button
-              v-if="canShareWidget"
-              type="button"
-              class="btn-secondary px-4 py-2.5 rounded-xl text-sm inline-flex items-center gap-2"
-              data-testid="btn-share-widget"
-              @click="openWidgetShare"
-            >
-              <Icon icon="heroicons:share" class="w-4 h-4" />
-              <span class="hidden sm:inline">{{ $t('iam.share') }}</span>
-            </button>
-            <button
-              v-if="widget"
-              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors inline-flex items-center gap-2"
-              data-testid="btn-widget-settings"
-              @click="openAdvancedModal()"
-            >
-              <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4" />
-              <span class="hidden sm:inline">{{ $t('widgets.settings') }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <SharedResourceBanner
-        v-if="widget?.shared"
-        class="mx-4 lg:mx-6 mt-3"
-        kind="widget"
-        :owner-name="sharedWidgetMeta?.ownerName ?? widget.ownerName ?? null"
-        :shared-via="sharedWidgetMeta?.sharedVia ?? widget.sharedVia"
-        :permission="
-          widget.access && widget.access !== 'owner'
-            ? widget.access
-            : (sharedWidgetMeta?.permission ?? null)
-        "
-      />
-
-      <!-- Data Processing Notice -->
+    <div class="h-full bg-chat">
       <div
-        v-if="widget && !widget.config?.dataProcessingAccepted"
-        class="mx-4 lg:mx-6 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30"
+        class="mx-auto flex h-full min-h-0 w-full max-w-[100rem] flex-col"
+        data-testid="page-widget-detail"
       >
-        <div class="flex items-start gap-3">
-          <Icon
-            icon="heroicons:shield-exclamation"
-            class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
-          />
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-amber-700 dark:text-amber-300">
-              {{ $t('widgets.detail.avvNoticeTitle') }}
-            </p>
-            <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
-              {{ $t('widgets.detail.avvNoticeDescription') }}
-            </p>
-          </div>
+        <!-- Header -->
+        <div class="px-4 lg:px-6 py-4 border-b border-light-border/30 dark:border-dark-border/20">
           <button
-            class="px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/20 text-amber-700 dark:text-amber-300 hover:bg-amber-500/30 transition-colors flex-shrink-0"
-            @click="openAdvancedModal('privacy')"
+            class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"
+            @click="router.push({ name: 'channels-widgets' })"
           >
-            {{ $t('widgets.detail.avvNoticeCta') }}
+            <Icon icon="heroicons:arrow-left" class="w-3.5 h-3.5" />
+            {{ $t('widgets.detail.back') }}
           </button>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <h1 class="text-2xl lg:text-3xl font-bold txt-primary truncate">
+              {{ widget?.name || '...' }}
+            </h1>
+            <div class="flex gap-2">
+              <button
+                v-if="widget"
+                :class="[
+                  'px-4 py-2.5 rounded-xl border text-sm transition-colors inline-flex items-center gap-2',
+                  showAiPanel
+                    ? 'border-[var(--brand)]/40 bg-[var(--brand-alpha-light)] txt-brand'
+                    : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary',
+                ]"
+                data-testid="btn-toggle-ai-panel"
+                @click="showAiPanel = !showAiPanel"
+              >
+                <Icon icon="heroicons:sparkles" class="w-4 h-4" />
+                <span class="hidden sm:inline">{{ $t('widgets.setupChat.title') }}</span>
+              </button>
+              <button
+                v-if="canShareWidget"
+                type="button"
+                class="btn-secondary px-4 py-2.5 rounded-xl text-sm inline-flex items-center gap-2"
+                data-testid="btn-share-widget"
+                @click="openWidgetShare"
+              >
+                <Icon icon="heroicons:share" class="w-4 h-4" />
+                <span class="hidden sm:inline">{{ $t('iam.share') }}</span>
+              </button>
+              <button
+                v-if="widget"
+                class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors inline-flex items-center gap-2"
+                data-testid="btn-widget-settings"
+                @click="openAdvancedModal()"
+              >
+                <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4" />
+                <span class="hidden sm:inline">{{ $t('widgets.settings') }}</span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <!-- Content -->
-      <div class="flex-1 overflow-hidden">
-        <div v-if="loading" class="py-20 text-center">
-          <div
-            class="animate-spin w-10 h-10 border-4 border-[var(--brand)] border-t-transparent rounded-full mx-auto mb-4"
-          />
-          <p class="txt-secondary">{{ $t('common.loading') }}</p>
+        <SharedResourceBanner
+          v-if="widget?.shared"
+          class="mx-4 lg:mx-6 mt-3"
+          kind="widget"
+          :owner-name="sharedWidgetMeta?.ownerName ?? widget.ownerName ?? null"
+          :shared-via="sharedWidgetMeta?.sharedVia ?? widget.sharedVia"
+          :permission="
+            widget.access && widget.access !== 'owner'
+              ? widget.access
+              : (sharedWidgetMeta?.permission ?? null)
+          "
+        />
+
+        <!-- Data Processing Notice -->
+        <div
+          v-if="widget && !widget.config?.dataProcessingAccepted"
+          class="mx-4 lg:mx-6 mt-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30"
+        >
+          <div class="flex items-start gap-3">
+            <Icon
+              icon="heroicons:shield-exclamation"
+              class="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"
+            />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-amber-700 dark:text-amber-300">
+                {{ $t('widgets.detail.avvNoticeTitle') }}
+              </p>
+              <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                {{ $t('widgets.detail.avvNoticeDescription') }}
+              </p>
+            </div>
+            <button
+              class="px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/20 text-amber-700 dark:text-amber-300 hover:bg-amber-500/30 transition-colors flex-shrink-0"
+              @click="openAdvancedModal('privacy')"
+            >
+              {{ $t('widgets.detail.avvNoticeCta') }}
+            </button>
+          </div>
         </div>
 
-        <div v-else-if="!widget" class="py-20 text-center">
-          <Icon
-            icon="heroicons:exclamation-triangle"
-            class="w-12 h-12 txt-secondary mx-auto mb-3 opacity-40"
-          />
-          <p class="txt-secondary">{{ $t('widgets.detail.notFound') }}</p>
-        </div>
+        <!-- Content -->
+        <div class="flex-1 overflow-hidden">
+          <div v-if="loading" class="py-20 text-center">
+            <div
+              class="animate-spin w-10 h-10 border-4 border-[var(--brand)] border-t-transparent rounded-full mx-auto mb-4"
+            />
+            <p class="txt-secondary">{{ $t('common.loading') }}</p>
+          </div>
 
-        <div v-else class="h-full relative">
-          <!-- Split layout (Flow Builder left + optional AI Panel right) -->
-          <div class="h-full flex flex-col lg:flex-row">
-            <!-- Left: Flow Builder -->
-            <div class="w-full min-w-0 flex-1 overflow-y-auto px-4 lg:px-6 py-6 scroll-thin">
-              <div class="space-y-8">
-                <!-- Flow Builder -->
-                <section>
-                  <h2 class="text-xl font-bold txt-primary mb-1">
-                    {{ $t('widgets.detail.flowTitle') }}
-                  </h2>
-                  <p class="text-sm txt-secondary mb-4">
-                    {{ $t('widgets.detail.flowSubtitle') }}
-                  </p>
+          <div v-else-if="!widget" class="py-20 text-center">
+            <Icon
+              icon="heroicons:exclamation-triangle"
+              class="w-12 h-12 txt-secondary mx-auto mb-3 opacity-40"
+            />
+            <p class="txt-secondary">{{ $t('widgets.detail.notFound') }}</p>
+          </div>
 
-                  <!-- User Data Integration Card -->
-                  <div
-                    class="rounded-xl border-2 transition-all duration-300 mb-5 overflow-hidden"
-                    :class="
-                      isUserDataConfigured
-                        ? 'border-emerald-500/30 bg-emerald-500/5'
-                        : auth.isPro
-                          ? 'border-dashed border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/[0.02]'
-                          : 'border-dashed border-light-border/20 dark:border-dark-border/10 opacity-75'
-                    "
-                  >
-                    <!-- Free user: upgrade hint (PRO lock only, no purchase
+          <div v-else class="h-full relative">
+            <!-- Split layout (Flow Builder left + optional AI Panel right) -->
+            <div class="h-full flex flex-col lg:flex-row">
+              <!-- Left: Flow Builder -->
+              <div class="w-full min-w-0 flex-1 overflow-y-auto px-4 lg:px-6 py-6 scroll-thin">
+                <div class="space-y-8">
+                  <!-- Flow Builder -->
+                  <section>
+                    <h2 class="text-xl font-bold txt-primary mb-1">
+                      {{ $t('widgets.detail.flowTitle') }}
+                    </h2>
+                    <p class="text-sm txt-secondary mb-4">
+                      {{ $t('widgets.detail.flowSubtitle') }}
+                    </p>
+
+                    <!-- User Data Integration Card -->
+                    <div
+                      class="rounded-xl border-2 transition-all duration-300 mb-5 overflow-hidden"
+                      :class="
+                        isUserDataConfigured
+                          ? 'border-emerald-500/30 bg-emerald-500/5'
+                          : auth.isPro
+                            ? 'border-dashed border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/[0.02]'
+                            : 'border-dashed border-light-border/20 dark:border-dark-border/10 opacity-75'
+                      "
+                    >
+                      <!-- Free user: upgrade hint (PRO lock only, no purchase
                          steering, when no purchase channel is available) -->
-                    <button
-                      v-if="!auth.isPro"
-                      class="w-full text-left px-4 py-3 flex items-center gap-3"
-                      :class="purchaseAllowed ? '' : 'cursor-default'"
-                      @click="purchaseAllowed && router.push({ name: 'subscription' })"
-                    >
-                      <div
-                        class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-amber-500/10"
+                      <button
+                        v-if="!auth.isPro"
+                        class="w-full text-left px-4 py-3 flex items-center gap-3"
+                        :class="purchaseAllowed ? '' : 'cursor-default'"
+                        @click="purchaseAllowed && router.push({ name: 'subscription' })"
                       >
-                        <Icon icon="heroicons:lock-closed" class="w-5 h-5 text-amber-500" />
-                      </div>
-                      <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium txt-primary">
-                          {{ $t('widgets.detail.userData.title') }}
-                        </p>
-                        <p class="text-xs txt-secondary">
-                          {{
-                            purchaseAllowed
-                              ? $t('widgets.detail.userData.upgradeHint')
-                              : $t('widgets.advancedConfig.proRequired')
-                          }}
-                        </p>
-                      </div>
-                      <span
-                        class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white flex-shrink-0"
-                      >
-                        PRO
-                      </span>
-                    </button>
-
-                    <!-- PRO user: not configured -->
-                    <button
-                      v-else-if="!isUserDataConfigured"
-                      class="w-full text-left px-4 py-3 flex items-center gap-3"
-                      @click="openAdvancedModal('security')"
-                    >
-                      <div
-                        class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-violet-500/10"
-                      >
-                        <Icon icon="heroicons:user-circle" class="w-5 h-5 text-violet-500" />
-                      </div>
-                      <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium txt-primary">
-                          {{ $t('widgets.detail.userData.title') }}
-                        </p>
-                        <p class="text-xs txt-secondary">
-                          {{ $t('widgets.detail.userData.notConfigured') }}
-                        </p>
-                      </div>
-                      <span class="text-xs font-medium txt-brand flex items-center gap-1">
-                        {{ $t('widgets.detail.userData.setup') }}
-                        <Icon icon="heroicons:arrow-right" class="w-4 h-4" />
-                      </span>
-                    </button>
-
-                    <!-- PRO user: configured & active -->
-                    <template v-else>
-                      <div class="px-4 py-3 flex items-center gap-3">
                         <div
-                          class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-500/15"
+                          class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-amber-500/10"
                         >
-                          <Icon icon="heroicons:check-badge" class="w-5 h-5 text-emerald-500" />
+                          <Icon icon="heroicons:lock-closed" class="w-5 h-5 text-amber-500" />
                         </div>
                         <div class="flex-1 min-w-0">
                           <p class="text-sm font-medium txt-primary">
                             {{ $t('widgets.detail.userData.title') }}
                           </p>
-                          <p class="text-xs txt-secondary truncate font-mono">
-                            {{ widget?.config?.externalApiUrl }}
+                          <p class="text-xs txt-secondary">
+                            {{
+                              purchaseAllowed
+                                ? $t('widgets.detail.userData.upgradeHint')
+                                : $t('widgets.advancedConfig.proRequired')
+                            }}
                           </p>
                         </div>
-                        <div class="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            class="p-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
-                            :title="$t('widgets.detail.userData.edit')"
-                            @click="openAdvancedModal('security')"
-                          >
-                            <Icon icon="heroicons:pencil-square" class="w-4 h-4" />
-                          </button>
-                          <button
-                            class="p-1.5 rounded-xl text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                            :title="$t('widgets.detail.userData.remove')"
-                            @click="removeUserDataIntegration"
-                          >
-                            <Icon icon="heroicons:trash" class="w-4 h-4" />
-                          </button>
+                        <span
+                          class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white flex-shrink-0"
+                        >
+                          PRO
+                        </span>
+                      </button>
+
+                      <!-- PRO user: not configured -->
+                      <button
+                        v-else-if="!isUserDataConfigured"
+                        class="w-full text-left px-4 py-3 flex items-center gap-3"
+                        @click="openAdvancedModal('security')"
+                      >
+                        <div
+                          class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-violet-500/10"
+                        >
+                          <Icon icon="heroicons:user-circle" class="w-5 h-5 text-violet-500" />
                         </div>
-                      </div>
-                      <div class="px-4 pb-3 flex items-center gap-6 text-xs txt-secondary">
-                        <span class="flex items-center gap-1.5">
-                          <Icon icon="heroicons:server-stack" class="w-3.5 h-3.5" />
-                          API
+                        <div class="flex-1 min-w-0">
+                          <p class="text-sm font-medium txt-primary">
+                            {{ $t('widgets.detail.userData.title') }}
+                          </p>
+                          <p class="text-xs txt-secondary">
+                            {{ $t('widgets.detail.userData.notConfigured') }}
+                          </p>
+                        </div>
+                        <span class="text-xs font-medium txt-brand flex items-center gap-1">
+                          {{ $t('widgets.detail.userData.setup') }}
+                          <Icon icon="heroicons:arrow-right" class="w-4 h-4" />
                         </span>
-                        <span class="flex items-center gap-1.5">
-                          <Icon icon="heroicons:arrow-path" class="w-3.5 h-3.5" />
-                          {{ $t('widgets.detail.userData.autoFetch') }}
-                        </span>
-                        <span class="flex items-center gap-1.5">
-                          <Icon icon="heroicons:sparkles" class="w-3.5 h-3.5" />
-                          {{ $t('widgets.detail.userData.aiContext') }}
-                        </span>
-                      </div>
-                    </template>
-                  </div>
+                      </button>
 
-                  <!-- Contextual hint -->
-                  <div
-                    :class="[
-                      'rounded-xl px-4 py-2.5 text-sm flex items-center gap-2 transition-all duration-300 mb-5',
-                      selectedTriggerId
-                        ? 'bg-[var(--brand)]/10 border border-[var(--brand)]/25 text-[var(--brand)]'
-                        : 'bg-gray-100 dark:bg-white/5 txt-secondary',
-                    ]"
-                  >
-                    <Icon
-                      :icon="
-                        selectedTriggerId
-                          ? 'heroicons:arrow-long-right'
-                          : 'heroicons:cursor-arrow-rays'
-                      "
-                      class="w-4 h-4 flex-shrink-0"
-                    />
-                    {{
-                      selectedTriggerId
-                        ? $t('widgets.detail.flowHintConnect')
-                        : $t('widgets.detail.flowHintStart')
-                    }}
-                  </div>
+                      <!-- PRO user: configured & active -->
+                      <template v-else>
+                        <div class="px-4 py-3 flex items-center gap-3">
+                          <div
+                            class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-500/15"
+                          >
+                            <Icon icon="heroicons:check-badge" class="w-5 h-5 text-emerald-500" />
+                          </div>
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium txt-primary">
+                              {{ $t('widgets.detail.userData.title') }}
+                            </p>
+                            <p class="text-xs txt-secondary truncate font-mono">
+                              {{ widget?.config?.externalApiUrl }}
+                            </p>
+                          </div>
+                          <div class="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              class="p-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                              :title="$t('widgets.detail.userData.edit')"
+                              @click="openAdvancedModal('security')"
+                            >
+                              <Icon icon="heroicons:pencil-square" class="w-4 h-4" />
+                            </button>
+                            <button
+                              class="p-1.5 rounded-xl text-red-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                              :title="$t('widgets.detail.userData.remove')"
+                              @click="removeUserDataIntegration"
+                            >
+                              <Icon icon="heroicons:trash" class="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div class="px-4 pb-3 flex items-center gap-6 text-xs txt-secondary">
+                          <span class="flex items-center gap-1.5">
+                            <Icon icon="heroicons:server-stack" class="w-3.5 h-3.5" />
+                            API
+                          </span>
+                          <span class="flex items-center gap-1.5">
+                            <Icon icon="heroicons:arrow-path" class="w-3.5 h-3.5" />
+                            {{ $t('widgets.detail.userData.autoFetch') }}
+                          </span>
+                          <span class="flex items-center gap-1.5">
+                            <Icon icon="heroicons:sparkles" class="w-3.5 h-3.5" />
+                            {{ $t('widgets.detail.userData.aiContext') }}
+                          </span>
+                        </div>
+                      </template>
+                    </div>
 
-                  <!-- Flow canvas -->
-                  <div ref="flowRef" class="relative">
-                    <!-- SVG connections -->
-                    <svg
-                      v-if="svgLines.length"
-                      :width="svgWidth"
-                      :height="svgHeight"
-                      class="absolute top-0 left-0 pointer-events-none z-10"
-                    >
-                      <defs>
-                        <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stop-color="var(--brand)" stop-opacity="0.9" />
-                          <stop offset="100%" stop-color="var(--brand)" stop-opacity="0.35" />
-                        </linearGradient>
-                      </defs>
-                      <g v-for="line in svgLines" :key="line.id">
-                        <path
-                          :d="line.path"
-                          fill="none"
-                          stroke="var(--brand)"
-                          stroke-width="8"
-                          opacity="0.06"
-                          stroke-linecap="round"
-                        />
-                        <path
-                          :d="line.path"
-                          fill="none"
-                          stroke="url(#flowGrad)"
-                          stroke-width="2.5"
-                          stroke-linecap="round"
-                        />
-                      </g>
-                    </svg>
-
-                    <!-- Animated neural dots -->
+                    <!-- Contextual hint -->
                     <div
-                      v-for="(line, lineIdx) in svgLines"
-                      :key="'dot-' + line.id"
-                      class="absolute w-1.5 h-1.5 rounded-full pointer-events-none z-10"
-                      :style="{
-                        background: 'var(--brand)',
-                        boxShadow: '0 0 6px var(--brand)',
-                        offsetPath: `path('${line.path}')`,
-                        animation: `flowDot ${2 + lineIdx * 0.25}s linear infinite`,
-                      }"
-                    />
+                      :class="[
+                        'rounded-xl px-4 py-2.5 text-sm flex items-center gap-2 transition-all duration-300 mb-5',
+                        selectedTriggerId
+                          ? 'bg-[var(--brand)]/10 border border-[var(--brand)]/25 text-[var(--brand)]'
+                          : 'bg-gray-100 dark:bg-white/5 txt-secondary',
+                      ]"
+                    >
+                      <Icon
+                        :icon="
+                          selectedTriggerId
+                            ? 'heroicons:arrow-long-right'
+                            : 'heroicons:cursor-arrow-rays'
+                        "
+                        class="w-4 h-4 flex-shrink-0"
+                      />
+                      {{
+                        selectedTriggerId
+                          ? $t('widgets.detail.flowHintConnect')
+                          : $t('widgets.detail.flowHintStart')
+                      }}
+                    </div>
 
-                    <!-- Two-column layout -->
-                    <div class="flex gap-8 sm:gap-14 lg:gap-24">
-                      <!-- LEFT: Triggers (criteria only) -->
-                      <div class="flex-1 space-y-3">
-                        <p
-                          class="text-[11px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                        >
-                          {{ $t('widgets.detail.triggersLabel') }}
-                        </p>
-
-                        <!-- Existing trigger cards -->
-                        <template v-for="trigger in triggers" :key="trigger.id">
-                          <!-- Edit mode -->
-                          <FlowNodeEditor
-                            v-if="editingNodeId === trigger.id"
-                            :node="trigger"
-                            node-type="trigger"
-                            @save="handleNodeSave($event, 'trigger')"
-                            @cancel="cancelEditing"
+                    <!-- Flow canvas -->
+                    <div ref="flowRef" class="relative">
+                      <!-- SVG connections -->
+                      <svg
+                        v-if="svgLines.length"
+                        :width="svgWidth"
+                        :height="svgHeight"
+                        class="absolute top-0 left-0 pointer-events-none z-10"
+                      >
+                        <defs>
+                          <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="var(--brand)" stop-opacity="0.9" />
+                            <stop offset="100%" stop-color="var(--brand)" stop-opacity="0.35" />
+                          </linearGradient>
+                        </defs>
+                        <g v-for="line in svgLines" :key="line.id">
+                          <path
+                            :d="line.path"
+                            fill="none"
+                            stroke="var(--brand)"
+                            stroke-width="8"
+                            opacity="0.06"
+                            stroke-linecap="round"
                           />
-                          <!-- Display mode -->
-                          <div
-                            v-else
-                            :ref="(el) => setRef('trigger', trigger.id, el)"
-                            :class="[
-                              'group relative rounded-xl border-2 cursor-pointer transition-all duration-200',
-                              selectedTriggerId === trigger.id
-                                ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-lg shadow-[var(--brand)]/10 scale-[1.02]'
-                                : hasConnectionFrom(trigger.id)
-                                  ? 'border-[var(--brand)]/30 bg-[var(--brand)]/[0.02] hover:border-[var(--brand)]/50'
-                                  : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40',
-                            ]"
-                            @click="selectTrigger(trigger.id)"
-                          >
-                            <div class="flex items-center justify-between gap-2 px-3 py-2.5">
-                              <div class="flex-1 min-w-0">
-                                <span class="text-xs font-semibold txt-primary block truncate">
-                                  {{ splitLabel(trigger.label).title }}
-                                </span>
-                                <span
-                                  v-if="
-                                    splitLabel(trigger.label).preview &&
-                                    expandedNodeId !== trigger.id
-                                  "
-                                  class="text-[11px] txt-secondary truncate block mt-0.5"
-                                  @click.stop="toggleExpand(trigger.id)"
-                                >
-                                  {{ splitLabel(trigger.label).preview.substring(0, 50)
-                                  }}{{ splitLabel(trigger.label).preview.length > 50 ? '...' : '' }}
-                                </span>
-                              </div>
-                              <div class="flex items-center gap-0.5 flex-shrink-0">
-                                <button
-                                  class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
-                                  @click.stop="startEditing(trigger.id)"
-                                >
-                                  <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
-                                  @click.stop="removeTrigger(trigger.id)"
-                                >
-                                  <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                            <!-- Expanded content -->
-                            <div
-                              v-if="
-                                expandedNodeId === trigger.id && splitLabel(trigger.label).preview
-                              "
-                              class="px-3 pb-2.5 border-t border-light-border/20 dark:border-dark-border/10"
-                              @click.stop
-                            >
-                              <p
-                                class="text-[11px] txt-secondary pt-2 whitespace-pre-wrap break-words"
-                              >
-                                {{ trigger.label }}
-                              </p>
-                            </div>
-                            <span
-                              :class="[
-                                'absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
-                                selectedTriggerId === trigger.id
-                                  ? 'border-[var(--brand)] bg-[var(--brand)] scale-125'
-                                  : hasConnectionFrom(trigger.id)
-                                    ? 'border-[var(--brand)] bg-[var(--brand)]/50'
-                                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
-                              ]"
-                            />
-                          </div>
-                        </template>
+                          <path
+                            :d="line.path"
+                            fill="none"
+                            stroke="url(#flowGrad)"
+                            stroke-width="2.5"
+                            stroke-linecap="round"
+                          />
+                        </g>
+                      </svg>
 
-                        <!-- Trigger wizard form -->
-                        <Transition
-                          enter-active-class="transition-all duration-300 ease-out"
-                          enter-from-class="opacity-0 -translate-y-2 scale-95"
-                          enter-to-class="opacity-100 translate-y-0 scale-100"
-                          leave-active-class="transition-all duration-200 ease-in"
-                          leave-from-class="opacity-100 translate-y-0 scale-100"
-                          leave-to-class="opacity-0 -translate-y-2 scale-95"
-                        >
-                          <div
-                            v-if="activeWizard?.side === 'trigger'"
-                            class="rounded-xl border-2 border-[var(--brand)]/30 bg-[var(--brand)]/[0.03] p-4 space-y-3"
-                          >
-                            <div class="relative">
-                              <label
-                                class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                              >
-                                {{ $t('widgets.detail.wizard.label') }}
-                              </label>
-                              <div class="flex gap-1.5">
-                                <input
-                                  v-model="wizardLabel"
-                                  class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
-                                />
-                                <button
-                                  type="button"
-                                  :disabled="!wizardLabel.trim() || enhancingField === 'label'"
-                                  class="px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
-                                  :title="$t('widgets.detail.wizard.aiEnhance')"
-                                  @click="enhanceField('label')"
-                                >
-                                  <Icon
-                                    :icon="
-                                      enhancingField === 'label'
-                                        ? 'heroicons:arrow-path'
-                                        : 'heroicons:sparkles'
-                                    "
-                                    :class="[
-                                      'w-4 h-4 txt-brand',
-                                      enhancingField === 'label' && 'animate-spin',
-                                    ]"
-                                  />
-                                </button>
-                              </div>
-                            </div>
-                            <div class="relative">
-                              <label
-                                class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                              >
-                                {{ $t('widgets.detail.wizard.details') }}
-                              </label>
-                              <div class="flex gap-1.5">
-                                <textarea
-                                  v-model="wizardDetails"
-                                  rows="2"
-                                  :placeholder="
-                                    $t(
-                                      `widgets.detail.wizard.detailsPlaceholder.${activeWizard.key}`
-                                    )
-                                  "
-                                  class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
-                                />
-                                <button
-                                  type="button"
-                                  :disabled="!wizardDetails.trim() || enhancingField === 'details'"
-                                  class="self-start px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
-                                  :title="$t('widgets.detail.wizard.aiEnhance')"
-                                  @click="enhanceField('details')"
-                                >
-                                  <Icon
-                                    :icon="
-                                      enhancingField === 'details'
-                                        ? 'heroicons:arrow-path'
-                                        : 'heroicons:sparkles'
-                                    "
-                                    :class="[
-                                      'w-4 h-4 txt-brand',
-                                      enhancingField === 'details' && 'animate-spin',
-                                    ]"
-                                  />
-                                </button>
-                              </div>
-                            </div>
-                            <div class="flex justify-end gap-2">
-                              <button
-                                class="px-3 py-1.5 rounded-xl text-xs font-medium txt-secondary hover:txt-primary transition-colors"
-                                @click="cancelWizard"
-                              >
-                                {{ $t('widgets.detail.wizard.cancel') }}
-                              </button>
-                              <button
-                                :disabled="!wizardLabel.trim()"
-                                class="px-4 py-1.5 rounded-xl text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
-                                @click="confirmWizard"
-                              >
-                                {{ $t('widgets.detail.wizard.create') }}
-                              </button>
-                            </div>
-                          </div>
-                        </Transition>
+                      <!-- Animated neural dots -->
+                      <div
+                        v-for="(line, lineIdx) in svgLines"
+                        :key="'dot-' + line.id"
+                        class="absolute w-1.5 h-1.5 rounded-full pointer-events-none z-10"
+                        :style="{
+                          background: 'var(--brand)',
+                          boxShadow: '0 0 6px var(--brand)',
+                          offsetPath: `path('${line.path}')`,
+                          animation: `flowDot ${2 + lineIdx * 0.25}s linear infinite`,
+                        }"
+                      />
 
-                        <!-- Template quick-add buttons (always visible) -->
-                        <div :class="['space-y-1.5', triggers.length > 0 && 'pt-1']">
+                      <!-- Two-column layout -->
+                      <div class="flex gap-8 sm:gap-14 lg:gap-24">
+                        <!-- LEFT: Triggers (criteria only) -->
+                        <div class="flex-1 space-y-3">
                           <p
-                            v-if="triggers.length === 0"
-                            class="text-xs txt-secondary opacity-70 mb-2"
+                            class="text-[11px] font-bold uppercase tracking-widest txt-secondary mb-1"
                           >
-                            {{ $t('widgets.detail.triggersEmptyHint') }}
+                            {{ $t('widgets.detail.triggersLabel') }}
                           </p>
-                          <button
-                            v-for="tpl in triggerTemplates"
-                            :key="tpl.key"
-                            :class="[
-                              'w-full flex items-center gap-3 rounded-xl border transition-all duration-200 group/tpl text-left',
-                              triggers.length > 0
-                                ? 'p-2 border-transparent hover:border-light-border/20 dark:hover:border-dark-border/15 hover:bg-[var(--brand)]/5'
-                                : 'p-3 border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5',
-                            ]"
-                            @click="openWizard('trigger', tpl.key)"
-                          >
-                            <span
+
+                          <!-- Existing trigger cards -->
+                          <template v-for="trigger in triggers" :key="trigger.id">
+                            <!-- Edit mode -->
+                            <FlowNodeEditor
+                              v-if="editingNodeId === trigger.id"
+                              :node="trigger"
+                              node-type="trigger"
+                              @save="handleNodeSave($event, 'trigger')"
+                              @cancel="cancelEditing"
+                            />
+                            <!-- Display mode -->
+                            <div
+                              v-else
+                              :ref="(el) => setRef('trigger', trigger.id, el)"
                               :class="[
-                                'rounded-lg flex items-center justify-center flex-shrink-0',
-                                triggers.length > 0 ? 'w-6 h-6' : 'w-8 h-8',
-                                tpl.bg,
+                                'group relative rounded-xl border-2 cursor-pointer transition-all duration-200',
+                                selectedTriggerId === trigger.id
+                                  ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-lg shadow-[var(--brand)]/10 scale-[1.02]'
+                                  : hasConnectionFrom(trigger.id)
+                                    ? 'border-[var(--brand)]/30 bg-[var(--brand)]/[0.02] hover:border-[var(--brand)]/50'
+                                    : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40',
                               ]"
+                              @click="selectTrigger(trigger.id)"
                             >
-                              <Icon
-                                :icon="tpl.icon"
-                                :class="[triggers.length > 0 ? 'w-3 h-3' : 'w-4 h-4', tpl.color]"
-                              />
-                            </span>
-                            <div class="flex-1 min-w-0">
-                              <p
-                                :class="[
-                                  'font-medium txt-primary truncate',
-                                  triggers.length > 0 ? 'text-xs' : 'text-sm',
-                                ]"
-                              >
-                                {{ $t(`widgets.detail.triggerTemplates.${tpl.key}`) }}
-                              </p>
-                              <p
-                                v-if="triggers.length === 0"
-                                class="text-[11px] txt-secondary truncate"
-                              >
-                                {{ $t(`widgets.detail.triggerTemplateHints.${tpl.key}`) }}
-                              </p>
-                            </div>
-                            <Icon
-                              icon="heroicons:plus-circle"
-                              class="w-4 h-4 txt-secondary opacity-0 group-hover/tpl:opacity-100 transition-opacity flex-shrink-0"
-                            />
-                          </button>
-                        </div>
-
-                        <!-- Manual add -->
-                        <form class="flex gap-2" @submit.prevent="addTrigger">
-                          <input
-                            v-model="newTriggerText"
-                            :placeholder="$t('widgets.detail.addTrigger')"
-                            class="flex-1 min-w-0 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
-                          />
-                          <button
-                            type="submit"
-                            :disabled="!newTriggerText.trim()"
-                            class="px-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            <Icon icon="heroicons:plus" class="w-4 h-4" />
-                          </button>
-                        </form>
-                      </div>
-
-                      <!-- RIGHT: Responses / Sources -->
-                      <div class="flex-1 space-y-3">
-                        <p
-                          class="text-[11px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                        >
-                          {{ $t('widgets.detail.responsesLabel') }}
-                        </p>
-
-                        <!-- Existing response cards -->
-                        <template v-for="response in responses" :key="response.id">
-                          <!-- Edit mode -->
-                          <FlowNodeEditor
-                            v-if="editingNodeId === response.id"
-                            :node="response"
-                            node-type="response"
-                            @save="handleNodeSave($event, 'response')"
-                            @cancel="cancelEditing"
-                          />
-                          <!-- Display mode -->
-                          <div
-                            v-else
-                            :ref="(el) => setRef('response', response.id, el)"
-                            :class="[
-                              'group relative pl-5 rounded-xl border-2 transition-all duration-200',
-                              selectedTriggerId
-                                ? isConnected(selectedTriggerId, response.id)
-                                  ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-lg shadow-[var(--brand)]/10 cursor-pointer'
-                                  : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 cursor-pointer hover:scale-[1.01]'
-                                : hasConnectionTo(response.id)
-                                  ? 'border-[var(--brand)]/30 bg-[var(--brand)]/[0.02]'
-                                  : 'border-light-border/30 dark:border-dark-border/20',
-                            ]"
-                            @click="handleResponseClick(response.id)"
-                          >
-                            <span
-                              :class="[
-                                'absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
-                                selectedTriggerId && isConnected(selectedTriggerId, response.id)
-                                  ? 'border-[var(--brand)] bg-[var(--brand)] scale-125'
-                                  : selectedTriggerId
-                                    ? 'border-[var(--brand)]/40 bg-white dark:bg-gray-800 animate-pulse'
-                                    : hasConnectionTo(response.id)
-                                      ? 'border-[var(--brand)] bg-[var(--brand)]/50'
-                                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
-                              ]"
-                            />
-                            <div class="flex items-center justify-between gap-2 px-3 py-2.5">
-                              <div class="flex items-center gap-2 flex-1 min-w-0">
-                                <span
-                                  :class="[
-                                    'w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0',
-                                    getResponseTypeInfo(response).bg,
-                                  ]"
-                                >
-                                  <Icon
-                                    :icon="getResponseTypeInfo(response).icon"
-                                    :class="['w-3.5 h-3.5', getResponseTypeInfo(response).color]"
-                                  />
-                                </span>
+                              <div class="flex items-center justify-between gap-2 px-3 py-2.5">
                                 <div class="flex-1 min-w-0">
                                   <span class="text-xs font-semibold txt-primary block truncate">
-                                    {{ splitLabel(response.label).title }}
+                                    {{ splitLabel(trigger.label).title }}
                                   </span>
                                   <span
-                                    v-if="response.meta?.url && expandedNodeId !== response.id"
-                                    class="text-[11px] text-blue-500 truncate block mt-0.5 hover:underline"
-                                    @click.stop="toggleExpand(response.id)"
-                                  >
-                                    {{ response.meta.url }}
-                                  </span>
-                                  <span
-                                    v-else-if="
-                                      splitLabel(response.label).preview &&
-                                      expandedNodeId !== response.id
+                                    v-if="
+                                      splitLabel(trigger.label).preview &&
+                                      expandedNodeId !== trigger.id
                                     "
                                     class="text-[11px] txt-secondary truncate block mt-0.5"
-                                    @click.stop="toggleExpand(response.id)"
+                                    @click.stop="toggleExpand(trigger.id)"
                                   >
-                                    {{ splitLabel(response.label).preview.substring(0, 50)
+                                    {{ splitLabel(trigger.label).preview.substring(0, 50)
                                     }}{{
-                                      splitLabel(response.label).preview.length > 50 ? '...' : ''
+                                      splitLabel(trigger.label).preview.length > 50 ? '...' : ''
                                     }}
                                   </span>
                                 </div>
+                                <div class="flex items-center gap-0.5 flex-shrink-0">
+                                  <button
+                                    class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
+                                    @click.stop="startEditing(trigger.id)"
+                                  >
+                                    <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
+                                    @click.stop="removeTrigger(trigger.id)"
+                                  >
+                                    <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
-                              <div class="flex items-center gap-0.5 flex-shrink-0">
-                                <button
-                                  class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
-                                  @click.stop="startEditing(response.id)"
-                                >
-                                  <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
-                                  @click.stop="removeResponse(response.id)"
-                                >
-                                  <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                            <!-- Expanded content -->
-                            <div
-                              v-if="expandedNodeId === response.id"
-                              class="px-3 pb-2.5 border-t border-light-border/20 dark:border-dark-border/10"
-                              @click.stop
-                            >
-                              <p
-                                class="text-[11px] txt-secondary pt-2 whitespace-pre-wrap break-words"
-                              >
-                                {{ response.label }}
-                              </p>
-                              <a
-                                v-if="response.meta?.url"
-                                :href="response.meta.url"
-                                target="_blank"
-                                rel="noopener"
-                                class="inline-flex items-center gap-1 text-[11px] text-blue-500 hover:underline mt-1"
+                              <!-- Expanded content -->
+                              <div
+                                v-if="
+                                  expandedNodeId === trigger.id && splitLabel(trigger.label).preview
+                                "
+                                class="px-3 pb-2.5 border-t border-light-border/20 dark:border-dark-border/10"
                                 @click.stop
                               >
-                                <Icon icon="heroicons:arrow-top-right-on-square" class="w-3 h-3" />
-                                {{ response.meta.url }}
-                              </a>
-                            </div>
-                          </div>
-                        </template>
-
-                        <!-- Response wizard form -->
-                        <Transition
-                          enter-active-class="transition-all duration-300 ease-out"
-                          enter-from-class="opacity-0 -translate-y-2 scale-95"
-                          enter-to-class="opacity-100 translate-y-0 scale-100"
-                          leave-active-class="transition-all duration-200 ease-in"
-                          leave-from-class="opacity-100 translate-y-0 scale-100"
-                          leave-to-class="opacity-0 -translate-y-2 scale-95"
-                        >
-                          <div
-                            v-if="activeWizard?.side === 'response'"
-                            class="rounded-xl border-2 border-[var(--brand)]/30 bg-[var(--brand)]/[0.03] p-4 space-y-3"
-                          >
-                            <div class="relative">
-                              <label
-                                class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                              >
-                                {{ $t('widgets.detail.wizard.label') }}
-                              </label>
-                              <div class="flex gap-1.5">
-                                <input
-                                  v-model="wizardLabel"
-                                  class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
-                                />
-                                <button
-                                  type="button"
-                                  :disabled="!wizardLabel.trim() || enhancingField === 'label'"
-                                  class="px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
-                                  :title="$t('widgets.detail.wizard.aiEnhance')"
-                                  @click="enhanceField('label')"
+                                <p
+                                  class="text-[11px] txt-secondary pt-2 whitespace-pre-wrap break-words"
                                 >
-                                  <Icon
-                                    :icon="
-                                      enhancingField === 'label'
-                                        ? 'heroicons:arrow-path'
-                                        : 'heroicons:sparkles'
-                                    "
-                                    :class="[
-                                      'w-4 h-4 txt-brand',
-                                      enhancingField === 'label' && 'animate-spin',
-                                    ]"
-                                  />
-                                </button>
+                                  {{ trigger.label }}
+                                </p>
                               </div>
-                            </div>
-
-                            <!-- Type-specific fields -->
-                            <div v-if="activeWizard.key === 'link'" class="relative">
-                              <label
-                                class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                              >
-                                {{ $t('widgets.detail.wizard.url') }}
-                              </label>
-                              <input
-                                v-model="wizardUrl"
-                                placeholder="https://..."
-                                class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                              <span
+                                :class="[
+                                  'absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
+                                  selectedTriggerId === trigger.id
+                                    ? 'border-[var(--brand)] bg-[var(--brand)] scale-125'
+                                    : hasConnectionFrom(trigger.id)
+                                      ? 'border-[var(--brand)] bg-[var(--brand)]/50'
+                                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
+                                ]"
                               />
                             </div>
+                          </template>
 
-                            <template v-if="activeWizard.key === 'api'">
-                              <div class="relative">
-                                <label
-                                  class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                                >
-                                  {{ $t('widgets.detail.wizard.endpoint') }}
-                                </label>
-                                <input
-                                  v-model="wizardUrl"
-                                  placeholder="https://api.example.com/v1/..."
-                                  class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
-                                />
-                              </div>
-                              <div class="relative">
-                                <label
-                                  class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                                >
-                                  {{ $t('widgets.detail.wizard.method') }}
-                                </label>
-                                <select
-                                  v-model="wizardMethod"
-                                  class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
-                                >
-                                  <option value="GET">GET</option>
-                                  <option value="POST">POST</option>
-                                  <option value="PUT">PUT</option>
-                                </select>
-                              </div>
-                            </template>
-
+                          <!-- Trigger wizard form -->
+                          <Transition
+                            enter-active-class="transition-all duration-300 ease-out"
+                            enter-from-class="opacity-0 -translate-y-2 scale-95"
+                            enter-to-class="opacity-100 translate-y-0 scale-100"
+                            leave-active-class="transition-all duration-200 ease-in"
+                            leave-from-class="opacity-100 translate-y-0 scale-100"
+                            leave-to-class="opacity-0 -translate-y-2 scale-95"
+                          >
                             <div
-                              v-if="
-                                activeWizard.key === 'text' ||
-                                activeWizard.key === 'list' ||
-                                activeWizard.key === 'custom'
-                              "
-                              class="relative"
+                              v-if="activeWizard?.side === 'trigger'"
+                              class="rounded-xl border-2 border-[var(--brand)]/30 bg-[var(--brand)]/[0.03] p-4 space-y-3"
                             >
-                              <label
-                                class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                              >
-                                {{ $t('widgets.detail.wizard.details') }}
-                              </label>
-                              <div class="flex gap-1.5">
-                                <textarea
-                                  v-model="wizardDetails"
-                                  rows="3"
-                                  :placeholder="
-                                    $t(
-                                      `widgets.detail.wizard.detailsPlaceholder.${activeWizard.key}`
-                                    )
-                                  "
-                                  class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
-                                />
-                                <button
-                                  type="button"
-                                  :disabled="!wizardDetails.trim() || enhancingField === 'details'"
-                                  class="self-start px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
-                                  :title="$t('widgets.detail.wizard.aiEnhance')"
-                                  @click="enhanceField('details')"
-                                >
-                                  <Icon
-                                    :icon="
-                                      enhancingField === 'details'
-                                        ? 'heroicons:arrow-path'
-                                        : 'heroicons:sparkles'
-                                    "
-                                    :class="[
-                                      'w-4 h-4 txt-brand',
-                                      enhancingField === 'details' && 'animate-spin',
-                                    ]"
-                                  />
-                                </button>
-                              </div>
-                            </div>
-
-                            <div v-if="activeWizard.key === 'pdf'" class="space-y-2">
-                              <label
-                                class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
-                              >
-                                {{ $t('widgets.detail.wizard.files') }}
-                              </label>
-
-                              <!-- Attached files list -->
-                              <div
-                                v-for="wf in wizardFiles"
-                                :key="wf.messageId"
-                                class="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-white/5 border border-light-border/15 dark:border-dark-border/10"
-                              >
-                                <Icon
-                                  icon="heroicons:document"
-                                  class="w-4 h-4 txt-brand flex-shrink-0"
-                                />
-                                <span class="flex-1 text-xs txt-primary truncate">{{
-                                  wf.fileName
-                                }}</span>
-                                <button
-                                  type="button"
-                                  class="p-0.5 txt-secondary hover:text-red-500 transition-colors"
-                                  @click="removeWizardFile(wf.messageId)"
-                                >
-                                  <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-
-                              <p
-                                v-if="wizardFiles.length === 0"
-                                class="text-xs txt-secondary opacity-60 py-1"
-                              >
-                                {{ $t('widgets.detail.wizard.noFilesYet') }}
-                              </p>
-
-                              <!-- Upload + File manager buttons -->
-                              <div class="flex gap-2">
+                              <div class="relative">
                                 <label
-                                  :class="[
-                                    'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-light-border/30 dark:border-dark-border/20 cursor-pointer hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all',
-                                    wizardUploadingFile && 'opacity-50 pointer-events-none',
-                                  ]"
+                                  class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
                                 >
-                                  <Icon
-                                    :icon="
-                                      wizardUploadingFile
-                                        ? 'heroicons:arrow-path'
-                                        : 'heroicons:arrow-up-tray'
-                                    "
-                                    :class="[
-                                      'w-3.5 h-3.5 txt-brand',
-                                      wizardUploadingFile && 'animate-spin',
-                                    ]"
-                                  />
-                                  {{
-                                    wizardUploadingFile
-                                      ? $t('widgets.detail.wizard.uploading')
-                                      : $t('widgets.detail.wizard.uploadFile')
-                                  }}
-                                  <input
-                                    type="file"
-                                    class="hidden"
-                                    accept=".pdf,.doc,.docx,.txt,.md,.csv,.xlsx"
-                                    @change="handleWizardFileUpload"
-                                  />
+                                  {{ $t('widgets.detail.wizard.label') }}
                                 </label>
-                                <button
-                                  type="button"
-                                  class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all"
-                                  @click="showWizardFilePicker = true"
-                                >
-                                  <Icon
-                                    icon="heroicons:folder-open"
-                                    class="w-3.5 h-3.5 txt-brand"
+                                <div class="flex gap-1.5">
+                                  <input
+                                    v-model="wizardLabel"
+                                    class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
                                   />
-                                  {{ $t('widgets.detail.wizard.fromFileManager') }}
+                                  <button
+                                    type="button"
+                                    :disabled="!wizardLabel.trim() || enhancingField === 'label'"
+                                    class="px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                                    :title="$t('widgets.detail.wizard.aiEnhance')"
+                                    @click="enhanceField('label')"
+                                  >
+                                    <Icon
+                                      :icon="
+                                        enhancingField === 'label'
+                                          ? 'heroicons:arrow-path'
+                                          : 'heroicons:sparkles'
+                                      "
+                                      :class="[
+                                        'w-4 h-4 txt-brand',
+                                        enhancingField === 'label' && 'animate-spin',
+                                      ]"
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+                              <div class="relative">
+                                <label
+                                  class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                                >
+                                  {{ $t('widgets.detail.wizard.details') }}
+                                </label>
+                                <div class="flex gap-1.5">
+                                  <textarea
+                                    v-model="wizardDetails"
+                                    rows="2"
+                                    :placeholder="
+                                      $t(
+                                        `widgets.detail.wizard.detailsPlaceholder.${activeWizard.key}`
+                                      )
+                                    "
+                                    class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  />
+                                  <button
+                                    type="button"
+                                    :disabled="
+                                      !wizardDetails.trim() || enhancingField === 'details'
+                                    "
+                                    class="self-start px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                                    :title="$t('widgets.detail.wizard.aiEnhance')"
+                                    @click="enhanceField('details')"
+                                  >
+                                    <Icon
+                                      :icon="
+                                        enhancingField === 'details'
+                                          ? 'heroicons:arrow-path'
+                                          : 'heroicons:sparkles'
+                                      "
+                                      :class="[
+                                        'w-4 h-4 txt-brand',
+                                        enhancingField === 'details' && 'animate-spin',
+                                      ]"
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+                              <div class="flex justify-end gap-2">
+                                <button
+                                  class="px-3 py-1.5 rounded-xl text-xs font-medium txt-secondary hover:txt-primary transition-colors"
+                                  @click="cancelWizard"
+                                >
+                                  {{ $t('widgets.detail.wizard.cancel') }}
+                                </button>
+                                <button
+                                  :disabled="!wizardLabel.trim()"
+                                  class="px-4 py-1.5 rounded-xl text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
+                                  @click="confirmWizard"
+                                >
+                                  {{ $t('widgets.detail.wizard.create') }}
                                 </button>
                               </div>
                             </div>
+                          </Transition>
 
-                            <div class="flex justify-end gap-2">
-                              <button
-                                class="px-3 py-1.5 rounded-xl text-xs font-medium txt-secondary hover:txt-primary transition-colors"
-                                @click="cancelWizard"
-                              >
-                                {{ $t('widgets.detail.wizard.cancel') }}
-                              </button>
-                              <button
-                                :disabled="!wizardLabel.trim()"
-                                class="px-4 py-1.5 rounded-xl text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
-                                @click="confirmWizard"
-                              >
-                                {{ $t('widgets.detail.wizard.create') }}
-                              </button>
-                            </div>
-                          </div>
-                        </Transition>
-
-                        <!-- Source type templates (always visible) -->
-                        <div :class="['pt-1', responses.length === 0 && 'pt-0']">
-                          <p
-                            v-if="responses.length === 0"
-                            class="text-xs txt-secondary opacity-70 mb-2"
-                          >
-                            {{ $t('widgets.detail.responsesEmptyHint') }}
-                          </p>
-                          <div
-                            :class="[
-                              'grid gap-2',
-                              responses.length > 0 ? 'grid-cols-3' : 'grid-cols-2',
-                            ]"
-                          >
+                          <!-- Template quick-add buttons (always visible) -->
+                          <div :class="['space-y-1.5', triggers.length > 0 && 'pt-1']">
+                            <p
+                              v-if="triggers.length === 0"
+                              class="text-xs txt-secondary opacity-70 mb-2"
+                            >
+                              {{ $t('widgets.detail.triggersEmptyHint') }}
+                            </p>
                             <button
-                              v-for="tpl in responseTemplates"
+                              v-for="tpl in triggerTemplates"
                               :key="tpl.key"
                               :class="[
-                                'flex flex-col items-center gap-1.5 rounded-xl border transition-all duration-200 group/tpl',
-                                responses.length > 0
+                                'w-full flex items-center gap-3 rounded-xl border transition-all duration-200 group/tpl text-left',
+                                triggers.length > 0
                                   ? 'p-2 border-transparent hover:border-light-border/20 dark:hover:border-dark-border/15 hover:bg-[var(--brand)]/5'
-                                  : 'p-4 border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 hover:scale-[1.03]',
+                                  : 'p-3 border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5',
                               ]"
-                              @click="openWizard('response', tpl.key)"
+                              @click="openWizard('trigger', tpl.key)"
                             >
                               <span
                                 :class="[
-                                  'rounded-xl flex items-center justify-center',
-                                  responses.length > 0 ? 'w-7 h-7' : 'w-10 h-10',
+                                  'rounded-lg flex items-center justify-center flex-shrink-0',
+                                  triggers.length > 0 ? 'w-6 h-6' : 'w-8 h-8',
                                   tpl.bg,
                                 ]"
                               >
                                 <Icon
                                   :icon="tpl.icon"
-                                  :class="[
-                                    responses.length > 0 ? 'w-3.5 h-3.5' : 'w-5 h-5',
-                                    tpl.color,
-                                  ]"
+                                  :class="[triggers.length > 0 ? 'w-3 h-3' : 'w-4 h-4', tpl.color]"
                                 />
                               </span>
-                              <span
-                                :class="[
-                                  'font-medium txt-primary',
-                                  responses.length > 0 ? 'text-[10px]' : 'text-xs',
-                                ]"
-                              >
-                                {{ $t(`widgets.detail.responseTemplates.${tpl.key}`) }}
-                              </span>
+                              <div class="flex-1 min-w-0">
+                                <p
+                                  :class="[
+                                    'font-medium txt-primary truncate',
+                                    triggers.length > 0 ? 'text-xs' : 'text-sm',
+                                  ]"
+                                >
+                                  {{ $t(`widgets.detail.triggerTemplates.${tpl.key}`) }}
+                                </p>
+                                <p
+                                  v-if="triggers.length === 0"
+                                  class="text-[11px] txt-secondary truncate"
+                                >
+                                  {{ $t(`widgets.detail.triggerTemplateHints.${tpl.key}`) }}
+                                </p>
+                              </div>
+                              <Icon
+                                icon="heroicons:plus-circle"
+                                class="w-4 h-4 txt-secondary opacity-0 group-hover/tpl:opacity-100 transition-opacity flex-shrink-0"
+                              />
                             </button>
                           </div>
+
+                          <!-- Manual add -->
+                          <form class="flex gap-2" @submit.prevent="addTrigger">
+                            <input
+                              v-model="newTriggerText"
+                              :placeholder="$t('widgets.detail.addTrigger')"
+                              class="flex-1 min-w-0 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            />
+                            <button
+                              type="submit"
+                              :disabled="!newTriggerText.trim()"
+                              class="px-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <Icon icon="heroicons:plus" class="w-4 h-4" />
+                            </button>
+                          </form>
                         </div>
 
-                        <!-- Manual add -->
-                        <form class="flex gap-2" @submit.prevent="addResponse">
-                          <input
-                            v-model="newResponseText"
-                            :placeholder="$t('widgets.detail.addResponse')"
-                            class="flex-1 min-w-0 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
-                          />
-                          <button
-                            type="submit"
-                            :disabled="!newResponseText.trim()"
-                            class="px-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        <!-- RIGHT: Responses / Sources -->
+                        <div class="flex-1 space-y-3">
+                          <p
+                            class="text-[11px] font-bold uppercase tracking-widest txt-secondary mb-1"
                           >
-                            <Icon icon="heroicons:plus" class="w-4 h-4" />
-                          </button>
-                        </form>
+                            {{ $t('widgets.detail.responsesLabel') }}
+                          </p>
+
+                          <!-- Existing response cards -->
+                          <template v-for="response in responses" :key="response.id">
+                            <!-- Edit mode -->
+                            <FlowNodeEditor
+                              v-if="editingNodeId === response.id"
+                              :node="response"
+                              node-type="response"
+                              @save="handleNodeSave($event, 'response')"
+                              @cancel="cancelEditing"
+                            />
+                            <!-- Display mode -->
+                            <div
+                              v-else
+                              :ref="(el) => setRef('response', response.id, el)"
+                              :class="[
+                                'group relative pl-5 rounded-xl border-2 transition-all duration-200',
+                                selectedTriggerId
+                                  ? isConnected(selectedTriggerId, response.id)
+                                    ? 'border-[var(--brand)] bg-[var(--brand)]/5 shadow-lg shadow-[var(--brand)]/10 cursor-pointer'
+                                    : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 cursor-pointer hover:scale-[1.01]'
+                                  : hasConnectionTo(response.id)
+                                    ? 'border-[var(--brand)]/30 bg-[var(--brand)]/[0.02]'
+                                    : 'border-light-border/30 dark:border-dark-border/20',
+                              ]"
+                              @click="handleResponseClick(response.id)"
+                            >
+                              <span
+                                :class="[
+                                  'absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-20 transition-all',
+                                  selectedTriggerId && isConnected(selectedTriggerId, response.id)
+                                    ? 'border-[var(--brand)] bg-[var(--brand)] scale-125'
+                                    : selectedTriggerId
+                                      ? 'border-[var(--brand)]/40 bg-white dark:bg-gray-800 animate-pulse'
+                                      : hasConnectionTo(response.id)
+                                        ? 'border-[var(--brand)] bg-[var(--brand)]/50'
+                                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
+                                ]"
+                              />
+                              <div class="flex items-center justify-between gap-2 px-3 py-2.5">
+                                <div class="flex items-center gap-2 flex-1 min-w-0">
+                                  <span
+                                    :class="[
+                                      'w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0',
+                                      getResponseTypeInfo(response).bg,
+                                    ]"
+                                  >
+                                    <Icon
+                                      :icon="getResponseTypeInfo(response).icon"
+                                      :class="['w-3.5 h-3.5', getResponseTypeInfo(response).color]"
+                                    />
+                                  </span>
+                                  <div class="flex-1 min-w-0">
+                                    <span class="text-xs font-semibold txt-primary block truncate">
+                                      {{ splitLabel(response.label).title }}
+                                    </span>
+                                    <span
+                                      v-if="response.meta?.url && expandedNodeId !== response.id"
+                                      class="text-[11px] text-blue-500 truncate block mt-0.5 hover:underline"
+                                      @click.stop="toggleExpand(response.id)"
+                                    >
+                                      {{ response.meta.url }}
+                                    </span>
+                                    <span
+                                      v-else-if="
+                                        splitLabel(response.label).preview &&
+                                        expandedNodeId !== response.id
+                                      "
+                                      class="text-[11px] txt-secondary truncate block mt-0.5"
+                                      @click.stop="toggleExpand(response.id)"
+                                    >
+                                      {{ splitLabel(response.label).preview.substring(0, 50)
+                                      }}{{
+                                        splitLabel(response.label).preview.length > 50 ? '...' : ''
+                                      }}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div class="flex items-center gap-0.5 flex-shrink-0">
+                                  <button
+                                    class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary"
+                                    @click.stop="startEditing(response.id)"
+                                  >
+                                    <Icon icon="heroicons:pencil-square" class="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500"
+                                    @click.stop="removeResponse(response.id)"
+                                  >
+                                    <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                              <!-- Expanded content -->
+                              <div
+                                v-if="expandedNodeId === response.id"
+                                class="px-3 pb-2.5 border-t border-light-border/20 dark:border-dark-border/10"
+                                @click.stop
+                              >
+                                <p
+                                  class="text-[11px] txt-secondary pt-2 whitespace-pre-wrap break-words"
+                                >
+                                  {{ response.label }}
+                                </p>
+                                <a
+                                  v-if="response.meta?.url"
+                                  :href="response.meta.url"
+                                  target="_blank"
+                                  rel="noopener"
+                                  class="inline-flex items-center gap-1 text-[11px] text-blue-500 hover:underline mt-1"
+                                  @click.stop
+                                >
+                                  <Icon
+                                    icon="heroicons:arrow-top-right-on-square"
+                                    class="w-3 h-3"
+                                  />
+                                  {{ response.meta.url }}
+                                </a>
+                              </div>
+                            </div>
+                          </template>
+
+                          <!-- Response wizard form -->
+                          <Transition
+                            enter-active-class="transition-all duration-300 ease-out"
+                            enter-from-class="opacity-0 -translate-y-2 scale-95"
+                            enter-to-class="opacity-100 translate-y-0 scale-100"
+                            leave-active-class="transition-all duration-200 ease-in"
+                            leave-from-class="opacity-100 translate-y-0 scale-100"
+                            leave-to-class="opacity-0 -translate-y-2 scale-95"
+                          >
+                            <div
+                              v-if="activeWizard?.side === 'response'"
+                              class="rounded-xl border-2 border-[var(--brand)]/30 bg-[var(--brand)]/[0.03] p-4 space-y-3"
+                            >
+                              <div class="relative">
+                                <label
+                                  class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                                >
+                                  {{ $t('widgets.detail.wizard.label') }}
+                                </label>
+                                <div class="flex gap-1.5">
+                                  <input
+                                    v-model="wizardLabel"
+                                    class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  />
+                                  <button
+                                    type="button"
+                                    :disabled="!wizardLabel.trim() || enhancingField === 'label'"
+                                    class="px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                                    :title="$t('widgets.detail.wizard.aiEnhance')"
+                                    @click="enhanceField('label')"
+                                  >
+                                    <Icon
+                                      :icon="
+                                        enhancingField === 'label'
+                                          ? 'heroicons:arrow-path'
+                                          : 'heroicons:sparkles'
+                                      "
+                                      :class="[
+                                        'w-4 h-4 txt-brand',
+                                        enhancingField === 'label' && 'animate-spin',
+                                      ]"
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <!-- Type-specific fields -->
+                              <div v-if="activeWizard.key === 'link'" class="relative">
+                                <label
+                                  class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                                >
+                                  {{ $t('widgets.detail.wizard.url') }}
+                                </label>
+                                <input
+                                  v-model="wizardUrl"
+                                  placeholder="https://..."
+                                  class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                />
+                              </div>
+
+                              <template v-if="activeWizard.key === 'api'">
+                                <div class="relative">
+                                  <label
+                                    class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                                  >
+                                    {{ $t('widgets.detail.wizard.endpoint') }}
+                                  </label>
+                                  <input
+                                    v-model="wizardUrl"
+                                    placeholder="https://api.example.com/v1/..."
+                                    class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  />
+                                </div>
+                                <div class="relative">
+                                  <label
+                                    class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                                  >
+                                    {{ $t('widgets.detail.wizard.method') }}
+                                  </label>
+                                  <select
+                                    v-model="wizardMethod"
+                                    class="w-full px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  >
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="PUT">PUT</option>
+                                  </select>
+                                </div>
+                              </template>
+
+                              <div
+                                v-if="
+                                  activeWizard.key === 'text' ||
+                                  activeWizard.key === 'list' ||
+                                  activeWizard.key === 'custom'
+                                "
+                                class="relative"
+                              >
+                                <label
+                                  class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                                >
+                                  {{ $t('widgets.detail.wizard.details') }}
+                                </label>
+                                <div class="flex gap-1.5">
+                                  <textarea
+                                    v-model="wizardDetails"
+                                    rows="3"
+                                    :placeholder="
+                                      $t(
+                                        `widgets.detail.wizard.detailsPlaceholder.${activeWizard.key}`
+                                      )
+                                    "
+                                    class="flex-1 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-none focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                                  />
+                                  <button
+                                    type="button"
+                                    :disabled="
+                                      !wizardDetails.trim() || enhancingField === 'details'
+                                    "
+                                    class="self-start px-2.5 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all disabled:opacity-30"
+                                    :title="$t('widgets.detail.wizard.aiEnhance')"
+                                    @click="enhanceField('details')"
+                                  >
+                                    <Icon
+                                      :icon="
+                                        enhancingField === 'details'
+                                          ? 'heroicons:arrow-path'
+                                          : 'heroicons:sparkles'
+                                      "
+                                      :class="[
+                                        'w-4 h-4 txt-brand',
+                                        enhancingField === 'details' && 'animate-spin',
+                                      ]"
+                                    />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div v-if="activeWizard.key === 'pdf'" class="space-y-2">
+                                <label
+                                  class="block text-[10px] font-bold uppercase tracking-widest txt-secondary mb-1"
+                                >
+                                  {{ $t('widgets.detail.wizard.files') }}
+                                </label>
+
+                                <!-- Attached files list -->
+                                <div
+                                  v-for="wf in wizardFiles"
+                                  :key="wf.messageId"
+                                  class="flex items-center gap-2 p-2 rounded-lg bg-gray-50 dark:bg-white/5 border border-light-border/15 dark:border-dark-border/10"
+                                >
+                                  <Icon
+                                    icon="heroicons:document"
+                                    class="w-4 h-4 txt-brand flex-shrink-0"
+                                  />
+                                  <span class="flex-1 text-xs txt-primary truncate">{{
+                                    wf.fileName
+                                  }}</span>
+                                  <button
+                                    type="button"
+                                    class="p-0.5 txt-secondary hover:text-red-500 transition-colors"
+                                    @click="removeWizardFile(wf.messageId)"
+                                  >
+                                    <Icon icon="heroicons:x-mark" class="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                <p
+                                  v-if="wizardFiles.length === 0"
+                                  class="text-xs txt-secondary opacity-60 py-1"
+                                >
+                                  {{ $t('widgets.detail.wizard.noFilesYet') }}
+                                </p>
+
+                                <!-- Upload + File manager buttons -->
+                                <div class="flex gap-2">
+                                  <label
+                                    :class="[
+                                      'flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-light-border/30 dark:border-dark-border/20 cursor-pointer hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all',
+                                      wizardUploadingFile && 'opacity-50 pointer-events-none',
+                                    ]"
+                                  >
+                                    <Icon
+                                      :icon="
+                                        wizardUploadingFile
+                                          ? 'heroicons:arrow-path'
+                                          : 'heroicons:arrow-up-tray'
+                                      "
+                                      :class="[
+                                        'w-3.5 h-3.5 txt-brand',
+                                        wizardUploadingFile && 'animate-spin',
+                                      ]"
+                                    />
+                                    {{
+                                      wizardUploadingFile
+                                        ? $t('widgets.detail.wizard.uploading')
+                                        : $t('widgets.detail.wizard.uploadFile')
+                                    }}
+                                    <input
+                                      type="file"
+                                      class="hidden"
+                                      accept=".pdf,.doc,.docx,.txt,.md,.csv,.xlsx"
+                                      @change="handleWizardFileUpload"
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 transition-all"
+                                    @click="showWizardFilePicker = true"
+                                  >
+                                    <Icon
+                                      icon="heroicons:folder-open"
+                                      class="w-3.5 h-3.5 txt-brand"
+                                    />
+                                    {{ $t('widgets.detail.wizard.fromFileManager') }}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div class="flex justify-end gap-2">
+                                <button
+                                  class="px-3 py-1.5 rounded-xl text-xs font-medium txt-secondary hover:txt-primary transition-colors"
+                                  @click="cancelWizard"
+                                >
+                                  {{ $t('widgets.detail.wizard.cancel') }}
+                                </button>
+                                <button
+                                  :disabled="!wizardLabel.trim()"
+                                  class="px-4 py-1.5 rounded-xl text-xs font-medium bg-[var(--brand)] text-white hover:opacity-90 transition-opacity disabled:opacity-30"
+                                  @click="confirmWizard"
+                                >
+                                  {{ $t('widgets.detail.wizard.create') }}
+                                </button>
+                              </div>
+                            </div>
+                          </Transition>
+
+                          <!-- Source type templates (always visible) -->
+                          <div :class="['pt-1', responses.length === 0 && 'pt-0']">
+                            <p
+                              v-if="responses.length === 0"
+                              class="text-xs txt-secondary opacity-70 mb-2"
+                            >
+                              {{ $t('widgets.detail.responsesEmptyHint') }}
+                            </p>
+                            <div
+                              :class="[
+                                'grid gap-2',
+                                responses.length > 0 ? 'grid-cols-3' : 'grid-cols-2',
+                              ]"
+                            >
+                              <button
+                                v-for="tpl in responseTemplates"
+                                :key="tpl.key"
+                                :class="[
+                                  'flex flex-col items-center gap-1.5 rounded-xl border transition-all duration-200 group/tpl',
+                                  responses.length > 0
+                                    ? 'p-2 border-transparent hover:border-light-border/20 dark:hover:border-dark-border/15 hover:bg-[var(--brand)]/5'
+                                    : 'p-4 border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/40 hover:bg-[var(--brand)]/5 hover:scale-[1.03]',
+                                ]"
+                                @click="openWizard('response', tpl.key)"
+                              >
+                                <span
+                                  :class="[
+                                    'rounded-xl flex items-center justify-center',
+                                    responses.length > 0 ? 'w-7 h-7' : 'w-10 h-10',
+                                    tpl.bg,
+                                  ]"
+                                >
+                                  <Icon
+                                    :icon="tpl.icon"
+                                    :class="[
+                                      responses.length > 0 ? 'w-3.5 h-3.5' : 'w-5 h-5',
+                                      tpl.color,
+                                    ]"
+                                  />
+                                </span>
+                                <span
+                                  :class="[
+                                    'font-medium txt-primary',
+                                    responses.length > 0 ? 'text-[10px]' : 'text-xs',
+                                  ]"
+                                >
+                                  {{ $t(`widgets.detail.responseTemplates.${tpl.key}`) }}
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <!-- Manual add -->
+                          <form class="flex gap-2" @submit.prevent="addResponse">
+                            <input
+                              v-model="newResponseText"
+                              :placeholder="$t('widgets.detail.addResponse')"
+                              class="flex-1 min-w-0 px-3 py-2 rounded-xl text-sm border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/40"
+                            />
+                            <button
+                              type="submit"
+                              :disabled="!newResponseText.trim()"
+                              class="px-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <Icon icon="heroicons:plus" class="w-4 h-4" />
+                            </button>
+                          </form>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </section>
+                  </section>
 
-                <!-- Knowledge & Sources -->
-                <section data-testid="section-knowledge">
-                  <h2 class="text-lg font-bold txt-primary mb-1 flex items-center gap-2">
-                    <Icon icon="heroicons:book-open" class="w-5 h-5 txt-brand" />
-                    {{ $t('widgets.detail.knowledge.title') }}
-                  </h2>
-                  <p class="text-sm txt-secondary mb-3">
-                    {{ $t('widgets.detail.knowledge.description') }}
-                  </p>
+                  <!-- Knowledge & Sources -->
+                  <section data-testid="section-knowledge">
+                    <h2 class="text-lg font-bold txt-primary mb-1 flex items-center gap-2">
+                      <Icon icon="heroicons:book-open" class="w-5 h-5 txt-brand" />
+                      {{ $t('widgets.detail.knowledge.title') }}
+                    </h2>
+                    <p class="text-sm txt-secondary mb-3">
+                      {{ $t('widgets.detail.knowledge.description') }}
+                    </p>
 
-                  <!-- Linked files -->
-                  <div v-if="promptFiles.length > 0" class="space-y-2 mb-3">
-                    <div
-                      v-for="file in promptFiles"
-                      :key="file.id"
-                      class="flex items-center gap-3 p-2.5 rounded-lg surface-chip"
-                      data-testid="knowledge-file"
-                    >
-                      <Icon icon="heroicons:document" class="w-5 h-5 txt-secondary flex-shrink-0" />
-                      <span class="flex-1 min-w-0 text-sm txt-primary truncate">
-                        {{ file.fileName }}
-                      </span>
-                      <span v-if="file.chunks > 0" class="text-xs txt-secondary flex-shrink-0">
-                        {{ $t('widgets.detail.knowledge.chunks', { count: file.chunks }) }}
-                      </span>
+                    <!-- Linked files -->
+                    <div v-if="promptFiles.length > 0" class="space-y-2 mb-3">
+                      <div
+                        v-for="file in promptFiles"
+                        :key="file.id"
+                        class="flex items-center gap-3 p-2.5 rounded-lg surface-chip"
+                        data-testid="knowledge-file"
+                      >
+                        <Icon
+                          icon="heroicons:document"
+                          class="w-5 h-5 txt-secondary flex-shrink-0"
+                        />
+                        <span class="flex-1 min-w-0 text-sm txt-primary truncate">
+                          {{ file.fileName }}
+                        </span>
+                        <span v-if="file.chunks > 0" class="text-xs txt-secondary flex-shrink-0">
+                          {{ $t('widgets.detail.knowledge.chunks', { count: file.chunks }) }}
+                        </span>
+                        <button
+                          type="button"
+                          class="p-1.5 rounded-xl hover:bg-red-500/10 transition-colors flex-shrink-0"
+                          :aria-label="$t('widgets.detail.knowledge.remove')"
+                          data-testid="btn-remove-knowledge-file"
+                          @click="removeKnowledgeFile(file)"
+                        >
+                          <Icon icon="heroicons:x-mark" class="w-4 h-4 text-red-500" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Empty state -->
+                    <div v-else class="text-center py-4 surface-chip rounded-lg mb-3">
+                      <Icon
+                        icon="heroicons:document-text"
+                        class="w-7 h-7 txt-secondary mx-auto mb-1 opacity-50"
+                      />
+                      <p class="text-sm txt-secondary">
+                        {{ $t('widgets.detail.knowledge.empty') }}
+                      </p>
+                    </div>
+
+                    <!-- Add sources -->
+                    <div class="flex flex-col sm:flex-row gap-2">
+                      <label
+                        class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-lg cursor-pointer border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+                        :class="{ 'opacity-60 pointer-events-none': knowledgeUploading }"
+                      >
+                        <Icon
+                          v-if="knowledgeUploading"
+                          icon="heroicons:arrow-path"
+                          class="w-4 h-4 txt-secondary animate-spin"
+                        />
+                        <Icon
+                          v-else
+                          icon="heroicons:cloud-arrow-up"
+                          class="w-4 h-4 txt-secondary"
+                        />
+                        <span class="text-sm font-medium txt-brand">
+                          {{
+                            knowledgeUploading
+                              ? $t('widgets.detail.wizard.uploading')
+                              : $t('widgets.detail.knowledge.upload')
+                          }}
+                        </span>
+                        <input
+                          type="file"
+                          class="hidden"
+                          accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
+                          multiple
+                          :disabled="knowledgeUploading"
+                          data-testid="input-knowledge-upload"
+                          @change="handleKnowledgeUpload"
+                        />
+                      </label>
                       <button
                         type="button"
-                        class="p-1.5 rounded-xl hover:bg-red-500/10 transition-colors flex-shrink-0"
-                        :aria-label="$t('widgets.detail.knowledge.remove')"
-                        data-testid="btn-remove-knowledge-file"
-                        @click="removeKnowledgeFile(file)"
+                        class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-xl border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+                        data-testid="btn-pick-knowledge-files"
+                        @click="showKnowledgeFilePicker = true"
                       >
-                        <Icon icon="heroicons:x-mark" class="w-4 h-4 text-red-500" />
+                        <Icon icon="heroicons:folder-open" class="w-4 h-4 txt-secondary" />
+                        <span class="text-sm font-medium txt-brand">
+                          {{ $t('widgets.detail.knowledge.pick') }}
+                        </span>
                       </button>
                     </div>
-                  </div>
+                  </section>
 
-                  <!-- Empty state -->
-                  <div v-else class="text-center py-4 surface-chip rounded-lg mb-3">
-                    <Icon
-                      icon="heroicons:document-text"
-                      class="w-7 h-7 txt-secondary mx-auto mb-1 opacity-50"
-                    />
-                    <p class="text-sm txt-secondary">
-                      {{ $t('widgets.detail.knowledge.empty') }}
-                    </p>
-                  </div>
+                  <WidgetAssistantBinding
+                    v-if="widget"
+                    :widget="widget"
+                    @updated="onWidgetAssistantUpdated"
+                  />
 
-                  <!-- Add sources -->
-                  <div class="flex flex-col sm:flex-row gap-2">
-                    <label
-                      class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-lg cursor-pointer border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
-                      :class="{ 'opacity-60 pointer-events-none': knowledgeUploading }"
+                  <!-- Expert: Prompt -->
+                  <details class="group">
+                    <summary
+                      class="cursor-pointer text-sm font-medium txt-secondary hover:txt-primary transition-colors inline-flex items-center gap-2 select-none"
                     >
                       <Icon
-                        v-if="knowledgeUploading"
-                        icon="heroicons:arrow-path"
-                        class="w-4 h-4 txt-secondary animate-spin"
+                        icon="heroicons:chevron-right"
+                        class="w-4 h-4 transition-transform group-open:rotate-90"
                       />
-                      <Icon v-else icon="heroicons:cloud-arrow-up" class="w-4 h-4 txt-secondary" />
-                      <span class="text-sm font-medium txt-brand">
-                        {{
-                          knowledgeUploading
-                            ? $t('widgets.detail.wizard.uploading')
-                            : $t('widgets.detail.knowledge.upload')
-                        }}
-                      </span>
-                      <input
-                        type="file"
-                        class="hidden"
-                        accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
-                        multiple
-                        :disabled="knowledgeUploading"
-                        data-testid="input-knowledge-upload"
-                        @change="handleKnowledgeUpload"
+                      {{ $t('widgets.detail.expertPrompt') }}
+                    </summary>
+                    <div class="mt-3">
+                      <textarea
+                        v-model="manualPromptContent"
+                        rows="8"
+                        class="w-full px-4 py-3 rounded-xl border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-y focus:outline-none focus:ring-2 focus:ring-[var(--brand)] text-sm font-mono"
                       />
-                    </label>
+                    </div>
+                  </details>
+
+                  <!-- Auto-save indicator -->
+                  <div class="flex items-center justify-between pt-2 pb-8">
+                    <div class="flex items-center gap-2 text-xs">
+                      <template v-if="autoSaveStatus === 'saving'">
+                        <Icon
+                          icon="heroicons:arrow-path"
+                          class="w-3.5 h-3.5 animate-spin txt-secondary"
+                        />
+                        <span class="txt-secondary">{{ $t('common.saving') }}…</span>
+                      </template>
+                      <template v-else-if="autoSaveStatus === 'saved'">
+                        <Icon icon="heroicons:check-circle" class="w-3.5 h-3.5 text-emerald-500" />
+                        <span class="text-emerald-600 dark:text-emerald-400">
+                          {{ $t('widgets.detail.autoSaved') }}
+                        </span>
+                      </template>
+                      <template v-else-if="autoSaveStatus === 'unsaved'">
+                        <Icon
+                          icon="heroicons:ellipsis-horizontal-circle"
+                          class="w-3.5 h-3.5 text-amber-500"
+                        />
+                        <span class="text-amber-600 dark:text-amber-400">
+                          {{ $t('widgets.detail.unsavedChanges') }}
+                        </span>
+                      </template>
+                    </div>
                     <button
-                      type="button"
-                      class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-dashed rounded-xl border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
-                      data-testid="btn-pick-knowledge-files"
-                      @click="showKnowledgeFilePicker = true"
+                      :disabled="saving || autoSaveStatus === 'saving'"
+                      class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-60 inline-flex items-center gap-2"
+                      @click="save"
                     >
-                      <Icon icon="heroicons:folder-open" class="w-4 h-4 txt-secondary" />
-                      <span class="text-sm font-medium txt-brand">
-                        {{ $t('widgets.detail.knowledge.pick') }}
-                      </span>
+                      <Icon
+                        v-if="saving"
+                        icon="heroicons:arrow-path"
+                        class="w-4 h-4 animate-spin"
+                      />
+                      <Icon v-else icon="heroicons:check" class="w-4 h-4" />
+                      {{ saving ? $t('common.saving') : $t('common.save') }}
                     </button>
                   </div>
-                </section>
-
-                <WidgetAssistantBinding
-                  v-if="widget"
-                  :widget="widget"
-                  @updated="onWidgetAssistantUpdated"
-                />
-
-                <!-- Expert: Prompt -->
-                <details class="group">
-                  <summary
-                    class="cursor-pointer text-sm font-medium txt-secondary hover:txt-primary transition-colors inline-flex items-center gap-2 select-none"
-                  >
-                    <Icon
-                      icon="heroicons:chevron-right"
-                      class="w-4 h-4 transition-transform group-open:rotate-90"
-                    />
-                    {{ $t('widgets.detail.expertPrompt') }}
-                  </summary>
-                  <div class="mt-3">
-                    <textarea
-                      v-model="manualPromptContent"
-                      rows="8"
-                      class="w-full px-4 py-3 rounded-xl border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary resize-y focus:outline-none focus:ring-2 focus:ring-[var(--brand)] text-sm font-mono"
-                    />
-                  </div>
-                </details>
-
-                <!-- Auto-save indicator -->
-                <div class="flex items-center justify-between pt-2 pb-8">
-                  <div class="flex items-center gap-2 text-xs">
-                    <template v-if="autoSaveStatus === 'saving'">
-                      <Icon
-                        icon="heroicons:arrow-path"
-                        class="w-3.5 h-3.5 animate-spin txt-secondary"
-                      />
-                      <span class="txt-secondary">{{ $t('common.saving') }}…</span>
-                    </template>
-                    <template v-else-if="autoSaveStatus === 'saved'">
-                      <Icon icon="heroicons:check-circle" class="w-3.5 h-3.5 text-emerald-500" />
-                      <span class="text-emerald-600 dark:text-emerald-400">
-                        {{ $t('widgets.detail.autoSaved') }}
-                      </span>
-                    </template>
-                    <template v-else-if="autoSaveStatus === 'unsaved'">
-                      <Icon
-                        icon="heroicons:ellipsis-horizontal-circle"
-                        class="w-3.5 h-3.5 text-amber-500"
-                      />
-                      <span class="text-amber-600 dark:text-amber-400">
-                        {{ $t('widgets.detail.unsavedChanges') }}
-                      </span>
-                    </template>
-                  </div>
-                  <button
-                    :disabled="saving || autoSaveStatus === 'saving'"
-                    class="btn-primary px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-60 inline-flex items-center gap-2"
-                    @click="save"
-                  >
-                    <Icon v-if="saving" icon="heroicons:arrow-path" class="w-4 h-4 animate-spin" />
-                    <Icon v-else icon="heroicons:check" class="w-4 h-4" />
-                    {{ saving ? $t('common.saving') : $t('common.save') }}
-                  </button>
                 </div>
               </div>
-            </div>
 
-            <!-- Right: AI Setup Assistant (desktop side panel, opt-in via header toggle) -->
-            <div
-              v-if="showAiPanel"
-              class="hidden lg:flex lg:w-[30%] lg:flex-shrink-0 border-l border-light-border/30 dark:border-dark-border/20 p-4"
-            >
-              <WidgetAiSetupPanel
-                v-if="widget"
-                :widget-id="widget.widgetId"
-                :current-flow="currentFlowSnapshot"
-                @update-flow="handleAiFlowUpdate"
-                @update-widget-name="handleWidgetNameUpdate"
-                @open-settings="openAdvancedModal"
-              />
-            </div>
-
-            <!-- Mobile: AI Panel bottom sheet (opt-in via header toggle) -->
-            <Transition
-              enter-active-class="transition-transform duration-300 ease-out"
-              enter-from-class="translate-y-full"
-              enter-to-class="translate-y-0"
-              leave-active-class="transition-transform duration-200 ease-in"
-              leave-from-class="translate-y-0"
-              leave-to-class="translate-y-full"
-            >
+              <!-- Right: AI Setup Assistant (desktop side panel, opt-in via header toggle) -->
               <div
-                v-if="showAiPanel && widget"
-                class="lg:hidden fixed inset-x-0 bottom-0 z-30 h-[75vh] bg-chat rounded-t-2xl shadow-2xl p-4"
+                v-if="showAiPanel"
+                class="hidden lg:flex lg:w-[30%] lg:flex-shrink-0 border-l border-light-border/30 dark:border-dark-border/20 p-4"
               >
                 <WidgetAiSetupPanel
+                  v-if="widget"
                   :widget-id="widget.widgetId"
                   :current-flow="currentFlowSnapshot"
                   @update-flow="handleAiFlowUpdate"
@@ -1203,7 +1205,30 @@
                   @open-settings="openAdvancedModal"
                 />
               </div>
-            </Transition>
+
+              <!-- Mobile: AI Panel bottom sheet (opt-in via header toggle) -->
+              <Transition
+                enter-active-class="transition-transform duration-300 ease-out"
+                enter-from-class="translate-y-full"
+                enter-to-class="translate-y-0"
+                leave-active-class="transition-transform duration-200 ease-in"
+                leave-from-class="translate-y-0"
+                leave-to-class="translate-y-full"
+              >
+                <div
+                  v-if="showAiPanel && widget"
+                  class="lg:hidden fixed inset-x-0 bottom-0 z-30 h-[75vh] bg-chat rounded-t-2xl shadow-2xl p-4"
+                >
+                  <WidgetAiSetupPanel
+                    :widget-id="widget.widgetId"
+                    :current-flow="currentFlowSnapshot"
+                    @update-flow="handleAiFlowUpdate"
+                    @update-widget-name="handleWidgetNameUpdate"
+                    @open-settings="openAdvancedModal"
+                  />
+                </div>
+              </Transition>
+            </div>
           </div>
         </div>
       </div>

@@ -307,7 +307,7 @@ make up
 - **Synaplan Desktop** — Pair a computer and run skills on it. Open **Channels → Synaplan Desktop**. No installer yet ([synaplan-desktop](https://github.com/metadist/synaplan-desktop))
 - **AI assistants** — Saved recipes (instructions, knowledge folders, tools, triggers) that you publish in versions ([assistants](https://docs.synaplan.com/assistants))
 - **Tools & approvals** — One tool registry; write-class actions pause under **Approvals** ([tools](https://docs.synaplan.com/tools-and-approvals))
-- **People & groups** — Share folders, chats, assistants and tasks; **Operate → People** ([people](https://docs.synaplan.com/people-and-groups))
+- **Users & groups** — Share folders, chats, assistants and tasks; **Operate → Users** ([people](https://docs.synaplan.com/people-and-groups))
 - **File work** — Short Python or Node runs on *copies* of files you picked, in an isolated sidecar ([guide](docs/COMPUTE.md))
 - **Live Support** — Realtime WebSocket layer (Centrifugo + Redis): human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md))
 - **WhatsApp** — Meta Business API integration

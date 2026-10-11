@@ -58,22 +58,22 @@ defineProps<{
 }
 
 .sidebar-nav-link:hover {
-  background: rgba(0, 63, 199, 0.07);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
 }
 
 .sidebar-nav-link.is-active {
   color: var(--brand);
-  background: rgba(0, 63, 199, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(0, 63, 199, 0.14);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 22%, transparent);
 }
 
 .dark .sidebar-nav-link:hover {
-  background: rgba(107, 143, 214, 0.1);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
 }
 
 .dark .sidebar-nav-link.is-active {
-  background: rgba(107, 143, 214, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(107, 143, 214, 0.22);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 28%, transparent);
 }
 
 .sidebar-nav-link__icon {
@@ -86,25 +86,20 @@ defineProps<{
 }
 
 .sidebar-nav-link:hover .sidebar-nav-link__icon {
-  background: rgba(0, 63, 199, 0.12);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
   color: var(--brand);
 }
 
 .dark .sidebar-nav-link:hover .sidebar-nav-link__icon {
-  background: rgba(107, 143, 214, 0.18);
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
 }
 
-/* White on #003fc7 is 8.3:1. The dark-theme brand is a light blue, so it
-   takes dark ink instead (#0b1220 on #6d9ae0 is 6.5:1). */
+/* Ink follows --on-brand: white on the deep light-mode blue, near-black on
+   the light dark-mode and OLED accents. */
 .sidebar-nav-link.is-active .sidebar-nav-link__icon {
   background: var(--brand);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 63, 199, 0.3);
-}
-
-.dark .sidebar-nav-link.is-active .sidebar-nav-link__icon {
-  color: #0b1220;
-  box-shadow: 0 2px 10px rgba(109, 154, 224, 0.25);
+  color: var(--on-brand);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
 }
 
 .sidebar-nav-link:not(.is-active) .sidebar-nav-link__icon.is-danger {

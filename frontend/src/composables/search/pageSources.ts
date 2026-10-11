@@ -61,6 +61,12 @@ export function usePageSources() {
             icon: item.icon,
             synonymsKey: 'search.palette.synonyms.search_models',
           })
+          list.push({
+            path: '/admin/vectors',
+            label: String(t('pageTitles.vectorStorage')),
+            breadcrumb: `${breadcrumb} › ${child.label} › ${String(t('adminSetup.tabs.search'))}`,
+            icon: CircleStackIcon,
+          })
         }
       }
     }
@@ -93,12 +99,6 @@ export function usePageSources() {
         label: String(t('pageTitles.ragSearch')),
         breadcrumb: files,
         icon: DocumentMagnifyingGlassIcon,
-      },
-      {
-        path: '/files/vectors',
-        label: String(t('pageTitles.vectorStorage')),
-        breadcrumb: files,
-        icon: CircleStackIcon,
       }
     )
     if (configStore.features?.memoryService) {

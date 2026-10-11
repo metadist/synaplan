@@ -28,6 +28,49 @@ describe('Dialog prompt', () => {
     wrapper?.unmount()
   })
 
+  it('multiline Enter inserts a line, Save can resolve empty, and Escape cancels', async () => {
+    const pending = useDialog().prompt({
+      title: 'Tags',
+      message: 'Enter one tag per line.',
+      multiline: true,
+      defaultValue: 'alpha',
+    })
+    await nextTick()
+    await nextTick()
+
+    const input = document.querySelector(
+      '[data-testid="input-dialog-prompt"]'
+    ) as HTMLTextAreaElement | null
+    if (!input) {
+      throw new Error('missing prompt input')
+    }
+    expect(input.tagName).toBe('TEXTAREA')
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    )
+    expect(document.querySelector('[data-testid="modal-dialog"]')).not.toBeNull()
+
+    input.value = ''
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    click('btn-dialog-confirm')
+    await expect(pending).resolves.toBe('')
+
+    const cancelled = useDialog().prompt({
+      title: 'Tags',
+      message: 'Enter one tag per line.',
+      multiline: true,
+    })
+    await nextTick()
+    const again = document.querySelector(
+      '[data-testid="input-dialog-prompt"]'
+    ) as HTMLTextAreaElement | null
+    again?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+    await expect(cancelled).resolves.toBeNull()
+    wrapper?.unmount()
+  })
+
   it('resolves Cancel as null', async () => {
     const pending = useDialog().prompt({ title: 'Reject', message: 'Why?' })
     await nextTick()

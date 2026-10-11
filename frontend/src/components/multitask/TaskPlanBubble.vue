@@ -82,7 +82,7 @@ const onSchedule = async () => {
     })
     await savedTasksApi.create(prompt.id, name.trim(), props.sourceMessageId)
     success(t('config.savedTasks.scheduledFromChat'))
-    await router.push('/channels/tasks')
+    await router.push('/tasks')
   } catch {
     showError(t('config.savedTasks.createFailed'))
   } finally {

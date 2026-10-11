@@ -1,12 +1,12 @@
 {
   "liveSupport": {
     "title": "Live-Support",
-    "subtitle": "Antworten Sie Besuchern in Echtzeit",
+    "subtitle": "Besucher, die nach einem Menschen gefragt haben, warten hier. Antworte, um zu übernehmen; gib danach an die KI zurück.",
     "allWidgets": "Alle Widgets",
-    "waiting": "Wartend",
+    "waiting": "Wartet auf dich",
     "myChats": "Meine Chats",
     "active": "Aktiv",
-    "noSessions": "Keine wartenden Sitzungen",
+    "noSessions": "Gerade wartet niemand. Sobald jemand nach einem Menschen fragt, erscheint er hier.",
     "noMessages": "Noch keine Nachrichten",
     "chatWith": "Chat mit",
     "messagesCount": "Nachrichten",
@@ -16,7 +16,15 @@
     "typePlaceholder": "Nachricht eingeben...",
     "messageSent": "Nachricht gesendet",
     "visitor": "Besucher",
-    "you": "Sie"
+    "you": "Sie",
+    "noMine": "Du hast noch kein Gespräch übernommen. Antworte einem wartenden Besucher, um zu beginnen.",
+    "loadFailed": "Die Gespräche konnten nicht geladen werden. Besucher bekommen in der Zwischenzeit weiter KI-Antworten.",
+    "loadMessagesFailed": "Dieses Gespräch konnte nicht geöffnet werden. Versuche es gleich noch einmal.",
+    "sendFailed": "Deine Antwort wurde nicht gesendet, die KI antwortet weiter. Versuche es noch einmal.",
+    "sendFailedTakenOver": "Du hast das Gespräch übernommen, aber deine Antwort wurde nicht gesendet. Versuche es noch einmal.",
+    "handBackFailed": "Das Gespräch liegt weiter bei dir. Versuche noch einmal, es zurückzugeben.",
+    "backToList": "Zurück zu den Gesprächen",
+    "send": "Antwort senden"
   },
   "widgetSessions": {
     "title": "Sitzungen",
@@ -772,7 +780,15 @@
       "support": "Support"
     },
     "listTitle": "Chat-Widgets",
-    "listEmpty": "Noch keine Widgets. Erstellen Sie ein Chat-Widget, um zu beginnen."
+    "listEmpty": "Noch keine Widgets. Erstellen Sie ein Chat-Widget, um zu beginnen.",
+    "tabs": {
+      "widgets": "Widgets",
+      "conversations": "Gespräche"
+    },
+    "conversations": {
+      "noWidgetsTitle": "Noch keine Gespräche",
+      "noWidgetsHint": "Erstelle zuerst ein Chat-Widget. Wenn ein Besucher nach einem Menschen fragt, wartet das Gespräch hier auf dich."
+    }
   },
   "widget": {
     "title": "Chat Support",

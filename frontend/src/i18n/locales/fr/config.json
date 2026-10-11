@@ -5,8 +5,8 @@
       "description": "Configurez et gérez vos modèles IA",
       "tabs": {
         "choice": "Choix du modèle",
-        "list": "Liste complète",
-        "runs": "Exécutions vectorielles",
+        "list": "Tous les modèles",
+        "runs": "Exécutions d’embedding",
         "edit": "Modifier les modèles"
       },
       "defaultConfigTitle": "Configuration des modèles par défaut",
@@ -321,15 +321,15 @@
       }
     },
     "taskPrompts": {
-      "title": "Instructions IA",
-      "subtitle": "aussi appelées messages système — définissent comment l’IA traite chaque tâche",
+      "title": "Thèmes",
+      "subtitle": "Chaque thème indique à l’IA comment répondre à un type de demande. Pour chaque message, le thème adapté est choisi automatiquement.",
       "selectPrompt": "Sélectionner une instruction",
-      "selectPromptTitle": "Sélectionner une instruction",
-      "selectPromptDescription": "Choisissez une instruction existante à consulter ou à modifier",
+      "selectPromptTitle": "Choisissez un thème",
+      "selectPromptDescription": "Choisissez un thème à gauche pour le voir ou le modifier.",
       "selectPromptHelp": "Choisissez une instruction existante à modifier ou à utiliser comme modèle",
       "selectPlaceholder": "Sélectionnez une instruction de tâche…",
       "searchPlaceholder": "Rechercher des sujets, descriptions, mots-clés…",
-      "noPromptsMatch": "Aucune instruction ne correspond à la recherche ou au filtre actuel.",
+      "noPromptsMatch": "Aucun thème ne correspond à votre recherche.",
       "filterAll": "Toutes",
       "filterSystem": "Système",
       "filterCustom": "Personnalisées",
@@ -355,21 +355,21 @@
       "contentPlaceholder": "Saisissez votre message système ici…",
       "promptContentPlaceholder": "Saisissez le message système qui guidera le comportement de l’IA pour cette tâche…",
       "contentHelp": "C’est le message système qui guide le comportement de l’IA",
-      "createNew": "Créer une nouvelle instruction",
+      "createNew": "Nouveau thème",
       "loadTemplate": "Charger un modèle",
       "topic": "Sujet",
       "topicPlaceholder": "p. ex. analyseur-personnalise",
       "name": "Nom",
       "namePlaceholder": "p. ex. Analyseur de fichiers personnalisé",
-      "createButton": "Créer une nouvelle instruction",
+      "createButton": "Nouveau thème",
       "dangerZone": "Zone de danger",
       "deleteWarning": "La suppression de cette instruction est définitive et irréversible.",
       "deletePrompt": "Supprimer l’instruction",
       "saveChanges": "Enregistrer les modifications",
-      "noPrompts": "Aucune instruction disponible",
+      "noPrompts": "Pas encore de thèmes.",
       "language": "Langue",
       "workingLanguage": "Travail en : {language}",
-      "workingLanguageHint": "Les instructions affichées dépendent de la langue actuelle de l’interface. Les instructions personnalisées que vous créez n’apparaîtront que dans cette langue.",
+      "workingLanguageHint": "Les thèmes s’affichent dans la langue de l’interface. Ceux que vous créez n’apparaissent que dans cette langue.",
       "systemPromptAdminTitle": "Instruction système (modification admin)",
       "systemPromptAdminDesc": "Vous avez un accès administrateur. Les modifications mettront à jour cette instruction système pour TOUS les utilisateurs, dans toutes les langues.",
       "systemPromptLanguageFixed": "Instruction système — la langue est verrouillée sur la valeur d’origine et ne peut pas être changée.",
@@ -501,11 +501,10 @@
       "autoPauseBody": "Cette tâche a échoué trois fois de suite. Corrigez le problème, puis reprenez.",
       "createFailed": "Impossible d’enregistrer ceci comme tâche.",
       "created": "Enregistrée comme tâche. Vous pouvez la lancer maintenant.",
-      "overviewTitle": "Tâches enregistrées",
-      "overviewSubtitle": "Instructions qui s’exécutent quand vous le demandez, ou plus tard selon un planning.",
+      "overviewTitle": "Tâches",
+      "overviewSubtitle": "Des instructions qui s’exécutent à la demande ou toutes seules selon un horaire.",
       "overviewLoading": "Chargement des tâches enregistrées…",
-      "overviewEmpty": "Rien n’est encore planifié. Après un plan de chat, utilisez l’horloge — ou enregistrez une instruction personnalisée sous",
-      "overviewEmptyAssistants": "Rien n’est encore planifié. Après un plan de chat, utilisez l’horloge — ou ajoutez une planification à un assistant sous",
+      "overviewEmpty": "Pas encore de tâches. Créez-en une et laissez-la tourner chaque matin, par exemple.",
       "loadFailed": "Impossible de charger les tâches enregistrées.",
       "delete": "Supprimer",
       "deleteConfirm": "Supprimer la tâche enregistrée « {name} » ? Les partages de cette tâche sont aussi retirés.",
@@ -598,6 +597,22 @@
       "tabs": {
         "tasks": "Tâches enregistrées",
         "watches": "Pages surveillées"
+      },
+      "overviewEmptyHint": "Vous pouvez aussi enregistrer un plan de chat terminé comme tâche avec le bouton horloge.",
+      "newTask": {
+        "open": "Nouvelle tâche",
+        "title": "Nouvelle tâche",
+        "name": "Nom",
+        "namePlaceholder": "Résumé des actualités du matin",
+        "instruction": "Que doit faire l’IA ?",
+        "instructionPlaceholder": "Trouve les trois actualités les plus importantes de notre secteur et résume chacune en deux phrases.",
+        "schedule": "Quand",
+        "at": "À",
+        "hint": "Le résultat apparaît dans un chat dédié. Tout se modifie plus tard sur la fiche de la tâche.",
+        "create": "Créer la tâche",
+        "created": "Tâche créée.",
+        "createdWithoutSchedule": "La tâche a été créée, mais sans horaire. Réglez l’heure sur sa fiche.",
+        "failed": "La tâche n’a pas été créée. Rien n’a été enregistré ; réessayez."
       }
     },
     "connections": {
@@ -659,7 +674,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Connectez-vous avec votre compte Microsoft professionnel ou personnel pour que Synaplan puisse lire vos e-mails Outlook. Lecture seule, et vous pouvez déconnecter à tout moment.",
+          "description": "Connectez-vous avec votre compte Microsoft professionnel ou personnel. Synaplan lit votre messagerie Outlook, peut ajouter des événements au calendrier et envoyer des résultats depuis votre boîte. Vous pouvez vous déconnecter à tout moment.",
           "connect": "Connecter Microsoft 365",
           "connectAnother": "Connecter un autre compte",
           "connectedAs": "Connecté en tant que {account}.",
@@ -914,9 +929,9 @@
       "errorDeleting": "Échec de la suppression de la clé API",
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
       "scopes": {
-        "hint": "Laissez décoché pour un accès complet. Cocher Personnes limite cette clé. Le travail sur fichiers ajoute les portées chat et fichiers pour exécuter des scripts — pas d’accès administrateur.",
-        "iamRead": "Personnes — voir les groupes",
-        "iamManage": "Personnes — gérer les groupes",
+        "hint": "Laissez décoché pour un accès complet. Cocher Utilisateurs limite cette clé. Le travail sur fichiers ajoute les portées chat et fichiers pour exécuter des scripts — pas d’accès administrateur.",
+        "iamRead": "Utilisateurs — voir les groupes",
+        "iamManage": "Utilisateurs — gérer les groupes",
         "computeRun": "Travail sur fichiers — exécuter de courts scripts sur des copies de vos fichiers"
       }
     },
@@ -924,11 +939,11 @@
       "title": "Synaplan Desktop",
       "description": "Synaplan Desktop est une application distincte pour cet ordinateur. Elle utilise votre compte Synaplan et peut exécuter les skills que vous installez.",
       "chatGate": {
-        "gatewayAdmin": "L’application ne peut pas discuter tant que vous n’activez pas la passerelle IA sous Clients de codage et qu’une clé de fournisseur n’est pas disponible. L’association fonctionne toujours.",
-        "gatewayUser": "L’application ne peut pas discuter tant qu’un administrateur n’active pas la passerelle IA sous Clients de codage. L’association fonctionne toujours.",
-        "keyAdmin": "La passerelle IA est activée, mais aucune clé de fournisseur ne paie le chat de l’application. Autorisez la clé de l’instance sous Clients de codage, ou enregistrez la vôtre.",
+        "gatewayAdmin": "L’application ne peut pas discuter tant que vous n’activez pas la passerelle de code dans Admin › IA et qu’aucune clé de fournisseur n’est disponible. L’appairage fonctionne toujours.",
+        "gatewayUser": "L'application ne peut pas discuter tant qu'un administrateur n'active pas la passerelle IA. L'association fonctionne toujours.",
+        "keyAdmin": "La passerelle de code est active, mais aucune clé de fournisseur ne paiera le chat de l’application. Autorisez la clé de l’instance dans Admin › IA ou enregistrez la vôtre.",
         "keyUser": "Le chat de l’application n’a pas encore de clé de fournisseur. Demandez à un administrateur d’autoriser la clé de l’instance, ou enregistrez la vôtre. L’association fonctionne toujours.",
-        "openCodingClients": "Ouvrir Clients de codage"
+        "openCodingClients": "Ouvrir les réglages de la passerelle"
       },
       "pairButton": "Associer cet ordinateur",
       "loadFailed": "Impossible de charger les ordinateurs connectés.",
@@ -1061,8 +1076,8 @@
       "errorRemoving": "Échec du retrait du numéro de téléphone"
     },
     "usage": {
-      "title": "Statistiques d’utilisation",
-      "description": "Suivez votre utilisation de l’API sur tous les canaux et fonctionnalités",
+      "title": "Mon utilisation",
+      "description": "Combien vous avez utilisé le chat, les fichiers et les autres fonctions, et ce que cela a coûté.",
       "export": "Exporter CSV",
       "exportSuccess": "Données d’utilisation exportées avec succès",
       "errorLoading": "Échec du chargement des statistiques d’utilisation",
@@ -1163,6 +1178,14 @@
       }
     },
     "setByAdmin": "Défini par votre administrateur",
-    "fromGroup": "Valeur par défaut de votre groupe"
+    "fromGroup": "Valeur par défaut de votre groupe",
+    "aiSettings": {
+      "title": "Paramètres IA",
+      "subtitle": "Choisissez quel modèle IA fait chaque type de travail et rédigez des thèmes qui indiquent à l’IA comment répondre.",
+      "tabs": {
+        "defaults": "Modèles par défaut",
+        "topics": "Thèmes"
+      }
+    }
   }
 }

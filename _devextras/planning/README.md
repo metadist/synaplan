@@ -22,7 +22,8 @@ paths were renamed on 2026-09-17.
 | [`20260907_ux_user_flows.md`](./20260907_ux_user_flows.md) | Binding UX contract (U1–U12) |
 | [`20260907_ux_user_flows/`](./20260907_ux_user_flows/) | Journey notes that apply the contract |
 | [`20260913-use-case-research/`](./20260913-use-case-research/) | Ten jobs + Perfect-UX bar (AGENTS.md) |
-| [`20260914-navigation-consolidation/`](./20260914-navigation-consolidation/) | Nav work in progress (NV08+; NV01–NV07 on `main`) |
+| [`20261009-ux-overhaul/`](./20261009-ux-overhaul/00_master_plan.md) | UX overhaul: rail Chats · Library · Assistants · Apps · Admin, Apps directory, every sub page explained, guided tours (UX00–UX14). Replaces NV10–NV23 |
+| [`20260914-navigation-consolidation/`](./20260914-navigation-consolidation/) | NV01–NV09 shipped; NV10–NV23 replaced by the UX overhaul |
 | [`20260903_secure_compute/`](./20260903_secure_compute/) | Compute B3 in progress; B4 planned |
 | [`20260903_more_nextcloud/`](./20260903_more_nextcloud/) | S2–S3 still planned |
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/) | Editor / partner epics still planned |

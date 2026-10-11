@@ -45,11 +45,10 @@
       "autoPauseBody": "Bu görev üst üste üç kez başarısız oldu. Sorunu gider, sonra devam et.",
       "createFailed": "Görev olarak kaydedilemedi.",
       "created": "Görev olarak kaydedildi. Şimdi çalıştırabilirsin.",
-      "overviewTitle": "Kayıtlı görevler",
-      "overviewSubtitle": "İstediğinde veya daha sonra bir zamanlamayla çalışan talimatlar.",
+      "overviewTitle": "Görevler",
+      "overviewSubtitle": "İstediğinizde veya bir zamanlamayla kendiliğinden çalışan talimatlar.",
       "overviewLoading": "Kayıtlı görevler yükleniyor…",
-      "overviewEmpty": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya özel bir talimat kaydet:",
-      "overviewEmptyAssistants": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya bir asistana zamanlama ekle:",
+      "overviewEmpty": "Henüz görev yok. Bir tane oluşturun ve örneğin her sabah çalışmasını sağlayın.",
       "loadFailed": "Kayıtlı görevler yüklenemedi.",
       "delete": "Sil",
       "deleteConfirm": "\"{name}\" kayıtlı görevi silinsin mi? Bu görevin paylaşımları da kaldırılır.",
@@ -142,6 +141,22 @@
       "tabs": {
         "tasks": "Kayıtlı görevler",
         "watches": "İzlenen sayfalar"
+      },
+      "overviewEmptyHint": "Tamamlanmış bir sohbet planını saat düğmesiyle görev olarak da kaydedebilirsiniz.",
+      "newTask": {
+        "open": "Yeni görev",
+        "title": "Yeni görev",
+        "name": "Ad",
+        "namePlaceholder": "Sabah haber özeti",
+        "instruction": "Yapay zeka ne yapmalı?",
+        "instructionPlaceholder": "Sektörümüzle ilgili en önemli üç haberi bul ve her birini iki cümlede özetle.",
+        "schedule": "Ne zaman",
+        "at": "Saat",
+        "hint": "Sonuç kendi sohbetinde görünür. Her şeyi daha sonra görev kartından değiştirebilirsiniz.",
+        "create": "Görevi oluştur",
+        "created": "Görev oluşturuldu.",
+        "createdWithoutSchedule": "Görev oluşturuldu ancak zamanlama olmadan. Saati kartından ayarlayın.",
+        "failed": "Görev oluşturulmadı. Hiçbir şey kaydedilmedi; tekrar deneyin."
       }
     },
     "connections": {
@@ -203,7 +218,7 @@
       "providers": {
         "m365": {
           "name": "Microsoft 365",
-          "description": "Synaplan’ın Outlook postalarını okuyabilmesi için iş veya kişisel Microsoft hesabınla oturum aç. Yalnızca okuma yapar ve istediğin an bağlantıyı kesebilirsin.",
+          "description": "İş veya kişisel Microsoft hesabınızla oturum açın. Synaplan Outlook e-postalarınızı okur, takvime etkinlik ekleyebilir ve sonuçları posta kutunuzdan gönderebilir. Bağlantıyı istediğiniz zaman kesebilirsiniz.",
           "connect": "Microsoft 365’i bağla",
           "connectAnother": "Başka bir hesap bağla",
           "connectedAs": "{account} olarak bağlandı.",
@@ -289,8 +304,8 @@
       "description": "AI modellerinizi yapılandırın ve yönetin",
       "tabs": {
         "choice": "Model seçimi",
-        "list": "Tüm liste",
-        "runs": "Vektör çalıştırmaları",
+        "list": "Tüm modeller",
+        "runs": "Embedding çalıştırmaları",
         "edit": "Modelleri düzenle"
       },
       "defaultConfigTitle": "Varsayılan Model Yapılandırması",
@@ -458,11 +473,11 @@
       }
     },
     "taskPrompts": {
-      "title": "AI Talimatları",
-      "subtitle": "sistem promptları olarak da bilinir — AI'nın her görevi nasıl ele alacağını belirler",
+      "title": "Konular",
+      "subtitle": "Her konu, yapay zekaya bir istek türüne nasıl yanıt vereceğini söyler. Her mesaj için uygun konu otomatik olarak seçilir.",
       "selectPrompt": "Prompt Seç",
-      "selectPromptTitle": "Bir Prompt Seçin",
-      "selectPromptDescription": "Görüntülemek veya düzenlemek için mevcut bir prompt seçin",
+      "selectPromptTitle": "Bir konu seçin",
+      "selectPromptDescription": "Görüntülemek veya değiştirmek için soldan bir konu seçin.",
       "selectPromptHelp": "Düzenlemek veya şablon olarak kullanmak için mevcut bir prompt seçin",
       "promptDetails": "Prompt Detayları",
       "rulesForSelection": "Seçim Kuralları",
@@ -482,18 +497,20 @@
       "contentPlaceholder": "Sistem promptunuzu buraya girin...",
       "promptContentPlaceholder": "Bu görev için AI'ın davranışını yönlendirecek sistem promptunu girin...",
       "contentHelp": "Bu, AI'ın davranışını yönlendiren sistem mesajıdır",
-      "createNew": "Yeni Prompt Oluştur",
+      "createNew": "Yeni konu",
       "loadTemplate": "Şablon Yükle",
       "topic": "Konu",
       "topicPlaceholder": "ör. özel-analizci",
       "name": "Ad",
       "namePlaceholder": "ör. Özel Dosya Analizci",
-      "createButton": "Yeni Prompt Oluştur",
+      "createButton": "Yeni konu",
       "dangerZone": "Tehlikeli Bölge",
       "deleteWarning": "Bu promptu silmek kalıcıdır ve geri alınamaz.",
       "deletePrompt": "Promptu Sil",
       "saveChanges": "Değişiklikleri Kaydet",
-      "noPrompts": "Prompt yok"
+      "noPrompts": "Henüz konu yok.",
+      "noPromptsMatch": "Aramanızla eşleşen konu yok.",
+      "workingLanguageHint": "Konular arayüz dilinizde gösterilir. Oluşturduğunuz konular yalnızca bu dilde görünür."
     },
     "routing": {
       "title": "Yönlendirme",
@@ -667,9 +684,9 @@
       "errorDeleting": "API anahtarı silinemedi",
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
       "scopes": {
-        "hint": "Tam erişim için işaretlemeyin. Kişiler kutusu bu anahtarı sınırlar. Dosya işi, betik çalıştırabilmek için sohbet ve dosya kapsamları ekler — yönetici erişimi vermez.",
-        "iamRead": "Kişiler — grupları görüntüle",
-        "iamManage": "Kişiler — grupları yönet",
+        "hint": "Tam erişim için işaretlemeyin. Kullanıcılar kutusu bu anahtarı sınırlar. Dosya işi, betik çalıştırabilmek için sohbet ve dosya kapsamları ekler — yönetici erişimi vermez.",
+        "iamRead": "Kullanıcılar — grupları görüntüle",
+        "iamManage": "Kullanıcılar — grupları yönet",
         "computeRun": "Dosya işi — dosyalarınızın kopyalarında kısa betikler çalıştır"
       }
     },
@@ -677,11 +694,11 @@
       "title": "Synaplan Desktop",
       "description": "Synaplan Desktop, bu bilgisayar için ayrı bir uygulamadır. Synaplan hesabınızı kullanır ve yüklediğiniz skill'leri çalıştırabilir.",
       "chatGate": {
-        "gatewayAdmin": "Kodlama istemcileri altında AI ağ geçidini açana ve bir sağlayıcı anahtarı kullanılabilir olana kadar uygulama sohbet edemez. Bağlama çalışmaya devam eder.",
-        "gatewayUser": "Bir yönetici Kodlama istemcileri altında AI ağ geçidini açana kadar uygulama sohbet edemez. Bağlama çalışmaya devam eder.",
-        "keyAdmin": "AI ağ geçidi açık, ancak uygulama sohbetini ödeyecek bir sağlayıcı anahtarı yok. Kodlama istemcileri altında örnek anahtarına izin verin veya kendi anahtarınızı kaydedin.",
+        "gatewayAdmin": "Kodlama ağ geçidini Yönetici › Yapay zeka altında açana ve bir sağlayıcı anahtarı kullanılabilir olana kadar uygulama sohbet edemez. Eşleştirme yine de çalışır.",
+        "gatewayUser": "Bir yönetici AI ağ geçidini açana kadar uygulama sohbet edemez. Eşleştirme yine çalışır.",
+        "keyAdmin": "Kodlama ağ geçidi açık, ancak uygulama sohbetini ödeyecek bir sağlayıcı anahtarı yok. Örnek anahtarına Yönetici › Yapay zeka altında izin verin veya kendi anahtarınızı kaydedin.",
         "keyUser": "Uygulama sohbetinin henüz bir sağlayıcı anahtarı yok. Bir yöneticiden örnek anahtarına izin vermesini isteyin veya kendi anahtarınızı kaydedin. Bağlama çalışmaya devam eder.",
-        "openCodingClients": "Kodlama istemcilerini aç"
+        "openCodingClients": "Ağ geçidi ayarlarını aç"
       },
       "pairButton": "Bu bilgisayarı bağla",
       "loadFailed": "Bağlı bilgisayarlar yüklenemedi.",
@@ -814,8 +831,8 @@
       "errorRemoving": "Telefon numarası kaldırılamadı"
     },
     "usage": {
-      "title": "Kullanım İstatistikleri",
-      "description": "Tüm kanal ve özelliklerdeki API kullanımınızı takip edin",
+      "title": "Kullanımım",
+      "description": "Sohbeti, dosyaları ve diğer özellikleri ne kadar kullandığınız ve bunun maliyeti.",
       "export": "CSV Dışa Aktar",
       "exportSuccess": "Kullanım verileri başarıyla dışa aktarıldı",
       "errorLoading": "Kullanım istatistikleri yüklenemedi",
@@ -892,6 +909,14 @@
     "embeddingSwitch": {
       "scopes": {
         "search": "Smart Search dizini"
+      }
+    },
+    "aiSettings": {
+      "title": "AI ayarları",
+      "subtitle": "Her iş türünü hangi yapay zeka modelinin yapacağını seçin ve yapay zekaya nasıl yanıt vereceğini anlatan konular yazın.",
+      "tabs": {
+        "defaults": "Varsayılan modeller",
+        "topics": "Konular"
       }
     }
   }

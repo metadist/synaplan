@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 final class SettingMatcherTest extends TestCase
 {
     private const KEY = 'FEATURE_IAM_GROUPS_ENABLED';
-    private const LABELS = 'Features People & sharing';
+    private const LABELS = 'Features Users & sharing';
     private const DESCRIPTION = 'Let people create groups and share with them.';
 
     public function testExactKeyWins(): void

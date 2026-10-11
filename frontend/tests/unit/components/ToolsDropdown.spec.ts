@@ -6,7 +6,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import ToolsDropdown from '@/components/ToolsDropdown.vue'
 
 const { features } = vi.hoisted(() => ({
-  features: { selfAware: false, help: false, memoryService: false },
+  features: { selfAware: false, memoryService: false },
 }))
 
 const desktopEnabled = { value: false }

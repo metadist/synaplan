@@ -24,13 +24,27 @@ export async function getRuntimeFeatures(
   return body.features ?? {}
 }
 
-/**
- * With AGENTS.ENABLED on, /ai/instructions redirects to the Assistants gallery
- * (`instructionsRouteGuard`), so the legacy Instructions page is unreachable.
- */
+/** AGENTS.ENABLED: the Assistants gallery and builder exist. */
 export async function isAgentsEnabled(
   request: APIRequestContext,
   credentials?: { user: string; pass: string }
 ): Promise<boolean> {
   return (await getRuntimeFeatures(request, credentials)).agentsEnabled === true
+}
+
+/**
+ * Same rule as `isModuleConfigured()` in the app: a module the runtime config
+ * does not report counts as configured.
+ */
+export async function isModuleConfigured(
+  request: APIRequestContext,
+  moduleId: string
+): Promise<boolean> {
+  const res = await request.get(`${getApiUrl()}/api/v1/config/runtime`)
+  if (!res.ok()) {
+    throw new Error(`runtime config failed: ${res.status()} ${await res.text()}`)
+  }
+  const body = (await res.json()) as { modules?: Record<string, { configured?: boolean }> }
+  const configured = body.modules?.[moduleId]?.configured
+  return typeof configured === 'boolean' ? configured : true
 }

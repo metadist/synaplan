@@ -1,7 +1,7 @@
 <template>
   <MainLayout>
     <div
-      class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
+      class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-test"
     >
       <div class="max-w-[100rem] mx-auto space-y-6">
@@ -63,9 +63,9 @@
             >
             <router-link
               data-testid="link-route"
-              to="/channels/email"
+              to="/apps/mailbox"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/channels/email</router-link
+              >/apps/mailbox</router-link
             >
             <router-link
               data-testid="link-route"
@@ -75,9 +75,9 @@
             >
             <router-link
               data-testid="link-route"
-              to="/channels"
+              to="/apps"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/channels</router-link
+              >/apps</router-link
             >
             <router-link
               data-testid="link-route"
@@ -87,21 +87,21 @@
             >
             <router-link
               data-testid="link-route"
-              to="/ai/instructions"
+              to="/ai/models?tab=topics"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/ai/instructions</router-link
+              >/ai/models?tab=topics</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/ai/routing"
+              to="/admin/setup?tab=behavior"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/ai/routing</router-link
+              >/admin/setup?tab=behavior</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/channels/api"
+              to="/apps/api"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/channels/api</router-link
+              >/apps/api</router-link
             >
             <router-link
               data-testid="link-route"

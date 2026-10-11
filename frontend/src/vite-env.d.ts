@@ -11,7 +11,8 @@ declare module 'vue-router' {
     public?: boolean
     allowGuest?: boolean
     requiresAdmin?: boolean
-    helpId?: string
+    /** Guided tour id (src/tours) started once on the first visit. */
+    tour?: string
     context?: unknown
   }
 }

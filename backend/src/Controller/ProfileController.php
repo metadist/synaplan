@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\EmailChatService;
 use App\Service\GuestSessionService;
+use App\Service\Profile\ToursSeen;
 use App\Service\UserDeletionService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -67,6 +68,13 @@ class ProfileController extends AbstractController
                         new OA\Property(property: 'emailKeyword', type: 'string', nullable: true, example: 'myproject'),
                         new OA\Property(property: 'personalEmailAddress', type: 'string', example: 'smart+myproject@synaplan.net'),
                         new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'toursSeen',
+                            description: 'Guided tours and onboarding cards this person finished or dismissed',
+                            type: 'array',
+                            items: new OA\Items(type: 'string'),
+                            example: ['apps', 'checklist.dismissed']
+                        ),
                     ]
                 ),
             ]
@@ -125,6 +133,7 @@ class ProfileController extends AbstractController
                 'externalAuthInfo' => $externalAuthInfo,
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'toursSeen' => ToursSeen::fromDetails($details),
             ],
         ]);
     }
@@ -156,6 +165,13 @@ class ProfileController extends AbstractController
                 new OA\Property(property: 'timezone', type: 'string', example: 'Europe/Berlin'),
                 new OA\Property(property: 'invoiceEmail', type: 'string', example: 'billing@example.com'),
                 new OA\Property(property: 'emailKeyword', type: 'string', nullable: true, example: 'myproject'),
+                new OA\Property(
+                    property: 'toursSeen',
+                    description: 'Replaces the list of finished guided tours. Invalid ids are dropped; at most 64 are kept.',
+                    type: 'array',
+                    items: new OA\Items(type: 'string'),
+                    example: ['apps']
+                ),
             ]
         )
     )]
@@ -226,6 +242,10 @@ class ProfileController extends AbstractController
 
         if (array_key_exists('memoriesEnabled', $data)) {
             $details['memories_enabled'] = (bool) $data['memoriesEnabled'];
+        }
+
+        if (array_key_exists('toursSeen', $data)) {
+            $details[ToursSeen::DETAILS_KEY] = ToursSeen::normalize($data['toursSeen']);
         }
 
         if (isset($data['emailKeyword'])) {

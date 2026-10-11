@@ -103,7 +103,7 @@ watch(searchQuery, (newValue, oldValue) => {
   path: '/tools/chat-widget',
   name: 'tools-chat-widget',
   component: () => import('../views/ToolsView.vue'),
-  meta: { requiresAuth: true, helpId: 'tools.chatWidget' }
+  meta: { requiresAuth: true }
 }
 ```
 
@@ -549,59 +549,13 @@ const testConnection = async () => {
 
 ---
 
-## 🎨 Help System – Konkretes Beispiel
+## Guided tours
 
-### 1. **Help Content** (`src/data/helpContent.ts`)
-
-```typescript
-export const helpContent = {
-  'tools.docSummary': {
-    title: 'Document Summary',
-    steps: [
-      {
-        title: 'Quick Presets',
-        content: 'Select a preset...',
-        selector: '[data-help="presets"]'  // CSS Selector
-      },
-      { ... }
-    ]
-  }
-}
-```
-
-### 2. **Elemente markieren** (`SummaryConfiguration.vue`)
-
-```vue
-<div data-help="presets">
-  <!-- Diese Box wird im Help-Modus hervorgehoben -->
-</div>
-```
-
-### 3. **Help öffnen** (`HelpButton.vue`)
-
-```typescript
-const { openHelp } = useHelp()
-
-const handleClick = () => {
-  openHelp() // Startet Tour
-}
-```
-
-### 4. **Tour anzeigen** (`HelpTour.vue`)
-
-```typescript
-// Aktueller Schritt
-const currentStepIndex = ref(0)
-
-// Element finden und highlighten
-const updateHighlight = () => {
-  const step = props.steps[currentStepIndex.value]
-  if (step?.selector) {
-    const element = document.querySelector(step.selector)
-    highlightedElement.value = element
-  }
-}
-```
+Each area has a short driver.js tour (`src/tours/<area>.ts`). Steps point at
+`[data-tour="..."]` elements and take their copy from the `tours` i18n
+namespace. `useTour()` starts a tour once automatically on the first visit
+and stores finished tour ids on the account (`toursSeen` in the profile).
+The `?` button in `PageHeader` (prop `tour-id`) restarts it.
 
 ---
 
@@ -615,7 +569,7 @@ const updateHighlight = () => {
 3. Route hinzufügen           → src/router/index.ts
 4. Komponenten erstellen      → src/components/myfeature/
 5. i18n Keys hinzufügen       → src/i18n/en.json
-6. Help Content hinzufügen    → src/data/helpContent.ts
+6. Tour hinzufügen            → src/tours/<area>.ts
 ```
 
 ### 2. **Dev-Server starten**

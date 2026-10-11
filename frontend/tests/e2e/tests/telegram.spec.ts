@@ -36,7 +36,7 @@ test.describe('@ci @telegram Telegram channel', () => {
     await page.addInitScript(() => {
       localStorage.setItem('language', 'en')
     })
-    await page.goto('/channels')
+    await page.goto('/apps/telegram')
     await expect(page.locator(selectors.inboundConfig.telegramSection)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
@@ -119,7 +119,7 @@ test.describe('@ci @telegram Telegram channel', () => {
 
     await expectTelegramThread(page)
 
-    await page.goto('/channels')
+    await page.goto('/apps/telegram')
     await page.getByTestId('btn-telegram-disconnect').click()
     await expect(page.getByText('Your chat history stays in Synaplan.')).toBeVisible()
     await page.getByTestId('btn-dialog-confirm').click()
@@ -401,7 +401,7 @@ async function openChannels(page: import('@playwright/test').Page): Promise<void
     localStorage.setItem('language', 'en')
   })
   await login(page, CREDENTIALS.getAdminCredentials())
-  await page.goto('/channels')
+  await page.goto('/apps/telegram')
   await page.evaluate(() => localStorage.setItem('language', 'en'))
   await page.reload()
   await expect(page.locator(selectors.inboundConfig.telegramSection)).toBeVisible({

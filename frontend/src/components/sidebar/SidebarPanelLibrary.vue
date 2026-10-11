@@ -1,5 +1,9 @@
 <template>
-  <nav class="flex flex-col gap-0.5 px-3 pt-3 pb-3" :aria-label="$t('nav.files')">
+  <nav
+    class="flex flex-col gap-0.5 px-3 pt-3 pb-3"
+    :aria-label="$t('nav.files')"
+    data-tour="library-tabs"
+  >
     <SidebarNavLink
       v-for="item in links"
       :key="item.id"
