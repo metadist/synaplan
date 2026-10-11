@@ -44,28 +44,44 @@ function computeMedian(sorted: number[]): number {
   return sorted[mid] ?? 0
 }
 
-const peersCache = new WeakMap<readonly AIModel[], { median: number }>()
+const peersCache = new WeakMap<readonly AIModel[], Map<string, number>>()
 
-function getMedianForPeers(peers: readonly AIModel[]): number {
-  const cached = peersCache.get(peers)
-  if (cached) return cached.median
+function modelCost(model: AIModel, capability?: string): number {
+  if (capability === 'TEXT2PIC' || capability === 'PIC2PIC') {
+    const priced = model.capabilityPrices?.[capability]
+    if (typeof priced === 'number') return priced
+  }
+  return getAverageCost(model)
+}
+
+function getMedianForPeers(peers: readonly AIModel[], capability?: string): number {
+  const key = capability ?? ''
+  const byCapability = peersCache.get(peers) ?? new Map<string, number>()
+  if (!peersCache.has(peers)) peersCache.set(peers, byCapability)
+  const cached = byCapability.get(key)
+  if (cached !== undefined) return cached
 
   const costs = peers
-    .map(getAverageCost)
+    .map((peer) => modelCost(peer, capability))
     .filter((c) => c > 0)
     .sort((a, b) => a - b)
 
   const median = computeMedian(costs)
-  peersCache.set(peers, { median })
+  byCapability.set(key, median)
   return median
 }
 
 /**
  * Classify a model's cost tier relative to its peers.
  * Peers should be the models shown in the same dropdown.
+ * Image dropdowns pass the capability so the badge uses the billed per-image price.
  */
-export function getCostTier(model: AIModel, peers: readonly AIModel[]): CostTierInfo {
-  const avgCost = getAverageCost(model)
+export function getCostTier(
+  model: AIModel,
+  peers: readonly AIModel[],
+  capability?: string
+): CostTierInfo {
+  const avgCost = modelCost(model, capability)
 
   if (model.priceKnown === false && avgCost <= 0) {
     return { ...TIER_CONFIG.unknown, tier: 'unknown' }
@@ -73,7 +89,7 @@ export function getCostTier(model: AIModel, peers: readonly AIModel[]): CostTier
 
   if (avgCost <= 0) return { ...TIER_CONFIG.free, tier: 'free' }
 
-  const median = getMedianForPeers(peers)
+  const median = getMedianForPeers(peers, capability)
 
   if (median <= 0) return { ...TIER_CONFIG.mid, tier: 'mid' }
 

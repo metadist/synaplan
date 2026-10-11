@@ -382,6 +382,33 @@ final readonly class CostCalculationService
     }
 
     /**
+     * Per-image prices the image dropdowns badge.
+     *
+     * TEXT2PIC is the medium (the app's "standard") price at the model's
+     * default size. PIC2PIC is the high price at that size, which is what an
+     * edit is billed. A row without a quality table uses the flat priceOut
+     * for both, so the two dropdowns stay comparable. Chat rows return null.
+     *
+     * @return array{TEXT2PIC: float, PIC2PIC: float}|null
+     */
+    public function imageCapabilityPrices(Model $model): ?array
+    {
+        $tag = strtolower($model->getTag());
+        if (!in_array($tag, ['text2pic', 'image'], true)) {
+            return null;
+        }
+
+        $flat = (float) $model->getPriceOut();
+        [$textToImage] = $this->lookupImageTierPrice($model, 'medium', null);
+        [$imageEdit] = $this->lookupImageTierPrice($model, 'high', null);
+
+        return [
+            'TEXT2PIC' => $textToImage ?? $flat,
+            'PIC2PIC' => $imageEdit ?? $flat,
+        ];
+    }
+
+    /**
      * Resolve the per-image price for an image model's quality × size tier.
      *
      * gpt-image bills a different price for every (quality, size) combination

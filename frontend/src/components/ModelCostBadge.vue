@@ -17,7 +17,8 @@ import type { AIModel } from '@/types/ai-models'
 const props = defineProps<{
   model: AIModel
   peers: readonly AIModel[]
+  capability?: string
 }>()
 
-const tierInfo = computed(() => getCostTier(props.model, props.peers))
+const tierInfo = computed(() => getCostTier(props.model, props.peers, props.capability))
 </script>

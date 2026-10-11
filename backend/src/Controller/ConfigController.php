@@ -30,6 +30,7 @@ use App\Service\Client\MobileVersionService;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Config\FeatureStatusReporter;
 use App\Service\Config\LayeredConfigResolver;
+use App\Service\CostCalculationService;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\Embedding\EmbeddingMetadataService;
@@ -127,6 +128,7 @@ class ConfigController extends AbstractController
         private readonly ?SearchInterpreter $searchInterpreter = null,
         private readonly ?\App\Service\Chat\ChatWelcomeConfig $chatWelcomeConfig = null,
         private readonly ?\App\Service\Chat\ChatActionPolicy $chatActionPolicy = null,
+        private readonly ?CostCalculationService $costCalculationService = null,
     ) {
     }
 
@@ -974,6 +976,16 @@ class ConfigController extends AbstractController
                                     new OA\Property(property: 'priceIn', type: 'number', example: 0.15, description: 'USD per 1M input tokens'),
                                     new OA\Property(property: 'priceOut', type: 'number', example: 0.6, description: 'USD per 1M output tokens'),
                                     new OA\Property(property: 'priceKnown', type: 'boolean', example: true, description: 'False when the model was imported from a listing that published no price. The menu then says "price unknown" instead of "Free".'),
+                                    new OA\Property(
+                                        property: 'capabilityPrices',
+                                        type: 'object',
+                                        nullable: true,
+                                        description: 'Per-image price an image dropdown badges. TEXT2PIC is medium quality at the default size; PIC2PIC is high quality at that size, which is what an edit is billed. Absent on chat rows.',
+                                        properties: [
+                                            new OA\Property(property: 'TEXT2PIC', type: 'number', example: 0.01317),
+                                            new OA\Property(property: 'PIC2PIC', type: 'number', example: 0.05268),
+                                        ]
+                                    ),
                                 ]
                             )
                         ),
@@ -1072,6 +1084,10 @@ class ConfigController extends AbstractController
                 'available' => $available,
                 'unavailableReason' => $unavailableReason,
             ];
+            $capabilityPrices = $this->costCalculationService?->imageCapabilityPrices($model);
+            if (null !== $capabilityPrices) {
+                $row['capabilityPrices'] = $capabilityPrices;
+            }
             $reasoningLevels = ReasoningLevelCatalog::levels($model->getService(), $model->getProviderId(), $model->getFeatures());
             if (null !== $reasoningLevels) {
                 $row['reasoningLevels'] = $reasoningLevels;
