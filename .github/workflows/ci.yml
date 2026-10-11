@@ -1434,9 +1434,23 @@ jobs:
     # deploy/compose.yaml and its pinned third-party images, and runs the same
     # smoke test the AMI release build runs.
     #
-    # Pull requests only. Any failed job fails the CI run: on main that stops
-    # the release tag from promoting the tested images, and on a tag it stops
-    # release-publish.yml and the AMI build.
+    # Decision (#2271, 2026-10-11): stay pull-request-only. Do not run this
+    # job on main or on v* tags, and do not add it to the needs of
+    # docker-push-amd64 or docker-manifest.
+    #
+    # Every pull-request CI run from 2026-09-29 through 2026-10-11 was
+    # checked (376 runs). The smoke job: 283 success, 0 failure, 22
+    # cancelled because a newer push superseded the run (longest 231s, none
+    # reached the 20 minute timeout), 9 skipped with the heavy image build,
+    # and 62 runs from before the job existed. First success: 2026-09-30.
+    # That is more than 50 heavy runs and no product or environment failure,
+    # but the four-week window is not complete. A registry outage at tag
+    # time would still stop a release that has no product defect.
+    #
+    # Any failed job fails the CI run. If this job later moves onto main, a
+    # failure there stops the release tag from promoting the tested images,
+    # and on a tag it stops release-publish.yml and the AMI build. Revisit
+    # after 2026-10-28.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker-build]
