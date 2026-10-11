@@ -873,7 +873,9 @@ class ChatController extends AbstractController
     #[Route('/shared/{token}', name: 'shared', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/chats/shared/{token}',
+        operationId: 'getSharedChat',
         summary: 'Get a publicly shared chat by token',
+        description: 'Returns the chat title and its messages. Knowledge sources are ids and labels only; the passage is loaded separately.',
         security: [],
         tags: ['Chats'],
         parameters: [
@@ -884,27 +886,83 @@ class ChatController extends AbstractController
                 response: 200,
                 description: 'Shared chat with messages',
                 content: new OA\JsonContent(
+                    required: ['success', 'chat', 'messages'],
                     properties: [
-                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(
                             property: 'chat',
-                            type: 'object',
+                            required: ['title', 'createdAt'],
                             properties: [
                                 new OA\Property(property: 'title', type: 'string'),
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                            ]
+                            ],
+                            type: 'object',
                         ),
                         new OA\Property(
                             property: 'messages',
                             type: 'array',
                             items: new OA\Items(
-                                type: 'object',
+                                required: ['id', 'text', 'direction', 'timestamp'],
                                 properties: [
+                                    new OA\Property(property: 'id', type: 'integer'),
+                                    new OA\Property(property: 'text', type: 'string'),
+                                    new OA\Property(property: 'direction', type: 'string', enum: ['IN', 'OUT']),
+                                    new OA\Property(property: 'timestamp', type: 'integer'),
+                                    new OA\Property(property: 'topic', type: 'string'),
+                                    new OA\Property(property: 'language', type: 'string'),
+                                    new OA\Property(property: 'provider', type: 'string'),
+                                    new OA\Property(
+                                        property: 'file',
+                                        nullable: true,
+                                        required: ['path', 'type'],
+                                        properties: [
+                                            new OA\Property(property: 'path', type: 'string'),
+                                            new OA\Property(property: 'type', type: 'string'),
+                                        ],
+                                        type: 'object',
+                                    ),
+                                    new OA\Property(
+                                        property: 'files',
+                                        type: 'array',
+                                        items: new OA\Items(
+                                            required: ['id', 'filename', 'fileType', 'filePath'],
+                                            properties: [
+                                                new OA\Property(property: 'id', type: 'integer'),
+                                                new OA\Property(property: 'filename', type: 'string'),
+                                                new OA\Property(property: 'fileType', type: 'string'),
+                                                new OA\Property(property: 'filePath', type: 'string'),
+                                                new OA\Property(property: 'fileSize', type: 'integer', nullable: true),
+                                                new OA\Property(property: 'fileMime', type: 'string', nullable: true),
+                                            ],
+                                            type: 'object',
+                                        ),
+                                    ),
+                                    new OA\Property(
+                                        property: 'ragSources',
+                                        type: 'array',
+                                        nullable: true,
+                                        description: 'Sources cited by this answer. Passage text is not included.',
+                                        items: new OA\Items(
+                                            required: ['n', 'chunkId', 'fileId', 'fileName', 'groupKey', 'startLine', 'endLine'],
+                                            properties: [
+                                                new OA\Property(property: 'n', type: 'integer'),
+                                                new OA\Property(property: 'chunkId', type: 'string'),
+                                                new OA\Property(property: 'fileId', type: 'integer'),
+                                                new OA\Property(property: 'fileName', type: 'string'),
+                                                new OA\Property(property: 'groupKey', type: 'string'),
+                                                new OA\Property(property: 'score', type: 'number', nullable: true),
+                                                new OA\Property(property: 'startLine', type: 'integer'),
+                                                new OA\Property(property: 'endLine', type: 'integer'),
+                                            ],
+                                            type: 'object',
+                                        ),
+                                    ),
                                     new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
                                     new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
                                     new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
                                     new OA\Property(property: 'voiceReplyFailed', type: 'string', nullable: true, description: 'Voice-reply failure reason when TTS was requested but no audio was stored (provider_error, empty_text, rate_limited)'),
-                                ]
+                                ],
+                                type: 'object',
                             )
                         ),
                     ]

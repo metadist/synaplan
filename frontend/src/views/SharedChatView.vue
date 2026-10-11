@@ -386,7 +386,7 @@ import {
 import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
 import { collapseApiToolTurn } from '@/utils/apiToolTurn'
-import { SharedChatPayloadSchema } from '@/utils/sharedChatPayload'
+import { GetSharedChatResponseSchema } from '@/generated/api-schemas'
 import { setLocale, supportedLanguages, type SupportedLanguage } from '@/i18n'
 import { parseAIResponse } from '@/utils/responseParser'
 
@@ -607,7 +607,7 @@ onMounted(async () => {
   try {
     const data = await httpClient(`/api/v1/chats/shared/${token.value}`, {
       skipAuth: true,
-      schema: SharedChatPayloadSchema,
+      schema: GetSharedChatResponseSchema,
     })
 
     if (!data.success) {

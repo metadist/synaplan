@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import SharedChatView from '@/views/SharedChatView.vue'
-import { SharedChatPayloadSchema } from '@/utils/sharedChatPayload'
+import { GetSharedChatResponseSchema } from '@/generated/api-schemas'
 import { httpClient } from '@/services/api/httpClient'
 
 vi.mock('@/services/api/httpClient', async (importOriginal) => {
@@ -31,20 +31,34 @@ const payload = {
     {
       id: 1,
       text: 'See the handbook.',
-      direction: 'OUT',
+      direction: 'OUT' as const,
       timestamp: 1_700_000_000,
       ragSources: [source],
     },
   ],
 }
 
+const passage = {
+  success: true,
+  chunkId: 'chunk-1',
+  fileId: 9,
+  fileName: 'handbook.pdf',
+  groupKey: 'docs',
+  text: 'The cited passage',
+  startLine: 4,
+  endLine: 8,
+}
+
 describe('SharedChatView knowledge sources', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    vi.mocked(httpClient).mockResolvedValue(SharedChatPayloadSchema.parse(payload))
+    vi.mocked(httpClient).mockImplementation(async (endpoint: string) => {
+      if (endpoint.includes('/rag/chunks/')) return passage
+      return GetSharedChatResponseSchema.parse(payload)
+    })
   })
 
-  it('keeps ragSources through parse and renders the sources row', async () => {
+  it('keeps ragSources and opens then hides the cited passage', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
@@ -71,9 +85,24 @@ describe('SharedChatView knowledge sources', () => {
     })
     await flushPromises()
 
-    const data = SharedChatPayloadSchema.parse(payload)
-    expect(data.messages?.[0]?.ragSources?.[0]?.chunkId).toBe('chunk-1')
+    const listed = GetSharedChatResponseSchema.parse(payload)
+    expect(listed.messages[0]?.ragSources?.[0]?.chunkId).toBe('chunk-1')
     expect(wrapper.get('[data-testid="knowledge-sources"]').text()).toContain('handbook.pdf')
     expect(wrapper.find('a[href="/files"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="knowledge-source-open"]').trigger('click')
+    await flushPromises()
+
+    const passageCall = vi
+      .mocked(httpClient)
+      .mock.calls.find((call) => String(call[0]).includes('/rag/chunks/'))
+    expect(passageCall?.[0]).toBe('/api/v1/chats/shared/public-token/rag/chunks/chunk-1')
+    expect(wrapper.get('[data-testid="knowledge-source-passage"]').text()).toContain(
+      'The cited passage'
+    )
+
+    await wrapper.get('[data-testid="knowledge-source-open"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="knowledge-source-passage"]').exists()).toBe(false)
   })
 })
