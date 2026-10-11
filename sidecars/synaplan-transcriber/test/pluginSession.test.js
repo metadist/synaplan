@@ -513,13 +513,13 @@ test('the plugin client previews with multipart audio; anything but 200 is no ca
   const fetchImpl = async (url, options) => {
     seen.push({ url, method: options.method, seq: options.body.get('seq'), endpointId: options.body.get('endpointId') })
     return status === 200
-      ? new Response(JSON.stringify({ seq: 2, text: ' Hallo ', dropped: null, speechEndMs: 640 }), { status })
+      ? new Response(JSON.stringify({ seq: 2, text: ' Hallo ', dropped: null, speechEndMs: 640, segmentEndsMs: [320, 640, 'x'] }), { status })
       : new Response(JSON.stringify({ error: 'captions_off' }), { status })
   }
   const client = createPluginClient({ baseUrl: 'https://synaplan.example', apiKey: 'sk_test', fetchImpl })
   const fields = { endpointId: 'ada', seq: 2, t0Ms: 0, t1Ms: 1000, audio: Buffer.from('OggS') }
 
-  assert.deepEqual(await client.preview(REF, fields), { text: 'Hallo', dropped: null, speechEndMs: 640 })
+  assert.deepEqual(await client.preview(REF, fields), { text: 'Hallo', dropped: null, speechEndMs: 640, segmentEndsMs: [320, 640] })
   status = 403
   assert.equal(await client.preview(REF, fields), null)
   status = 409
@@ -527,4 +527,142 @@ test('the plugin client previews with multipart audio; anything but 200 is no ca
   assert.equal(seen[0].url, `https://synaplan.example/api/v1/plugins/synascriber/public/transcriber/sessions/${REF}/preview`)
   assert.equal(seen[0].method, 'POST')
   assert.equal(seen[0].seq, '2')
+})
+
+test('an interim whose window ends without text is cleared under the same message id', async () => {
+  const time = clock()
+  const plugin = previewPlugin({ text: 'Guten', dropped: null, speechEndMs: null })
+  plugin.window = async () => ({ ended: false, text: '', dropped: 'no_speech' })
+  const session = liveSession(plugin, time)
+  const out = []
+  const send = (message) => out.push(message)
+
+  await talk(session, 'ada-1', 1.2, time, send)
+  await session.settle()
+  await session.handle({ event: 'stop', stop: { tag: 'ada-1' } }, send)
+  await session.settle()
+
+  const forWindow = out.filter((message) => message.message_id === 'ms_1:ada:1')
+  assert.deepEqual(forWindow.map((message) => [message.is_interim, message.transcript[0].text]), [[true, 'Guten'], [false, '']])
+})
+
+test('a window that fails clears its interim and the gap is reported', async () => {
+  const time = clock()
+  const plugin = previewPlugin({ text: 'Guten', dropped: null, speechEndMs: null })
+  plugin.window = async () => {
+    const error = new Error('bad window')
+    error.status = 422
+    throw error
+  }
+  const session = liveSession(plugin, time)
+  const out = []
+  const send = (message) => out.push(message)
+
+  await talk(session, 'ada-1', 1.2, time, send)
+  await session.settle()
+  await session.handle({ event: 'stop', stop: { tag: 'ada-1' } }, send)
+  await session.settle()
+
+  const last = out.filter((message) => message.message_id === 'ms_1:ada:1').at(-1)
+  assert.equal(last.is_interim, false)
+  assert.equal(last.transcript[0].text, '')
+  assert.ok(plugin.calls.events.some((event) => event.type === 'stt-failure'))
+})
+
+test('captions switched off while a preview is in flight: the late answer shows nothing', async () => {
+  const time = clock()
+  let release
+  const plugin = previewPlugin(() => new Promise((resolve) => { release = resolve }))
+  plugin.bind = async () => ({ sessionId: 'ms_1', state: 'running', language: 'de', captions: false })
+  const session = liveSession(plugin, time, { refreshEveryMs: 5 })
+  const out = []
+  const send = (message) => out.push(message)
+
+  await session.connect()
+  await talk(session, 'ada-1', 1.1, time, send)
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  release({ text: 'zu spät', dropped: null, speechEndMs: 100 })
+  await session.settle()
+  await session.finish(send)
+
+  assert.equal(out.filter((message) => message.type === 'transcription-result' && message.is_interim).length, 0)
+  assert.equal(plugin.calls.windows.filter((call) => call.cut === 'pause').length, 0)
+})
+
+test('a window that already showed text is not dropped as silence by a later empty preview', async () => {
+  const time = clock()
+  let answers = 0
+  const plugin = previewPlugin(() => (answers++ === 0
+    ? { text: 'Guten', dropped: null, speechEndMs: null }
+    : { text: '', dropped: 'no_speech', speechEndMs: null }))
+  const session = liveSession(plugin, time, { idlePreviewEveryMs: 1500 })
+
+  await talk(session, 'ada-1', 5, time, () => {})
+  await session.settle()
+
+  assert.equal(session.stats().silentDrops, 0)
+})
+
+test('a blank PREVIEW_EVERY_MS keeps the default; only an explicit 0 turns previews off', async () => {
+  const { loadConfig } = await import('../src/config.js')
+  const base = { SYNAPLAN_URL: 'http://synaplan', SYNAPLAN_API_KEY: 'sk_test', TRANSCRIBER_MODE: 'jitsi', TRANSCRIBER_AUTH_TOKEN: 'secret' }
+  assert.equal(loadConfig({ ...base, PREVIEW_EVERY_MS: '' }).previewEveryMs, 1500)
+  assert.equal(loadConfig({ ...base, PREVIEW_EVERY_MS: '  ' }).previewEveryMs, 1500)
+  assert.equal(loadConfig(base).previewEveryMs, 1500)
+  assert.equal(loadConfig({ ...base, PREVIEW_EVERY_MS: '0' }).previewEveryMs, 0)
+  assert.throws(() => loadConfig({ ...base, PREVIEW_EVERY_MS: '200' }), /PREVIEW_EVERY_MS/)
+})
+
+test('at the length limit the window ends at the last phrase boundary of the latest preview', async () => {
+  const time = clock()
+  const plugin = previewPlugin((fields) => {
+    const ms = fields.t1Ms - fields.t0Ms
+    return { text: 'ein langer Satz ohne Pause', dropped: null, speechEndMs: ms, segmentEndsMs: ms >= 2500 ? [1200, ms] : [ms] }
+  })
+  const session = liveSession(plugin, time, { commitAfterMs: 3000 })
+
+  await talk(session, 'ada-1', 3.2, time, () => {})
+  await session.settle()
+
+  const first = plugin.calls.windows[0]
+  assert.equal(first.cut, 'soft')
+  assert.equal(first.t1Ms - first.t0Ms, 1260, 'cut at the 1200 ms boundary plus a 60 ms pad, not at 3000 ms')
+  assert.deepEqual([session.stats().softCuts, session.stats().hardCuts], [1, 0])
+})
+
+test('without a phrase boundary the limit is a hard cut', async () => {
+  const time = clock()
+  const plugin = previewPlugin((fields) => ({ text: 'ohne Grenze', dropped: null, speechEndMs: fields.t1Ms - fields.t0Ms, segmentEndsMs: [fields.t1Ms - fields.t0Ms] }))
+  const session = liveSession(plugin, time, { commitAfterMs: 3000 })
+
+  await talk(session, 'ada-1', 3.1, time, () => {})
+  await session.settle()
+
+  assert.equal(plugin.calls.windows[0].cut, 'hard')
+  assert.deepEqual([session.stats().softCuts, session.stats().hardCuts], [0, 1])
+})
+
+test('while a cut waits for a busy speech server, further packets do not queue more cuts', async () => {
+  const time = clock()
+  const plugin = fakePlugin()
+  let releaseFirst
+  const first = new Promise((resolve) => { releaseFirst = resolve })
+  let calls = 0
+  plugin.window = async (ref, fields) => {
+    plugin.calls.windows.push({ seq: fields.seq, ms: fields.t1Ms - fields.t0Ms, cut: fields.cut })
+    calls += 1
+    if (calls === 1) {
+      await first
+    }
+    return { ended: false, text: 'ok', dropped: null }
+  }
+  const session = liveSession(plugin, time, { commitAfterMs: 1000, previewEveryMs: 0 })
+
+  await talk(session, 'ada-1', 1.0, time, () => {})
+  await talk(session, 'ada-1', 1.5, time, () => {})
+  releaseFirst()
+  await session.settle()
+
+  assert.deepEqual(plugin.calls.windows.map((call) => [call.seq, call.cut]), [[1, 'hard'], [2, 'hard']])
+  assert.ok(plugin.calls.windows.every((call) => call.ms >= 500), 'no tiny windows from queued cuts')
 })

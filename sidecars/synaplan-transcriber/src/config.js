@@ -46,7 +46,8 @@ export function loadConfig(env) {
   }
 
   // synaScriber live captions: how often a speaker's window so far is previewed; 0 = off.
-  const previewEveryMs = Number(env.PREVIEW_EVERY_MS ?? 1500)
+  const previewRaw = clean(env.PREVIEW_EVERY_MS)
+  const previewEveryMs = previewRaw === '' ? 1500 : Number(previewRaw)
   if (!Number.isFinite(previewEveryMs) || (previewEveryMs !== 0 && (previewEveryMs < 500 || previewEveryMs > 10000))) {
     throw new Error('PREVIEW_EVERY_MS must be 0 or between 500 and 10000')
   }

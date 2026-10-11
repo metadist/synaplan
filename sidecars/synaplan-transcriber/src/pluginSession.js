@@ -131,6 +131,7 @@ export function createPluginClient({ baseUrl, apiKey, fetchImpl = fetch }) {
         text: String(body.text || '').trim(),
         dropped: body.dropped ?? null,
         speechEndMs: Number.isFinite(body.speechEndMs) ? body.speechEndMs : null,
+        segmentEndsMs: Array.isArray(body.segmentEndsMs) ? body.segmentEndsMs.filter(Number.isFinite) : [],
       }
     },
 
@@ -246,6 +247,9 @@ export function createPluginSession({
   minPreviewMs = 1000,
   pauseMs = 700,
   silenceDropMs = 4000,
+  minSoftCutMs = 1000,
+  softCutGuardMs = 300,
+  softCutPadMs = 60,
   now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   retryForMs = DEFAULT_RETRY_MS,
@@ -263,6 +267,8 @@ export function createPluginSession({
   let previews = 0
   let pauseCuts = 0
   let silentDrops = 0
+  let softCuts = 0
+  let hardCuts = 0
   const inFlight = new Set()
   let meetingLanguage = language
   let captionsOn = captions !== false
@@ -304,6 +310,9 @@ export function createPluginSession({
         previewing: false,
         lastPreviewAt: 0,
         heard: false,
+        interimSeq: 0,
+        lastPreview: null,
+        cutQueued: false,
       }
       speakers.set(tag, entry)
     }
@@ -335,8 +344,33 @@ export function createPluginSession({
     return { packets, samples, at }
   }
 
+  /**
+   * A window that showed an interim caption but ends without a final one
+   * (no text, dropped, failed, captions turned off) gets an empty final
+   * under the same message id, so the line never keeps text that is not in
+   * the transcript.
+   */
+  function settleInterim(entry, seq, send) {
+    if (entry.interimSeq !== seq) {
+      return
+    }
+    entry.interimSeq = 0
+    send(caption({
+      sessionId: currentSessionId,
+      endpointId: entry.endpointId,
+      seq,
+      text: '',
+      language: meetingLanguage,
+      name: roster[entry.endpointId]?.name,
+      at: now(),
+    }))
+  }
+
   async function flush(tag, send, cut, { limit = Infinity, seq: expected = null } = {}) {
     const entry = speakers.get(tag)
+    if (entry) {
+      entry.cutQueued = false
+    }
     if (expected !== null && entry && entry.seq + 1 !== expected) {
       return
     }
@@ -366,22 +400,27 @@ export function createPluginSession({
       idempotencyKey: `${refHash8(ref)}:${endpointId}:${seq}`,
     }), retryForMs, sleep)
     if (!outcome.ok) {
+      settleInterim(entry, seq, send)
       await reportGap(endpointId, t0Ms, t1Ms)
       return
     }
     const result = outcome.value
     if (result.ended) {
+      settleInterim(entry, seq, send)
       ended = true
       return
     }
     windows += 1
     if (!result.text || result.dropped) {
+      settleInterim(entry, seq, send)
       return
     }
     entry.text = `${entry.text} ${result.text}`.trim()
     if (!captionsOn) {
+      settleInterim(entry, seq, send)
       return
     }
+    entry.interimSeq = entry.interimSeq === seq ? 0 : entry.interimSeq
     send(caption({
       sessionId: currentSessionId,
       endpointId,
@@ -395,8 +434,50 @@ export function createPluginSession({
 
   function enqueue(tag, send, cut, options) {
     const entry = speaker(tag)
+    if (cut !== 'stop') {
+      entry.cutQueued = true
+    }
     entry.chain = entry.chain.then(() => flush(tag, send, cut, options)).catch(() => {})
     return entry.chain
+  }
+
+  /** How many leading packets of the window fit into `ms`. */
+  function packetsWithin(entry, ms) {
+    const limit = ms * 48
+    let samples = 0
+    let count = 0
+    for (const packet of entry.packets) {
+      samples += opusPacketSamples(packet)
+      if (samples > limit) {
+        break
+      }
+      count += 1
+    }
+    return count
+  }
+
+  /**
+   * At the length limit, end the window at the last phrase boundary the
+   * latest preview reported (cut "soft"), so no word is split across two
+   * windows; the rest starts the next one. Without such a boundary it is a
+   * hard cut.
+   */
+  function limitCut(tag, send) {
+    const entry = speakers.get(tag)
+    const last = entry.lastPreview
+    if (last && last.seq === entry.seq + 1) {
+      const boundary = [...last.ends].reverse().find((end) => end >= minSoftCutMs && end <= last.durationMs - softCutGuardMs)
+      if (boundary !== undefined) {
+        const count = packetsWithin(entry, boundary + softCutPadMs)
+        if (count > 0 && count < entry.packets.length) {
+          softCuts += 1
+          enqueue(tag, send, 'soft', { limit: count, seq: last.seq })
+          return
+        }
+      }
+    }
+    hardCuts += 1
+    enqueue(tag, send, 'hard')
   }
 
   /**
@@ -410,7 +491,7 @@ export function createPluginSession({
       return
     }
     const entry = speakers.get(tag)
-    if (!entry || entry.previewing || entry.packets.length === 0) {
+    if (!entry || entry.previewing || entry.cutQueued || entry.packets.length === 0) {
       return
     }
     const durationMs = Math.round(entry.samples / 48)
@@ -438,18 +519,20 @@ export function createPluginSession({
 
   function onPreview(tag, send, snap, result) {
     const entry = speakers.get(tag)
-    if (!entry || !result || closing || ended || entry.seq + 1 !== snap.seq) {
+    if (!entry || !result || closing || ended || !captionsOn || entry.seq + 1 !== snap.seq) {
       return
     }
     if (!result.text || result.dropped) {
       entry.heard = false
-      if (snap.durationMs >= silenceDropMs) {
+      if (snap.durationMs >= silenceDropMs && entry.interimSeq !== snap.seq) {
         take(entry, snap.count)
         silentDrops += 1
       }
       return
     }
     entry.heard = true
+    entry.interimSeq = snap.seq
+    entry.lastPreview = { seq: snap.seq, durationMs: snap.durationMs, ends: result.segmentEndsMs || [] }
     send(caption({
       sessionId: currentSessionId,
       endpointId: entry.endpointId || endpointFromTag(tag),
@@ -485,6 +568,9 @@ export function createPluginSession({
       if (entry.samples >= MIN_FINAL_SAMPLES) {
         await flush(tag, send, 'stop')
       }
+      if (entry.interimSeq) {
+        settleInterim(entry, entry.interimSeq, send)
+      }
     }
     await postLifecycle('session-end')
     await postLifecycle('finished')
@@ -494,7 +580,7 @@ export function createPluginSession({
 
   return {
     ended: () => ended,
-    stats: () => ({ windows, failures, gaps, speakers: speakers.size, previews, pauseCuts, silentDrops }),
+    stats: () => ({ windows, failures, gaps, speakers: speakers.size, previews, pauseCuts, softCuts, hardCuts, silentDrops }),
 
     /** Resolves when no preview and no window is in flight (tests, shutdown). */
     async settle() {
@@ -577,7 +663,9 @@ export function createPluginSession({
       entry.packets.push(packet)
       entry.samples += opusPacketSamples(packet)
       if (entry.samples >= commitSamples) {
-        enqueue(tag, send, 'hard')
+        if (!entry.cutQueued) {
+          limitCut(tag, send)
+        }
         return
       }
       maybePreview(tag, send)

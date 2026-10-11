@@ -84,7 +84,7 @@ function upgradePlugin({ sockets, request, socket, head, ref, meetingId, plugin,
         }
         session.finish(send).then((result) => {
           const stats = session.stats()
-          log(`Notes ${ref}: ${result.state} after ${stats.windows} windows from ${stats.speakers} speakers (${stats.failures} failed, ${stats.gaps} gaps, ${stats.previews} previews, ${stats.pauseCuts} pause cuts, ${stats.silentDrops} silent stretches dropped).`)
+          log(`Notes ${ref}: ${result.state} after ${stats.windows} windows from ${stats.speakers} speakers (${stats.failures} failed, ${stats.gaps} gaps, ${stats.previews} previews, ${stats.pauseCuts} pause / ${stats.softCuts} soft / ${stats.hardCuts} hard cuts, ${stats.silentDrops} silent stretches dropped).`)
         }).catch((error) => {
           log(`Notes ${ref} were not finished: ${error.message}`)
         })
