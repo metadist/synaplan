@@ -563,7 +563,7 @@ jobs:
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
 
       - name: Upload minimal OpenAPI spec
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openapi-spec-minimal
           path: backend/openapi-spec.json
@@ -681,7 +681,7 @@ jobs:
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
 
       - name: Upload OpenAPI spec artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openapi-spec
           path: backend/openapi-spec.json
@@ -732,14 +732,14 @@ jobs:
           wait "$WIDGET_PID"
 
       - name: Upload frontend build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: frontend-dist
           path: frontend/dist/
           retention-days: 1
 
       - name: Upload widget build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: widget-dist
           path: frontend/dist-widget/
@@ -968,7 +968,7 @@ jobs:
           outputs: type=docker,dest=/tmp/docker-image.tar
 
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: docker-image
           path: /tmp/docker-image.tar
@@ -1254,7 +1254,7 @@ jobs:
 
       - name: Upload Playwright test results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-results-${{ strategy.job-index }}-${{ matrix.browser }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}-${{ matrix.auth_method }}
           path: |
@@ -1310,7 +1310,7 @@ jobs:
 
       - name: Upload flake summary
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-flake-summary
           path: flake-summary.json
@@ -1412,7 +1412,7 @@ jobs:
 
       - name: Upload results
         if: always() && steps.baselines.outputs.exists == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-results-visual
           path: |
@@ -2358,7 +2358,7 @@ jobs:
           path: /tmp/openapi
 
       - name: Re-upload for this run
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openapi-spec
           path: /tmp/openapi/openapi-spec.json
