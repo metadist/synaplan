@@ -1,6 +1,7 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { openApp } from '../helpers/auth'
+import { openMemories } from '../helpers/memories'
 import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS, INTERVALS, getApiUrl } from '../config/config'
 
@@ -23,8 +24,7 @@ test.describe('@ci Memories', () => {
 
     await test.step('Arrange: open the memories page', async () => {
       await openApp(page)
-      await page.goto('/memories')
-      await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await openMemories(page)
     })
 
     await test.step('Act: create a memory via the advanced form', async () => {
@@ -126,8 +126,7 @@ test.describe('@ci Memories', () => {
     const chat = new ChatHelper(page)
 
     await openApp(page)
-    await page.goto('/memories')
-    await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+    await openMemories(page)
     await page.locator(MEM.btnCreate).click()
     await page.locator(MEM.formModal).waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
     await page.locator(MEM.btnModeAdvanced).click()

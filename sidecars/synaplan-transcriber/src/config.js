@@ -45,6 +45,13 @@ export function loadConfig(env) {
     throw new Error('COMMIT_AFTER_MS must be between 1000 and 60000')
   }
 
+  // synaScriber live captions: how often a speaker's window so far is previewed; 0 = off.
+  const previewRaw = clean(env.PREVIEW_EVERY_MS)
+  const previewEveryMs = previewRaw === '' ? 1500 : Number(previewRaw)
+  if (!Number.isFinite(previewEveryMs) || (previewEveryMs !== 0 && (previewEveryMs < 500 || previewEveryMs > 10000))) {
+    throw new Error('PREVIEW_EVERY_MS must be 0 or between 500 and 10000')
+  }
+
   const jitsi = mode === 'jitsi' || mode === 'opendesk'
   const authToken = clean(env.TRANSCRIBER_AUTH_TOKEN)
   if (jitsi && authToken === '') {
@@ -71,6 +78,7 @@ export function loadConfig(env) {
     language,
     authToken,
     commitAfterMs,
+    previewEveryMs,
     matrixHomeserver,
     matrixToken,
     matrixUserId,
