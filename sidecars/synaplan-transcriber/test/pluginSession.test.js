@@ -385,3 +385,146 @@ test('an accepted bridge reports connected before audio', async () => {
     await new Promise((resolve) => server.close(resolve))
   }
 })
+
+function clock(start = 1700000000000) {
+  let time = start
+  return { now: () => time, tick: (ms) => { time += ms } }
+}
+
+/** Feeds `seconds` of 20 ms packets for one speaker, advancing the clock like real time. */
+async function talk(session, tag, seconds, time, send) {
+  for (let i = 0; i < Math.round(seconds * 50); i++) {
+    time.tick(20)
+    await session.handle(media(tag), send)
+  }
+}
+
+function previewPlugin(answer) {
+  const plugin = fakePlugin()
+  plugin.calls.previews = []
+  plugin.preview = async (ref, fields) => {
+    plugin.calls.previews.push({ seq: fields.seq, t0Ms: fields.t0Ms, t1Ms: fields.t1Ms, endpointId: fields.endpointId, ogg: fields.audio.subarray(0, 4).toString() })
+    return typeof answer === 'function' ? answer(fields) : answer
+  }
+  return plugin
+}
+
+function liveSession(plugin, time, options = {}) {
+  return createPluginSession({
+    ref: REF,
+    language: 'de',
+    sessionId: 'ms_1',
+    speakers: { ada: { name: 'Ada' } },
+    client: plugin,
+    commitAfterMs: 8000,
+    now: time.now,
+    refreshEveryMs: 0,
+    ...options,
+  })
+}
+
+test('live captions: the window so far is previewed and shown as an interim caption', async () => {
+  const time = clock()
+  const plugin = previewPlugin({ text: 'Guten', dropped: null, speechEndMs: null })
+  const session = liveSession(plugin, time)
+  const out = []
+  const send = (message) => out.push(message)
+
+  await talk(session, 'ada-1', 1.2, time, send)
+  await session.settle()
+  await session.handle({ event: 'stop', stop: { tag: 'ada-1' } }, send)
+  await session.finish(send)
+
+  assert.deepEqual(plugin.calls.previews[0], { seq: 1, t0Ms: 20, t1Ms: 1020, endpointId: 'ada', ogg: 'OggS' })
+  const interim = out.find((message) => message.is_interim === true)
+  const final = out.find((message) => message.is_interim === false)
+  assert.equal(interim.transcript[0].text, 'Guten')
+  assert.equal(interim.message_id, 'ms_1:ada:1')
+  assert.equal(interim.participant.name, 'Ada')
+  assert.equal(final.message_id, 'ms_1:ada:1')
+  assert.ok(out.indexOf(interim) < out.indexOf(final))
+})
+
+test('a pause in the preview ends the window there, the rest starts the next one', async () => {
+  const time = clock()
+  const plugin = previewPlugin({ text: 'Guten Morgen', dropped: null, speechEndMs: 200 })
+  const session = liveSession(plugin, time)
+  const send = () => {}
+
+  await talk(session, 'ada-1', 1.5, time, send)
+  await session.settle()
+
+  assert.deepEqual(
+    plugin.calls.windows.map(({ seq, t0Ms, t1Ms, cut }) => ({ seq, t0Ms, t1Ms, cut })),
+    [{ seq: 1, t0Ms: 20, t1Ms: 1020, cut: 'pause' }],
+  )
+  assert.equal(session.stats().pauseCuts, 1)
+
+  await session.handle({ event: 'stop', stop: { tag: 'ada-1' } }, send)
+  await session.settle()
+  assert.equal(plugin.calls.windows[1].t0Ms, 1020)
+  assert.equal(plugin.calls.windows[1].cut, 'stop')
+})
+
+test('stretches without speech are dropped before they become a window', async () => {
+  const time = clock()
+  const plugin = previewPlugin({ text: '', dropped: 'no_speech', speechEndMs: null })
+  const session = liveSession(plugin, time)
+
+  await talk(session, 'ada-1', 9, time, () => {})
+  await session.settle()
+
+  assert.equal(plugin.calls.windows.length, 0, 'a listening participant sends no window, not even at the 8 s hard cut')
+  assert.equal(session.stats().silentDrops, 1)
+  assert.deepEqual(plugin.calls.previews.map((call) => call.t1Ms - call.t0Ms), [1000, 4000, 3000])
+})
+
+test('a preview that comes back after its window was sent shows nothing', async () => {
+  const time = clock()
+  let release
+  const plugin = previewPlugin(() => new Promise((resolve) => { release = resolve }))
+  const session = liveSession(plugin, time)
+  const out = []
+  const send = (message) => out.push(message)
+
+  await talk(session, 'ada-1', 1.1, time, send)
+  await session.handle({ event: 'stop', stop: { tag: 'ada-1' } }, send)
+  release({ text: 'zu spät', dropped: null, speechEndMs: null })
+  await session.settle()
+
+  assert.equal(plugin.calls.windows.length, 1)
+  assert.equal(out.filter((message) => message.is_interim === true).length, 0)
+})
+
+test('no previews when live captions are off', async () => {
+  const time = clock()
+  const plugin = previewPlugin({ text: 'Guten', dropped: null, speechEndMs: null })
+  const session = liveSession(plugin, time, { captions: false })
+
+  await talk(session, 'ada-1', 2, time, () => {})
+  await session.settle()
+
+  assert.equal(plugin.calls.previews.length, 0)
+})
+
+test('the plugin client previews with multipart audio; anything but 200 is no caption', async () => {
+  const seen = []
+  let status = 200
+  const fetchImpl = async (url, options) => {
+    seen.push({ url, method: options.method, seq: options.body.get('seq'), endpointId: options.body.get('endpointId') })
+    return status === 200
+      ? new Response(JSON.stringify({ seq: 2, text: ' Hallo ', dropped: null, speechEndMs: 640 }), { status })
+      : new Response(JSON.stringify({ error: 'captions_off' }), { status })
+  }
+  const client = createPluginClient({ baseUrl: 'https://synaplan.example', apiKey: 'sk_test', fetchImpl })
+  const fields = { endpointId: 'ada', seq: 2, t0Ms: 0, t1Ms: 1000, audio: Buffer.from('OggS') }
+
+  assert.deepEqual(await client.preview(REF, fields), { text: 'Hallo', dropped: null, speechEndMs: 640 })
+  status = 403
+  assert.equal(await client.preview(REF, fields), null)
+  status = 409
+  assert.equal(await client.preview(REF, fields), null)
+  assert.equal(seen[0].url, `https://synaplan.example/api/v1/plugins/synascriber/public/transcriber/sessions/${REF}/preview`)
+  assert.equal(seen[0].method, 'POST')
+  assert.equal(seen[0].seq, '2')
+})

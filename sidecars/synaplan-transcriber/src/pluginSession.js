@@ -112,6 +112,28 @@ export function createPluginClient({ baseUrl, apiKey, fetchImpl = fetch }) {
       }
     },
 
+    /**
+     * Live caption of the window so far. Best effort: anything but 200 means
+     * "no caption this time", never the end of the session.
+     */
+    async preview(ref, fields) {
+      const form = new FormData()
+      form.append('audio', new Blob([fields.audio], { type: 'audio/ogg' }), 'window.ogg')
+      form.append('endpointId', String(fields.endpointId))
+      form.append('seq', String(fields.seq))
+      form.append('t0Ms', String(fields.t0Ms))
+      form.append('t1Ms', String(fields.t1Ms))
+      const { status, body } = await call(`/${encodeURIComponent(ref)}/preview`, { method: 'POST', body: form })
+      if (status !== 200) {
+        return null
+      }
+      return {
+        text: String(body.text || '').trim(),
+        dropped: body.dropped ?? null,
+        speechEndMs: Number.isFinite(body.speechEndMs) ? body.speechEndMs : null,
+      }
+    },
+
     async event(ref, payload) {
       const { status, body, retryAfterMs: retryAfter } = await call(`/${encodeURIComponent(ref)}/events`, {
         method: 'POST',
@@ -187,7 +209,7 @@ function promptFor(text, glossary) {
   return tail ? `${tail}\n${gloss}` : gloss
 }
 
-function caption({ sessionId, endpointId, seq, text, language, name, at }) {
+function caption({ sessionId, endpointId, seq, text, language, name, at, interim = false }) {
   const participant = { id: endpointId }
   if (name) {
     participant.name = name
@@ -196,7 +218,7 @@ function caption({ sessionId, endpointId, seq, text, language, name, at }) {
     type: 'transcription-result',
     event: 'transcription-result',
     message_id: `${sessionId}:${endpointId}:${seq}`,
-    is_interim: false,
+    is_interim: interim,
     transcript: [{ text }],
     participant,
     timestamp: at,
@@ -219,6 +241,11 @@ export function createPluginSession({
   glossary: initialGlossary = [],
   client,
   commitAfterMs = 8000,
+  previewEveryMs = 1500,
+  idlePreviewEveryMs = 3000,
+  minPreviewMs = 1000,
+  pauseMs = 700,
+  silenceDropMs = 4000,
   now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   retryForMs = DEFAULT_RETRY_MS,
@@ -233,6 +260,10 @@ export function createPluginSession({
   let windows = 0
   let failures = 0
   let gaps = 0
+  let previews = 0
+  let pauseCuts = 0
+  let silentDrops = 0
+  const inFlight = new Set()
   let meetingLanguage = language
   let captionsOn = captions !== false
   let currentSessionId = sessionId
@@ -270,6 +301,9 @@ export function createPluginSession({
         endpointId: endpointFromTag(tag),
         seq: 0,
         text: '',
+        previewing: false,
+        lastPreviewAt: 0,
+        heard: false,
       }
       speakers.set(tag, entry)
     }
@@ -291,8 +325,21 @@ export function createPluginSession({
     }
   }
 
-  async function flush(tag, send, cut) {
+  /** Removes the first `count` packets of a speaker's window and returns them with their length. */
+  function take(entry, count) {
+    const packets = entry.packets.splice(0, Math.min(count, entry.packets.length))
+    const samples = packets.reduce((sum, packet) => sum + opusPacketSamples(packet), 0)
+    const at = entry.startedAt
+    entry.samples = Math.max(0, entry.samples - samples)
+    entry.startedAt = entry.packets.length > 0 ? at + Math.round(samples / 48) : 0
+    return { packets, samples, at }
+  }
+
+  async function flush(tag, send, cut, { limit = Infinity, seq: expected = null } = {}) {
     const entry = speakers.get(tag)
+    if (expected !== null && entry && entry.seq + 1 !== expected) {
+      return
+    }
     if (!entry || entry.packets.length === 0 || ended) {
       if (entry) {
         entry.packets = []
@@ -300,13 +347,8 @@ export function createPluginSession({
       }
       return
     }
-    const packets = entry.packets
-    const at = entry.startedAt
-    const samples = entry.samples
+    const { packets, samples, at } = take(entry, limit)
     const endpointId = entry.endpointId || endpointFromTag(tag)
-    entry.packets = []
-    entry.samples = 0
-    entry.startedAt = 0
     entry.seq += 1
     const seq = entry.seq
     const t0Ms = Math.max(0, at - origin)
@@ -351,10 +393,77 @@ export function createPluginSession({
     }))
   }
 
-  function enqueue(tag, send, cut) {
+  function enqueue(tag, send, cut, options) {
     const entry = speaker(tag)
-    entry.chain = entry.chain.then(() => flush(tag, send, cut)).catch(() => {})
+    entry.chain = entry.chain.then(() => flush(tag, send, cut, options)).catch(() => {})
     return entry.chain
+  }
+
+  /**
+   * While someone speaks, the window so far goes to the plugin's preview
+   * route every `previewEveryMs` (less often after silence): the answer is a
+   * live caption, shows where speech paused (the window then ends there), and
+   * stretches without speech are dropped before they become a window.
+   */
+  function maybePreview(tag, send) {
+    if (previewEveryMs <= 0 || !captionsOn || closing || ended || typeof client.preview !== 'function') {
+      return
+    }
+    const entry = speakers.get(tag)
+    if (!entry || entry.previewing || entry.packets.length === 0) {
+      return
+    }
+    const durationMs = Math.round(entry.samples / 48)
+    const every = entry.heard ? previewEveryMs : idlePreviewEveryMs
+    if (durationMs < minPreviewMs || now() - entry.lastPreviewAt < every) {
+      return
+    }
+    const snap = { seq: entry.seq + 1, count: entry.packets.length, durationMs }
+    const t0Ms = Math.max(0, entry.startedAt - origin)
+    entry.previewing = true
+    entry.lastPreviewAt = now()
+    previews += 1
+    const work = client.preview(ref, {
+      endpointId: entry.endpointId || endpointFromTag(tag),
+      seq: snap.seq,
+      t0Ms,
+      t1Ms: t0Ms + Math.max(1, durationMs),
+      audio: muxOpusPackets(entry.packets.slice(0, snap.count)),
+    }).then((result) => onPreview(tag, send, snap, result)).catch(() => {}).finally(() => {
+      entry.previewing = false
+      inFlight.delete(work)
+    })
+    inFlight.add(work)
+  }
+
+  function onPreview(tag, send, snap, result) {
+    const entry = speakers.get(tag)
+    if (!entry || !result || closing || ended || entry.seq + 1 !== snap.seq) {
+      return
+    }
+    if (!result.text || result.dropped) {
+      entry.heard = false
+      if (snap.durationMs >= silenceDropMs) {
+        take(entry, snap.count)
+        silentDrops += 1
+      }
+      return
+    }
+    entry.heard = true
+    send(caption({
+      sessionId: currentSessionId,
+      endpointId: entry.endpointId || endpointFromTag(tag),
+      seq: snap.seq,
+      text: result.text,
+      language: meetingLanguage,
+      name: roster[entry.endpointId]?.name,
+      at: now(),
+      interim: true,
+    }))
+    if (result.speechEndMs !== null && snap.durationMs - result.speechEndMs >= pauseMs) {
+      pauseCuts += 1
+      enqueue(tag, send, 'pause', { limit: snap.count, seq: snap.seq })
+    }
   }
 
   async function postLifecycle(type) {
@@ -385,7 +494,15 @@ export function createPluginSession({
 
   return {
     ended: () => ended,
-    stats: () => ({ windows, failures, gaps, speakers: speakers.size }),
+    stats: () => ({ windows, failures, gaps, speakers: speakers.size, previews, pauseCuts, silentDrops }),
+
+    /** Resolves when no preview and no window is in flight (tests, shutdown). */
+    async settle() {
+      while (inFlight.size > 0) {
+        await Promise.all([...inFlight])
+      }
+      await Promise.all([...speakers.values()].map((entry) => entry.chain))
+    },
 
     async connect() {
       await client.event(ref, { type: 'connected', at: now() })
@@ -461,7 +578,9 @@ export function createPluginSession({
       entry.samples += opusPacketSamples(packet)
       if (entry.samples >= commitSamples) {
         enqueue(tag, send, 'hard')
+        return
       }
+      maybePreview(tag, send)
     },
 
     finish(send) {
