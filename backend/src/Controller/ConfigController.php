@@ -11,6 +11,7 @@ use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Bundle\BundleConfig;
 use App\DTO\ImageModelRow;
+use App\DTO\ModelRow;
 use App\Entity\Config;
 use App\Entity\User;
 use App\Model\ModelCatalog;
@@ -961,26 +962,7 @@ class ConfigController extends AbstractController
                     property: 'models',
                     type: 'object',
                     properties: [
-                        new OA\Property(
-                            property: 'CHAT',
-                            type: 'array',
-                            items: new OA\Items(
-                                properties: [
-                                    new OA\Property(property: 'id', type: 'integer', example: 324),
-                                    new OA\Property(property: 'service', type: 'string', example: 'Groq'),
-                                    new OA\Property(property: 'name', type: 'string', example: 'Qwen 3.6 27B'),
-                                    new OA\Property(property: 'quality', type: 'integer', example: 9),
-                                    new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning')),
-                                    new OA\Property(property: 'reasoningLevels', type: 'array', items: new OA\Items(type: 'string', example: 'medium'), description: 'Discrete reasoning levels this model accepts, cheapest first. Absent when the model has no level knob and the chat keeps the on/off Thinking control.'),
-                                    new OA\Property(property: 'reasoningEffortDefault', type: 'string', example: 'medium', description: 'Level selected when the person has not chosen one. Present only together with reasoningLevels.'),
-                                    new OA\Property(property: 'available', type: 'boolean', example: true, description: 'False only in the admin includeUnavailable view: the provider has no key/URL, or the Ollama model is not pulled.'),
-                                    new OA\Property(property: 'unavailableReason', type: 'string', nullable: true, enum: ['provider_unavailable', 'not_pulled'], example: null),
-                                    new OA\Property(property: 'priceIn', type: 'number', example: 0.15, description: 'USD per 1M input tokens'),
-                                    new OA\Property(property: 'priceOut', type: 'number', example: 0.6, description: 'USD per 1M output tokens'),
-                                    new OA\Property(property: 'priceKnown', type: 'boolean', example: true, description: 'False when the model was imported from a listing that published no price. The menu then says "price unknown" instead of "Free".'),
-                                ]
-                            )
-                        ),
+                        new OA\Property(property: 'CHAT', type: 'array', items: new OA\Items(ref: new Model(type: ModelRow::class))),
                         new OA\Property(
                             property: 'TEXT2PIC',
                             type: 'array',
