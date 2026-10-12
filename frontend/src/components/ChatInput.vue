@@ -23,50 +23,11 @@
     <!-- On mobile the horizontal padding matches the drawer toggle's left
          offset (left-3 = 12px) so the composer aligns with the menu button and
          uses the full width; md+ keeps the roomier px-4. -->
-    <div class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4">
-      <LiveVoicePanel
-        v-if="showLiveVoice && live.active.value"
-        class="mb-3"
-        :phase="live.phase.value"
-        :status="t(`chatInput.liveVoice.status.${live.phase.value}`)"
-        :company-line="t('chatInput.liveVoice.companyLine', { company: live.company.value })"
-        :touches-line="t('chatInput.liveVoice.touchesLine')"
-        :owner-line="t('chatInput.liveVoice.ownerLine')"
-        :model-label="live.activeModel.value?.name ?? ''"
-        :budget-label="
-          live.secondsLeft.value === null
-            ? ''
-            : t('chatInput.liveVoice.budget', { seconds: live.secondsLeft.value })
-        "
-        :mute-label="
-          live.muted.value ? t('chatInput.liveVoice.unmute') : t('chatInput.liveVoice.mute')
-        "
-        :captions-label="
-          live.captions.value
-            ? t('chatInput.liveVoice.captionsOff')
-            : t('chatInput.liveVoice.captions')
-        "
-        :end-label="t('chatInput.liveVoice.end')"
-        :settings-label="t('chatInput.liveVoice.settings')"
-        :caption-text="live.captionText.value"
-        :show-caption="live.captions.value"
-        :level="live.level.value"
-        :warn-banner="
-          live.budgetWrap.value
-            ? t('chatInput.liveVoice.wrap')
-            : live.budgetWarn.value
-              ? t('chatInput.liveVoice.warn')
-              : ''
-        "
-        :terminal-message="t(live.terminalMessageKey.value)"
-        :terminal-action-label="t(live.terminalActionKey.value)"
-        :terminal-action="live.terminalAction.value"
-        @mute="live.toggleMute()"
-        @captions="live.toggleCaptions()"
-        @end="live.end()"
-        @dismiss="live.dismiss()"
-        @action="onLiveTerminalAction"
-      />
+    <div
+      class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4"
+      :inert="liveActive"
+      :class="liveActive ? 'invisible' : ''"
+    >
       <!-- File and Quote Display (above input) -->
       <div
         v-if="uploadedFiles.length > 0 || quote || pastedBlocks.length > 0"
@@ -491,17 +452,6 @@
               />
 
               <button
-                v-if="showLiveVoice && !live.active.value"
-                type="button"
-                class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl flex-shrink-0"
-                :aria-label="t('chatInput.liveVoice.start')"
-                data-testid="btn-chat-live-voice"
-                @click="live.press()"
-              >
-                <Icon icon="mdi:waveform" class="w-5 h-5" />
-              </button>
-
-              <button
                 v-if="showMicrophoneButton"
                 type="button"
                 :class="[
@@ -515,6 +465,18 @@
               >
                 <Icon v-if="isRecording" icon="mdi:stop" class="w-5 h-5 text-white" />
                 <MicrophoneIcon v-else class="w-5 h-5" />
+              </button>
+
+              <button
+                v-if="showLiveVoiceButton"
+                type="button"
+                class="icon-ghost !rounded-xl h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
+                :aria-label="$t('chatInput.liveVoice.button')"
+                :title="$t('chatInput.liveVoice.button')"
+                data-testid="btn-chat-live-voice"
+                @click="livePress"
+              >
+                <Icon icon="mdi:waveform" class="w-5 h-5" />
               </button>
 
               <button
@@ -548,14 +510,57 @@
       @save="savePastedBlock"
     />
 
+    <div
+      v-if="liveActive"
+      class="absolute inset-0 z-10 overflow-y-auto bg-chat-input-area px-3 py-2 md:px-4 md:py-4"
+    >
+      <div class="mx-auto max-w-[70rem]">
+        <LiveVoicePanel
+          :phase="livePhase"
+          :status="liveStatus"
+          :company-line="$t('chatInput.liveVoice.companyLine', { company: liveCompany })"
+          :touches-line="$t('chatInput.liveVoice.touchesLine')"
+          :owner-line="$t('chatInput.liveVoice.ownerLine')"
+          :model-label="liveModelLabel"
+          :budget-label="liveBudgetLabel"
+          :mute-label="
+            liveMuted ? $t('chatInput.liveVoice.unmute') : $t('chatInput.liveVoice.mute')
+          "
+          :captions-label="
+            liveCaptions
+              ? $t('chatInput.liveVoice.captionsOn')
+              : $t('chatInput.liveVoice.captionsOff')
+          "
+          :end-label="$t('chatInput.liveVoice.end')"
+          :settings-label="$t('chatInput.liveVoice.settings')"
+          :caption-text="liveCaptionText"
+          :show-caption="liveCaptions"
+          :level="liveLevel"
+          :warn-banner="
+            liveBudgetWarn && livePhase !== 'ended'
+              ? $t('chatInput.liveVoice.warnBanner', { seconds: liveSecondsLeft ?? 0 })
+              : ''
+          "
+          :terminal-message="$t(liveTerminalMessageKey)"
+          :terminal-action-label="$t(liveTerminalActionKey)"
+          :terminal-action="liveTerminalAction"
+          @mute="liveToggleMute"
+          @captions="liveToggleCaptions"
+          @end="liveEnd"
+          @dismiss="liveDismiss"
+          @action="onLiveTerminalAction"
+        />
+      </div>
+    </div>
+
     <LiveVoiceConsentDialog
-      v-if="live.consentOpen.value"
-      :title="t('chatInput.liveVoice.consentTitle')"
-      :body="t('chatInput.liveVoice.consentBody', { company: live.company.value })"
-      :allow-label="t('chatInput.liveVoice.consentAllow')"
-      :decline-label="t('chatInput.liveVoice.consentDecline')"
-      @allow="live.allowConsent()"
-      @decline="live.declineConsent()"
+      v-if="liveConsentOpen"
+      :title="$t('chatInput.liveVoice.consentTitle')"
+      :body="$t('chatInput.liveVoice.consentBody', { company: liveCompany })"
+      :allow-label="$t('chatInput.liveVoice.consentAllow')"
+      :decline-label="$t('chatInput.liveVoice.consentDecline')"
+      @allow="liveAllowConsent"
+      @decline="liveDeclineConsent"
     />
   </div>
 </template>
@@ -601,6 +606,9 @@ import type { FileItem } from '@/services/filesService'
 import { deleteFile, getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 import { useLiveVoice } from '@/composables/useLiveVoice'
+import { liveVoiceButtonVisible } from '@/services/liveVoice/visibility'
+import { liveCostBudget, type LiveVoiceCostBudget } from '@/services/api/liveVoiceApi'
+import type { LimitCheckResult } from '@/composables/useLimitCheck'
 import LiveVoicePanel from '@/components/chat/LiveVoicePanel.vue'
 import LiveVoiceConsentDialog from '@/components/chat/LiveVoiceConsentDialog.vue'
 import { speechFailureMessageKey } from '@/utils/speechFailure'
@@ -1251,19 +1259,7 @@ const emit = defineEmits<{
   stop: []
   guestFeatureGate: [featureKey: string]
   clearQuote: []
-  liveVoiceBudget: [
-    budget: {
-      allowed: boolean
-      limitType: 'monthly'
-      actionType: string
-      used: number
-      limit: number
-      remaining: number
-      userLevel: string
-      phoneVerified: boolean
-      topupAvailable: boolean
-    },
-  ]
+  budgetBlocked: [result: LimitCheckResult]
 }>()
 
 const canSend = computed(() => {
@@ -2151,22 +2147,11 @@ const startWebSpeechRecording = async () => {
   }
 }
 
-const lastLiveBudget = ref<{
-  allowed: false
-  limitType: 'monthly'
-  actionType: 'VOICE_LIVE'
-  used: number
-  limit: number
-  remaining: number
-  userLevel: string
-  phoneVerified: boolean
-  topupAvailable: boolean
-} | null>(null)
-const live = useLiveVoice((budget) => {
-  const result = {
-    allowed: false as const,
-    limitType: 'monthly' as const,
-    actionType: 'VOICE_LIVE',
+function liveBudgetResult(budget: LiveVoiceCostBudget): LimitCheckResult {
+  return {
+    allowed: false,
+    limitType: 'monthly',
+    actionType: 'MESSAGES',
     used: Number(budget.used),
     limit: Number(budget.limit),
     remaining: Number(budget.remaining),
@@ -2174,29 +2159,80 @@ const live = useLiveVoice((budget) => {
     phoneVerified: budget.phoneVerified,
     topupAvailable: budget.topupAvailable,
   }
-  lastLiveBudget.value = result
-  emit('liveVoiceBudget', result)
+}
+
+const {
+  phase: livePhase,
+  active: liveActive,
+  consentOpen: liveConsentOpen,
+  muted: liveMuted,
+  captions: liveCaptions,
+  level: liveLevel,
+  secondsLeft: liveSecondsLeft,
+  captionText: liveCaptionText,
+  activeModel: liveModel,
+  budgetWarn: liveBudgetWarn,
+  budgetWrap: liveBudgetWrap,
+  company: liveCompany,
+  terminalAction: liveTerminalAction,
+  terminalMessageKey: liveTerminalMessageKey,
+  terminalActionKey: liveTerminalActionKey,
+  options: liveOptions,
+  press: livePress,
+  allowConsent: liveAllowConsent,
+  declineConsent: liveDeclineConsent,
+  end: liveEnd,
+  toggleMute: liveToggleMute,
+  toggleCaptions: liveToggleCaptions,
+  dismiss: liveDismiss,
+} = useLiveVoice((budget) => emit('budgetBlocked', liveBudgetResult(budget)))
+
+const showLiveVoiceButton = computed(() =>
+  liveVoiceButtonVisible({
+    enabled: configStore.voiceLive?.enabled === true,
+    guest: isGuestMode.value,
+    nativeApp: isNativeApp(),
+  })
+)
+
+const liveStatus = computed(() => {
+  const phase = livePhase.value
+  if (phase === 'thinking') return t('chatInput.liveVoice.thinking')
+  if (phase === 'speaking') return t('chatInput.liveVoice.speaking')
+  if (phase === 'ending') {
+    return liveBudgetWrap.value
+      ? t('chatInput.liveVoice.wrappingUp')
+      : t('chatInput.liveVoice.ending')
+  }
+  if (phase === 'connecting') return t('chatInput.liveVoice.connecting')
+  if (phase === 'ended') return t(liveTerminalMessageKey.value)
+  return t('chatInput.liveVoice.listening')
 })
-const showLiveVoice = computed(() => configStore.voiceLive.enabled && !isGuestMode.value)
+
+const liveModelLabel = computed(() => liveModel.value?.name ?? '')
+
+const liveBudgetLabel = computed(() => {
+  const left = liveSecondsLeft.value
+  if (left === null) return ''
+  if (left < 90) return t('chatInput.liveVoice.budgetSeconds', { seconds: left })
+  return t('chatInput.liveVoice.budgetMinutes', { minutes: Math.max(1, Math.round(left / 60)) })
+})
 
 function onLiveTerminalAction() {
-  const action = live.terminalAction.value
-  if (action === 'talk_again') {
-    live.dismiss()
-    void live.press()
+  const action = liveTerminalAction.value
+  const budget = liveCostBudget(liveOptions.value?.costBudget)
+  liveDismiss()
+  if (action === 'top_up' && budget) {
+    emit('budgetBlocked', liveBudgetResult(budget))
     return
   }
   if (action === 'microphone') {
-    live.dismiss()
     void toggleRecording()
     return
   }
-  if (action === 'top_up') {
-    if (lastLiveBudget.value) emit('liveVoiceBudget', lastLiveBudget.value)
-    live.dismiss()
-    return
+  if (action === 'talk_again') {
+    void livePress()
   }
-  live.dismiss()
 }
 
 /**

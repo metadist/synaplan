@@ -408,7 +408,7 @@
           Boolean(pinnedAgentId)
         "
         :quote="quoting.pendingQuote.value"
-        @live-voice-budget="checkAndShowLimit"
+        @budget-blocked="showLimitOrPaywall"
         @send="handleSendMessage"
         @stop="handleUserStop"
         @guest-feature-gate="handleGuestFeatureGate"

@@ -871,6 +871,9 @@
       "latency": "Latencia",
       "duration": "Duración",
       "noRecentActivity": "Sin actividad reciente",
+      "durationMinutes": "{minutes} min {seconds} s",
+      "durationSeconds": "{seconds} s",
+      "openChat": "Abrir este chat",
       "actions": {
         "messages": "Mensajes",
         "images": "Imágenes",

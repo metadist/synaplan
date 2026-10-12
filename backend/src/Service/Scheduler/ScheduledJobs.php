@@ -24,9 +24,9 @@ final class ScheduledJobs
     public const LANES = [
         self::LANE_TICK => [
             'app:media:reap-jobs',
-            'app:voice:reap-sessions',
             'app:chat:reap-stuck',
             'app:desktop:reap-jobs',
+            'app:voice:reap-sessions',
             'app:process-mail-handlers',
             'app:process-emails',
         ],

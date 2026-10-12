@@ -332,7 +332,7 @@ quota sums `BSECONDS` per window (running sessions included), so no new
 | Key | Mode | Price fields |
 | --- | ---- | ------------ |
 | `openai:gpt-live-1:voice2voice` | `per_second` | `priceIn 0.05`, `inUnit permin` |
-| `openai:gpt-realtime-2.1:voice2voice` | `per_audio_token` (new) | `json.audio_price_in_per_1M 32`, `audio_cache_in 0.40`, `audio_price_out_per_1M 64`, text 4 / 0.40 / 24 |
+| `openai:gpt-realtime-2.1:voice2voice` | `per_audio_token` (new) | `json.audio_price_in_per_1M 32`, `audio_cache_in_per_1M 0.40`, `audio_price_out_per_1M 64`, text 4 / 0.40 / 24 |
 | `openai:gpt-realtime-2.1-mini:voice2voice` | `per_audio_token` | audio 10 / 0.30 / 20; text 0.60 / 0.06 / 2.40 |
 | `google:gemini-3.8-live:voice2voice` | `per_audio_token` | audio in 3, out 12; text 0.75 / 4.50 |
 | `google:gemini-3.8-live-extended-thinking:voice2voice` | `per_audio_token` | verify at LV0 |

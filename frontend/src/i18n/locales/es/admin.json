@@ -100,22 +100,22 @@
   "admin": {
     "liveVoice": {
       "title": "Conversaciones en vivo",
-      "intro": "Vea quién está hablando ahora y finalice una conversación si hace falta.",
-      "directHint": "Cuando esto está activado, la siguiente conversación de OpenAI se conecta desde el navegador. Google y xAI siguen en este servidor. Desactivarlo no mueve una conversación que ya está en curso.",
-      "directTurnOn": "Activar la conexión directa",
-      "directTurnOff": "Desactivar la conexión directa",
-      "directSaved": "Guardado. La siguiente conversación de OpenAI usa este ajuste.",
-      "directFailed": "No se pudo guardar el ajuste.",
-      "loadFailed": "No se pudieron cargar las conversaciones en vivo.",
-      "killTitle": "¿Finalizar esta conversación?",
-      "killMessage": "Esto finaliza la conversación en vivo de {email}. La transcripción ya guardada permanece en el chat.",
-      "someone": "esta persona",
-      "kill": "Finalizar conversación",
-      "killed": "La conversación ha terminado.",
-      "killFailed": "No se pudo finalizar la conversación.",
-      "loading": "Cargando conversaciones en vivo…",
+      "intro": "Personas que están hablando ahora. Al terminar una, el micrófono se detiene en unos segundos. La transcripción ya guardada permanece en el chat.",
       "empty": "Nadie está en una conversación en vivo.",
-      "seconds": "{seconds} segundos"
+      "loading": "Cargando…",
+      "seconds": "{seconds} s",
+      "someone": "esta persona",
+      "kill": "Terminar conversación",
+      "killTitle": "¿Terminar esta conversación en vivo?",
+      "killMessage": "Esto termina la conversación en vivo de {email}. La transcripción ya guardada permanece en el chat. No se envía nada más.",
+      "killed": "La conversación se detendrá en unos segundos.",
+      "killFailed": "No se pudo terminar la conversación.",
+      "loadFailed": "No se pudieron cargar las conversaciones en vivo.",
+      "directHint": "Si está activado, la siguiente conversación de OpenAI se conecta desde el navegador. Google y xAI siguen en este servidor. Desactivarlo no mueve una conversación que ya está en curso.",
+      "directTurnOn": "Activar conexión directa",
+      "directTurnOff": "Desactivar conexión directa",
+      "directSaved": "Guardado. La siguiente conversación de OpenAI usa este ajuste.",
+      "directFailed": "No se pudo guardar la conexión directa."
     },
     "title": "Operar",
     "description": "Tu servidor de un vistazo: usuarios, registros y uso.",
@@ -1320,7 +1320,7 @@
       "label": "Notas de la reunión"
     },
     "live_voice": {
-      "label": "Voz en vivo"
+      "label": "Conversaciones en vivo"
     },
     "compute": {
       "label": "Cómputo seguro (trabajo con archivos)",

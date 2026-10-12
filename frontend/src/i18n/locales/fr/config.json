@@ -1123,6 +1123,9 @@
       "cost": "Coût",
       "estimatedTooltip": "Nombre de jetons estimé (pas de mesure exacte du fournisseur)",
       "noRecentActivity": "Aucune activité récente",
+      "durationMinutes": "{minutes} min {seconds} s",
+      "durationSeconds": "{seconds} s",
+      "openChat": "Ouvrir ce chat",
       "activity": {
         "searchPlaceholder": "Rechercher par modèle ou fournisseur…",
         "allActions": "Toutes les actions",

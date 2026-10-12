@@ -136,7 +136,8 @@
 
 	# Live voice gateway. The sidecar holds the provider socket. An install
 	# that has not started the `voice` profile gets a 502 on this path, which
-	# is the same as the feature being off.
+	# is the same as the feature being off. The upstream is overridable for
+	# the same shared-network DNS reason as Centrifugo above.
 	handle /voice/ws* {
 		reverse_proxy {$LIVE_VOICE_UPSTREAM_ADDR:voice:8096}
 	}

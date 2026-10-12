@@ -79,7 +79,7 @@ class ConfigController extends AbstractController
     private const DEFAULTS_SCOPE_INSTANCE = 'instance';
 
     /** Capabilities the AI Models page binds a default model to. */
-    private const DEFAULT_MODEL_CAPABILITIES = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+    private const DEFAULT_MODEL_CAPABILITIES = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE', 'VOICE_LIVE'];
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -133,7 +133,6 @@ class ConfigController extends AbstractController
         private readonly ?\App\Service\Chat\ChatWelcomeConfig $chatWelcomeConfig = null,
         private readonly ?\App\Service\Chat\ChatActionPolicy $chatActionPolicy = null,
         private readonly ?CostCalculationService $costCalculationService = null,
-        private readonly ?LiveVoiceModule $liveVoice = null,
     ) {
     }
 
@@ -275,7 +274,8 @@ class ConfigController extends AbstractController
                 new OA\Property(
                     property: 'voiceLive',
                     type: 'object',
-                    description: 'Full-duplex live voice. Absent until the gateway and a provider key are configured.',
+                    required: ['enabled'],
+                    description: 'Live voice. enabled is true only when the gateway is configured and a speech-to-speech model has a provider key. Older clients ignore this key.',
                     properties: [
                         new OA\Property(property: 'enabled', type: 'boolean', example: false),
                     ]
@@ -773,7 +773,7 @@ class ConfigController extends AbstractController
             ],
             'features' => $features,
             'voiceLive' => [
-                'enabled' => $this->liveVoice?->isConfigured() ?? false,
+                'enabled' => $this->modules->get(LiveVoiceModule::ID)->isConfigured(),
             ],
             'speech' => $speech,
             'plugins' => $plugins,
@@ -1110,6 +1110,7 @@ class ConfigController extends AbstractController
             'SOUND2TEXT' => [],
             'TEXT2SOUND' => [],
             'ANALYZE' => [],
+            'VOICE_LIVE' => [],
         ];
 
         foreach ($modelList as $model) {
@@ -1172,6 +1173,11 @@ class ConfigController extends AbstractController
                 case 'TTS':
                 case 'TEXT2SOUND':
                     $grouped['TEXT2SOUND'][] = $model;
+                    break;
+                case 'VOICE2VOICE':
+                    // Live speech-to-speech. Its own picker only — the default
+                    // arm below would otherwise drop it into every dropdown.
+                    $grouped['VOICE_LIVE'][] = $model;
                     break;
                 default:
                     // If no specific tag, add to all capabilities (flexible)
@@ -1652,7 +1658,7 @@ class ConfigController extends AbstractController
         }
 
         $ownerId = $global ? 0 : $user->getId();
-        $validCapabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $validCapabilities = self::DEFAULT_MODEL_CAPABILITIES;
 
         // Premium gate for VECTORIZE: switching the embedding model is
         // a paid feature even at the per-user scope, because every

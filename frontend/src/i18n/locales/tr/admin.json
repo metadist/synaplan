@@ -99,23 +99,23 @@
   },
   "admin": {
     "liveVoice": {
-      "title": "Canlı konuşmalar",
-      "intro": "Şu anda kimin konuştuğunu görün ve gerekirse bir konuşmayı bitirin.",
-      "directHint": "Bu açıkken sonraki OpenAI konuşması tarayıcıdan bağlanır. Google ve xAI bu sunucuda kalır. Kapatmak, hâlihazırda süren bir konuşmayı taşımaz.",
+      "title": "Canlı sohbetler",
+      "intro": "Şu anda konuşan kişiler. Birini bitirmek mikrofonu birkaç saniye içinde durdurur. Zaten kaydedilen döküm sohbette kalır.",
+      "empty": "Kimse canlı sohbette değil.",
+      "loading": "Yükleniyor…",
+      "seconds": "{seconds} sn",
+      "someone": "bu kişi",
+      "kill": "Sohbeti bitir",
+      "killTitle": "Bu canlı sohbet bitsin mi?",
+      "killMessage": "Bu, {email} için canlı sohbeti bitirir. Zaten kaydedilen döküm sohbette kalır. Başka bir şey gönderilmez.",
+      "killed": "Sohbet birkaç saniye içinde duracak.",
+      "killFailed": "Sohbet bitirilemedi.",
+      "loadFailed": "Canlı sohbetler yüklenemedi.",
+      "directHint": "Bu açıkken, sonraki OpenAI sohbeti tarayıcıdan bağlanır. Google ve xAI bu sunucuda kalır. Kapatmak, sürmekte olan bir sohbeti taşımaz.",
       "directTurnOn": "Doğrudan bağlantıyı aç",
       "directTurnOff": "Doğrudan bağlantıyı kapat",
-      "directSaved": "Kaydedildi. Sonraki OpenAI konuşması bu ayarı kullanır.",
-      "directFailed": "Ayar kaydedilemedi.",
-      "loadFailed": "Canlı konuşmalar yüklenemedi.",
-      "killTitle": "Bu konuşma bitirilsin mi?",
-      "killMessage": "Bu, {email} için canlı konuşmayı bitirir. Daha önce kaydedilen döküm sohbette kalır.",
-      "someone": "bu kişi",
-      "kill": "Konuşmayı bitir",
-      "killed": "Konuşma bitti.",
-      "killFailed": "Konuşma bitirilemedi.",
-      "loading": "Canlı konuşmalar yükleniyor…",
-      "empty": "Kimse canlı konuşmada değil.",
-      "seconds": "{seconds} saniye"
+      "directSaved": "Kaydedildi. Sonraki OpenAI sohbeti bu ayarı kullanır.",
+      "directFailed": "Doğrudan bağlantı ayarı kaydedilemedi."
     },
     "title": "İşlet",
     "description": "Sunucunuza genel bakış: kullanıcılar, kayıtlar ve kullanım.",
@@ -1320,7 +1320,7 @@
       "label": "Toplantı notları"
     },
     "live_voice": {
-      "label": "Canlı ses"
+      "label": "Canlı konuşmalar"
     },
     "compute": {
       "label": "Güvenli dosya çalışması",

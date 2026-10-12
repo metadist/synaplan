@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import UsageStatistics from '@/components/config/UsageStatistics.vue'
+import { i18n } from '@/i18n'
 
 const mockStats = {
   user_level: 'PRO',
@@ -193,6 +195,66 @@ describe('UsageStatistics', () => {
       '[data-testid="select-activity-action"] option[value="MESSAGE_DIGEST"]'
     )
     expect(option.text()).toBe('Long-term memory')
+  })
+
+  it('offers live conversation and transcription in the activity filter', async () => {
+    const wrapper = mount(UsageStatistics, mountOptions)
+    await flushPromises()
+
+    const select = wrapper.get('[data-testid="select-activity-action"]')
+    expect(select.get('option[value="VOICE_LIVE"]').text()).toBe(
+      i18n.global.t('config.usage.actions.voice_live')
+    )
+    expect(select.get('option[value="TRANSCRIPTION"]').text()).toBe(
+      i18n.global.t('config.usage.actions.transcription')
+    )
+  })
+
+  it('shows talk time under the chip and links a live conversation to its chat', async () => {
+    const { getActivityLog } = await import('@/api/usageApi')
+    vi.mocked(getActivityLog).mockResolvedValueOnce({
+      items: [
+        {
+          timestamp: Math.floor(Date.now() / 1000) - 30,
+          datetime: '2026-10-12 12:00:00',
+          action: 'VOICE_LIVE',
+          source: 'WEB',
+          model: 'gpt-live',
+          tokens: 10,
+          prompt_tokens: 4,
+          completion_tokens: 6,
+          cached_tokens: 0,
+          cache_creation_tokens: 0,
+          estimated: false,
+          cost: 0.04,
+          latency: 800,
+          status: 'running',
+          duration_seconds: 252,
+          chat_id: 7,
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 20,
+      total_pages: 1,
+    })
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', name: 'chat', component: { template: '<div />' } }],
+    })
+    const wrapper = mount(UsageStatistics, {
+      global: { ...mountOptions.global, plugins: [i18n, router] },
+    })
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="item-activity"]')
+    expect(row.text()).toContain(
+      i18n.global.t('config.usage.durationMinutes', { minutes: 4, seconds: 12 })
+    )
+    const link = row.get('a')
+    expect(link.attributes('href')).toContain('chat=7')
+    expect(link.attributes('title')).toBe(i18n.global.t('config.usage.openChat'))
   })
 
   it('should show dash for zero cached tokens', async () => {

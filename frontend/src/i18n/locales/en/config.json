@@ -1125,6 +1125,9 @@
       "cost": "Cost",
       "estimatedTooltip": "Token count estimated (no exact measurement from provider)",
       "noRecentActivity": "No recent activity",
+      "durationMinutes": "{minutes} min {seconds} s",
+      "durationSeconds": "{seconds} s",
+      "openChat": "Open this chat",
       "activity": {
         "searchPlaceholder": "Search by model or provider...",
         "allActions": "All actions",

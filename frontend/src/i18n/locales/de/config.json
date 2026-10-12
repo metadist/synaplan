@@ -1097,6 +1097,9 @@
       "cost": "Kosten",
       "estimatedTooltip": "Tokenanzahl geschätzt (keine exakte Messung vom Provider)",
       "noRecentActivity": "Keine aktuellen Aktivitäten",
+      "durationMinutes": "{minutes} Min. {seconds} s",
+      "durationSeconds": "{seconds} s",
+      "openChat": "Diesen Chat öffnen",
       "activity": {
         "searchPlaceholder": "Nach Modell oder Provider suchen...",
         "allActions": "Alle Aktionen",

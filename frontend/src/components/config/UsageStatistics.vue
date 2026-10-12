@@ -348,7 +348,6 @@
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.cachedTokens') }}</th>
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.cost') }}</th>
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.latency') }}</th>
-                <th class="px-3 py-3 text-right">{{ $t('config.usage.duration') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-light-border">
@@ -362,9 +361,27 @@
                   {{ getTimeAgo(entry.timestamp) }}
                 </td>
                 <td class="px-3 py-3">
-                  <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
-                    {{ getActionLabel(entry.action) }}
-                  </span>
+                  <RouterLink
+                    v-if="entry.chat_id"
+                    :to="{ name: 'chat', query: { chat: String(entry.chat_id) } }"
+                    class="inline-flex flex-col"
+                    :title="$t('config.usage.openChat')"
+                  >
+                    <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
+                      {{ getActionLabel(entry.action) }}
+                    </span>
+                    <span v-if="talkDuration(entry)" class="mt-1 text-xs txt-secondary">
+                      {{ talkDuration(entry) }}
+                    </span>
+                  </RouterLink>
+                  <template v-else>
+                    <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
+                      {{ getActionLabel(entry.action) }}
+                    </span>
+                    <p v-if="talkDuration(entry)" class="mt-1 text-xs txt-secondary">
+                      {{ talkDuration(entry) }}
+                    </p>
+                  </template>
                 </td>
                 <td class="px-3 py-3 whitespace-nowrap">
                   <span class="flex items-center gap-1.5 text-xs txt-secondary">
@@ -408,17 +425,10 @@
                 <td class="px-3 py-3 text-right txt-secondary">
                   {{ entry.latency > 0 ? (entry.latency / 1000).toFixed(1) + 's' : '-' }}
                 </td>
-                <td class="px-3 py-3 text-right txt-secondary whitespace-nowrap">
-                  {{
-                    entry.duration_seconds && entry.duration_seconds > 0
-                      ? entry.duration_seconds.toFixed(1) + 's'
-                      : '-'
-                  }}
-                </td>
               </tr>
 
               <tr v-if="activityItems.length === 0" data-testid="row-empty">
-                <td colspan="10" class="px-4 py-8 text-center txt-secondary text-sm">
+                <td colspan="9" class="px-4 py-8 text-center txt-secondary text-sm">
                   {{ $t('config.usage.noRecentActivity') }}
                 </td>
               </tr>
@@ -506,6 +516,7 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { RouterLink } from 'vue-router'
 import {
   getUsageStats,
   downloadUsageExport,
@@ -693,6 +704,16 @@ const getSubscriptionStatusClass = (status: SubscriptionStatus) => {
     default:
       return 'text-gray-600 dark:text-gray-400'
   }
+}
+
+function talkDuration(entry: ActivityEntry): string {
+  const seconds = entry.duration_seconds
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return ''
+  const total = Math.round(seconds)
+  const minutes = Math.floor(total / 60)
+  const rest = total % 60
+  if (minutes === 0) return t('config.usage.durationSeconds', { seconds: rest })
+  return t('config.usage.durationMinutes', { minutes, seconds: rest })
 }
 
 const getActionLabel = (action: string) => {

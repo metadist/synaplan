@@ -10,6 +10,7 @@ use App\Entity\ModelPriceHistory;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
 use App\Service\CostCalculationService;
+use App\Service\Voice\VoiceLiveMeter;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -944,6 +945,67 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.001000', $result->cacheSavings);
         $this->assertSame(1000, $result->billedInputTokens);
         $this->assertSame('model', $result->priceSnapshot['source']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations]
+    public function testVoiceLivePerSecondBillsSessionLength(): void
+    {
+        $model = $this->createModelMock('OpenAI', 0.05, 0.0, 'permin', '-', [
+            'pricing_mode' => 'per_second',
+        ]);
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateVoiceLiveCost(389, new VoiceLiveMeter(seconds: 60));
+
+        $this->assertSame('0.050000', $result->totalCost);
+    }
+
+    #[\PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations]
+    public function testVoiceLivePerSecondAddsTextItems(): void
+    {
+        $model = $this->createModelMock('xAI', 0.08, 0.0, 'permin', '-', [
+            'pricing_mode' => 'per_second',
+            'text_item_price' => 0.004,
+        ]);
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateVoiceLiveCost(394, new VoiceLiveMeter(seconds: 60, textItems: 2));
+
+        $this->assertSame('0.088000', $result->totalCost);
+        $this->assertSame(2, $result->priceSnapshot['text_items']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations]
+    public function testVoiceLivePerAudioTokenBillsAudioAndTextApart(): void
+    {
+        $model = $this->createModelMock('Google', 0.75, 4.50, 'per1M', 'per1M', [
+            'pricing_mode' => 'per_audio_token',
+            'audio_price_in_per_1M' => 3.0,
+            'audio_price_out_per_1M' => 12.0,
+            'audio_cache_in_per_1M' => 0.30,
+        ]);
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateVoiceLiveCost(390, new VoiceLiveMeter(
+            audioInTokens: 1000,
+            audioOutTokens: 2000,
+            audioCacheTokens: 500,
+            textInTokens: 100,
+            textOutTokens: 50,
+        ));
+
+        // audio in 0.003 + cache 0.00015 + text in 0.000075 + audio out 0.024 + text out 0.000225
+        $this->assertSame('0.027450', $result->totalCost);
+        $this->assertSame('per_audio_token', $result->priceSnapshot['pricing_mode']);
     }
 
     private function createModelMock(

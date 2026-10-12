@@ -506,9 +506,10 @@ final class ModelDiscoveryServiceTest extends TestCase
             clock: new MockClock('2026-09-12 12:00:00'),
         )->run();
 
-        $this->assertCount(1, $report->pending);
-        $this->assertSame('gpt-truly-new', $report->pending[0]['id']);
-        $this->assertSame(3, $report->silencedByClass['openai']);
+        $pendingIds = array_column($report->pending, 'id');
+        sort($pendingIds);
+        $this->assertSame(['gpt-4o-realtime-preview', 'gpt-truly-new'], $pendingIds);
+        $this->assertSame(2, $report->silencedByClass['openai']);
     }
 
     public function testPendingDisappearsWhenIgnored(): void

@@ -871,6 +871,9 @@
       "latency": "Gecikme",
       "duration": "Süre",
       "noRecentActivity": "Son aktivite yok",
+      "durationMinutes": "{minutes} dk {seconds} sn",
+      "durationSeconds": "{seconds} sn",
+      "openChat": "Bu sohbeti aç",
       "actions": {
         "messages": "Mesajlar",
         "images": "Görseller",
@@ -882,7 +885,7 @@
         "api_chat": "API Sohbeti",
         "rerank": "Yeniden sıralama",
         "message_digest": "Uzun süreli bellek",
-        "voice_live": "Canlı konuşma",
+        "voice_live": "Canlı sohbet",
         "transcription": "Transkripsiyon"
       },
       "sources": {

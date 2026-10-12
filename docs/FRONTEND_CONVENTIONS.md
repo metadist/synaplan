@@ -66,8 +66,9 @@ One action ⇒ one glyph, on every surface (U9/U12). The canonical set is
 `heroicons:` Iconify strings where a component cannot be used (dynamic `:icon`
 bindings). What the user sees is the glyph — `heroicons:eye` and `EyeIcon` are
 the same glyph and both fine; `mdi:eye-outline` next to either of them is the
-bug. `mdi:` is reserved for glyphs Heroicons lacks — today that is only the
-file-type icons behind `previewIconForName()` (`@/services/filePreview.ts`).
+bug. `mdi:` is reserved for glyphs Heroicons lacks — today that is the
+file-type icons behind `previewIconForName()` (`@/services/filePreview.ts`)
+and the live-conversation waveform.
 
 | Action | Glyph |
 | ------ | ----- |
@@ -80,7 +81,7 @@ file-type icons behind `previewIconForName()` (`@/services/filePreview.ts`).
 | Close | `XMarkIcon` |
 | Share | `ShareIcon` |
 | Folder / new folder | `FolderIcon` / `FolderPlusIcon` |
-| Live conversation | `mdi:waveform` (Heroicons has no waveform; this is the one conversation glyph) |
+| Live conversation | `mdi:waveform` (Heroicons has no waveform; `MicrophoneIcon` stays dictation, `SpeakerWaveIcon` stays spoken replies) |
 
 File rows never hand-roll buttons: `frontend/src/components/files/FileRowActions.vue`
 owns the glyphs, order (chat → preview → download → delete), density (`p-1.5`,

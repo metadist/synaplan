@@ -47,7 +47,7 @@
 
       <SettingsAppearanceSection v-else-if="section === 'appearance'" />
       <SettingsChatSection v-else-if="section === 'chat'" />
-      <SettingsVoiceSection v-else-if="section === 'voice'" />
+      <SettingsVoiceSection v-else-if="section === 'voice'" @keydown.enter.prevent />
       <SettingsDataSection v-else-if="section === 'data'" />
       <ProfileBillingSection v-else-if="section === 'billing'" />
       <fieldset

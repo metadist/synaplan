@@ -25,7 +25,7 @@ export interface DefaultsResponse {
 }
 
 export interface SaveDefaultsRequest {
-  defaults: Partial<Record<Capability, number>>
+  defaults: Partial<Record<Capability, number>> & { VOICE_LIVE?: number }
   /** Admin only: save the instance defaults guests and members without their own choice use. */
   global?: boolean
 }

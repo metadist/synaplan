@@ -100,22 +100,22 @@
   "admin": {
     "liveVoice": {
       "title": "Conversations en direct",
-      "intro": "Voyez qui parle en ce moment, et terminez une conversation si vous en avez besoin.",
-      "directHint": "Lorsque ceci est activé, la prochaine conversation OpenAI se connecte depuis le navigateur. Google et xAI restent sur ce serveur. Le désactiver ne déplace pas une conversation déjà en cours.",
+      "intro": "Personnes qui parlent en ce moment. En terminer une arrête le microphone en quelques secondes. La transcription déjà enregistrée reste dans le chat.",
+      "empty": "Personne n’est en conversation en direct.",
+      "loading": "Chargement…",
+      "seconds": "{seconds} s",
+      "someone": "cette personne",
+      "kill": "Terminer la conversation",
+      "killTitle": "Terminer cette conversation en direct ?",
+      "killMessage": "Cela met fin à la conversation en direct de {email}. La transcription déjà enregistrée reste dans le chat. Rien de plus n’est envoyé.",
+      "killed": "La conversation s’arrêtera dans quelques secondes.",
+      "killFailed": "Impossible de terminer la conversation.",
+      "loadFailed": "Impossible de charger les conversations en direct.",
+      "directHint": "Lorsque c’est activé, la prochaine conversation OpenAI se connecte depuis le navigateur. Google et xAI restent sur ce serveur. Le désactiver ne déplace pas une conversation déjà en cours.",
       "directTurnOn": "Activer la connexion directe",
       "directTurnOff": "Désactiver la connexion directe",
       "directSaved": "Enregistré. La prochaine conversation OpenAI utilise ce réglage.",
-      "directFailed": "Le réglage n’a pas pu être enregistré.",
-      "loadFailed": "Les conversations en direct n’ont pas pu être chargées.",
-      "killTitle": "Terminer cette conversation ?",
-      "killMessage": "Cela termine la conversation en direct de {email}. La transcription déjà enregistrée reste dans le chat.",
-      "someone": "cette personne",
-      "kill": "Terminer la conversation",
-      "killed": "La conversation est terminée.",
-      "killFailed": "La conversation n’a pas pu être terminée.",
-      "loading": "Chargement des conversations en direct…",
-      "empty": "Personne n’est dans une conversation en direct.",
-      "seconds": "{seconds} secondes"
+      "directFailed": "Impossible d’enregistrer la connexion directe."
     },
     "title": "Exploitation",
     "description": "Votre serveur en un coup d’œil : utilisateurs, inscriptions et utilisation.",
@@ -1324,7 +1324,7 @@
       "label": "Notes de réunion"
     },
     "live_voice": {
-      "label": "Voix en direct"
+      "label": "Conversations en direct"
     },
     "compute": {
       "label": "Calcul sécurisé (travail sur fichiers)",
