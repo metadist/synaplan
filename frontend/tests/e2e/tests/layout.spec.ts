@@ -565,6 +565,10 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
   })
 
   test('a sent message keeps its edit controls readable in light and dark', async ({ page }) => {
+    test.skip(
+      isMobileViewport(page),
+      'A phone hides the desktop rail, and the first answer is too slow for this scan. Contrast is checked on desktop.'
+    )
     await openApp(page)
     await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     const chat = new ChatHelper(page)
