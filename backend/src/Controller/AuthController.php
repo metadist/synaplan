@@ -866,6 +866,7 @@ class AuthController extends AbstractController
     }
 
     #[Route('/verify-email', name: 'verify_email', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/auth/verify-email', summary: 'Confirm an email address with a verification token', tags: ['Authentication'])]
     public function verifyEmail(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -912,6 +913,7 @@ class AuthController extends AbstractController
     }
 
     #[Route('/forgot-password', name: 'forgot_password', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/auth/forgot-password', summary: 'Email a password reset link', tags: ['Authentication'])]
     public function forgotPassword(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -952,6 +954,7 @@ class AuthController extends AbstractController
     }
 
     #[Route('/reset-password', name: 'reset_password', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/auth/reset-password', summary: 'Set a new password with a reset token', tags: ['Authentication'])]
     public function resetPassword(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -996,6 +999,7 @@ class AuthController extends AbstractController
     }
 
     #[Route('/resend-verification', name: 'resend_verification', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/auth/resend-verification', summary: 'Send the email verification message again', tags: ['Authentication'])]
     public function resendVerification(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
