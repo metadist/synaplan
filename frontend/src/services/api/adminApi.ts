@@ -2,7 +2,10 @@
 import { httpClient } from './httpClient'
 import {
   GetAdminGetUsersResponseSchema,
+  GetAdminVoiceLiveSessionsResponseSchema,
   PostAdminCreateUserAccountResponseSchema,
+  PostAdminVoiceLiveKillResponseSchema,
+  PutAdminVoiceLiveWebrtcResponseSchema,
   PostAdminResendUserVerificationResponseSchema,
   PostAdminVerifyUserResponseSchema,
   SearchAdminUsersResponseSchema,
@@ -184,6 +187,27 @@ export const adminApi = {
 
   async getUsageStats(period: 'day' | 'week' | 'month' | 'all' = 'week'): Promise<UsageStats> {
     return httpClient<UsageStats>(`/api/v1/admin/usage-stats?period=${period}`)
+  },
+
+  async listLiveSessions() {
+    return httpClient('/api/v1/admin/voice/live/sessions', {
+      schema: GetAdminVoiceLiveSessionsResponseSchema,
+    })
+  },
+
+  async setLiveVoiceWebRtc(enabled: boolean) {
+    return httpClient('/api/v1/admin/voice/live/webrtc', {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+      schema: PutAdminVoiceLiveWebrtcResponseSchema,
+    })
+  },
+
+  async killLiveSession(sessionId: number) {
+    return httpClient(`/api/v1/admin/voice/live/sessions/${sessionId}/kill`, {
+      method: 'POST',
+      schema: PostAdminVoiceLiveKillResponseSchema,
+    })
   },
 
   async getOverview(): Promise<SystemOverview> {

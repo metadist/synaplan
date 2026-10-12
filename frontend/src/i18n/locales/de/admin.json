@@ -98,6 +98,25 @@
     }
   },
   "admin": {
+    "liveVoice": {
+      "title": "Live-Gespräche",
+      "intro": "Sehen Sie, wer gerade spricht, und beenden Sie ein Gespräch, wenn es nötig ist.",
+      "directHint": "Wenn dies an ist, verbindet sich das nächste OpenAI-Gespräch aus dem Browser. Google und xAI bleiben auf diesem Server. Ausschalten verschiebt ein Gespräch nicht, das schon läuft.",
+      "directTurnOn": "Direktverbindung einschalten",
+      "directTurnOff": "Direktverbindung ausschalten",
+      "directSaved": "Gespeichert. Das nächste OpenAI-Gespräch verwendet diese Einstellung.",
+      "directFailed": "Die Einstellung konnte nicht gespeichert werden.",
+      "loadFailed": "Die Live-Gespräche konnten nicht geladen werden.",
+      "killTitle": "Dieses Gespräch beenden?",
+      "killMessage": "Das beendet das Live-Gespräch von {email}. Das bereits gespeicherte Transkript bleibt im Chat.",
+      "someone": "dieser Person",
+      "kill": "Gespräch beenden",
+      "killed": "Das Gespräch wurde beendet.",
+      "killFailed": "Das Gespräch konnte nicht beendet werden.",
+      "loading": "Live-Gespräche werden geladen…",
+      "empty": "Niemand ist in einem Live-Gespräch.",
+      "seconds": "{seconds} Sekunden"
+    },
     "title": "Betrieb",
     "description": "Dein Server auf einen Blick: Benutzer, Registrierungen und Nutzung.",
     "tabs": {
@@ -1303,6 +1322,9 @@
     },
     "opendesk_stt": {
       "label": "Besprechungsnotizen"
+    },
+    "live_voice": {
+      "label": "Live-Stimme"
     },
     "compute": {
       "label": "Sichere Dateiarbeit",

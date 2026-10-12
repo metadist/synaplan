@@ -342,6 +342,22 @@
     "cancel": "Cancel"
   },
   "settings": {
+    "voice": {
+      "title": "Live voice",
+      "intro": "Choose the model and voice for a live conversation. Your voice goes to {company} while you talk.",
+      "loadFailed": "Voice settings could not be loaded.",
+      "saved": "Saved.",
+      "saveFailed": "The settings could not be saved.",
+      "withdrawn": "Permission withdrawn. The next conversation asks again.",
+      "loading": "Loading voice settings…",
+      "model": "Model",
+      "voice": "Voice",
+      "noVoices": "This model has no voice to choose.",
+      "captions": "Show captions while you talk",
+      "save": "Save",
+      "withdrawHint": "You can withdraw permission. A conversation that is already running keeps going until you end it.",
+      "withdraw": "Withdraw permission"
+    },
     "title": "Preferences",
     "subtitle": "Manage your preferences and configuration",
     "sections": {
@@ -349,6 +365,7 @@
       "profile": "Profile",
       "appearance": "Language & appearance",
       "chat": "Chat & AI",
+      "voice": "Live voice",
       "data": "Data & privacy",
       "billing": "Billing",
       "security": "Security",

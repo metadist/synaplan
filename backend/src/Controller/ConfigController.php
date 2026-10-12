@@ -17,6 +17,7 @@ use App\Entity\User;
 use App\Model\ModelCatalog;
 use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
+use App\Module\Sidecar\LiveVoiceModule;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Repository\ConfigRepository;
 use App\Repository\GroupRepository;
@@ -132,6 +133,7 @@ class ConfigController extends AbstractController
         private readonly ?\App\Service\Chat\ChatWelcomeConfig $chatWelcomeConfig = null,
         private readonly ?\App\Service\Chat\ChatActionPolicy $chatActionPolicy = null,
         private readonly ?CostCalculationService $costCalculationService = null,
+        private readonly ?LiveVoiceModule $liveVoice = null,
     ) {
     }
 
@@ -268,6 +270,14 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'showPoweredBy', type: 'boolean', example: true, description: 'Whether to show the "· powered by <label>" attribution'),
                         new OA\Property(property: 'poweredByLabel', type: 'string', example: 'Synaplan', description: 'Attribution label (the platform being credited)'),
                         new OA\Property(property: 'poweredByUrl', type: 'string', example: 'https://www.synaplan.com', description: 'Attribution link target'),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'voiceLive',
+                    type: 'object',
+                    description: 'Full-duplex live voice. Absent until the gateway and a provider key are configured.',
+                    properties: [
+                        new OA\Property(property: 'enabled', type: 'boolean', example: false),
                     ]
                 ),
                 new OA\Property(
@@ -762,6 +772,9 @@ class ConfigController extends AbstractController
                     ?? $request->getBasePath().'/single_bird-light.svg',
             ],
             'features' => $features,
+            'voiceLive' => [
+                'enabled' => $this->liveVoice?->isConfigured() ?? false,
+            ],
             'speech' => $speech,
             'plugins' => $plugins,
             'googleTag' => $googleTagConfig,

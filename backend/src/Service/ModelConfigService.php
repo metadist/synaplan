@@ -59,6 +59,7 @@ final readonly class ModelConfigService
         'TEXT2VID' => 'text2vid',
         'SOUND2TEXT' => 'sound2text',
         'TEXT2SOUND' => 'text2sound',
+        'VOICE_LIVE' => 'voice2voice',
     ];
 
     public function __construct(

@@ -51,13 +51,6 @@ final class ModelDiscoveryIgnoreList
             'decidedOn' => '2026-09-25',
         ],
         [
-            'provider' => 'openai',
-            'match' => 'contains',
-            'value' => 'realtime',
-            'reason' => 'Realtime/voice sessions, not offered',
-            'decidedOn' => '2026-09-25',
-        ],
-        [
             'provider' => 'mistral',
             'match' => 'contains',
             'value' => 'moderation',

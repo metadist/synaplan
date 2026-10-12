@@ -156,6 +156,28 @@ final class RedisService
     }
 
     /**
+     * Store the value only when the key is absent. A live-voice ticket uses
+     * this so the same ticket cannot be redeemed twice.
+     */
+    public function setIfAbsent(string $key, string $value, int $ttlSeconds): bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $result = $client->set($this->prefix($key), $value, 'EX', $ttlSeconds, 'NX');
+
+            return null !== $result && false !== $result;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('SET NX', $key, $e);
+
+            return false;
+        }
+    }
+
+    /**
      * SET the payload unless the current value is a terminal media-job snapshot.
      *
      * Returns null when this caller stored the payload. Returns the existing

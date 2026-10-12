@@ -335,6 +335,28 @@
             "mobile_class": "ota-candidate"
         },
         {
+            "id": "live_voice",
+            "label_key": "modules.live_voice.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "LIVE_VOICE_GATEWAY_URL or LIVE_VOICE_GATEWAY_SECRET is unset",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "LIVE_VOICE_GATEWAY_URL",
+                    "LIVE_VOICE_GATEWAY_SECRET",
+                    "LIVE_VOICE_PUBLIC_WS_PATH"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/live-voice",
+            "mobile_class": "backend-only"
+        },
+        {
             "id": "local_ai",
             "label_key": "modules.local_ai.label",
             "state": "absent",

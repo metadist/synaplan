@@ -321,6 +321,22 @@
     "retryLater": "Tekrar Dene"
   },
   "settings": {
+    "voice": {
+      "title": "Canlı ses",
+      "intro": "Canlı konuşma için modeli ve sesi seçin. Konuşurken sesiniz {company} hizmetine gider.",
+      "loadFailed": "Ses ayarları yüklenemedi.",
+      "saved": "Kaydedildi.",
+      "saveFailed": "Ayarlar kaydedilemedi.",
+      "withdrawn": "İzin geri alındı. Sonraki konuşma yeniden sorar.",
+      "loading": "Ses ayarları yükleniyor…",
+      "model": "Model",
+      "voice": "Ses",
+      "noVoices": "Bu modelde seçilecek bir ses yok.",
+      "captions": "Konuşurken altyazıları göster",
+      "save": "Kaydet",
+      "withdrawHint": "İzni geri alabilirsiniz. Hâlihazırda süren bir konuşma, siz bitirene kadar devam eder.",
+      "withdraw": "İzni geri al"
+    },
     "title": "Tercihler",
     "subtitle": "Tercihlerinizi ve yapılandırmanızı yönetin",
     "sections": {
@@ -328,6 +344,7 @@
       "profile": "Profil",
       "appearance": "Dil ve görünüm",
       "chat": "Sohbet ve AI",
+      "voice": "Canlı ses",
       "data": "Veri ve gizlilik",
       "billing": "Faturalandırma",
       "security": "Güvenlik",

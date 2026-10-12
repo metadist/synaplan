@@ -14,6 +14,7 @@ final class ScheduledJobsTest extends TestCase
         self::assertSame([
             'tick' => [
                 'app:media:reap-jobs',
+                'app:voice:reap-sessions',
                 'app:chat:reap-stuck',
                 'app:desktop:reap-jobs',
                 'app:process-mail-handlers',

@@ -1,6 +1,6 @@
 # Live voice conversations — master plan
 
-**Status:** Draft 2026-10-08. Tick §0 before the first product PR.
+**Status:** LV1–LV6 are in the working tree on `feat/live-voice` (2026-10-12). The next product step is LV7, the native apps, and it is store-required. It waits for one spoken walk. The direct browser connection stays off.
 **Goal:** A person presses one button next to the microphone and talks with
 Synaplan like with ChatGPT Voice or Gemini Live: full duplex, interruptible,
 no typing. The answer still comes from *their* Synaplan chat (chat model,

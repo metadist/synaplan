@@ -342,6 +342,22 @@
     "cancel": "Annuler"
   },
   "settings": {
+    "voice": {
+      "title": "Voix en direct",
+      "intro": "Choisissez le modèle et la voix d’une conversation en direct. Votre voix est envoyée à {company} pendant que vous parlez.",
+      "loadFailed": "Les réglages de la voix n’ont pas pu être chargés.",
+      "saved": "Enregistré.",
+      "saveFailed": "Les réglages n’ont pas pu être enregistrés.",
+      "withdrawn": "Autorisation retirée. La prochaine conversation demandera à nouveau.",
+      "loading": "Chargement des réglages de la voix…",
+      "model": "Modèle",
+      "voice": "Voix",
+      "noVoices": "Ce modèle n’a pas de voix à choisir.",
+      "captions": "Afficher les sous-titres pendant que vous parlez",
+      "save": "Enregistrer",
+      "withdrawHint": "Vous pouvez retirer l’autorisation. Une conversation déjà en cours continue jusqu’à ce que vous la terminiez.",
+      "withdraw": "Retirer l’autorisation"
+    },
     "title": "Préférences",
     "subtitle": "Gérez vos préférences et votre configuration",
     "sections": {
@@ -349,6 +365,7 @@
       "profile": "Profil",
       "appearance": "Langue et apparence",
       "chat": "Chat et IA",
+      "voice": "Voix en direct",
       "data": "Données et confidentialité",
       "billing": "Facturation",
       "security": "Sécurité",

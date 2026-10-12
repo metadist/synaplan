@@ -185,6 +185,9 @@ export interface ActivityEntry {
   source: string
   /** Communication channel (WEB, MESSAGES_API, OPENAI_API, …). Optional on older backends. */
   channel?: string
+  /** Spoken seconds for a live conversation or a transcription. 0 when the row has none. */
+  duration_seconds?: number
+  chat_id?: number | null
   model: string
   tokens: number
   prompt_tokens: number

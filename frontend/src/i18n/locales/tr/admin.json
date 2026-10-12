@@ -98,6 +98,25 @@
     }
   },
   "admin": {
+    "liveVoice": {
+      "title": "Canlı konuşmalar",
+      "intro": "Şu anda kimin konuştuğunu görün ve gerekirse bir konuşmayı bitirin.",
+      "directHint": "Bu açıkken sonraki OpenAI konuşması tarayıcıdan bağlanır. Google ve xAI bu sunucuda kalır. Kapatmak, hâlihazırda süren bir konuşmayı taşımaz.",
+      "directTurnOn": "Doğrudan bağlantıyı aç",
+      "directTurnOff": "Doğrudan bağlantıyı kapat",
+      "directSaved": "Kaydedildi. Sonraki OpenAI konuşması bu ayarı kullanır.",
+      "directFailed": "Ayar kaydedilemedi.",
+      "loadFailed": "Canlı konuşmalar yüklenemedi.",
+      "killTitle": "Bu konuşma bitirilsin mi?",
+      "killMessage": "Bu, {email} için canlı konuşmayı bitirir. Daha önce kaydedilen döküm sohbette kalır.",
+      "someone": "bu kişi",
+      "kill": "Konuşmayı bitir",
+      "killed": "Konuşma bitti.",
+      "killFailed": "Konuşma bitirilemedi.",
+      "loading": "Canlı konuşmalar yükleniyor…",
+      "empty": "Kimse canlı konuşmada değil.",
+      "seconds": "{seconds} saniye"
+    },
     "title": "İşlet",
     "description": "Sunucunuza genel bakış: kullanıcılar, kayıtlar ve kullanım.",
     "tabs": {
@@ -1299,6 +1318,9 @@
     },
     "opendesk_stt": {
       "label": "Toplantı notları"
+    },
+    "live_voice": {
+      "label": "Canlı ses"
     },
     "compute": {
       "label": "Güvenli dosya çalışması",

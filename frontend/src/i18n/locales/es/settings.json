@@ -320,6 +320,22 @@
     "retryLater": "Reintentar"
   },
   "settings": {
+    "voice": {
+      "title": "Voz en vivo",
+      "intro": "Elija el modelo y la voz para una conversación en vivo. Su voz va a {company} mientras habla.",
+      "loadFailed": "No se pudieron cargar los ajustes de voz.",
+      "saved": "Guardado.",
+      "saveFailed": "No se pudieron guardar los ajustes.",
+      "withdrawn": "Permiso retirado. La siguiente conversación vuelve a preguntar.",
+      "loading": "Cargando ajustes de voz…",
+      "model": "Modelo",
+      "voice": "Voz",
+      "noVoices": "Este modelo no tiene una voz para elegir.",
+      "captions": "Mostrar subtítulos mientras habla",
+      "save": "Guardar",
+      "withdrawHint": "Puede retirar el permiso. Una conversación que ya está en curso sigue hasta que usted la finalice.",
+      "withdraw": "Retirar el permiso"
+    },
     "title": "Preferencias",
     "subtitle": "Administra tus preferencias y configuración",
     "sections": {
@@ -327,6 +343,7 @@
       "profile": "Perfil",
       "appearance": "Idioma y apariencia",
       "chat": "Chat e IA",
+      "voice": "Voz en vivo",
       "data": "Datos y privacidad",
       "billing": "Facturación",
       "security": "Seguridad",

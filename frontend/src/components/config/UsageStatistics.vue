@@ -289,6 +289,8 @@
             <option value="EMBEDDINGS">{{ $t('config.usage.actions.embeddings') }}</option>
             <option value="RERANK">{{ $t('config.usage.actions.rerank') }}</option>
             <option value="MESSAGE_DIGEST">{{ $t('config.usage.actions.message_digest') }}</option>
+            <option value="VOICE_LIVE">{{ $t('config.usage.actions.voice_live') }}</option>
+            <option value="TRANSCRIPTION">{{ $t('config.usage.actions.transcription') }}</option>
           </select>
 
           <input
@@ -346,6 +348,7 @@
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.cachedTokens') }}</th>
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.cost') }}</th>
                 <th class="px-3 py-3 text-right">{{ $t('config.usage.latency') }}</th>
+                <th class="px-3 py-3 text-right">{{ $t('config.usage.duration') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-light-border">
@@ -405,10 +408,17 @@
                 <td class="px-3 py-3 text-right txt-secondary">
                   {{ entry.latency > 0 ? (entry.latency / 1000).toFixed(1) + 's' : '-' }}
                 </td>
+                <td class="px-3 py-3 text-right txt-secondary whitespace-nowrap">
+                  {{
+                    entry.duration_seconds && entry.duration_seconds > 0
+                      ? entry.duration_seconds.toFixed(1) + 's'
+                      : '-'
+                  }}
+                </td>
               </tr>
 
               <tr v-if="activityItems.length === 0" data-testid="row-empty">
-                <td colspan="9" class="px-4 py-8 text-center txt-secondary text-sm">
+                <td colspan="10" class="px-4 py-8 text-center txt-secondary text-sm">
                   {{ $t('config.usage.noRecentActivity') }}
                 </td>
               </tr>

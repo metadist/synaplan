@@ -1,0 +1,17 @@
+{
+  "name": "synaplan-voice",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Live voice gateway. Holds the provider socket and relays PCM to the signed-in client.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

@@ -1115,6 +1115,7 @@
       "channel": "Canal",
       "tokens": "Jetons",
       "latency": "Latence",
+      "duration": "Durée",
       "model": "Modèle",
       "promptTokens": "Instruction",
       "completionTokens": "Complétion",
@@ -1153,7 +1154,9 @@
         "embeddings": "Embeddings",
         "api_chat": "Chat API",
         "rerank": "Rerank",
-        "message_digest": "Mémoire à long terme"
+        "message_digest": "Mémoire à long terme",
+        "voice_live": "Conversation en direct",
+        "transcription": "Transcription"
       },
       "sources": {
         "whatsapp": "WhatsApp",

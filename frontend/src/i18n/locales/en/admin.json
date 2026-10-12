@@ -98,6 +98,25 @@
     }
   },
   "admin": {
+    "liveVoice": {
+      "title": "Live conversations",
+      "intro": "See who is talking right now, and end a conversation if you need to.",
+      "directHint": "When this is on, the next OpenAI conversation connects from the browser. Google and xAI stay on this server. Turning it off does not move a conversation that is already running.",
+      "directTurnOn": "Turn on direct connection",
+      "directTurnOff": "Turn off direct connection",
+      "directSaved": "Saved. The next OpenAI conversation uses this setting.",
+      "directFailed": "The setting could not be saved.",
+      "loadFailed": "Live conversations could not be loaded.",
+      "killTitle": "End this conversation?",
+      "killMessage": "This ends the live conversation for {email}. The transcript already saved stays in the chat.",
+      "someone": "this person",
+      "kill": "End conversation",
+      "killed": "The conversation has ended.",
+      "killFailed": "The conversation could not be ended.",
+      "loading": "Loading live conversations…",
+      "empty": "Nobody is in a live conversation.",
+      "seconds": "{seconds} seconds"
+    },
     "title": "Operate",
     "description": "Your server at a glance: users, sign-ups and usage.",
     "tabs": {
@@ -1303,6 +1322,9 @@
     },
     "opendesk_stt": {
       "label": "Meeting notes"
+    },
+    "live_voice": {
+      "label": "Live voice"
     },
     "compute": {
       "label": "Secure compute (file work)",

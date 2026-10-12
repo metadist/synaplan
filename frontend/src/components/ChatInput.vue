@@ -24,6 +24,49 @@
          offset (left-3 = 12px) so the composer aligns with the menu button and
          uses the full width; md+ keeps the roomier px-4. -->
     <div class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4">
+      <LiveVoicePanel
+        v-if="showLiveVoice && live.active.value"
+        class="mb-3"
+        :phase="live.phase.value"
+        :status="t(`chatInput.liveVoice.status.${live.phase.value}`)"
+        :company-line="t('chatInput.liveVoice.companyLine', { company: live.company.value })"
+        :touches-line="t('chatInput.liveVoice.touchesLine')"
+        :owner-line="t('chatInput.liveVoice.ownerLine')"
+        :model-label="live.activeModel.value?.name ?? ''"
+        :budget-label="
+          live.secondsLeft.value === null
+            ? ''
+            : t('chatInput.liveVoice.budget', { seconds: live.secondsLeft.value })
+        "
+        :mute-label="
+          live.muted.value ? t('chatInput.liveVoice.unmute') : t('chatInput.liveVoice.mute')
+        "
+        :captions-label="
+          live.captions.value
+            ? t('chatInput.liveVoice.captionsOff')
+            : t('chatInput.liveVoice.captions')
+        "
+        :end-label="t('chatInput.liveVoice.end')"
+        :settings-label="t('chatInput.liveVoice.settings')"
+        :caption-text="live.captionText.value"
+        :show-caption="live.captions.value"
+        :level="live.level.value"
+        :warn-banner="
+          live.budgetWrap.value
+            ? t('chatInput.liveVoice.wrap')
+            : live.budgetWarn.value
+              ? t('chatInput.liveVoice.warn')
+              : ''
+        "
+        :terminal-message="t(live.terminalMessageKey.value)"
+        :terminal-action-label="t(live.terminalActionKey.value)"
+        :terminal-action="live.terminalAction.value"
+        @mute="live.toggleMute()"
+        @captions="live.toggleCaptions()"
+        @end="live.end()"
+        @dismiss="live.dismiss()"
+        @action="onLiveTerminalAction"
+      />
       <!-- File and Quote Display (above input) -->
       <div
         v-if="uploadedFiles.length > 0 || quote || pastedBlocks.length > 0"
@@ -448,6 +491,17 @@
               />
 
               <button
+                v-if="showLiveVoice && !live.active.value"
+                type="button"
+                class="icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl flex-shrink-0"
+                :aria-label="t('chatInput.liveVoice.start')"
+                data-testid="btn-chat-live-voice"
+                @click="live.press()"
+              >
+                <Icon icon="mdi:waveform" class="w-5 h-5" />
+              </button>
+
+              <button
                 v-if="showMicrophoneButton"
                 type="button"
                 :class="[
@@ -493,6 +547,16 @@
       @close="closePastedBlock"
       @save="savePastedBlock"
     />
+
+    <LiveVoiceConsentDialog
+      v-if="live.consentOpen.value"
+      :title="t('chatInput.liveVoice.consentTitle')"
+      :body="t('chatInput.liveVoice.consentBody', { company: live.company.value })"
+      :allow-label="t('chatInput.liveVoice.consentAllow')"
+      :decline-label="t('chatInput.liveVoice.consentDecline')"
+      @allow="live.allowConsent()"
+      @decline="live.declineConsent()"
+    />
   </div>
 </template>
 
@@ -536,6 +600,9 @@ import { isNativeApp } from '@/services/api/nativeRuntime'
 import type { FileItem } from '@/services/filesService'
 import { deleteFile, getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
+import { useLiveVoice } from '@/composables/useLiveVoice'
+import LiveVoicePanel from '@/components/chat/LiveVoicePanel.vue'
+import LiveVoiceConsentDialog from '@/components/chat/LiveVoiceConsentDialog.vue'
 import { speechFailureMessageKey } from '@/utils/speechFailure'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
@@ -1184,6 +1251,19 @@ const emit = defineEmits<{
   stop: []
   guestFeatureGate: [featureKey: string]
   clearQuote: []
+  liveVoiceBudget: [
+    budget: {
+      allowed: boolean
+      limitType: 'monthly'
+      actionType: string
+      used: number
+      limit: number
+      remaining: number
+      userLevel: string
+      phoneVerified: boolean
+      topupAvailable: boolean
+    },
+  ]
 }>()
 
 const canSend = computed(() => {
@@ -2069,6 +2149,54 @@ const startWebSpeechRecording = async () => {
     showError(t('chatInput.speechError', { error: errMessage }))
     isRecording.value = false
   }
+}
+
+const lastLiveBudget = ref<{
+  allowed: false
+  limitType: 'monthly'
+  actionType: 'VOICE_LIVE'
+  used: number
+  limit: number
+  remaining: number
+  userLevel: string
+  phoneVerified: boolean
+  topupAvailable: boolean
+} | null>(null)
+const live = useLiveVoice((budget) => {
+  const result = {
+    allowed: false as const,
+    limitType: 'monthly' as const,
+    actionType: 'VOICE_LIVE',
+    used: Number(budget.used),
+    limit: Number(budget.limit),
+    remaining: Number(budget.remaining),
+    userLevel: budget.userLevel,
+    phoneVerified: budget.phoneVerified,
+    topupAvailable: budget.topupAvailable,
+  }
+  lastLiveBudget.value = result
+  emit('liveVoiceBudget', result)
+})
+const showLiveVoice = computed(() => configStore.voiceLive.enabled && !isGuestMode.value)
+
+function onLiveTerminalAction() {
+  const action = live.terminalAction.value
+  if (action === 'talk_again') {
+    live.dismiss()
+    void live.press()
+    return
+  }
+  if (action === 'microphone') {
+    live.dismiss()
+    void toggleRecording()
+    return
+  }
+  if (action === 'top_up') {
+    if (lastLiveBudget.value) emit('liveVoiceBudget', lastLiveBudget.value)
+    live.dismiss()
+    return
+  }
+  live.dismiss()
 }
 
 /**

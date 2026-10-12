@@ -869,6 +869,7 @@
       "channel": "Kanal",
       "tokens": "Token",
       "latency": "Gecikme",
+      "duration": "Süre",
       "noRecentActivity": "Son aktivite yok",
       "actions": {
         "messages": "Mesajlar",
@@ -880,7 +881,9 @@
         "search_query": "Arama Sorgusu",
         "api_chat": "API Sohbeti",
         "rerank": "Yeniden sıralama",
-        "message_digest": "Uzun süreli bellek"
+        "message_digest": "Uzun süreli bellek",
+        "voice_live": "Canlı konuşma",
+        "transcription": "Transkripsiyon"
       },
       "sources": {
         "whatsapp": "WhatsApp",

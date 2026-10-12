@@ -9,6 +9,7 @@ use App\Entity\Model;
 use App\Model\ModelCatalog;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
+use App\Service\Voice\VoiceLiveMeter;
 use Psr\Log\LoggerInterface;
 
 final readonly class CostCalculationService
@@ -509,6 +510,44 @@ final readonly class CostCalculationService
             'per1' => $price,
             default => $price / 1_000_000,
         };
+    }
+
+    /**
+     * Provider USD for one live-voice meter. Markup is applied later, with the
+     * rest of the monthly budget, so this number stays the raw provider price.
+     */
+    public function calculateVoiceLiveCost(int $modelId, VoiceLiveMeter $meter): CostResult
+    {
+        $model = $this->modelRepository->find($modelId);
+        if (!$model) {
+            return $this->zeroCostResult();
+        }
+
+        $json = $model->getJson();
+        $mode = $json['pricing_mode'] ?? 'per_token';
+        $perMillion = static fn (int $tokens, float $price): float => $tokens * $price / 1_000_000;
+        $input = 0.0;
+        $output = 0.0;
+
+        if ('per_second' === $mode) {
+            $input = $meter->seconds * self::normaliseToPerUnit($model->getPriceIn(), $model->getInUnit());
+            $output = $meter->textItems * (float) ($json['text_item_price'] ?? 0);
+        } elseif ('per_audio_token' === $mode) {
+            $input = $perMillion($meter->audioInTokens, (float) ($json['audio_price_in_per_1M'] ?? 0))
+                + $perMillion($meter->audioCacheTokens, (float) ($json['audio_cache_in'] ?? 0))
+                + $perMillion($meter->textInTokens, (float) ($json['text_price_in_per_1M'] ?? 0));
+            $output = $perMillion($meter->audioOutTokens, (float) ($json['audio_price_out_per_1M'] ?? 0))
+                + $perMillion($meter->textOutTokens, (float) ($json['text_price_out_per_1M'] ?? 0));
+        }
+
+        return new CostResult(
+            totalCost: number_format($input + $output, 6, '.', ''),
+            inputCost: number_format($input, 6, '.', ''),
+            outputCost: number_format($output, 6, '.', ''),
+            cacheSavings: '0.000000',
+            priceSnapshot: ['pricing_mode' => $mode],
+            billedInputTokens: $meter->audioInTokens + $meter->textInTokens,
+        );
     }
 
     private function zeroCostResult(): CostResult

@@ -342,6 +342,22 @@
     }
   },
   "settings": {
+    "voice": {
+      "title": "Live-Stimme",
+      "intro": "Wählen Sie Modell und Stimme für ein Live-Gespräch. Ihre Stimme geht an {company}, solange Sie sprechen.",
+      "loadFailed": "Die Spracheinstellungen konnten nicht geladen werden.",
+      "saved": "Gespeichert.",
+      "saveFailed": "Die Einstellungen konnten nicht gespeichert werden.",
+      "withdrawn": "Erlaubnis zurückgezogen. Das nächste Gespräch fragt erneut.",
+      "loading": "Spracheinstellungen werden geladen…",
+      "model": "Modell",
+      "voice": "Stimme",
+      "noVoices": "Dieses Modell hat keine Stimme zur Auswahl.",
+      "captions": "Untertitel anzeigen, während Sie sprechen",
+      "save": "Speichern",
+      "withdrawHint": "Sie können die Erlaubnis zurückziehen. Ein Gespräch, das schon läuft, geht weiter, bis Sie es beenden.",
+      "withdraw": "Erlaubnis zurückziehen"
+    },
     "title": "Einstellungen",
     "subtitle": "Verwalten Sie Ihre Präferenzen und Konfiguration",
     "sections": {
@@ -349,6 +365,7 @@
       "profile": "Profil",
       "appearance": "Sprache & Darstellung",
       "chat": "Chat & KI",
+      "voice": "Live-Stimme",
       "data": "Daten & Datenschutz",
       "billing": "Abrechnung",
       "security": "Sicherheit",

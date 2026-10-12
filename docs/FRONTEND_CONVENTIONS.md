@@ -80,6 +80,7 @@ file-type icons behind `previewIconForName()` (`@/services/filePreview.ts`).
 | Close | `XMarkIcon` |
 | Share | `ShareIcon` |
 | Folder / new folder | `FolderIcon` / `FolderPlusIcon` |
+| Live conversation | `mdi:waveform` (Heroicons has no waveform; this is the one conversation glyph) |
 
 File rows never hand-roll buttons: `frontend/src/components/files/FileRowActions.vue`
 owns the glyphs, order (chat → preview → download → delete), density (`p-1.5`,

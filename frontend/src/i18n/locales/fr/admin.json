@@ -98,6 +98,25 @@
     }
   },
   "admin": {
+    "liveVoice": {
+      "title": "Conversations en direct",
+      "intro": "Voyez qui parle en ce moment, et terminez une conversation si vous en avez besoin.",
+      "directHint": "Lorsque ceci est activé, la prochaine conversation OpenAI se connecte depuis le navigateur. Google et xAI restent sur ce serveur. Le désactiver ne déplace pas une conversation déjà en cours.",
+      "directTurnOn": "Activer la connexion directe",
+      "directTurnOff": "Désactiver la connexion directe",
+      "directSaved": "Enregistré. La prochaine conversation OpenAI utilise ce réglage.",
+      "directFailed": "Le réglage n’a pas pu être enregistré.",
+      "loadFailed": "Les conversations en direct n’ont pas pu être chargées.",
+      "killTitle": "Terminer cette conversation ?",
+      "killMessage": "Cela termine la conversation en direct de {email}. La transcription déjà enregistrée reste dans le chat.",
+      "someone": "cette personne",
+      "kill": "Terminer la conversation",
+      "killed": "La conversation est terminée.",
+      "killFailed": "La conversation n’a pas pu être terminée.",
+      "loading": "Chargement des conversations en direct…",
+      "empty": "Personne n’est dans une conversation en direct.",
+      "seconds": "{seconds} secondes"
+    },
     "title": "Exploitation",
     "description": "Votre serveur en un coup d’œil : utilisateurs, inscriptions et utilisation.",
     "tabs": {
@@ -1303,6 +1322,9 @@
     },
     "opendesk_stt": {
       "label": "Notes de réunion"
+    },
+    "live_voice": {
+      "label": "Voix en direct"
     },
     "compute": {
       "label": "Calcul sécurisé (travail sur fichiers)",

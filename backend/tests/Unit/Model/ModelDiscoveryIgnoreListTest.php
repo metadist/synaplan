@@ -28,7 +28,8 @@ final class ModelDiscoveryIgnoreListTest extends TestCase
     {
         $this->assertNotNull(ModelDiscoveryIgnoreList::matchingClassRule('openai', 'ft:personal-abc'));
         $this->assertNotNull(ModelDiscoveryIgnoreList::matchingClassRule('openai', 'text-moderation-latest'));
-        $this->assertNotNull(ModelDiscoveryIgnoreList::matchingClassRule('openai', 'gpt-4o-realtime-preview'));
+        $this->assertNull(ModelDiscoveryIgnoreList::matchingClassRule('openai', 'gpt-live-1'));
+        $this->assertNull(ModelDiscoveryIgnoreList::matchingClassRule('openai', 'gpt-realtime-2.1'));
         $this->assertNotNull(ModelDiscoveryIgnoreList::matchingClassRule('mistral', 'mistral-moderation-latest'));
         $this->assertNull(ModelDiscoveryIgnoreList::matchingClassRule('openai', 'text-embedding-3-large'));
         $this->assertNull(ModelDiscoveryIgnoreList::matchingClassRule('openai', 'whisper-1'));
@@ -41,9 +42,9 @@ final class ModelDiscoveryIgnoreListTest extends TestCase
         $this->assertTrue(ModelDiscoveryIgnoreList::contains('OpenAI', 'omni-moderation-latest'));
     }
 
-    public function testClassRulesAreExactlyTheFourDecided(): void
+    public function testClassRulesAreExactlyTheDecidedSet(): void
     {
-        $this->assertCount(4, ModelDiscoveryIgnoreList::CLASS_RULES);
+        $this->assertCount(3, ModelDiscoveryIgnoreList::CLASS_RULES);
         $values = array_map(
             static fn (array $r): string => $r['provider'].':'.$r['match'].':'.$r['value'],
             ModelDiscoveryIgnoreList::CLASS_RULES,
@@ -52,7 +53,6 @@ final class ModelDiscoveryIgnoreListTest extends TestCase
         $this->assertSame([
             'mistral:contains:moderation',
             'openai:contains:moderation',
-            'openai:contains:realtime',
             'openai:prefix:ft:',
         ], $values);
     }

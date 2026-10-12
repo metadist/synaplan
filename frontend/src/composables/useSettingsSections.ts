@@ -19,12 +19,14 @@ export interface SettingsSectionLink {
 export function settingsSectionLinks(
   profileLoadFailed: boolean,
   showBilling: boolean,
-  showApp: boolean
+  showApp: boolean,
+  showVoice = false
 ): SettingsSectionLink[] {
   const items: SettingsSectionLink[] = [
     { id: 'profile', slug: 'profile', labelKey: 'settings.sections.profile' },
     { id: 'appearance', slug: 'appearance', labelKey: 'settings.sections.appearance' },
     { id: 'chat', slug: 'chat', labelKey: 'settings.sections.chat' },
+    ...(showVoice ? [{ id: 'voice', slug: 'voice', labelKey: 'settings.sections.voice' }] : []),
     { id: 'data', slug: 'data', labelKey: 'settings.sections.data' },
   ]
   if (!profileLoadFailed && showBilling) {
@@ -52,7 +54,12 @@ export function useSettingsSections(profileLoadFailed: MaybeRef<boolean> = false
   const showBilling = computed(() => config.billing.enabled && purchaseAllowed)
 
   const sections = computed(() =>
-    settingsSectionLinks(toValue(profileLoadFailed), showBilling.value, showApp)
+    settingsSectionLinks(
+      toValue(profileLoadFailed),
+      showBilling.value,
+      showApp,
+      config.voiceLive.enabled
+    )
   )
 
   return { sections, showApp, showBilling }
@@ -87,7 +94,8 @@ export function settingsLocationFor(
     settingsSectionLinks(
       false,
       config.billing.enabled && isPurchaseAllowed(),
-      isNativeServerControlAvailable()
+      isNativeServerControlAvailable(),
+      config.voiceLive.enabled
     ).map((item) => item.slug)
   )
   const query: LocationQuery = { ...to.query }

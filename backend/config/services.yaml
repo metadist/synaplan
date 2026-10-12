@@ -235,6 +235,11 @@ parameters:
     # per-instance password set this to true.
     env(BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE): 'false'
 
+    # Live voice stays off until an operator points at the sidecar and sets a secret.
+    env(LIVE_VOICE_GATEWAY_URL): ''
+    env(LIVE_VOICE_GATEWAY_SECRET): ''
+    env(LIVE_VOICE_PUBLIC_WS_PATH): '/voice/ws'
+
     # Meeting notes stay off until an operator points at the sidecar.
     env(OPENDESK_STT_URL): ''
     env(OPENDESK_STT_PUBLIC_URL): ''
@@ -1190,6 +1195,23 @@ services:
         arguments:
             $baseUrl: '%env(COMPUTE_URL)%'
             $token: '%env(COMPUTE_TOKEN)%'
+
+    App\Module\Sidecar\LiveVoiceModule:
+        arguments:
+            $gatewayUrl: '%env(LIVE_VOICE_GATEWAY_URL)%'
+            $gatewaySecret: '%env(LIVE_VOICE_GATEWAY_SECRET)%'
+
+    App\Service\Voice\VoiceLiveTicketService:
+        arguments:
+            $secret: '%env(LIVE_VOICE_GATEWAY_SECRET)%'
+
+    App\Service\Voice\VoiceLiveInternalAuth:
+        arguments:
+            $secret: '%env(LIVE_VOICE_GATEWAY_SECRET)%'
+
+    App\Service\Voice\VoiceLiveSessionService:
+        arguments:
+            $publicWsPath: '%env(LIVE_VOICE_PUBLIC_WS_PATH)%'
 
     App\Module\Sidecar\OpendeskSttModule:
         arguments:

@@ -408,6 +408,7 @@
           Boolean(pinnedAgentId)
         "
         :quote="quoting.pendingQuote.value"
+        @live-voice-budget="checkAndShowLimit"
         @send="handleSendMessage"
         @stop="handleUserStop"
         @guest-feature-gate="handleGuestFeatureGate"
