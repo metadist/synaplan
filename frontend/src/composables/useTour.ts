@@ -36,6 +36,27 @@ function writeGuestSeen(ids: string[]): void {
   }
 }
 
+/** Keeps the first occurrence of each id. Remote ids stay ahead of local ones. */
+function mergeIds(...lists: string[][]): string[] {
+  const merged: string[] = []
+  for (const list of lists) {
+    for (const id of list) {
+      if (!merged.includes(id)) merged.push(id)
+    }
+  }
+  return merged
+}
+
+/**
+ * Records ids in this browser immediately, before any account request.
+ * A refresh in the same moment must not open the tour again.
+ */
+function remember(ids: string[]): void {
+  const merged = mergeIds(readGuestSeen(), seen.value, ids)
+  writeGuestSeen(merged)
+  seen.value = merged
+}
+
 function ownerKey(): 'guest' | number {
   const auth = useAuthStore()
   return auth.isAuthenticated && auth.user ? auth.user.id : 'guest'
@@ -46,20 +67,28 @@ async function ensureLoaded(): Promise<void> {
   if (loadedFor === owner) return
   if (loading) return loading
   loading = (async () => {
-    if (owner === 'guest') {
-      seen.value = readGuestSeen()
-    } else {
+    let remote: string[] = []
+    if (owner !== 'guest') {
       try {
         const response = await httpClient('/api/v1/profile', {
           method: 'GET',
           schema: GetApiProfileGetResponseSchema,
         })
-        seen.value = response.profile?.toursSeen ?? []
+        remote = response.profile?.toursSeen ?? []
       } catch {
-        seen.value = readGuestSeen()
+        remote = []
       }
     }
+    // The browser copy wins over a stale or empty account list. Closing the
+    // tour writes localStorage before the save request, so a refresh cannot
+    // forget a dismissal the account has not stored yet.
+    const merged = mergeIds(remote, readGuestSeen())
+    seen.value = merged
+    writeGuestSeen(merged)
     loadedFor = owner
+    if (owner !== 'guest' && merged.some((id) => !remote.includes(id))) {
+      void persist()
+    }
   })()
   try {
     await loading
@@ -82,9 +111,9 @@ async function persist(): Promise<void> {
 }
 
 async function markSeen(id: string): Promise<void> {
+  remember([id])
   await ensureLoaded()
-  if (seen.value.includes(id)) return
-  seen.value = [...seen.value, id]
+  if (!seen.value.includes(id)) seen.value = mergeIds(seen.value, [id])
   await persist()
 }
 
@@ -159,6 +188,12 @@ function startTour(id: string): boolean {
 
   const t = i18n.global.t
   activeTour.value = id
+
+  const finish = (): void => {
+    activeTour.value = null
+    void markSeen(id)
+  }
+
   const instance = driver({
     steps,
     showProgress: steps.length > 1,
@@ -172,11 +207,17 @@ function startTour(id: string): boolean {
     stageRadius: 12,
     allowClose: true,
     smoothScroll: true,
-    // driver.js skips onDestroyed when the tour closes before its first
-    // highlight has settled, so every user close is handled here instead.
+    // The close button does not emit closeClick once this hook is set, so it
+    // has to record the dismissal and destroy the tour itself.
+    onCloseClick: () => {
+      finish()
+      instance.destroy()
+    },
+    // Escape, the overlay and the last step come through here. driver.js
+    // skips onDestroyed when the tour closes before its first highlight has
+    // settled, so every user close is handled in these two hooks instead.
     onDestroyStarted: () => {
-      activeTour.value = null
-      void markSeen(id)
+      finish()
       instance.destroy()
     },
   })
@@ -188,18 +229,30 @@ function startTour(id: string): boolean {
  * Starts the tour once per account. Skipped under browser automation so a
  * Playwright run never meets an overlay it did not ask for.
  */
+function alreadySeen(id: string): boolean {
+  return seen.value.includes(id) || readGuestSeen().includes(id)
+}
+
 async function maybeAutoStart(id: string): Promise<void> {
   if (typeof navigator !== 'undefined' && navigator.webdriver) return
   const tour = getTour(id)
   if (!tour || activeTour.value) return
+  // Closed in this browser: do not wait for the account. A refresh must not
+  // open the tour again while that save is still in flight or came back empty.
+  if (readGuestSeen().includes(id)) {
+    void ensureLoaded()
+    return
+  }
   await ensureLoaded()
-  if (seen.value.includes(id)) return
+  if (alreadySeen(id)) return
   const [firstTarget, ...laterTargets] = tour.steps.flatMap((step) =>
     step.target ? [step.target] : []
   )
   if (firstTarget && !(await waitForTarget(firstTarget))) return
+  if (alreadySeen(id) || activeTour.value) return
   await Promise.all(laterTargets.map((target) => waitForTarget(target, LATER_TARGET_WAIT_MS)))
   if (firstTarget && !findTarget(firstTarget)) return
+  if (alreadySeen(id) || activeTour.value) return
   startTour(id)
 }
 

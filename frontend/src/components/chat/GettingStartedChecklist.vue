@@ -64,14 +64,13 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useTour } from '@/composables/useTour'
+import { CHECKLIST_SEEN_ID } from '@/tours'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { listFiles } from '@/services/filesService'
 import { agentsApi } from '@/services/api/agentsApi'
 import { availableApps } from '@/apps/catalog'
 import { loadConnectedAppIds } from '@/apps/status'
-
-const CHECKLIST_DISMISSED_ID = 'checklist.dismissed'
 
 type ItemId = 'provider' | 'file' | 'assistant' | 'app'
 
@@ -116,18 +115,18 @@ const doneCount = computed(() => items.value.filter((item) => item.done).length)
 const visible = computed(
   () =>
     loaded.value &&
-    !seen.value.includes(CHECKLIST_DISMISSED_ID) &&
+    !seen.value.includes(CHECKLIST_SEEN_ID) &&
     items.value.length > 0 &&
     doneCount.value < items.value.length
 )
 
 async function dismiss(): Promise<void> {
-  await markSeen(CHECKLIST_DISMISSED_ID)
+  await markSeen(CHECKLIST_SEEN_ID)
 }
 
 onMounted(async () => {
   await ensureLoaded()
-  if (seen.value.includes(CHECKLIST_DISMISSED_ID)) return
+  if (seen.value.includes(CHECKLIST_SEEN_ID)) return
   if (authStore.isAdmin) {
     status.value = { provider: configStore.setup.chatReady !== false }
   }

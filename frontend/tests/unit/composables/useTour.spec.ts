@@ -48,6 +48,9 @@ describe('useTour', () => {
     httpClient.mockReset()
     lastConfig = null
     authenticated = false
+    // happy-dom reports webdriver=true, which is exactly the switch that
+    // keeps Playwright from ever meeting an automatic tour.
+    Object.defineProperty(window.navigator, 'webdriver', { value: false, configurable: true })
     useTour().resetTourCache()
   })
 
@@ -66,9 +69,7 @@ describe('useTour', () => {
 
     expect(destroySpy).toHaveBeenCalledOnce()
     expect(useTour().activeTour.value).toBeNull()
-    await vi.waitFor(() =>
-      expect(JSON.parse(localStorage.getItem('synaplan.toursSeen') ?? '[]')).toEqual(['demo'])
-    )
+    expect(JSON.parse(localStorage.getItem('synaplan.toursSeen') ?? '[]')).toEqual(['demo'])
     expect(useTour().startTour('demo')).toBe(true)
     lastConfig?.onDestroyStarted?.()
   })
@@ -103,5 +104,21 @@ describe('useTour', () => {
     httpClient.mockResolvedValueOnce({ profile: { toursSeen: ['demo'] } })
     await useTour().maybeAutoStart('demo')
     expect(driveSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not auto-start a tour this browser already closed when the account list is empty', async () => {
+    authenticated = true
+    localStorage.setItem('synaplan.toursSeen', JSON.stringify(['demo']))
+    httpClient.mockResolvedValue({ profile: { toursSeen: [] }, success: true })
+
+    await useTour().maybeAutoStart('demo')
+
+    expect(driveSpy).not.toHaveBeenCalled()
+    await vi.waitFor(() =>
+      expect(httpClient).toHaveBeenCalledWith('/api/v1/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ toursSeen: ['demo'] }),
+      })
+    )
   })
 })
