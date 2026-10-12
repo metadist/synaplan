@@ -167,9 +167,9 @@ final class RedisService
         }
 
         try {
-            $result = $client->set($this->prefix($key), $value, 'EX', $ttlSeconds, 'NX');
+            $result = $client->set($this->prefix($key), $value, 'EX', max(1, $ttlSeconds), 'NX');
 
-            return null !== $result && false !== $result;
+            return null !== $result && 'OK' === (string) $result;
         } catch (\Throwable $e) {
             $this->logCommandFailure('SET NX', $key, $e);
 
