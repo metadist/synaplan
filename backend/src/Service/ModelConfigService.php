@@ -559,6 +559,10 @@ final readonly class ModelConfigService
         if (!$model instanceof Model) {
             return null;
         }
+        $expectedTag = self::CAPABILITY_TAGS[$setting] ?? null;
+        if (null === $expectedTag || $model->getTag() !== $expectedTag) {
+            return null;
+        }
         if ($selectableOnly && 1 !== $model->getSelectable()) {
             return null;
         }

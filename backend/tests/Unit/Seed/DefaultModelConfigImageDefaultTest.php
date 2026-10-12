@@ -2,20 +2,17 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Migration;
+namespace App\Tests\Unit\Seed;
 
+use App\Seed\DefaultModelConfigSeeder;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Schema\Schema;
-use Doctrine\Migrations\AbstractMigration;
-use DoctrineMigrations\Version20261012120000;
-use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
  * The global image defaults move from Nano Banana 2 to Flare only while they
  * still hold that row and Flare is active (#2407). User bindings stay.
  */
-final class Version20261012120000Test extends KernelTestCase
+final class DefaultModelConfigImageDefaultTest extends KernelTestCase
 {
     private const FLARE = 348;
     private const NANO = 371;
@@ -48,7 +45,7 @@ final class Version20261012120000Test extends KernelTestCase
         $this->givenBinding(0, 'PIC2PIC', self::NANO);
         $this->givenBinding(0, 'TEXT2PIC', self::NANO);
 
-        $this->runMigration();
+        $this->repoint();
 
         self::assertSame((string) self::FLARE, $this->fetch(0, 'PIC2PIC'));
         self::assertSame((string) self::FLARE, $this->fetch(0, 'TEXT2PIC'));
@@ -59,7 +56,7 @@ final class Version20261012120000Test extends KernelTestCase
         $this->givenBinding(0, 'PIC2PIC', self::NANO);
         $this->givenBinding(7, 'PIC2PIC', self::NANO);
 
-        $this->runMigration();
+        $this->repoint();
 
         self::assertSame((string) self::FLARE, $this->fetch(0, 'PIC2PIC'));
         self::assertSame((string) self::NANO, $this->fetch(7, 'PIC2PIC'));
@@ -69,7 +66,7 @@ final class Version20261012120000Test extends KernelTestCase
     {
         $this->givenBinding(0, 'PIC2PIC', self::OTHER);
 
-        $this->runMigration();
+        $this->repoint();
 
         self::assertSame((string) self::OTHER, $this->fetch(0, 'PIC2PIC'));
     }
@@ -79,29 +76,14 @@ final class Version20261012120000Test extends KernelTestCase
         $this->givenModel(self::FLARE, 'gpt-image-2.5-flare', active: false);
         $this->givenBinding(0, 'PIC2PIC', self::NANO);
 
-        $this->runMigration();
+        $this->repoint();
 
         self::assertSame((string) self::NANO, $this->fetch(0, 'PIC2PIC'));
     }
 
-    private function runMigration(): void
+    private function repoint(): void
     {
-        $migration = $this->loadMigration();
-        $migration->up(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $this->connection->executeStatement(
-                $query->getStatement(),
-                $query->getParameters(),
-                $query->getTypes()
-            );
-        }
-    }
-
-    private function loadMigration(): AbstractMigration
-    {
-        require_once dirname(__DIR__, 2).'/migrations/Version20261012120000.php';
-
-        return new Version20261012120000($this->connection, new NullLogger());
+        (new DefaultModelConfigSeeder($this->connection, 'prod'))->repointGlobalNanoBananaImageDefaults();
     }
 
     private function givenModel(int $id, string $providerId, bool $active): void

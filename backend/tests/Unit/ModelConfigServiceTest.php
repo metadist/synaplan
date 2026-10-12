@@ -689,6 +689,32 @@ class ModelConfigServiceTest extends TestCase
         self::assertSame(371, $this->service->getDefaultModel('PIC2PIC', null));
     }
 
+    public function testPic2PicSkipsAGenericRowThatCannotEdit(): void
+    {
+        $this->givenModels([]);
+        $this->givenCapabilityCatalog('text2pic', [100 => 'Google', 200 => 'Google'], [
+            100 => ['image'],
+            200 => ['pic2pic', 'image'],
+        ]);
+        $this->givenUsableProviders(['google']);
+        $this->givenDefaultModelRows([0 => 1]);
+
+        self::assertSame(200, $this->service->getDefaultModel('PIC2PIC', null));
+    }
+
+    public function testARepurposedFlareRowIsNotTheImageFallback(): void
+    {
+        $this->givenModels(
+            [348 => 'OpenAI', 500 => 'Google'],
+            tagsByModelId: [348 => 'chat', 500 => 'text2pic'],
+        );
+        $this->givenCapabilityCatalog('text2pic', [500 => 'Google']);
+        $this->givenUsableProviders(['openai', 'google']);
+        $this->givenDefaultModelRows([0 => 1]);
+
+        self::assertSame(500, $this->service->getDefaultModel('TEXT2PIC', null));
+    }
+
     public function testPic2PicWithoutGoogleUsesFlare(): void
     {
         $this->givenModels([348 => 'OpenAI', 371 => 'Google']);
@@ -796,16 +822,18 @@ class ModelConfigServiceTest extends TestCase
         array $successorByModelId = [],
         array $retiredModelIds = [],
         array $featuresByModelId = [],
+        array $tagsByModelId = [],
     ): void {
         $this->modelRepository
             ->method('find')
-            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds, $successorByModelId, $retiredModelIds, $featuresByModelId): ?Model {
+            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds, $successorByModelId, $retiredModelIds, $featuresByModelId, $tagsByModelId): ?Model {
                 if (!isset($servicesByModelId[$modelId])) {
                     return null;
                 }
 
                 $model = $this->createMock(Model::class);
                 $model->method('getId')->willReturn($modelId);
+                $model->method('getTag')->willReturn($tagsByModelId[$modelId] ?? 'text2pic');
                 $model->method('getService')->willReturn($servicesByModelId[$modelId]);
                 $model->method('getProviderId')->willReturn($providerIdsByModelId[$modelId] ?? '');
                 $model->method('getActive')->willReturn(in_array($modelId, $inactiveModelIds, true) ? 0 : 1);
@@ -823,19 +851,21 @@ class ModelConfigServiceTest extends TestCase
      * this, findByTag() returns an empty list and getDefaultModel() falls
      * through to the configured binding.
      *
-     * @param array<int, string> $servicesByModelId
+     * @param array<int, string>       $servicesByModelId
+     * @param array<int, list<string>> $featuresByModelId
      */
-    private function givenCapabilityCatalog(string $tag, array $servicesByModelId): void
+    private function givenCapabilityCatalog(string $tag, array $servicesByModelId, array $featuresByModelId = []): void
     {
         $models = [];
         foreach ($servicesByModelId as $modelId => $service) {
             $model = $this->createMock(Model::class);
             $model->method('getId')->willReturn($modelId);
+            $model->method('getTag')->willReturn($tag);
             $model->method('getService')->willReturn($service);
             $model->method('getProviderId')->willReturn('');
             $model->method('getActive')->willReturn(1);
             $model->method('getSelectable')->willReturn(1);
-            $model->method('getFeatures')->willReturn(['pic2pic', 'image']);
+            $model->method('getFeatures')->willReturn($featuresByModelId[$modelId] ?? ['pic2pic', 'image']);
             $models[] = $model;
         }
 
