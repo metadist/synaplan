@@ -507,9 +507,9 @@
     "loading": "Modeller yükleniyor...",
     "costTier": {
       "free": "Ücretsiz",
-      "low": "Low Cost",
-      "mid": "Mid Cost",
-      "high": "High Cost",
+      "low": "Düşük maliyet",
+      "mid": "Orta maliyet",
+      "high": "Yüksek maliyet",
       "unknown": "Fiyat bilinmiyor"
     }
   },

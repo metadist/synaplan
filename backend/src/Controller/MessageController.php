@@ -340,6 +340,7 @@ class MessageController extends AbstractController
     }
 
     #[Route('/history', name: 'history', methods: ['GET'])]
+    #[OA\Get(path: '/api/v1/messages/history', summary: 'List recent messages for the signed-in user', tags: ['Messages'])]
     public function getHistory(
         Request $request,
         #[CurrentUser] ?User $user,

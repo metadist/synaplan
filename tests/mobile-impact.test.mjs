@@ -258,6 +258,7 @@ test('local development, deployment, and test tooling does not trigger an app re
     'server.json',
     'renovate.json5',
     'LICENSE',
+    'redocly.yaml',
     'Makefile',
     '.editorconfig',
     '.vscode/settings.json',

@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\AI\Service\AiFacade;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -22,6 +23,7 @@ class TestController extends AbstractController
     }
 
     #[Route('/api/test/embed', name: 'api_test_embed', methods: ['GET'])]
+    #[OA\Get(path: '/api/test/embed', summary: 'Exercise the embedding provider with a fixed sentence', tags: ['Test'])]
     public function testEmbed(AiFacade $aiFacade): JsonResponse
     {
         $result = $aiFacade->embed('This is a test text');

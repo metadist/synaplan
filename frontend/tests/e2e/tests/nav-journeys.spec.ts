@@ -9,6 +9,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { test, expect, type Page } from '../test-setup'
 import { login, loginViaApi, openApp } from '../helpers/auth'
+import { openMemories } from '../helpers/memories'
 import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
 import { getRuntimeFeatures, isModuleConfigured } from '../helpers/features'
@@ -270,14 +271,13 @@ test.describe('@ci Navigation journeys', () => {
 
     await test.step('Memories opens the page, not a dialog', async () => {
       await openApp(page)
-      await page.goto('/memories')
-      await expect(page).toHaveURL(/\/memories/, { timeout: TIMEOUTS.STANDARD })
+      await openMemories(page)
+      await expect(page).toHaveURL(/\/memories/)
       await expect(page.locator(MEM.page)).toBeVisible()
       await expect(page.locator('[data-testid="modal-memories-dialog"]')).toHaveCount(0)
     })
 
     await test.step('Highlight a memory and Back returns to the chat', async () => {
-      await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await page.locator(MEM.btnCreate).click()
       await page.locator(MEM.formModal).waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
       await page.locator(MEM.btnModeAdvanced).click()

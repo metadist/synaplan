@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller\Plugin;
 
 use App\Service\File\FileStorageService;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,6 +24,7 @@ final class PluginAssetController extends AbstractController
     }
 
     #[Route('/api/v1/user/{userId}/plugins/{pluginName}/assets/{path}', name: 'app_plugin_asset', requirements: ['path' => '.*'], methods: ['GET'])]
+    #[OA\Get(path: '/api/v1/user/{userId}/plugins/{pluginName}/assets/{path}', summary: 'Download a file from an installed plugin', tags: ['Plugins'])]
     public function serveAsset(int $userId, string $pluginName, string $path): Response
     {
         // 1. Resolve user plugin directory

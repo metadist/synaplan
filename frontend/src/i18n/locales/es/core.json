@@ -507,9 +507,9 @@
     "loading": "Cargando modelos...",
     "costTier": {
       "free": "Gratis",
-      "low": "Low Cost",
-      "mid": "Mid Cost",
-      "high": "High Cost",
+      "low": "Coste bajo",
+      "mid": "Coste medio",
+      "high": "Coste alto",
       "unknown": "Precio desconocido"
     }
   },

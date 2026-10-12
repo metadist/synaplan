@@ -48,7 +48,17 @@ final class AdminGroupConfigController extends AbstractController
                                 type: 'object',
                                 required: ['value', 'source', 'locked'],
                                 properties: [
-                                    new OA\Property(property: 'value', nullable: true),
+                                    new OA\Property(
+                                        property: 'value',
+                                        description: 'The setting value. A feature flag is a boolean, MODELS.ALLOWED is a list of catalog keys, and other settings are text. Null when the group has not set it.',
+                                        type: 'string',
+                                        nullable: true,
+                                        oneOf: [
+                                            new OA\Schema(type: 'string'),
+                                            new OA\Schema(type: 'boolean'),
+                                            new OA\Schema(type: 'array', items: new OA\Items(type: 'string')),
+                                        ],
+                                    ),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, enum: ['group', 'admin']),
                                     new OA\Property(property: 'locked', type: 'boolean'),
                                 ]
@@ -115,7 +125,17 @@ final class AdminGroupConfigController extends AbstractController
                                 type: 'object',
                                 required: ['value', 'source', 'locked'],
                                 properties: [
-                                    new OA\Property(property: 'value', nullable: true),
+                                    new OA\Property(
+                                        property: 'value',
+                                        description: 'The setting value. A feature flag is a boolean, MODELS.ALLOWED is a list of catalog keys, and other settings are text. Null when the group has not set it.',
+                                        type: 'string',
+                                        nullable: true,
+                                        oneOf: [
+                                            new OA\Schema(type: 'string'),
+                                            new OA\Schema(type: 'boolean'),
+                                            new OA\Schema(type: 'array', items: new OA\Items(type: 'string')),
+                                        ],
+                                    ),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, enum: ['group', 'admin']),
                                     new OA\Property(property: 'locked', type: 'boolean'),
                                 ]

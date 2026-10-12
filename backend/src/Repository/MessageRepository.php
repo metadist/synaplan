@@ -189,6 +189,45 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * True when a message of this chat cites the chunk id in rag_sources.
+     * A substring hit is not enough: the id must be that source's chunkId.
+     */
+    public function chatCitesChunk(int $chatId, string $chunkId): bool
+    {
+        if ($chatId <= 0 || '' === $chunkId) {
+            return false;
+        }
+
+        $values = $this->getEntityManager()->createQueryBuilder()
+            ->select('meta.metaValue')
+            ->from(MessageMeta::class, 'meta')
+            ->innerJoin(Message::class, 'message', 'WITH', 'message.id = meta.messageId')
+            ->where('message.chatId = :chatId')
+            ->andWhere('meta.metaKey = :metaKey')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('metaKey', 'rag_sources')
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        foreach ($values as $raw) {
+            if (!is_string($raw) || !str_contains($raw, $chunkId)) {
+                continue;
+            }
+            $decoded = json_decode($raw, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            foreach ($decoded as $row) {
+                if (is_array($row) && (string) ($row['chunkId'] ?? '') === $chunkId) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Id of the newest message in a chat that sits strictly before the given
      * one in the {@see findChatHistory()} ordering (unixTimestamp, then id).
      *
@@ -828,11 +867,13 @@ class MessageRepository extends ServiceEntityRepository
 
     /**
      * Get the last message for each of the given chat IDs.
-     * Returns an array keyed by chatId with the message text.
+     *
+     * Direction and provider let the session list hide an AI scratchpad
+     * without rewriting a visitor or operator message.
      *
      * @param int[] $chatIds
      *
-     * @return array<int, string>
+     * @return array<int, array{text: string, direction: string, provider: string}>
      */
     public function getLastMessageTextForChats(array $chatIds): array
     {
@@ -845,7 +886,7 @@ class MessageRepository extends ServiceEntityRepository
 
         // Use MAX(BID) to get the actual last message (BID is auto-increment)
         $sql = '
-            SELECT m.BCHATID as chat_id, m.BTEXT as text
+            SELECT m.BCHATID as chat_id, m.BTEXT as text, m.BDIRECT as direction, m.BPROVIDX as provider
             FROM BMESSAGES m
             INNER JOIN (
                 SELECT BCHATID, MAX(BID) as max_id
@@ -864,7 +905,11 @@ class MessageRepository extends ServiceEntityRepository
 
         $messages = [];
         foreach ($result->fetchAllAssociative() as $row) {
-            $messages[(int) $row['chat_id']] = (string) $row['text'];
+            $messages[(int) $row['chat_id']] = [
+                'text' => (string) $row['text'],
+                'direction' => (string) $row['direction'],
+                'provider' => (string) $row['provider'],
+            ];
         }
 
         return $messages;

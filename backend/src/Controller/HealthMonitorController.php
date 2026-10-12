@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Service\TokenService;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -31,6 +32,7 @@ final class HealthMonitorController extends AbstractController
     }
 
     #[Route('/api/health/probe', name: 'api_health_probe', methods: ['GET'])]
+    #[OA\Get(path: '/api/health/probe', summary: 'Check that the signed-in account can still get an access token', tags: ['Health'])]
     public function probe(): JsonResponse
     {
         $user = $this->getUser();

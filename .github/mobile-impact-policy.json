@@ -105,6 +105,7 @@
       "server.json",
       "renovate.json5",
       "LICENSE",
+      "redocly.yaml",
       "**/Makefile",
       ".editorconfig",
       ".gitignore",
