@@ -173,16 +173,20 @@ export function createLiveSideband({ apiKey, url, WebSocketImpl = WebSocket } = 
 }
 
 export function applyLiveServerEvent(event, state, emit) {
-  if (event.type === 'session.input_transcript.delta') state.heard += String(event.delta ?? '')
+  if (event.type === 'session.input_transcript.delta') remember(state, emit, 'user', event.delta)
   if (event.type === 'session.input_transcript.done') {
-    emit('transcript', { role: 'user', text: String(event.transcript ?? state.heard), final: true })
-    state.heard = ''
+    if (event.transcript) state.heard = String(event.transcript)
+    commit(state, emit, 'user')
   }
   if (event.type === 'session.output_audio.delta' && event.delta) {
     emit('audio', Buffer.from(event.delta, 'base64'))
   }
+  if (event.type === 'session.output_transcript.delta') {
+    remember(state, emit, 'assistant', event.delta ?? event.transcript)
+  }
   if (event.type === 'session.output_transcript.done') {
-    emit('transcript', { role: 'assistant', text: String(event.transcript ?? ''), final: true })
+    if (event.transcript) state.spoken = String(event.transcript)
+    commit(state, emit, 'assistant')
   }
   if (event.type === 'session.delegation.created' && event.delegation?.target === 'client') {
     emit('delegate', { id: event.delegation.id, question: state.heard || String(event.delegation.task ?? '') })
@@ -190,7 +194,28 @@ export function applyLiveServerEvent(event, state, emit) {
   if (event.type === 'session.usage.updated') emit('usage', mapOpenAiUsage(event.usage))
   if (event.type === 'session.interrupted') emit('interrupted')
   if (event.type === 'error') emit('error', new Error('provider_error'))
-  if (event.type === 'session.closed') emit('closed')
+  if (event.type === 'session.closed') {
+    commit(state, emit, 'user')
+    commit(state, emit, 'assistant')
+    if (event.usage) emit('usage', mapOpenAiUsage(event.usage))
+    emit('closed')
+  }
+}
+
+function remember(state, emit, role, piece) {
+  const mine = role === 'user' ? 'heard' : 'spoken'
+  const otherKey = role === 'user' ? 'spoken' : 'heard'
+  const otherRole = role === 'user' ? 'assistant' : 'user'
+  if (state[otherKey]) commit(state, emit, otherRole)
+  state[mine] = `${state[mine] ?? ''}${piece ?? ''}`
+  if (state[mine] !== '') emit('transcript', { role, text: state[mine], final: false })
+}
+
+function commit(state, emit, role) {
+  const mine = role === 'user' ? 'heard' : 'spoken'
+  const text = String(state[mine] ?? '')
+  state[mine] = ''
+  if (text !== '') emit('transcript', { role, text, final: true })
 }
 
 export function mapOpenAiUsage(usage = {}) {

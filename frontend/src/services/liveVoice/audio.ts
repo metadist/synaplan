@@ -1,7 +1,8 @@
 export interface LiveVoiceSocketHandlers {
   onReady: () => void
   onState: (state: 'thinking' | 'listening' | 'speaking') => void
-  onTranscript: (role: 'user' | 'assistant', text: string) => void
+  onTranscript: (role: 'user' | 'assistant', text: string, final: boolean) => void
+  onPlaybackIdle: () => void
   onInterrupted: () => void
   onWrapUp: () => void
   onEnded: (reason: string) => void
@@ -44,6 +45,9 @@ export async function openLiveVoiceAudio(input: {
 
   const playback = new AudioWorkletNode(input.context, 'pcm-playback')
   playback.port.postMessage({ type: 'config', sourceRate: input.outRate })
+  playback.port.onmessage = (event: MessageEvent<{ type?: string }>) => {
+    if (event.data?.type === 'idle') input.handlers.onPlaybackIdle()
+  }
   playback.connect(input.context.destination)
 
   const socket = new WebSocket(input.wsUrl)
@@ -65,14 +69,12 @@ export async function openLiveVoiceAudio(input: {
     if (event.data.type !== 'pcm' || !event.data.pcm) return
     if (typeof event.data.level === 'number') input.handlers.onLevel(event.data.level)
     if (muted || socket.readyState !== WebSocket.OPEN) return
-    const pcm = event.data.pcm
-    const copy = new Uint8Array(pcm.byteLength)
-    copy.set(pcm)
-    socket.send(copy)
+    socket.send(pcm16Frame(event.data.pcm))
   }
 
   socket.onmessage = (event) => {
     if (typeof event.data !== 'string') {
+      if (input.context.state === 'suspended') void input.context.resume()
       const pcm = new Int16Array(event.data as ArrayBuffer)
       playback.port.postMessage({ type: 'pcm', pcm }, [pcm.buffer])
       input.handlers.onAudioOut()
@@ -112,6 +114,11 @@ export async function openLiveVoiceAudio(input: {
   }
 }
 
+/** Little-endian PCM16 bytes. A typed-array copy would keep only the low byte of each sample. */
+export function pcm16Frame(pcm: Int16Array): Uint8Array {
+  return new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength).slice()
+}
+
 export function applyControlMessage(
   raw: string,
   handlers: LiveVoiceSocketHandlers,
@@ -124,6 +131,7 @@ export function applyControlMessage(
     text?: string
     reason?: string
     secondsLeft?: number
+    final?: boolean
   }
   try {
     message = JSON.parse(raw) as typeof message
@@ -140,7 +148,7 @@ export function applyControlMessage(
     handlers.onState(state)
   }
   if (message.type === 'transcript' && (role === 'user' || role === 'assistant') && message.text) {
-    handlers.onTranscript(role, message.text)
+    handlers.onTranscript(role, message.text, message.final === true)
   }
   if (message.type === 'interrupted') {
     onInterrupted?.()

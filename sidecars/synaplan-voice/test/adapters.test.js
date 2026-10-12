@@ -4,7 +4,7 @@ import { WebSocketServer } from 'ws'
 import { compatibleHeaders, createCompatibleAdapter } from '../src/adapters/compatible.js'
 import { createGeminiAdapter } from '../src/adapters/gemini.js'
 import { adapterKind } from '../src/adapters/index.js'
-import { createOpenAiAdapter, mapOpenAiUsage } from '../src/adapters/openai.js'
+import { applyLiveServerEvent, createOpenAiAdapter, mapOpenAiUsage } from '../src/adapters/openai.js'
 import { createOpenAiRealtimeAdapter } from '../src/adapters/realtime.js'
 import { createXaiAdapter } from '../src/adapters/xai.js'
 import { mapGeminiUsage } from '../src/adapters/gemini.js'
@@ -29,6 +29,31 @@ test('OpenAI adapter starts a stored-off client-delegation session', async () =>
 
 test('OpenAI usage seconds are copied through', () => {
   assert.equal(mapOpenAiUsage({ seconds: 7 }).seconds, 7)
+})
+
+test('GPT-Live transcript pieces are kept without a done event', () => {
+  const state = { heard: '' }
+  const turns = []
+  let usage = null
+  const emit = (name, payload) => {
+    if (name === 'transcript') turns.push(payload)
+    if (name === 'usage') usage = payload
+  }
+  applyLiveServerEvent({ type: 'session.input_transcript.delta', delta: 'What ' }, state, emit)
+  applyLiveServerEvent({ type: 'session.input_transcript.delta', delta: 'time is it?' }, state, emit)
+  applyLiveServerEvent({ type: 'session.output_transcript.delta', delta: 'Four.' }, state, emit)
+  applyLiveServerEvent({ type: 'session.closed', usage: { seconds: 7 } }, state, emit)
+  assert.deepEqual(
+    turns.map((turn) => [turn.role, turn.text, turn.final]),
+    [
+      ['user', 'What ', false],
+      ['user', 'What time is it?', false],
+      ['user', 'What time is it?', true],
+      ['assistant', 'Four.', false],
+      ['assistant', 'Four.', true],
+    ],
+  )
+  assert.equal(usage.seconds, 7)
 })
 
 test('Gemini adapter resumes on GoAway with the new handle', async () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { pcm16Frame } from '@/services/liveVoice/audio'
 import { nextLivePhase } from '@/services/liveVoice/machine'
 import {
   liveEndReason,
@@ -71,6 +72,12 @@ describe('live voice phases', () => {
     expect(nextLivePhase('listening', { type: 'wrap_up' })).toBe('ending')
     expect(nextLivePhase('connecting', { type: 'fail' })).toBe('ended')
     expect(nextLivePhase('ending', { type: 'audio' })).toBe('ending')
+    expect(nextLivePhase('speaking', { type: 'audio_idle' })).toBe('listening')
+    expect(nextLivePhase('ending', { type: 'audio_idle' })).toBe('ending')
+  })
+
+  it('sends microphone samples as little-endian PCM16', () => {
+    expect(Array.from(pcm16Frame(new Int16Array([0x1234, -2])))).toEqual([0x34, 0x12, 0xfe, 0xff])
   })
 })
 

@@ -6,6 +6,7 @@ export type LiveEvent =
   | { type: 'ready' }
   | { type: 'state'; state: 'thinking' | 'listening' | 'speaking' }
   | { type: 'audio' }
+  | { type: 'audio_idle' }
   | { type: 'interrupted' }
   | { type: 'wrap_up' }
   | { type: 'ended' }
@@ -25,6 +26,7 @@ export function nextLivePhase(phase: LivePhase, event: LiveEvent): LivePhase {
     return 'listening'
   }
   if (event.type === 'audio') return phase === 'ending' ? 'ending' : 'speaking'
+  if (event.type === 'audio_idle') return phase === 'speaking' ? 'listening' : phase
   if (event.type === 'interrupted') return phase === 'ending' ? 'ending' : 'listening'
   return phase
 }

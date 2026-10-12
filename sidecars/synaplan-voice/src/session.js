@@ -53,6 +53,8 @@ export function handleConnection(socket, request, deps) {
   let clientSocket = socket
   let lastConfig = null
   let adopted = false
+  const latestTurn = new Map()
+  const storedTurn = new Map()
   const tickMs = Number(deps.tickSeconds ?? 15) * 1000
   const idleMs = Number(deps.idleSeconds ?? 120) * 1000
 
@@ -88,6 +90,14 @@ export function handleConnection(socket, request, deps) {
     return { status: response.status, json }
   }
 
+  const storeTurn = (role, text) => {
+    if (!sessionId || !role || !text || storedTurn.get(role) === text) return
+    storedTurn.set(role, text)
+    void post(`/internal/voice/sessions/${sessionId}/transcript`, {
+      turns: [{ role, text, startMs: 0, endMs: 0 }],
+    }).catch(() => log({ event: 'transcript_callback_failed' }))
+  }
+
   const finish = async (reason) => {
     if (ended) return
     ended = true
@@ -95,6 +105,7 @@ export function handleConnection(socket, request, deps) {
     clearInterval(idleTimer)
     clearTimeout(wrapTimer)
     clearTimeout(parkTimer)
+    for (const [role, text] of latestTurn) storeTurn(role, text)
     if (sessionId) parkedSessions.delete(sessionId)
     const latencyMs = Date.now() - startedAt
     try {
@@ -185,11 +196,10 @@ export function handleConnection(socket, request, deps) {
       })
       adapter.on('transcript', (turn) => {
         lastAudioAt = Date.now()
-        if (!turn?.final) return
-        send({ type: 'transcript', role: turn.role, text: turn.text, final: true })
-        void post(`/internal/voice/sessions/${sessionId}/transcript`, {
-          turns: [{ role: turn.role, text: turn.text, startMs: 0, endMs: 0 }],
-        }).catch(() => log({ event: 'transcript_callback_failed' }))
+        if (!turn?.text || !turn.role) return
+        latestTurn.set(turn.role, turn.text)
+        send({ type: 'transcript', role: turn.role, text: turn.text, final: turn.final === true })
+        if (turn.final) storeTurn(turn.role, turn.text)
       })
       adapter.on('delegate', (event) => {
         send({ type: 'state', state: 'thinking' })

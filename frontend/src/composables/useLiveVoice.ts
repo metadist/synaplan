@@ -65,6 +65,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   let connectTimer: ReturnType<typeof setTimeout> | undefined
   let starting = false
   let ignoreClose = false
+  const liveTurns: { user?: string; assistant?: string } = {}
 
   const active = computed(() => phase.value !== 'idle')
   const company = computed(() =>
@@ -93,8 +94,36 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     teardown()
   }
 
+  function closeLiveTurns() {
+    for (const role of ['user', 'assistant'] as const) {
+      const id = liveTurns[role]
+      if (!id) continue
+      history.finishStreamingMessage(id)
+      delete liveTurns[role]
+    }
+  }
+
+  function showTurn(role: 'user' | 'assistant', text: string, final: boolean) {
+    captionText.value = text
+    if (incognito.active || text.trim() === '') return
+    const existing = liveTurns[role]
+    if (existing) {
+      history.updateStreamingMessage(existing, text)
+      if (final) {
+        history.finishStreamingMessage(existing)
+        delete liveTurns[role]
+      }
+      return
+    }
+    const id = history.addStreamingMessage(role)
+    history.updateStreamingMessage(id, text)
+    if (final) history.finishStreamingMessage(id)
+    else liveTurns[role] = id
+  }
+
   function teardown() {
     clearTimeout(connectTimer)
+    closeLiveTurns()
     audio?.close()
     audio = null
     level.value = 0
@@ -175,12 +204,8 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
       const handlers: LiveVoiceSocketHandlers = {
         onReady: () => apply({ type: 'ready' }),
         onState: (state) => apply({ type: 'state', state }),
-        onTranscript: (role, text) => {
-          captionText.value = text
-          if (!incognito.active) {
-            history.addMessage(role, [{ type: 'text', content: text }])
-          }
-        },
+        onTranscript: (role, text, final) => showTurn(role, text, final),
+        onPlaybackIdle: () => apply({ type: 'audio_idle' }),
         onInterrupted: () => apply({ type: 'interrupted' }),
         onWrapUp: () => {
           budgetWrap.value = true
