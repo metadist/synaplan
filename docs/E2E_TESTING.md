@@ -288,6 +288,7 @@ Assert the **stable terminal DOM**, never an intermediate signal the app discard
 * **Impersonation exit: banner hidden ≠ admin page mounted.** `refreshUser()` clears `impersonator` (banner hides) before `onExit` can `router.push({ name: 'admin' })`. Awaiting config reload / realtime inside `stopImpersonation` delayed that push; CI then sat on `/` for 15s waiting for `view-admin`. Return from stop as soon as the session is restored, and wait for `selectors.pages.admin`, not a pause after the banner.
 * **Two loads of the same chat history.** `ChatView`'s mount and its `activeChatId` watcher both loaded the selected chat's messages. The stale-response guard dropped the first answer, so "Loading messages…" stayed up until the slower request returned and `state-empty` missed its wait. A selection triggers one load; the mount joins the watcher's load instead of starting its own.
 * **A loading flag held by an unrelated request.** The sidebar's `data-chats-loading` waited for the incoming-shares lookup as well as the chat list. A loading marker covers only the data its section shows.
+* **Upgrade reminder over a UI login.** `LOGGED_OUT` contexts used to start with empty `localStorage`, so the daily paywall reminder (`synaplan.paywallLastShownAt`) was due. When `auth.spec.ts` logged in as a worker account that earlier tests had filled with chats, the paywall covered the page and swallowed the user-menu click. Both storage states in `test-setup.ts` now carry the throttle; a spec that tests the reminder clears it itself.
 
 ---
 
