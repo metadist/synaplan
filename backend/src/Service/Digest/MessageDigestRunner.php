@@ -27,6 +27,10 @@ use Psr\Log\LoggerInterface;
  * stop the whole run. A batch-caused failure stops that user only; after
  * three failures of the same batch start the batch is skipped. Backfill
  * never moves the cursor.
+ *
+ * The scheduled run takes users who have waited longest first. Each user
+ * it finishes is stamped, so a run killed by the daily time limit continues
+ * with the next user the following night instead of starting over.
  */
 final readonly class MessageDigestRunner
 {
@@ -56,7 +60,9 @@ final readonly class MessageDigestRunner
             return $this->emptyRunSummary();
         }
 
-        $userIds = null !== $onlyUserId ? [$onlyUserId] : $this->messageRepository->findDistinctUserIds();
+        $userIds = null !== $onlyUserId
+            ? [$onlyUserId]
+            : $this->orderByLastDigested($this->messageRepository->findDistinctUserIds());
         $maxBatches = $maxBatchesPerUser ?? $this->config->getMaxBatchesPerUser();
 
         return $this->runAcrossUsers($userIds, $maxBatches, $dryRun, null, true, 'run');
@@ -236,6 +242,7 @@ final readonly class MessageDigestRunner
             $user = $this->userRepository->find($userId);
             if (null === $user || !$user->isMemoriesEnabled()) {
                 ++$summary['skipped_users'];
+                $this->rememberScheduledPass($job, $dryRun, $userId);
                 continue;
             }
 
@@ -251,6 +258,7 @@ final readonly class MessageDigestRunner
                 $this->markAborted($summary, $result, \count($userIds) - $index - 1, $job);
                 break;
             }
+            $this->rememberScheduledPass($job, $dryRun, $userId);
         }
 
         $this->logger->info('Message digest '.$job.' finished', $summary);
@@ -291,6 +299,43 @@ final readonly class MessageDigestRunner
             $result['abort_reason'] ?? 'unknown',
             $unprocessed,
         ));
+    }
+
+    /**
+     * Users the nightly run has not reached sort first, then the least
+     * recently finished. Ties break by user id, so the order does not depend
+     * on the database returning owners in the same sequence.
+     *
+     * @param list<int> $userIds
+     *
+     * @return list<int>
+     */
+    private function orderByLastDigested(array $userIds): array
+    {
+        if (\count($userIds) < 2) {
+            return $userIds;
+        }
+
+        $lastDigestedAt = $this->config->lastDigestedAtFor($userIds);
+        usort(
+            $userIds,
+            static function (int $left, int $right) use ($lastDigestedAt): int {
+                $byTime = ($lastDigestedAt[$left] ?? 0) <=> ($lastDigestedAt[$right] ?? 0);
+
+                return 0 !== $byTime ? $byTime : $left <=> $right;
+            },
+        );
+
+        return $userIds;
+    }
+
+    private function rememberScheduledPass(string $job, bool $dryRun, int $userId): void
+    {
+        if ('run' !== $job || $dryRun || $userId <= 0) {
+            return;
+        }
+
+        $this->config->markDigested($userId, time());
     }
 
     private function isAbortReason(?string $reason): bool
