@@ -26,8 +26,8 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'reasoningEffortDefault', type: 'string', nullable: true, example: 'medium', description: 'Level selected when the person has not chosen one. Present only together with reasoningLevels.'),
         new OA\Property(property: 'available', type: 'boolean', example: true, description: 'False only in the admin includeUnavailable view: the provider has no key/URL, or the Ollama model is not pulled.'),
         new OA\Property(property: 'unavailableReason', type: 'string', nullable: true, enum: ['provider_unavailable', 'not_pulled'], example: null),
-        new OA\Property(property: 'priceIn', type: 'number', example: 0.15, description: 'USD per 1M input tokens'),
-        new OA\Property(property: 'priceOut', type: 'number', example: 0.6, description: 'USD per 1M output tokens'),
+        new OA\Property(property: 'priceIn', type: 'number', example: 0.15, description: 'USD per input unit of this model, e.g. 1M tokens for a text model. The image dropdowns badge from capabilityPrices when a row has it.'),
+        new OA\Property(property: 'priceOut', type: 'number', example: 0.6, description: 'USD per output unit of this model: 1M tokens for a text model, one image for an image model. The image dropdowns badge from capabilityPrices when a row has it.'),
         new OA\Property(property: 'priceKnown', type: 'boolean', example: true, description: 'False when the model was imported from a listing that published no price. The menu then says "price unknown" instead of "Free".'),
     ]
 )]
