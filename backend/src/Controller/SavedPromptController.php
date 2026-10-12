@@ -69,14 +69,31 @@ final class SavedPromptController extends AbstractController
         summary: 'Save a prompt',
         tags: ['Prompts'],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['name', 'command', 'body'], properties: [
-            new OA\Property(property: 'name', type: 'string'),
-            new OA\Property(property: 'command', type: 'string'),
-            new OA\Property(property: 'body', type: 'string'),
+            new OA\Property(property: 'name', type: 'string', example: 'Weekly note'),
+            new OA\Property(property: 'command', type: 'string', example: 'note'),
+            new OA\Property(property: 'body', type: 'string', example: 'Summarize this week for {{team}}.'),
             new OA\Property(property: 'tags', type: 'array', items: new OA\Items(type: 'string')),
         ])),
         responses: [
-            new OA\Response(response: 201, description: 'Created'),
-            new OA\Response(response: 400, description: 'Invalid prompt'),
+            new OA\Response(response: 201, description: 'Created', content: new OA\JsonContent(
+                required: ['success', 'prompt'],
+                properties: [
+                    new OA\Property(property: 'success', type: 'boolean', example: true),
+                    new OA\Property(property: 'prompt', required: ['id', 'name', 'command', 'body'], properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 7),
+                        new OA\Property(property: 'name', type: 'string', example: 'Weekly note'),
+                        new OA\Property(property: 'command', type: 'string', example: 'note'),
+                        new OA\Property(property: 'body', type: 'string'),
+                        new OA\Property(property: 'tags', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'variables', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
+                    ], type: 'object'),
+                ],
+            )),
+            new OA\Response(response: 400, description: 'Invalid prompt', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'You already have a prompt with that command.'),
+            ])),
+            new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
     public function create(Request $request, #[CurrentUser] ?User $user): JsonResponse
@@ -97,6 +114,43 @@ final class SavedPromptController extends AbstractController
     }
 
     #[Route('/{id}', name: 'update', methods: ['PUT'], requirements: ['id' => '\d+'])]
+    #[OA\Put(
+        path: '/api/v1/saved-prompts/{id}',
+        summary: 'Change a saved prompt you own',
+        description: 'Replaces name, command, body and tags. Tags that are not sent are removed.',
+        tags: ['Prompts'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['name', 'command', 'body'], properties: [
+            new OA\Property(property: 'name', type: 'string', example: 'Weekly note'),
+            new OA\Property(property: 'command', type: 'string', example: 'note2'),
+            new OA\Property(property: 'body', type: 'string', example: 'Summarize this week for {{team}}.'),
+            new OA\Property(property: 'tags', type: 'array', items: new OA\Items(type: 'string')),
+        ])),
+        responses: [
+            new OA\Response(response: 200, description: 'Saved', content: new OA\JsonContent(
+                required: ['success', 'prompt'],
+                properties: [
+                    new OA\Property(property: 'success', type: 'boolean', example: true),
+                    new OA\Property(property: 'prompt', required: ['id', 'name', 'command', 'body'], properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 7),
+                        new OA\Property(property: 'name', type: 'string', example: 'Weekly note'),
+                        new OA\Property(property: 'command', type: 'string', example: 'note'),
+                        new OA\Property(property: 'body', type: 'string'),
+                        new OA\Property(property: 'tags', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'variables', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
+                    ], type: 'object'),
+                ],
+            )),
+            new OA\Response(response: 400, description: 'Invalid prompt', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'You already have a prompt with that command.'),
+            ])),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'No prompt with this id is yours'),
+        ]
+    )]
     public function update(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user instanceof User) {
@@ -118,6 +172,22 @@ final class SavedPromptController extends AbstractController
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
+    #[OA\Delete(
+        path: '/api/v1/saved-prompts/{id}',
+        summary: 'Delete a saved prompt you own',
+        tags: ['Prompts'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Deleted', content: new OA\JsonContent(
+                required: ['success'],
+                properties: [new OA\Property(property: 'success', type: 'boolean', example: true)],
+            )),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'No prompt with this id is yours'),
+        ]
+    )]
     public function delete(int $id, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user instanceof User) {

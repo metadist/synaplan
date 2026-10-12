@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import AccordionSection from '@/components/AccordionSection.vue'
 import AccordionStack from '@/components/AccordionStack.vue'
-import SectionJumpNav from '@/components/SectionJumpNav.vue'
 import ConfigSectionBody from '@/components/admin/ConfigSectionBody.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import type { ConfigSectionRef } from '@/constants/operateSettings'
@@ -27,7 +26,6 @@ const props = withDefaults(
 )
 
 const route = useRoute()
-const router = useRouter()
 
 const resolved = computed<ResolvedConfigSection[]>(() =>
   props.sections
@@ -44,7 +42,7 @@ const sectionIds = computed(() => resolved.value.map((section) => section.id))
 const { isOpen, toggle, open, expandAll, collapseAll, allOpen } = useAccordion(sectionIds)
 const showToolbar = computed(() => resolved.value.length > 1)
 
-/** Section a deep link or the jump nav pointed at, ringed until another one is chosen. */
+/** Section a deep link pointed at, ringed until the address changes. */
 const highlighted = ref<string | null>(null)
 
 async function reveal(sectionId: string): Promise<void> {
@@ -63,13 +61,6 @@ async function reveal(sectionId: string): Promise<void> {
     return
   }
   panel?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
-function jumpTo(sectionId: string): void {
-  if (route.query.section !== sectionId) {
-    void router.replace({ query: { ...route.query, section: sectionId } })
-  }
-  void reveal(sectionId)
 }
 
 watch(
@@ -92,13 +83,7 @@ watch(
     <Icon icon="mdi:loading" class="w-6 h-6 animate-spin mx-auto txt-secondary" />
   </div>
   <div v-else-if="resolved.length > 0" class="space-y-4">
-    <div v-if="showToolbar" class="flex items-center justify-between gap-3 flex-wrap">
-      <SectionJumpNav
-        :items="resolved.map((section) => ({ id: section.id, label: section.label }))"
-        :active-id="highlighted"
-        :nav-label="$t('admin.config.accordion.jumpTo')"
-        @select="jumpTo"
-      />
+    <div v-if="showToolbar" class="flex justify-end">
       <button
         type="button"
         class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"

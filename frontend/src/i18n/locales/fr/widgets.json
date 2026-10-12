@@ -1,12 +1,12 @@
 {
   "liveSupport": {
     "title": "Assistance en direct",
-    "subtitle": "Répondez aux visiteurs en temps réel",
+    "subtitle": "Les visiteurs qui ont demandé une personne attendent ici. Répondez pour prendre la main, puis rendez-la à l’IA.",
     "allWidgets": "Tous les widgets",
     "waiting": "En attente",
     "myChats": "Mes chats",
     "active": "Actifs",
-    "noSessions": "Aucune session en attente",
+    "noSessions": "Aucun visiteur n’attend. Quand quelqu’un demande une personne, il apparaît ici.",
     "noMessages": "Aucun message pour le moment",
     "chatWith": "Chat avec",
     "messagesCount": "messages",
@@ -16,7 +16,15 @@
     "typePlaceholder": "Saisissez votre message…",
     "messageSent": "Message envoyé",
     "visitor": "Visiteur",
-    "you": "Vous"
+    "you": "Vous",
+    "noMine": "Vous n’avez repris aucune conversation. Répondez à un visiteur en attente pour commencer.",
+    "loadFailed": "Les conversations n’ont pas pu être chargées. Les visiteurs reçoivent toujours les réponses de l’IA.",
+    "loadMessagesFailed": "Cette conversation n’a pas pu être ouverte. Réessayez dans un instant.",
+    "sendFailed": "Votre réponse n’a pas été envoyée et l’IA répond toujours. Réessayez.",
+    "sendFailedTakenOver": "Vous avez repris la conversation, mais votre réponse n’a pas été envoyée. Réessayez.",
+    "handBackFailed": "La conversation reste avec vous. Réessayez de la rendre.",
+    "backToList": "Retour aux conversations",
+    "send": "Envoyer la réponse"
   },
   "widgetSessions": {
     "title": "Sessions",
@@ -884,6 +892,14 @@
       "support": "Support"
     },
     "listTitle": "Widgets de chat",
-    "listEmpty": "Aucun widget pour le moment. Créez un widget de chat pour commencer."
+    "listEmpty": "Aucun widget pour le moment. Créez un widget de chat pour commencer.",
+    "tabs": {
+      "widgets": "Widgets",
+      "conversations": "Conversations"
+    },
+    "conversations": {
+      "noWidgetsTitle": "Pas encore de conversations",
+      "noWidgetsHint": "Créez d’abord un widget de chat. Quand un visiteur demande une personne, la conversation vous attend ici."
+    }
   }
 }

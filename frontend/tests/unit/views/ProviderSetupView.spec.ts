@@ -164,7 +164,7 @@ describe('ProviderSetupView — AI infrastructure', () => {
     expect(link.attributes('href')).toBe('/ai/models?tab=edit')
   })
 
-  it('groups everything AI into six topic tabs', async () => {
+  it('groups everything AI into seven topic tabs', async () => {
     const { wrapper } = await mountView()
 
     const labels = [
@@ -174,6 +174,7 @@ describe('ProviderSetupView — AI infrastructure', () => {
       ['search', 'Knowledge search'],
       ['behavior', 'Chat behavior'],
       ['prompts', 'System prompts'],
+      ['gateway', 'Coding gateway'],
     ]
     for (const [id, label] of labels) {
       expect(wrapper.get(`[data-testid="admin-setup-tab-${id}"]`).text()).toContain(label)

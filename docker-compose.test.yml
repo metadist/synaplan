@@ -118,7 +118,7 @@ services:
   # collections (the backend auto-creates them on first use). Not published
   # to a host port; only app_test talks to it.
   qdrant_test:
-    image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
+    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
     container_name: synaplan-qdrant-test
     restart: "no"
     networks:
@@ -126,7 +126,7 @@ services:
 
   # Ollama Test (Optional - Integration Profile)
   ollama_test:
-    image: ollama/ollama:latest@sha256:1bef639749741b375e9a1eb2c1346fb57ce52f5432de1f74846e44ccc18e1687
+    image: ollama/ollama:latest@sha256:b86366bb528bbf7f1424435d165028497a5b69bf6ddb4fa5a87102e2b79f44fb
     container_name: synaplan-ollama-test
     ports:
       - "11436:11434"

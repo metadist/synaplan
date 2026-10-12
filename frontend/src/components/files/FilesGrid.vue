@@ -1,10 +1,5 @@
 <template>
   <div data-testid="files-grid">
-    <div class="mb-4">
-      <h2 class="text-xl font-semibold txt-primary">{{ $t('files.generated.title') }}</h2>
-      <p class="text-sm txt-secondary">{{ $t('files.generated.subtitle') }}</p>
-    </div>
-
     <!-- Kind filter: server-side origin_kind facet (image/video/audio/document/calendar) -->
     <div class="flex flex-wrap gap-1.5 mb-4" data-testid="generated-kind-filter">
       <button
@@ -42,19 +37,16 @@
       </div>
     </div>
 
-    <!-- Empty state -->
-    <div
+    <EmptyState
       v-else-if="files.length === 0"
-      class="flex flex-col items-center justify-center py-16 px-4 text-center"
-      data-testid="grid-empty"
-    >
-      <div
-        class="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4"
-      >
-        <Icon icon="mdi:image-multiple-outline" class="w-8 h-8 text-gray-400" />
-      </div>
-      <p class="text-sm txt-secondary max-w-sm">{{ $t('files.empty.generatedBody') }}</p>
-    </div>
+      bare
+      :icon="SparklesIcon"
+      :title="$t('files.empty.generatedBody')"
+      :action-label="$t('files.empty.generatedAction')"
+      to="/"
+      test-id="grid-empty"
+      action-test-id="btn-generated-empty-action"
+    />
 
     <!-- Gallery -->
     <div
@@ -257,7 +249,13 @@ import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowDownTrayIcon,
+  ChatBubbleLeftRightIcon,
+  SparklesIcon,
+  TrashIcon,
+} from '@heroicons/vue/24/outline'
+import EmptyState from '@/components/common/EmptyState.vue'
 import FilePreview from '@/components/files/FilePreview.vue'
 import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
 import FilePushMenu from '@/components/files/FilePushMenu.vue'

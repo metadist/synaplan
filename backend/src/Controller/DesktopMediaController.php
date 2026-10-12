@@ -49,7 +49,7 @@ final class DesktopMediaController extends AbstractController
             properties: [
                 new OA\Property(property: 'prompt', type: 'string', example: 'A cat on a wooden floor'),
                 new OA\Property(property: 'type', type: 'string', enum: ['image', 'video'], example: 'image'),
-                new OA\Property(property: 'model', type: 'string', description: 'Catalog key `service:providerId:tag`', example: 'openai:gpt-image-1:text2pic'),
+                new OA\Property(property: 'model', type: 'string', description: 'Catalog key `service:providerId:tag`', example: 'openai:gpt-image-2.5-flare:text2pic'),
             ]
         )
     )]
@@ -86,7 +86,7 @@ final class DesktopMediaController extends AbstractController
                 'user_id' => $user->getId(),
                 'type' => $type,
                 'error' => $e->getMessage(),
-            ]);
+            ] + $e->logContext());
 
             return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (\RuntimeException $e) {

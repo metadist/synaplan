@@ -3,6 +3,7 @@
 namespace App\Service\Message\Handler;
 
 use App\AI\Exception\ProviderCancelledException;
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Entity\File;
@@ -22,6 +23,7 @@ use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Media\RenderedImageSize;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\TtsScriptGuard;
@@ -415,6 +417,25 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $modelConfig = [];
         if ($modelId) {
             $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
+
+            // An "Again" pick or a task prompt's pinned aiModel is a stored copy
+            // of a BID and is read ahead of the default chain, so a retired one
+            // must follow its successor here or it reaches a provider that has
+            // shut the model down.
+            if ($model?->isRetired()) {
+                $replacementId = $this->modelConfigService->replacementForRetiredModel(
+                    (int) $modelId,
+                    $this->capabilityForMediaRequest($mediaType, $isPic2Pic, $hasVideoReferenceImage),
+                    $this->modelConfigService->getEffectiveUserIdForMessage($message),
+                );
+                $model = null !== $replacementId ? $this->em->getRepository(\App\Entity\Model::class)->find($replacementId) : null;
+                $modelId = null !== $model ? $replacementId : null;
+                if (null === $model) {
+                    $provider = null;
+                    $modelName = null;
+                }
+            }
+
             if ($model) {
                 $provider = strtolower($model->getService());
                 $modelName = $model->getProviderId() ?: $model->getName();
@@ -1009,11 +1030,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $mediaUsage = [];
             if ('image' === $mediaType) {
                 $mediaUsage['images'] = $result['image_count'] ?? 1;
-                // Carry the requested quality/size so per-tier image models
-                // (gpt-image) bill the exact price (#1315). Mirrors the defaults
-                // used when building $imageOptions above.
+                // Carry the quality/size so per-tier image models (gpt-image)
+                // bill the exact price (#1315). The quality mirrors the default
+                // used when building $imageOptions above. An edit leaves the
+                // size to the model, so the size it rendered wins over the
+                // requested one when the provider reports it (#2404).
                 $mediaUsage['quality'] = $options['quality'] ?? ($isPic2Pic ? 'high' : 'standard');
-                $mediaUsage['size'] = $options['size'] ?? '1024x1024';
+                $mediaUsage['size'] = RenderedImageSize::billingKey($media[0]['size'] ?? null)
+                    ?? $options['size'] ?? '1024x1024';
             } elseif ('video' === $mediaType) {
                 $requestedDuration = $options['duration'] ?? $classification['duration'] ?? 8;
                 $duration = $result['duration_seconds'] ?? null;
@@ -1110,7 +1134,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 'model' => $modelName,
                 'media_type' => $mediaType,
                 'exception' => $e,
-            ]);
+            ] + ($e instanceof ProviderException ? $e->logContext() : []));
 
             $lang = $classification['language'] ?? 'en';
             // Admins get the raw provider error/cause appended for diagnosis;
@@ -1659,6 +1683,15 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         return null;
     }
 
+    private function capabilityForMediaRequest(string $mediaType, bool $isPic2Pic, bool $hasVideoReferenceImage): string
+    {
+        return match ($mediaType) {
+            'video' => $hasVideoReferenceImage ? 'IMG2VID' : 'TEXT2VID',
+            'audio' => 'TEXT2SOUND',
+            default => $isPic2Pic ? 'PIC2PIC' : 'TEXT2PIC',
+        };
+    }
+
     /**
      * Resolve media type, provider, and model name from a model ID.
      *
@@ -2093,7 +2126,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // exact price when the async job is later recorded (#1315). Read
             // from the RESOLVED provider options, not the raw request options:
             // $imageOptions already applied the pic2pic default ('high'), and
-            // billing must follow what was actually sent to the provider.
+            // billing must follow what was actually sent to the provider. The
+            // size is the request's; SyncMediaJobGenerator replaces it with the
+            // size the model rendered when the provider reports one (#2404).
             default => [
                 'images' => 1,
                 'quality' => $mediaOptions['quality'] ?? $options['quality'] ?? 'standard',

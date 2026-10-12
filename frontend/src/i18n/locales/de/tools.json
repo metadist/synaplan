@@ -43,7 +43,7 @@
     "disconnected": "Plattform getrennt.",
     "disconnectError": "Die Plattform konnte nicht getrennt werden.",
     "loadError": "Verknüpfte Plattformen konnten nicht geladen werden.",
-    "adminPointer": "Ganze Server gibst du unter Betrieb › Personen › Plattform-Instanzen frei."
+    "adminPointer": "Ganze Server gibst du unter Admin › Benutzer frei."
   },
   "tools": {
     "title": "Verfügbare Tools",
@@ -54,13 +54,6 @@
     "noCommands": "Keine Befehle verfügbar",
     "searchCommands": "Befehle suchen...",
     "noCommandsFound": "Keine Befehle entsprechen deiner Suche"
-  },
-  "help": {
-    "title": "Hilfe",
-    "openHelp": "Hilfe öffnen",
-    "close": "Schließen",
-    "gotIt": "Verstanden!",
-    "noContent": "Keine Hilfe für diese Seite verfügbar"
   },
   "aiProvider": {
     "error": {
@@ -92,27 +85,13 @@
     "commandError": "Der Plugin-Befehl ist fehlgeschlagen. Bitte versuche es erneut."
   },
   "channels": {
-    "title": "Kanäle",
-    "description": "Sie können diese Plattform über verschiedene Kanäle erreichen.",
-    "whatsappChannels": "WhatsApp-Kanal/Kanäle",
     "whatsappAssistant": "Assistent für WhatsApp",
     "whatsappAssistantHint": "Eingehende WhatsApp-Nachrichten beantwortet dieser veröffentlichte Assistent.",
     "whatsappAssistantNone": "Kein Assistent — gewöhnlicher Chat",
     "whatsappAssistantSaved": "WhatsApp nutzt jetzt diesen Assistenten",
     "whatsappAssistantFailed": "Der WhatsApp-Assistent konnte nicht gespeichert werden",
-    "emailChannels": "E-Mail-Kanal/Kanäle",
-    "apiChannel": "API-Kanal",
-    "webWidget": "Web-Widget",
-    "defaultHandling": "Standardverarbeitung",
-    "personalKeyword": "persönliches Keyword",
     "keywordSaved": "E-Mail-Keyword erfolgreich gespeichert",
-    "addKeyword": "Prüfen Sie, ob ein Keyword frei ist, um Ihre eigene Verarbeitung hinzuzufügen:",
     "keywordPlaceholder": "Keyword",
-    "yourEmailAddress": "Ihre E-Mail-Adresse: {email}",
-    "noKeywordSet": "Sie haben noch kein persönliches Keyword festgelegt. Sie können nur anonym an den Standard-Handler schreiben!",
-    "apiDescription": "Einfache API-Aufrufe mit Ihrem persönlichen API-Schlüssel:",
-    "apiDocumentationInfo": "Für eine ausführliche API-Dokumentation mit allen verfügbaren Endpunkten, Anfrage-/Antwortformaten und Authentifizierungsmethoden besuchen Sie bitte unsere umfassende API-Dokumentation.",
-    "viewApiDocumentation": "API-Dokumentation ansehen",
     "apiDocumentation": {
       "title": "API-Dokumentation",
       "description": "Vollständige API-Referenz zur Integration mit Synaplan. Alle Endpunkte sind mit Anfrage-/Antwortbeispielen dokumentiert.",
@@ -401,29 +380,23 @@
     "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
     "writeBadge": "Schreiben erlaubt"
   },
-  "aiAccounts": {
-    "title": "Deine KI-Konten",
-    "subtitle": "Nutze deine eigenen Anbieterkonten statt der des Servers. Schlüssel werden verschlüsselt gespeichert und nur du kannst sie sehen.",
-    "sectionHiggsfield": "Higgsfield — Videogenerierung",
-    "sectionAnthropic": "Anthropic — Coding-Clients"
-  },
   "messagesGateway": {
-    "title": "Coding-Clients",
+    "title": "Coding-Tool verbinden",
     "description": "Verbinden Sie Claude Code und andere Anthropic-kompatible Agenten-Tools mit Ihrem Synaplan-Arbeitsbereich. Anfragen gehen an POST /v1/messages und werden gegen Ihr Synaplan-Budget erfasst.",
     "statusTitle": "Gateway-Status",
     "statusEnabled": "Aktiviert",
     "statusNotReady": "Nicht bereit",
-    "missingKey": "Kein Anbieter-Schlüssel bezahlt diese Anfragen. Speichern Sie einen unter {accounts}. Es wird nichts gesendet, bis ein Schlüssel gespeichert ist.",
+    "missingKey": "Kein Anbieterschlüssel bezahlt diese Anfragen. Speichere einen unter {accounts}. Es wird nichts gesendet, bis ein Schlüssel gespeichert ist.",
     "missingKeyAdmin": "Eine Person mit Administratorrechten kann auch den Server-Schlüssel erlauben.",
-    "yourAiAccounts": "Deine KI-Konten",
-    "gatewayOff": "Coding-Clients sind ausgeschaltet, deshalb wird nichts gesendet. Eine Person mit Administratorrechten kann das Gateway einschalten.",
+    "yourAiAccounts": "Dein Anthropic-Schlüssel",
+    "gatewayOff": "Coding-Tools sind ausgeschaltet, deshalb wird nichts gesendet. Eine Person mit Administratorrechten kann das Gateway einschalten.",
     "apiKeyStep": "Erstellen Sie einen Synaplan-API-Schlüssel unter {keys} und setzen Sie ihn an die Stelle von sk_your_synaplan_api_key.",
-    "apiKeysLink": "Verwalten → Entwickler & Geräte → API-Schlüssel",
+    "apiKeysLink": "Apps › API & Entwickler",
     "firstStartHint": "Beim ersten Start fragt Claude Code, ob dieser API-Schlüssel verwendet und ob dem Ordner vertraut werden soll. Der Vorschlag ist Nein. Wählen Sie beides mit Ja, sonst wird der Schlüssel abgelehnt und nichts gesendet.",
     "statusDisabled": "Deaktiviert",
     "budgetLine": "Budget verbraucht: {percent}% ({used} von {budget})",
     "budgetLineUnlimited": "Budget verbraucht: {used} (kein monatliches Budgetlimit)",
-    "setupTitle": "Claude-Code-Einrichtung",
+    "setupTitle": "Setup in dein Terminal einfügen",
     "setupHint": "Richten Sie Claude Code auf diese Synaplan-Instanz. Verwenden Sie genau eine Credential-Variable — ANTHROPIC_API_KEY (x-api-key) oder ANTHROPIC_AUTH_TOKEN (Bearer).",
     "copySetup": "Setup-Befehle kopieren",
     "copySuccess": "Setup-Befehle kopiert",
@@ -435,8 +408,7 @@
     "saveKey": "Schlüssel speichern",
     "clearKey": "Schlüssel entfernen",
     "clearKeyConfirmTitle": "Anthropic-Schlüssel entfernen?",
-    "clearKeyConfirm": "Schlüssel entfernen — Coding-Clients nutzen wieder den Schlüssel des Servers, falls einer konfiguriert ist.",
-    "byokPointer": "Du nutzt einen eigenen Anthropic-Schlüssel? Verwalte ihn unter Deine KI-Konten.",
+    "clearKeyConfirm": "Schlüssel entfernen — Coding-Tools nutzen wieder den Schlüssel des Servers, falls einer konfiguriert ist.",
     "saveKeySuccess": "API-Schlüssel gespeichert",
     "saveKeyError": "API-Schlüssel konnte nicht gespeichert werden",
     "clearKeySuccess": "API-Schlüssel entfernt",
@@ -519,7 +491,7 @@
       "mcpTools": {
         "label": "KI-Assistenten Ihre Werkzeuge nutzen lassen",
         "description": "Synaplan führt die Werkzeuge Ihrer verbundenen Werkzeug-Server selbst aus und gibt das Ergebnis an den Assistenten zurück.",
-        "noneConfigured": "Es ist noch kein Werkzeug-Server verbunden. Sie können einen unter Verwalten → Verbindungen → MCP-Server hinzufügen."
+        "noneConfigured": "Es ist noch kein Werkzeug-Server verbunden. Sie können einen unter Apps › Tool-Server (MCP) hinzufügen."
       },
       "mcpWithClientTools": {
         "label": "Eigene Werkzeuge auch anbieten, wenn das Agenten-Tool eigene mitbringt",
@@ -556,7 +528,7 @@
       },
       "requiresMcpTools": "Verfügbar, sobald Ihre Werkzeuge oben eingeschaltet sind."
     },
-    "loadError": "Coding-Clients-Einstellungen konnten nicht geladen werden",
+    "loadError": "Die Claude-Code-Einstellungen konnten nicht geladen werden.",
     "source": {
       "user": "Ihr Schlüssel",
       "operator": "Operator-Schlüssel",
@@ -685,5 +657,293 @@
     "useTemplateDone": "Kopie erstellt. Sie ist aus, bis Sie sie einschalten.",
     "useTemplateNeedsSetup": "Kopie erstellt und ausgeschaltet. Verbinden Sie den fehlenden Assistenten, das Werkzeug oder die Verbindung, bevor Sie sie einschalten.",
     "useTemplateNeedsSetupItems": "Kopie erstellt und ausgeschaltet. Noch nötig: {items}."
+  },
+  "tours": {
+    "common": {
+      "start": "Kurz erklären",
+      "next": "Weiter",
+      "back": "Zurück",
+      "done": "Fertig",
+      "progress": "{current} von {total}"
+    },
+    "chats": {
+      "rail": {
+        "title": "Fünf Bereiche",
+        "body": "Diese Leiste wechselt zwischen Chats, Bibliothek, Assistenten, Apps und Admin. Jeder Bereich öffnet daneben sein eigenes Menü."
+      },
+      "new": {
+        "title": "Neuen Chat starten",
+        "body": "Jeder Chat wird in der Liste darunter gespeichert, damit du später zurückkehren kannst."
+      },
+      "input": {
+        "title": "Frag einfach",
+        "body": "Schreib deine Frage und drücke Enter. Synaplan wählt ein passendes Modell und kann deine Dateien und Erinnerungen nutzen."
+      },
+      "plus": {
+        "title": "Dateien und Werkzeuge",
+        "body": "Hänge eine Datei oder ein Foto an oder schalte für diese Nachricht ein Werkzeug wie die Websuche ein."
+      },
+      "model": {
+        "title": "Modell wählen",
+        "body": "Lass es auf Automatik oder wähle selbst ein Modell. Deine Standards findest du unter Assistenten › KI-Einstellungen."
+      },
+      "search": {
+        "title": "Alles finden",
+        "body": "Durchsuche Chats, Dateien, Assistenten und Seiten von überall, auch mit Strg+K oder ⌘K."
+      }
+    },
+    "library": {
+      "tabs": {
+        "title": "Alles, was du aufbewahrst",
+        "body": "Deine Dateien, was aus Apps ankam, was die KI erzeugt hat, dazu Suche und Erinnerungen — je ein Tab."
+      },
+      "upload": {
+        "title": "Dateien hinzufügen",
+        "body": "Leg Dateien hier ab. Synaplan liest sie, damit Chats und Assistenten aus ihrem Inhalt antworten können."
+      },
+      "use": {
+        "title": "Im Chat verwenden",
+        "body": "Wähle im Chat + › Wissensordner, um aus einem Ordner zu antworten, oder frag einfach — passende Dateien werden selbst gefunden."
+      }
+    },
+    "assistants": {
+      "create": {
+        "title": "Assistenten erstellen",
+        "body": "Ein Assistent merkt sich Anweisungen, Dateien und Werkzeuge, damit du sie nicht in jedem Chat wiederholst."
+      },
+      "gallery": {
+        "title": "Deine Assistenten",
+        "body": "Starte einen Chat damit, bearbeite ihn, kopiere eine Vorlage oder teile ihn mit deinem Team."
+      },
+      "more": {
+        "title": "Aufgaben und Freigaben",
+        "body": "Im Menü Assistenten findest du auch Aufgaben, die nach Zeitplan laufen, wartende Freigaben und deine KI-Einstellungen."
+      }
+    },
+    "tasks": {
+      "new": {
+        "title": "Aufgabe erstellen",
+        "body": "Beschreibe, was die KI tun soll und auf Wunsch wann. Sie läuft dann von selbst."
+      },
+      "approvals": {
+        "title": "Du behältst die Kontrolle",
+        "body": "Bevor eine Aufgabe eine Mail sendet oder etwas ändert, fragt sie dich unter Freigaben. Ergebnisse stehen in den Läufen der Aufgabe."
+      }
+    },
+    "apps": {
+      "search": {
+        "title": "App finden",
+        "body": "Suche nach Name oder Vorhaben, zum Beispiel Mail oder Kalender."
+      },
+      "tabs": {
+        "title": "Alle oder verbunden",
+        "body": "Verbunden zeigt nur, was du schon nutzt, damit du es schnell prüfen oder trennen kannst."
+      },
+      "list": {
+        "title": "App öffnen",
+        "body": "Jede App erklärt, was sie kann, verbindet sich in wenigen Schritten und lässt sich auf derselben Seite abschalten."
+      }
+    },
+    "admin": {
+      "cards": {
+        "title": "Dein Server auf einen Blick",
+        "body": "Benutzer, neue Registrierungen, abgeschaltete Funktionen und zu prüfende Modelle. Jede Karte öffnet die Seite dahinter."
+      },
+      "attention": {
+        "title": "Was dich braucht",
+        "body": "Probleme stehen hier, jeweils mit einem Knopf, der dich direkt zur Lösung bringt."
+      },
+      "sections": {
+        "title": "Admin-Bereiche",
+        "body": "Systemstatus, KI-Infrastruktur, Benutzer und Systemkonfiguration. Die Konfiguration hat eine eigene Einstellungs-Suche."
+      }
+    },
+    "checklist": {
+      "title": "Erste Schritte",
+      "progress": "{done} von {total} erledigt",
+      "dismiss": "Checkliste ausblenden",
+      "doneLabel": "(erledigt)",
+      "items": {
+        "provider": {
+          "title": "KI-Anbieter einrichten",
+          "where": "Unter Admin › KI-Infrastruktur"
+        },
+        "file": {
+          "title": "Datei hochladen",
+          "where": "Du findest sie danach unter Bibliothek › Dateien"
+        },
+        "assistant": {
+          "title": "Assistenten erstellen",
+          "where": "Er erscheint unter Assistenten"
+        },
+        "app": {
+          "title": "App verbinden",
+          "where": "Verbundene Apps stehen unter Apps › Verbunden"
+        }
+      }
+    }
+  },
+  "apps": {
+    "title": "Apps",
+    "subtitle": "Verbinde Synaplan mit den Werkzeugen, die du schon nutzt.",
+    "searchLabel": "Apps durchsuchen",
+    "searchPlaceholder": "Apps durchsuchen…",
+    "tabAll": "Alle",
+    "tabConnected": "Verbunden",
+    "connected": "Verbunden",
+    "connectedEmpty": "Noch keine App verbunden.",
+    "browseAll": "Alle Apps ansehen",
+    "noResults": "Keine App passt zu „{query}“.",
+    "clearSearch": "Suche löschen",
+    "pluginTagline": "Von deiner Administration hinzugefügt.",
+    "backToAll": "Alle Apps",
+    "factWhat": "Was sie macht",
+    "factWho": "Wer sie sieht",
+    "factStop": "So stoppst du sie",
+    "ownerOnly": "Nur du. Andere in deiner Organisation sehen diese Verbindung nicht.",
+    "linkedEmpty": "Noch nichts verknüpft. Starte die Verbindung in {client} — hier gibst du keinen Schlüssel ein.",
+    "categories": {
+      "messengers": "Messenger",
+      "website": "Website",
+      "email": "E-Mail",
+      "files": "Dateien & Dokumente",
+      "ai": "KI & Medien",
+      "developer": "Werkzeuge & Entwickler",
+      "extensions": "Plugins"
+    },
+    "email": {
+      "addressesTitle": "Deine Adressen",
+      "baseHint": "Schicke oder leite eine E-Mail hierher weiter, Synaplan antwortet dir.",
+      "personalHint": "Deine persönliche Adresse mit deinem Stichwort.",
+      "keywordTitle": "Persönliches Stichwort",
+      "keywordHint": "Optional: Mit einem Stichwort bekommst du eine eigene Adresse, zum Beispiel für ein Projekt.",
+      "copy": "Kopieren",
+      "copied": "Adresse kopiert.",
+      "copyFailed": "Die Adresse konnte nicht kopiert werden. Markiere sie und kopiere sie selbst.",
+      "saveFailed": "Das Stichwort wurde nicht gespeichert. Versuche es erneut."
+    },
+    "mailbox": {
+      "loadFailed": "Deine Postfächer konnten nicht geladen werden. Lade die Seite neu.",
+      "saveFailed": "Das Postfach wurde nicht gespeichert. Nichts wurde geändert."
+    },
+    "claudeCode": {
+      "keyTitle": "Dein Anthropic-Schlüssel",
+      "keyHint": "Optional. Mit deinem eigenen Schlüssel wird die Nutzung über dein Anthropic-Konto abgerechnet.",
+      "apiKeyTitle": "Synaplan-API-Schlüssel erstellen",
+      "adminOff": "Das Gateway ist für alle ausgeschaltet. ",
+      "adminLink": "Gateway-Einstellungen unter Admin › KI"
+    },
+    "items": {
+      "telegram": {
+        "name": "Telegram",
+        "tagline": "Chatte in Telegram mit deinem Assistenten.",
+        "about": "Dein eigener Telegram-Bot antwortet mit deinem Assistenten. Nur deine Nachrichten erreichen Synaplan, niemand sonst kann den Bot nutzen.",
+        "stop": "Unten trennen. Der Bot antwortet sofort nicht mehr."
+      },
+      "whatsapp": {
+        "name": "WhatsApp",
+        "tagline": "Frag Synaplan direkt aus WhatsApp.",
+        "about": "Bestätige deine Telefonnummer und schreibe dann der Synaplan-Nummer. Es antwortet der Assistent, den du unten wählst.",
+        "stop": "Wähle unten keinen Assistenten oder entferne deine bestätigte Nummer."
+      },
+      "widgets": {
+        "name": "Chat-Widgets",
+        "tagline": "Bring einen KI-Assistenten auf deine Website."
+      },
+      "email": {
+        "name": "E-Mail an Synaplan",
+        "tagline": "Leite eine E-Mail weiter und erhalte eine Antwort.",
+        "about": "Schreibe oder leite an deine Synaplan-Adresse weiter. Synaplan liest die Nachricht und antwortet dir per E-Mail.",
+        "stop": "Schicke einfach keine Mails mehr. Lösche das Stichwort, um deine persönliche Adresse aufzugeben."
+      },
+      "mailbox": {
+        "name": "Postfach-Automation",
+        "tagline": "Lass die KI ein Postfach sortieren und beantworten.",
+        "about": "Synaplan prüft regelmäßig ein IMAP-Postfach, sortiert jede neue Mail in die richtige Abteilung und kann per SMTP antworten.",
+        "stop": "Setze das Postfach in der Liste unten auf inaktiv oder lösche es."
+      },
+      "microsoft365": {
+        "name": "Microsoft 365",
+        "tagline": "Outlook-Mail und -Kalender für deinen Assistenten.",
+        "about": "Nach der Anmeldung bei Microsoft kann die KI deine Outlook-Mails lesen, Termine in deinen Kalender eintragen und Ergebnisse aus deinem eigenen Postfach senden.",
+        "stop": "Entferne die Verbindung unten. Der Zugriff endet sofort."
+      },
+      "dropbox": {
+        "name": "Dropbox",
+        "tagline": "KI-Ergebnisse direkt in Dropbox speichern.",
+        "about": "Nach der Anmeldung bei Dropbox können Aufgaben und Chats Dateien in einem Ordner deiner Wahl speichern. Synaplan durchsucht deine übrigen Dateien nicht.",
+        "stop": "Entferne die Verbindung unten. Der Zugriff endet sofort."
+      },
+      "webdav": {
+        "name": "Cloud-Ordner & Kalender",
+        "tagline": "Nextcloud, OpenCloud oder jeder WebDAV-Ordner.",
+        "about": "Verbinde einen Ordner mit einem App-Passwort. Aufgaben können dort Ergebnisse speichern und mit Nextcloud Termine in deinen Kalender eintragen.",
+        "stop": "Entferne die Verbindung unten. Der Zugriff endet sofort."
+      },
+      "nextcloud": {
+        "name": "Synaplan in Nextcloud",
+        "tagline": "Nutze deine Assistenten direkt in Nextcloud.",
+        "about": "Installiere die Synaplan-App in Nextcloud und melde dich dort an. Nextcloud nutzt dann dieses Konto; du kopierst nie einen Schlüssel.",
+        "stop": "Trenne den Server in der Liste unten."
+      },
+      "owncloud": {
+        "name": "Synaplan in ownCloud",
+        "tagline": "Nutze deine Assistenten direkt in ownCloud.",
+        "about": "Installiere die Synaplan-App in ownCloud und melde dich dort an. ownCloud nutzt dann dieses Konto; du kopierst nie einen Schlüssel.",
+        "stop": "Trenne den Server in der Liste unten."
+      },
+      "outlook": {
+        "name": "Synaplan in Outlook",
+        "tagline": "Beantworte Mails und fasse sie mit deinem Assistenten in Outlook zusammen.",
+        "about": "Füge in Outlook das Synaplan-Add-in hinzu und melde dich dort an. Das Add-in nutzt dann dieses Konto.",
+        "stop": "Trenne es in der Liste unten."
+      },
+      "claudeCode": {
+        "name": "Claude Code & Coding-Tools",
+        "tagline": "Nutze Claude Code über Synaplan mit deinem Wissen und Budget.",
+        "about": "Richte Claude Code mit einem API-Schlüssel auf Synaplan aus. Anfragen nutzen dann deine Synaplan-Werkzeuge und zählen zu deinem Budget.",
+        "stop": "Widerrufe den API-Schlüssel unter API & Entwickler."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "tagline": "Erstelle Videos mit deinem Higgsfield-Konto.",
+        "about": "Speichere deinen Higgsfield-Schlüssel und das Secret. Bilder und Videos, die du im Chat erstellst, werden dann über dein Higgsfield-Konto abgerechnet.",
+        "stop": "Entferne unten deinen Schlüssel."
+      },
+      "mcp": {
+        "name": "Tool-Server (MCP)",
+        "tagline": "Gib der KI Werkzeuge von einem MCP-Server.",
+        "about": "Gib eine Serveradresse ein. Die KI kann dann im Chat die Werkzeuge dieses Servers nutzen.",
+        "stop": "Schalte den Server in der Liste unten aus oder lösche ihn."
+      },
+      "customTools": {
+        "name": "Eigene Werkzeuge",
+        "tagline": "Binde jede Web-API als Werkzeug ein.",
+        "about": "Beschreibe einen HTTP-Aufruf einmal (oder importiere eine OpenAPI-Datei). Die KI kann ihn dann im Chat nutzen.",
+        "stop": "Lösche das Werkzeug in der Liste unten."
+      },
+      "desktop": {
+        "name": "Synaplan Desktop",
+        "tagline": "Lass deinen Assistenten mit Dateien auf deinem Computer arbeiten.",
+        "about": "Kopple die Desktop-App mit einem Code. Sie führt Aufträge aus dem Chat auf deinem eigenen Rechner aus.",
+        "stop": "Entferne das Gerät unten. Laufende Aufträge werden abgebrochen."
+      },
+      "api": {
+        "name": "API & Entwickler",
+        "tagline": "API-Schlüssel und Dokumentation für eigene Integrationen.",
+        "about": "Erstelle einen Schlüssel für Skripte und andere Apps. Jeder Aufruf handelt in deinem Namen und zählt zu deinen Limits.",
+        "stop": "Widerrufe den Schlüssel unten. Er funktioniert sofort nicht mehr."
+      }
+    },
+    "linkedSteps": {
+      "title": "So verbindest du es",
+      "install": "Installiere die Synaplan-App in {client}.",
+      "installOutlook": "Füge in Outlook das Synaplan-Add-in hinzu.",
+      "address": "Gib dort diese Serveradresse ein:",
+      "signIn": "Melde dich mit deinem Synaplan-Konto an und bestätige. Die Verbindung erscheint dann unten.",
+      "copy": "Adresse kopieren",
+      "copied": "Adresse kopiert",
+      "copyFailed": "Die Adresse konnte nicht kopiert werden. Markiere sie und kopiere sie von Hand."
+    }
   }
 }

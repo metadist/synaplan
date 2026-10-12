@@ -79,6 +79,17 @@ final class FailureClassifierTest extends TestCase
         self::assertFalse($kind->countsAgainstModel());
     }
 
+    public function testTextOnlyImageReplyIsAUserErrorThatDoesNotCountAgainstTheModel(): void
+    {
+        $kind = $this->classifier->classify(
+            ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP')
+        );
+
+        self::assertSame(FailureKind::UserError, $kind);
+        self::assertFalse($kind->countsAgainstModel());
+        self::assertFalse($kind->justifiesAutoDisable());
+    }
+
     public function testBlockedContentIsAUserErrorNotAModelDefect(): void
     {
         $kind = $this->classifier->classify(

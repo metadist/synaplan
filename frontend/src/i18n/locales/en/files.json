@@ -181,7 +181,6 @@
     "tabGenerated": "Generated",
     "tabWorkspace": "Workspace",
     "workspace": {
-      "title": "Workspace",
       "subtitle": "The AI's working folder for file work — it reads and writes files here and reuses them across runs. Finished results are saved to Generated.",
       "empty": "This appears when you ask the AI to keep working on files across runs. One-off results are saved to Generated instead.",
       "emptyAction": "Back to chat",
@@ -314,7 +313,6 @@
       "dismissConfirm": "Dismiss"
     },
     "incoming": {
-      "title": "Incoming",
       "subtitle": "Files pushed in for your knowledge base — review, then keep or dismiss.",
       "keep": "Keep",
       "keepAll": "Keep all",
@@ -329,7 +327,6 @@
       "open": "Preview"
     },
     "generated": {
-      "title": "Generated",
       "subtitle": "Finished results from your chats and tasks — images, audio, documents and files created by code — saved to your knowledge base to search, reuse and download.",
       "kinds": {
         "all": "All",
@@ -351,7 +348,8 @@
       "text": "Everything you upload or create lives here. The assistant can use files marked searchable by AI. Photos, recordings, and AI-created files need you to make them searchable first.",
       "dismiss": "Got it",
       "reopen": "What is this?"
-    }
+    },
+    "searchIntro": "Ask a question in your own words and see which passages in your files answer it."
   },
   "vectorStorage": {
     "intro": "An overview of your vector storage — how many files have been indexed and how many vectors (chunks) are stored for semantic search.",

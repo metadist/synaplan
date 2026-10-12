@@ -9,7 +9,7 @@
 # Local AI, office documents, file work, local-network TLS and scripted backups
 # use deploy/compose.yaml instead.
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.3.1}
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.3.2}
 
 x-app-command: &app-command
   - |
@@ -23,7 +23,7 @@ x-app-environment: &app-environment
   APP_ENV: prod
   APP_DEBUG: "0"
   SYNAPLAN_PLATFORM: selfhost
-  APP_VERSION: ${SYNAPLAN_VERSION:-5.3.1}
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.3.2}
   APP_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   FRONTEND_URL: ${SYNAPLAN_URL:-http://127.0.0.1:${SYNAPLAN_HTTP_PORT:-8000}}
   # Space-separated. Without SYNAPLAN_URL both local spellings keep live chat
@@ -486,7 +486,7 @@ services:
     restart: unless-stopped
 
   qdrant:
-    image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
+    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
     volumes:
       - qdrant:/qdrant/storage
     healthcheck:

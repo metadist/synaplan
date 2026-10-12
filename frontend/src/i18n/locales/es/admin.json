@@ -99,7 +99,7 @@
   },
   "admin": {
     "title": "Operar",
-    "description": "Tu servidor de un vistazo: personas, registros y uso.",
+    "description": "Tu servidor de un vistazo: usuarios, registros y uso.",
     "tabs": {
       "overview": "Resumen",
       "users": "Usuarios",
@@ -159,8 +159,8 @@
       "currentUser": "(Tú)",
       "verified": "Verificado",
       "notVerified": "Sin verificar",
-      "notVerifiedHint": "Esta persona no puede entrar hasta que la cuenta esté verificada.",
-      "addUser": "Añadir persona",
+      "notVerifiedHint": "Este usuario no puede entrar hasta que la cuenta esté verificada.",
+      "addUser": "Añadir usuario",
       "displayName": "Nombre",
       "password": "Contraseña",
       "createUser": "Crear cuenta",
@@ -174,7 +174,7 @@
       "resendVerificationConfirm": "¿Enviar otro correo de verificación a {email}?",
       "resent": "Correo de verificación enviado.",
       "resendFailed": "No se envió el correo de verificación.",
-      "registrationNoMail": "El registro está activado, pero el correo no está configurado. Las cuentas nuevas siguen sin verificar hasta que las marques en Personas. Configura MAILER_DSN para enviar correo.",
+      "registrationNoMail": "El registro está activado, pero el correo no está configurado. Las cuentas nuevas siguen sin verificar hasta que las marques en Usuarios. Configura MAILER_DSN para enviar correo.",
       "unverified": "No verificado",
       "searchPlaceholder": "Buscar por correo...",
       "noUsers": "No se encontraron usuarios",
@@ -399,8 +399,8 @@
         "step3": "Ve a «Permisos de API» → «Agregar un permiso» → «Microsoft Graph» → «Permisos delegados» y añade todos estos:",
         "step3Note": "offline_access no es opcional: sin él Microsoft no emite un token de actualización y toda ejecución programada deja de funcionar al cabo de una hora.",
         "step4": "Ve a «Certificados y secretos» → «Nuevo secreto de cliente» y copia la columna Valor, no el Id. de secreto. Solo se muestra esta vez.",
-        "step5": "Pega el ID de cliente y el secreto en los campos de abajo, indica el inquilino y activa M365_ENABLED. Después, cada persona conecta su cuenta en Gestionar → Conexiones.",
-        "ready": "Listo: ya se puede conectar una cuenta de Microsoft 365 en Gestionar → Conexiones.",
+        "step5": "Pega el ID de cliente y el secreto en los campos de abajo, indica el inquilino y activa M365_ENABLED. Después, cada persona conecta su cuenta en Apps › Microsoft 365.",
+        "ready": "Listo: ya se puede conectar una cuenta de Microsoft 365 en Apps › Microsoft 365.",
         "notReady": "Todavía no está activo. Rellena los campos de abajo y activa M365_ENABLED.",
         "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente."
       },
@@ -412,8 +412,8 @@
         "step2": "En la pestaña «Permissions», activa estos dos permisos y haz clic en «Submit»:",
         "step3": "En la pestaña «Settings», en «OAuth 2 → Redirect URIs», añade exactamente esta dirección:",
         "step4": "También en la pestaña «Settings», copia el App key y el App secret (haz clic en «Show»).",
-        "step5": "Pega la clave y el secreto en los campos de abajo y activa DROPBOX_ENABLED. Después, los usuarios conectan su cuenta en Gestionar → Conexiones.",
-        "ready": "Listo: los usuarios pueden conectar su cuenta de Dropbox en Gestionar → Conexiones.",
+        "step5": "Pega la clave y el secreto en los campos de abajo y activa DROPBOX_ENABLED. Después, los usuarios conectan su cuenta en Apps › Dropbox.",
+        "ready": "Listo: los usuarios pueden conectar su cuenta de Dropbox en Apps › Dropbox.",
         "notReady": "Todavía no está activo. Rellena los campos de abajo y activa DROPBOX_ENABLED.",
         "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente.",
         "resetTitle": "Restablecer todas las conexiones de Dropbox",
@@ -439,7 +439,7 @@
       },
       "tabIntro": {
         "auth": "Quién puede registrarse e iniciar sesión, y qué proveedores de inicio de sesión se ofrecen.",
-        "sharing": "Qué pueden compartir las personas con todos, qué grupos de inicio de sesión se sincronizan y cuánto tiempo se guarda el registro de auditoría.",
+        "sharing": "Qué pueden compartir los usuarios con todos, qué grupos de inicio de sesión se sincronizan y cuánto tiempo se guarda el registro de auditoría.",
         "features": "Activa o desactiva funciones completas para todos en este servidor. Los cambios se aplican al instante.",
         "web_search": "Elige quién busca en la web para el chat y pruébalo con una consulta.",
         "tools": "Lo que la IA puede hacer por su cuenta: tareas guardadas, reglas de aprobación de herramientas y trabajo con archivos en un entorno aislado.",
@@ -510,7 +510,7 @@
         "COMPUTE_POLICY_INTERACTIVE": "Cuando la persona propietaria está presente (chat o una llamada API en vivo): ejecutar el trabajo automáticamente, preguntar primero o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_POLICY_UNATTENDED": "Cuando una tarea guardada ejecuta trabajo con archivos por su cuenta: preguntar primero (predeterminado), ejecutar automáticamente o no ejecutarlo nunca. Un asistente no puede relajar esto.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Cuántos días puede permanecer sin uso una carpeta de trabajo con archivos antes de que la limpieza la elimine. Predeterminado: 90.",
-        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Canales → Synaplan Desktop. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Apps › Synaplan Desktop. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código.",
         "FEATURE_SEARCH_AI_ENABLED": "Ayuda de IA en la paleta de búsqueda (Ctrl/Cmd+K): ante una pregunta en lenguaje normal, el modelo de herramientas elige el resultado que mejor encaja y lo explica en una frase. Nunca cambia nada por sí mismo. Cada uso es una llamada breve a la IA. Desactivado: se mantienen la búsqueda por palabras clave y por significado."
       },
       "fieldOptions": {
@@ -531,7 +531,33 @@
         }
       },
       "valueSet": "Este ajuste tiene un valor guardado.",
-      "valueEmpty": "Este ajuste sigue vacío."
+      "valueEmpty": "Este ajuste sigue vacío.",
+      "search": {
+        "label": "Buscar ajustes",
+        "placeholder": "Busca por nombre o clave, p. ej. registro o SMTP",
+        "noHits": "Ningún ajuste coincide con «{query}».",
+        "clear": "Borrar búsqueda"
+      }
+    },
+    "attention": {
+      "title": "Requiere atención",
+      "allGood": "Ahora mismo nada requiere tu atención.",
+      "loadFailed": "No se pudo cargar el estado del servidor. Inténtalo de nuevo.",
+      "models": "{count} modelo requiere atención. | {count} modelos requieren atención.",
+      "unhealthy": "{name} está activado pero no responde.",
+      "needsSetup": "{name} está activado pero aún no está configurado.",
+      "openModelHealth": "Abrir estado de modelos",
+      "openStatus": "Abrir estado del sistema",
+      "cards": {
+        "people": "Usuarios",
+        "peopleHint": "Cuentas en este servidor",
+        "signups": "Nuevos registros",
+        "signupsHint": "En el periodo del gráfico de abajo",
+        "features": "Funciones desactivadas",
+        "featuresHint": "Desactivadas o sin configurar",
+        "models": "Modelos por revisar",
+        "modelsHint": "Sin conexión, con fallos o retirados"
+      }
     }
   },
   "statistics": {
@@ -713,13 +739,13 @@
         "globalGroup": "El mismo modelo para todos",
         "userChat": "Las preguntas de búsqueda usan el modelo de chat de cada persona. El tuyo es {model}.",
         "userChatUnavailable": "Las preguntas de búsqueda usan el modelo de chat de cada persona. El tuyo no puede responder ahora, así que tu búsqueda no muestra ayuda de IA.",
-        "ready": "{model} responde las preguntas de búsqueda de todas las personas.",
+        "ready": "{model} responde las preguntas de búsqueda de todos los usuarios.",
         "off": "La ayuda de IA en la búsqueda está desactivada, por eso la paleta no muestra ninguna fila de IA.",
         "openFlag": "Activarla en Funciones",
         "unavailable": "El modelo elegido no puede responder ahora, por eso la paleta no muestra ninguna fila de IA. Elige otro modelo o configura su proveedor.",
-        "saved": "Las preguntas de búsqueda de todas las personas usan ahora {model}.",
+        "saved": "Las preguntas de búsqueda de todos los usuarios usan ahora {model}.",
         "savedUserChat": "Las preguntas de búsqueda vuelven a usar el modelo de chat de cada persona.",
-        "restored": "Las preguntas de búsqueda de todas las personas vuelven a usar {model}.",
+        "restored": "Las preguntas de búsqueda de todos los usuarios vuelven a usar {model}.",
         "restoredUserChat": "Las preguntas de búsqueda vuelven a usar el modelo de chat de cada persona."
       },
       "embed": {
@@ -816,7 +842,7 @@
     }
   },
   "people": {
-    "title": "Personas",
+    "title": "Usuarios",
     "subtitle": "Cuentas, grupos, políticas y contenido denunciado en este servidor.",
     "tabs": {
       "users": "Usuarios",
@@ -826,12 +852,12 @@
       "moderation": "Moderación",
       "audit": "Auditoría"
     },
-    "openPeople": "Abrir Personas",
+    "openPeople": "Abrir Usuarios",
     "backToOperate": "Volver a Operar",
     "myGroups": {
       "subtitle": "Grupos a los que pertenece en esta instancia.",
-      "emptyMember": "Aún no está en ningún grupo. Un administrador puede añadirle en la página Personas.",
-      "emptyAdmin": "Aún no hay grupos. Cree uno en la página Personas.",
+      "emptyMember": "Aún no está en ningún grupo. Un administrador puede añadirle en la página Usuarios.",
+      "emptyAdmin": "Aún no hay grupos. Cree uno en la página Usuarios.",
       "leave": "Salir",
       "leaveConfirm": "¿Salir del grupo \"{name}\"? Perderá el acceso a lo que este grupo puede ver. Lo que compartió con este grupo sigue compartido con los demás miembros. Puede retirarlo más tarde en el diálogo Compartir de cada elemento.",
       "leaveConfirmWithShares": "¿Salir del grupo \"{name}\"? Perderá el acceso a lo que este grupo puede ver. 1 elemento que compartió con este grupo sigue compartido con los demás miembros. Salir lo conserva. Salir y dejar de compartir lo retira. | ¿Salir del grupo \"{name}\"? Perderá el acceso a lo que este grupo puede ver. {count} elementos que compartió con este grupo siguen compartidos con los demás miembros. Salir los conserva. Salir y dejar de compartir los retira.",
@@ -843,7 +869,7 @@
       "ledBy": "Dirigido por {name}",
       "noLeader": "Nadie dirige este grupo todavía.",
       "alsoIn": "También en este grupo: {names}",
-      "onlyYou": "Usted es la única persona en este grupo.",
+      "onlyYou": "Usted es el único usuario en este grupo.",
       "sharedLine": "Compartido con este grupo: {items}",
       "youCanLeave": "Puede salir. Entonces pierde el acceso a lo que este grupo puede ver.",
       "youLead": "Usted dirige este grupo. Puede salir, y entonces pierde el acceso a lo que este grupo puede ver."
@@ -865,10 +891,10 @@
       "rename": "Renombrar",
       "renameTitle": "Renombrar grupo",
       "delete": "Eliminar",
-      "deleteConfirm": "¿Eliminar el grupo \"{name}\"? Las personas permanecen en la instancia. {shares}, y {policies}.",
+      "deleteConfirm": "¿Eliminar el grupo \"{name}\"? Los usuarios permanecen en la instancia. {shares}, y {policies}.",
       "deleteConfirmShares": "1 elemento compartido con este grupo termina | {count} elementos compartidos con este grupo terminan",
       "deleteConfirmPolicies": "se elimina 1 política | se eliminan {count} políticas",
-      "deleteConfirmUnknown": "¿Eliminar el grupo \"{name}\"? Las personas permanecen en la instancia. Los elementos compartidos con este grupo terminan y se eliminan las políticas del grupo.",
+      "deleteConfirmUnknown": "¿Eliminar el grupo \"{name}\"? Los usuarios permanecen en la instancia. Los elementos compartidos con este grupo terminan y se eliminan las políticas del grupo.",
       "empty": "Aún no hay grupos. Cree uno para compartir más adelante.",
       "loadError": "No se pudieron cargar los grupos.",
       "saveError": "No se pudo guardar el grupo.",
@@ -876,16 +902,16 @@
       "renamed": "Grupo renombrado.",
       "deleted": "Grupo eliminado.",
       "directoryReadOnly": "Este grupo viene de su inicio de sesión y no se puede cambiar el nombre ni eliminar aquí.",
-      "directoryManagedHint": "Las pertenencias de su inicio de sesión se actualizan en el próximo acceso. Aún puede añadir personas a mano.",
-      "addMember": "Añadir una persona",
+      "directoryManagedHint": "Las pertenencias de su inicio de sesión se actualizan en el próximo acceso. Aún puede añadir usuarios a mano.",
+      "addMember": "Añadir un usuario",
       "addMemberPlaceholder": "Buscar por nombre o correo",
-      "addMemberNotFound": "Ninguna persona coincide con ese nombre o correo.",
+      "addMemberNotFound": "Ningún usuario coincide con ese nombre o correo.",
       "removeMember": "Quitar",
       "removeConfirm": "¿Quitar a {email} de este grupo? Lo que compartió con este grupo sigue compartido.",
       "roleMember": "Miembro",
       "roleManager": "Responsable",
-      "memberAdded": "Persona añadida al grupo.",
-      "memberRemoved": "Persona quitada del grupo.",
+      "memberAdded": "Usuario añadido al grupo.",
+      "memberRemoved": "Usuario quitado del grupo.",
       "sharedWith": "Compartido con este grupo",
       "sharedEmpty": "Todavía no hay nada compartido con este grupo.",
       "sharedLoading": "Cargando elementos compartidos…",
@@ -976,7 +1002,7 @@
       }
     },
     "linkedPlatforms": {
-      "intro": "Servidores de Nextcloud, ownCloud y Outlook que pidieron usar este Synaplan. Aprueba uno para que sus usuarios puedan conectar sus propias cuentas en Gestionar › Conexiones › Plataformas vinculadas.",
+      "intro": "Servidores de Nextcloud, ownCloud y Outlook que pidieron usar este Synaplan. Aprueba uno para que sus usuarios puedan conectar sus propias cuentas en Apps.",
       "empty": "Aún no se ha registrado ninguna plataforma.",
       "client": "Plataforma",
       "host": "Dirección",
@@ -995,7 +1021,9 @@
         "active": "Activa",
         "pending": "En espera de aprobación",
         "revoked": "Revocada"
-      }
+      },
+      "emptyHint": "Un servidor se registra cuando alguien instala el complemento de Synaplan en Nextcloud, ownCloud u Outlook e introduce la dirección de este servidor.",
+      "emptyAction": "Ver los pasos de configuración"
     },
     "policies": {
       "group": "Grupo",
@@ -1018,7 +1046,7 @@
       "groupForcesOff": "Este grupo lo desactiva para sus miembros.",
       "rateLimit": "Nivel de límite de uso",
       "useGlobal": "Usar el valor de la instancia",
-      "useBillingTier": "Usar el plan de la persona",
+      "useBillingTier": "Usar el plan del usuario",
       "conflict": "Otro grupo define un valor distinto. Gana el grupo con el número más bajo.",
       "locks": "Valores de instancia bloqueados",
       "locksHelper": "Estos bloqueos se aplican a toda la instancia, no a un grupo. Mientras un bloqueo está activo, solo se usa el valor de la instancia. Los valores de grupo y personales se conservan, pero se ignoran. Desactive el bloqueo para volver a usarlos.",
@@ -1062,6 +1090,13 @@
         "CHAT_EXPORT_ENABLED": "Exportar chats",
         "CHAT_SHARE_ENABLED": "Compartir chats"
       }
+    },
+    "intro": {
+      "users": "Todos los usuarios con cuenta aquí. Cambia un nivel, verifica una dirección o desactiva una cuenta.",
+      "groups": "Los grupos reúnen usuarios para compartir asistentes y fijar reglas una sola vez para todas.",
+      "policies": "Las políticas deciden qué puede usar un grupo, por ejemplo qué funciones o modelos.",
+      "moderation": "Contenido que los usuarios han denunciado. Revísalo y consérvalo o elimínalo.",
+      "audit": "Un registro de quién cambió qué en este servidor, lo más reciente primero."
     }
   },
   "iam": {
@@ -1075,7 +1110,7 @@
     "sharedWithMe": "Compartido conmigo",
     "incoming": {
       "title": "Chats entrantes",
-      "subtitle": "Chats que personas o grupos han compartido contigo",
+      "subtitle": "Chats que usuarios o grupos han compartido contigo",
       "menu": "Chats entrantes",
       "purpose": "Compartidos contigo",
       "menuNew": "Nuevos chats entrantes",
@@ -1083,7 +1118,7 @@
       "newCount": "{count} entrantes nuevos",
       "owner": "de {name}",
       "sourceGroup": "Este chat pertenece a {owner}. Le llegó a través del grupo \"{name}\".",
-      "sourceEveryone": "Este chat pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
+      "sourceEveryone": "Este chat pertenece a {owner}. Se compartió con todos los usuarios que tienen una cuenta.",
       "sourceDirect": "Este chat pertenece a {owner}. Se compartió con usted personalmente.",
       "emptyText": "No hay chats entrantes",
       "filter": {
@@ -1102,7 +1137,7 @@
         "groupTitle": "Compartido con el grupo «{name}»",
         "groupTitleGeneric": "Compartido con un grupo",
         "everyone": "Todos",
-        "everyoneTitle": "Compartido con todas las personas que tienen una cuenta",
+        "everyoneTitle": "Compartido con todos los usuarios que tienen una cuenta",
         "direct": "Compartido contigo",
         "directTitle": "Compartido contigo personalmente",
         "from": "De {name}",
@@ -1110,7 +1145,7 @@
         "widgetTitle": "Una conversación de visitante de uno de tus widgets de chat"
       }
     },
-    "everyone": "Todas las personas con una cuenta",
+    "everyone": "Todos los usuarios con una cuenta",
     "owner": "Propietario",
     "fileUnavailable": "Este archivo ya no está disponible.",
     "kind": {
@@ -1131,30 +1166,30 @@
     "banner": {
       "knowledge_folder": {
         "sourceGroup": "Esta carpeta pertenece a {owner}. Le llegó a través del grupo «{name}».",
-        "sourceEveryone": "Esta carpeta pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
+        "sourceEveryone": "Esta carpeta pertenece a {owner}. Se compartió con todos los usuarios que tienen una cuenta.",
         "sourceDirect": "Esta carpeta pertenece a {owner}. Se compartió con usted personalmente."
       },
       "assistant": {
         "sourceGroup": "Este asistente pertenece a {owner}. Le llegó a través del grupo «{name}».",
-        "sourceEveryone": "Este asistente pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
+        "sourceEveryone": "Este asistente pertenece a {owner}. Se compartió con todos los usuarios que tienen una cuenta.",
         "sourceDirect": "Este asistente pertenece a {owner}. Se compartió con usted personalmente."
       },
       "saved_task": {
         "sourceGroup": "Esta tarea guardada pertenece a {owner}. Le llegó a través del grupo «{name}».",
-        "sourceEveryone": "Esta tarea guardada pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
+        "sourceEveryone": "Esta tarea guardada pertenece a {owner}. Se compartió con todos los usuarios que tienen una cuenta.",
         "sourceDirect": "Esta tarea guardada pertenece a {owner}. Se compartió con usted personalmente."
       },
       "widget": {
         "sourceGroup": "Este widget de chat pertenece a {owner}. Le llegó a través del grupo «{name}».",
-        "sourceEveryone": "Este widget de chat pertenece a {owner}. Se compartió con todas las personas que tienen una cuenta.",
+        "sourceEveryone": "Este widget de chat pertenece a {owner}. Se compartió con todos los usuarios que tienen una cuenta.",
         "sourceDirect": "Este widget de chat pertenece a {owner}. Se compartió con usted personalmente."
       }
     },
     "dialog": {
       "title": "Compartir «{name}»",
       "who": "Quién",
-      "searchPlaceholder": "Buscar una persona o un grupo…",
-      "searchPlaceholderSharedGroup": "Buscar personas de un grupo en común, o un grupo…",
+      "searchPlaceholder": "Buscar un usuario o un grupo…",
+      "searchPlaceholderSharedGroup": "Buscar usuarios de un grupo en común, o un grupo…",
       "permission": "Permiso",
       "sharedWith": "Compartido con",
       "empty": "Solo usted puede ver esto.",
@@ -1170,18 +1205,18 @@
       "removed": "Se dejó de compartir con {name}.",
       "removeFailed": "No se pudo dejar de compartir. Inténtelo de nuevo.",
       "permissionFailed": "No se pudo cambiar el permiso. Inténtelo de nuevo.",
-      "noMatches": "Ninguna persona o grupo coincide.",
+      "noMatches": "Ningún usuario o grupo coincide.",
       "noMatchesSharedGroup": "Nadie de un grupo en común, ni ningún grupo, coincide con ese nombre.",
-      "searchFailed": "No se pudo buscar personas o grupos.",
+      "searchFailed": "No se pudo buscar usuarios o grupos.",
       "tryAgain": "Intentar de nuevo",
-      "everyoneInactive": "Este uso compartido sigue guardado, pero nadie más puede usarlo mientras compartir con todas las personas está desactivado. Puede quitarlo aquí.",
+      "everyoneInactive": "Este uso compartido sigue guardado, pero nadie más puede usarlo mientras compartir con todos los usuarios está desactivado. Puede quitarlo aquí.",
       "ownerLine": "Propietario · {name}",
       "publicLink": "Enlace público",
       "publicLinkHint": "Cualquiera con el enlace puede verlo.",
       "managePublicLink": "Gestionar enlace público",
       "openPublicLink": "Gestionar enlace público",
       "subjectType": {
-        "user": "persona",
+        "user": "usuario",
         "group": "grupo"
       },
       "consequence": {

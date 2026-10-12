@@ -1013,11 +1013,7 @@ class AiFacade
             'attempted' => $attempted,
         ]);
 
-        if ($lastException) {
-            throw $lastException;
-        }
-
-        throw new ProviderException('Vision AI failed', 'unknown');
+        throw $lastException;
     }
 
     /**

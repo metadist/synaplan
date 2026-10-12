@@ -70,6 +70,17 @@ describe('useNavSections', () => {
     expect(wrapper.vm.sectionKeyForPath('/profile')).toBeNull()
   })
 
+  it('puts the apps under Apps and tasks, approvals and shortcuts under Assistants', () => {
+    const wrapper = mountSections({ email: 'user@test.com', level: 'PRO' })
+    expect(wrapper.vm.sectionKeyForPath('/apps')).toBe('channels')
+    expect(wrapper.vm.sectionKeyForPath('/apps/connected')).toBe('channels')
+    expect(wrapper.vm.sectionKeyForPath('/apps/telegram')).toBe('channels')
+    expect(wrapper.vm.sectionKeyForPath('/plugins/fastbill')).toBe('channels')
+    expect(wrapper.vm.sectionKeyForPath('/tasks')).toBe('assistants')
+    expect(wrapper.vm.sectionKeyForPath('/approvals')).toBe('assistants')
+    expect(wrapper.vm.sectionKeyForPath('/prompts')).toBe('assistants')
+  })
+
   it('selects no rail section on profile pages and remembers the previous one', async () => {
     const wrapper = mountSections({ email: 'user@test.com', level: 'PRO' })
     const router = wrapper.vm.$router

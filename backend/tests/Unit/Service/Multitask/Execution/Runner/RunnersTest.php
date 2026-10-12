@@ -677,6 +677,33 @@ final class RunnersTest extends TestCase
     }
 
     /**
+     * An inline image node that gets text instead of a picture must show the
+     * localized quote and recovery sentence. metadata.error is the raw
+     * English exception and must not become the task-card text.
+     */
+    public function testMediaGenerationRunnerUsesTheLocalizedTextReply(): void
+    {
+        $localized = "Google hat kein Bild erstellt, sondern mit Text geantwortet:\n\n> 10\n\n"
+            .'Formuliere die Anfrage als Bildanweisung um oder wähle ein anderes Bildmodell.';
+        $handler = $this->createStub(MediaGenerationHandler::class);
+        $handler->method('handle')->willReturn([
+            'content' => $localized,
+            'metadata' => [
+                'error' => 'Google returned text instead of an image (gemini-3.1-flash-image): "10"',
+            ],
+        ]);
+
+        $runner = new MediaGenerationRunner($handler, $this->createStub(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::ImageGeneration, [], ['prompt' => 'Wie viele Fenster?']);
+
+        $result = $runner->run($node, $this->context($this->message('Wie viele Fenster?')));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame($localized, $result->error);
+        self::assertStringNotContainsString('returned text instead', (string) $result->error);
+    }
+
+    /**
      * Regression: the synthetic message handed to MediaGenerationHandler must
      * carry the inbound message's attachments — the handler detects pic2pic
      * (image edit with a reference image) purely from the files on the message

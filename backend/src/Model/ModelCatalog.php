@@ -22,6 +22,19 @@ use Doctrine\DBAL\Connection;
  */
 class ModelCatalog
 {
+    /**
+     * Image models tried when the bound TEXT2PIC or PIC2PIC model cannot run (#2407).
+     * Shipped defaults are the first key. PIC2PIC still skips a row that lacks the pic2pic feature.
+     *
+     * @var list<string>
+     */
+    public const IMAGE_FALLBACK_KEYS = [
+        'openai:gpt-image-2.5-flare:text2pic',
+        'openai:gpt-image-2.5-sunburst:text2pic',
+        'google:gemini-3.1-flash-image:text2pic',
+        'google:gemini-3-pro-image:text2pic',
+    ];
+
     /** Maps DEFAULTMODEL capabilities to the model tag they require. */
     public const CAPABILITY_TAGS = [
         'CHAT' => 'chat',
@@ -374,6 +387,25 @@ class ModelCatalog
             'retiredOn' => '2026-10-02',
             'successor' => 'openai:gpt-5.6-luna:chat',
             'reason' => 'Deprecated by OpenAI; access ends on 2027-04-01. Migrate to GPT-5.6 Luna.',
+        ],
+
+        // --- 2026-10-08 (OpenAI image model shutdowns, 2026-10-23 and 2026-12-01) ---
+        // Retired ahead of the shutdown, like BID 234: OpenAI still serves both
+        // ids, so the availability check would only see them once every binding
+        // already fails. GPT Image 2.5 Flare is the same provider and key on the
+        // same Responses API edit path, ranks above both on the public image-edit
+        // boards and costs less per image (high 1024²: $0.05268 vs $0.133/$0.167).
+        29 => [
+            'providerId' => 'gpt-image-1',
+            'retiredOn' => '2026-10-08',
+            'successor' => 'openai:gpt-image-2.5-flare:text2pic',
+            'reason' => 'Deprecated by OpenAI; access ends on 2026-10-23. Migrate to GPT Image 2.5 Flare.',
+        ],
+        151 => [
+            'providerId' => 'gpt-image-1.5',
+            'retiredOn' => '2026-10-08',
+            'successor' => 'openai:gpt-image-2.5-flare:text2pic',
+            'reason' => 'Deprecated by OpenAI; access ends on 2026-12-01. Migrate to GPT Image 2.5 Flare.',
         ],
     ];
 
@@ -1428,6 +1460,8 @@ class ModelCatalog
         ],
         // ==================== OPENAI MODELS ====================
         [
+            // Retired 2026-10-08 ahead of OpenAI's 2026-10-23 shutdown; see
+            // RETIREMENTS[29] (successor GPT Image 2.5 Flare).
             'id' => 29,
             'service' => 'OpenAI',
             'name' => 'gpt-image-1',
@@ -2259,6 +2293,8 @@ class ModelCatalog
             ],
         ],
         [
+            // Retired 2026-10-08 ahead of OpenAI's 2026-12-01 shutdown; see
+            // RETIREMENTS[151] (successor GPT Image 2.5 Flare).
             'id' => 151,
             'service' => 'OpenAI',
             'name' => 'gpt-image-1.5',
@@ -2749,11 +2785,13 @@ class ModelCatalog
             // and https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide).
             // Claude Sonnet 5.5 — released 2026-09-28. Faster, lower-cost
             // complement to Opus 5.5 for everyday tasks. Same $2/$10 rate as
-            // Sonnet 5; cache reads stay the Anthropic-wide 0.1x ($0.20/1M),
-            // so no cache_read_price_per_1M override. Adaptive thinking is on
-            // when the field is omitted; the lowest setting is
-            // thinking.type between_tools (low/medium/high only). Effort also
-            // accepts xhigh and max. No temperature. Rejects forced
+            // Sonnet 5. Cache reads are 0.05x base input ($0.10/1M), NOT the
+            // Anthropic-wide 0.1x — overridden below via
+            // `cache_read_price_per_1M` (pricing page, verified 2026-10-08:
+            // https://platform.claude.com/docs/en/about-claude/pricing).
+            // Adaptive thinking is on when the field is omitted; the lowest
+            // setting is thinking.type between_tools (low/medium/high only).
+            // Effort also accepts xhigh and max. No temperature. Rejects forced
             // tool_choice — see AnthropicProvider / StructuredOutputCapability.
             'id' => 379,
             'service' => 'Anthropic',
@@ -2774,6 +2812,7 @@ class ModelCatalog
                 'params' => ['model' => 'claude-sonnet-5-5'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
                 'meta' => ['context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30', 'reasoning_effort_default' => 'high'],
+                'cache_read_price_per_1M' => 0.10,
             ],
         ],
         [
@@ -2796,6 +2835,7 @@ class ModelCatalog
                 'params' => ['model' => 'claude-sonnet-5-5'],
                 'features' => ['vision'],
                 'meta' => ['supports_images' => true],
+                'cache_read_price_per_1M' => 0.10,
             ],
         ],
         [

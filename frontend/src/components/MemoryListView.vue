@@ -267,11 +267,20 @@
         </div>
       </div>
 
-      <!-- Empty State -->
+      <EmptyState
+        v-if="memories.length === 0"
+        bare
+        :title="$t('memories.empty')"
+        :hint="$t('memories.emptyDesc')"
+        :action-label="$t('memories.createButton')"
+        test-id="state-memories-empty"
+        action-test-id="btn-memories-empty-create"
+        @action="emit('create')"
+      />
       <div
-        v-if="filteredMemories.length === 0"
+        v-else-if="filteredMemories.length === 0"
         class="text-center py-12"
-        data-testid="state-memories-empty"
+        data-testid="state-memories-no-results"
       >
         <Icon icon="mdi:brain-off" class="w-16 h-16 mx-auto txt-secondary mb-4" />
         <p class="txt-secondary text-lg">{{ $t('memories.noResults') }}</p>
@@ -283,6 +292,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { useDateFormat } from '@/composables/useDateFormat'
 

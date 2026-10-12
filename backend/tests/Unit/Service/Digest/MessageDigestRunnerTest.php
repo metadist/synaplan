@@ -43,6 +43,12 @@ final class MessageDigestRunnerTest extends TestCase
     /** @var list<string> */
     private array $failureWrites = [];
 
+    /** @var array<int, int> */
+    private array $lastDigestedAt = [];
+
+    /** @var list<int> */
+    private array $markedDigested = [];
+
     protected function setUp(): void
     {
         $this->digestService = $this->createMock(MessageDigestService::class);
@@ -57,6 +63,8 @@ final class MessageDigestRunnerTest extends TestCase
         $this->lowestSkippedAfterIds = [];
         $this->cursorFailures = [];
         $this->failureWrites = [];
+        $this->lastDigestedAt = [];
+        $this->markedDigested = [];
 
         $this->config->method('getBatchSize')->willReturn(25);
         $this->config->method('getQuietSeconds')->willReturn(3600);
@@ -72,6 +80,15 @@ final class MessageDigestRunnerTest extends TestCase
             function (int $userId): void {
                 $this->failureWrites[] = 'clear:'.$userId;
                 unset($this->cursorFailures[$userId]);
+            },
+        );
+        $this->config->method('lastDigestedAtFor')->willReturnCallback(
+            fn (array $userIds): array => $this->lastDigestedAt,
+        );
+        $this->config->method('markDigested')->willReturnCallback(
+            function (int $userId, int $at): void {
+                $this->markedDigested[] = $userId;
+                $this->lastDigestedAt[$userId] = $at;
             },
         );
         $this->rateLimitService->method('checkCostBudget')->willReturnCallback(
@@ -689,6 +706,100 @@ final class MessageDigestRunnerTest extends TestCase
         self::assertNull($config->getCursorFailures(7));
     }
 
+    public function testScheduledRunStartsWithTheUserWaitingLongest(): void
+    {
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->lastDigestedAt = [7 => 500, 8 => 100];
+        $this->messageRepository->method('findDistinctUserIds')->willReturn([7, 9, 8]);
+        $seen = [];
+        $this->userRepository->method('find')->willReturnCallback(function (int $id) use (&$seen): User {
+            $seen[] = $id;
+            $user = $this->makeUser($id);
+            if (9 === $id) {
+                $user->setMemoriesEnabled(false);
+            }
+
+            return $user;
+        });
+        $this->messageRepository->method('findDigestCandidates')->willReturn([]);
+
+        $this->runner->run();
+
+        self::assertSame([9, 8, 7], $seen);
+        self::assertSame([9, 8, 7], $this->markedDigested);
+    }
+
+    public function testAbortedUserIsNotMarkedSoTheNextRunRetriesThem(): void
+    {
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->lastDigestedAt = [8 => 10];
+        $this->messageRepository->method('findDistinctUserIds')->willReturn([8, 7]);
+        $seen = [];
+        $this->userRepository->method('find')->willReturnCallback(function (int $id) use (&$seen): User {
+            $seen[] = $id;
+
+            return $this->makeUser($id);
+        });
+        $this->messageRepository->method('findDigestCandidates')->willReturn([$this->makeMessage(10)]);
+        $this->digestService->method('digestBatch')->willReturn([
+            'scanned' => 0,
+            'created' => 0,
+            'proposals' => [],
+            'failed' => true,
+            'failureReason' => ChatFailureReason::RateLimited->value,
+        ]);
+
+        $summary = $this->runner->run();
+
+        self::assertSame([7], $seen);
+        self::assertTrue($summary['aborted']);
+        self::assertSame([], $this->markedDigested);
+    }
+
+    public function testDryRunDoesNotMarkUsersDigested(): void
+    {
+        $this->config->method('isEnabled')->willReturn(true);
+        $this->messageRepository->method('findDistinctUserIds')->willReturn([8, 7]);
+        $this->userRepository->method('find')->willReturnCallback(fn (int $id): User => $this->makeUser($id));
+        $this->messageRepository->method('findDigestCandidates')->willReturn([]);
+
+        $this->runner->run(dryRun: true);
+
+        self::assertSame([], $this->markedDigested);
+    }
+
+    public function testBackfillDoesNotReshuffleUsersOrMarkThemDigested(): void
+    {
+        $this->lastDigestedAt = [7 => 50];
+        $this->messageRepository->method('findDistinctUserIds')->willReturn([7, 8]);
+        $seen = [];
+        $this->userRepository->method('find')->willReturnCallback(function (int $id) use (&$seen): User {
+            $seen[] = $id;
+
+            return $this->makeUser($id);
+        });
+        $this->messageRepository->method('findDigestCandidates')->willReturn([]);
+
+        $this->runner->backfill(null, 1_000);
+
+        self::assertSame([7, 8], $seen);
+        self::assertSame([], $this->markedDigested);
+    }
+
+    public function testLastDigestedAtReadsAndStoresTheScheduledStamp(): void
+    {
+        $stored = ['8|'.MessageDigestConfig::KEY_LAST_DIGESTED_AT => '100'];
+        $config = new MessageDigestConfig($this->configRepository($stored));
+
+        self::assertEquals([8 => 100], $config->lastDigestedAtFor([7, 8]));
+
+        $config->markDigested(7, 200);
+        self::assertSame('200', $stored['7|'.MessageDigestConfig::KEY_LAST_DIGESTED_AT]);
+        self::assertEquals([7 => 200, 8 => 100], $config->lastDigestedAtFor([8, 7]));
+        $config->markDigested(0, 200);
+        self::assertArrayNotHasKey('0|'.MessageDigestConfig::KEY_LAST_DIGESTED_AT, $stored);
+    }
+
     public function testBudgetStopSkipsTheModelCallAndLeavesTheCursor(): void
     {
         $this->budgetAllowed = false;
@@ -746,6 +857,19 @@ final class MessageDigestRunnerTest extends TestCase
                 unset($stored[$key]);
 
                 return true;
+            },
+        );
+        $repository->method('getValuesForOwners')->willReturnCallback(
+            static function (array $ownerIds, string $group, string $setting) use (&$stored): array {
+                $values = [];
+                foreach ($ownerIds as $ownerId) {
+                    $key = ((int) $ownerId).'|'.$setting;
+                    if (isset($stored[$key])) {
+                        $values[(int) $ownerId] = $stored[$key];
+                    }
+                }
+
+                return $values;
             },
         );
 

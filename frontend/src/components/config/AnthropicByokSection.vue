@@ -67,6 +67,10 @@ import {
   type MessagesGatewayStatus,
 } from '@/services/api/messagesGatewayApi'
 
+const emit = defineEmits<{
+  changed: []
+}>()
+
 const { t } = useI18n()
 const { confirm } = useDialog()
 const { success, error } = useNotification()
@@ -101,6 +105,7 @@ async function onSaveKey() {
     apiKey.value = ''
     success(t('messagesGateway.saveKeySuccess'))
     await load()
+    emit('changed')
   } catch (err) {
     error((err as Error).message || t('messagesGateway.saveKeyError'))
   } finally {
@@ -121,6 +126,7 @@ async function onClearKey() {
     await clearMessagesGatewayKey('anthropic')
     success(t('messagesGateway.clearKeySuccess'))
     await load()
+    emit('changed')
   } catch (err) {
     error((err as Error).message || t('messagesGateway.clearKeyError'))
   } finally {

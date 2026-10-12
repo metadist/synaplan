@@ -22,10 +22,10 @@ const groups = (...items: SearchResult[]) => {
 
 describe('isExactMatch', () => {
   it('matches the title or a setting key, typed out or as words', () => {
-    const groupsSetting = result('setting', 'People & groups', 'FEATURE_IAM_GROUPS_ENABLED')
+    const groupsSetting = result('setting', 'Users & groups', 'FEATURE_IAM_GROUPS_ENABLED')
     expect(isExactMatch(groupsSetting, 'FEATURE_IAM_GROUPS_ENABLED')).toBe(true)
     expect(isExactMatch(groupsSetting, 'feature iam groups enabled')).toBe(true)
-    expect(isExactMatch(groupsSetting, 'people groups')).toBe(true)
+    expect(isExactMatch(groupsSetting, 'users groups')).toBe(true)
     expect(isExactMatch(groupsSetting, 'groups')).toBe(false)
     expect(isExactMatch(groupsSetting, '  ')).toBe(false)
   })
@@ -34,7 +34,7 @@ describe('isExactMatch', () => {
 describe('orderKinds', () => {
   it('keeps the fixed order without an exact match', () => {
     const map = groups(
-      result('setting', 'People & groups'),
+      result('setting', 'Users & groups'),
       result('command', 'New chat'),
       result('page', 'Groups page')
     )
@@ -44,7 +44,7 @@ describe('orderKinds', () => {
   it('moves a group whose top hit is exact to the front', () => {
     const map = groups(
       result('command', 'Switch language to Deutsch'),
-      result('setting', 'People & groups', 'FEATURE_IAM_GROUPS_ENABLED')
+      result('setting', 'Users & groups', 'FEATURE_IAM_GROUPS_ENABLED')
     )
     expect(orderKinds(map, 'FEATURE_IAM_GROUPS_ENABLED')).toEqual(['setting', 'command'])
   })

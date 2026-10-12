@@ -9,6 +9,7 @@ import BrandingStyleResetCard from '@/components/admin/BrandingStyleResetCard.vu
 import ConfigSectionStack from '@/components/admin/ConfigSectionStack.vue'
 import RestartRequiredBanner from '@/components/admin/RestartRequiredBanner.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import WebSearchPlugTab from '@/components/admin/plugs/WebSearchPlugTab.vue'
 import { useSystemConfig } from '@/composables/useSystemConfig'
 import { useTheme } from '@/composables/useTheme'
@@ -21,6 +22,7 @@ import {
   AI_INFRA_PATH,
   AI_TAB_SECTIONS,
   SYSTEM_CONFIG_GROUPS,
+  SYSTEM_CONFIG_PATH,
   sectionKey,
   type ConfigSectionRef,
   type SystemGroupId,
@@ -185,6 +187,84 @@ watch(
   }
 )
 
+const MAX_SEARCH_HITS = 50
+
+interface SettingHit {
+  id: string
+  /** Page that shows the setting: this page, or AI infrastructure. */
+  path: string
+  key: string | null
+  label: string
+  description: string
+  tabId: string
+  place: string
+  sectionId: string | null
+}
+
+const searchQuery = ref('')
+const normalizedQuery = computed(() => searchQuery.value.trim().toLowerCase())
+
+/** Every setting whose key, help text, section or tab name contains the query. */
+const searchHits = computed<SettingHit[]>(() => {
+  const query = normalizedQuery.value
+  if (!query) return []
+  const matches = (...texts: string[]) => texts.some((text) => text.toLowerCase().includes(query))
+  const hits: SettingHit[] = []
+  const pushFields = (ref: ConfigSectionRef, path: string, tabId: string, tabName: string) => {
+    const section = systemConfig.resolveSection(ref)
+    if (!section) return
+    for (const field of [...section.fields, ...section.managedFields]) {
+      const descriptionKey = `admin.config.fields.${field.key}`
+      const description = te(descriptionKey) ? t(descriptionKey) : field.schema.description
+      if (!matches(field.key, description, section.label, tabName)) continue
+      hits.push({
+        id: `${path}:${ref.tab}.${ref.section}.${field.key}`,
+        path,
+        key: field.key,
+        label: field.key,
+        description,
+        tabId,
+        place: `${tabName} › ${section.label}`,
+        sectionId: ref.section,
+      })
+    }
+  }
+  for (const tab of allTabs.value) {
+    if (tab.panel && matches(tab.label, tab.intro)) {
+      hits.push({
+        id: `tab-${tab.id}`,
+        path: SYSTEM_CONFIG_PATH,
+        key: null,
+        label: tab.label,
+        description: tab.intro,
+        tabId: tab.id,
+        place: tab.label,
+        sectionId: null,
+      })
+    }
+    for (const ref of tab.sections) pushFields(ref, SYSTEM_CONFIG_PATH, tab.id, tab.label)
+  }
+  const aiPage = t('nav.adminProviderSetup')
+  for (const [aiTab, refs] of Object.entries(AI_TAB_SECTIONS)) {
+    const tabName = `${aiPage} › ${t(`adminSetup.tabs.${aiTab}`)}`
+    for (const ref of refs) pushFields(ref, AI_INFRA_PATH, aiTab, tabName)
+  }
+  return hits.slice(0, MAX_SEARCH_HITS)
+})
+
+function openHit(hit: SettingHit): void {
+  searchQuery.value = ''
+  const query: Record<string, string> = { tab: hit.tabId }
+  if (hit.sectionId) query.section = hit.sectionId
+  if (hit.key) query.highlight = hit.key
+  if (hit.path !== SYSTEM_CONFIG_PATH) {
+    void router.push({ path: hit.path, query })
+    return
+  }
+  requestedTab.value = hit.tabId
+  void router.replace({ query })
+}
+
 // Mobile: one dropdown lists every tab under its topic header, so the
 // desktop topic list is not lost on a phone.
 const mobileTabMenuOpen = ref(false)
@@ -228,8 +308,8 @@ onBeforeUnmount(() => {
 
 <template>
   <MainLayout data-testid="view-admin-config">
-    <div class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin">
-      <div class="container mx-auto max-w-[90rem]">
+    <div class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin">
+      <div class="mx-auto w-full max-w-[100rem]">
         <RestartRequiredBanner
           :visible="systemConfig.restartRequired.value"
           @dismiss="systemConfig.dismissRestart"
@@ -259,6 +339,20 @@ onBeforeUnmount(() => {
         <!-- Release notice: informs and links to the guide, never updates anything -->
         <UpdatePanel v-if="updatesStore.canRead" class="mb-6" />
 
+        <div v-if="schema" class="mb-6">
+          <label for="admin-config-search" class="sr-only">{{
+            $t('admin.config.search.label')
+          }}</label>
+          <input
+            id="admin-config-search"
+            v-model="searchQuery"
+            type="search"
+            :placeholder="$t('admin.config.search.placeholder')"
+            class="w-full max-w-xl px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-admin-config-search"
+          />
+        </div>
+
         <div
           v-if="!schema && !systemConfig.loadFailed.value"
           class="flex items-center justify-center py-20"
@@ -266,6 +360,44 @@ onBeforeUnmount(() => {
         >
           <Icon icon="mdi:loading" class="w-8 h-8 animate-spin txt-secondary" />
         </div>
+
+        <section
+          v-else-if="schema && normalizedQuery"
+          class="space-y-3"
+          :aria-label="$t('admin.config.search.label')"
+          data-testid="section-admin-config-search"
+        >
+          <EmptyState
+            v-if="searchHits.length === 0"
+            :title="$t('admin.config.search.noHits', { query: searchQuery.trim() })"
+            :action-label="$t('admin.config.search.clear')"
+            test-id="state-admin-config-no-hits"
+            action-test-id="btn-admin-config-clear-search"
+            @action="searchQuery = ''"
+          />
+          <ul
+            v-else
+            class="surface-card overflow-hidden rounded-2xl divide-y divide-light-border/20 dark:divide-dark-border/10"
+          >
+            <li v-for="hit in searchHits" :key="hit.id">
+              <button
+                type="button"
+                class="stack-row w-full text-left px-4 py-3 hover-surface flex flex-col gap-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]"
+                data-testid="item-admin-config-hit"
+                @click="openHit(hit)"
+              >
+                <span class="text-sm font-medium txt-primary break-words">
+                  <code v-if="hit.key" class="text-xs">{{ hit.label }}</code>
+                  <template v-else>{{ hit.label }}</template>
+                </span>
+                <span v-if="hit.description" class="text-xs txt-secondary break-words">
+                  {{ hit.description }}
+                </span>
+                <span class="text-xs txt-brand">{{ hit.place }}</span>
+              </button>
+            </li>
+          </ul>
+        </section>
 
         <div
           v-else-if="schema && currentTab"

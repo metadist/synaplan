@@ -91,23 +91,37 @@ final class WebSearchTopicPolicy
         '/'.self::REQUEST_START_EN.'look\s+(?:it|this|that|them)\s+up\s+online\b/u',
         '/'.self::REQUEST_START_EN.'(?:do|run)\s+an?\s+(?:web|internet|online)\s+search\b/u',
         '/'.self::REQUEST_START_EN.'google\s+(?:it|this|that|for)\b/u',
-        '/'.self::REQUEST_START_EN.'(?:find|search)\b[^.?!]*\b(?:on|from)\s+the\s+(?:web|internet)\b/u',
+        '/'.self::REQUEST_START_EN.'(?:find|search)\b'.self::REQUEST_SPAN.'\bon\s+the\s+(?:web|internet)\b/u',
         // German
-        '/'.self::REQUEST_START_DE.'(?:such|suche|durchsuche|recherchier|recherchiere|schau|schaue|guck|gucke)\b[^.?!]*(?:\b(?:im|ins|das|dem)\s+(?:internet|netz|web)\b|\bonline\b)/u',
-        '/'.self::REQUEST_START_DE.'(?:kannst|könntest|koenntest|würdest|wuerdest)\s+du\b[^.?!]*(?:\b(?:im|ins)\s+(?:internet|netz|web)\b|\bonline\b)[^.?!]*\b(?:suchen|nachsuchen|nachschauen|nachsehen|nachgucken|recherchieren|schauen|gucken)\b/u',
-        '/'.self::REQUEST_START_DE.'(?:kannst|könntest|koenntest|würdest|wuerdest)\s+du\b[^.?!]*\bgoogeln\b/u',
+        '/'.self::REQUEST_START_DE.'(?:such|suche|durchsuche|recherchier|recherchiere|schau|schaue|guck|gucke)\b'.self::REQUEST_SPAN.'(?:\b(?:im|ins|das|dem)\s+(?:internet|netz|web)\b|\bonline\b)/u',
+        '/'.self::REQUEST_START_DE.'(?:kannst|könntest|koenntest|würdest|wuerdest)\s+du\b'.self::REQUEST_SPAN.'(?:\b(?:im|ins)\s+(?:internet|netz|web)\b|\bonline\b)'.self::REQUEST_SPAN.'\b(?:suchen|nachsuchen|nachschauen|nachsehen|nachgucken|recherchieren|schauen|gucken)\b/u',
+        '/'.self::REQUEST_START_DE.'(?:kannst|könntest|koenntest|würdest|wuerdest)\s+du\b'.self::REQUEST_SPAN.'\bgoogeln\b/u',
         '/'.self::REQUEST_START_DE.'(?:mach|mache|starte|führ|führe|fuehr|fuehre)\s+(?:mal\s+)?(?:eine\s+)?(?:websuche|internetsuche|online-suche|onlinesuche)\b/u',
         '/'.self::REQUEST_START_DE.'(?:websuche|internetsuche)\s*:/u',
         '/'.self::REQUEST_START_DE.'(?:google|googel)\s+(?:mal|bitte|das|nach)\b/u',
         // Spanish
-        '/'.self::REQUEST_START_ES.'(?:busca|buscar|búscalo|buscalo|investiga|investigar)\b[^.?!]*\b(?:en|por)\s+(?:internet|la\s+web|google|línea|linea)\b/u',
+        '/'.self::REQUEST_START_ES.'(?:busca|buscar|búscalo|buscalo|investiga|investigar)\b'.self::REQUEST_SPAN.'\b(?:en|por)\s+(?:internet|la\s+web|google|línea|linea)\b/u',
         // French
-        '/'.self::REQUEST_START_FR.'(?:cherche|chercher|recherche|rechercher)\b[^.?!]*\b(?:sur\s+(?:internet|le\s+web|google)|en\s+ligne)\b/u',
+        '/'.self::REQUEST_START_FR.'(?:cherche|chercher|recherche|rechercher)\b'.self::REQUEST_SPAN.'\b(?:sur\s+(?:internet|le\s+web|google)|en\s+ligne)\b/u',
         // Italian
-        '/'.self::REQUEST_START_IT.'(?:cerca|cercare)\b[^.?!]*\b(?:su|in)\s+(?:internet|web|google)\b/u',
+        '/'.self::REQUEST_START_IT.'(?:cerca|cercare)\b'.self::REQUEST_SPAN.'\b(?:su|in)\s+(?:internet|web|google)\b/u',
         // Turkish (the verb comes last: "internette ara", "internetten bakar mısın")
         '/\b(?:internette|internetten|webde|google\'da|googleda)\s+(?:ara|araştır|arastir|bak)(?:\s*$|\s*[:.!?,]|\s+(?:mısın|misin|bakar|lütfen|lutfen)\b)/u',
     ];
+
+    /**
+     * Words between the verb and "internet" / "online" within one sentence.
+     * Bounded so a crafted message (thousands of clause starts) cannot make
+     * the backtracking engine run for seconds on every chat turn, and so a
+     * long paragraph is not read as one request.
+     */
+    private const REQUEST_SPAN = '[^.?!]{0,80}';
+
+    /**
+     * A request to search sits at the start or the end of a message. Only
+     * that much of each end is scanned.
+     */
+    private const EXPLICIT_REQUEST_SCAN_CHARS = 500;
 
     private const CLAUSE_START = '(?:^|[.!?;:,]\s*)[¿¡]?\s*';
 
@@ -345,10 +359,20 @@ final class WebSearchTopicPolicy
             return false;
         }
 
-        $lower = mb_strtolower($text);
-        foreach (self::EXPLICIT_SEARCH_PATTERNS as $pattern) {
-            if (1 === preg_match($pattern, $lower)) {
-                return true;
+        $lower = mb_strtolower(trim($text));
+        $parts = mb_strlen($lower) <= 2 * self::EXPLICIT_REQUEST_SCAN_CHARS
+            ? [$lower]
+            : [
+                mb_substr($lower, 0, self::EXPLICIT_REQUEST_SCAN_CHARS),
+                // Drop the word the cut landed in, so "versuche" never reads as "suche".
+                preg_replace('/^\S*\s*/u', '', mb_substr($lower, -self::EXPLICIT_REQUEST_SCAN_CHARS)) ?? '',
+            ];
+
+        foreach ($parts as $part) {
+            foreach (self::EXPLICIT_SEARCH_PATTERNS as $pattern) {
+                if (1 === preg_match($pattern, $part)) {
+                    return true;
+                }
             }
         }
 

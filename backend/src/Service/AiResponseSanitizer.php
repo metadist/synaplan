@@ -53,4 +53,45 @@ final readonly class AiResponseSanitizer
 
         return trim($text);
     }
+
+    /**
+     * An assistant scratchpad is only hidden for the AI. Visitor, operator
+     * and system messages may contain the literal tags.
+     */
+    public static function isAssistantScratchpad(string $direction, string $providerIndex): bool
+    {
+        if ('OUT' !== $direction) {
+            return false;
+        }
+
+        return !in_array($providerIndex, ['SYSTEM', 'HUMAN_OPERATOR'], true);
+    }
+
+    /**
+     * Transcript text for one message. AI scratchpads are removed; every
+     * other sender is returned unchanged.
+     */
+    public static function transcriptText(string $text, string $direction, string $providerIndex): string
+    {
+        return self::isAssistantScratchpad($direction, $providerIndex)
+            ? self::stripForDisplay($text)
+            : $text;
+    }
+
+    /**
+     * Visible text, then the first $limit characters.
+     *
+     * For an AI message the cut happens after the scratchpad is gone, so a
+     * long `<think>` block cannot fill a session preview. Other senders are
+     * truncated without removing `<think>`.
+     */
+    public static function preview(string $text, int $limit = 100, string $direction = 'OUT', string $providerIndex = ''): string
+    {
+        $visible = self::transcriptText($text, $direction, $providerIndex);
+        if ($limit < 1 || '' === $visible) {
+            return '';
+        }
+
+        return mb_substr($visible, 0, $limit);
+    }
 }

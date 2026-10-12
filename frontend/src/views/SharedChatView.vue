@@ -224,6 +224,15 @@
                 />
               </template>
 
+              <KnowledgeSources
+                v-if="
+                  message.direction === 'OUT' && message.ragSources && message.ragSources.length > 0
+                "
+                :sources="message.ragSources"
+                :show-library-link="false"
+                :load-passage="loadSharedPassage"
+              />
+
               <!-- File attachments (images, videos) -->
               <div v-if="message.file" class="mt-3">
                 <MessageImage
@@ -364,7 +373,10 @@ import MessageAudio from '../components/MessageAudio.vue'
 import MessageCode from '../components/MessageCode.vue'
 import MessageJson from '../components/MessageJson.vue'
 import MessageText from '../components/MessageText.vue'
+import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
 import BrandAttribution from '../components/BrandAttribution.vue'
+import { GetSharedChatRagChunkResponseSchema } from '@/generated/api-schemas'
+import type { RagSourceRef } from '@/stores/history'
 import {
   buildUploadUrl,
   isAudioFileType,
@@ -374,49 +386,9 @@ import {
 import { useConfigStore } from '@/stores/config'
 import { httpClient } from '@/services/api/httpClient'
 import { collapseApiToolTurn } from '@/utils/apiToolTurn'
-import { z } from 'zod'
+import { GetSharedChatResponseSchema } from '@/generated/api-schemas'
 import { setLocale, supportedLanguages, type SupportedLanguage } from '@/i18n'
 import { parseAIResponse } from '@/utils/responseParser'
-
-// Issue #1175: user-uploaded attachments travel on the File entity M2M
-// relation, serialized by MessageApiFormatter as `files[]`. The shared
-// endpoint now returns them so viewers can see uploaded images, PDFs, audio,
-// etc. — not just the legacy single AI-generated `file`.
-const SharedChatFileSchema = z.object({
-  id: z.number(),
-  filename: z.string(),
-  fileType: z.string(),
-  filePath: z.string(),
-  fileSize: z.number().nullable().optional(),
-  fileMime: z.string().nullable().optional(),
-})
-
-const SharedChatMessageSchema = z.object({
-  id: z.number(),
-  text: z.string(),
-  direction: z.enum(['IN', 'OUT']),
-  timestamp: z.number(),
-  topic: z.string().optional(),
-  language: z.string().optional(),
-  provider: z.string().optional(),
-  file: z
-    .object({
-      path: z.string(),
-      type: z.string(),
-    })
-    .nullable()
-    .optional(),
-  files: z.array(SharedChatFileSchema).optional(),
-})
-
-const SharedChatPayloadSchema = z.object({
-  success: z.boolean(),
-  chat: z.object({
-    title: z.string(),
-    createdAt: z.string(),
-  }),
-  messages: z.array(SharedChatMessageSchema).optional(),
-})
 
 const config = useConfigStore()
 const route = useRoute()
@@ -450,6 +422,7 @@ interface Message {
     type: string
   } | null
   files?: SharedChatFile[]
+  ragSources?: RagSourceRef[] | null
 }
 
 interface Chat {
@@ -634,7 +607,7 @@ onMounted(async () => {
   try {
     const data = await httpClient(`/api/v1/chats/shared/${token.value}`, {
       skipAuth: true,
-      schema: SharedChatPayloadSchema,
+      schema: GetSharedChatResponseSchema,
     })
 
     if (!data.success) {
@@ -650,6 +623,17 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+const loadSharedPassage = async (chunkId: string): Promise<string> => {
+  const data = await httpClient(
+    `/api/v1/chats/shared/${encodeURIComponent(token.value)}/rag/chunks/${encodeURIComponent(chunkId)}`,
+    {
+      skipAuth: true,
+      schema: GetSharedChatRagChunkResponseSchema,
+    }
+  )
+  return data.text
+}
 
 const formatDate = (timestamp: number): string => {
   return formatDateTime(new Date(timestamp * 1000))

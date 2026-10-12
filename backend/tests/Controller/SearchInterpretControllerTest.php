@@ -21,7 +21,7 @@ final class SearchInterpretControllerTest extends WebTestCase
 
     private const CANDIDATES = [
         ['id' => 'page:/files', 'kind' => 'page', 'title' => 'Files', 'subtitle' => 'Sources'],
-        ['id' => 'setting:FEATURE_IAM_GROUPS_ENABLED', 'kind' => 'setting', 'title' => 'FEATURE_IAM_GROUPS_ENABLED', 'subtitle' => 'Features › People & sharing', 'value' => 'false'],
+        ['id' => 'setting:FEATURE_IAM_GROUPS_ENABLED', 'kind' => 'setting', 'title' => 'FEATURE_IAM_GROUPS_ENABLED', 'subtitle' => 'Features › Users & sharing', 'value' => 'false'],
     ];
 
     private KernelBrowser $client;

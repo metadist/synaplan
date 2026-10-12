@@ -13,6 +13,7 @@ use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\RenderedImageSize;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -250,8 +251,11 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
         $this->registerGeneratedFile($user, $localPath, $mimeType);
 
-        // pic2pic uses high quality (see generateImage call above).
-        $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId, null, null, 'high', self::DEFAULT_IMAGE_SIZE);
+        // pic2pic uses high quality (see generateImage call above). The edit
+        // leaves the size to the model, so bill the size it rendered (#2404).
+        $renderedSize = $result['images'][0]['size'] ?? null;
+        $billedSize = RenderedImageSize::billingKey(is_string($renderedSize) ? $renderedSize : null) ?? self::DEFAULT_IMAGE_SIZE;
+        $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId, null, null, 'high', $billedSize);
 
         // Clean up temporary upload files
         foreach ($imagePaths as $tmpPath) {
@@ -469,12 +473,12 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
      */
     private function resolveModel(User $user, string $type, ?int $modelId): array
     {
+        $capability = match ($type) {
+            'pic2pic' => 'PIC2PIC',
+            'video' => 'TEXT2VID',
+            default => 'TEXT2PIC',
+        };
         if (null === $modelId) {
-            $capability = match ($type) {
-                'pic2pic' => 'PIC2PIC',
-                'video' => 'TEXT2VID',
-                default => 'TEXT2PIC',
-            };
             $modelId = $this->modelConfigService->getDefaultModel($capability, $user->getId());
         }
 
@@ -485,6 +489,18 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $model = $this->em->getRepository(Model::class)->find($modelId);
         if (null === $model) {
             throw new NoModelAvailableException('Model not found: '.$modelId);
+        }
+
+        // An id the provider shut down follows the retirement record (its
+        // catalog successor) instead of failing at the provider.
+        if ($model->isRetired()) {
+            $replacementId = $this->modelConfigService->replacementForRetiredModel($modelId, $capability, $user->getId());
+            $replacement = null !== $replacementId ? $this->em->getRepository(Model::class)->find($replacementId) : null;
+            if (null === $replacement) {
+                throw new NoModelAvailableException(sprintf('The selected model (%s) has been retired by its provider and no replacement is available. Choose another model in Settings.', $model->getName()));
+            }
+            $model = $replacement;
+            $modelId = $replacementId;
         }
 
         return [

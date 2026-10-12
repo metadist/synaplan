@@ -156,8 +156,8 @@ final class SearchController extends AbstractController
                         properties: [
                             new OA\Property(property: 'id', type: 'string', example: 'setting:FEATURE_IAM_GROUPS_ENABLED'),
                             new OA\Property(property: 'kind', type: 'string', enum: InterpretCandidate::KINDS, example: 'setting'),
-                            new OA\Property(property: 'title', type: 'string', example: 'People & groups'),
-                            new OA\Property(property: 'subtitle', type: 'string', nullable: true, example: 'Features › People & sharing'),
+                            new OA\Property(property: 'title', type: 'string', example: 'Users & groups'),
+                            new OA\Property(property: 'subtitle', type: 'string', nullable: true, example: 'Features › Users & sharing'),
                             new OA\Property(property: 'value', type: 'string', nullable: true, description: 'Current value of a setting', example: 'false'),
                         ],
                     ),

@@ -2,27 +2,16 @@ import { computed, readonly, ref, watch, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   AdjustmentsHorizontalIcon,
-  ArrowsRightLeftIcon,
   BookOpenIcon,
   BuildingOffice2Icon,
   ChatBubbleBottomCenterTextIcon,
   CheckBadgeIcon,
   ClockIcon,
   Cog6ToothIcon,
-  CommandLineIcon,
-  ComputerDesktopIcon,
   CpuChipIcon,
-  DocumentTextIcon,
-  EnvelopeIcon,
   FolderIcon,
-  GlobeAltIcon,
   IdentificationIcon,
-  InboxArrowDownIcon,
-  KeyIcon,
-  LifebuoyIcon,
-  LinkIcon,
   PuzzlePieceIcon,
-  ServerStackIcon,
   ShieldCheckIcon,
   Squares2X2Icon,
   UsersIcon,
@@ -34,12 +23,10 @@ import { useConfigStore } from '../stores/config'
 import { useApprovalsStore } from '../stores/approvals'
 import { getFeaturesStatus } from '../services/featuresService'
 import { modelStatusApi } from '../services/api/adminModelStatusApi'
+import { partnersApi } from '../services/api/partnersApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
 import { isApprovalsEnabled } from './useApprovalsFeature'
-import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
-import { isPlatformLinksEnabled } from './usePlatformLinksFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
-import { isAiAccountsEnabled } from './useAiAccounts'
 
 export interface NavChild {
   /** Stable identifier used for data-testid — never derived from the route path */
@@ -53,6 +40,8 @@ export interface NavChild {
   group?: string
   /** Stable group id (`assistants`, `channels`, …) for testids and nesting */
   groupKey?: string
+  /** Sub-pages opened from this entry that keep it highlighted. */
+  alsoActiveOn?: string[]
 }
 
 export interface NavChildGroup {
@@ -98,6 +87,7 @@ export function hasNestedNavGroups(children: NavChild[] | undefined): boolean {
  * every other child uses prefix match.
  */
 export function isNavChildActive(child: NavChild, sectionPath: string, routePath: string): boolean {
+  if (child.alsoActiveOn?.some((path) => routePath.startsWith(path))) return true
   return child.path === sectionPath ? routePath === child.path : routePath.startsWith(child.path)
 }
 
@@ -118,6 +108,8 @@ export interface NavItem {
 // Module-scoped so the desktop rail and the mobile nav share one fetch.
 const disabledFeaturesCount = ref(0)
 const offlineModelsCount = ref(0)
+/** Partners needs a public https address; an opened membership stays listed so it can be closed. */
+const partnersListed = ref(false)
 let featureStatusRequested = false
 
 /** Model health reports its latest count so the Operate badge never lags behind the page. */
@@ -197,6 +189,13 @@ export function useNavItems() {
     } catch {
       offlineModelsCount.value = 0
     }
+
+    try {
+      const membership = await partnersApi.membership()
+      partnersListed.value = membership.reachable || membership.opened
+    } catch {
+      partnersListed.value = false
+    }
   }
 
   const navItems = computed<NavItem[]>(() => {
@@ -225,39 +224,23 @@ export function useNavItems() {
 
     if (canSeeManage(signedIn.value)) {
       const assistants = t('nav.groupAssistants')
-      const channels = t('nav.channels')
       const automations = t('nav.groupAutomations')
-      const connections = t('nav.connections')
-      const developer = t('nav.groupDeveloper')
+      const apps = t('nav.groupApps')
 
       const grouped = (groupKey: string, group: string) => ({ groupKey, group })
 
       const manageChildren: NavChild[] = [
-        {
-          key: 'ai-models',
-          path: '/ai/models',
-          label: t('nav.configAiModels'),
-          icon: CpuChipIcon,
-          ...grouped('assistants', assistants),
-        },
-        ...(isAiAccountsEnabled()
+        ...(isAgentsEnabled()
           ? [
               {
-                key: 'ai-accounts',
-                path: '/ai/providers',
-                label: t('nav.aiAccounts'),
-                icon: KeyIcon,
+                key: 'assistants',
+                path: '/ai/assistants',
+                label: t('nav.assistants'),
+                icon: IdentificationIcon,
                 ...grouped('assistants', assistants),
               },
             ]
           : []),
-        {
-          key: 'task-prompts',
-          path: isAgentsEnabled() ? '/ai/assistants' : '/ai/instructions',
-          label: isAgentsEnabled() ? t('nav.assistants') : t('nav.configTaskPrompts'),
-          icon: isAgentsEnabled() ? IdentificationIcon : DocumentTextIcon,
-          ...grouped('assistants', assistants),
-        },
         {
           key: 'saved-prompts',
           path: '/prompts',
@@ -266,17 +249,17 @@ export function useNavItems() {
           ...grouped('assistants', assistants),
         },
         {
-          key: 'sorting-prompt',
-          path: '/ai/routing',
-          label: t('nav.configSortingPrompt'),
-          icon: ArrowsRightLeftIcon,
+          key: 'ai-models',
+          path: '/ai/models',
+          label: t('nav.configAiModels'),
+          icon: CpuChipIcon,
           ...grouped('assistants', assistants),
         },
         ...(isSavedTasksEnabled()
           ? [
               {
                 key: 'saved-tasks',
-                path: '/channels/tasks',
+                path: '/tasks',
                 label: t('nav.savedTasks'),
                 icon: ClockIcon,
                 ...grouped('automations', automations),
@@ -287,7 +270,7 @@ export function useNavItems() {
           ? [
               {
                 key: 'approvals',
-                path: '/channels/approvals',
+                path: '/approvals',
                 label: t('nav.approvals'),
                 icon: CheckBadgeIcon,
                 badge:
@@ -297,94 +280,25 @@ export function useNavItems() {
             ]
           : []),
         {
-          key: 'inbound',
-          path: '/channels',
-          label: t('nav.configInbound'),
-          icon: InboxArrowDownIcon,
-          ...grouped('channels', channels),
+          key: 'apps',
+          path: '/apps',
+          label: t('nav.allApps'),
+          icon: Squares2X2Icon,
+          ...grouped('apps', apps),
         },
         {
           key: 'chat-widget',
           path: '/channels/widgets',
           label: t('nav.toolsChatWidget'),
           icon: ChatBubbleBottomCenterTextIcon,
-          ...grouped('channels', channels),
-        },
-        {
-          key: 'mail-handler',
-          path: '/channels/email',
-          label: t('nav.toolsMailHandler'),
-          icon: EnvelopeIcon,
-          ...grouped('channels', channels),
-        },
-        {
-          key: 'live-support',
-          path: '/channels/widgets/live-support',
-          label: t('nav.liveSupport'),
-          icon: LifebuoyIcon,
-          ...grouped('channels', channels),
-        },
-        ...(isDesktopAgentEnabled()
-          ? [
-              {
-                key: 'desktop',
-                path: '/channels/desktop',
-                label: t('nav.desktop'),
-                icon: ComputerDesktopIcon,
-                ...grouped('channels', channels),
-              },
-            ]
-          : []),
-        {
-          key: 'connections',
-          path: '/channels/connections',
-          label: t('nav.configConnections'),
-          icon: LinkIcon,
-          ...grouped('connections', connections),
-        },
-        {
-          key: 'mcp-servers',
-          path: '/channels/mcp',
-          label: t('nav.mcpServers'),
-          icon: ServerStackIcon,
-          ...grouped('connections', connections),
-        },
-        ...(isPlatformLinksEnabled()
-          ? [
-              {
-                key: 'linked-platforms',
-                path: '/channels/platform-links',
-                label: t('nav.linkedPlatforms'),
-                icon: GlobeAltIcon,
-                ...grouped('connections', connections),
-              },
-            ]
-          : []),
-        {
-          key: 'api-keys',
-          path: '/channels/api',
-          label: t('nav.configApiKeys'),
-          icon: KeyIcon,
-          ...grouped('developer', developer),
-        },
-        {
-          key: 'api-docs',
-          path: '/channels/api/docs',
-          label: t('pageTitles.configApiDocs'),
-          icon: BookOpenIcon,
-          ...grouped('developer', developer),
-        },
-        {
-          key: 'ai-agents',
-          path: '/channels/agents',
-          label: t('nav.aiAgents'),
-          icon: CommandLineIcon,
-          ...grouped('developer', developer),
+          ...grouped('apps', apps),
         },
       ]
 
       items.push({
         key: 'manage',
+        // No child uses this path, so every child (including `/apps`) keeps
+        // prefix matching; the URL itself redirects to the apps directory.
         path: '/channels',
         label: t('nav.manage'),
         description: t('nav.manageDescription'),
@@ -438,6 +352,7 @@ export function useNavItems() {
           label: t('nav.adminProviderSetup'),
           icon: CpuChipIcon,
           badge: badge(offlineModelsCount.value),
+          alsoActiveOn: ['/admin/vectors'],
         },
         {
           key: 'admin-people',
@@ -445,12 +360,16 @@ export function useNavItems() {
           label: t('nav.adminPeople'),
           icon: UsersIcon,
         },
-        {
-          key: 'admin-partners',
-          path: '/admin/partners',
-          label: t('nav.adminPartners'),
-          icon: BuildingOffice2Icon,
-        },
+        ...(partnersListed.value
+          ? [
+              {
+                key: 'admin-partners',
+                path: '/admin/partners',
+                label: t('nav.adminPartners'),
+                icon: BuildingOffice2Icon,
+              },
+            ]
+          : []),
         {
           key: 'admin-config',
           path: '/admin/config',

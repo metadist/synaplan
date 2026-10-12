@@ -69,7 +69,7 @@ final class MediaController extends AbstractController
                     ]
                 ),
                 new OA\Property(property: 'provider', type: 'string', example: 'openai'),
-                new OA\Property(property: 'model', type: 'string', example: 'gpt-image-1.5'),
+                new OA\Property(property: 'model', type: 'string', example: 'gpt-image-2.5-flare'),
             ]
         )
     )]
@@ -118,9 +118,8 @@ final class MediaController extends AbstractController
         } catch (ProviderException $e) {
             $this->logger->error('Pic2pic generation provider error', [
                 'user_id' => $user->getId(),
-                'provider' => $e->getProviderName(),
                 'error' => $e->getMessage(),
-            ]);
+            ] + $e->logContext());
 
             return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (\RuntimeException $e) {
@@ -280,9 +279,8 @@ final class MediaController extends AbstractController
             $this->logger->error('Media generation provider error', [
                 'user_id' => $user->getId(),
                 'type' => $type,
-                'provider' => $e->getProviderName(),
                 'error' => $e->getMessage(),
-            ]);
+            ] + $e->logContext());
 
             return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (\RuntimeException $e) {

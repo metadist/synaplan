@@ -512,6 +512,49 @@ class MediaGenerationServiceTest extends TestCase
         $this->em->expects(self::any())->method('getRepository')->with(Model::class)->willReturn($repo);
     }
 
+    public function testAnExplicitRetiredModelIdFollowsItsSuccessor(): void
+    {
+        $this->allowRateLimit();
+        $retired = $this->createModel('OpenAI', 'gpt-image-1.5', 'gpt-image-1.5');
+        $retired->method('isRetired')->willReturn(true);
+        $flare = $this->createModel('OpenAI', 'gpt-image-2.5-flare', 'GPT Image 2.5 Flare');
+        $repo = $this->createMock(EntityRepository::class);
+        $repo->method('find')->willReturnCallback(static fn (int $id): ?Model => match ($id) {
+            151 => $retired,
+            348 => $flare,
+            default => null,
+        });
+        $this->em->expects(self::any())->method('getRepository')->with(Model::class)->willReturn($repo);
+        $this->modelConfigService->expects(self::once())
+            ->method('replacementForRetiredModel')
+            ->with(151, 'TEXT2PIC', self::anything())
+            ->willReturn(348);
+
+        $pngData = "\x89PNG\r\n\x1a\n".str_repeat("\0", 100);
+        $this->aiFacade->expects(self::once())
+            ->method('generateImage')
+            ->with('a lighthouse', self::anything(), self::callback(static fn (array $o): bool => 'gpt-image-2.5-flare' === $o['model']))
+            ->willReturn(['images' => ['data:image/png;base64,'.base64_encode($pngData)]]);
+
+        $result = $this->service->generate($this->createUser(), 'a lighthouse', 'image', 151);
+
+        self::assertSame('gpt-image-2.5-flare', $result['model']);
+    }
+
+    public function testAnExplicitRetiredModelWithoutAUsableSuccessorIsRefused(): void
+    {
+        $this->allowRateLimit();
+        $retired = $this->createModel('OpenAI', 'gpt-image-1', 'gpt-image-1');
+        $retired->method('isRetired')->willReturn(true);
+        $this->setUpModelResolution(29, $retired);
+        $this->modelConfigService->method('replacementForRetiredModel')->willReturn(null);
+        $this->aiFacade->expects(self::never())->method('generateImage');
+
+        $this->expectException(NoModelAvailableException::class);
+
+        $this->service->generate($this->createUser(), 'a lighthouse', 'image', 29);
+    }
+
     public function testEmptyPromptThrowsInvalidArgument(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -653,6 +696,29 @@ class MediaGenerationServiceTest extends TestCase
         $this->expectExceptionMessage('Provider returned no media');
 
         $this->service->generate($this->createUser(), 'sunset', 'image', 42);
+    }
+
+    public function testATextOnlyImageReplyReachesTheCallerAsTheProviderException(): void
+    {
+        $this->allowRateLimit();
+        $model = $this->createModel('Google', 'gemini-3.1-flash-image', 'Nano Banana 2');
+        $this->setUpModelResolution(371, $model);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'pic2pic_test_');
+        file_put_contents($tmpFile, "\x89PNG\r\n\x1a\n".str_repeat("\0", 50));
+        $noImage = ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP');
+        $this->aiFacade->method('generateImage')->willThrowException($noImage);
+        $this->rateLimitService->expects(self::never())->method('recordUsage');
+
+        try {
+            $this->service->generateFromImages($this->createUser(), 'Wie viele Fenster?', [$tmpFile], 371);
+            self::fail('Expected the provider exception');
+        } catch (ProviderException $e) {
+            self::assertSame($noImage, $e);
+            self::assertSame('10', $e->getContext()['text_response'] ?? null);
+        } finally {
+            @unlink($tmpFile);
+        }
     }
 
     public function testVideoGenerationCallsCorrectFacadeMethod(): void
@@ -824,6 +890,35 @@ class MediaGenerationServiceTest extends TestCase
 
         @unlink($tmpFile1);
         @unlink($tmpFile2);
+    }
+
+    public function testPic2picBillsTheSizeTheModelRendered(): void
+    {
+        $this->allowRateLimit();
+        $model = $this->createModel('OpenAI', 'gpt-image-1.5', 'GPT Image 1.5');
+        $this->setUpModelResolution(151, $model);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'pic2pic_test_');
+        file_put_contents($tmpFile, "\x89PNG\r\n\x1a\n".str_repeat("\0", 50));
+
+        $pngData = "\x89PNG\r\n\x1a\n".str_repeat("\0", 100);
+        $this->aiFacade->method('generateImage')->willReturn([
+            'images' => [['url' => 'data:image/png;base64,'.base64_encode($pngData), 'size' => '1536x1024']],
+            'provider' => 'openai',
+            'model' => 'gpt-image-1.5',
+        ]);
+
+        $this->rateLimitService->expects(self::once())
+            ->method('recordUsage')
+            ->with(
+                self::anything(),
+                'IMAGES',
+                self::callback(static fn (array $meta): bool => ['images' => 1.0, 'quality' => 'high', 'size' => '1536x1024'] === $meta['media_usage']),
+            );
+
+        $this->service->generateFromImages($this->createUser(), 'add muntins to the left window', [$tmpFile], 151);
+
+        @unlink($tmpFile);
     }
 
     public function testPic2picWithSingleImage(): void

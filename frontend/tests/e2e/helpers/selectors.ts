@@ -83,7 +83,7 @@ export const selectors = {
     mobileMoreAccountSection: '[data-testid="section-mobile-more-account"]',
     mobileMoreChannels: '[data-testid="btn-mobile-more-manage"]',
     mobileMoreManage: '[data-testid="btn-mobile-more-manage"]',
-    mobileMoreInbound: '[data-testid="link-mobile-more-inbound"]',
+    mobileMoreApps: '[data-testid="link-mobile-more-apps"]',
     mobileMorePreferences: '[data-testid="btn-mobile-more-preferences"]',
     /** In-drawer chat history (paginated, infinite scroll) */
     mobileHistorySection: '[data-testid="section-mobile-history"]',
@@ -121,10 +121,13 @@ export const selectors = {
     /** Channels flyout children shown only when Saved Tasks is enabled (features.savedTasks) */
     flyoutLinkConnections: '[data-testid="link-sidebar-v2-connections"]',
     flyoutLinkSavedTasks: '[data-testid="link-sidebar-v2-saved-tasks"]',
-    flyoutLinkLiveSupport: '[data-testid="link-sidebar-v2-live-support"]',
+    /** Apps panel: directory and connected apps */
+    flyoutLinkApps: '[data-testid="link-sidebar-v2-apps"]',
+    flyoutLinkAppsConnected: '[data-testid="link-sidebar-v2-apps-connected"]',
     flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
     flyoutLinkAiAccounts: '[data-testid="link-sidebar-v2-ai-accounts"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
+    flyoutLinkSavedPrompts: '[data-testid="link-sidebar-v2-saved-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
     flyoutLinkAdminPeople: '[data-testid="link-sidebar-v2-admin-people"]',
     flyoutLinkAdminSetup: '[data-testid="link-sidebar-v2-admin-setup"]',
@@ -162,6 +165,8 @@ export const selectors = {
     chatBtnToggle: '[data-testid="btn-chat-toggle"]',
     textInput: '[data-testid="input-chat-message"]',
     sendBtn: '[data-testid="btn-chat-send"]',
+    /** Slash-command menu, open while the composer text starts with "/" */
+    commandPalette: '[data-testid="comp-command-palette"]',
     /** "+" menu trigger in the composer (holds attach, tools and knowledge) */
     plusToggle: '[data-testid="btn-chat-plus"]',
     /** "+" menu panel (opens upward) */
@@ -503,12 +508,17 @@ export const selectors = {
     textNewLevel: '[data-testid="text-new-level"]',
   },
   inboundConfig: {
-    page: '[data-testid="page-config-inbound"]',
-    resetDefaults: '[data-testid="btn-reset-defaults"]',
     whatsappSection: '[data-testid="section-whatsapp"]',
     telegramSection: '[data-testid="section-telegram"]',
-    whatsappNotice: '[data-testid="notice-feature-not-configured"][data-module="whatsapp"]',
     emailSection: '[data-testid="section-email"]',
+  },
+  apps: {
+    page: '[data-testid="page-apps"]',
+    search: '[data-testid="input-apps-search"]',
+    card: (id: string) => `[data-testid="card-app-${id}"]`,
+    tabConnected: '[data-testid="tab-apps-connected"]',
+    connectedEmpty: '[data-testid="apps-connected-empty"]',
+    noResults: '[data-testid="apps-no-results"]',
   },
   assistants: {
     /** Gallery rendered by /ai/assistants (and by /ai/instructions while AGENTS.ENABLED is on) */
@@ -559,10 +569,23 @@ export const selectors = {
     /** Header action on the editor of a custom prompt: turn it into a Saved Task */
     btnSaveAsTask: '[data-testid="btn-save-as-task"]',
   },
+  savedPrompts: {
+    page: '[data-testid="page-prompts"]',
+    newBtn: '[data-testid="btn-prompt-new"]',
+    form: '[data-testid="form-saved-prompt"]',
+    nameInput: '[data-testid="input-saved-prompt-name"]',
+    commandInput: '[data-testid="input-saved-prompt-command"]',
+    bodyInput: '[data-testid="input-saved-prompt-body"]',
+    saveBtn: '[data-testid="btn-saved-prompt-save"]',
+    /** One row per saved prompt on /prompts */
+    row: '[data-testid="row-saved-prompt"]',
+    editBtn: '[data-testid="btn-saved-prompt-edit"]',
+    deleteBtn: '[data-testid="btn-saved-prompt-delete"]',
+  },
   savedTasks: {
     page: '[data-testid="page-saved-tasks"]',
     emptyState: '[data-testid="saved-tasks-empty"]',
-    /** One card per task; rendered on /channels/tasks and inline on the prompt editor */
+    /** One card per task; rendered on /tasks and inline on the prompt editor */
     card: '[data-testid="saved-task-card"]',
     runNow: '[data-testid="btn-run-now"]',
     delete: '[data-testid="btn-delete-saved-task"]',
@@ -572,6 +595,11 @@ export const selectors = {
     /** Run history list, visible after clicking "View runs" */
     runsList: '[data-testid="saved-task-runs"]',
     lastRun: '[data-testid="saved-task-last-run"]',
+    btnNew: '[data-testid="btn-new-task"]',
+    newModal: '[data-testid="modal-new-task"]',
+    newName: '[data-testid="input-new-task-name"]',
+    newInstruction: '[data-testid="input-new-task-instruction"]',
+    newCreate: '[data-testid="btn-new-task-create"]',
   },
   pages: {
     chat: '[data-testid="page-chat"]',

@@ -235,7 +235,6 @@
     "tabGenerated": "Generados",
     "tabWorkspace": "Espacio de trabajo",
     "workspace": {
-      "title": "Espacio de trabajo",
       "subtitle": "La carpeta de trabajo de la IA para el trabajo con archivos: aquí lee y escribe archivos y los reutiliza entre ejecuciones. Los resultados finales se guardan en Generados.",
       "empty": "Aparece cuando pides a la IA que siga trabajando con archivos entre ejecuciones. Los resultados puntuales se guardan en Generados.",
       "emptyAction": "Volver al chat",
@@ -368,7 +367,6 @@
       "dismissConfirm": "Descartar"
     },
     "incoming": {
-      "title": "Entrantes",
       "subtitle": "Archivos enviados para tu base de conocimiento: revísalos y consérvalos o descártalos.",
       "keep": "Conservar",
       "keepAll": "Conservar todo",
@@ -383,7 +381,6 @@
       "open": "Vista previa"
     },
     "generated": {
-      "title": "Generados",
       "subtitle": "Resultados finales de tus chats y tareas: imágenes, audio, documentos y archivos creados por código, guardados en tu base de conocimiento para buscar, reutilizar y descargar.",
       "kinds": {
         "all": "Todos",
@@ -405,7 +402,8 @@
       "text": "Todo lo que subes o creas está aquí. El asistente puede usar los archivos marcados como consultables por IA. Fotos, grabaciones y archivos creados por IA necesitan que los hagas consultables primero.",
       "dismiss": "Entendido",
       "reopen": "¿Qué es esto?"
-    }
+    },
+    "searchIntro": "Haz una pregunta con tus palabras y mira qué pasajes de tus archivos la responden."
   },
   "vectorStorage": {
     "intro": "Un resumen de tu almacenamiento vectorial: cuántos archivos se han indexado y cuántos vectores (fragmentos) se guardan para la búsqueda semántica.",

@@ -177,6 +177,7 @@ export const useAuthStore = defineStore('auth', () => {
       { useChatModelPickStore },
       { useSmartSearchStore },
       { resetIncomingCount },
+      { useCommandsStore },
     ] = await Promise.all([
       import('./chats'),
       import('./history'),
@@ -186,6 +187,7 @@ export const useAuthStore = defineStore('auth', () => {
       import('./chatModelPick'),
       import('./smartSearch'),
       import('@/composables/useLibraryLinks'),
+      import('./commands'),
     ])
     useChatsStore().$reset()
     useHistoryStore().clear()
@@ -193,6 +195,7 @@ export const useAuthStore = defineStore('auth', () => {
     useFeedbackStore().$reset()
     useChatModelPickStore().clear()
     useSmartSearchStore().reset()
+    useCommandsStore().reset()
     resetIncomingCount()
     clearSseToken()
   }

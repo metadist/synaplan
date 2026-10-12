@@ -116,7 +116,6 @@ function runtimeConfigFallback(): RuntimeConfig {
       siteKey: '',
     },
     features: {
-      help: false,
       memoryService: false,
       officeConvertEnabled: false,
       documentToolsEnabled: false,

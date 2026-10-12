@@ -12,6 +12,8 @@ export interface DialogOptions {
   placeholder?: string
   defaultValue?: string
   danger?: boolean
+  /** Prompt uses a multiline field. Enter inserts a line; confirm is the button. */
+  multiline?: boolean
 }
 
 export interface DialogState extends DialogOptions {

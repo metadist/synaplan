@@ -312,16 +312,24 @@
       "editHintDescription": "Después de guardar, puedes afinar tu asistente de IA en cualquier momento en Configuración Avanzada → Configuración IA → Asistente IA del Widget."
     },
     "listTitle": "Widgets de chat",
-    "listEmpty": "Aún no hay widgets. Crea un widget de chat para empezar."
+    "listEmpty": "Aún no hay widgets. Crea un widget de chat para empezar.",
+    "tabs": {
+      "widgets": "Widgets",
+      "conversations": "Conversaciones"
+    },
+    "conversations": {
+      "noWidgetsTitle": "Aún no hay conversaciones",
+      "noWidgetsHint": "Crea primero un widget de chat. Cuando un visitante pida hablar con una persona, la conversación te esperará aquí."
+    }
   },
   "liveSupport": {
     "title": "Soporte en vivo",
-    "subtitle": "Responde a los visitantes en tiempo real",
+    "subtitle": "Aquí esperan los visitantes que pidieron una persona. Responde para atenderlos y devuélvelos a la IA cuando termines.",
     "allWidgets": "Todos los Widgets",
-    "waiting": "En espera",
+    "waiting": "Esperando",
     "myChats": "Mis Chats",
     "active": "Activo",
-    "noSessions": "No hay sesiones en espera",
+    "noSessions": "No hay ningún visitante esperando. Cuando alguien pida una persona, aparecerá aquí.",
     "noMessages": "Aún no hay mensajes",
     "chatWith": "Chatear con",
     "messagesCount": "mensajes",
@@ -331,7 +339,15 @@
     "typePlaceholder": "Escribe tu mensaje...",
     "messageSent": "Mensaje enviado",
     "visitor": "Visitante",
-    "you": "Tú"
+    "you": "Tú",
+    "noMine": "Aún no has atendido ninguna conversación. Responde a un visitante en espera para empezar.",
+    "loadFailed": "No se pudieron cargar las conversaciones. Mientras tanto, los visitantes siguen recibiendo respuestas de la IA.",
+    "loadMessagesFailed": "No se pudo abrir esta conversación. Inténtalo de nuevo en un momento.",
+    "sendFailed": "Tu respuesta no se envió y la IA sigue respondiendo. Inténtalo de nuevo.",
+    "sendFailedTakenOver": "Has tomado la conversación, pero tu respuesta no se envió. Inténtalo de nuevo.",
+    "handBackFailed": "La conversación sigue contigo. Intenta devolverla de nuevo.",
+    "backToList": "Volver a las conversaciones",
+    "send": "Enviar respuesta"
   },
   "widgetSessions": {
     "title": "Sesiones",

@@ -288,7 +288,7 @@
 
       <p class="text-xs txt-secondary mt-4">
         {{ $t('mcpServers.usageAdvancedHint') }}
-        <RouterLink to="/ai/instructions" class="text-[var(--brand)] hover:underline">
+        <RouterLink to="/ai/models?tab=topics" class="text-[var(--brand)] hover:underline">
           {{ $t('mcpServers.usageAdvancedLink') }}
         </RouterLink>
       </p>

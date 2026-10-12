@@ -201,6 +201,16 @@ final readonly class MediaGenerationRunner implements TaskRunner
                 'metadata_keys' => array_keys($metadata),
             ]);
 
+            // handle() accumulates the streamed user-facing message into
+            // content. That is the localized quote and recovery sentence.
+            // metadata.error is the raw exception, which is English and
+            // technical — the task card must not show it when the handler
+            // already wrote a sentence the person can act on.
+            $localizedFailure = is_string($result['content'] ?? null) ? trim($result['content']) : '';
+            if ('' !== $localizedFailure) {
+                return NodeResult::failed($localizedFailure, is_array($metadata) ? $metadata : []);
+            }
+
             $errorSuffix = is_scalar($metadata['error'] ?? null) ? ': '.(string) $metadata['error'] : '';
 
             return NodeResult::failed($node->capability->value.' produced no file'.$errorSuffix);

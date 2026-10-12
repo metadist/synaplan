@@ -10,6 +10,8 @@ use App\AI\Provider\ReasoningLevelCatalog;
 use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Bundle\BundleConfig;
+use App\DTO\ImageModelRow;
+use App\DTO\ModelRow;
 use App\Entity\Config;
 use App\Entity\User;
 use App\Model\ModelCatalog;
@@ -30,6 +32,7 @@ use App\Service\Client\MobileVersionService;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Config\FeatureStatusReporter;
 use App\Service\Config\LayeredConfigResolver;
+use App\Service\CostCalculationService;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\Embedding\EmbeddingMetadataService;
@@ -57,6 +60,7 @@ use App\Service\UserMemoryService;
 use App\Service\WebSpeechConfig;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -127,6 +131,7 @@ class ConfigController extends AbstractController
         private readonly ?SearchInterpreter $searchInterpreter = null,
         private readonly ?\App\Service\Chat\ChatWelcomeConfig $chatWelcomeConfig = null,
         private readonly ?\App\Service\Chat\ChatActionPolicy $chatActionPolicy = null,
+        private readonly ?CostCalculationService $costCalculationService = null,
     ) {
     }
 
@@ -216,10 +221,10 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'platformLinksEnabled', type: 'boolean', example: false, description: 'When true, partner instances can register and exchange a link code for a per-user API key. On by default; pin with FEATURE_PLATFORM_LINKS_ENABLED. The Outlook add-in connect path is not gated by this flag.'),
                         new OA\Property(property: 'agentsEnabled', type: 'boolean', example: false, description: 'When true, the Assistants CRUD API and stream agentId pin are available. On by default; pin with FEATURE_AGENTS_ENABLED.'),
                         new OA\Property(property: 'bundleEnabled', type: 'boolean', example: false, description: 'When true, Settings shows Export & import. On by default; pin with FEATURE_BUNDLE_ENABLED.'),
-                        new OA\Property(property: 'iamGroups', type: 'boolean', example: false, description: 'When true, Operate shows People and the group API is available. On by default; pin with FEATURE_IAM_GROUPS_ENABLED.'),
-                        new OA\Property(property: 'iamSharing', type: 'boolean', example: false, description: 'When true, owners can share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Requires iamGroups. On by default; pin with FEATURE_IAM_SHARING_ENABLED.'),
+                        new OA\Property(property: 'iamGroups', type: 'boolean', example: false, description: 'When true, Operate shows Users and the group API is available. On by default; pin with FEATURE_IAM_GROUPS_ENABLED.'),
+                        new OA\Property(property: 'iamSharing', type: 'boolean', example: false, description: 'When true, owners can share a knowledge folder, chat, AI assistant, saved task or chat widget with a user, a group or everyone. Requires iamGroups. On by default; pin with FEATURE_IAM_SHARING_ENABLED.'),
                         new OA\Property(property: 'iamImpersonationDisabled', type: 'boolean', example: false, description: 'When true, administrators cannot start an impersonation session (IAM.ADMIN_IMPERSONATION=disabled).'),
-                        new OA\Property(property: 'iamPolicies', type: 'boolean', example: false, description: 'When true, People shows Policies and group defaults / allowed models apply. Requires iamGroups. On by default; pin with FEATURE_IAM_GROUP_POLICIES_ENABLED.'),
+                        new OA\Property(property: 'iamPolicies', type: 'boolean', example: false, description: 'When true, Users shows Policies and group defaults / allowed models apply. Requires iamGroups. On by default; pin with FEATURE_IAM_GROUP_POLICIES_ENABLED.'),
                         new OA\Property(property: 'officeConvertEnabled', type: 'boolean', example: false, description: 'When true, Collabora CODE convert-to is configured (OFFICE_CONVERT_URL). Office thumbnails, PDF export, inline preview and combine stay off while this is false.'),
                         new OA\Property(property: 'computeEnabled', type: 'boolean', example: false, description: 'When true, file work is on (sidecar URL + token and COMPUTE.ENABLED). The API-key create form then offers the compute:run grant.'),
                         new OA\Property(property: 'computeWorkspacesEnabled', type: 'boolean', example: false, description: 'When true, file-work runs may keep a folder between runs and Files shows Workspace. Off by default; needs computeEnabled.'),
@@ -250,6 +255,10 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'logoUrl', type: 'string', example: '', description: 'Light-mode logo URL; empty string falls back to the bundled asset'),
                         new OA\Property(property: 'logoDarkUrl', type: 'string', example: '', description: 'Dark-mode logo URL; empty string falls back to the bundled asset'),
                         new OA\Property(property: 'iconUrl', type: 'string', example: '', description: 'Brand icon/favicon URL; empty string falls back to the bundled asset'),
+                        new OA\Property(property: 'resolvedLogoUrl', type: 'string', example: '/synaplan-dark.svg', description: 'Logo for a light theme, never empty: logoUrl, else the bundled logo. The resolved* fields are for integrations that cannot apply the fallbacks themselves'),
+                        new OA\Property(property: 'resolvedLogoDarkUrl', type: 'string', example: '/synaplan-light.svg', description: 'Logo for a dark theme, never empty: logoDarkUrl, else logoUrl, else the bundled logo'),
+                        new OA\Property(property: 'resolvedIconUrl', type: 'string', example: '/single_bird-dark.svg', description: 'Icon for a light theme, never empty: iconUrl, else the resolved logo, else the bundled icon'),
+                        new OA\Property(property: 'resolvedIconDarkUrl', type: 'string', example: '/single_bird-light.svg', description: 'Icon for a dark theme, never empty: iconUrl, else the resolved dark logo, else the bundled icon'),
                         new OA\Property(property: 'homepageUrl', type: 'string', example: 'https://www.synaplan.com', description: 'Brand homepage link used in auth/footer surfaces'),
                         new OA\Property(property: 'privacyUrl', type: 'string', example: 'https://www.synaplan.com/privacy-policy', description: 'Privacy-policy link (reachable in-app + store metadata; store-policy mandatory)'),
                         new OA\Property(property: 'termsUrl', type: 'string', example: 'https://www.synaplan.com/terms', description: 'Terms-of-use link (reachable in-app + store metadata)'),
@@ -742,7 +751,16 @@ class ConfigController extends AbstractController
                 'mailerConfigured' => $this->mailerConfig->isConfigured(),
             ],
             'recaptcha' => $recaptchaConfig,
-            'branding' => $this->brandingService->getBranding(),
+            'branding' => $this->brandingService->getBranding() + [
+                'resolvedLogoUrl' => $this->brandingService->getLogoUrl(false)
+                    ?? $request->getBasePath().'/synaplan-dark.svg',
+                'resolvedLogoDarkUrl' => $this->brandingService->getLogoUrl(true)
+                    ?? $request->getBasePath().'/synaplan-light.svg',
+                'resolvedIconUrl' => $this->brandingService->getIconUrl(false)
+                    ?? $request->getBasePath().'/single_bird-dark.svg',
+                'resolvedIconDarkUrl' => $this->brandingService->getIconUrl(true)
+                    ?? $request->getBasePath().'/single_bird-light.svg',
+            ],
             'features' => $features,
             'speech' => $speech,
             'plugins' => $plugins,
@@ -944,25 +962,18 @@ class ConfigController extends AbstractController
                     property: 'models',
                     type: 'object',
                     properties: [
+                        new OA\Property(property: 'CHAT', type: 'array', items: new OA\Items(ref: new Model(type: ModelRow::class))),
                         new OA\Property(
-                            property: 'CHAT',
+                            property: 'TEXT2PIC',
                             type: 'array',
-                            items: new OA\Items(
-                                properties: [
-                                    new OA\Property(property: 'id', type: 'integer', example: 324),
-                                    new OA\Property(property: 'service', type: 'string', example: 'Groq'),
-                                    new OA\Property(property: 'name', type: 'string', example: 'Qwen 3.6 27B'),
-                                    new OA\Property(property: 'quality', type: 'integer', example: 9),
-                                    new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning')),
-                                    new OA\Property(property: 'reasoningLevels', type: 'array', items: new OA\Items(type: 'string', example: 'medium'), description: 'Discrete reasoning levels this model accepts, cheapest first. Absent when the model has no level knob and the chat keeps the on/off Thinking control.'),
-                                    new OA\Property(property: 'reasoningEffortDefault', type: 'string', example: 'medium', description: 'Level selected when the person has not chosen one. Present only together with reasoningLevels.'),
-                                    new OA\Property(property: 'available', type: 'boolean', example: true, description: 'False only in the admin includeUnavailable view: the provider has no key/URL, or the Ollama model is not pulled.'),
-                                    new OA\Property(property: 'unavailableReason', type: 'string', nullable: true, enum: ['provider_unavailable', 'not_pulled'], example: null),
-                                    new OA\Property(property: 'priceIn', type: 'number', example: 0.15, description: 'USD per 1M input tokens'),
-                                    new OA\Property(property: 'priceOut', type: 'number', example: 0.6, description: 'USD per 1M output tokens'),
-                                    new OA\Property(property: 'priceKnown', type: 'boolean', example: true, description: 'False when the model was imported from a listing that published no price. The menu then says "price unknown" instead of "Free".'),
-                                ]
-                            )
+                            description: 'Text-to-image rows. capabilityPrices.TEXT2PIC is the medium price at the default size.',
+                            items: new OA\Items(ref: new Model(type: ImageModelRow::class))
+                        ),
+                        new OA\Property(
+                            property: 'PIC2PIC',
+                            type: 'array',
+                            description: 'Image-edit rows. capabilityPrices.PIC2PIC is the high price at the default size, which is what an edit is billed.',
+                            items: new OA\Items(ref: new Model(type: ImageModelRow::class))
                         ),
                     ]
                 ),
@@ -1059,6 +1070,10 @@ class ConfigController extends AbstractController
                 'available' => $available,
                 'unavailableReason' => $unavailableReason,
             ];
+            $capabilityPrices = $this->costCalculationService?->imageCapabilityPrices($model);
+            if (null !== $capabilityPrices) {
+                $row['capabilityPrices'] = $capabilityPrices;
+            }
             $reasoningLevels = ReasoningLevelCatalog::levels($model->getService(), $model->getProviderId(), $model->getFeatures());
             if (null !== $reasoningLevels) {
                 $row['reasoningLevels'] = $reasoningLevels;

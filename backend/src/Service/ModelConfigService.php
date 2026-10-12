@@ -7,6 +7,7 @@ use App\AI\Service\ProviderRegistry;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\User;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
@@ -499,6 +500,8 @@ final readonly class ModelConfigService
             return null;
         }
 
+        $preferredIds = $this->preferredImageModelIds($setting);
+
         // Health is a preference, not a veto. Pass one skips the models the
         // monitor considers dead; pass two accepts them anyway. A wrong health
         // verdict must never be able to leave a capability with no model at
@@ -506,25 +509,87 @@ final readonly class ModelConfigService
         // status page is there to tell the operator what happened.
         foreach ([true, false] as $healthyOnly) {
             foreach ([true, false] as $selectableOnly) {
+                foreach ($preferredIds as $modelId) {
+                    $picked = $this->usablePreferredImageModel($modelId, $setting, $userId, $selectableOnly, $healthyOnly);
+                    if (null !== $picked) {
+                        return $picked;
+                    }
+                }
                 // findByTag() orders by quality DESC, id ASC.
                 foreach ($this->modelRepository->findByTag($tag, $selectableOnly) as $model) {
                     $modelId = (int) $model->getId();
-                    if (!$this->isAllowedModel($userId, $modelId, $setting)) {
+                    if (in_array($modelId, $preferredIds, true)) {
                         continue;
                     }
-                    if (!$this->isModelUsable($model)) {
-                        continue;
-                    }
-                    if ($healthyOnly && $this->isModelOffline($modelId)) {
+                    if (!$this->imageModelFits($model, $setting, $userId, $healthyOnly)) {
                         continue;
                     }
 
-                    return $model->getId();
+                    return $modelId;
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function preferredImageModelIds(string $setting): array
+    {
+        if (!in_array($setting, ['TEXT2PIC', 'PIC2PIC'], true)) {
+            return [];
+        }
+
+        $ids = [];
+        foreach (ModelCatalog::IMAGE_FALLBACK_KEYS as $key) {
+            $bid = ModelCatalog::findBidByKey($key);
+            if (null !== $bid) {
+                $ids[] = $bid;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function usablePreferredImageModel(int $modelId, string $setting, ?int $userId, bool $selectableOnly, bool $healthyOnly): ?int
+    {
+        $model = $this->modelRepository->find($modelId);
+        if (!$model instanceof Model) {
+            return null;
+        }
+        $expectedTag = self::CAPABILITY_TAGS[$setting] ?? null;
+        if (null === $expectedTag || $model->getTag() !== $expectedTag) {
+            return null;
+        }
+        if ($selectableOnly && 1 !== $model->getSelectable()) {
+            return null;
+        }
+        if (!$this->imageModelFits($model, $setting, $userId, $healthyOnly)) {
+            return null;
+        }
+
+        return $modelId;
+    }
+
+    private function imageModelFits(Model $model, string $setting, ?int $userId, bool $healthyOnly): bool
+    {
+        $modelId = (int) $model->getId();
+        if ('PIC2PIC' === $setting && !in_array('pic2pic', $model->getFeatures(), true)) {
+            return false;
+        }
+        if (!$this->isAllowedModel($userId, $modelId, $setting)) {
+            return false;
+        }
+        if (!$this->isModelUsable($model)) {
+            return false;
+        }
+        if ($healthyOnly && $this->isModelOffline($modelId)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -619,6 +684,32 @@ final readonly class ModelConfigService
         }
 
         return $modelId;
+    }
+
+    /**
+     * The model that serves a retired id now: its usable catalog successor,
+     * else the capability default. Null when nothing that is not itself
+     * retired can take over — the caller must refuse rather than send the id
+     * to a provider that shut it down.
+     *
+     * {@see resolveUsableModelId()} alone is not enough here: its last resort
+     * hands back the configured binding even when that binding is the retired
+     * id (or another retired one), and an operator re-enabling a retired row
+     * makes it look usable until the next seed switches it off again.
+     */
+    public function replacementForRetiredModel(int $modelId, string $capability, ?int $userId = null): ?int
+    {
+        $replacementId = $this->resolveUsableModelId($modelId, $capability, $userId);
+        if (null === $replacementId || $replacementId === $modelId) {
+            return null;
+        }
+
+        $replacement = $this->modelRepository->find($replacementId);
+        if (!$replacement instanceof Model || $replacement->isRetired()) {
+            return null;
+        }
+
+        return $replacementId;
     }
 
     /**

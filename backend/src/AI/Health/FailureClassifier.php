@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Health;
 
+use App\AI\Exception\NoImageException;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\StructuredOutputViolationException;
@@ -139,6 +140,14 @@ final readonly class FailureClassifier
         // model health — counting it would let a burst of echoed input fields
         // switch off the routing model for everyone.
         if ($error instanceof StructuredOutputViolationException) {
+            return FailureKind::UserError;
+        }
+
+        // The image model finished normally and wrote a sentence instead of
+        // pixels. That is the request, not an outage: the message has no
+        // recognised pattern and no HTTP status, so it would otherwise be
+        // filed as transient and start counting against the model.
+        if ($error instanceof NoImageException) {
             return FailureKind::UserError;
         }
 

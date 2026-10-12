@@ -312,16 +312,24 @@
       "editHintDescription": "Kaydettikten sonra, AI asistanınızı Gelişmiş Ayarlar → AI Kurulumu → Widget AI Sihirbazı altından istediğiniz zaman ince ayarlayabilirsiniz."
     },
     "listTitle": "Sohbet widget'ları",
-    "listEmpty": "Henüz widget yok. Başlamak için bir sohbet widget'ı oluşturun."
+    "listEmpty": "Henüz widget yok. Başlamak için bir sohbet widget'ı oluşturun.",
+    "tabs": {
+      "widgets": "Widget'lar",
+      "conversations": "Sohbetler"
+    },
+    "conversations": {
+      "noWidgetsTitle": "Henüz sohbet yok",
+      "noWidgetsHint": "Önce bir sohbet widget'ı oluşturun. Bir ziyaretçi bir kişiyle konuşmak istediğinde sohbet burada sizi bekler."
+    }
   },
   "liveSupport": {
     "title": "Canlı Destek",
-    "subtitle": "Ziyaretçilere gerçek zamanlı yanıt verin",
+    "subtitle": "Bir kişiyle konuşmak isteyen ziyaretçiler burada bekler. Devralmak için yanıtlayın; işiniz bitince yapay zekaya geri verin.",
     "allWidgets": "Tüm Widget'lar",
-    "waiting": "Bekliyor",
+    "waiting": "Sizi bekliyor",
     "myChats": "Sohbetlerim",
     "active": "Aktif",
-    "noSessions": "Bekleyen oturum yok",
+    "noSessions": "Bekleyen ziyaretçi yok. Biri bir kişiyle konuşmak istediğinde burada görünür.",
     "noMessages": "Henüz mesaj yok",
     "chatWith": "Sohbet et",
     "messagesCount": "mesaj",
@@ -331,7 +339,15 @@
     "typePlaceholder": "Mesajınızı yazın...",
     "messageSent": "Mesaj gönderildi",
     "visitor": "Ziyaretçi",
-    "you": "Sen"
+    "you": "Sen",
+    "noMine": "Henüz bir sohbeti devralmadınız. Başlamak için bekleyen bir ziyaretçiyi yanıtlayın.",
+    "loadFailed": "Sohbetler yüklenemedi. Ziyaretçiler bu sırada yapay zeka yanıtları almaya devam eder.",
+    "loadMessagesFailed": "Bu sohbet açılamadı. Birazdan tekrar deneyin.",
+    "sendFailed": "Yanıtınız gönderilmedi ve yapay zeka yanıtlamaya devam ediyor. Tekrar deneyin.",
+    "sendFailedTakenOver": "Sohbeti devraldınız ancak yanıtınız gönderilmedi. Tekrar deneyin.",
+    "handBackFailed": "Sohbet hâlâ sizde. Tekrar geri vermeyi deneyin.",
+    "backToList": "Sohbetlere dön",
+    "send": "Yanıtı gönder"
   },
   "widgetSessions": {
     "title": "Oturumlar",

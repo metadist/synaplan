@@ -9,6 +9,7 @@ use App\Entity\Config;
 use App\Entity\GroupConfig;
 use App\Entity\GroupMember;
 use App\Entity\Model;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use App\Repository\GroupConfigRepository;
 use App\Repository\GroupMemberRepository;
@@ -647,6 +648,147 @@ class ModelConfigServiceTest extends TestCase
         self::assertSame(332, $this->service->getDefaultModel('CHAT', 1));
     }
 
+    /**
+     * #2413: a user who picked gpt-image-1.5 for image edits lands on the
+     * successor the retirement records, GPT Image 2.5 Flare.
+     */
+    public function testAUserLevelPic2PicBindingToGptImage15ResolvesToFlare(): void
+    {
+        $flare = ModelCatalog::successorBid(151);
+        self::assertSame(348, $flare);
+        $this->givenModels(
+            [151 => 'OpenAI', 348 => 'OpenAI', 371 => 'Google'],
+            inactiveModelIds: [151],
+            successorByModelId: [151 => $flare],
+        );
+        $this->givenUsableProviders(['openai', 'google']);
+        $this->givenDefaultModelRows([1 => 151, 0 => 371]);
+
+        self::assertSame(348, $this->service->getDefaultModel('PIC2PIC', 1));
+    }
+
+    /**
+     * #2407: no OpenAI key falls through Flare and Sunburst to Nano Banana 2.
+     * A row without the pic2pic feature is never that fallback.
+     */
+    public function testPic2PicWithoutOpenAiUsesNanoBanana2(): void
+    {
+        $this->givenModels(
+            [348 => 'OpenAI', 349 => 'OpenAI', 371 => 'Google', 100 => 'Google'],
+            featuresByModelId: [
+                348 => ['pic2pic'],
+                349 => ['pic2pic'],
+                371 => ['pic2pic'],
+                100 => ['image'],
+            ],
+        );
+        $this->givenCapabilityCatalog('text2pic', [100 => 'Google', 371 => 'Google']);
+        $this->givenUsableProviders(['google']);
+        $this->givenDefaultModelRows([0 => 348]);
+
+        self::assertSame(371, $this->service->getDefaultModel('PIC2PIC', null));
+    }
+
+    public function testPic2PicSkipsAGenericRowThatCannotEdit(): void
+    {
+        $this->givenModels([]);
+        $this->givenCapabilityCatalog('text2pic', [100 => 'Google', 200 => 'Google'], [
+            100 => ['image'],
+            200 => ['pic2pic', 'image'],
+        ]);
+        $this->givenUsableProviders(['google']);
+        $this->givenDefaultModelRows([0 => 1]);
+
+        self::assertSame(200, $this->service->getDefaultModel('PIC2PIC', null));
+    }
+
+    public function testARepurposedFlareRowIsNotTheImageFallback(): void
+    {
+        $this->givenModels(
+            [348 => 'OpenAI', 500 => 'Google'],
+            tagsByModelId: [348 => 'chat', 500 => 'text2pic'],
+        );
+        $this->givenCapabilityCatalog('text2pic', [500 => 'Google']);
+        $this->givenUsableProviders(['openai', 'google']);
+        $this->givenDefaultModelRows([0 => 1]);
+
+        self::assertSame(500, $this->service->getDefaultModel('TEXT2PIC', null));
+    }
+
+    public function testPic2PicWithoutGoogleUsesFlare(): void
+    {
+        $this->givenModels([348 => 'OpenAI', 371 => 'Google']);
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([0 => 371]);
+
+        self::assertSame(348, $this->service->getDefaultModel('PIC2PIC', null));
+    }
+
+    public function testAUserImageBindingWinsOverTheGlobalFlareDefault(): void
+    {
+        $this->givenModels([348 => 'OpenAI', 371 => 'Google']);
+        $this->givenUsableProviders(['openai', 'google']);
+        $this->givenDefaultModelRows([1 => 371, 0 => 348]);
+
+        self::assertSame(371, $this->service->getDefaultModel('PIC2PIC', 1));
+    }
+
+    public function testShippedImageDefaultsAreFlare(): void
+    {
+        $defaults = (new \ReflectionClass(\App\Seed\DefaultModelConfigSeeder::class))->getConstant('PROD_MODEL_DEFAULTS');
+        self::assertIsArray($defaults);
+        $bySetting = [];
+        foreach ($defaults as $row) {
+            $bySetting[$row['setting']] = $row['modelKey'];
+        }
+
+        self::assertSame('openai:gpt-image-2.5-flare:text2pic', $bySetting['PIC2PIC']);
+        self::assertSame('openai:gpt-image-2.5-flare:text2pic', $bySetting['TEXT2PIC']);
+        self::assertSame(348, ModelCatalog::findBidByKey($bySetting['PIC2PIC']));
+    }
+
+    public function testReplacementForRetiredModelFollowsTheSuccessor(): void
+    {
+        $this->givenModels(
+            [151 => 'OpenAI', 348 => 'OpenAI'],
+            inactiveModelIds: [151],
+            successorByModelId: [151 => 348],
+            retiredModelIds: [151],
+        );
+        $this->givenUsableProviders(['openai']);
+
+        self::assertSame(348, $this->service->replacementForRetiredModel(151, 'TEXT2PIC', 1));
+    }
+
+    /**
+     * An operator who switched a retired row back on makes it look usable;
+     * the provider has still shut it down, so it must never be handed back.
+     */
+    public function testReplacementForRetiredModelNeverReturnsTheRetiredIdItself(): void
+    {
+        $this->givenModels([29 => 'OpenAI'], retiredModelIds: [29]);
+        $this->givenUsableProviders(['openai']);
+
+        self::assertNull($this->service->replacementForRetiredModel(29, 'TEXT2PIC', 1));
+    }
+
+    /**
+     * With no usable successor and no usable default, getDefaultModel() hands
+     * back the configured binding — here another retired row.
+     */
+    public function testReplacementForRetiredModelRejectsARetiredFallback(): void
+    {
+        $this->givenModels(
+            [29 => 'OpenAI', 151 => 'OpenAI'],
+            inactiveModelIds: [29, 151],
+            retiredModelIds: [29, 151],
+        );
+        $this->givenUsableProviders(['openai']);
+        $this->givenDefaultModelRows([1 => 151]);
+
+        self::assertNull($this->service->replacementForRetiredModel(29, 'TEXT2PIC', 1));
+    }
+
     public function testResolveUsableModelIdKeepsAnOverrideThatStillWorks(): void
     {
         $this->givenModels([255 => 'OpenAI']);
@@ -671,25 +813,34 @@ class ModelConfigServiceTest extends TestCase
      * @param array<int, string> $providerIdsByModelId
      * @param list<int>          $inactiveModelIds     BIDs to hand back with BACTIVE = 0
      * @param array<int, int>    $successorByModelId
+     * @param list<int>          $retiredModelIds      BIDs whose row carries BRETIREDON
      */
     private function givenModels(
         array $servicesByModelId,
         array $providerIdsByModelId = [],
         array $inactiveModelIds = [],
         array $successorByModelId = [],
+        array $retiredModelIds = [],
+        array $featuresByModelId = [],
+        array $tagsByModelId = [],
     ): void {
         $this->modelRepository
             ->method('find')
-            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds, $successorByModelId): ?Model {
+            ->willReturnCallback(function (int $modelId) use ($servicesByModelId, $providerIdsByModelId, $inactiveModelIds, $successorByModelId, $retiredModelIds, $featuresByModelId, $tagsByModelId): ?Model {
                 if (!isset($servicesByModelId[$modelId])) {
                     return null;
                 }
 
                 $model = $this->createMock(Model::class);
+                $model->method('getId')->willReturn($modelId);
+                $model->method('getTag')->willReturn($tagsByModelId[$modelId] ?? 'text2pic');
                 $model->method('getService')->willReturn($servicesByModelId[$modelId]);
                 $model->method('getProviderId')->willReturn($providerIdsByModelId[$modelId] ?? '');
                 $model->method('getActive')->willReturn(in_array($modelId, $inactiveModelIds, true) ? 0 : 1);
+                $model->method('getSelectable')->willReturn(1);
+                $model->method('getFeatures')->willReturn($featuresByModelId[$modelId] ?? ['pic2pic', 'image']);
                 $model->method('getSuccessorId')->willReturn($successorByModelId[$modelId] ?? null);
+                $model->method('isRetired')->willReturn(in_array($modelId, $retiredModelIds, true));
 
                 return $model;
             });
@@ -700,17 +851,21 @@ class ModelConfigServiceTest extends TestCase
      * this, findByTag() returns an empty list and getDefaultModel() falls
      * through to the configured binding.
      *
-     * @param array<int, string> $servicesByModelId
+     * @param array<int, string>       $servicesByModelId
+     * @param array<int, list<string>> $featuresByModelId
      */
-    private function givenCapabilityCatalog(string $tag, array $servicesByModelId): void
+    private function givenCapabilityCatalog(string $tag, array $servicesByModelId, array $featuresByModelId = []): void
     {
         $models = [];
         foreach ($servicesByModelId as $modelId => $service) {
             $model = $this->createMock(Model::class);
             $model->method('getId')->willReturn($modelId);
+            $model->method('getTag')->willReturn($tag);
             $model->method('getService')->willReturn($service);
             $model->method('getProviderId')->willReturn('');
             $model->method('getActive')->willReturn(1);
+            $model->method('getSelectable')->willReturn(1);
+            $model->method('getFeatures')->willReturn($featuresByModelId[$modelId] ?? ['pic2pic', 'image']);
             $models[] = $model;
         }
 
@@ -1657,7 +1812,7 @@ class ModelConfigServiceTest extends TestCase
             'ollama:bge-m3:vectorize' => 'Ollama',
         ];
         foreach ($keyToService as $key => $service) {
-            $bid = \App\Model\ModelCatalog::findBidByKey($key);
+            $bid = ModelCatalog::findBidByKey($key);
             $this->assertNotNull($bid, "catalog key $key must resolve");
             $servicesById[$bid] = $service;
         }

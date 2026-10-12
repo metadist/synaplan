@@ -34,6 +34,7 @@
           v-if="!openSharedFolder"
           class="surface-card p-4 sm:p-5 relative"
           data-testid="section-upload-form"
+          data-tour="library-upload"
           @dragenter.prevent="handleDragEnter"
           @dragover.prevent="handleDragOver"
           @dragleave="handleDragLeave"
@@ -802,11 +803,10 @@
                     >
                       <TrashIcon class="w-3.5 h-3.5" />
                     </button>
-                    <!-- Share stays visible at rest. Use-in-chat and delete appear on hover. -->
                     <button
                       v-if="iamSharingEnabled && !folder.pending && !folder.shared"
                       type="button"
-                      class="absolute top-1 left-1 p-1.5 rounded-xl text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] hover:bg-[var(--brand)]/15 transition-colors"
+                      class="absolute top-1 left-1 p-1.5 rounded-xl text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
                       :title="$t('iam.share')"
                       :aria-label="$t('iam.share')"
                       :data-testid="`btn-share-folder-${folder.name}`"

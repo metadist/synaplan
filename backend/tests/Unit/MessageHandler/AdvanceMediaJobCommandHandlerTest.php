@@ -383,6 +383,37 @@ final class AdvanceMediaJobCommandHandlerTest extends TestCase
         self::assertStringNotContainsString('upstream_xyz', $captured);
     }
 
+    public function testSyncImageJobTextOnlyReplyStoresTheLocalizedQuote(): void
+    {
+        $job = $this->job(MediaJob::STATUS_QUEUED);
+        $job->setType(MediaJob::TYPE_IMAGE)
+            ->setProvider('google')
+            ->setModel('gemini-3.1-flash-image')
+            ->setPrompt('Wie viele Fenster hat dieses Haus?')
+            ->setOptions(['lang' => 'de']);
+        $this->jobService->method('findByKey')->willReturn($job);
+
+        $this->syncGenerator->method('generate')
+            ->willThrowException(ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP'));
+
+        $captured = null;
+        $this->jobService->expects(self::once())
+            ->method('markFailed')
+            ->willReturnCallback(function (MediaJob $j, string $message) use (&$captured): bool {
+                $captured = $message;
+
+                return true;
+            });
+
+        $this->handler->__invoke(new AdvanceMediaJobCommand($job->getJobKey()));
+
+        self::assertSame(
+            "Google hat kein Bild erstellt, sondern mit Text geantwortet:\n\n> 10\n\n"
+            .'Formuliere die Anfrage als Bildanweisung um oder wähle ein anderes Bildmodell.',
+            $captured,
+        );
+    }
+
     public function testProviderExceptionOnSubmitMarksFailedAndDoesNotThrow(): void
     {
         $job = $this->job(MediaJob::STATUS_QUEUED);

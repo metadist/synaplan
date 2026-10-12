@@ -43,7 +43,7 @@
     "disconnected": "Platform disconnected.",
     "disconnectError": "The platform could not be disconnected.",
     "loadError": "Linked platforms could not be loaded.",
-    "adminPointer": "Approving whole servers happens under Operate › People › Platform instances."
+    "adminPointer": "Admins approve whole servers under Admin › Users."
   },
   "plugins": {
     "title": "Plugins",
@@ -63,13 +63,6 @@
     "noCommands": "No commands available",
     "searchCommands": "Search commands...",
     "noCommandsFound": "No commands match your search"
-  },
-  "help": {
-    "title": "Help",
-    "openHelp": "Open help",
-    "close": "Close",
-    "gotIt": "Got it!",
-    "noContent": "No help available for this page"
   },
   "mail": {
     "title": "Mail Handler Configuration",
@@ -252,27 +245,13 @@
     }
   },
   "channels": {
-    "title": "Channels",
-    "description": "You can reach this platform via different channels. Different channels offer different features, if you set those up. Please take a look at the channels listed below:",
-    "whatsappChannels": "WhatsApp Channel(s)",
     "whatsappAssistant": "Assistant for WhatsApp",
     "whatsappAssistantHint": "Incoming WhatsApp messages are answered by this published assistant.",
     "whatsappAssistantNone": "No assistant — use the usual chat",
     "whatsappAssistantSaved": "WhatsApp now uses this assistant",
     "whatsappAssistantFailed": "Could not save the WhatsApp assistant",
-    "emailChannels": "Email Channel(s)",
-    "apiChannel": "API Channel",
-    "webWidget": "Web Widget",
-    "defaultHandling": "default handling",
-    "personalKeyword": "personal keyword",
     "keywordSaved": "Email keyword saved successfully",
-    "addKeyword": "Check for a free keyword to add your own handling:",
     "keywordPlaceholder": "keyword",
-    "yourEmailAddress": "Your email address: {email}",
-    "noKeywordSet": "You have not set a personal keyword yet. You can only write anonymously to the default handler!",
-    "apiDescription": "Simple API calls with your personal API key:",
-    "apiDocumentationInfo": "For detailed API documentation including all available endpoints, request/response formats, and authentication methods, please visit our comprehensive API documentation.",
-    "viewApiDocumentation": "View API Documentation",
     "apiDocumentation": {
       "title": "API Documentation",
       "description": "Complete API reference for integrating with Synaplan. All endpoints are documented with request/response examples.",
@@ -478,29 +457,23 @@
     "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",
     "writeBadge": "Writes allowed"
   },
-  "aiAccounts": {
-    "title": "Your AI accounts",
-    "subtitle": "Use your own provider accounts instead of the server's. Keys are stored encrypted and only you can see them.",
-    "sectionHiggsfield": "Higgsfield — video generation",
-    "sectionAnthropic": "Anthropic — coding clients"
-  },
   "messagesGateway": {
-    "title": "Coding clients",
+    "title": "Connect your coding tool",
     "description": "Connect Claude Code and other Anthropic-compatible agent tools to your Synaplan workspace. Requests go to POST /v1/messages and are metered against your Synaplan budget.",
     "statusTitle": "Gateway status",
     "statusEnabled": "Enabled",
     "statusNotReady": "Not ready",
     "statusDisabled": "Disabled",
-    "missingKey": "No provider key will pay for these requests. Save one under {accounts}. Nothing is sent until a key is saved.",
+    "missingKey": "No provider key will pay for these requests. Save one in {accounts}. Nothing is sent until a key is saved.",
     "missingKeyAdmin": "An admin can also allow the server key.",
-    "yourAiAccounts": "Your AI accounts",
-    "gatewayOff": "Coding clients are turned off, so nothing is sent. An admin can turn the gateway on.",
+    "yourAiAccounts": "Your Anthropic key",
+    "gatewayOff": "Coding tools are turned off, so nothing is sent. An admin can turn the gateway on.",
     "apiKeyStep": "Create a Synaplan API key under {keys}, then paste it in place of sk_your_synaplan_api_key.",
-    "apiKeysLink": "Manage → Developer & devices → API Keys",
+    "apiKeysLink": "Apps › API & developers",
     "firstStartHint": "The first time Claude Code starts, it asks whether to use this API key and whether to trust the folder. The suggested answer is no. Choose yes for both, or the key is rejected and nothing is sent.",
     "budgetLine": "Budget used: {percent}% ({used} of {budget})",
     "budgetLineUnlimited": "Budget used: {used} (no monthly budget limit)",
-    "setupTitle": "Claude Code setup",
+    "setupTitle": "Paste the setup into your terminal",
     "setupHint": "Point Claude Code at this Synaplan instance. Use exactly one credential variable — ANTHROPIC_API_KEY (x-api-key) or ANTHROPIC_AUTH_TOKEN (Bearer).",
     "copySetup": "Copy setup commands",
     "copySuccess": "Setup commands copied",
@@ -512,8 +485,7 @@
     "saveKey": "Save key",
     "clearKey": "Remove key",
     "clearKeyConfirmTitle": "Remove Anthropic key?",
-    "clearKeyConfirm": "Remove key — coding clients use the server's key again if one is configured.",
-    "byokPointer": "Using your own Anthropic key? Manage it under Your AI accounts.",
+    "clearKeyConfirm": "Remove key — coding tools use the server's key again if one is configured.",
     "saveKeySuccess": "API key saved",
     "saveKeyError": "Could not save API key",
     "clearKeySuccess": "API key removed",
@@ -596,7 +568,7 @@
       "mcpTools": {
         "label": "Let AI assistants use your tools",
         "description": "Synaplan runs the tools of your connected tool servers itself and passes the result back to the assistant.",
-        "noneConfigured": "No tool server is connected yet. You can add one under Manage → Connections → MCP Servers."
+        "noneConfigured": "No tool server is connected yet. You can add one under Apps › Tool servers (MCP)."
       },
       "mcpWithClientTools": {
         "label": "Offer your tools even when the agent tool brings its own",
@@ -633,7 +605,7 @@
       },
       "requiresMcpTools": "Available once your tools are switched on above."
     },
-    "loadError": "Could not load Coding clients settings",
+    "loadError": "Could not load the Claude Code settings.",
     "source": {
       "user": "Your key",
       "operator": "Operator key",
@@ -762,5 +734,293 @@
     "useTemplateDone": "Copy created. It is off until you turn it on.",
     "useTemplateNeedsSetup": "Copy created and left off. Connect the missing assistant, tool, or connection before you turn it on.",
     "useTemplateNeedsSetupItems": "Copy created and left off. Still needed: {items}."
+  },
+  "tours": {
+    "common": {
+      "start": "Show me around",
+      "next": "Next",
+      "back": "Back",
+      "done": "Done",
+      "progress": "{current} of {total}"
+    },
+    "chats": {
+      "rail": {
+        "title": "Five areas",
+        "body": "This bar switches between Chats, Library, Assistants, Apps and Admin. Each area opens its own menu next to it."
+      },
+      "new": {
+        "title": "Start a new chat",
+        "body": "Every chat is saved in the list below, so you can come back to it later."
+      },
+      "input": {
+        "title": "Ask anything",
+        "body": "Type your question and press Enter. Synaplan picks a suitable model and can use your files and memories."
+      },
+      "plus": {
+        "title": "Files and tools",
+        "body": "Attach a file or a photo, or turn on a tool such as web search for this message."
+      },
+      "model": {
+        "title": "Choose the model",
+        "body": "Leave it on automatic or pick a model yourself. Your defaults live under Assistants › AI settings."
+      },
+      "search": {
+        "title": "Find anything",
+        "body": "Search chats, files, assistants and pages from anywhere, also with Ctrl+K or ⌘K."
+      }
+    },
+    "library": {
+      "tabs": {
+        "title": "Everything you keep",
+        "body": "Your files, what arrived from apps, what the AI generated, plus search and memories — one tab each."
+      },
+      "upload": {
+        "title": "Add files",
+        "body": "Drop files here. Synaplan reads them so chats and assistants can answer from their content."
+      },
+      "use": {
+        "title": "Use them in a chat",
+        "body": "In a chat, choose + › Knowledge folder to answer from a folder, or simply ask — relevant files are found on their own."
+      }
+    },
+    "assistants": {
+      "create": {
+        "title": "Create an assistant",
+        "body": "An assistant remembers its instructions, files and tools, so you do not repeat them in every chat."
+      },
+      "gallery": {
+        "title": "Your assistants",
+        "body": "Start a chat with one, edit it, copy a template or share it with your team."
+      },
+      "more": {
+        "title": "Tasks and approvals",
+        "body": "The Assistants menu also holds Tasks that run on a schedule, Approvals waiting for you, and your AI settings."
+      }
+    },
+    "tasks": {
+      "new": {
+        "title": "Create a task",
+        "body": "Describe what the AI should do and, if you like, when. It then runs on its own."
+      },
+      "approvals": {
+        "title": "You stay in control",
+        "body": "Before a task sends a mail or changes something, it asks you under Approvals. Results show up in the task’s runs."
+      }
+    },
+    "apps": {
+      "search": {
+        "title": "Find an app",
+        "body": "Search by name or what you want to do, for example mail or calendar."
+      },
+      "tabs": {
+        "title": "All or connected",
+        "body": "Connected shows only what you already use, so you can check or disconnect it quickly."
+      },
+      "list": {
+        "title": "Open an app",
+        "body": "Each app explains what it can do, connects in a few steps and can be turned off on the same page."
+      }
+    },
+    "admin": {
+      "cards": {
+        "title": "Your server at a glance",
+        "body": "Users, new sign-ups, switched-off features and models to check. Each card opens the page behind it."
+      },
+      "attention": {
+        "title": "What needs you",
+        "body": "Problems are listed here with a button that takes you straight to the fix."
+      },
+      "sections": {
+        "title": "Admin sections",
+        "body": "System status, AI infrastructure, Users and System configuration. The configuration page has its own settings search."
+      }
+    },
+    "checklist": {
+      "title": "Getting started",
+      "progress": "{done} of {total} done",
+      "dismiss": "Hide the checklist",
+      "doneLabel": "(done)",
+      "items": {
+        "provider": {
+          "title": "Set up an AI provider",
+          "where": "Under Admin › AI infrastructure"
+        },
+        "file": {
+          "title": "Upload a file",
+          "where": "You find it later under Library › Files"
+        },
+        "assistant": {
+          "title": "Create an assistant",
+          "where": "It appears under Assistants"
+        },
+        "app": {
+          "title": "Connect an app",
+          "where": "Connected apps are listed under Apps › Connected"
+        }
+      }
+    }
+  },
+  "apps": {
+    "title": "Apps",
+    "subtitle": "Connect Synaplan to the tools you already use.",
+    "searchLabel": "Search apps",
+    "searchPlaceholder": "Search apps…",
+    "tabAll": "All",
+    "tabConnected": "Connected",
+    "connected": "Connected",
+    "connectedEmpty": "No app is connected yet.",
+    "browseAll": "Browse all apps",
+    "noResults": "No app matches \"{query}\".",
+    "clearSearch": "Clear search",
+    "pluginTagline": "Added by your administrator.",
+    "backToAll": "All apps",
+    "factWhat": "What it does",
+    "factWho": "Who can see it",
+    "factStop": "How to stop it",
+    "ownerOnly": "Only you. Others in your organisation do not see this connection.",
+    "linkedEmpty": "Nothing is linked yet. Start the connection in {client} — you will not type a key here.",
+    "categories": {
+      "messengers": "Messengers",
+      "website": "Website",
+      "email": "E-mail",
+      "files": "Files & documents",
+      "ai": "AI & media",
+      "developer": "Tools & developers",
+      "extensions": "Plugins"
+    },
+    "email": {
+      "addressesTitle": "Your addresses",
+      "baseHint": "Send or forward an e-mail here and Synaplan answers you.",
+      "personalHint": "Your personal address with your keyword.",
+      "keywordTitle": "Personal keyword",
+      "keywordHint": "Optional: a keyword gives you your own address, for example for a project.",
+      "copy": "Copy",
+      "copied": "Address copied.",
+      "copyFailed": "The address could not be copied. Select it and copy it by hand.",
+      "saveFailed": "The keyword was not saved. Try again."
+    },
+    "mailbox": {
+      "loadFailed": "Your mailboxes could not be loaded. Reload the page.",
+      "saveFailed": "The mailbox was not saved. Nothing was changed."
+    },
+    "claudeCode": {
+      "keyTitle": "Your Anthropic key",
+      "keyHint": "Optional. With your own key, usage is billed to your Anthropic account.",
+      "apiKeyTitle": "Create a Synaplan API key",
+      "adminOff": "The gateway is off for everyone. ",
+      "adminLink": "Gateway settings in Admin › AI"
+    },
+    "items": {
+      "telegram": {
+        "name": "Telegram",
+        "tagline": "Chat with your assistant in Telegram.",
+        "about": "Your own Telegram bot answers with your assistant. Only your messages reach Synaplan; nobody else can use the bot.",
+        "stop": "Disconnect below. The bot stops answering at once."
+      },
+      "whatsapp": {
+        "name": "WhatsApp",
+        "tagline": "Ask Synaplan from WhatsApp.",
+        "about": "Verify your phone number, then message the Synaplan number. The assistant you pick below answers.",
+        "stop": "Pick no assistant below or remove your verified number."
+      },
+      "widgets": {
+        "name": "Chat widgets",
+        "tagline": "Put an AI assistant on your website."
+      },
+      "email": {
+        "name": "Email to Synaplan",
+        "tagline": "Forward an e-mail and get an answer back.",
+        "about": "Write or forward to your Synaplan address. Synaplan reads the message and replies to you by e-mail.",
+        "stop": "Simply stop sending mail. Clear the keyword to retire your personal address."
+      },
+      "mailbox": {
+        "name": "Mailbox automation",
+        "tagline": "Let the AI sort and answer a mailbox.",
+        "about": "Synaplan checks an IMAP mailbox on a schedule, sends each new mail to the right department and can reply via SMTP.",
+        "stop": "Set the mailbox to inactive or delete it in the list below."
+      },
+      "microsoft365": {
+        "name": "Microsoft 365",
+        "tagline": "Outlook mail and calendar for your assistant.",
+        "about": "After you sign in with Microsoft, the AI can read your Outlook mail, add events to your calendar and send results from your own mailbox.",
+        "stop": "Remove the connection below. Access ends immediately."
+      },
+      "dropbox": {
+        "name": "Dropbox",
+        "tagline": "Save AI results straight into Dropbox.",
+        "about": "After you sign in with Dropbox, tasks and chats can save files into a folder you choose. Synaplan does not browse your other files.",
+        "stop": "Remove the connection below. Access ends immediately."
+      },
+      "webdav": {
+        "name": "Cloud folders & calendar",
+        "tagline": "Nextcloud, OpenCloud or any WebDAV folder.",
+        "about": "Connect a folder with an app password. Tasks can save results there and, with Nextcloud, put meetings into your calendar.",
+        "stop": "Remove the connection below. Access ends immediately."
+      },
+      "nextcloud": {
+        "name": "Synaplan in Nextcloud",
+        "tagline": "Use your assistants inside Nextcloud.",
+        "about": "Install the Synaplan app in Nextcloud and sign in there. Nextcloud then uses this account; you never copy a key.",
+        "stop": "Disconnect the server in the list below."
+      },
+      "owncloud": {
+        "name": "Synaplan in ownCloud",
+        "tagline": "Use your assistants inside ownCloud.",
+        "about": "Install the Synaplan app in ownCloud and sign in there. ownCloud then uses this account; you never copy a key.",
+        "stop": "Disconnect the server in the list below."
+      },
+      "outlook": {
+        "name": "Synaplan in Outlook",
+        "tagline": "Answer and summarise mail with your assistant in Outlook.",
+        "about": "Add the Synaplan add-in in Outlook and sign in there. The add-in then uses this account.",
+        "stop": "Disconnect it in the list below."
+      },
+      "claudeCode": {
+        "name": "Claude Code & coding tools",
+        "tagline": "Run Claude Code through Synaplan with your knowledge and budget.",
+        "about": "Point Claude Code at Synaplan with an API key. Requests then use your Synaplan tools and count against your budget.",
+        "stop": "Revoke the API key under API & developers."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "tagline": "Create videos with your Higgsfield account.",
+        "about": "Save your Higgsfield key and secret. Images and videos you create in chat are then billed to your Higgsfield account.",
+        "stop": "Remove your key below."
+      },
+      "mcp": {
+        "name": "Tool servers (MCP)",
+        "tagline": "Give the AI tools from any MCP server.",
+        "about": "Add a server address. The AI can then use that server’s tools in chat.",
+        "stop": "Turn the server off or delete it in the list below."
+      },
+      "customTools": {
+        "name": "Custom tools",
+        "tagline": "Connect any web API as a tool.",
+        "about": "Describe an HTTP call once (or import an OpenAPI file). The AI can then use it in chat.",
+        "stop": "Delete the tool in the list below."
+      },
+      "desktop": {
+        "name": "Synaplan Desktop",
+        "tagline": "Let your assistant work with files on your computer.",
+        "about": "Pair the desktop app with a code. It runs jobs you start from chat on your own machine.",
+        "stop": "Remove the device below. Running jobs are cancelled."
+      },
+      "api": {
+        "name": "API & developers",
+        "tagline": "API keys and documentation for your own integrations.",
+        "about": "Create a key for scripts and other apps. Every call acts as you and counts against your limits.",
+        "stop": "Revoke the key below. It stops working immediately."
+      }
+    },
+    "linkedSteps": {
+      "title": "How to connect",
+      "install": "Install the Synaplan app in {client}.",
+      "installOutlook": "Add the Synaplan add-in in Outlook.",
+      "address": "Enter this server address there:",
+      "signIn": "Sign in with your Synaplan account and confirm. The connection then appears below.",
+      "copy": "Copy address",
+      "copied": "Address copied",
+      "copyFailed": "The address could not be copied. Select it and copy it by hand."
+    }
   }
 }

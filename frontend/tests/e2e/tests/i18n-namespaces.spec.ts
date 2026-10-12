@@ -24,7 +24,7 @@ const TITLES = {
     assistants: /Assistants/,
     widgets: /Widgets de chat/,
     settings: /Préférences/,
-    admin: /Exploitation/,
+    admin: /Administration/,
   },
 } as const
 

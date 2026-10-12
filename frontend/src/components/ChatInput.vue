@@ -228,6 +228,7 @@
                 :rows="1"
                 class="flex-1 min-w-0"
                 data-testid="input-chat-message"
+                data-tour="chat-input"
                 @keydown="handleKeyDown"
                 @focus="isFocused = true"
                 @blur="isFocused = false"
@@ -272,10 +273,12 @@
             </button>
           </div>
 
-          <!-- Control bar. Plus and the tool badge on the left; the model chip,
-               microphone and send on the right. Enhance lives on the text row. -->
+          <!-- Control bar. One row at every width: the tools summary leaves
+               first, then the model name collapses to its icon. Plus, files,
+               the microphone and send stay 44px. Enhance lives on the text row. -->
           <div
-            class="flex flex-wrap items-center gap-1.5 px-3 pb-2.5"
+            ref="controlsRef"
+            class="flex flex-nowrap items-center gap-1.5 px-3 pb-2.5"
             data-testid="section-chat-controls"
           >
             <!-- Plus menu: attach, tools and knowledge folder.
@@ -286,17 +289,26 @@
               <button
                 type="button"
                 :class="[
-                  'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative touch-manipulation',
+                  'surface-chip icon-ghost relative h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl touch-manipulation',
                   plusMenuOpen && 'pill--active',
                 ]"
-                :aria-label="$t('chatInput.plusMenu.label')"
+                :aria-label="hideToolsSummary ? toolsSummaryText : $t('chatInput.plusMenu.label')"
+                :title="hideToolsSummary ? toolsSummaryText : undefined"
                 :aria-expanded="plusMenuOpen"
                 :disabled="uploading"
                 data-testid="btn-chat-plus"
+                data-tour="chat-plus"
                 @click="togglePlusMenu"
               >
                 <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
                 <PlusIcon v-else class="w-5 h-5" />
+                <span
+                  v-if="hideToolsSummary && !isGuestMode"
+                  class="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-[var(--brand)] text-[color:var(--on-brand)] text-[10px] font-semibold inline-flex items-center justify-center"
+                  data-testid="badge-plus-tools-count"
+                >
+                  {{ toolsCount }}
+                </span>
               </button>
 
               <div
@@ -413,22 +425,25 @@
               @remove="clearTool"
             />
             <span
-              v-if="!isGuestMode"
-              class="max-w-[10rem] truncate text-xs txt-secondary"
+              v-if="!isGuestMode && !hideToolsSummary"
+              class="max-w-[10rem] shrink truncate text-xs txt-secondary"
               data-testid="chip-tools-summary"
             >
               {{ toolsSummaryText }}
             </span>
 
             <div
-              class="ml-auto flex min-w-0 max-w-full items-center gap-1.5"
+              class="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1.5"
               data-testid="section-chat-primary-actions"
+              data-tour="chat-model"
             >
               <ModelDropdown
                 v-model="selectedModelId"
                 v-model:reasoning-effort="reasoningEffort"
+                class="min-w-0"
                 :levels="reasoningLevels"
                 :guest="isGuestMode"
+                :collapse-name="collapseModelName"
                 @gate="emit('guestFeatureGate', 'models')"
               />
 
@@ -669,6 +684,7 @@ const isToolCommand = (name: string): name is ChatTool =>
   (TOOL_COMMANDS as readonly string[]).includes(name)
 
 const activeTool = ref<ChatTool | null>(null)
+const toolsCount = computed(() => (configStore.features?.selfAware ? 4 : 3))
 const toolsSummaryText = computed(() => {
   const names: Record<string, string> = {
     search: t('chatInput.tools.webSearch'),
@@ -678,12 +694,45 @@ const toolsSummaryText = computed(() => {
   }
   return toolsSummaryLabel(
     {
-      count: configStore.features?.selfAware ? 4 : 3,
+      count: toolsCount.value,
       activeName: activeTool.value ? (names[activeTool.value] ?? null) : null,
     },
     (key, params) => String(t(key, params))
   )
 })
+const controlsRef = ref<HTMLElement | null>(null)
+const hideToolsSummary = ref(false)
+const collapseModelName = ref(false)
+let controlsObserver: ResizeObserver | null = null
+let fittingControls = false
+
+const controlBarOverflows = (): boolean => {
+  const el = controlsRef.value
+  if (!el) return false
+  return el.scrollWidth - el.clientWidth > 1
+}
+
+/**
+ * Keep the control bar on one line. The tools summary leaves first; the
+ * model name collapses to its icon only when the row still overflows.
+ * Same order as chooseControlBarFit.
+ */
+const fitControlBar = async (): Promise<void> => {
+  if (!controlsRef.value || fittingControls || isGuestMode.value) return
+  fittingControls = true
+  try {
+    hideToolsSummary.value = false
+    collapseModelName.value = false
+    await nextTick()
+    if (!controlBarOverflows()) return
+    hideToolsSummary.value = true
+    await nextTick()
+    if (!controlBarOverflows()) return
+    collapseModelName.value = true
+  } finally {
+    fittingControls = false
+  }
+}
 const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
@@ -912,6 +961,9 @@ onMounted(() => {
   void restoreDesktopJobs()
 })
 const { t, locale } = useI18n()
+watch([toolsSummaryText, selectedModelId, activeTool, isGuestMode], () => {
+  void fitControlBar()
+})
 const route = useRoute()
 const router = useRouter()
 const {
@@ -1230,7 +1282,6 @@ watch(
   message,
   (newValue) => {
     if (newValue.startsWith('/')) {
-      void commandsStore.loadSavedPrompts()
       // Only show palette if no space (still typing command) or only command without args
       const hasSpace = newValue.includes(' ')
       const parsed = parseCommand(newValue)
@@ -1279,6 +1330,12 @@ watch(
   },
   { immediate: false }
 )
+
+// Fetch on every open, not on every keystroke of the same command, so a
+// prompt saved or deleted on Prompts is in the next menu without a reload.
+watch(paletteVisible, (visible) => {
+  if (visible) void commandsStore.loadSavedPrompts()
+})
 
 /**
  * Stop Web Speech and the audio recorder.
@@ -1794,6 +1851,14 @@ const clearSilenceTimer = () => {
 }
 
 onMounted(() => {
+  const controls = controlsRef.value
+  if (controls && typeof ResizeObserver !== 'undefined') {
+    controlsObserver = new ResizeObserver(() => {
+      void fitControlBar()
+    })
+    controlsObserver.observe(controls)
+  }
+  void fitControlBar()
   document.addEventListener('click', handlePlusClickOutside)
   // Capture so Escape still closes the panel when the composer stops the
   // event for an open command or mention palette.
@@ -1801,6 +1866,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  controlsObserver?.disconnect()
+  controlsObserver = null
   dictationUnmounted = true
   stopDictation({ keepText: false })
   document.removeEventListener('click', handlePlusClickOutside)

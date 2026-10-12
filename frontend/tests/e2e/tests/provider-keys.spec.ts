@@ -57,7 +57,7 @@ test.describe('@ci Provider keys — one editor', () => {
     })
 
     // The settings load next to the provider list; wait until they are listed.
-    await expect(page.locator('[data-testid="btn-jump-section-tts"]')).toBeVisible({
+    await expect(page.locator('[data-testid="btn-setup-section-tts"]')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
     await page.locator('[data-testid="btn-setup-accordion-toggle-all"]').click()

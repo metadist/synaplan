@@ -35,6 +35,92 @@ class MediaErrorMessageBuilderTest extends TestCase
         $this->assertStringContainsString('Sorry, the image could not be generated right now.', $message);
     }
 
+    public function testATextOnlyReplyIsQuotedWithARecoveryInEnglish(): void
+    {
+        $exception = ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP');
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'en');
+
+        $this->assertSame(
+            "Google returned no image and answered with text instead:\n\n> 10\n\n"
+            .'Rephrase the request as an image instruction or choose a different image model.',
+            $message,
+        );
+    }
+
+    public function testATextOnlyReplyIsQuotedWithARecoveryInGerman(): void
+    {
+        $exception = ProviderException::noImage('google', 'gemini-3.1-flash-image', "Zehn.\nAlle sichtbar.", 'STOP');
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'de');
+
+        $this->assertSame(
+            "Google hat kein Bild erstellt, sondern mit Text geantwortet:\n\n> Zehn.\n> Alle sichtbar.\n\n"
+            .'Formuliere die Anfrage als Bildanweisung um oder wähle ein anderes Bildmodell.',
+            $message,
+        );
+        $this->assertStringNotContainsString('gemini-3.1-flash-image', $message);
+    }
+
+    public function testATextOnlyReplyIsCutTo300Characters(): void
+    {
+        $exception = ProviderException::noImage('openai', 'gpt-image-1.5', str_repeat('A', 500), null);
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'en');
+
+        $this->assertStringStartsWith('OpenAI returned no image', $message);
+        $this->assertStringContainsString('> '.str_repeat('A', 300)."\n\n", $message);
+        $this->assertStringNotContainsString(str_repeat('A', 301), $message);
+    }
+
+    public function testATextOnlyReplyIsLocalizedForSpanishFrenchAndTurkish(): void
+    {
+        $exception = ProviderException::noImage('google', 'gemini-3.1-flash-image', '10', 'STOP');
+
+        $this->assertStringStartsWith('Google no generó ninguna imagen', $this->builder->buildErrorMessage($exception, 'image', 'es'));
+        $this->assertStringStartsWith("Google n'a généré aucune image", $this->builder->buildErrorMessage($exception, 'image', 'fr'));
+        $this->assertStringStartsWith('Google görsel oluşturmadı', $this->builder->buildErrorMessage($exception, 'image', 'tr'));
+    }
+
+    public function testATextOnlyVideoReplyNamesAVideoRecovery(): void
+    {
+        $exception = new ProviderException('No video', 'google', ['text_response' => 'Sure, here is a story.']);
+
+        $message = $this->builder->buildErrorMessage($exception, 'video', 'en');
+
+        $this->assertStringEndsWith('Rephrase the request as a video instruction or choose a different video model.', $message);
+        $this->assertStringNotContainsString('image', $message);
+    }
+
+    public function testAWindowsLineBreakInTheReplyStaysInsideTheQuote(): void
+    {
+        $exception = ProviderException::noImage('google', 'gemini-3.1-flash-image', "One.\r\nTwo.", 'STOP');
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'en');
+
+        $this->assertStringContainsString("> One.\n> Two.\n\n", $message);
+    }
+
+    public function testAnImageTheSafetyFilterDiscardedExplainsTheFilter(): void
+    {
+        $exception = ProviderException::imageFiltered('google', 'imagen-4.0-generate-001', 'The image was filtered.');
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'en');
+
+        $this->assertStringContainsString('Google refused to generate the image with code **SAFETY**.', $message);
+        $this->assertStringContainsString('> The image was filtered.', $message);
+        $this->assertStringNotContainsString('answered with text', $message);
+    }
+
+    public function testNoImageWithoutAReplyKeepsTheGenericCopy(): void
+    {
+        $exception = ProviderException::noImage('google', 'gemini-3.1-flash-image', null, 'STOP');
+
+        $message = $this->builder->buildErrorMessage($exception, 'image', 'en');
+
+        $this->assertSame('Sorry, the image could not be generated right now. Please try again or use a different model.', $message);
+    }
+
     public function testBuildErrorMessageWithGenericException(): void
     {
         $exception = new \Exception('Generic error');
@@ -50,15 +136,15 @@ class MediaErrorMessageBuilderTest extends TestCase
 
         // Image
         $message = $this->builder->buildErrorMessage($exception, 'image', 'de');
-        $this->assertStringContainsString('Openai hat die Erstellung des Bildes mit dem Code **RECITATION** abgelehnt.', $message);
+        $this->assertStringContainsString('OpenAI hat die Erstellung des Bildes mit dem Code **RECITATION** abgelehnt.', $message);
 
         // Audio
         $message = $this->builder->buildErrorMessage($exception, 'audio', 'de');
-        $this->assertStringContainsString('Openai hat die Erstellung des Audios mit dem Code **RECITATION** abgelehnt.', $message);
+        $this->assertStringContainsString('OpenAI hat die Erstellung des Audios mit dem Code **RECITATION** abgelehnt.', $message);
 
         // Video
         $message = $this->builder->buildErrorMessage($exception, 'video', 'de');
-        $this->assertStringContainsString('Openai hat die Erstellung des Videos mit dem Code **RECITATION** abgelehnt.', $message);
+        $this->assertStringContainsString('OpenAI hat die Erstellung des Videos mit dem Code **RECITATION** abgelehnt.', $message);
     }
 
     public function testBuildContentBlockedMessageUnknownReason(): void

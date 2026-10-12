@@ -2,6 +2,7 @@
 
 namespace Plugin\HelloWorld\Controller;
 
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -9,6 +10,7 @@ use Symfony\Component\Routing\Attribute\Route;
 class HelloController extends AbstractController
 {
     #[Route('/api/v1/user/{userId}/plugins/hello_world/hello', name: 'plugin_hello_world_hello', methods: ['GET'])]
+    #[OA\Get(path: '/api/v1/user/{userId}/plugins/hello_world/hello', summary: 'Hello World plugin sample', tags: ['Plugins'])]
     public function hello(int $userId): JsonResponse
     {
         return new JsonResponse([

@@ -28,9 +28,7 @@
                 'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
                 dialog.danger
                   ? 'bg-red-500/10 text-red-500'
-                  : dialog.type === 'confirm' || dialog.type === 'choice'
-                    ? 'bg-blue-500/10 text-blue-500'
-                    : 'bg-[var(--brand)]/10 text-[var(--brand)]',
+                  : 'bg-[var(--brand)]/10 text-[var(--brand)]',
               ]"
             >
               <ExclamationTriangleIcon v-if="dialog.danger" class="w-6 h-6" />
@@ -53,8 +51,18 @@
           </p>
 
           <!-- Input for prompt -->
+          <textarea
+            v-if="dialog.type === 'prompt' && dialog.multiline"
+            ref="inputRef"
+            v-model="inputValue"
+            rows="5"
+            :placeholder="dialog.placeholder"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-dialog-prompt"
+            @keydown.esc="handleCancel"
+          />
           <input
-            v-if="dialog.type === 'prompt'"
+            v-else-if="dialog.type === 'prompt'"
             ref="inputRef"
             v-model="inputValue"
             type="text"
@@ -113,7 +121,7 @@ import {
 const { dialog, close } = useDialog()
 const { teleportTarget } = useFullscreenTeleportTarget()
 const inputValue = ref('')
-const inputRef = ref<HTMLInputElement>()
+const inputRef = ref<HTMLInputElement | HTMLTextAreaElement>()
 const panelRef = ref<HTMLElement>()
 let previouslyFocused: HTMLElement | null = null
 let restoreFocusTimer: ReturnType<typeof setTimeout> | null = null

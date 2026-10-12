@@ -64,7 +64,7 @@ final readonly class GroupPolicyService
         }
 
         // Empty PHP arrays JSON-encode as []. The OpenAPI/Zod contract is an
-        // object, and the People → Policies tab treats a parse miss as a load
+        // object, and the Users → Policies tab treats a parse miss as a load
         // failure toast.
         return ['settings' => $settings, 'conflicts' => (object) $conflicts];
     }

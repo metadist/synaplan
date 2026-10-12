@@ -58,8 +58,14 @@
       </fieldset>
 
       <!-- Outside a disabled fieldset. Enter saves the server, not the profile. -->
-      <section v-else-if="section === 'app'" id="app-server" @keydown.enter.prevent>
+      <section
+        v-else-if="section === 'app'"
+        id="app-server"
+        class="space-y-6"
+        @keydown.enter.prevent
+      >
         <NativeServerControl />
+        <NativeAppVersions />
       </section>
 
       <ProfileLegalSection v-else-if="section === 'legal'" />
@@ -80,6 +86,7 @@ import { useRoute } from 'vue-router'
 import { provideProfileSettings } from '@/composables/useProfileSettings'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import NativeServerControl from '@/components/NativeServerControl.vue'
+import NativeAppVersions from '@/components/NativeAppVersions.vue'
 import SettingsAppearanceSection from '@/components/settings/SettingsAppearanceSection.vue'
 import SettingsChatSection from '@/components/settings/SettingsChatSection.vue'
 import SettingsDataSection from '@/components/settings/SettingsDataSection.vue'

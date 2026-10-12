@@ -70,7 +70,8 @@
     "userDisabled": {
       "title": "Los recuerdos están desactivados para tu cuenta",
       "message": "La IA no usará ni actualizará automáticamente los recuerdos. Puedes activarlo en la configuración de tu perfil en cualquier momento.",
-      "enable": "Activar recuerdos"
+      "enable": "Activar recuerdos",
+      "openSettings": "Abrir ajustes del chat"
     },
     "unavailable": {
       "title": "Los recuerdos se están configurando",
@@ -399,7 +400,8 @@
       "editSuccess": "Feedback actualizado",
       "editError": "Error al actualizar feedback",
       "deleteSuccess": "Feedback eliminado",
-      "deleteError": "Error al eliminar feedback"
+      "deleteError": "Error al eliminar feedback",
+      "emptyAction": "Abrir un chat"
     }
   }
 }

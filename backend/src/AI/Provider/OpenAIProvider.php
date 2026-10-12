@@ -1140,6 +1140,11 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             }
 
             return $images;
+        } catch (ProviderException $e) {
+            // A text-only reply (and any other provider outcome) already
+            // carries its context. Wrapping it here drops the quoted reply
+            // and the model, so the chat shows the generic generation error.
+            throw $e;
         } catch (\Exception $e) {
             // Check for content policy violations
             if (false !== stripos($e->getMessage(), 'content_policy')
@@ -1170,27 +1175,8 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'size' => $options['size'] ?? '1024x1024',
             ];
 
-            if (isset($options['quality'])) {
-                $quality = $options['quality'];
-
-                // Map legacy values to supported ones
-                $qualityMap = [
-                    'standard' => 'medium',
-                    'hd' => 'high',
-                ];
-                if (isset($qualityMap[strtolower((string) $quality)])) {
-                    $quality = $qualityMap[strtolower((string) $quality)];
-                }
-
-                $quality = strtolower((string) $quality);
-                $allowedQualities = $this->allowedGptImageQualities($model);
-                if (!in_array($quality, $allowedQualities, true)) {
-                    $this->logger->warning('OpenAI '.$model.': Unsupported quality value, defaulting to high', [
-                        'provided' => $options['quality'],
-                    ]);
-                    $quality = 'high';
-                }
-
+            $quality = $this->gptImageQuality($model, $options['quality'] ?? null);
+            if (null !== $quality) {
                 $requestBody['quality'] = $quality;
             }
             if (isset($options['background'])) {
@@ -1314,60 +1300,40 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     private function generateImageWithResponsesApi(string $prompt, array $imagePaths, array $options = []): array
     {
         try {
-            $model = $options['model'] ?? 'gpt-image-1.5';
+            $model = $options['model'] ?? 'gpt-image-2.5-flare';
             $responsesModel = $this->pickResponsesModel($model);
 
-            $this->logger->info('OpenAI: Pic2pic via Responses API', [
-                'model' => $responsesModel,
-                'image_model' => $model,
-                'image_count' => \count($imagePaths),
-                'prompt_length' => \strlen($prompt),
-            ]);
-
-            $contentParts = [['type' => 'input_text', 'text' => $prompt]];
+            $imageDataUrls = [];
             foreach ($imagePaths as $imgPath) {
                 $data = file_get_contents($imgPath);
                 if (false === $data) {
                     throw new \Exception('Failed to read image: '.basename($imgPath));
                 }
                 $mime = mime_content_type($imgPath) ?: 'image/png';
-                $contentParts[] = [
-                    'type' => 'input_image',
-                    'image_url' => 'data:'.$mime.';base64,'.base64_encode($data),
-                ];
+                $imageDataUrls[] = 'data:'.$mime.';base64,'.base64_encode($data);
             }
 
-            $requestBody = [
+            $requestBody = $this->buildImageEditRequest($prompt, $model, $imageDataUrls, $options);
+
+            $this->logger->info('OpenAI: Pic2pic via Responses API', [
                 'model' => $responsesModel,
-                'input' => [['role' => 'user', 'content' => $contentParts]],
-                // GPT Image 2.5 must be named on the tool; omitting `model`
-                // lets the Responses API pick a default that is not the
-                // catalog row the user selected.
-                'tools' => [['type' => 'image_generation', 'model' => $model]],
-            ];
+                'image_model' => $model,
+                'image_count' => \count($imagePaths),
+                'prompt_length' => \strlen($prompt),
+                'quality' => $requestBody['tools'][0]['quality'] ?? null,
+            ]);
 
             $key = $this->resolveApiKey();
 
-            $ch = curl_init('https://api.openai.com/v1/responses');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer '.$key,
+            $response = $this->httpClient->request('POST', 'https://api.openai.com/v1/responses', [
+                'headers' => [
+                    'Authorization' => 'Bearer '.$key,
                 ],
-                CURLOPT_POSTFIELDS => json_encode($requestBody),
-                CURLOPT_TIMEOUT => 180,
+                'json' => $requestBody,
+                'timeout' => 180,
             ]);
-
-            $responseBody = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($curlError) {
-                throw new \Exception('cURL error: '.$curlError);
-            }
+            $httpCode = $response->getStatusCode();
+            $responseBody = $response->getContent(false);
 
             if (200 !== $httpCode) {
                 $this->logger->error('OpenAI Responses API: HTTP error', [
@@ -1389,15 +1355,19 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                         'url' => 'data:image/png;base64,'.$output['result'],
                         'b64_json' => $output['result'],
                         'revised_prompt' => $output['revised_prompt'] ?? $prompt,
+                        // What the model rendered, e.g. 1536x1024: the edit
+                        // request leaves the size to the model.
+                        'size' => is_string($output['size'] ?? null) ? $output['size'] : null,
                     ];
                 }
             }
 
             if (empty($images)) {
+                $exception = ProviderException::noImage('openai', (string) $model, $this->responsesMessageText($response['output']), null);
                 $this->logger->error('OpenAI Responses API: No images in output', [
                     'output_types' => array_column($response['output'] ?? [], 'type'),
-                ]);
-                throw new ProviderException('Responses API returned no generated images', 'openai');
+                ] + $exception->logContext());
+                throw $exception;
             }
 
             return $images;
@@ -1406,6 +1376,94 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI Responses API pic2pic error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    /**
+     * Text of the assistant `message` output item: what the model said when
+     * it answered in prose instead of calling the image tool.
+     *
+     * @param array<mixed> $output Responses API `output` list
+     */
+    private function responsesMessageText(array $output): ?string
+    {
+        foreach ($output as $item) {
+            if (!is_array($item) || 'message' !== ($item['type'] ?? null)) {
+                continue;
+            }
+            foreach ($item['content'] ?? [] as $part) {
+                if (is_array($part) && is_string($part['text'] ?? null) && '' !== trim($part['text'])) {
+                    return $part['text'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Responses API body for an edit of attached images. Pure: the caller
+     * reads and encodes the images.
+     *
+     * No `size` is sent, so the model keeps the orientation of the photo.
+     * No `input_fidelity` either: gpt-image-2 and later always edit at high
+     * input fidelity and must not get the key.
+     *
+     * @param list<string>         $imageDataUrls `data:` URLs of the attached images
+     * @param array<string, mixed> $options       quality
+     *
+     * @return array{model: string, input: list<array<string, mixed>>, tools: list<array<string, mixed>>}
+     */
+    private function buildImageEditRequest(string $prompt, string $model, array $imageDataUrls, array $options): array
+    {
+        $content = [['type' => 'input_text', 'text' => $prompt]];
+        foreach ($imageDataUrls as $dataUrl) {
+            $content[] = ['type' => 'input_image', 'image_url' => $dataUrl];
+        }
+
+        // GPT Image 2.5 must be named on the tool; omitting `model` lets the
+        // Responses API pick a default that is not the catalog row the user
+        // selected.
+        $tool = ['type' => 'image_generation', 'model' => $model];
+        $quality = $this->gptImageQuality($model, $options['quality'] ?? null);
+        if (null !== $quality) {
+            $tool['quality'] = $quality;
+        }
+
+        return [
+            'model' => $this->pickResponsesModel($model),
+            'input' => [['role' => 'user', 'content' => $content]],
+            'tools' => [$tool],
+        ];
+    }
+
+    /**
+     * The quality tier to send to a gpt-image model, or null when the caller
+     * asked for none. Legacy values map onto the gpt-image tiers
+     * (standard → medium, hd → high); a tier the model does not accept is
+     * sent as high, the tier media billing assumes for an unknown value.
+     */
+    private function gptImageQuality(string $model, mixed $requested): ?string
+    {
+        if (null === $requested) {
+            return null;
+        }
+
+        $quality = strtolower((string) $requested);
+        $quality = match ($quality) {
+            'standard' => 'medium',
+            'hd' => 'high',
+            default => $quality,
+        };
+
+        if (!in_array($quality, $this->allowedGptImageQualities($model), true)) {
+            $this->logger->warning('OpenAI '.$model.': Unsupported quality value, defaulting to high', [
+                'provided' => $requested,
+            ]);
+
+            return 'high';
+        }
+
+        return $quality;
     }
 
     /**

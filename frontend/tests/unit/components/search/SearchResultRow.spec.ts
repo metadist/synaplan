@@ -51,7 +51,7 @@ describe('SearchResultRow', () => {
           ...base,
           id: 'setting:FEATURE_IAM_GROUPS_ENABLED',
           kind: 'setting',
-          title: 'People & groups',
+          title: 'Users & groups',
           route: '/admin/config?tab=features&section=iam&highlight=FEATURE_IAM_GROUPS_ENABLED',
         },
         active: false,

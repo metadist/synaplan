@@ -1,0 +1,38 @@
+# Lint rules for the OpenAPI spec dumped in CI (frontend-build job).
+# Extends Redocly's recommended ruleset. See
+# https://github.com/metadist/synaplan/issues/2411.
+extends:
+  - recommended
+
+rules:
+  # Recommended already includes this. Kept explicit: an undeclared security
+  # scheme broke client generation (metadist/synaplan-opencloud#33).
+  security-defined: error
+
+  # Most operations document the success body only. Error JSON is the shared
+  # {error} shape; listing a 4xx on every operation is a separate sweep.
+  operation-4xx-response: off
+
+  # Tags are the controller groups. A description on each one is not needed
+  # for generated clients.
+  tag-description: off
+
+  # OAuth and connection callbacks answer with a browser redirect, not a
+  # JSON 2xx body.
+  operation-2xx-response: off
+
+  # `{id}` and a literal segment such as `shared` are different routes.
+  # Redocly treats every template parameter as overlapping.
+  no-ambiguous-paths: off
+
+  # Request DTO schemas are declared for the spec even when a path item
+  # does not $ref them yet. CookieAuth is the browser session scheme.
+  no-unused-components: off
+
+  # A nullable object is written as oneOf [schema, null], and two 403
+  # bodies both use an `error` string. The rule rejects both shapes.
+  no-illogical-composition-keywords: off
+
+  # The dumped spec describes a self-hosted install. The server URL is the
+  # local dev origin, not a public host.
+  no-server-example.com: off

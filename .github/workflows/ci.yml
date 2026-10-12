@@ -139,7 +139,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           # `redis` (phpredis) is in composer.json's require for `symfony/redis-messenger`,
@@ -233,7 +233,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
 
@@ -336,7 +336,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           # `redis` (phpredis) is required by `symfony/redis-messenger`. Sessions
@@ -495,7 +495,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
@@ -563,7 +563,7 @@ jobs:
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
 
       - name: Upload minimal OpenAPI spec
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openapi-spec-minimal
           path: backend/openapi-spec.json
@@ -603,7 +603,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           # Same extension set as the backend job so `composer install` passes
@@ -681,18 +681,23 @@ jobs:
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
 
       - name: Upload OpenAPI spec artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openapi-spec
           path: backend/openapi-spec.json
           retention-days: 1
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Lint OpenAPI spec
+        # Rules live in redocly.yaml. Catches spec defects that client
+        # generators do not report, e.g. an undeclared security scheme.
+        run: npx --yes @redocly/cli@2.60.0 lint backend/openapi-spec.json
 
       - name: Install dependencies
         working-directory: frontend
@@ -727,14 +732,14 @@ jobs:
           wait "$WIDGET_PID"
 
       - name: Upload frontend build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: frontend-dist
           path: frontend/dist/
           retention-days: 1
 
       - name: Upload widget build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: widget-dist
           path: frontend/dist-widget/
@@ -794,7 +799,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -963,7 +968,7 @@ jobs:
           outputs: type=docker,dest=/tmp/docker-image.tar
 
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: docker-image
           path: /tmp/docker-image.tar
@@ -1133,7 +1138,7 @@ jobs:
           echo $! > /tmp/stack-startup.pid
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -1249,7 +1254,7 @@ jobs:
 
       - name: Upload Playwright test results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-results-${{ strategy.job-index }}-${{ matrix.browser }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}-${{ matrix.auth_method }}
           path: |
@@ -1305,7 +1310,7 @@ jobs:
 
       - name: Upload flake summary
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-flake-summary
           path: flake-summary.json
@@ -1378,7 +1383,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.baselines.outputs.exists == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -1407,7 +1412,7 @@ jobs:
 
       - name: Upload results
         if: always() && steps.baselines.outputs.exists == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-results-visual
           path: |
@@ -1429,9 +1434,24 @@ jobs:
     # deploy/compose.yaml and its pinned third-party images, and runs the same
     # smoke test the AMI release build runs.
     #
-    # Pull requests only. Any failed job fails the CI run: on main that stops
-    # the release tag from promoting the tested images, and on a tag it stops
-    # release-publish.yml and the AMI build.
+    # Decision (#2271, 2026-10-11): stay pull-request-only. Do not run this
+    # job on main or on v* tags, and do not add it to the needs of
+    # docker-push-amd64 or docker-manifest.
+    #
+    # Every pull-request CI run from 2026-09-29 through 2026-10-11 was
+    # checked (376 runs). The smoke job: 283 success, 0 failure, 22
+    # cancelled because a newer push superseded the run (longest 231s, none
+    # reached the 20 minute timeout), 9 skipped with the heavy image build,
+    # and 62 runs from before the job existed. First success: 2026-09-30.
+    # That is more than 50 heavy runs and no product or environment failure,
+    # but the four-week window is not complete. A registry outage at tag
+    # time would still stop a release that has no product defect.
+    #
+    # Any failed job fails the CI run. If this job later moves onto main, a
+    # failure there stops the release tag from promoting the tested images,
+    # and on a tag it stops release-publish.yml and the AMI build.
+    # This comment does not close #2271. Revisit that issue after 2026-10-28,
+    # when four weeks have also passed.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker-build]
@@ -2285,7 +2305,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
 
@@ -2317,7 +2337,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -2353,7 +2373,7 @@ jobs:
           path: /tmp/openapi
 
       - name: Re-upload for this run
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openapi-spec
           path: /tmp/openapi/openapi-spec.json

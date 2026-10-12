@@ -231,6 +231,49 @@ final class ConfigControllerModelsTest extends WebTestCase
         }
     }
 
+    public function testImageRowsCarryTheBilledCapabilityPriceAndChatRowsDoNot(): void
+    {
+        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $admin = new User();
+        $admin->setMail('cost-badge-'.bin2hex(random_bytes(4)).'@test.com');
+        $admin->setPw(password_hash('password', PASSWORD_BCRYPT));
+        $admin->setUserLevel('ADMIN');
+        $admin->setProviderId('local');
+        $admin->setCreated(date('YmdHis'));
+        $admin->setType('WEB');
+        $admin->setEmailVerified(true);
+        $em->persist($admin);
+        $em->flush();
+        $this->authenticateClient($this->client, $admin);
+        $this->client->disableReboot();
+
+        $data = $this->fetchModels('?includeUnavailable=1');
+
+        $picRows = $data['models']['PIC2PIC'] ?? [];
+        self::assertNotEmpty($picRows);
+        foreach ($picRows as $row) {
+            self::assertArrayHasKey('capabilityPrices', $row);
+            self::assertArrayHasKey('TEXT2PIC', $row['capabilityPrices']);
+            self::assertArrayHasKey('PIC2PIC', $row['capabilityPrices']);
+        }
+
+        $flare = null;
+        foreach ($picRows as $row) {
+            if ('gpt-image-2.5-flare' === ($row['providerId'] ?? null)) {
+                $flare = $row;
+                break;
+            }
+        }
+        if (is_array($flare)) {
+            self::assertEqualsWithDelta(0.01317, $flare['capabilityPrices']['TEXT2PIC'], 0.000001);
+            self::assertEqualsWithDelta(0.05268, $flare['capabilityPrices']['PIC2PIC'], 0.000001);
+        }
+
+        $chat = $data['models']['CHAT'][0] ?? null;
+        self::assertIsArray($chat);
+        self::assertArrayNotHasKey('capabilityPrices', $chat);
+    }
+
     private function deleteImportedTestRow(EntityManagerInterface $em, string $providerId): void
     {
         $em->createQuery('DELETE FROM App\Entity\Model m WHERE m.providerId = :pid')

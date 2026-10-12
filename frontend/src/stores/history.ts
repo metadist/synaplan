@@ -13,6 +13,7 @@ import { finalizeSettledInProgressTurn } from '@/utils/chatErrorDisplay'
 import { authService } from '@/services/authService'
 import { useChatsStore } from '@/stores/chats'
 import { chatGoneStatus } from '@/utils/chatAccessError'
+import { transcriptAfterSavedEdit } from '@/utils/editTranscript'
 import { createUuid } from '@/utils/uuid'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
@@ -711,6 +712,10 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  const applySavedEdit = (id: string, text: string) => {
+    messages.value = transcriptAfterSavedEdit(messages.value, id, text)
+  }
+
   const clear = () => {
     // Drop any load that is still in flight. Incognito clears the transcript
     // while the shared chat's messages may still be arriving.
@@ -975,6 +980,7 @@ export const useHistoryStore = defineStore('history', () => {
     finishStreamingMessage,
     finishLiveThinking,
     markSuperseded,
+    applySavedEdit,
     removeMessage,
     setMessageStatus,
     clearMessageError,

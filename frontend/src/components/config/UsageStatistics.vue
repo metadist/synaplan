@@ -1,19 +1,6 @@
 <template>
   <div class="space-y-6" data-testid="page-config-usage">
-    <!-- Header -->
-    <div
-      class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-      data-testid="section-header"
-    >
-      <div>
-        <h2 class="text-xl font-semibold txt-primary mb-2">
-          {{ $t('config.usage.title') }}
-        </h2>
-        <p class="text-sm txt-secondary">
-          {{ $t('config.usage.description') }}
-        </p>
-      </div>
-
+    <div class="flex justify-end" data-testid="section-usage-actions">
       <button
         :disabled="loading || exporting"
         class="w-full sm:w-auto btn-secondary px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"

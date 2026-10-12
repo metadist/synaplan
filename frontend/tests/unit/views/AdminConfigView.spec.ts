@@ -236,17 +236,51 @@ describe('AdminConfigView — topics', () => {
     expect(wrapper.find('[data-testid="btn-config-test-mailer"]').exists()).toBe(true)
   })
 
-  it('folds sections and opens them from the header or jump nav', async () => {
+  it('folds sections and opens them from the header', async () => {
     const { wrapper } = await mountView('/admin/config?tab=auth')
 
     expect(wrapper.get('#config-section-access').attributes('data-open')).toBe('false')
-    expect(wrapper.find('[data-testid="btn-jump-section-google"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-jump-nav"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="btn-config-section-access"]').trigger('click')
     expect(wrapper.get('#config-section-access').attributes('data-open')).toBe('true')
 
     await wrapper.get('[data-testid="btn-config-accordion-toggle-all"]').trigger('click')
     expect(wrapper.get('#config-section-google').attributes('data-open')).toBe('true')
+  })
+
+  it('finds a setting by key and opens its section', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('[data-testid="input-admin-config-search"]').setValue('mailer_dsn')
+    const hits = wrapper.findAll('[data-testid="item-admin-config-hit"]')
+    expect(hits).toHaveLength(1)
+    await hits[0]!.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query).toMatchObject({ tab: 'email', section: 'mailer' })
+  })
+
+  it('sends a hit that lives on AI infrastructure there', async () => {
+    const { wrapper, router } = await mountView()
+
+    await wrapper.get('[data-testid="input-admin-config-search"]').setValue('OLLAMA_BASE_URL')
+    await wrapper.get('[data-testid="item-admin-config-hit"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.path).toBe('/admin/setup')
+  })
+
+  it('shows one sentence and a clear action when nothing matches', async () => {
+    const { wrapper } = await mountView()
+
+    const input = wrapper.get('[data-testid="input-admin-config-search"]')
+    await input.setValue('zzz-nothing')
+    expect(wrapper.find('[data-testid="state-admin-config-no-hits"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="btn-admin-config-clear-search"]').trigger('click')
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(wrapper.find('[data-testid="config-group-access"]').exists()).toBe(true)
   })
 
   it('shows one sentence and a retry when the settings cannot be loaded', async () => {

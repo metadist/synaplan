@@ -32,6 +32,7 @@
     </button>
 
     <nav
+      data-tour="rail"
       class="flex-1 flex flex-col items-center gap-1 py-1 w-full overflow-y-auto sidebar-scroll"
       :aria-label="$t('nav.menu')"
       @scroll="hideTipNow"
@@ -46,9 +47,10 @@
         :aria-describedby="tip?.key === section.key ? TOOLTIP_ID : undefined"
         :aria-current="activeKey === section.key ? 'page' : undefined"
         :data-testid="section.testId"
+        :data-tour="`rail-${section.key}`"
         @pointerenter="scheduleTip(section, $event)"
         @pointerleave="hideTipSoon"
-        @focus="scheduleTip(section, $event, true)"
+        @focus="showTipOnKeyboardFocus(section, $event)"
         @blur="hideTipNow"
         @click="openSection(section.key)"
       >
@@ -189,6 +191,12 @@ function placeTip(section: NavSection, anchor: HTMLElement) {
     top: rect.top + rect.height / 2,
     left: rect.right + 10,
   }
+}
+
+function showTipOnKeyboardFocus(section: NavSection, event: FocusEvent) {
+  const anchor = event.currentTarget
+  if (!(anchor instanceof HTMLElement) || !anchor.matches(':focus-visible')) return
+  scheduleTip(section, event, true)
 }
 
 function scheduleTip(section: NavSection, event: Event, immediate = false) {
