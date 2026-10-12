@@ -14,7 +14,9 @@
             data-testid="stat-total"
           >
             <Icon icon="heroicons:rectangle-stack" class="w-4 h-4 text-[var(--brand)]" />
-            <span class="text-sm font-semibold txt-primary">{{ prompts.length }}</span>
+            <span v-if="!loading" class="text-sm font-semibold txt-primary">{{
+              prompts.length
+            }}</span>
             <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statTotal') }}</span>
           </div>
           <div
@@ -22,7 +24,9 @@
             data-testid="stat-system"
           >
             <Icon icon="heroicons:shield-check" class="w-4 h-4 text-blue-500" />
-            <span class="text-sm font-semibold txt-primary">{{ systemPromptCount }}</span>
+            <span v-if="!loading" class="text-sm font-semibold txt-primary">{{
+              systemPromptCount
+            }}</span>
             <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statSystem') }}</span>
           </div>
           <div
@@ -30,7 +34,9 @@
             data-testid="stat-custom"
           >
             <Icon icon="heroicons:user" class="w-4 h-4 text-purple-500" />
-            <span class="text-sm font-semibold txt-primary">{{ customPromptCount }}</span>
+            <span v-if="!loading" class="text-sm font-semibold txt-primary">{{
+              customPromptCount
+            }}</span>
             <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statCustom') }}</span>
           </div>
         </div>
@@ -166,120 +172,164 @@
 
         <!-- Scrollable category groups -->
         <div class="flex-1 overflow-y-auto py-2" data-testid="section-task-prompt-cards">
-          <template v-for="group in categorizedPrompts" :key="group.id">
-            <div v-if="group.prompts.length > 0" class="px-2 mb-1">
-              <button
-                type="button"
-                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors text-[11px] uppercase tracking-wide font-semibold"
-                :data-testid="`group-${group.id}`"
-                @click="toggleGroup(group.id)"
-              >
-                <Icon
-                  :icon="
-                    isGroupCollapsed(group.id)
-                      ? 'heroicons:chevron-right'
-                      : 'heroicons:chevron-down'
-                  "
-                  class="w-3.5 h-3.5"
-                />
-                <Icon :icon="group.icon" class="w-3.5 h-3.5" />
-                <span class="flex-1 text-left">{{ group.label }}</span>
-                <span
-                  class="px-1.5 rounded-full text-[10px] font-semibold leading-none py-0.5 bg-light-border/30 dark:bg-dark-border/20"
-                >
-                  {{ group.prompts.length }}
-                </span>
-              </button>
-
-              <ul v-if="!isGroupCollapsed(group.id)" class="space-y-0.5 mt-1">
-                <li v-for="prompt in group.prompts" :key="prompt.id">
-                  <button
-                    type="button"
-                    class="w-full text-left px-2 rounded-xl transition-all group flex items-center gap-2"
-                    :class="[
-                      viewDensity === 'compact' ? 'py-1.5' : 'py-2.5',
-                      selectedPromptId === prompt.id
-                        ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
-                        : 'hover:bg-light-border/10 dark:hover:bg-dark-border/10 txt-primary',
-                    ]"
-                    :data-testid="`card-prompt-${prompt.topic}`"
-                    :title="prompt.shortDescription || prompt.topic"
-                    @click="onCardSelect(prompt.id)"
-                  >
-                    <!-- Active indicator stripe -->
-                    <span
-                      class="w-0.5 self-stretch rounded-full transition-all"
-                      :class="
-                        selectedPromptId === prompt.id ? 'bg-[var(--brand)]' : 'bg-transparent'
-                      "
-                    />
-
-                    <Icon
-                      :icon="topicIcon(prompt.topic)"
-                      class="w-4 h-4 flex-shrink-0"
-                      :class="
-                        selectedPromptId === prompt.id
-                          ? 'text-[var(--brand)]'
-                          : 'txt-secondary group-hover:text-[var(--brand)]'
-                      "
-                    />
-
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-1.5">
-                        <span class="text-sm font-medium truncate">{{ prompt.name }}</span>
-
-                        <!-- Inline mini-badges (always visible) -->
-                        <span
-                          v-if="prompt.isUserOverride"
-                          class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 leading-none flex-shrink-0"
-                          :title="$t('config.taskPrompts.badgeOverride')"
-                          data-testid="badge-override"
-                        >
-                          {{ $t('config.taskPrompts.badgeOverride') }}
-                        </span>
-                        <span
-                          v-if="prompt.shared"
-                          class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-[var(--brand)]/10 text-[var(--brand)] leading-none flex-shrink-0"
-                          data-testid="badge-shared-assistant"
-                        >
-                          {{ $t('iam.sharedWithMe') }}
-                        </span>
-                      </div>
-                      <p
-                        v-if="viewDensity === 'detailed' && prompt.shortDescription"
-                        class="text-[11px] txt-secondary line-clamp-1 mt-0.5"
-                      >
-                        {{ prompt.shortDescription }}
-                      </p>
-                      <p
-                        v-else-if="viewDensity === 'detailed'"
-                        class="text-[10px] txt-secondary font-mono truncate mt-0.5"
-                      >
-                        {{ prompt.topic }}
-                      </p>
-                    </div>
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </template>
-
           <div
-            v-if="filteredPrompts.length === 0"
+            v-if="loading"
             class="text-center py-12 px-4"
-            data-testid="text-no-prompts-match"
+            role="status"
+            data-testid="task-prompts-loading"
           >
-            <Icon icon="heroicons:funnel" class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30" />
-            <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.noPromptsMatch') }}</p>
+            <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.loading') }}</p>
+          </div>
+          <div
+            v-else-if="error"
+            class="text-center py-12 px-4"
+            data-testid="task-prompts-load-error"
+            role="alert"
+          >
+            <p class="text-sm txt-secondary">{{ error }}</p>
             <button
-              v-if="promptListSearch || promptListFilter !== 'all'"
-              class="text-xs text-[var(--brand)] hover:underline mt-2"
-              data-testid="btn-clear-filters"
-              @click="clearFilters"
+              type="button"
+              class="btn-secondary mt-4 px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-task-prompts-retry"
+              @click="loadPrompts()"
             >
-              {{ $t('config.taskPrompts.clearFilters') }}
+              {{ $t('common.retry') }}
             </button>
           </div>
+          <template v-else>
+            <template v-for="group in categorizedPrompts" :key="group.id">
+              <div v-if="group.prompts.length > 0" class="px-2 mb-1">
+                <button
+                  type="button"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors text-[11px] uppercase tracking-wide font-semibold"
+                  :data-testid="`group-${group.id}`"
+                  @click="toggleGroup(group.id)"
+                >
+                  <Icon
+                    :icon="
+                      isGroupCollapsed(group.id)
+                        ? 'heroicons:chevron-right'
+                        : 'heroicons:chevron-down'
+                    "
+                    class="w-3.5 h-3.5"
+                  />
+                  <Icon :icon="group.icon" class="w-3.5 h-3.5" />
+                  <span class="flex-1 text-left">{{ group.label }}</span>
+                  <span
+                    class="px-1.5 rounded-full text-[10px] font-semibold leading-none py-0.5 bg-light-border/30 dark:bg-dark-border/20"
+                  >
+                    {{ group.prompts.length }}
+                  </span>
+                </button>
+
+                <ul v-if="!isGroupCollapsed(group.id)" class="space-y-0.5 mt-1">
+                  <li v-for="prompt in group.prompts" :key="prompt.id">
+                    <button
+                      type="button"
+                      class="w-full text-left px-2 rounded-xl transition-all group flex items-center gap-2"
+                      :class="[
+                        viewDensity === 'compact' ? 'py-1.5' : 'py-2.5',
+                        selectedPromptId === prompt.id
+                          ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                          : 'hover:bg-light-border/10 dark:hover:bg-dark-border/10 txt-primary',
+                      ]"
+                      :data-testid="`card-prompt-${prompt.topic}`"
+                      :title="prompt.shortDescription || prompt.topic"
+                      @click="onCardSelect(prompt.id)"
+                    >
+                      <!-- Active indicator stripe -->
+                      <span
+                        class="w-0.5 self-stretch rounded-full transition-all"
+                        :class="
+                          selectedPromptId === prompt.id ? 'bg-[var(--brand)]' : 'bg-transparent'
+                        "
+                      />
+
+                      <Icon
+                        :icon="topicIcon(prompt.topic)"
+                        class="w-4 h-4 flex-shrink-0"
+                        :class="
+                          selectedPromptId === prompt.id
+                            ? 'text-[var(--brand)]'
+                            : 'txt-secondary group-hover:text-[var(--brand)]'
+                        "
+                      />
+
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-sm font-medium truncate">{{ prompt.name }}</span>
+
+                          <!-- Inline mini-badges (always visible) -->
+                          <span
+                            v-if="prompt.isUserOverride"
+                            class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 leading-none flex-shrink-0"
+                            :title="$t('config.taskPrompts.badgeOverride')"
+                            data-testid="badge-override"
+                          >
+                            {{ $t('config.taskPrompts.badgeOverride') }}
+                          </span>
+                          <span
+                            v-if="prompt.shared"
+                            class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-[var(--brand)]/10 text-[var(--brand)] leading-none flex-shrink-0"
+                            data-testid="badge-shared-assistant"
+                          >
+                            {{ $t('iam.sharedWithMe') }}
+                          </span>
+                        </div>
+                        <p
+                          v-if="viewDensity === 'detailed' && prompt.shortDescription"
+                          class="text-[11px] txt-secondary line-clamp-1 mt-0.5"
+                        >
+                          {{ prompt.shortDescription }}
+                        </p>
+                        <p
+                          v-else-if="viewDensity === 'detailed'"
+                          class="text-[10px] txt-secondary font-mono truncate mt-0.5"
+                        >
+                          {{ prompt.topic }}
+                        </p>
+                      </div>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </template>
+
+            <div
+              v-if="filteredPrompts.length === 0 && !topicFiltersActive"
+              class="text-center py-12 px-4"
+              data-testid="text-no-prompts"
+            >
+              <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.noPrompts') }}</p>
+              <button
+                type="button"
+                class="btn-primary mt-4 inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+                data-testid="btn-no-prompts-create"
+                @click="showCreateModal = true"
+              >
+                {{ $t('config.taskPrompts.createNew') }}
+              </button>
+            </div>
+            <div
+              v-else-if="filteredPrompts.length === 0"
+              class="text-center py-12 px-4"
+              data-testid="text-no-prompts-match"
+            >
+              <Icon
+                icon="heroicons:funnel"
+                class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30"
+              />
+              <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.noPromptsMatch') }}</p>
+              <button
+                v-if="promptListSearch || promptListFilter !== 'all'"
+                class="text-xs text-[var(--brand)] hover:underline mt-2"
+                data-testid="btn-clear-filters"
+                @click="clearFilters"
+              >
+                {{ $t('config.taskPrompts.clearFilters') }}
+              </button>
+            </div>
+          </template>
         </div>
 
         <!-- Hidden compat select for legacy automation tools -->
@@ -1372,6 +1422,9 @@ const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
 const promptListSearch = ref('')
 const promptListFilter = ref<'all' | 'system' | 'custom' | 'shared'>('all')
+const topicFiltersActive = computed(
+  () => promptListSearch.value.trim() !== '' || promptListFilter.value !== 'all'
+)
 const iamSharingEnabled = computed(() => isIamSharingEnabled())
 const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
@@ -1624,7 +1677,7 @@ const editorTabs = computed(() => {
 useEscapeKey(() => (showCreateModal.value = false), showCreateModal)
 
 const contentTextarea = ref<HTMLTextAreaElement | null>(null)
-const loading = ref(false)
+const loading = ref(true)
 const error = ref<string | null>(null)
 
 const promptFiles = ref<PromptFile[]>([])
@@ -1836,10 +1889,8 @@ const loadPrompts = async () => {
         toolInternet: internetModeFromMetadata(metadata),
       }
     })
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to load prompts'
-    error.value = errorMessage
-    showError(errorMessage)
+  } catch {
+    error.value = t('config.taskPrompts.loadFailed')
   } finally {
     loading.value = false
   }

@@ -31,6 +31,19 @@ class AgentRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function existsForOwner(int $ownerId): bool
+    {
+        $found = $this->createQueryBuilder('a')
+            ->select('a.id')
+            ->where('a.ownerId = :ownerId')
+            ->setParameter('ownerId', $ownerId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getScalarResult();
+
+        return [] !== $found;
+    }
+
     public function findByIdAndOwner(int $id, int $ownerId): ?Agent
     {
         return $this->findOneBy(['id' => $id, 'ownerId' => $ownerId]);

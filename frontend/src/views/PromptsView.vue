@@ -175,6 +175,18 @@ const errorText = ref('')
 const loaded = ref(false)
 const loadFailed = ref(false)
 const draft = ref({ name: '', command: '', body: '' })
+/**
+ * A list response that left before a save or delete must not paint over that
+ * change, and it must not hide the other shortcuts it already knew about.
+ * Writes are laid on top of whatever list comes back.
+ */
+let listRevision = 0
+/** The revision of the newest list response that was allowed to update the page. */
+let appliedRevision = -1
+type ListWrite =
+  | { revision: number; type: 'upsert'; row: SavedPromptRow }
+  | { revision: number; type: 'delete'; id: number }
+const listWrites: ListWrite[] = []
 
 /** Show these rows and hand them to the slash menu and the command search. */
 function showPrompts(rows: SavedPromptRow[]): void {
@@ -182,14 +194,37 @@ function showPrompts(rows: SavedPromptRow[]): void {
   commandsStore.setSavedPrompts(rows)
 }
 
+/** Lay writes that happened after this request started onto its rows. */
+function mergeList(serverRows: SavedPromptRow[], requestRevision: number): SavedPromptRow[] {
+  let rows = serverRows
+  for (const write of listWrites) {
+    if (write.revision <= requestRevision) continue
+    if (write.type === 'delete') {
+      rows = rows.filter((row) => row.id !== write.id)
+    } else {
+      rows = [...rows.filter((row) => row.id !== write.row.id), write.row].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      )
+    }
+  }
+  return rows
+}
+
 async function load(): Promise<void> {
+  const requestRevision = listRevision
   try {
     const data = await httpClient('/api/v1/saved-prompts', {
       schema: GetApiSavedPromptsListResponseSchema,
     })
-    showPrompts(data.prompts ?? [])
+    if (requestRevision < appliedRevision) return
+    showPrompts(mergeList(data.prompts ?? [], requestRevision))
+    appliedRevision = requestRevision
+    for (let index = listWrites.length - 1; index >= 0; index -= 1) {
+      if (listWrites[index].revision <= requestRevision) listWrites.splice(index, 1)
+    }
     loadFailed.value = false
   } catch {
+    if (requestRevision < appliedRevision) return
     loadFailed.value = true
   } finally {
     loaded.value = true
@@ -249,6 +284,8 @@ async function save(): Promise<void> {
   saving.value = true
   try {
     const saved = await writeDraft(editingId.value)
+    listRevision += 1
+    listWrites.push({ revision: listRevision, type: 'upsert', row: saved })
     showPrompts(withSavedRow(saved))
     closeForm()
     success(t('savedPrompts.saved'))
@@ -278,6 +315,8 @@ async function remove(prompt: SavedPromptRow): Promise<void> {
     return
   }
   if (editingId.value === id) closeForm()
+  listRevision += 1
+  listWrites.push({ revision: listRevision, type: 'delete', id })
   showPrompts(prompts.value.filter((row) => row.id !== id))
 }
 

@@ -25,6 +25,9 @@ test.describe('@ci Task Prompts', () => {
 
       // Wait until at least one topic card is rendered before interacting
       const firstCard = page.locator(SEL.cardAny).first()
+      await expect(page.getByTestId('task-prompts-loading')).toBeHidden({
+        timeout: TIMEOUTS.VERY_LONG,
+      })
       await expect(firstCard).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await firstCard.click()
 
@@ -49,6 +52,9 @@ test.describe('@ci Task Prompts', () => {
       await page.goto(PAGE)
 
       const firstCard = page.locator(SEL.cardAny).first()
+      await expect(page.getByTestId('task-prompts-loading')).toBeHidden({
+        timeout: TIMEOUTS.VERY_LONG,
+      })
       await expect(firstCard).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await firstCard.click()
 
@@ -73,6 +79,9 @@ test.describe('@ci Task Prompts', () => {
     })
 
     await test.step('Assert: stat pills and at least one prompt card render', async () => {
+      await expect(page.getByTestId('task-prompts-loading')).toBeHidden({
+        timeout: TIMEOUTS.VERY_LONG,
+      })
       await expect(page.locator(SEL.statTotal)).toBeVisible()
       await expect(page.locator(SEL.statSystem)).toBeVisible()
       await expect(page.locator(SEL.cardAny).first()).toBeVisible({ timeout: TIMEOUTS.STANDARD })

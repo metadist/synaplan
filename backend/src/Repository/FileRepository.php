@@ -78,6 +78,24 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
+     * True when the library list would be non-empty. Same rows as an unfiltered
+     * list: the owner's files, without incognito uploads.
+     */
+    public function existsForUser(int $userId): bool
+    {
+        $found = $this->createQueryBuilder('mf')
+            ->select('mf.id')
+            ->where('mf.userId = :userId')
+            ->andWhere('mf.ephemeral = false')
+            ->setParameter('userId', $userId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getScalarResult();
+
+        return [] !== $found;
+    }
+
+    /**
      * Map a client sort token to a safe (field, direction) pair. Defaults to
      * newest first; unknown tokens fall back to the default to avoid DQL
      * injection via the order-by clause.

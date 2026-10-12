@@ -203,6 +203,7 @@
               v-model="editDraft"
               class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               rows="3"
+              :aria-label="t('chatMessage.edit')"
               data-testid="input-message-edit"
             />
             <div class="flex gap-2">

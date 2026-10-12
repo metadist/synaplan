@@ -1580,3 +1580,56 @@
 .dark.theme-oled .mode-toggle-active {
   color: var(--on-brand) !important;
 }
+
+/* User-bubble controls. The glass secondary button paints dark ink on the
+   blue fill; these rules stay on the bubble and do not reach portaled menus. */
+.design-v2 .bubble-user .btn-secondary,
+.design-v2.dark .bubble-user .btn-secondary,
+.design-v2.dark.theme-oled .bubble-user .btn-secondary {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+}
+.design-v2 .bubble-user .btn-secondary:hover,
+.design-v2.dark .bubble-user .btn-secondary:hover,
+.design-v2.dark.theme-oled .bubble-user .btn-secondary:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.28);
+  border-color: #fff;
+  box-shadow: none;
+}
+.design-v2 .bubble-user .icon-ghost,
+.design-v2.dark .bubble-user .icon-ghost,
+.design-v2 .bubble-user .txt-secondary,
+.design-v2.dark .bubble-user .txt-secondary {
+  color: #fff;
+}
+.design-v2 .bubble-user .icon-ghost:hover,
+.design-v2 .bubble-user .icon-ghost:focus-visible,
+.design-v2.dark .bubble-user .icon-ghost:hover,
+.design-v2.dark .bubble-user .icon-ghost:focus-visible,
+.design-v2.dark.theme-oled .bubble-user .icon-ghost:hover,
+.design-v2.dark.theme-oled .bubble-user .icon-ghost:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+.design-v2 .bubble-user .surface-card .txt-secondary,
+.design-v2 .bubble-user .surface-elevated .txt-secondary,
+.design-v2 .bubble-user .dropdown-panel .txt-secondary,
+.design-v2.dark .bubble-user .surface-card .txt-secondary,
+.design-v2.dark .bubble-user .surface-elevated .txt-secondary,
+.design-v2.dark .bubble-user .dropdown-panel .txt-secondary {
+  color: var(--txt-secondary);
+}
+
+/* The glass textarea is a 3% wash, so its ink would sit on the blue fill.
+   The edit field needs an opaque card in both themes. */
+.design-v2 .bubble-user textarea,
+.design-v2.dark .bubble-user textarea,
+.design-v2.dark.theme-oled .bubble-user textarea,
+.design-v2 .bubble-user textarea:focus,
+.design-v2.dark .bubble-user textarea:focus,
+.design-v2.dark.theme-oled .bubble-user textarea:focus {
+  background: var(--bg-card) !important;
+  color: var(--txt-primary) !important;
+}
