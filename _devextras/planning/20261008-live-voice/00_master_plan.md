@@ -1,13 +1,25 @@
 # Live voice conversations — master plan
 
-**Status:** LV1–LV6 are in the working tree on `feat/live-voice` (2026-10-12). The next product step is LV7, the native apps, and it is store-required. It waits for one spoken walk. The direct browser connection stays off.
+**Status:** Draft 2026-10-08. §0 agreed 2026-10-12. LV0 numbers are in
+`STATUS.md` (2026-10-12): both launch providers answer, Synaplan brain ~2.8 s,
+spoken reply starts about 4.2–4.5 s after the user stops. Still open from LV0:
+WebRTC, relay overhead, iPhone echo. LV1 (catalog, pricing, session table,
+metering, activity duration) and LV2 (voice sidecar, tickets, callbacks,
+delegation, transcript, reaper) are in the working tree. LV3 (button, consent
+sheet, panel, settings, five locales) is in the working tree. LV4 (budget
+warning, wrap-up, activity row, admin live list) is in the working tree.
+LV5 (Realtime, Realtime mini, Gemini extended thinking, Grok Voice) is in
+the working tree. LV6 (optional OpenAI WebRTC, admin switch default off) is
+in the working tree. Next product step is LV7.
 **Goal:** A person presses one button next to the microphone and talks with
 Synaplan like with ChatGPT Voice or Gemini Live: full duplex, interruptible,
 no typing. The answer still comes from *their* Synaplan chat (chat model,
 memories, knowledge, tools) whenever the provider allows it. The same
 conversation runs in the web app, the mobile apps and CarPlay. Every second
-is metered, limited, billed and shown, and a limit reached mid-sentence ends
-the conversation politely instead of cutting it off.
+is metered and its cost lands in the user's **one** monthly usage budget,
+next to chat, images, video and everything else — no separate voice quota,
+no separate bill. A budget that runs out mid-sentence ends the conversation
+politely instead of cutting it off.
 **Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
 (U1–U12) and the Perfect-UX bar in `AGENTS.md`.
 **Class:** LV1, LV2, LV5, LV9 `backend-only` (plus a new sidecar,
@@ -30,22 +42,26 @@ Files in this track (create the others when LV0 starts):
 the composer (Web Speech or Whisper via `purpose=dictation`), a "voice reply"
 toggle that reads the answer aloud (`voiceReply=1` → TTS → SSE `audio`), and
 in `synaplan-apps` a CarPlay loop of on-device `SpeechTranscriber` → chat
-SSE → TTS. Nothing streams audio to a model. `XaiProvider.php` and
-`docs/PRICING_MAINTENANCE.md` already say why: no realtime capability, no
-per-minute pricing mode, no session metering.
+SSE → TTS. Nothing streams audio to a model yet. LV1 adds the catalog rows,
+the `per_second` / `per_audio_token` prices, the `BVOICESESSIONS` table and
+the metering service. The socket path is LV2.
 
 **What we build.**
 
 1. A **voice gateway** sidecar (`sidecars/synaplan-voice`, Node 22 + `ws`,
    the same shape as `synaplan-transcriber`) that holds the long-lived
    provider connection. PHP never holds an audio socket.
-2. A **provider port** for speech-to-speech models with adapters for
-   OpenAI GPT-Live, OpenAI Realtime 2.1, Gemini Live, xAI Grok Voice, and
-   an OpenAI-Realtime-compatible self-hosted endpoint.
+2. A **provider port** for speech-to-speech models. Launch adapters:
+   OpenAI GPT-Live and Gemini Live. Later: OpenAI Realtime 2.1, xAI Grok
+   Voice, and an OpenAI-Realtime-compatible self-hosted endpoint.
 3. **Delegation**: the voice model handles the conversation; real answers
-   come from Synaplan's normal chat pipeline (`MessageProcessor`).
+   always come from Synaplan's normal chat pipeline (`MessageProcessor`),
+   i.e. the user's chat model with memories, knowledge and tools.
+
 4. **Metering**: one `BUSELOG` row per conversation, updated every tick,
-   plus a minutes quota and the cost budget checked *during* the session.
+   carrying the voice cost and the cost of Synaplan's answers. It feeds the
+   existing cost budget (`SUM(BCOST)` + markup), which is checked *during*
+   the session. No minutes quota.
 5. A **conversation button** beside the microphone, a live panel in the
    composer, transcripts as normal chat messages, usage on `/statistics`.
 6. **Mobile + CarPlay**: the native shells connect to the same gateway over
@@ -59,9 +75,9 @@ per-minute pricing mode, no session metering.
 | Duration metering precedent | `backend/src/Service/Usage/TranscriptionUsageRecorder.php` |
 | Price math (`permin`, `per_second`) | `backend/src/Service/CostCalculationService.php` (`normaliseToPerUnit`) |
 | Model rows, capability tags | `backend/src/Model/ModelCatalog.php` (`MODELS`, `CAPABILITY_TAGS`), `backend/src/Service/Model/CapabilityCatalog.php` |
-| Realtime class silenced in discovery | `ModelDiscoveryIgnoreList::CLASS_RULES` (remove the realtime rule in LV1) |
+| Live-voice discovery | `ModelDiscoveryIgnoreList::CLASS_RULES` — the OpenAI `realtime` rule was removed in LV1 |
 | Default models per capability | `backend/src/Seed/DefaultModelConfigSeeder.php`, `ModelConfigService::getDefaultModel()` |
-| Limit tables | `backend/src/Seed/RateLimitConfigSeeder.php` (`RATELIMITS_{LEVEL}`) |
+| Budget per level | `BSUBSCRIPTIONS.BCOST_BUDGET_MONTHLY` (seed: `backend/src/Seed/SubscriptionPlanSeeder.php`); no new `RATELIMITS_{LEVEL}` keys |
 | Optional feature switch | `backend/src/Module/` (`FeatureModuleInterface`, `ModuleGateListener`) |
 | Chat pipeline entry | `MessageProcessor::process()` / `processStream()`; `ChatHandler` |
 | Short-lived socket token precedent | `backend/src/Realtime/Token/RealtimeTokenService.php` |
@@ -90,21 +106,23 @@ per-minute pricing mode, no session metering.
 | 1 | The provider key never reaches a client. Browsers and apps get a single-use **gateway ticket**, never a provider token. | Locked | |
 | 2 | A Node sidecar (`synaplan-voice`) holds provider sessions. FrankenPHP does not grow a WebSocket server. | Locked | |
 | 3 | **Relay first**: every client and every provider goes client ⇄ gateway ⇄ provider. Direct browser WebRTC to OpenAI (server-side SDP exchange + sideband) is LV6, an optimisation behind an admin setting, not the baseline. | Proposed | |
-| 4 | Default brain = **Synaplan**. GPT-Live runs with client delegation; the other adapters expose one tool, `consult_synaplan`, that runs the chat pipeline. An admin may allow "voice model answers directly" per model. | Proposed | |
-| 5 | Primary model at launch: `gpt-live-1`. Then `gemini-3.8-live`, `grok-voice-think-fast-2.0`, `gpt-realtime-2.1` / `-mini`. Self-hosted OpenAI-Realtime-compatible endpoint in LV9. | Proposed | |
+| 4 | The brain is **always Synaplan**: the user's chat model with memories, knowledge and tools. GPT-Live runs with `client` delegation (not `responses`); the other adapters expose one tool, `consult_synaplan`, that runs the chat pipeline. There is **no** "voice model answers directly" mode. | Agreed 2026-10-12 | Yes |
+| 5 | Launch models: **`gpt-live-1` and `gemini-3.8-live`** together. Later: `grok-voice-think-fast-2.0`, `gpt-realtime-2.1` / `-mini`, `gemini-3.8-live-extended-thinking`. Self-hosted OpenAI-Realtime-compatible endpoint in LV9. | Agreed 2026-10-12 | Yes |
 | 6 | New capability `VOICE_LIVE`, catalog tag `voice2voice`, default key `DEFAULTMODEL.VOICE_LIVE`. Not mixed into `SOUND2TEXT` / `TEXT2SOUND`. | Locked | |
-| 7 | Quota is **minutes**, not a count. New limit keys `VOICE_LIVE_SECONDS_{TOTAL,HOURLY,MONTHLY}`. The cost budget (`SUM(BCOST)` + markup) is checked on every tick too. | Locked | |
-| 8 | One `BUSELOG` row per conversation (action `VOICE_LIVE`), inserted at start with `BSTATUS=running`, updated on every tick, closed at the end. Delegated answers stay separate `MESSAGES` rows tagged with the session id. | Proposed | |
-| 9 | Delegated answers count against `MESSAGES` like typed ones. A conversation therefore consumes minutes **and** messages. | Proposed (open: product) | |
-| 10 | At the limit: warn 60 s before, then the model says one goodbye sentence, then the session closes (≤ 8 s grace). Web: limit modal / paywall. App: IAP paywall only. CarPlay: falls back to the turn-based loop instead of ending. | Proposed | |
+| 7 | **No own quota.** Live voice has no minutes limit and no `RATELIMITS_*` keys. Its cost is one more line in the user's monthly cost budget (`SUM(BCOST)` + markup, `RateLimitService::checkCostBudget`), shared with chat, images, video and every other paid action, checked at start and on every tick. Whatever budget an operator sets per level (including a free level, e.g. $1/month) applies unchanged. A level with no budget behaves exactly like chat today (unlimited). | Agreed 2026-10-12 | Yes |
+| 8 | One `BUSELOG` row per conversation (action `VOICE_LIVE`), inserted at start with `BSTATUS=running`, updated on every tick, closed at the end. Its `BCOST` is the voice cost **plus** the cost of every Synaplan answer in that conversation; `BMETADATA` holds the split. The answers get no `MESSAGES` usage row of their own. Pipeline side steps (routing, RAG embeddings, memory extraction) keep recording exactly as for a typed message — they are in the same budget either way. | Agreed 2026-10-12 | Yes |
+| 9 | Synaplan's answers inside a conversation cost money (in the budget) but do **not** count against the `MESSAGES` count limit. No extra token counting. | Agreed 2026-10-12 | Yes |
+| 10 | When the budget runs out: warn when about 60 s of voice is left in the budget, then the model says one goodbye sentence, then the session closes (≤ 8 s grace). Web: the existing budget path (`COST_BUDGET_EXCEEDED` → top-up / plan). App: IAP paywall only. CarPlay: says one sentence and ends — the turn-based loop would draw on the same budget, so it is no fallback here (it stays the fallback for capacity and provider errors). | Proposed | |
 | 11 | One live session per user at a time; per-provider concurrency caps from config (xAI allows only 10 per team). Full ⇒ honest copy + offer turn-based voice. | Locked | |
-| 12 | New table `BVOICESESSIONS` for state, provider session id, seconds, end reason. Migration is raw, idempotent SQL (Galera rules). | Proposed (schema: ask first) | |
-| 13 | Synaplan stores no audio. Provider storage off where the API allows it (`store:false` / ZDR on OpenAI, paid tier on Gemini). Transcripts are normal chat messages; incognito persists nothing. | Locked | |
+| 12 | New table `BVOICESESSIONS` for state, provider session id, seconds, end reason. Migration is raw, idempotent SQL (Galera rules). | Agreed 2026-10-12 (migration approved) | Yes |
+| 13 | Synaplan stores no audio. Provider storage off where the API allows it (`store:false` on OpenAI, paid tier on Gemini). Transcripts are normal chat messages; incognito persists nothing. OpenAI ZDR and EU data residency (`eu.api.openai.com`) are requested **after** launch, not a launch blocker. | Agreed 2026-10-12 | Yes |
 | 14 | Conversation glyph: `mdi:waveform` (Heroicons has no waveform; `SpeakerWaveIcon` is TTS, `MicrophoneIcon` is dictation). Added to the icon map in the same PR. | Proposed | |
 | 15 | Widget and guest users get no live voice in v1. | Locked | |
 | 16 | The native apps enable live voice only in a new store binary (`store-required`: new audio path to third parties ⇒ privacy labels). Older binaries keep the turn-based loop; the SPA hides the button unless the native capability is present. | Locked | |
-| 17 | Proposed minute quotas (seconds in config): ANONYMOUS 0, NEW 10 min lifetime, PRO 30/h · 150/month, TEAM 60/h · 500/month, BUSINESS 120/h · 1500/month. Validate against the €10/€30/€60 budgets in LV0. | Proposed (open: product) | |
-| 18 | Default max conversation length 30 min, idle end after 2 min of silence on both sides; both admin-configurable. | Proposed | |
+| 17 | ~~Minute quotas per level~~ — replaced 2026-10-12 by decision 7. Measured in LV0 what the seeded budgets buy: see `STATUS.md`. | Superseded | Yes |
+| 18 | Default max conversation length 30 min, idle end after 2 min of silence on both sides; both admin-configurable. On a self-hosted install without billing (budget gate off) this length and the admin's on/off switch are the only limits. | Agreed 2026-10-12 (self-host part) | |
+| 19 | Provider accounts: OpenAI is on usage tier Build or higher (GPT-Live does not run on Free), Gemini runs on the paid tier (the free tier trains on data). Both confirmed ready 2026-10-12. xAI only when its adapter lands. | Agreed 2026-10-12 | Yes |
+
 
 ---
 
@@ -112,13 +130,14 @@ per-minute pricing mode, no session metering.
 
 | Id | Who | Step |
 | -- | --- | ---- |
-| **J-LV-1** | A PRO user opens a chat, presses the waveform button, allows the microphone once, talks, interrupts the answer mid-sentence, presses End. The transcript is in the same chat within ten seconds, the minutes are on `/statistics`. | LV3, LV4 |
-| **J-LV-2** | First use: one sheet says which company hears the voice (e.g. "Your voice goes to OpenAI while you talk"), that minutes count against the plan, and how to stop. One primary button. Declining leaves everything as before. | LV3 |
-| **J-LV-3** | The user has 40 seconds left. A banner shows the countdown; at zero the assistant says goodbye in one sentence, the panel shows "Conversation ended — your live minutes for this month are used up" with the plan / top-up action. Nothing was lost from the transcript. | LV4 |
+| **J-LV-1** | A PRO user opens a chat, presses the waveform button, allows the microphone once, talks, interrupts the answer mid-sentence, presses End. The transcript is in the same chat within ten seconds, the cost is in the usage budget on `/statistics` as one "Live conversation" row in Recent Activity (cost and talk time). | LV3, LV4 |
+| **J-LV-2** | First use: one sheet says which company hears the voice (e.g. "Your voice goes to OpenAI while you talk"), that talking uses the same monthly usage budget as chat, and how to stop. One primary button. Declining leaves everything as before. | LV3 |
+| **J-LV-3** | The user's budget covers about 40 more seconds. A banner shows the countdown; at zero the assistant says goodbye in one sentence, the panel shows "Conversation ended — your usage budget for this month is used up" with the top-up / plan action. Nothing was lost from the transcript. | LV4 |
 | **J-LV-4** | Microphone denied, provider down, network lost, or all live slots busy: one sentence names the recovery and offers the turn-based microphone. The panel never stays on "connecting". | LV3 |
 | **J-LV-5** | An admin turns the feature on: sets the gateway env, picks a `VOICE_LIVE` default model, sees the button appear for users. Turning it off removes the button within one runtime-config refresh. | LV2, LV3 |
 | **J-LV-6** | In the iOS/Android app (new binary), the same button works with the phone speaker, without headphones, and the answer stops when the user talks over it. | LV7 |
-| **J-LV-7** | In CarPlay the driver taps Synaplan, picks a chat, and talks freely. When live minutes run out mid-drive, the app says one sentence and continues in the normal turn-based mode. | LV8 |
+| **J-LV-7** | In CarPlay the driver taps Synaplan, picks a chat, and talks freely. When the usage budget runs out mid-drive, the app says one sentence and ends the conversation (no screen text). When the live service is busy or down, it says one sentence and continues in the normal turn-based mode. | LV8 |
+
 | **J-LV-8** | The user ends a conversation by closing the tab. The server still closes the provider session within 15 s, saves the transcript, and the usage row reaches a terminal state. | LV2 |
 
 Each `ota-candidate` sprint lists the five exit bullets from the UX
@@ -220,7 +239,7 @@ providers. **Test on a real head unit before shipping LV8.**
 Browser / App / CarPlay
   │ 1. POST /api/v1/voice/live/sessions  (cookie or Bearer)
   ▼
-Symfony backend ──────────────── checks flag, plan, minutes, budget, concurrency,
+Symfony backend ──────────────── checks flag, cost budget, concurrency,
   │                               creates BVOICESESSIONS + BUSELOG(running),
   │                               builds instructions + chat history,
   │                               returns { ticket, wsUrl, allowedSeconds, … }
@@ -243,8 +262,8 @@ Provider realtime API (OpenAI Live / Realtime, Gemini Live, xAI, compatible)
 | --------- | -------------- |
 | `VoiceLiveController` (`/api/v1/voice/live/*`) | Options, start, end, status, consent. Thin; delegates to services. Full OpenAPI annotations. |
 | `VoiceLiveSessionService` | Pre-checks, session row, ticket minting, instruction + history assembly, finalisation. |
-| `VoiceLiveUsageService` | Tick handling: provider usage → seconds/tokens → cost; updates `BUSELOG` row; re-checks minutes + budget; returns `continue / warn / wrap_up / stop`. |
-| `VoiceLiveDelegationService` | Builds an IN `Message` from the transcript segment, runs `MessageProcessor::process()` with voice options, returns spoken-length text + facts; records `MESSAGES` usage with `voice_session_id`. |
+| `VoiceLiveUsageService` | Tick handling: provider usage → seconds/tokens → cost; updates `BUSELOG` row; re-checks the cost budget; returns `continue / warn / wrap_up / stop`. |
+| `VoiceLiveDelegationService` | Builds an IN `Message` from the transcript segment, runs `MessageProcessor::process()` with voice options, returns spoken-length text + facts; adds the answer's cost to the conversation's `VOICE_LIVE` row (no `MESSAGES` usage row, no `MESSAGES` count check). |
 | `VoiceTranscriptWriter` | Turns provider transcript deltas into ordered IN/OUT messages in the chat; marks them `source=live_voice`. |
 | `InternalVoiceController` (`/internal/voice/*`) | Gateway callbacks; HMAC + network-restricted firewall; not in the public OpenAPI. |
 | `LiveVoiceModule` (FeatureModule `live_voice`) | Configured when `LIVE_VOICE_GATEWAY_URL` + secret are set and at least one `voice2voice` model is active with its provider key. Gates the public routes. |
@@ -271,9 +290,9 @@ interface LiveVoiceAdapter {
 | `GeminiLiveAdapter` | function `consult_synaplan`, `NON_BLOCKING`, scheduling `WHEN_IDLE`; context via `send_client_content` | `usageMetadata` deltas; session resumption on `GoAway`, `contextWindowCompression` on |
 | `XaiVoiceAdapter` | function `consult_synaplan` | gateway wall clock of the session (server VAD bills duration) + text items |
 
-"Voice model answers directly" (decision 4, admin opt-in per model) skips
-`consult_synaplan` and only injects memories/knowledge summaries in the
-instructions — cheaper and faster, but not the user's chat model.
+There is no "voice model answers directly" mode (decision 4): every
+content answer is delegated to Synaplan. The voice model answers on its own
+only for conversation control (greeting, "say that again", "slower").
 
 ### 4.3 Start payload (instructions and context)
 
@@ -306,9 +325,9 @@ anything needing tools, call Synaplan". No secrets, no full memory dump.
 `BPROVIDERSESSIONID`, `BSTATUS` (`connecting|live|ending|ended`),
 `BENDREASON`, `BSTARTED`, `BENDED`, `BSECONDS`, `BUSELOGID`,
 `BCLIENT` (`web|ios|android|carplay`), `BTRANSPORT` (`relay|webrtc`).
-Raw `CREATE TABLE IF NOT EXISTS`, no Schema API (Galera rule). The minutes
-quota sums `BSECONDS` per window (running sessions included), so no new
-`BUSELOG` column is needed.
+Raw `CREATE TABLE IF NOT EXISTS`, no Schema API (Galera rule). Cost lives
+in the existing `BUSELOG.BCOST`, so no new `BUSELOG` column is needed;
+`BSECONDS` is for display and the admin view, not for a limit.
 
 ### 4.6 Security
 
@@ -348,16 +367,22 @@ job's mode handling, and remove the realtime rule in
 ### 5.2 Metering
 
 1. **Start**: `BUSELOG` row inserted (`VOICE_LIVE`, `BSTATUS=running`,
-   cost 0, `BMETADATA.voice_session_id`).
+   cost 0, `BMODEL` = voice model, `BMETADATA.voice_session_id`,
+   `BMETADATA.source` = client, `BMETADATA.chat_id`). Written through
+   `RateLimitService` like every other action, so markup, BYO-key
+   `zero_cost` and price snapshot behave the same.
 2. **Tick** every 15 s (and on close): gateway posts the provider's
    cumulative usage. Backend computes delta → seconds/tokens → `BCOST`
-   (raw provider USD), updates the row, updates `BVOICESESSIONS.BSECONDS`.
+   (raw provider cost, like every row), updates the row and
+   `BMETADATA.media_usage.duration_seconds`, updates `BVOICESESSIONS.BSECONDS`.
    Provider-reported numbers win over wall clock; xAI uses gateway wall
    clock by design.
 3. **Close**: final usage from `session.closed` / last `usageMetadata`;
    `BSTATUS=success`; latency field = time to first audio.
-4. **Delegation**: each `consult_synaplan` / GPT-Live delegation is a
-   normal `MESSAGES` row with its tokens and the session id.
+4. **Delegation**: the cost of each `consult_synaplan` / GPT-Live
+   delegation answer is added to the same `VOICE_LIVE` row
+   (`BMETADATA.voice_cost`, `BMETADATA.answer_cost`, `answer_count`); it is
+   not a `MESSAGES` row and does not touch the `MESSAGES` count limit.
 5. **Crash safety**: a reaper closes sessions without a tick for 45 s
    (gateway gone) and bills up to the last tick. A provider reconnect does
    not open a second row.
@@ -365,42 +390,72 @@ job's mode handling, and remove the realtime rule in
 
 ### 5.3 Gates during the session
 
-`allowedSeconds` at start = min(minutes left in the hourly window, minutes
-left in the monthly / lifetime window, budget left ÷ worst-case cost per
-second of the chosen model, admin max length). Each tick re-computes it
-(another device may have used minutes; a top-up may have arrived).
+The only gate is the user's normal cost budget, the same one chat, images
+and video draw on. `allowedSeconds` at start = min(remaining budget ÷
+worst-case charged cost per second of the chosen model — voice plus an
+allowance for answers, markup included — and the admin max length). No
+budget for the level, or the budget gate off (self-host without billing)
+⇒ admin max length only. Each tick re-computes it: a chat in another tab
+may have spent budget, a top-up may have arrived.
 
 | Remaining | Gateway action | User sees |
 | --------- | -------------- | --------- |
-| > 60 s | continue | elapsed time, remaining minutes in the panel |
+| > 60 s | continue | elapsed time, "about N min left in your budget" when a budget applies |
 | ≤ 60 s | `warn`: instruction "mention once, briefly, that about a minute is left" | banner with countdown |
 | 0 | `wrap_up`: instruction "say goodbye in one sentence and stop"; mic muted | "Wrapping up…" |
 | 0 + 8 s or model done | `stop`: session closed, row finalised | terminal panel (§6.4) with the reason and the next action |
 
 End reasons and copy targets: `user_end`, `idle`, `max_duration`,
-`limit_minutes_hourly` (reset countdown, `LimitReachedModal`),
-`limit_minutes_monthly` (top-up on web / plan on web / IAP paywall in the
-app), `limit_budget` (`COST_BUDGET_EXCEEDED` path), `limit_messages`
-(delegation refused; the model says it cannot look things up any more),
-`provider_error`, `network_lost`, `capacity`, `admin_disabled`.
+`limit_budget` (the existing `COST_BUDGET_EXCEEDED` path: top-up / plan
+on web, IAP paywall in the app), `provider_error`, `network_lost`,
+`capacity`, `admin_disabled`.
 
-If `MESSAGES` is exhausted but minutes are not, the delegation returns a
-fixed fact ("the user's message limit is reached") and the model ends
-politely — the session is not silently left without a brain.
+The worst-case estimate can be beaten by a long answer. If a delegation
+would push the budget past zero, the answer is still spoken (it is already
+paid for) and the session moves straight to `wrap_up`.
 
 ### 5.4 Display
 
-- **Panel**: elapsed, remaining live minutes ("12 min left this month"),
-  the model and voice chip.
+- **Panel**: elapsed time, "about 12 min left in your budget" (estimate
+  from the remaining budget; hidden when no budget applies), the model and
+  voice chip.
 - **Taximeter** (`usageTaximeter` store): live cost updates on each tick.
-- **`/statistics`**: new action "Live voice" in limits (minutes used /
-  limit / reset), breakdown, activity filter, CSV export. Fix in the same
-  PR that `TRANSCRIPTION` is missing from `getUserLimits()`,
-  `UsageStatsService::ACTION_TYPES` and the activity filter.
-- **Activity row**: one per conversation with duration, model, cost, end
-  reason, link to the chat.
-- **Admin**: per-model concurrency and minutes in the usage admin view;
-  live sessions count and a kill switch per session.
+- **Budget**: nothing new to build. `checkCostBudget()` already sums
+  `BCOST` of *all* `BUSELOG` rows of the user in the billing period, whatever
+  the action, times the markup, against `BSUBSCRIPTIONS.BCOST_BUDGET_MONTHLY`
+  of the level (plus top-ups). The `VOICE_LIVE` row is one more of those
+  rows, so the budget bar, "today / this week / this month" and the limit
+  checks of chat, images and video see the voice cost without any change.
+  Example from our production settings: NEW 1, PRO 15, TEAM 40, BUSINESS 80
+  per month — a PRO user who talks for 60 min on GPT-Live (~$3 + answers)
+  has that much less for chat and images that month.
+- **`/statistics` → Recent Activity** (`UsageStatistics.vue`,
+  `UsageStatsService::getActivityLog()` / `getRecentUsage()`): one row per
+  conversation, the same row shape as every other action:
+
+  | Column | Live conversation row |
+  | --- | --- |
+  | Action | chip "Live conversation" — i18n `config.usage.actions.voice_live`: de *Live-Gespräch*, en *Live conversation*, es *Conversación en vivo*, fr *Conversation en direct*, tr *Canlı sohbet* |
+  | Duration | **new** under the chip: talk time, e.g. "4 min 12 s" (from `BMETADATA.media_usage.duration_seconds`, the key transcription already uses) |
+  | Channel | web, iOS, Android, CarPlay (from `BMETADATA.source`) |
+  | Model | the voice model (`GPT-Live`, `Gemini 3.8 Live`); the answering chat model in the tooltip |
+  | Tokens | the answers' prompt / completion tokens (+ Gemini audio tokens); GPT-Live voice itself is per second, so no token figure for it |
+  | Cost | voice + answers, same unit and markup rule as every other row |
+  | Latency | time to first spoken audio |
+
+  While a conversation runs, its row is already there and its cost grows
+  each tick; the reaper guarantees it ends in a terminal state.
+  The action filter gets "Live conversation" (`VOICE_LIVE`) and the missing
+  "Transcription" (`TRANSCRIPTION`). The CSV export gets a `Duration (s)`
+  column (empty for other actions). The API adds one optional
+  `duration_seconds` to the activity and recent-usage items (OpenAPI +
+  regenerated Zod). `VOICE_LIVE` is **not** added to
+  `UsageStatsService::ACTION_TYPES` — that list drives the count limits,
+  and live voice has none.
+- **Activity row link**: the row opens the chat the conversation was in.
+- **Admin**: per-model concurrency and voice seconds in the usage admin
+  view; live sessions count and a kill switch per session.
+
 
 ---
 
@@ -411,8 +466,10 @@ politely — the session is not silently left without a brain.
 In `section-chat-primary-actions`: `ModelDropdown` → microphone →
 **conversation button** (`mdi:waveform`, 44×44, `icon-ghost !rounded-xl`,
 `data-testid="btn-chat-live-voice"`) → send. Shown only when the module
-is configured, the user's plan has live minutes > 0 or may buy them, and
-(in the app) the native capability exists. Tooltip and aria-label from
+is configured and (in the app) the native capability exists. An exhausted
+budget does not hide the button: pressing it opens the same budget prompt
+a typed message gets (top-up / plan on web, IAP in the app), so the user
+learns why instead of finding a missing control. Tooltip and aria-label from
 i18n (`chatInput.liveVoice`). Guests and the widget never see it.
 
 ### 6.2 Panel (replaces the composer row while live, not a new page)
@@ -420,7 +477,7 @@ i18n (`chatInput.liveVoice`). Guests and the widget never see it.
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │  ◉  Listening…                       GPT-Live · Marin   ▾    │
-│     ▁▃▅▇▅▃▁ (input level)            12 min left this month  │
+│     ▁▃▅▇▅▃▁ (input level)       ~12 min left in your budget  │
 │                                                              │
 │  [ Mute ]   [ Captions on ]                     [ End ]      │
 │  Your voice goes to OpenAI while you talk. Transcript saved  │
@@ -443,7 +500,7 @@ voice settings.
 ### 6.4 Terminal states (U8)
 
 One sentence + one action each, five locales, e.g. "Conversation ended —
-your live minutes for this month are used up. [See plans]"; "The voice
+your usage budget for this month is used up. [Top up]"; "The voice
 service did not answer. Nothing more was sent. [Use the microphone
 instead]"; "Your connection dropped. The transcript up to here is saved.
 [Talk again]". Never an HTTP code.
@@ -451,8 +508,7 @@ instead]"; "Your connection dropped. The transcript up to here is saved.
 ### 6.5 Settings
 
 Settings → Voice: preferred live model (from `VOICE_LIVE` models the plan
-allows), voice per provider (from catalog `json.voices`), captions default,
-"Let the voice model answer directly" only when the admin allowed it.
+allows), voice per provider (from catalog `json.voices`), captions default.
 Consent can be withdrawn here.
 
 ### 6.6 Audio implementation
@@ -477,8 +533,8 @@ terms per `AGENTS.md`.
 
 | Method + path | Body / query | Response |
 | ------------- | ------------ | -------- |
-| `GET /api/v1/voice/live/options` | — | `available`, `reason?`, `models[{id,label,provider,voices[],brainModes[]}]`, `defaultModelId`, `secondsLeft{hourly,period}`, `consentGiven`, `maxSessionSeconds` |
-| `POST /api/v1/voice/live/sessions` | `chatId?`, `modelId?`, `voice?`, `language`, `client` (`web/ios/android/carplay`), `incognito?` | `sessionId`, `chatId`, `ticket`, `wsUrl`, `audio{inRate,outRate,format}`, `allowedSeconds`, `warnAtSeconds`, `provider`, `model`, `voice` — or the house limit payload (`rate_limit_exceeded`, `limit_type`, `reset_at`, `COST_BUDGET_EXCEEDED`, `topup_available`) |
+| `GET /api/v1/voice/live/options` | — | `available`, `reason?`, `models[{id,label,provider,voices[]}]`, `defaultModelId`, `estimatedSecondsLeft` (from the cost budget; `null` when no budget applies), `budgetExhausted`, `consentGiven`, `maxSessionSeconds` |
+| `POST /api/v1/voice/live/sessions` | `chatId?`, `modelId?`, `voice?`, `language`, `client` (`web/ios/android/carplay`), `incognito?` | `sessionId`, `chatId`, `ticket`, `wsUrl`, `transport` (`relay` or `webrtc`), `audio{inRate,outRate,format}`, `allowedSeconds`, `warnAtSeconds`, `provider`, `model`, `voice` — or the house budget payload (`COST_BUDGET_EXCEEDED`, `limit`, `used`, `remaining`, `topup_available`), identical to the one `/api/v1/messages/send` returns |
 | `POST /api/v1/voice/live/sessions/{id}/end` | — | terminal summary |
 | `GET /api/v1/voice/live/sessions/{id}` | — | `status`, `endReason`, `seconds`, `cost`, `chatId` |
 | `PUT /api/v1/voice/live/consent` | `given: bool` | `consentGiven` |
@@ -509,8 +565,8 @@ schema file in the sidecar is the single source for TS and Swift tests.
 - Store work: App Store privacy labels (audio data shared with OpenAI /
   Google / xAI for app functionality), Play Data safety, `PrivacyInfo`
   review, microphone purpose string updated to mention live conversations,
-  store review notes with a demo account that has live minutes.
-- IAP: no new products; minutes come from the existing plans. Paywall in
+  store review notes with a demo account that has budget left.
+- IAP: no new products; live voice draws on the existing plan budget. Paywall in
   the app is IAP-only (anti-steering).
 
 ### 8.2 CarPlay (LV8)
@@ -521,10 +577,12 @@ schema file in the sidecar is the single source for TS and Swift tests.
   provider audio → player node. Echo cancellation stays on; GPT-Live
   handles barge-in itself, so the local `BargeInDetector` is used only with
   turn-based providers.
-- Choice per conversation: live when `options.available` and minutes > 0,
-  else the existing turn-based loop. Live minutes exhausted mid-drive ⇒
-  one spoken sentence, then the turn-based loop continues in the same chat
-  (decision 10). No message content on screen (CarPlay rules).
+- Choice per conversation: live when `options.available`, else the
+  existing turn-based loop. Budget exhausted mid-drive ⇒ one spoken
+  sentence and the conversation ends; the turn-based loop draws on the same
+  budget, so it is not offered (decision 10). Live service busy or down ⇒
+  one sentence, then the turn-based loop continues in the same chat. No
+  message content on screen (CarPlay rules).
 - Locked phone: the session store already mirrors tokens with
   AfterFirstUnlockThisDeviceOnly; the start call uses Bearer.
 - Network loss in a tunnel: gateway keeps the provider session for 20 s
@@ -549,7 +607,6 @@ schema file in the sidecar is the single source for TS and Swift tests.
 | `LIVE_VOICE.WARN_SECONDS` | 60 | limit warning |
 | `LIVE_VOICE.TICK_SECONDS` | 15 | metering interval |
 | `LIVE_VOICE.CONCURRENCY.<provider>` | openai 50, google 100, xai 10 | provider caps (Redis semaphore) |
-| `RATELIMITS_{LEVEL}.VOICE_LIVE_SECONDS_{TOTAL,HOURLY,MONTHLY}` | decision 17 | minute quotas |
 
 Compose: profile `voice` for `synaplan-voice`; `.env.minimal` and
 `docker-compose.minimal.yml` list the decisive env (FeatureModule rule).
@@ -562,8 +619,8 @@ route; no private details go into this repository.
 
 | Layer | What |
 | ----- | ---- |
-| Backend unit | cost math for `per_second` and `per_audio_token`; minutes window math (hourly rolling, monthly, lifetime, running sessions); `allowedSeconds`; end-reason mapping; ticket single-use; transcript segmentation; delegation option building |
-| Backend integration | start → ticks → close with a fake gateway; limit crossing mid-session (minutes, budget, messages); reaper; incognito; BYO key; admin kill |
+| Backend unit | cost math for `per_second` and `per_audio_token`; budget → `allowedSeconds` (markup, top-ups, running sessions, no budget, gate off); answer cost added to the conversation row and no `MESSAGES` row written; end-reason mapping; ticket single-use; transcript segmentation; delegation option building |
+| Backend integration | start → ticks → close with a fake gateway; budget crossing mid-session (by voice, by a long answer, by a chat in another tab); reaper; incognito; BYO key; admin kill |
 | Characterization | none expected; if the delegation touches classifier input, re-record and review snapshots |
 | Sidecar | adapter event mapping against recorded fixture streams for all four providers; relay backpressure; resumption on `GoAway`; wrap-up timing; HMAC; no audio/text in logs |
 | Mock provider | `frontend/tests/e2e/stub-servers/voice/` speaking the OpenAI Live and Realtime dialects (and a Gemini dialect) with canned audio + transcripts + usage |
@@ -584,19 +641,53 @@ Full gates before every commit: `make ci-local`, `make test-e2e`,
 
 | Step | Scope | Class | Exit |
 | ---- | ----- | ----- | ---- |
-| **LV0** | Spike, no product code: GPT-Live access on our org; measure first-audio latency via relay vs WebRTC (EU and US); delegation round trip through `MessageProcessor` with a 2-sentence answer; WKWebView echo cancellation on the iPhone loudspeaker; cost per real minute for each provider incl. delegation tokens; verify unverified rows in §3. | — | `STATUS.md` with numbers; §0 ticked |
-| **LV1** | Catalog rows, `VOICE_LIVE` capability + default key, `per_audio_token` pricing, minute limit keys + seeder, `BVOICESESSIONS` migration, metering service, statistics/limits API (+ the `TRANSCRIPTION` gap), discovery rule removed, pricing docs. | backend-only | unit + integration green; usage page data correct with fake ticks |
-| **LV2** | `synaplan-voice` sidecar with `OpenAiLiveAdapter`, tickets, internal callbacks, delegation, transcript writer, reaper, `LiveVoiceModule`, Caddy route, compose profile, mock provider. | backend-only / no-app-impact | J-LV-5 (backend part) and J-LV-8 via a scripted WS client |
+| **LV0** | Spike, no product code, for **GPT-Live and Gemini Live**: access on our accounts; first-audio latency via relay vs WebRTC (EU and US); delegation round trip through `MessageProcessor` with a 2-sentence answer (`client` delegation on GPT-Live, `consult_synaplan` on Gemini); WKWebView echo cancellation on the iPhone loudspeaker; cost per real minute incl. delegation tokens; what the seeded budgets buy in minutes; verify unverified rows in §3. | — | Done 2026-10-12: `STATUS.md` with numbers for both providers |
+| **LV1** | Catalog rows (`gpt-live-1`, `gemini-3.8-live`), `VOICE_LIVE` capability + default key, `per_second` and `per_audio_token` pricing, `BVOICESESSIONS` migration, metering service that writes voice + answer cost into one `VOICE_LIVE` row of the existing budget, budget → `allowedSeconds`, `duration_seconds` on the activity / recent-usage API + CSV column, discovery rule removed, pricing docs. No limit keys, no seeder change. | backend-only | unit + integration green; with fake ticks the budget, the cost summary and the activity API show the conversation |
+| **LV2** | `synaplan-voice` sidecar with `OpenAiLiveAdapter` **and** `GeminiLiveAdapter` (`consult_synaplan`, resumption on `GoAway`, `contextWindowCompression`), tickets, internal callbacks, delegation, transcript writer, reaper, per-provider concurrency, `LiveVoiceModule`, Caddy route, compose profile, mock provider (OpenAI Live + Gemini dialects). | backend-only / no-app-impact | J-LV-5 (backend part) and J-LV-8 via a scripted WS client, per provider |
 | **LV3** | Button, consent sheet, panel, states, terminal copy, settings, five locales, icon map. | ota-candidate | J-LV-1, J-LV-2, J-LV-4, J-LV-5 walked; UX §6 five bullets |
-| **LV4** | Mid-session limits end to end: warn, wrap-up, terminal panels, paywall/top-up wiring, taximeter, statistics UI, activity row, admin live view + kill. | ota-candidate + backend-only | J-LV-3 walked; Playwright limit spec green |
-| **LV5** | `GeminiLiveAdapter`, `XaiVoiceAdapter`, `OpenAiRealtimeAdapter` (+ mini), `consult_synaplan` tool, resumption and compression, per-provider concurrency. | backend-only | fixture tests per adapter; manual DE/EN/ES/FR/TR pass per provider |
+| **LV4** | Mid-session budget end to end: warn, wrap-up, terminal panels, top-up / paywall wiring, taximeter, Recent Activity row (chip, duration, filter for `VOICE_LIVE` + `TRANSCRIPTION`), five locales, admin live view + kill. |
+ ota-candidate + backend-only | J-LV-3 walked; Playwright limit spec green |
+| **LV5** | `XaiVoiceAdapter`, `OpenAiRealtimeAdapter` (+ mini), `gemini-3.8-live-extended-thinking` row. | backend-only | fixture tests per adapter; manual DE/EN/ES/FR/TR pass per provider |
 | **LV6** | Optional direct WebRTC for OpenAI in the browser (server SDP exchange, `allowed_client_events`, sideband in the gateway for delegation + usage + kill), admin setting. | ota-candidate + backend-only | latency gain measured; billing identical to relay on the same session |
 | **LV7** | Apps: native capability seam, (if LV0 demands) native audio plugin, permissions, privacy labels, store notes. | store-required | J-LV-6 on iPhone and Android devices |
-| **LV8** | CarPlay live path with fallback to the turn-based loop. | store-required | J-LV-7 in CarPlay Simulator + a real head unit |
+| **LV8** | CarPlay live path with fallback to the turn-based loop for capacity and provider errors; budget end without fallback. |
+ store-required | J-LV-7 in CarPlay Simulator + a real head unit |
 | **LV9** | Compatible-endpoint adapter (Azure, Qwen Cloud, vLLM-Omni Qwen3-Omni), sovereign recipe docs (Unmute), barge-in for the turn-based web voice as the no-GPU fallback. | backend-only + ota-candidate | one self-hosted model talks end to end on a GPU box |
 
 `01_sprints.md` expands each row (files, vibe prompt, exit bullets) when
 LV0 is done.
+
+### LV3 exit (UX contract §6)
+
+- **Journey.** J-LV-5 flag-off walked in the browser: signed-in chat shows the dictation microphone and no live-conversation button. `/settings/voice` falls through to profile. A live provider conversation (J-LV-1, J-LV-2, J-LV-4 with the gateway on) was not walked; the module is off without gateway URL, secret and a provider key.
+- **Findability.** Closed turns are appended to the same chat as they finish. The cost row on `/statistics` is LV4.
+- **Copy.** Consent, states, terminal sentences and the withdraw consequence are in de, en, es, fr and tr.
+- **Empty, error, flag-off.** Flag off removes the button and the settings section. Terminal states name one recovery (talk again, microphone, top up, or close). Connecting times out into that sentence.
+- **Theme and size.** The panel uses the shared surface and button classes (light, dark, design v2). At 320 px the model chip collapses into a menu. A visual pass of a live panel was not possible while the module is off.
+
+### LV4 exit (UX contract §6)
+
+- **Journey.** J-LV-3 (about 40 seconds of budget left, countdown, one-sentence goodbye, terminal panel with the top-up action) was not walked against a provider. The module is off without a gateway URL, secret and a provider key. `VoiceLiveUsageServiceTest` covers the warn at 40 seconds and the wrap-up then stop. The statistics filter that names "Live conversation" and "Transcription" is the Playwright check that can pass with the module off.
+- **Findability.** A live-conversation row in Recent Activity shows the talk time under the chip and opens that chat when the row stored a chat id. The row is there while the conversation is still running and the cost grows on each tick. The taximeter reloads the charged total on each usage tick.
+- **Copy.** The countdown banner, "Wrapping up…", the action labels, the duration and the admin end-conversation dialog are in de, en, es, fr and tr. Ending a conversation from admin says the microphone stops within a few seconds and the saved transcript stays.
+- **Empty, error, flag-off.** With the module off the admin live section is absent. With it on and nobody talking, the section is one sentence. A missing session returns "not found". The kill confirm names the person and what stays saved.
+- **Theme and size.** The new rows use the existing statistics table and the shared card, text and danger-button classes. A live countdown banner was not on screen while the module is off.
+
+### LV5 exit (UX contract §6)
+
+- **Journey.** No new screen. The four models are catalog rows (BIDs 391–394) and appear in the live-voice model list once that provider's key is configured. A spoken conversation in de, en, es, fr and tr was not walked; that pass needs a running gateway and a provider key for each adapter.
+- **Findability.** The model name is the existing chip on the live panel and the model column on the usage row. Nothing new to hunt for.
+- **Copy.** No new user-facing sentences. The Grok Voice catalog description says EU data handling for that model is not confirmed.
+- **Empty, error, flag-off.** A model without its provider key stays off the list, same as GPT-Live and Gemini Live. Flag off still hides the button.
+- **Theme and size.** Unchanged. The adapters were checked against local fixture sockets, not a rendered panel.
+
+### LV6 exit (UX contract §6)
+
+- **Journey.** No new chat screen. The admin live section gains one switch, default off. With the module off that section is absent, so the switch was not clicked in the browser. A spoken WebRTC conversation was not walked; that needs the gateway, a provider key, and the switch on.
+- **Findability.** The switch sits on the same admin usage section as the live list. A conversation already running is unchanged when the switch moves.
+- **Copy.** The sentence names what the next OpenAI conversation does, that Google and xAI stay on the server, and that turning it off does not move a conversation already running. de, en, es, fr, tr.
+- **Empty, error, flag-off.** Default is off, so every conversation stays on the relay. Flag off hides the section. A failed save says the setting was not stored.
+- **Theme and size.** The switch uses the shared secondary button. Latency against a live provider was not measured. The fixture shows the sideband usage meter matches the relay mapper, and a stop closes the sideband.
 
 ---
 
@@ -604,11 +695,14 @@ LV0 is done.
 
 | Risk | Mitigation |
 | ---- | ---------- |
-| GPT-Live delegation latency feels slow with a reasoning chat model | `session.thinking.append` progress ("checking your notes"), voice-mode prompt keeps answers short, admin may pick a fast delegation model per session; measure in LV0 |
+| Delegation latency feels slow with a reasoning chat model (every content answer goes through Synaplan, decision 4) | `session.thinking.append` progress ("checking your notes") on GPT-Live, `NON_BLOCKING` + `WHEN_IDLE` on Gemini, voice-mode prompt keeps answers short, admin may pick a fast delegation model per session; measure in LV0 |
+
 | `commentary.append` ≤ 500 tokens | chunk long answers; the voice-mode prompt aims at ≤ 3 sentences and offers "shall I go on?" |
 | Gemini 10-minute connection resets | resumption handle in the gateway; client never sees the reconnect |
 | xAI 10 sessions per team | Redis semaphore + `capacity` end reason + turn-based offer |
 | Runaway cost | per-tick budget gate, hard max length, idle end, admin kill, reaper |
+| A level without a budget (0) is unlimited, as for chat today — live voice is ~$3/hour on GPT-Live | operators set a budget per level (also on free levels) when they enable the module; the module's admin page says so in one sentence; max length + idle end still apply |
+| One user spends the whole month's budget on voice and then cannot chat | intended by decision 7; the panel shows "about N min left in your budget" and the 60 s warning, `/statistics` shows voice as its own line in the breakdown |
 | Echo in cars and on loudspeakers | voice processing natively, WebRTC/`getUserMedia` AEC in browsers, head-unit test gate |
 | Provider price or model churn | pinned versioned IDs, price-drift job covers the new modes, retirement registry |
 | Privacy (third-party audio) | consent sheet per provider, ZDR/`store:false`, EU hosts, store privacy labels, incognito |
