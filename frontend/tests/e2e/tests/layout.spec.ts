@@ -567,19 +567,19 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
   test('a sent message keeps its edit controls readable in light and dark', async ({ page }) => {
     test.skip(
       isMobileViewport(page),
-      'A phone hides the desktop rail, and the first answer is too slow for this scan. Contrast is checked on desktop.'
+      'Phone chrome hides the desktop rail. The contrast scan runs on desktop.'
     )
     await openApp(page)
     await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     const chat = new ChatHelper(page)
-    // New Chat lives in the desktop rail. On a phone that rail is hidden, and
-    // the composer is already the empty or current chat.
-    if (!isMobileViewport(page)) {
-      await chat.startNewChat()
-    }
-    await chat.sendMessage('Hello from the contrast check')
-    const edit = page.getByTestId('btn-message-edit')
-    await expect(edit).toBeVisible({ timeout: TIMEOUTS.VERY_LONG })
+    await chat.startNewChat()
+    const previous = await chat.sendMessage('Hello from the contrast check')
+    await chat.waitForAnswer(previous, true)
+    // Edit is shown once the message is stored. The optimistic row has no id.
+    await page.reload()
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    const edit = page.getByTestId('btn-message-edit').last()
+    await expect(edit).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 
     await paintTheme(page, 'light')
     await axeIn(page, '[data-testid="user-message-bubble"]', 'user-message-light')
