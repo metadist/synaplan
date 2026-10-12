@@ -212,6 +212,7 @@
                   v-if="getSelectedModelObj(capability as Capability)"
                   :model="getSelectedModelObj(capability as Capability)!"
                   :peers="getModelsByPurpose(capability as Capability)"
+                  :capability="capability"
                 />
               </span>
             </button>
@@ -298,6 +299,7 @@
                       <ModelCostBadge
                         :model="model"
                         :peers="getModelsByPurpose(capability as Capability)"
+                        :capability="capability"
                       />
                     </div>
                     <div class="text-xs txt-secondary truncate">{{ model.service }}</div>

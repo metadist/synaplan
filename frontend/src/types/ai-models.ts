@@ -37,6 +37,12 @@ export interface AIModel {
   priceOut: number
   /** False when the model was imported without a published price. Absent means the price is known (including a real zero). */
   priceKnown?: boolean
+  /**
+   * Per-image price an image dropdown badges. TEXT2PIC is medium quality at
+   * the default size; PIC2PIC is high, which is what an edit is billed.
+   * Absent on chat rows.
+   */
+  capabilityPrices?: { TEXT2PIC?: number; PIC2PIC?: number }
   selectable?: boolean // Not returned by backend getModels
   description: string | null
   isSystemModel: boolean
