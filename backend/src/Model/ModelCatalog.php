@@ -22,6 +22,19 @@ use Doctrine\DBAL\Connection;
  */
 class ModelCatalog
 {
+    /**
+     * Image models tried when the bound TEXT2PIC or PIC2PIC model cannot run (#2407).
+     * Shipped defaults are the first key. PIC2PIC still skips a row that lacks the pic2pic feature.
+     *
+     * @var list<string>
+     */
+    public const IMAGE_FALLBACK_KEYS = [
+        'openai:gpt-image-2.5-flare:text2pic',
+        'openai:gpt-image-2.5-sunburst:text2pic',
+        'google:gemini-3.1-flash-image:text2pic',
+        'google:gemini-3-pro-image:text2pic',
+    ];
+
     /** Maps DEFAULTMODEL capabilities to the model tag they require. */
     public const CAPABILITY_TAGS = [
         'CHAT' => 'chat',
