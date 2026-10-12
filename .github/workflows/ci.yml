@@ -1449,8 +1449,9 @@ jobs:
     #
     # Any failed job fails the CI run. If this job later moves onto main, a
     # failure there stops the release tag from promoting the tested images,
-    # and on a tag it stops release-publish.yml and the AMI build. Revisit
-    # after 2026-10-28.
+    # and on a tag it stops release-publish.yml and the AMI build.
+    # This comment does not close #2271. Revisit that issue after 2026-10-28,
+    # when four weeks have also passed.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [docker-build]
