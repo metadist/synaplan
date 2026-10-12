@@ -67,10 +67,16 @@ describe('getCostTier', () => {
   })
 
   it('uses the text-to-image price when that capability is passed', () => {
-    const rows = [image('Flare', 0.01317, 0.05268), image('Pro', 0.134, 0.134)]
+    const rows: AIModel[] = [
+      image('Flare', 0.01317, 0.05268, 0.04),
+      image('Lite', 0.0336, 0.0336, 0.04),
+      image('Flash', 0.039, 0.039, 0.04),
+    ]
 
     expect(getCostTier(rows[0]!, rows, 'TEXT2PIC').tier).toBe('low')
     expect(getCostTier(rows[1]!, rows, 'TEXT2PIC').tier).toBe('mid')
+    expect(getCostTier(rows[0]!, rows, 'PIC2PIC').tier).toBe('mid')
+    expect(getCostTier(rows[0]!, rows).tier).toBe('mid')
   })
 
   it('falls back to the average when an image row has no capability price', () => {
@@ -81,9 +87,24 @@ describe('getCostTier', () => {
     expect(getCostTier(bare, peers, 'PIC2PIC').tier).toBe('mid')
     expect(getCostTier(bare, peers, 'PIC2PIC').tier).toBe(getCostTier(bare, peers).tier)
   })
+
+  it.each(['TEXT2PIC', 'PIC2PIC'])(
+    'falls back to the average price for %s when a row has no capability prices',
+    (capability) => {
+      const rows: AIModel[] = [
+        flatImage('Cheap', 0.01),
+        flatImage('Middle', 0.04),
+        flatImage('Dear', 0.2),
+      ]
+
+      expect(getCostTier(rows[0]!, rows, capability).tier).toBe('low')
+      expect(getCostTier(rows[1]!, rows, capability).tier).toBe('mid')
+      expect(getCostTier(rows[2]!, rows, capability).tier).toBe('high')
+    }
+  )
 })
 
-function image(name: string, textPrice: number, editPrice: number): AIModel {
+function image(name: string, textPrice: number, editPrice: number, flatPrice = textPrice): AIModel {
   return {
     id: name.length,
     service: 'OpenAI',
@@ -93,10 +114,16 @@ function image(name: string, textPrice: number, editPrice: number): AIModel {
     quality: 1,
     rating: 1,
     priceIn: 0,
-    priceOut: textPrice,
+    priceOut: flatPrice,
     description: null,
     isSystemModel: false,
     features: ['pic2pic'],
     capabilityPrices: { TEXT2PIC: textPrice, PIC2PIC: editPrice },
   }
+}
+
+function flatImage(name: string, price: number): AIModel {
+  const row = image(name, price, price)
+  delete row.capabilityPrices
+  return row
 }
