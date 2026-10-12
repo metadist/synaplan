@@ -24,6 +24,7 @@ final class MessageDigestConfig
     public const KEY_QUIET_SECONDS = 'QUIET_SECONDS';
     public const KEY_CURSOR = 'CURSOR';
     public const KEY_CURSOR_FAILURES = 'CURSOR_FAILURES';
+    public const KEY_LAST_DIGESTED_AT = 'LAST_DIGESTED_AT';
     public const KEY_START_AFTER_ID = 'START_AFTER_ID';
     public const KEY_TOP_K = 'TOP_K';
     public const KEY_MIN_SCORE = 'MIN_SCORE';
@@ -158,6 +159,39 @@ final class MessageDigestConfig
     public function clearCursorFailures(int $userId): void
     {
         $this->configRepository->deleteValue($userId, self::CONFIG_GROUP, self::KEY_CURSOR_FAILURES);
+    }
+
+    /**
+     * Unix time when the scheduled run last finished this user. A user with
+     * no row has never been reached and sorts ahead of everyone else.
+     *
+     * @param list<int> $userIds
+     *
+     * @return array<int, int> userId => unix time
+     */
+    public function lastDigestedAtFor(array $userIds): array
+    {
+        $raw = $this->configRepository->getValuesForOwners($userIds, self::CONFIG_GROUP, self::KEY_LAST_DIGESTED_AT);
+        $times = [];
+        foreach ($raw as $userId => $value) {
+            $times[$userId] = max(0, (int) $value);
+        }
+
+        return $times;
+    }
+
+    /**
+     * Record that the scheduled run finished this user, including a pass that
+     * found nothing to index. A killed run has no row for the user it was
+     * still working on, so the next night starts there.
+     */
+    public function markDigested(int $userId, int $at): void
+    {
+        if ($userId <= 0 || $at <= 0) {
+            return;
+        }
+
+        $this->configRepository->setValue($userId, self::CONFIG_GROUP, self::KEY_LAST_DIGESTED_AT, (string) $at);
     }
 
     // --- Retrieval knobs (Sprint 4) ---

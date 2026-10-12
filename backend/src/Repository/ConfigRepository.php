@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Config;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 class ConfigRepository extends ServiceEntityRepository
@@ -89,6 +90,41 @@ class ConfigRepository extends ServiceEntityRepository
         $this->getEntityManager()->flush();
 
         return true;
+    }
+
+    /**
+     * Values of one setting for many owners. Owners with no row are omitted.
+     *
+     * @param list<int> $ownerIds
+     *
+     * @return array<int, string> ownerId => value
+     */
+    public function getValuesForOwners(array $ownerIds, string $group, string $setting): array
+    {
+        $ownerIds = array_values(array_unique(array_map(intval(...), $ownerIds)));
+        if ([] === $ownerIds) {
+            return [];
+        }
+
+        $values = [];
+        foreach (array_chunk($ownerIds, 1000) as $chunk) {
+            $rows = $this->createQueryBuilder('c')
+                ->select('c.ownerId AS ownerId', 'c.value AS value')
+                ->where('c.group = :group')
+                ->andWhere('c.setting = :setting')
+                ->andWhere('c.ownerId IN (:ownerIds)')
+                ->setParameter('group', $group)
+                ->setParameter('setting', $setting)
+                ->setParameter('ownerIds', $chunk, ArrayParameterType::INTEGER)
+                ->getQuery()
+                ->getArrayResult();
+
+            foreach ($rows as $row) {
+                $values[(int) $row['ownerId']] = (string) $row['value'];
+            }
+        }
+
+        return $values;
     }
 
     /**
