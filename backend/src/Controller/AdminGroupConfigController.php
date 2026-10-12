@@ -50,9 +50,14 @@ final class AdminGroupConfigController extends AbstractController
                                 properties: [
                                     new OA\Property(
                                         property: 'value',
+                                        description: 'The setting value. A feature flag is a boolean, MODELS.ALLOWED is a list of catalog keys, and other settings are text. Null when the group has not set it.',
                                         type: 'string',
                                         nullable: true,
-                                        description: 'The setting value. Null when the group has not set it. A list setting is a JSON array of strings.',
+                                        oneOf: [
+                                            new OA\Schema(type: 'string'),
+                                            new OA\Schema(type: 'boolean'),
+                                            new OA\Schema(type: 'array', items: new OA\Items(type: 'string')),
+                                        ],
                                     ),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, enum: ['group', 'admin']),
                                     new OA\Property(property: 'locked', type: 'boolean'),
@@ -122,9 +127,14 @@ final class AdminGroupConfigController extends AbstractController
                                 properties: [
                                     new OA\Property(
                                         property: 'value',
+                                        description: 'The setting value. A feature flag is a boolean, MODELS.ALLOWED is a list of catalog keys, and other settings are text. Null when the group has not set it.',
                                         type: 'string',
                                         nullable: true,
-                                        description: 'The setting value. Null when the group has not set it. A list setting is a JSON array of strings.',
+                                        oneOf: [
+                                            new OA\Schema(type: 'string'),
+                                            new OA\Schema(type: 'boolean'),
+                                            new OA\Schema(type: 'array', items: new OA\Items(type: 'string')),
+                                        ],
                                     ),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, enum: ['group', 'admin']),
                                     new OA\Property(property: 'locked', type: 'boolean'),
