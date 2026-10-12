@@ -5,13 +5,20 @@ import { WebSocket } from 'ws'
 import { createMockAdapter } from '../src/adapters/mock.js'
 import { verify } from '../src/hmac.js'
 import { createServer } from '../src/server.js'
-import { shouldDropAudio } from '../src/session.js'
+import { shouldDropAudio, disconnectPlan, CARPLAY_RECONNECT_MS } from '../src/session.js'
 
 const SECRET = 'test-secret'
 
 test('audio is dropped once the client buffer is over a megabyte', () => {
   assert.equal(shouldDropAudio(1_000_000), false)
   assert.equal(shouldDropAudio(1_000_001), true)
+})
+
+test('only a CarPlay client parks the provider after the socket drops', () => {
+  assert.equal(disconnectPlan('carplay'), 'park')
+  assert.equal(disconnectPlan('web'), 'close')
+  assert.equal(disconnectPlan(''), 'close')
+  assert.equal(CARPLAY_RECONNECT_MS, 20_000)
 })
 
 for (const dialect of ['mock-openai', 'mock-google']) {
@@ -105,6 +112,74 @@ for (const dialect of ['mock-openai', 'mock-google']) {
     backend.close()
   })
 }
+
+test('a CarPlay drop keeps the provider until the reconnect window ends', async () => {
+  const calls = []
+  const backend = http.createServer((req, res) => {
+    const chunks = []
+    req.on('data', (chunk) => chunks.push(chunk))
+    req.on('end', () => {
+      calls.push(req.url)
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({
+        sessionId: 9,
+        provider: 'mock-openai',
+        model: 'gpt-live-1',
+        client: 'carplay',
+        voice: 'marin',
+        instructions: 'Ask Synaplan.',
+        allowedSeconds: 80,
+        transport: 'relay',
+        audio: { format: 'pcm16', inRate: 24000, outRate: 24000 },
+        action: 'continue',
+        ok: true,
+      }))
+    })
+  })
+  await listen(backend)
+  let adapter
+  const gateway = createServer({
+    synaplanUrl: `http://127.0.0.1:${backend.address().port}`,
+    secret: SECRET,
+    tickSeconds: 0,
+    idleSeconds: 0,
+    reconnectGraceMs: 200,
+    adapterFor: (provider) => {
+      adapter = createMockAdapter(provider)
+      return adapter
+    },
+  })
+  await listen(gateway)
+  const url = `ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=one`
+
+  const first = new WebSocket(url)
+  const firstFrames = []
+  first.on('message', (data, isBinary) => {
+    if (!isBinary) firstFrames.push(JSON.parse(data.toString()))
+  })
+  await once(first, 'open')
+  await waitFor(() => firstFrames.some((frame) => frame.type === 'ready'))
+  first.close()
+  await new Promise((resolve) => setTimeout(resolve, 40))
+  assert.equal(adapter.closed, false)
+  assert.equal(calls.some((path) => String(path).endsWith('/closed')), false)
+
+  const second = new WebSocket(url)
+  const secondFrames = []
+  second.on('message', (data, isBinary) => {
+    if (!isBinary) secondFrames.push(JSON.parse(data.toString()))
+  })
+  await once(second, 'open')
+  await waitFor(() => secondFrames.some((frame) => frame.type === 'ready'))
+  assert.equal(adapter.closed, false)
+
+  second.close()
+  await waitFor(() => calls.some((path) => String(path).endsWith('/closed')))
+  assert.equal(adapter.closed, true)
+
+  gateway.close()
+  backend.close()
+})
 
 function listen(server) {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))

@@ -10,9 +10,11 @@ The feature stays off until both `LIVE_VOICE_GATEWAY_URL` and `LIVE_VOICE_GATEWA
 
 The body may include `modelId`, `chatId`, `client` (`web`, `ios`, `android`, `carplay`) and `incognito`. Consent must already be stored with `PUT /api/v1/voice/live/consent` and `{ "given": true }`.
 
-The response carries `ticket`, `wsUrl`, `transport` (`relay` or `webrtc`), `audio` (`format`, `inRate`, `outRate`), `allowedSeconds` and `warnAtSeconds`. The ticket is a 30-second single-use JWT. It does not contain a provider key. `transport` is `relay` unless an admin has turned on the direct OpenAI connection and the chosen model is GPT-Live or GPT-Realtime. Google and xAI stay on `relay`.
+The response carries `ticket`, `wsUrl`, `transport` (`relay` or `webrtc`), `audio` (`format`, `inRate`, `outRate`), `allowedSeconds` and `warnAtSeconds`. The ticket is a 30-second single-use JWT. It does not contain a provider key. `transport` is `relay` unless an admin has turned on the direct OpenAI connection and the chosen model is GPT-Live or GPT-Realtime. Google and xAI stay on `relay`. `client: carplay` is always `relay`: the car has no WebRTC stack.
 
-A second open conversation for the same user is `409`. A used-up monthly budget is `429` with `code: COST_BUDGET_EXCEEDED`, the same payload as a typed message. Provider capacity is `503` with `code: VOICE_CAPACITY`.
+A second open conversation for the same user is `409` with `code: VOICE_BUSY`. A used-up monthly budget is `429` with `code: COST_BUDGET_EXCEEDED`, the same payload as a typed message. Provider capacity is `503` with `code: VOICE_CAPACITY`. The live service being down is `503` with `code: VOICE_UNAVAILABLE`. Missing consent is `403` with `code: VOICE_CONSENT_REQUIRED`.
+
+`POST /api/v1/voice/live/sessions/{id}/ticket` mints a fresh ticket for a session that is still open. It does not open a second session. CarPlay uses it after a short network drop. The socket URL carries the new ticket.
 
 ## Socket
 
@@ -38,7 +40,7 @@ The server sends:
 | `{ "type": "wrap_up" }` | One goodbye sentence, then the socket closes |
 | `{ "type": "ended", "reason" }` | The conversation is over. A dropped tab may close before this frame arrives |
 
-Closing the socket without `end` is a dropped tab. The sidecar still closes the provider and posts `network_lost`. Reasons are `user_end`, `idle`, `max_duration`, `limit_budget`, `provider_error`, `network_lost`, `capacity`, `admin_disabled`.
+Closing the socket without `end` is a dropped tab. The sidecar closes the provider and posts `network_lost`. A CarPlay client is the exception: the sidecar keeps the provider session for 20 seconds and the app reconnects with a fresh ticket for the same session. After 20 seconds it posts `network_lost`. A web or phone tab still ends immediately. Reasons are `user_end`, `idle`, `max_duration`, `limit_budget`, `provider_error`, `network_lost`, `capacity`, `admin_disabled`.
 
 GPT-Live uses client delegation. Gemini Live uses the tool `consult_synaplan`. Both come back through `POST /internal/voice/sessions/{id}/delegate`. The answer is spoken. It is not a separate `MESSAGES` usage row. Its cost is added to the one `VOICE_LIVE` row.
 

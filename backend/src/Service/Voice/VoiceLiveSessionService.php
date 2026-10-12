@@ -108,9 +108,10 @@ final readonly class VoiceLiveSessionService
 
         $incognito = true === ($body['incognito'] ?? false);
         $chat = $incognito ? null : $this->chatFor($user, $this->intOrNull($body['chatId'] ?? null));
-        $transport = VoiceLiveTransport::choose($provider, $model->getProviderId(), $this->webrtcOpenAi());
+        $client = $this->string($body['client'] ?? 'web');
+        $transport = VoiceLiveTransport::choose($provider, $model->getProviderId(), $this->webrtcOpenAi(), $client);
         try {
-            $session = $this->usage->open($user, $model, $chat?->getId(), $this->string($body['client'] ?? 'web'), false, $transport);
+            $session = $this->usage->open($user, $model, $chat?->getId(), '' !== $client ? $client : 'web', false, $transport);
         } catch (VoiceLiveBusyException) {
             $this->concurrency->release($provider);
             throw new VoiceLiveRejectedException(409, ['error' => 'A live conversation is already open.', 'code' => 'VOICE_BUSY']);
@@ -306,6 +307,32 @@ final readonly class VoiceLiveSessionService
             'instructions' => $this->instructions->build($user, $this->history($user, $session->getChatId()), '' !== $storedLanguage ? $storedLanguage : null),
             'allowedSeconds' => $this->usage->allowedSeconds($user, $model),
             'audio' => $this->audio($provider),
+            'transport' => $session->getTransport(),
+            'client' => $session->getClient(),
+        ];
+    }
+
+    /**
+     * A fresh single-use ticket for a session that is still open. CarPlay uses
+     * this after a tunnel drop. It does not open a second conversation.
+     *
+     * @return array<string, mixed>
+     */
+    public function resumeTicket(User $user, int $sessionId, Request $request): array
+    {
+        $session = $this->owned($user, $sessionId);
+        if ('ended' === $session->getStatus()) {
+            throw new VoiceLiveRejectedException(404, ['error' => 'Session not found']);
+        }
+
+        $ticket = $this->tickets->mint((int) $user->getId(), $sessionId);
+
+        return [
+            'sessionId' => $sessionId,
+            'chatId' => $session->getChatId(),
+            'ticket' => $ticket,
+            'wsUrl' => $this->wsUrl($request, $ticket),
+            'audio' => $this->audio(strtolower($session->getProvider())),
             'transport' => $session->getTransport(),
         ];
     }

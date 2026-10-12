@@ -151,3 +151,14 @@ microphone permission. The iOS purpose string names a live conversation.
 There is no new in-app product. The loudspeaker echo measurement is still
 open, so there is no native audio plugin. J-LV-6 was not walked on a device.
 No new latency numbers.
+
+## LV8
+
+CarPlay opens the live relay when the server says it is available, the driver
+has allowed it, and the monthly budget is not used up. The server forces
+`relay` for `client: carplay`. A dropped socket keeps the provider session
+for 20 seconds; the app mints a fresh ticket for the same session. A used-up
+budget is one spoken sentence and the conversation ends. A busy or down live
+service is one spoken sentence, then the turn-based loop in the same chat.
+The car screen still shows no message text. J-LV-7 was not walked. Echo and
+barge-in on a head unit were not measured. No new latency numbers.

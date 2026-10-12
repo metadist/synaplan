@@ -10,6 +10,7 @@ export function createServer(options = {}) {
     allowedOrigins: options.allowedOrigins ?? process.env.LIVE_VOICE_ALLOWED_ORIGINS ?? '',
     tickSeconds: options.tickSeconds ?? process.env.TICK_SECONDS ?? 15,
     idleSeconds: options.idleSeconds ?? process.env.IDLE_SECONDS ?? 120,
+    reconnectGraceMs: options.reconnectGraceMs,
     fetch: options.fetch ?? globalThis.fetch,
     adapterFor: options.adapterFor ?? ((provider, model) => adapterFor(provider, process.env, model)),
     openaiApiKey: options.openaiApiKey ?? process.env.OPENAI_API_KEY ?? '',

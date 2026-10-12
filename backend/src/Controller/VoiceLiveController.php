@@ -134,6 +134,45 @@ final class VoiceLiveController extends AbstractController
         return $this->call(fn (): array => $this->sessions->start($user, $this->body($request), $request));
     }
 
+    #[Route('/sessions/{id}/ticket', name: 'sessions_ticket', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/voice/live/sessions/{id}/ticket',
+        summary: 'Mint a fresh socket ticket for a live conversation that is still open',
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Ticket and socket URL for the same session',
+                content: new OA\JsonContent(
+                    required: ['sessionId', 'ticket', 'wsUrl', 'transport'],
+                    properties: [
+                        new OA\Property(property: 'sessionId', type: 'integer'),
+                        new OA\Property(property: 'chatId', type: 'integer', nullable: true),
+                        new OA\Property(property: 'ticket', type: 'string'),
+                        new OA\Property(property: 'wsUrl', type: 'string'),
+                        new OA\Property(property: 'audio', properties: [
+                            new OA\Property(property: 'format', type: 'string'),
+                            new OA\Property(property: 'inRate', type: 'integer'),
+                            new OA\Property(property: 'outRate', type: 'integer'),
+                        ], type: 'object'),
+                        new OA\Property(property: 'transport', type: 'string'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: 'Session not found or already ended'),
+        ]
+    )]
+    public function resumeTicket(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Unauthorized'], 401);
+        }
+
+        return $this->call(fn (): array => $this->sessions->resumeTicket($user, $id, $request));
+    }
+
     #[Route('/sessions/{id}/end', name: 'sessions_end', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/voice/live/sessions/{id}/end',

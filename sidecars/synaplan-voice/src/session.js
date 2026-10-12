@@ -5,6 +5,15 @@ import { exchangeSdp } from './webrtc.js'
 
 export const AUDIO_BUFFER_LIMIT = 1_000_000
 
+export const CARPLAY_RECONNECT_MS = 20_000
+
+/** CarPlay holds the provider across a short tunnel drop. Every other client closes at once. */
+export function disconnectPlan(client) {
+  return client === 'carplay' ? 'park' : 'close'
+}
+
+const parkedSessions = new Map()
+
 export function shouldDropAudio(bufferedAmount, limit = AUDIO_BUFFER_LIMIT) {
   return bufferedAmount > limit
 }
@@ -29,6 +38,7 @@ export function handleConnection(socket, request, deps) {
   const offerPromise = new Promise((resolve) => { offerResolve = resolve })
   let sessionId = null
   let provider = ''
+  let clientName = ''
   let ended = false
   let muted = false
   let dropping = false
@@ -39,6 +49,10 @@ export function handleConnection(socket, request, deps) {
   let tickTimer = null
   let idleTimer = null
   let wrapTimer = null
+  let parkTimer = null
+  let clientSocket = socket
+  let lastConfig = null
+  let adopted = false
   const tickMs = Number(deps.tickSeconds ?? 15) * 1000
   const idleMs = Number(deps.idleSeconds ?? 120) * 1000
 
@@ -47,7 +61,7 @@ export function handleConnection(socket, request, deps) {
   }
 
   const send = (payload) => {
-    if (socket.readyState === 1) socket.send(JSON.stringify(payload))
+    if (clientSocket && clientSocket.readyState === 1) clientSocket.send(JSON.stringify(payload))
   }
 
   const post = async (path, payload) => {
@@ -80,6 +94,8 @@ export function handleConnection(socket, request, deps) {
     clearInterval(tickTimer)
     clearInterval(idleTimer)
     clearTimeout(wrapTimer)
+    clearTimeout(parkTimer)
+    if (sessionId) parkedSessions.delete(sessionId)
     const latencyMs = Date.now() - startedAt
     try {
       adapter?.close()
@@ -93,7 +109,7 @@ export function handleConnection(socket, request, deps) {
     }
     log({ event: 'closed', reason, dropped })
     send({ type: 'ended', reason })
-    if (socket.readyState === 1) socket.close(1000)
+    if (clientSocket && clientSocket.readyState === 1) clientSocket.close(1000)
   }
 
   const applyDecision = (decision) => {
@@ -145,7 +161,15 @@ export function handleConnection(socket, request, deps) {
     const config = redeemed.json
     sessionId = config.sessionId
     provider = String(config.provider ?? '')
+    clientName = String(config.client ?? '')
     direct = config.transport === 'webrtc'
+    lastConfig = config
+    const waiting = parkedSessions.get(sessionId)
+    if (waiting) {
+      adopted = true
+      waiting.adopt(socket)
+      return
+    }
     startedAt = Date.now()
     lastAudioAt = startedAt
     const attach = (next) => {
@@ -153,11 +177,11 @@ export function handleConnection(socket, request, deps) {
       adapter.on('audio', (chunk) => {
         if (direct) return
         lastAudioAt = Date.now()
-        if (dropping || shouldDropAudio(socket.bufferedAmount)) {
+        if (dropping || shouldDropAudio(clientSocket ? clientSocket.bufferedAmount : 0)) {
           dropped += 1
           return
         }
-        if (socket.readyState === 1) socket.send(chunk)
+        if (clientSocket && clientSocket.readyState === 1) clientSocket.send(chunk)
       })
       adapter.on('transcript', (turn) => {
         lastAudioAt = Date.now()
@@ -244,7 +268,7 @@ export function handleConnection(socket, request, deps) {
     }
   })()
 
-  socket.on('message', (raw, isBinary) => {
+  const onMessage = (raw, isBinary) => {
     if (!isBinary && Buffer.isBuffer(raw) && looksLikeJson(raw)) {
       let early
       try {
@@ -281,11 +305,37 @@ export function handleConnection(socket, request, deps) {
     }
     if (message.type === 'interrupt') adapter.interrupt()
     if (message.type === 'end') void finish('user_end')
-  })
+  }
+  socket.on('message', onMessage)
 
-  socket.on('close', () => {
-    if (sessionId) void finish('network_lost')
-  })
+  const onClose = (mine) => {
+    if (adopted || ended || clientSocket !== mine) return
+    if (!sessionId || disconnectPlan(clientName) !== 'park') {
+      if (sessionId) void finish('network_lost')
+      return
+    }
+    clientSocket = null
+    clearTimeout(parkTimer)
+    parkTimer = setTimeout(() => {
+      parkedSessions.delete(sessionId)
+      void finish('network_lost')
+    }, Number(deps.reconnectGraceMs ?? CARPLAY_RECONNECT_MS))
+    parkedSessions.set(sessionId, {
+      adopt(next) {
+        clearTimeout(parkTimer)
+        parkedSessions.delete(sessionId)
+        clientSocket = next
+        next.on('message', onMessage)
+        next.on('close', () => onClose(next))
+        send({
+          type: 'ready',
+          audio: lastConfig?.audio,
+          allowedSeconds: lastConfig?.allowedSeconds,
+        })
+      },
+    })
+  }
+  socket.on('close', () => onClose(socket))
 }
 
 function originAllowed(origin, allowed) {

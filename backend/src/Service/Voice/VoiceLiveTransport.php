@@ -10,8 +10,12 @@ namespace App\Service\Voice;
  */
 final class VoiceLiveTransport
 {
-    public static function choose(string $provider, string $model, bool $enabled): string
+    public static function choose(string $provider, string $model, bool $enabled, string $client = 'web'): string
     {
+        // CarPlay has no WebRTC stack. It always uses the relay socket.
+        if ('carplay' === $client) {
+            return 'relay';
+        }
         if (!$enabled || 'openai' !== strtolower($provider)) {
             return 'relay';
         }

@@ -13,8 +13,12 @@ the working tree. LV6 (optional OpenAI WebRTC, admin switch default off) is
 in the working tree. LV7 (native `liveVoice` capability, microphone purpose
 string, store notes) is in the apps working tree. The button stays hidden on
 older binaries. A native audio plugin is not included: loudspeaker echo in
-WKWebView is still unmeasured. Next product step is the J-LV-6 walk on an
-iPhone and an Android device, then LV8.
+WKWebView is still unmeasured. LV8 (CarPlay live relay, 20-second resume,
+spoken budget end, spoken fallback to the turn-based loop) is in the working
+tree of both repositories. J-LV-6 and J-LV-7 were not walked on a device.
+A head-unit echo and barge-in pass is still open. Next product step is those
+walks, then LV9.
+
 **Goal:** A person presses one button next to the microphone and talks with
 Synaplan like with ChatGPT Voice or Gemini Live: full duplex, interruptible,
 no typing. The answer still comes from *their* Synaplan chat (chat model,
@@ -700,6 +704,14 @@ LV0 is done.
 - **Copy.** The iOS microphone purpose string names a live conversation. Store listing bullets and review notes are in de, en, es, and tr. No new in-app sentence: the panel copy is the web copy already in five locales.
 - **Empty, error, flag-off.** No plugin, module off, or a guest account: the button is absent and dictation stays. A denied microphone uses the existing terminal sentence and offers the turn-based microphone. A spent budget opens the existing store subscription screen. There is no new product.
 - **Theme and size.** Unchanged from the web panel. Audio stays in the WebView. A native audio plugin waits on the iPhone loudspeaker echo measurement.
+
+### LV8 exit (UX contract §6)
+
+- **Journey.** J-LV-7 (talk freely in CarPlay, one spoken sentence when the budget ends, one spoken sentence then the turn-based loop when live voice is busy or down) was not walked. It needs a new binary, a CarPlay Simulator or a head unit, a gateway, a provider key, and budget left. The route choice is covered by `LiveVoiceCarPlanTests`. Echo and barge-in on a real head unit are still open.
+- **Findability.** The voice screen is the same CarPlay template. A live conversation that falls back stays in the chat the start call returned. The cost row is the existing live-conversation row on statistics, in the phone app.
+- **Copy.** The four spoken sentences (budget used up, busy, unavailable, connection lost) are in de, en, es, fr, and tr. They do not tell the driver to use the iPhone. The car screen still shows no message text. A sentence that was already spoken does not add an alert.
+- **Empty, error, flag-off.** No consent, or live voice not configured: the existing turn-based loop, with no extra sentence. A used-up budget ends the conversation. A relay the car cannot use is ended, then the turn-based loop. A drop longer than 20 seconds says the connection was lost and ends.
+- **Theme and size.** No new CarPlay controls. Audio uses the existing voice graph. This was not played on a head unit.
 
 ---
 
