@@ -51,6 +51,7 @@ final readonly class VoiceLiveSessionService
         private RedisService $redis,
         private LoggerInterface $logger,
         private string $publicWsPath,
+        private VoiceLiveCompatibleEndpoint $compatible,
     ) {
     }
 
@@ -502,6 +503,13 @@ final readonly class VoiceLiveSessionService
 
     private function assertProviderKey(string $provider): void
     {
+        if (VoiceLiveCompatibleEndpoint::PROVIDER === $provider) {
+            if ($this->compatible->configured()) {
+                return;
+            }
+            throw new VoiceLiveRejectedException(409, ['error' => 'Live voice has no provider key yet.', 'code' => 'VOICE_UNAVAILABLE']);
+        }
+
         $status = $this->keys->getStatus($provider);
         if ($status['configured']) {
             return;
@@ -531,7 +539,14 @@ final readonly class VoiceLiveSessionService
     {
         $usable = [];
         foreach ($this->models->findActiveByTag('voice2voice') as $model) {
-            $status = $this->keys->getStatus(strtolower($model->getService()));
+            $provider = strtolower($model->getService());
+            if (VoiceLiveCompatibleEndpoint::PROVIDER === $provider) {
+                if ($this->compatible->configured()) {
+                    $usable[] = $model;
+                }
+                continue;
+            }
+            $status = $this->keys->getStatus($provider);
             if ($status['configured']) {
                 $usable[] = $model;
             }

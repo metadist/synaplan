@@ -19,6 +19,7 @@ final readonly class VoiceLiveConcurrency
         'openai' => 50,
         'google' => 100,
         'xai' => 10,
+        'compatible' => 4,
     ];
 
     public function __construct(

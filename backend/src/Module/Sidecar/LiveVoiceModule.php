@@ -11,6 +11,7 @@ use App\Module\Contract\MobileClass;
 use App\Module\Contract\ModuleStatus;
 use App\Module\Probe\SidecarHealthProbeInterface;
 use App\Repository\ModelRepository;
+use App\Service\Voice\VoiceLiveCompatibleEndpoint;
 
 /**
  * Full-duplex live voice. Absent until the gateway URL and secret are set
@@ -27,6 +28,7 @@ final class LiveVoiceModule implements FeatureModuleInterface
         private readonly string $gatewaySecret,
         private readonly ModelRepository $models,
         private readonly ProviderKeyStore $keys,
+        private readonly ?VoiceLiveCompatibleEndpoint $compatible = null,
     ) {
     }
 
@@ -56,7 +58,14 @@ final class LiveVoiceModule implements FeatureModuleInterface
         }
 
         foreach ($this->models->findActiveByTag('voice2voice') as $model) {
-            $status = $this->keys->getStatus(strtolower($model->getService()));
+            $provider = strtolower($model->getService());
+            if (VoiceLiveCompatibleEndpoint::PROVIDER === $provider) {
+                if ($this->compatible?->configured() ?? false) {
+                    return true;
+                }
+                continue;
+            }
+            $status = $this->keys->getStatus($provider);
             if ($status['configured']) {
                 return true;
             }

@@ -17,5 +17,6 @@ final class VoiceLiveTransportTest extends TestCase
         self::assertSame('relay', VoiceLiveTransport::choose('google', 'gemini-3.8-live', true));
         self::assertSame('relay', VoiceLiveTransport::choose('xai', 'grok-voice-think-fast-2.0', true));
         self::assertSame('relay', VoiceLiveTransport::choose('openai', 'gpt-live-1', true, 'carplay'));
+        self::assertSame('relay', VoiceLiveTransport::choose('compatible', 'qwen3-omni', true));
     }
 }

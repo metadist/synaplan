@@ -1,3 +1,4 @@
+import { createCompatibleAdapter } from './compatible.js'
 import { createGeminiAdapter } from './gemini.js'
 import { createMockAdapter } from './mock.js'
 import { createOpenAiAdapter } from './openai.js'
@@ -8,6 +9,7 @@ export function adapterKind(provider, model = '') {
   if (provider === 'mock-openai' || provider === 'mock-google') return provider
   if (provider === 'google') return 'gemini'
   if (provider === 'xai') return 'xai'
+  if (provider === 'compatible') return 'compatible'
   if (provider === 'openai' && String(model).startsWith('gpt-realtime')) return 'openai-realtime'
   return 'openai-live'
 }
@@ -22,6 +24,14 @@ export function adapterFor(provider, env = process.env, model = '') {
     return createXaiAdapter({
       apiKey: env.XAI_API_KEY ?? '',
       url: env.XAI_REALTIME_URL || undefined,
+    })
+  }
+  if (kind === 'compatible') {
+    return createCompatibleAdapter({
+      url: env.LIVE_VOICE_COMPATIBLE_WS_URL || undefined,
+      apiKey: env.LIVE_VOICE_COMPATIBLE_API_KEY ?? '',
+      auth: env.LIVE_VOICE_COMPATIBLE_AUTH || 'bearer',
+      model: env.LIVE_VOICE_COMPATIBLE_MODEL || '',
     })
   }
   if (kind === 'openai-realtime') {

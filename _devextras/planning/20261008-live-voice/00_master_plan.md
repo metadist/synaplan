@@ -16,8 +16,9 @@ older binaries. A native audio plugin is not included: loudspeaker echo in
 WKWebView is still unmeasured. LV8 (CarPlay live relay, 20-second resume,
 spoken budget end, spoken fallback to the turn-based loop) is in the working
 tree of both repositories. J-LV-6 and J-LV-7 were not walked on a device.
-A head-unit echo and barge-in pass is still open. Next product step is those
-walks, then LV9.
+A head-unit echo and barge-in pass is still open. LV9 (Realtime-compatible
+endpoint, Unmute recipe, barge-in on the spoken web reply) is in the working
+tree. A self-hosted model was not spoken on a GPU.
 
 **Goal:** A person presses one button next to the microphone and talks with
 Synaplan like with ChatGPT Voice or Gemini Live: full duplex, interruptible,
@@ -614,7 +615,11 @@ schema file in the sidecar is the single source for TS and Swift tests.
 | `LIVE_VOICE.IDLE_SECONDS` | 120 | both sides silent |
 | `LIVE_VOICE.WARN_SECONDS` | 60 | limit warning |
 | `LIVE_VOICE.TICK_SECONDS` | 15 | metering interval |
-| `LIVE_VOICE.CONCURRENCY.<provider>` | openai 50, google 100, xai 10 | provider caps (Redis semaphore) |
+| `LIVE_VOICE.CONCURRENCY.<provider>` | openai 50, google 100, xai 10, compatible 4 | provider caps (Redis semaphore) |
+| `LIVE_VOICE_COMPATIBLE_WS_URL` | empty (model hidden) | Realtime-compatible websocket (vLLM-Omni, Azure, Qwen Cloud) |
+| `LIVE_VOICE_COMPATIBLE_API_KEY` | empty | key for that socket; empty sends none |
+| `LIVE_VOICE_COMPATIBLE_AUTH` | `bearer` | `bearer`, `api-key`, or `none` |
+| `LIVE_VOICE_COMPATIBLE_MODEL` | empty (seeded `qwen3-omni`) | upstream model or Azure deployment name |
 
 Compose: profile `voice` for `synaplan-voice`; `.env.minimal` and
 `docker-compose.minimal.yml` list the decisive env (FeatureModule rule).
@@ -712,6 +717,14 @@ LV0 is done.
 - **Copy.** The four spoken sentences (budget used up, busy, unavailable, connection lost) are in de, en, es, fr, and tr. They do not tell the driver to use the iPhone. The car screen still shows no message text. A sentence that was already spoken does not add an alert.
 - **Empty, error, flag-off.** No consent, or live voice not configured: the existing turn-based loop, with no extra sentence. A used-up budget ends the conversation. A relay the car cannot use is ended, then the turn-based loop. A drop longer than 20 seconds says the connection was lost and ends.
 - **Theme and size.** No new CarPlay controls. Audio uses the existing voice graph. This was not played on a head unit.
+
+### LV9 exit (UX contract §6)
+
+- **Journey.** A self-hosted model was not spoken on a GPU. The compatible adapter sends the Realtime session setup, including `consult_synaplan`, against a local fixture. The spoken web reply stops when speech holds over it, if the microphone was already allowed. That was not walked in the browser.
+- **Findability.** The model is "Compatible realtime" in the live model list, and only while `LIVE_VOICE_COMPATIBLE_WS_URL` is a websocket URL. Talk time is the existing live-conversation row. The host's own bill is outside Synaplan.
+- **Copy.** No new screen sentence. The catalog description says Synaplan does not add a per-minute price. The self-hosted recipe is `docs/LIVE_VOICE_SELF_HOSTED.md`.
+- **Empty, error, flag-off.** An empty URL hides the model. A bad socket ends like any other provider error. Flag off still hides the button. Without a granted microphone, a spoken reply plays through.
+- **Theme and size.** Unchanged. The barge-in decision is the same thresholds as CarPlay.
 
 ---
 

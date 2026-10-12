@@ -81,6 +81,12 @@ Caddy proxies `/voice/ws` to the sidecar and sends `/internal/voice` to PHP. A m
 
 Usage is ticked about every 15 seconds. A session with no tick for 45 seconds is closed by `app:voice:reap-sessions` on the scheduler tick (about once a minute) and billed up to the last tick. Idle silence of two minutes ends the conversation from the sidecar. The admin max length is `BCONFIG` `LIVE_VOICE` / `MAX_SESSION_SECONDS` (default 1800, floor 60).
 
-Per-provider caps default to OpenAI 50, Google 100, xAI 10. Override with `LIVE_VOICE` / `CONCURRENCY_OPENAI` (and `CONCURRENCY_GOOGLE`, `CONCURRENCY_XAI`). Redis down refuses a new conversation, because a ticket cannot be made single-use without it.
+Per-provider caps default to OpenAI 50, Google 100, xAI 10, and 4 for a compatible endpoint. Override with `LIVE_VOICE` / `CONCURRENCY_OPENAI` (and `CONCURRENCY_GOOGLE`, `CONCURRENCY_XAI`, `CONCURRENCY_COMPATIBLE`). Redis down refuses a new conversation, because a ticket cannot be made single-use without it.
 
 Gemini sessions send `contextWindowCompression` and reconnect with the resumption handle on `GoAway`. That reconnect does not open a second usage row.
+
+## Your own realtime endpoint
+
+`LIVE_VOICE_COMPATIBLE_WS_URL` points the sidecar at one OpenAI-Realtime-compatible websocket. Empty hides the "Compatible realtime" model. The same variables belong on the backend and on the voice container. Details, including Azure, Qwen Cloud, vLLM-Omni, and the Unmute recipe, are in [LIVE_VOICE_SELF_HOSTED.md](LIVE_VOICE_SELF_HOSTED.md).
+
+That model always uses the relay. Synaplan records the talk time and does not add a per-minute price. A spoken reply in the normal chat stops when the person talks over it, if the microphone was already allowed.

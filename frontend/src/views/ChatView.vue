@@ -726,6 +726,7 @@ import { claimOwnedChatForSend } from '@/utils/claimOwnedChatForSend'
 import { showStoreCards } from '@/composables/useChatWelcome'
 import GettingStartedChecklist from '@/components/chat/GettingStartedChecklist.vue'
 import { AudioStreamer } from '@/utils/AudioStreamer'
+import { startBargeInMonitor } from '@/services/voice/bargeIn'
 import { createSmoothStream } from '@/utils/smoothStream'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import {
@@ -1514,6 +1515,7 @@ let attachedRunId: string | null = null
 // Chat currently marked as "still answering" in the sidebar by this view.
 let generatingChatId: number | null = null
 let currentAudioStreamer: AudioStreamer | null = null
+let stopBargeIn: (() => void) | null = null
 const isAudioStreaming = ref(false)
 
 // Processing status for real-time feedback
@@ -4107,7 +4109,18 @@ const streamAIResponse = async (
       if (options?.voiceReply) {
         currentAudioStreamer = new AudioStreamer()
         isAudioStreaming.value = true
+        currentAudioStreamer.setOnPlaybackStart(() => {
+          stopBargeIn?.()
+          stopBargeIn = startBargeInMonitor(() => {
+            stopBargeIn?.()
+            stopBargeIn = null
+            currentAudioStreamer?.stop()
+            void chatInputRef.value?.startDictation()
+          })
+        })
         currentAudioStreamer.setOnFinished(() => {
+          stopBargeIn?.()
+          stopBargeIn = null
           isAudioStreaming.value = false
           currentAudioStreamer = null
         })

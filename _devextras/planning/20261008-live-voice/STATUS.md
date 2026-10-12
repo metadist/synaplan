@@ -162,3 +162,14 @@ budget is one spoken sentence and the conversation ends. A busy or down live
 service is one spoken sentence, then the turn-based loop in the same chat.
 The car screen still shows no message text. J-LV-7 was not walked. Echo and
 barge-in on a head unit were not measured. No new latency numbers.
+
+## LV9
+
+A Realtime-compatible websocket (`LIVE_VOICE_COMPATIBLE_WS_URL`) offers one
+model for vLLM-Omni, Azure Realtime, or Qwen Cloud. Auth is bearer, `api-key`,
+or none. The seeded model id is `qwen3-omni`; `LIVE_VOICE_COMPATIBLE_MODEL`
+replaces it. Synaplan records the duration and adds no per-minute price. At
+most four of these sockets stay open. Unmute is documented as a separate
+recipe, not a provider. A spoken web reply stops when speech holds over it
+and the microphone was already allowed. A GPU walk was not done. No new
+latency numbers.

@@ -6061,5 +6061,26 @@ class ModelCatalog
                 'features' => ['live_voice'],
             ],
         ],
+        [
+            'id' => 395,
+            'service' => 'Compatible',
+            'name' => 'Compatible realtime',
+            'tag' => 'voice2voice',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'qwen3-omni',
+            'priceIn' => 0,
+            'inUnit' => 'permin',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI-Realtime-compatible speech-to-speech on an endpoint you run or rent (vLLM-Omni, Azure Realtime, or Qwen Cloud). Off until LIVE_VOICE_COMPATIBLE_WS_URL is set. Synaplan does not add a per-minute price; duration is still recorded. Answers still come from the user\'s chat model.',
+                'pricing_mode' => 'per_second',
+                'params' => ['model' => 'qwen3-omni'],
+                'features' => ['live_voice'],
+            ],
+        ],
     ];
 }

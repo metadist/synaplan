@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { WebSocketServer } from 'ws'
+import { compatibleHeaders, createCompatibleAdapter } from '../src/adapters/compatible.js'
 import { createGeminiAdapter } from '../src/adapters/gemini.js'
 import { adapterKind } from '../src/adapters/index.js'
 import { createOpenAiAdapter, mapOpenAiUsage } from '../src/adapters/openai.js'
@@ -79,6 +80,40 @@ test('adapter kind follows the model, not only the provider', () => {
   assert.equal(adapterKind('openai', 'gpt-realtime-2.1-mini'), 'openai-realtime')
   assert.equal(adapterKind('google', 'gemini-3.8-live-extended-thinking'), 'gemini')
   assert.equal(adapterKind('xai', 'grok-voice-think-fast-2.0'), 'xai')
+  assert.equal(adapterKind('compatible', 'qwen3-omni'), 'compatible')
+})
+
+test('a compatible endpoint speaks realtime and picks the auth header', async () => {
+  assert.deepEqual(compatibleHeaders('none', 'secret'), {})
+  assert.deepEqual(compatibleHeaders('bearer', ''), {})
+  assert.deepEqual(compatibleHeaders('api-key', 'azure-key'), { 'api-key': 'azure-key' })
+  assert.deepEqual(compatibleHeaders('bearer', 'sk-test'), { Authorization: 'Bearer sk-test' })
+
+  const server = new WebSocketServer({ port: 0, host: '127.0.0.1' })
+  await listen(server)
+  let seen = null
+  server.on('connection', (ws, request) => {
+    assert.equal(request.headers['api-key'], 'azure-key')
+    assert.equal(request.headers.authorization, undefined)
+    ws.on('message', (raw) => {
+      const event = JSON.parse(raw.toString())
+      if (event.type !== 'session.update') return
+      seen = event.session.model
+      assert.equal(event.session.tools[0].name, 'consult_synaplan')
+      ws.send(JSON.stringify({ type: 'session.updated' }))
+    })
+  })
+
+  const adapter = createCompatibleAdapter({
+    url: `ws://127.0.0.1:${server.address().port}`,
+    apiKey: 'azure-key',
+    auth: 'api-key',
+    model: 'my-deployment',
+  })
+  await adapter.open({ model: 'qwen3-omni', instructions: 'Ask Synaplan.', audio: { inRate: 24000, outRate: 24000 } })
+  assert.equal(seen, 'my-deployment')
+  adapter.close()
+  server.close()
 })
 
 test('Gemini extended thinking uses the same live setup', async () => {

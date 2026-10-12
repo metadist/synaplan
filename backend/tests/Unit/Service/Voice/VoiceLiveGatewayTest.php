@@ -20,6 +20,7 @@ use App\Service\CostCalculationService;
 use App\Service\Infrastructure\RedisService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\Voice\VoiceLiveCompatibleEndpoint;
 use App\Service\Voice\VoiceLiveConcurrency;
 use App\Service\Voice\VoiceLiveDelegationService;
 use App\Service\Voice\VoiceLiveInstructions;
@@ -110,6 +111,37 @@ final class VoiceLiveGatewayTest extends TestCase
         $on = new LiveVoiceModule($probe, 'http://voice:8096', 'secret', $readyModels, $readyKeys);
 
         self::assertTrue($on->isConfigured());
+    }
+
+    public function testACompatibleSocketCountsWithoutAProviderKey(): void
+    {
+        $probe = $this->createStub(SidecarHealthProbeInterface::class);
+        $model = (new Model())->setService('Compatible')->setTag('voice2voice')->setActive(1);
+        $models = $this->createStub(ModelRepository::class);
+        $models->method('findActiveByTag')->willReturn([$model]);
+        $keys = $this->createStub(ProviderKeyStore::class);
+        $keys->method('getStatus')->willReturn([
+            'configured' => false,
+            'source' => 'none',
+            'origin' => null,
+            'maskedKey' => '',
+            'hasSecret' => false,
+        ]);
+        $hidden = new LiveVoiceModule($probe, 'http://voice:8096', 'secret', $models, $keys, new VoiceLiveCompatibleEndpoint('https://gpu.example'));
+        self::assertFalse($hidden->isConfigured());
+        $shown = new LiveVoiceModule($probe, 'http://voice:8096', 'secret', $models, $keys, new VoiceLiveCompatibleEndpoint('wss://gpu.example/v1/realtime'));
+        self::assertTrue($shown->isConfigured());
+    }
+
+    public function testACompatibleGpuAllowsFourSockets(): void
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('increment')->willReturn(5);
+        $config = $this->createStub(ConfigRepository::class);
+        $config->method('getValue')->willReturn(null);
+
+        $this->expectException(VoiceLiveRejectedException::class);
+        (new VoiceLiveConcurrency($redis, $config))->acquire('compatible');
     }
 
     public function testConcurrencyRefusesTheFiftyFirstOpenAiSocket(): void

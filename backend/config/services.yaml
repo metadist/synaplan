@@ -239,6 +239,7 @@ parameters:
     env(LIVE_VOICE_GATEWAY_URL): ''
     env(LIVE_VOICE_GATEWAY_SECRET): ''
     env(LIVE_VOICE_PUBLIC_WS_PATH): '/voice/ws'
+    env(LIVE_VOICE_COMPATIBLE_WS_URL): ''
 
     # Meeting notes stay off until an operator points at the sidecar.
     env(OPENDESK_STT_URL): ''
@@ -1212,6 +1213,10 @@ services:
     App\Service\Voice\VoiceLiveSessionService:
         arguments:
             $publicWsPath: '%env(LIVE_VOICE_PUBLIC_WS_PATH)%'
+
+    App\Service\Voice\VoiceLiveCompatibleEndpoint:
+        arguments:
+            $wsUrl: '%env(LIVE_VOICE_COMPATIBLE_WS_URL)%'
 
     App\Module\Sidecar\OpendeskSttModule:
         arguments:

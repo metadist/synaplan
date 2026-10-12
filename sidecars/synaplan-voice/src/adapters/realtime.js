@@ -22,6 +22,7 @@ export function createRealtimeAdapter({
   WebSocketImpl = WebSocket,
   countTextItems = false,
   omitAudioFormat = false,
+  headers,
 } = {}) {
   const listeners = new Map()
   let ws = null
@@ -65,7 +66,7 @@ export function createRealtimeAdapter({
         : (url ?? `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(config.model ?? '')}`)
       await new Promise((resolve, reject) => {
         ws = new WebSocketImpl(socketUrl, {
-          headers: { Authorization: `Bearer ${apiKey ?? ''}` },
+          headers: headers ?? { Authorization: `Bearer ${apiKey ?? ''}` },
         })
         ws.on('error', (error) => {
           if (!opened) reject(error)
