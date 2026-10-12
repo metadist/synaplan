@@ -1693,9 +1693,11 @@ onMounted(async () => {
 
   if (!authStore.isAuthenticated) {
     await guestStore.initSession()
+    if (isViewUnmounted) return
 
     if (guestStore.chatId) {
       const rawMessages = await guestStore.loadMessages()
+      if (isViewUnmounted) return
       if (rawMessages.length > 0) {
         historyStore.clear()
         // Use the SAME row mapper as the authenticated reload path (issue
@@ -1705,6 +1707,7 @@ onMounted(async () => {
         const loaded: Message[] = rawMessages.map((m) => mapApiMessageRow(m))
         historyStore.messages.push(...loaded)
         await nextTick()
+        if (isViewUnmounted) return
         scrollToBottom()
       }
 
@@ -1713,6 +1716,7 @@ onMounted(async () => {
       void resumeActiveRunIfAny()
     }
 
+    if (isViewUnmounted) return
     const restricted = route.query.restricted as string | undefined
     if (restricted) {
       featureGateKey.value = restricted
@@ -1727,6 +1731,7 @@ onMounted(async () => {
       }
     }, 100)
 
+    if (isViewUnmounted) return
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
     window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
     window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)

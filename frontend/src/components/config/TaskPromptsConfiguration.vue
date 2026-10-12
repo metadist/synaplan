@@ -184,6 +184,7 @@
             v-else-if="error"
             class="text-center py-12 px-4"
             data-testid="task-prompts-load-error"
+            role="alert"
           >
             <p class="text-sm txt-secondary">{{ error }}</p>
             <button

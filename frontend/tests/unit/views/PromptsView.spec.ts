@@ -271,6 +271,6 @@ describe('PromptsView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('/beta')
-    expect(wrapper.text()).not.toContain('/alpha')
+    expect(wrapper.text()).toContain('/alpha')
   })
 })

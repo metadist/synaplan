@@ -568,7 +568,11 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
     await openApp(page)
     await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     const chat = new ChatHelper(page)
-    await chat.startNewChat()
+    // New Chat lives in the desktop rail. On a phone that rail is hidden, and
+    // the composer is already the empty or current chat.
+    if (!isMobileViewport(page)) {
+      await chat.startNewChat()
+    }
     await chat.sendMessage('Hello from the contrast check')
     const edit = page.getByTestId('btn-message-edit')
     await expect(edit).toBeVisible({ timeout: TIMEOUTS.VERY_LONG })
