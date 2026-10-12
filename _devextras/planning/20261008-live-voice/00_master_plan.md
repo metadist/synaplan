@@ -10,7 +10,11 @@ sheet, panel, settings, five locales) is in the working tree. LV4 (budget
 warning, wrap-up, activity row, admin live list) is in the working tree.
 LV5 (Realtime, Realtime mini, Gemini extended thinking, Grok Voice) is in
 the working tree. LV6 (optional OpenAI WebRTC, admin switch default off) is
-in the working tree. Next product step is LV7.
+in the working tree. LV7 (native `liveVoice` capability, microphone purpose
+string, store notes) is in the apps working tree. The button stays hidden on
+older binaries. A native audio plugin is not included: loudspeaker echo in
+WKWebView is still unmeasured. Next product step is the J-LV-6 walk on an
+iPhone and an Android device, then LV8.
 **Goal:** A person presses one button next to the microphone and talks with
 Synaplan like with ChatGPT Voice or Gemini Live: full duplex, interruptible,
 no typing. The answer still comes from *their* Synaplan chat (chat model,
@@ -688,6 +692,14 @@ LV0 is done.
 - **Copy.** The sentence names what the next OpenAI conversation does, that Google and xAI stay on the server, and that turning it off does not move a conversation already running. de, en, es, fr, tr.
 - **Empty, error, flag-off.** Default is off, so every conversation stays on the relay. Flag off hides the section. A failed save says the setting was not stored.
 - **Theme and size.** The switch uses the shared secondary button. Latency against a live provider was not measured. The fixture shows the sideband usage meter matches the relay mapper, and a stop closes the sideband.
+
+### LV7 exit (UX contract §6)
+
+- **Journey.** J-LV-6 (waveform button on the phone loudspeaker, answer stops when the person talks over it) was not walked. It needs a new binary on an iPhone and an Android device, a gateway, a provider key, and budget left. The capability flag is the app-local `SynaplanLiveVoice` plugin. Older binaries do not register it, so the button stays absent.
+- **Findability.** The button is the same waveform control as on the web, beside the microphone. The transcript lands in the same chat. The cost row is the existing live-conversation row on statistics.
+- **Copy.** The iOS microphone purpose string names a live conversation. Store listing bullets and review notes are in de, en, es, and tr. No new in-app sentence: the panel copy is the web copy already in five locales.
+- **Empty, error, flag-off.** No plugin, module off, or a guest account: the button is absent and dictation stays. A denied microphone uses the existing terminal sentence and offers the turn-based microphone. A spent budget opens the existing store subscription screen. There is no new product.
+- **Theme and size.** Unchanged from the web panel. Audio stays in the WebView. A native audio plugin waits on the iPhone loudspeaker echo measurement.
 
 ---
 

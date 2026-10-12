@@ -1,9 +1,11 @@
+import { hasNativeLiveVoice as binaryHasLiveVoice } from '@/services/api/nativeLiveVoice'
+
 /**
- * MOBILE-APP SEAM: the current store binary has no live-voice audio path.
- * The button stays hidden there until a binary exposes `liveVoice`.
+ * MOBILE-APP SEAM: older store binaries have no live-voice path. The button
+ * stays hidden until a binary exposes `window.SynaplanLiveVoice`.
  */
 export function hasNativeLiveVoice(): boolean {
-  return false
+  return binaryHasLiveVoice()
 }
 
 export function liveVoiceButtonVisible(input: {

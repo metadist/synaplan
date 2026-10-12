@@ -7,7 +7,7 @@ import {
   liveTerminalMessageKey,
 } from '@/services/liveVoice/terminal'
 import { liveVoiceSocketUrl } from '@/services/liveVoice/socket-url'
-import { liveVoiceButtonVisible } from '@/services/liveVoice/visibility'
+import { liveVoiceButtonVisible, hasNativeLiveVoice } from '@/services/liveVoice/visibility'
 
 describe('live voice button', () => {
   it('shows the button only when the module is on for a signed-in web user', () => {
@@ -23,6 +23,28 @@ describe('live voice button', () => {
         nativeLiveVoice: true,
       })
     ).toBe(true)
+  })
+
+  it('reads the binary capability and stays hidden when that binary omits it', () => {
+    const global = globalThis as { SynaplanLiveVoice?: { isAvailable: () => boolean } }
+    const previous = global.SynaplanLiveVoice
+    delete global.SynaplanLiveVoice
+    expect(hasNativeLiveVoice()).toBe(false)
+    expect(liveVoiceButtonVisible({ enabled: true, guest: false, nativeApp: true })).toBe(false)
+
+    global.SynaplanLiveVoice = { isAvailable: () => true }
+    expect(hasNativeLiveVoice()).toBe(true)
+    expect(liveVoiceButtonVisible({ enabled: true, guest: false, nativeApp: true })).toBe(true)
+
+    global.SynaplanLiveVoice = {
+      isAvailable: () => {
+        throw new Error('bridge down')
+      },
+    }
+    expect(hasNativeLiveVoice()).toBe(false)
+
+    if (previous) global.SynaplanLiveVoice = previous
+    else delete global.SynaplanLiveVoice
   })
 
   it('keeps the button when the monthly budget is already used up', () => {

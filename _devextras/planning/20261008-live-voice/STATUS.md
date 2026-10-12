@@ -140,3 +140,14 @@ delegation, usage and kill. Google and xAI stay on the relay. The fixture
 posts the same usage meter the relay mapper would, and a stop closes the
 sideband. A live provider conversation was not walked. The latency gain
 against a provider was not measured.
+
+## LV7
+
+The apps shell registers `SynaplanLiveVoice` on iOS and Android. The SPA
+shows the waveform button only when that plugin is present, so an older
+binary keeps it hidden. Audio stays in the WebView on the relay socket.
+Capacitor already grants Android `RESOURCE_AUDIO_CAPTURE` from the existing
+microphone permission. The iOS purpose string names a live conversation.
+There is no new in-app product. The loudspeaker echo measurement is still
+open, so there is no native audio plugin. J-LV-6 was not walked on a device.
+No new latency numbers.
