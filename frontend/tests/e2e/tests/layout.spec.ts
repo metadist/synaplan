@@ -14,6 +14,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { test, expect, LOGGED_OUT, type Page } from '../test-setup'
 import { openApp } from '../helpers/auth'
+import { ChatHelper } from '../helpers/chat'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
 
@@ -519,6 +520,9 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
     await openApp(page)
     await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     if (!isMobileViewport(page)) {
+      // openApp reopens the worker account's last chat, which earlier tests
+      // filled; the empty-chat scan needs a chat that is actually empty.
+      await new ChatHelper(page).startNewChat()
       await axeBlocking(page, 'empty-chat')
       await page.locator(NAV.sidebarV2Assistants).click()
       await expect(page.locator(NAV.sidebarPanel)).toBeVisible({ timeout: TIMEOUTS.SHORT })

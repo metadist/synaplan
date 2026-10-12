@@ -2,6 +2,7 @@ import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
+import { openMemories } from '../helpers/memories'
 import { TIMEOUTS, INTERVALS, getApiUrl } from '../config/config'
 
 const MEM = selectors.memories
@@ -90,7 +91,7 @@ test.describe('@ci Long-term memory', () => {
       })
 
       await test.step('Assert: Memories shows the entry', async () => {
-        await page.goto('/memories')
+        await openMemories(page)
         await page.locator(MEM.btnViewLongTerm).click()
         await expect(page.locator(MEM.sectionLongTerm)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
         await expect(page.locator(MEM.textLongTermIntro)).toBeVisible()
@@ -112,7 +113,7 @@ test.describe('@ci Long-term memory', () => {
       })
 
       await test.step('Act: delete the entry', async () => {
-        await page.goto('/memories')
+        await openMemories(page)
         await page.locator(MEM.btnViewLongTerm).click()
         const row = page.locator(MEM.itemLongTerm).filter({ hasText: title })
         await row.locator(MEM.btnLongTermDelete).click()

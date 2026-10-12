@@ -376,8 +376,11 @@ const refreshChats = async () => {
   // The chats store sends signed-out callers to the login page.
   if (isGuest.value) return
   chatsReady.value = false
+  // Incoming has its own section and fails closed; a slow share lookup must
+  // not hold the user's own list in its loading state.
+  void incomingStore.load()
   try {
-    await Promise.all([chatsStore.loadRailChats(true), incomingStore.load()])
+    await chatsStore.loadRailChats(true)
   } finally {
     chatsReady.value = true
     void nextTick(() => fillUntilScrollable())

@@ -22,8 +22,16 @@ services:
 
     # Warnings carry the degradations (e.g. "Qdrant health check timed out")
     # that explain a failed E2E run; CI collects these logs on failure.
+    #
+    # The image is immutable here, so the kernel runs without debug and OPcache
+    # never re-stats files, as in prod. Debug mode plus per-request revalidation
+    # doubled every E2E test's duration on the shared 4-vCPU runner and pushed
+    # waits over their timeouts. PHP warnings still throw: see
+    # `framework.php_errors` under `when@test`.
     environment:
       LOG_LEVEL: warning
+      APP_DEBUG: "0"
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: "0"
 
   ollama_test:
     profiles: !override

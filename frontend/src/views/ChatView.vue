@@ -1074,6 +1074,12 @@ let assistantChatBootstrapped = assistantThreadReady.value
 let suppressNextChatHistoryLoad = false
 let suppressBottomScrollForFocus = false
 let historyLoadedChatId: number | null = null
+// The history load the activeChatId watcher has in flight. The boot path joins
+// it instead of starting a second load for the same chat: a second load makes
+// the first response stale, so the spinner waits for the slower request.
+let watcherHistoryLoad: { chatId: number; done: Promise<void> } | null = null
+// False until the mount has settled the first chat selection.
+let chatBootSettled = false
 let programmaticMessageScroll = false
 let messageFocusGeneration = 0
 let messageFocusQueue: Promise<void> = Promise.resolve()
@@ -1779,11 +1785,17 @@ onMounted(async () => {
   // If no active chat, create one. A message deep link loads through
   // enqueueMessageFocus, which owns that chat's history.
   if (!focusTarget) {
-    if (!chatsStore.activeChatId) {
+    const bootChatId = chatsStore.activeChatId
+    if (!bootChatId) {
       await chatsStore.createChat('New Chat')
-    } else {
-      // Load messages for active chat
-      await historyStore.loadMessages(chatsStore.activeChatId)
+    } else if (watcherHistoryLoad?.chatId === bootChatId) {
+      // The selection changed while the list was loading (boot restore or a
+      // New Chat click); the watcher loads this chat and resumes its run.
+      await watcherHistoryLoad.done
+    } else if (historyLoadedChatId !== bootChatId && !incognitoStore.active) {
+      // Load messages for active chat. An incognito session started during
+      // boot keeps its transcript; ending it loads this chat.
+      await historyStore.loadMessages(bootChatId)
       if (chatsStore.activeChatId !== null) {
         historyLoadedChatId = chatsStore.activeChatId
       }
@@ -1804,6 +1816,7 @@ onMounted(async () => {
   } finally {
     assistantThreadReady.value = true
     assistantChatBootstrapped = true
+    chatBootSettled = true
   }
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
@@ -2253,11 +2266,16 @@ watch(
   () => chatsStore.activeChatId,
   async (newChatId, oldChatId) => {
     const focusAtStart = messageFocusGeneration
+    // The first selection while the view boots (from no chat) is the list
+    // arriving, not a pick. An incognito session started meanwhile keeps its
+    // transcript; ending that session restores this chat.
+    const bootSelectionUnderIncognito =
+      oldChatId == null && !chatBootSettled && incognitoStore.active
     // Picking a chat from the sidebar while incognito is active ends the
     // session (the incognito transcript is meant to be discarded). The
     // incognito watcher above restores nothing here — this watcher loads the
     // newly selected chat below.
-    if (oldChatId !== newChatId && incognitoStore.active) {
+    if (oldChatId !== newChatId && incognitoStore.active && !bootSelectionUnderIncognito) {
       void incognitoStore.endSession()
     }
 
@@ -2300,11 +2318,17 @@ watch(
       if (oldChatId !== newChatId) {
         historyLoadedChatId = null
       }
-      const skippedHistoryLoad = suppressNextChatHistoryLoad
+      const skippedHistoryLoad = suppressNextChatHistoryLoad || bootSelectionUnderIncognito
       if (suppressNextChatHistoryLoad) {
         suppressNextChatHistoryLoad = false
-      } else {
-        await historyStore.loadMessages(newChatId)
+      } else if (!bootSelectionUnderIncognito) {
+        const done = historyStore.loadMessages(newChatId)
+        watcherHistoryLoad = { chatId: newChatId, done }
+        try {
+          await done
+        } finally {
+          if (watcherHistoryLoad?.done === done) watcherHistoryLoad = null
+        }
         if (chatsStore.activeChatId === newChatId) {
           historyLoadedChatId = newChatId
         }
