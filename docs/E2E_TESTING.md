@@ -77,6 +77,7 @@ fixtures) is fixed instead.
   - `workspace-tab.spec.ts` "flag off": compute is on in the dev stack.
   - `admin-panel.spec.ts` "users: server-side search": once the dev database holds more than 50 users (guest sessions and E2E workers pile up), the admin row is no longer on the first page of the unfiltered list.
 - **Tests that reset mid-test after a file under `frontend/` was saved** during the run: Vite HMR reloaded the page (the trace shows module requests with `?t=<timestamp>`). Never save frontend files while Playwright runs against `:5173`; rerun the affected specs.
+- **`widget.spec.ts`: `Widget load error: Failed to fetch dynamically imported module: http://localhost:8000/widget.js`.** The `frontend-widgets` watcher was rebuilding `dist-widget/` after a change under `frontend/src/` (a rebuild takes over a minute; `docker compose logs frontend-widgets` ends with `built in …ms` when done). Rerun once the build has finished.
 - **`Generated API schemas do not match the backend OpenAPI spec`** from `globalSetup`: the backend spec changed since the frontend generated `src/generated/api-schemas.ts`. Run `make -C frontend generate-schemas`. The Vite dev server also regenerates them on a page load (at most every 30 s).
 - **`layout.spec.ts` "login page has no overflow and reachable submit" (chromium-mobile): `login submit: clipped bottom`.** The local login page shows the fresh-demo card above the form, which pushes Sign In below a ~664 px viewport. CI does not render that card. The same page's axe checks still pass.
 
@@ -285,6 +286,8 @@ Assert the **stable terminal DOM**, never an intermediate signal the app discard
 * **Keep-alive against stub control APIs.** A `beforeAll` Playwright `APIRequestContext` reused against `ollama-stub` `/__requests` after the chat (~6s idle) hits Node's default `keepAliveTimeout` (5s) → `socket hang up`. The chat UI had already succeeded. Retry once on that error in the stub helper; keep the stub's `keepAliveTimeout` above the longest chat wait. Do not treat a long-lived context as a live connection to a Node stub.
 * **No global model-default mutations from a parallel `@ci` spec.** `POST /api/v1/config/models/defaults` with `global: true` is process-wide. `afterAll` restore is not isolation — other workers already raced. Pin defaults in `globalSetup` only (TestProvider). Per-spec provider switches must be user-scoped or a dedicated serial job.
 * **Impersonation exit: banner hidden ≠ admin page mounted.** `refreshUser()` clears `impersonator` (banner hides) before `onExit` can `router.push({ name: 'admin' })`. Awaiting config reload / realtime inside `stopImpersonation` delayed that push; CI then sat on `/` for 15s waiting for `view-admin`. Return from stop as soon as the session is restored, and wait for `selectors.pages.admin`, not a pause after the banner.
+* **Two loads of the same chat history.** `ChatView`'s mount and its `activeChatId` watcher both loaded the selected chat's messages. The stale-response guard dropped the first answer, so "Loading messages…" stayed up until the slower request returned and `state-empty` missed its wait. A selection triggers one load; the mount joins the watcher's load instead of starting its own.
+* **A loading flag held by an unrelated request.** The sidebar's `data-chats-loading` waited for the incoming-shares lookup as well as the chat list. A loading marker covers only the data its section shows.
 
 ---
 
@@ -446,6 +449,12 @@ These are already configured in `playwright.config.ts` — do not duplicate or o
 | `screenshot` | `'only-on-failure'` | Do not add `page.screenshot()` unless debugging (remove before merge). |
 | `retries` | `1` (CI) / `0` (local) | Safety net, not a fix for flaky tests. |
 | `timeout` | `60_000` | Do not use `test.setTimeout()` unless genuinely needed (document why). |
+
+The CI stack (`docker-compose.test.ci.yml`) runs the test environment with
+`APP_DEBUG=0` and without OPcache timestamp checks, like prod. Debug mode and
+per-request revalidation doubled every test's duration on the shared 4-vCPU
+runner. PHP warnings still fail the request (`framework.php_errors.throw`
+under `when@test`).
 
 ---
 
