@@ -48,7 +48,12 @@ final class AdminGroupConfigController extends AbstractController
                                 type: 'object',
                                 required: ['value', 'source', 'locked'],
                                 properties: [
-                                    new OA\Property(property: 'value', nullable: true),
+                                    new OA\Property(
+                                        property: 'value',
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'The setting value. Null when the group has not set it. A list setting is a JSON array of strings.',
+                                    ),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, enum: ['group', 'admin']),
                                     new OA\Property(property: 'locked', type: 'boolean'),
                                 ]
@@ -115,7 +120,12 @@ final class AdminGroupConfigController extends AbstractController
                                 type: 'object',
                                 required: ['value', 'source', 'locked'],
                                 properties: [
-                                    new OA\Property(property: 'value', nullable: true),
+                                    new OA\Property(
+                                        property: 'value',
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'The setting value. Null when the group has not set it. A list setting is a JSON array of strings.',
+                                    ),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, enum: ['group', 'admin']),
                                     new OA\Property(property: 'locked', type: 'boolean'),
                                 ]

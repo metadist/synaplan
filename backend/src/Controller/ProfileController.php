@@ -139,6 +139,13 @@ class ProfileController extends AbstractController
     }
 
     #[Route('', name: 'update', methods: ['PUT', 'PATCH'])]
+    #[OA\Patch(
+        path: '/api/v1/profile',
+        summary: 'Update user profile',
+        description: 'Update authenticated user profile information',
+        security: [['Bearer' => []]],
+        tags: ['Profile']
+    )]
     #[OA\Put(
         path: '/api/v1/profile',
         summary: 'Update user profile',
@@ -575,6 +582,13 @@ class ProfileController extends AbstractController
     }
 
     #[Route('/email-keyword', name: 'set_email_keyword', methods: ['PUT', 'POST'])]
+    #[OA\Post(
+        path: '/api/v1/profile/email-keyword',
+        summary: 'Set user email keyword',
+        description: 'Set or update the user\'s email keyword for smart+keyword@synaplan.net',
+        security: [['Bearer' => []]],
+        tags: ['Profile']
+    )]
     #[OA\Put(
         path: '/api/v1/profile/email-keyword',
         summary: 'Set user email keyword',

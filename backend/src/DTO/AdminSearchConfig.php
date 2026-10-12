@@ -29,9 +29,21 @@ use OpenApi\Attributes as OA;
             ],
             type: 'object'
         ),
-        new OA\Property(property: 'activeRun', ref: new Model(type: AdminSearchRun::class), nullable: true),
+        new OA\Property(
+            property: 'activeRun',
+            description: 'The search reindex that is running, or null when nothing is running.',
+            type: 'object',
+            nullable: true,
+            allOf: [new OA\Schema(ref: new Model(type: AdminSearchRun::class))],
+        ),
         new OA\Property(property: 'otherRunActive', type: 'boolean', description: 'A documents or memories reindex is running; the embedding model cannot change until it ends', example: false),
-        new OA\Property(property: 'latestRun', ref: new Model(type: AdminSearchRun::class), nullable: true),
+        new OA\Property(
+            property: 'latestRun',
+            description: 'The most recent search reindex, or null when there has not been one.',
+            type: 'object',
+            nullable: true,
+            allOf: [new OA\Schema(ref: new Model(type: AdminSearchRun::class))],
+        ),
     ]
 )]
 final class AdminSearchConfig

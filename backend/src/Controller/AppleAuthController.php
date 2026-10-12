@@ -91,6 +91,11 @@ class AppleAuthController extends AbstractController
     }
 
     #[Route('/callback', name: 'apple_auth_callback', methods: ['GET', 'POST'])]
+    #[OA\Get(
+        path: '/api/v1/auth/apple/callback',
+        summary: 'Handle the Apple OAuth callback',
+        tags: ['Authentication']
+    )]
     #[OA\Post(
         path: '/api/v1/auth/apple/callback',
         summary: 'Handle the Apple OAuth callback (form_post)',

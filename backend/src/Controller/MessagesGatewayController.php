@@ -237,6 +237,12 @@ final class MessagesGatewayController extends AbstractController
     }
 
     #[Route('/keys/{provider}', name: 'put_key', methods: ['PUT', 'POST'], requirements: ['provider' => 'anthropic|openai|google'])]
+    #[OA\Post(
+        path: '/api/v1/messages-gateway/keys/{provider}',
+        summary: 'Save a BYO provider API key for the Messages gateway',
+        security: [['Bearer' => []]],
+        tags: ['Messages Gateway'],
+    )]
     #[OA\Put(
         path: '/api/v1/messages-gateway/keys/{provider}',
         summary: 'Save a BYO provider API key for the Messages gateway',

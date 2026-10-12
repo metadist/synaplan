@@ -95,7 +95,7 @@ class AdminController extends AbstractController
                             new OA\Property(property: 'type', type: 'string', example: 'email'),
                             new OA\Property(property: 'providerId', type: 'string', example: 'email'),
                             new OA\Property(property: 'emailVerified', type: 'boolean', example: true),
-                            new OA\Property(property: 'created', type: 'string', format: 'date-time', example: '2024-01-15 10:30:00'),
+                            new OA\Property(property: 'created', type: 'string', format: 'date-time', example: '2024-01-15T10:30:00+00:00'),
                             new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
                             new OA\Property(property: 'locale', type: 'string', example: 'en'),
                             new OA\Property(
