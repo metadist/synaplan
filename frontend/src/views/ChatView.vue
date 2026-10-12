@@ -1721,6 +1721,7 @@ onMounted(async () => {
     }
 
     setTimeout(() => {
+      if (isViewUnmounted) return
       if (chatInputRef.value?.textareaRef) {
         chatInputRef.value.textareaRef.focus()
       }
@@ -1758,6 +1759,10 @@ onMounted(async () => {
   })
 
   await Promise.all([chatsLoaded, modelsLoaded])
+  // The user may already have left the chat. route.query would then be the
+  // page they are on, and router.replace would rewrite it. The same leftover
+  // boot is what warns that the composer ref is gone.
+  if (isViewUnmounted) return
 
   // Deep link: /?chat=<id> opens that thread (Saved Tasks). Without it the
   // view reopened the last active chat. /?chat=<id>&message=<id> also scrolls
@@ -1781,6 +1786,7 @@ onMounted(async () => {
   } else if (requestedChatId !== null) {
     chatsStore.setActiveChat(requestedChatId)
   }
+  if (isViewUnmounted) return
 
   // If no active chat, create one. A message deep link loads through
   // enqueueMessageFocus, which owns that chat's history.
@@ -1796,6 +1802,7 @@ onMounted(async () => {
       // Load messages for active chat. An incognito session started during
       // boot keeps its transcript; ending it loads this chat.
       await historyStore.loadMessages(bootChatId)
+      if (isViewUnmounted) return
       if (chatsStore.activeChatId !== null) {
         historyLoadedChatId = chatsStore.activeChatId
       }
@@ -1804,6 +1811,7 @@ onMounted(async () => {
       void resumeActiveRunIfAny()
     }
   }
+  if (isViewUnmounted) return
 
   // Start chat from an assistant must not reopen an unrelated last thread.
   // A ?chat= deep link (Saved Tasks) keeps that thread even if agentId is set.
@@ -1814,10 +1822,13 @@ onMounted(async () => {
       await openFreshAssistantChatIfNeeded()
     }
   } finally {
-    assistantThreadReady.value = true
-    assistantChatBootstrapped = true
-    chatBootSettled = true
+    if (!isViewUnmounted) {
+      assistantThreadReady.value = true
+      assistantChatBootstrapped = true
+      chatBootSettled = true
+    }
   }
+  if (isViewUnmounted) return
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
   // freshly loaded history (no-op when the admin switch is off / not authed).
@@ -1829,12 +1840,14 @@ onMounted(async () => {
   // Scroll to newest message after initial load. A message deep link already
   // scrolled to that message inside enqueueMessageFocus.
   await nextTick()
+  if (isViewUnmounted) return
   if (!focusTarget) {
     scrollToBottom(true)
   }
 
   // Auto-focus ChatInput after mounting with delay
   setTimeout(() => {
+    if (isViewUnmounted) return
     if (chatInputRef.value?.textareaRef) {
       chatInputRef.value.textareaRef.focus()
     } else {

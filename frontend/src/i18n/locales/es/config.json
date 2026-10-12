@@ -509,6 +509,8 @@
       "deletePrompt": "Eliminar Prompt",
       "saveChanges": "Guardar Cambios",
       "noPrompts": "Aún no hay temas.",
+      "loading": "Cargando temas…",
+      "loadFailed": "No se han podido cargar los temas. Inténtalo de nuevo.",
       "noPromptsMatch": "Ningún tema coincide con tu búsqueda.",
       "workingLanguageHint": "Los temas se muestran en el idioma de la interfaz. Los temas que crees solo aparecen en este idioma."
     },

@@ -65,12 +65,8 @@ import { RouterLink } from 'vue-router'
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useTour } from '@/composables/useTour'
 import { CHECKLIST_SEEN_ID } from '@/tours'
-import { useAuthStore } from '@/stores/auth'
-import { useConfigStore } from '@/stores/config'
-import { listFiles } from '@/services/filesService'
-import { agentsApi } from '@/services/api/agentsApi'
-import { availableApps } from '@/apps/catalog'
-import { loadConnectedAppIds } from '@/apps/status'
+import { httpClient } from '@/services/api/httpClient'
+import { GetApiGettingStartedShowResponseSchema } from '@/generated/api-schemas'
 
 type ItemId = 'provider' | 'file' | 'assistant' | 'app'
 
@@ -87,22 +83,10 @@ const ITEM_TARGETS: Record<ItemId, string> = {
   app: '/apps',
 }
 
-const authStore = useAuthStore()
-const configStore = useConfigStore()
 const { seen, ensureLoaded, markSeen } = useTour()
 
 const loaded = ref(false)
 const status = ref<Partial<Record<ItemId, boolean>>>({})
-
-/** A check that fails leaves its item out: an unknown state is never shown as done or open. */
-async function check(id: ItemId, probe: () => Promise<boolean>): Promise<void> {
-  try {
-    const done = await probe()
-    status.value = { ...status.value, [id]: done }
-  } catch {
-    // Feature off or unreachable: the item stays absent.
-  }
-}
 
 const items = computed<Item[]>(() =>
   (Object.keys(ITEM_TARGETS) as ItemId[])
@@ -127,14 +111,19 @@ async function dismiss(): Promise<void> {
 onMounted(async () => {
   await ensureLoaded()
   if (seen.value.includes(CHECKLIST_SEEN_ID)) return
-  if (authStore.isAdmin) {
-    status.value = { provider: configStore.setup.chatReady !== false }
+  try {
+    const data = await httpClient('/api/v1/getting-started', {
+      schema: GetApiGettingStartedShowResponseSchema,
+    })
+    const next: Partial<Record<ItemId, boolean>> = {}
+    for (const id of Object.keys(ITEM_TARGETS) as ItemId[]) {
+      const value = data.items?.[id]
+      if (typeof value === 'boolean') next[id] = value
+    }
+    status.value = next
+  } catch {
+    // An unknown checklist stays hidden. It is never shown as all open.
   }
-  await Promise.all([
-    check('file', async () => (await listFiles({ limit: 1 })).pagination.total > 0),
-    check('assistant', async () => (await agentsApi.list()).length > 0),
-    check('app', async () => (await loadConnectedAppIds(await availableApps())).size > 0),
-  ])
   loaded.value = true
 })
 </script>

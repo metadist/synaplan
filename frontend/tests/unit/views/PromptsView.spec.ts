@@ -236,4 +236,41 @@ describe('PromptsView', () => {
     expect(names.map((text) => text.split('/')[0].trim())).toEqual(['Alpha', 'Beta', 'Gamma'])
     expect(calls('GET')).toHaveLength(1)
   })
+
+  it('keeps a shortcut that was saved while the list request was still open', async () => {
+    let releaseList: (value: { success: boolean; prompts: Row[] }) => void = () => {}
+    const pendingList = new Promise<{ success: boolean; prompts: Row[] }>((resolve) => {
+      releaseList = resolve
+    })
+    httpClient.mockImplementation(
+      (endpoint: string, options: { method?: string; body?: string } = {}) => {
+        if ((options.method ?? 'GET') === 'GET' && endpoint === '/api/v1/saved-prompts') {
+          return pendingList
+        }
+        return route(endpoint, options)
+      }
+    )
+
+    const wrapper = mount(PromptsView, {
+      global: { stubs: { MainLayout: { template: '<div><slot /></div>' } } },
+    })
+    await wrapper.find('[data-testid="btn-prompt-new"]').trigger('click')
+    await wrapper.find('[data-testid="input-saved-prompt-name"]').setValue('Beta')
+    await wrapper.find('[data-testid="input-saved-prompt-command"]').setValue('beta')
+    await wrapper.find('[data-testid="input-saved-prompt-body"]').setValue('B')
+    await wrapper.find('[data-testid="form-saved-prompt"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('/beta')
+    expect(wrapper.find('[data-testid="form-saved-prompt"]').exists()).toBe(false)
+
+    releaseList({
+      success: true,
+      prompts: [{ id: 1, name: 'Alpha', command: 'alpha', body: 'A', tags: [] }],
+    })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('/beta')
+    expect(wrapper.text()).not.toContain('/alpha')
+  })
 })

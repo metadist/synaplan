@@ -175,6 +175,12 @@ const errorText = ref('')
 const loaded = ref(false)
 const loadFailed = ref(false)
 const draft = ref({ name: '', command: '', body: '' })
+/**
+ * A list response captured before a save or delete must not paint over that
+ * change. The network can finish first and the callback can still run later,
+ * while the chat boot is keeping the main thread busy.
+ */
+let listEpoch = 0
 
 /** Show these rows and hand them to the slash menu and the command search. */
 function showPrompts(rows: SavedPromptRow[]): void {
@@ -183,16 +189,19 @@ function showPrompts(rows: SavedPromptRow[]): void {
 }
 
 async function load(): Promise<void> {
+  const epoch = ++listEpoch
   try {
     const data = await httpClient('/api/v1/saved-prompts', {
       schema: GetApiSavedPromptsListResponseSchema,
     })
+    if (epoch !== listEpoch) return
     showPrompts(data.prompts ?? [])
     loadFailed.value = false
   } catch {
+    if (epoch !== listEpoch) return
     loadFailed.value = true
   } finally {
-    loaded.value = true
+    if (epoch === listEpoch) loaded.value = true
   }
 }
 
@@ -249,6 +258,7 @@ async function save(): Promise<void> {
   saving.value = true
   try {
     const saved = await writeDraft(editingId.value)
+    listEpoch += 1
     showPrompts(withSavedRow(saved))
     closeForm()
     success(t('savedPrompts.saved'))
@@ -278,6 +288,7 @@ async function remove(prompt: SavedPromptRow): Promise<void> {
     return
   }
   if (editingId.value === id) closeForm()
+  listEpoch += 1
   showPrompts(prompts.value.filter((row) => row.id !== id))
 }
 
