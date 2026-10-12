@@ -22,6 +22,7 @@ use App\Service\Iam\ShareService;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
 use App\Service\PastedContentText;
+use App\Service\RAG\VectorSearchService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -54,6 +55,7 @@ class ChatController extends AbstractController
         private UserRepository $userRepository,
         private ConversationFileHistory $conversationFileHistory,
         private ChatActionPolicy $chatActionPolicy,
+        private VectorSearchService $vectorSearchService,
     ) {
     }
 
@@ -871,7 +873,9 @@ class ChatController extends AbstractController
     #[Route('/shared/{token}', name: 'shared', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/chats/shared/{token}',
+        operationId: 'getSharedChat',
         summary: 'Get a publicly shared chat by token',
+        description: 'Returns the chat title and its messages. Knowledge sources are ids and labels only; the passage is loaded separately.',
         security: [],
         tags: ['Chats'],
         parameters: [
@@ -882,27 +886,83 @@ class ChatController extends AbstractController
                 response: 200,
                 description: 'Shared chat with messages',
                 content: new OA\JsonContent(
+                    required: ['success', 'chat', 'messages'],
                     properties: [
-                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(
                             property: 'chat',
-                            type: 'object',
+                            required: ['title', 'createdAt'],
                             properties: [
                                 new OA\Property(property: 'title', type: 'string'),
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                            ]
+                            ],
+                            type: 'object',
                         ),
                         new OA\Property(
                             property: 'messages',
                             type: 'array',
                             items: new OA\Items(
-                                type: 'object',
+                                required: ['id', 'text', 'direction', 'timestamp'],
                                 properties: [
+                                    new OA\Property(property: 'id', type: 'integer'),
+                                    new OA\Property(property: 'text', type: 'string'),
+                                    new OA\Property(property: 'direction', type: 'string', enum: ['IN', 'OUT']),
+                                    new OA\Property(property: 'timestamp', type: 'integer'),
+                                    new OA\Property(property: 'topic', type: 'string'),
+                                    new OA\Property(property: 'language', type: 'string'),
+                                    new OA\Property(property: 'provider', type: 'string'),
+                                    new OA\Property(
+                                        property: 'file',
+                                        nullable: true,
+                                        required: ['path', 'type'],
+                                        properties: [
+                                            new OA\Property(property: 'path', type: 'string'),
+                                            new OA\Property(property: 'type', type: 'string'),
+                                        ],
+                                        type: 'object',
+                                    ),
+                                    new OA\Property(
+                                        property: 'files',
+                                        type: 'array',
+                                        items: new OA\Items(
+                                            required: ['id', 'filename', 'fileType', 'filePath'],
+                                            properties: [
+                                                new OA\Property(property: 'id', type: 'integer'),
+                                                new OA\Property(property: 'filename', type: 'string'),
+                                                new OA\Property(property: 'fileType', type: 'string'),
+                                                new OA\Property(property: 'filePath', type: 'string'),
+                                                new OA\Property(property: 'fileSize', type: 'integer', nullable: true),
+                                                new OA\Property(property: 'fileMime', type: 'string', nullable: true),
+                                            ],
+                                            type: 'object',
+                                        ),
+                                    ),
+                                    new OA\Property(
+                                        property: 'ragSources',
+                                        type: 'array',
+                                        nullable: true,
+                                        description: 'Sources cited by this answer. Passage text is not included.',
+                                        items: new OA\Items(
+                                            required: ['n', 'chunkId', 'fileId', 'fileName', 'groupKey', 'startLine', 'endLine'],
+                                            properties: [
+                                                new OA\Property(property: 'n', type: 'integer'),
+                                                new OA\Property(property: 'chunkId', type: 'string'),
+                                                new OA\Property(property: 'fileId', type: 'integer'),
+                                                new OA\Property(property: 'fileName', type: 'string'),
+                                                new OA\Property(property: 'groupKey', type: 'string'),
+                                                new OA\Property(property: 'score', type: 'number', nullable: true),
+                                                new OA\Property(property: 'startLine', type: 'integer'),
+                                                new OA\Property(property: 'endLine', type: 'integer'),
+                                            ],
+                                            type: 'object',
+                                        ),
+                                    ),
                                     new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
                                     new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
                                     new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
                                     new OA\Property(property: 'voiceReplyFailed', type: 'string', nullable: true, description: 'Voice-reply failure reason when TTS was requested but no audio was stored (provider_error, empty_text, rate_limited)'),
-                                ]
+                                ],
+                                type: 'object',
                             )
                         ),
                     ]
@@ -940,6 +1000,62 @@ class ChatController extends AbstractController
             ],
             'messages' => $messageData,
         ]);
+    }
+
+    /**
+     * Passage for a source this shared chat already cited.
+     * An unknown token and an uncited chunk id are the same not-found.
+     */
+    #[Route('/shared/{token}/rag/chunks/{chunkId}', name: 'shared_rag_chunk', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/chats/shared/{token}/rag/chunks/{chunkId}',
+        operationId: 'getSharedChatRagChunk',
+        summary: 'Load a cited knowledge passage for a shared chat',
+        description: 'Returns the passage only when this share token is public and a message of that chat cites the chunk id. The chat list stores ids only.',
+        security: [],
+        tags: ['Chats'],
+        parameters: [
+            new OA\Parameter(name: 'token', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'chunkId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Passage text',
+                content: new OA\JsonContent(
+                    required: ['success', 'chunkId', 'fileId', 'text', 'startLine', 'endLine'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'chunkId', type: 'string'),
+                        new OA\Property(property: 'fileId', type: 'integer'),
+                        new OA\Property(property: 'fileName', type: 'string', nullable: true),
+                        new OA\Property(property: 'groupKey', type: 'string'),
+                        new OA\Property(property: 'text', type: 'string'),
+                        new OA\Property(property: 'startLine', type: 'integer'),
+                        new OA\Property(property: 'endLine', type: 'integer'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: 'Share token or cited passage not found'),
+        ]
+    )]
+    public function sharedRagChunk(string $token, string $chunkId): JsonResponse
+    {
+        $chat = $this->chatRepository->findPublicByShareToken($token);
+        if (!$chat instanceof Chat) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+        $chatId = $chat->getId();
+        if (null === $chatId || !$this->messageRepository->chatCitesChunk($chatId, $chunkId)) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $passage = $this->vectorSearchService->passage($chat->getUserId(), $chunkId);
+        if (null === $passage) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json(['success' => true] + $passage);
     }
 
     #[Route('/{id}/continue', name: 'continue', methods: ['POST'])]

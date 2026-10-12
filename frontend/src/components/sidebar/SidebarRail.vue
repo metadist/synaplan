@@ -50,7 +50,7 @@
         :data-tour="`rail-${section.key}`"
         @pointerenter="scheduleTip(section, $event)"
         @pointerleave="hideTipSoon"
-        @focus="scheduleTip(section, $event, true)"
+        @focus="showTipOnKeyboardFocus(section, $event)"
         @blur="hideTipNow"
         @click="openSection(section.key)"
       >
@@ -191,6 +191,12 @@ function placeTip(section: NavSection, anchor: HTMLElement) {
     top: rect.top + rect.height / 2,
     left: rect.right + 10,
   }
+}
+
+function showTipOnKeyboardFocus(section: NavSection, event: FocusEvent) {
+  const anchor = event.currentTarget
+  if (!(anchor instanceof HTMLElement) || !anchor.matches(':focus-visible')) return
+  scheduleTip(section, event, true)
 }
 
 function scheduleTip(section: NavSection, event: Event, immediate = false) {
