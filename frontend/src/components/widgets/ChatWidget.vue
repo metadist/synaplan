@@ -641,6 +641,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
+import { stripThinkingBlocks } from '@/utils/stripThinkingBlocks'
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   XMarkIcon,
@@ -2292,12 +2293,6 @@ async function handleMessagesClick(event: MouseEvent): Promise<void> {
       console.error('Failed to copy:', err)
     }
   }
-}
-
-const stripThinkingBlocks = (text: string): string => {
-  let result = text.replace(/<think>[\s\S]*?<\/think>/g, '')
-  result = result.replace(/<think>[\s\S]*$/, '')
-  return result.trim()
 }
 
 const renderMessageContent = (value: string, role: 'user' | 'assistant' = 'assistant'): string => {
