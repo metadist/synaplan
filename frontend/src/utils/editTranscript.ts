@@ -8,6 +8,10 @@ export function questionText(parts: Part[]): string {
     .join('\n')
 }
 
+export function attachmentIdsForEdit(files: { id: number }[] | undefined): number[] {
+  return (files ?? []).map((file) => file.id).filter((id) => Number.isFinite(id) && id > 0)
+}
+
 function withQuestionText(parts: Part[], text: string): Part[] {
   const kept = parts.filter((part) => part.type !== 'text')
   return [{ type: 'text', content: text }, ...kept]

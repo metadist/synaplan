@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Message } from '@/stores/history'
 import {
   questionText,
+  attachmentIdsForEdit,
   shouldReloadTranscriptAfterVersionLink,
   transcriptAfterSavedEdit,
 } from '@/utils/editTranscript'
@@ -56,6 +57,13 @@ describe('transcriptAfterSavedEdit', () => {
 
     expect(edited[0].parts.map((part) => part.type)).toEqual(['text', 'image'])
     expect(questionText(edited[0].parts)).toBe('new sentence')
+  })
+
+  it('sends the question attachments with the edited text', () => {
+    expect(attachmentIdsForEdit(undefined)).toEqual([])
+    expect(attachmentIdsForEdit([{ id: 4 }, { id: 0 }, { id: Number.NaN }, { id: 9 }])).toEqual([
+      4, 9,
+    ])
   })
 
   it('reloads the transcript after an edit link and not after Again or a chat switch', () => {

@@ -653,7 +653,10 @@ import { iamApi } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { canComposeChat, isSharedConversationLocked } from '@/utils/sharedConversationLock'
 import { chatGoneStatus, continueOutcomeAfterRecheck } from '@/utils/chatAccessError'
-import { shouldReloadTranscriptAfterVersionLink } from '@/utils/editTranscript'
+import {
+  attachmentIdsForEdit,
+  shouldReloadTranscriptAfterVersionLink,
+} from '@/utils/editTranscript'
 import SharedConversationBanner from '@/components/iam/SharedConversationBanner.vue'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
@@ -3399,6 +3402,21 @@ function buildIncognitoHistorySnapshot(): IncognitoHistoryEntry[] {
  * ("An answer cannot be a version of itself"), which crashed the chat.
  * Call this from the complete/error handler, after that id exists.
  */
+async function reloadEditedTranscript(editedChatId: number | undefined): Promise<void> {
+  if (
+    editedChatId == null ||
+    !shouldReloadTranscriptAfterVersionLink({
+      kind: 'edit',
+      incognito: incognitoStore.active,
+      editedChatId,
+      activeChatId: chatsStore.activeChatId,
+    })
+  ) {
+    return
+  }
+  await historyStore.loadMessages(editedChatId)
+}
+
 function recordVersionLink(
   link: { kind: 'again' | 'edit'; previousId: number } | undefined,
   createdId: number | undefined,
@@ -3411,22 +3429,15 @@ function recordVersionLink(
       // replaces that bubble and closes its model list. An edit reloads
       // after the link so the open transcript matches the saved question.
       // A chat switch during the stream must not load this chat over the
-      // one the person is looking at now.
+      // one the person is looking at now. A failed link reloads too, so
+      // the optimistic wording does not stay when the server kept the
+      // previous question.
       await chatApi.linkTurn(createdId, link.kind, link.previousId)
-      if (
-        shouldReloadTranscriptAfterVersionLink({
-          kind: link.kind,
-          incognito: incognitoStore.active,
-          editedChatId,
-          activeChatId: chatsStore.activeChatId,
-        }) &&
-        editedChatId != null
-      ) {
-        await historyStore.loadMessages(editedChatId)
-      }
+      if (link.kind === 'edit') await reloadEditedTranscript(editedChatId)
     } catch (err) {
       console.error('Failed to record the answer version', err)
       showErrorToast(t('chat.versionLinkFailed'))
+      if (link.kind === 'edit') await reloadEditedTranscript(editedChatId)
     }
   })()
 }
@@ -3510,6 +3521,8 @@ const streamAIResponse = async (
     textSmoother.flush()
     textSmoother.cancel()
   })
+
+  let editedChatIdForRestore: number | undefined
 
   try {
     if (useMockData) {
@@ -4048,6 +4061,12 @@ const streamAIResponse = async (
       // Incognito turns belong to no chat — the backend processes them fully
       // in-memory and gets the conversation context from the history payload.
       const chatId = incognito ? undefined : (chatsStore.activeChatId ?? undefined)
+      editedChatIdForRestore = chatId
+
+      const restoreUnpersistedEdit = () => {
+        if (options?.linkVersion?.kind !== 'edit') return
+        void reloadEditedTranscript(chatId)
+      }
 
       // Snapshot the in-memory transcript for the backend (prior turns only:
       // the current user message is sent separately, and the just-created
@@ -4981,6 +5000,8 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
             if (typeof data.messageId === 'number') {
               recordVersionLink(options?.linkVersion, data.messageId, chatId)
+            } else {
+              restoreUnpersistedEdit()
             }
 
             // Issue #1070: the streamed state is only a live preview — the
@@ -5093,6 +5114,7 @@ const streamAIResponse = async (
               stopStreamingFn = null
               currentTrackId = undefined
               currentStreamingChatId = undefined
+              restoreUnpersistedEdit()
               return
             }
 
@@ -5143,6 +5165,7 @@ const streamAIResponse = async (
               stopStreamingFn = null
               currentTrackId = undefined
               currentStreamingChatId = undefined
+              restoreUnpersistedEdit()
               return
             }
 
@@ -5173,6 +5196,7 @@ const streamAIResponse = async (
               stopStreamingFn = null
               currentTrackId = undefined
               currentStreamingChatId = undefined
+              restoreUnpersistedEdit()
               return
             }
 
@@ -5198,6 +5222,7 @@ const streamAIResponse = async (
               stopStreamingFn = null
               currentTrackId = undefined
               currentStreamingChatId = undefined
+              restoreUnpersistedEdit()
               return
             }
 
@@ -5232,6 +5257,8 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
             if (typeof data.messageId === 'number') {
               recordVersionLink(options?.linkVersion, data.messageId, chatId)
+            } else {
+              restoreUnpersistedEdit()
             }
 
             // Clean up streaming resources after error
@@ -5272,6 +5299,7 @@ const streamAIResponse = async (
     stopStreamingFn = null
     currentTrackId = undefined
     currentStreamingChatId = undefined
+    if (options?.linkVersion?.kind === 'edit') void reloadEditedTranscript(editedChatIdForRestore)
   }
   // NOTE: Don't clean up in finally block! The streaming is async and still running.
   // Cleanup happens in the 'complete' event handler or in handleUserStop()
@@ -5744,8 +5772,10 @@ async function selectMessageVersion(messageId: number, kind: 'answer' | 'edit'):
 async function editUserMessage(message: Message, text: string): Promise<void> {
   const previousId = message.backendMessageId
   if (!isGuestMode.value && !incognitoStore.active && chatsStore.activeChatId == null) return
+  const fileIds = attachmentIdsForEdit(message.files)
   historyStore.applySavedEdit(message.id, text)
   await streamAIResponse(text, {
+    ...(fileIds.length > 0 ? { fileIds } : {}),
     linkVersion: previousId ? { kind: 'edit', previousId } : undefined,
   })
 }
