@@ -64,8 +64,22 @@ describe('getCostTier', () => {
     expect(tier('Banana 2')).toBe('mid')
     expect(tier('gpt-image-1.5')).toBe('high')
     expect(tier('Pro')).toBe('high')
+  })
 
-    expect(getCostTier(rows[0]!, rows).tier).toBe('low')
+  it('uses the text-to-image price when that capability is passed', () => {
+    const rows = [image('Flare', 0.01317, 0.05268), image('Pro', 0.134, 0.134)]
+
+    expect(getCostTier(rows[0]!, rows, 'TEXT2PIC').tier).toBe('low')
+    expect(getCostTier(rows[1]!, rows, 'TEXT2PIC').tier).toBe('mid')
+  })
+
+  it('falls back to the average when an image row has no capability price', () => {
+    const priced = image('Flare', 0.01317, 0.05268)
+    const bare = model(0, 0.2)
+    const peers = [priced, bare]
+
+    expect(getCostTier(bare, peers, 'PIC2PIC').tier).toBe('mid')
+    expect(getCostTier(bare, peers, 'PIC2PIC').tier).toBe(getCostTier(bare, peers).tier)
   })
 })
 

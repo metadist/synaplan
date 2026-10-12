@@ -10,6 +10,7 @@ use App\AI\Provider\ReasoningLevelCatalog;
 use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Bundle\BundleConfig;
+use App\DTO\ImageModelRow;
 use App\Entity\Config;
 use App\Entity\User;
 use App\Model\ModelCatalog;
@@ -58,6 +59,7 @@ use App\Service\UserMemoryService;
 use App\Service\WebSpeechConfig;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -976,18 +978,20 @@ class ConfigController extends AbstractController
                                     new OA\Property(property: 'priceIn', type: 'number', example: 0.15, description: 'USD per 1M input tokens'),
                                     new OA\Property(property: 'priceOut', type: 'number', example: 0.6, description: 'USD per 1M output tokens'),
                                     new OA\Property(property: 'priceKnown', type: 'boolean', example: true, description: 'False when the model was imported from a listing that published no price. The menu then says "price unknown" instead of "Free".'),
-                                    new OA\Property(
-                                        property: 'capabilityPrices',
-                                        type: 'object',
-                                        nullable: true,
-                                        description: 'Per-image price an image dropdown badges. TEXT2PIC is medium quality at the default size; PIC2PIC is high quality at that size, which is what an edit is billed. Absent on chat rows.',
-                                        properties: [
-                                            new OA\Property(property: 'TEXT2PIC', type: 'number', example: 0.01317),
-                                            new OA\Property(property: 'PIC2PIC', type: 'number', example: 0.05268),
-                                        ]
-                                    ),
                                 ]
                             )
+                        ),
+                        new OA\Property(
+                            property: 'TEXT2PIC',
+                            type: 'array',
+                            description: 'Text-to-image rows. capabilityPrices.TEXT2PIC is the medium price at the default size.',
+                            items: new OA\Items(ref: new Model(type: ImageModelRow::class))
+                        ),
+                        new OA\Property(
+                            property: 'PIC2PIC',
+                            type: 'array',
+                            description: 'Image-edit rows. capabilityPrices.PIC2PIC is the high price at the default size, which is what an edit is billed.',
+                            items: new OA\Items(ref: new Model(type: ImageModelRow::class))
                         ),
                     ]
                 ),
