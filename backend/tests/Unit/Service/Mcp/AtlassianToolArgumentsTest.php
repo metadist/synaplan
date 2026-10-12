@@ -63,6 +63,39 @@ final class AtlassianToolArgumentsTest extends TestCase
         self::assertSame('compact', $completed['view']);
     }
 
+    public function testUsesTheSiteOfTheMatchingIssueWhenSeveralLinksArePresent(): void
+    {
+        $client = $this->createMock(McpClient::class);
+        $client->expects($this->never())->method('callTool');
+        $arguments = new AtlassianToolArguments($client, new NullLogger());
+
+        $completed = $arguments->complete(
+            $this->server('https://mcp.atlassian.com/v2/mcp'),
+            $this->issueTool(),
+            ['issueIdOrKey' => 'B-2'],
+            'https://site-a.atlassian.net/browse/A-1 and https://site-b.atlassian.net/browse/B-2',
+        );
+
+        self::assertSame('https://site-b.atlassian.net', $completed['cloudId']);
+        self::assertSame('B-2', $completed['issueIdOrKey']);
+    }
+
+    public function testDoesNotBorrowAnotherSitesLinkWhenTheKeyDoesNotMatch(): void
+    {
+        $client = $this->createMock(McpClient::class);
+        $client->expects($this->never())->method('callTool');
+        $arguments = new AtlassianToolArguments($client, new NullLogger());
+
+        $completed = $arguments->complete(
+            $this->server('https://mcp.atlassian.com/v2/mcp'),
+            $this->issueTool(),
+            ['issueIdOrKey' => 'B-2'],
+            'https://site-a.atlassian.net/browse/A-1',
+        );
+
+        self::assertArrayNotHasKey('cloudId', $completed);
+    }
+
     public function testUsesTheOnlySiteOnTheAccountWhenTheMessageHasNoLink(): void
     {
         $client = $this->createMock(McpClient::class);

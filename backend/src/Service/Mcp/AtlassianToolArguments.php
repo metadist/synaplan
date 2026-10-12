@@ -39,10 +39,20 @@ final readonly class AtlassianToolArguments
         $required = is_array($tool['inputSchema']['required'] ?? null) ? $tool['inputSchema']['required'] : [];
         $haystack = $sourceText."\n".$this->argumentText($arguments);
 
+        if (isset($properties['issueIdOrKey']) && !$this->filled($arguments['issueIdOrKey'] ?? null)) {
+            $key = $this->issueKey($haystack);
+            if (null !== $key) {
+                $arguments['issueIdOrKey'] = $key;
+            }
+        }
+
         if (isset($properties['cloudId']) && !$this->filled($arguments['cloudId'] ?? null)) {
-            $cloudId = $this->cloudIdFromText($haystack);
+            $knownKey = $this->filled($arguments['issueIdOrKey'] ?? null)
+                ? strtoupper(trim((string) $arguments['issueIdOrKey']))
+                : null;
+            $cloudId = $this->cloudIdForIssue($haystack, $knownKey);
             $source = 'link';
-            if (null === $cloudId && in_array('cloudId', $required, true)) {
+            if (null === $cloudId && null === $knownKey && in_array('cloudId', $required, true) && !$this->textHasIssueUrl($haystack)) {
                 $cloudId = $this->soleSite($server);
                 $source = 'account';
             }
@@ -53,13 +63,6 @@ final readonly class AtlassianToolArguments
                     'tool' => $tool['name'],
                     'source' => $source,
                 ]);
-            }
-        }
-
-        if (isset($properties['issueIdOrKey']) && !$this->filled($arguments['issueIdOrKey'] ?? null)) {
-            $key = $this->issueKey($haystack);
-            if (null !== $key) {
-                $arguments['issueIdOrKey'] = $key;
             }
         }
 
@@ -87,8 +90,35 @@ final readonly class AtlassianToolArguments
     }
 
     /**
-     * A browse link wins over any other Atlassian URL in the same message,
-     * so a ticket on one site is not read from another site mentioned nearby.
+     * When an issue key is already chosen, the site comes from the link for
+     * that key. Another link in the same message is a different site and is
+     * not used. With no key, the first Atlassian link in the message is used.
+     */
+    private function cloudIdForIssue(string $text, ?string $issueKey): ?string
+    {
+        if (null !== $issueKey && '' !== $issueKey) {
+            $key = preg_quote($issueKey, '#');
+            if (1 === preg_match('#https://([a-z0-9-]+)\.atlassian\.net/browse/'.$key.'(?:[/?\#\s]|$)#i', $text, $match)) {
+                return 'https://'.strtolower($match[1]).'.atlassian.net';
+            }
+            if (1 === preg_match('#https://([a-z0-9-]+)\.atlassian\.net/\S*[?&]selectedIssue='.$key.'(?:&|\#|\s|$)#i', $text, $match)) {
+                return 'https://'.strtolower($match[1]).'.atlassian.net';
+            }
+
+            return null;
+        }
+
+        return $this->cloudIdFromText($text);
+    }
+
+    private function textHasIssueUrl(string $text): bool
+    {
+        return 1 === preg_match('#https://[a-z0-9-]+\.atlassian\.net/(?:browse/[A-Z][A-Z0-9]+-\d+|\S*[?&]selectedIssue=)#i', $text);
+    }
+
+    /**
+     * The first Atlassian link in the message. Used only when the call has
+     * no issue key of its own.
      */
     private function cloudIdFromText(string $text): ?string
     {
