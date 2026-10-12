@@ -149,6 +149,18 @@ describe('History Store', () => {
     expect(store.messages[0].isSuperseded).toBe(true)
   })
 
+  it('replaces an edited question and drops the previous answer', () => {
+    const store = useHistoryStore()
+    store.addMessage('user', [{ type: 'text', content: 'old sentence' }])
+    store.addMessage('assistant', [{ type: 'text', content: 'old answer' }])
+    const questionId = store.messages[0].id
+
+    store.applySavedEdit(questionId, 'new sentence')
+
+    expect(store.messages).toHaveLength(1)
+    expect(store.messages[0].parts[0].content).toBe('new sentence')
+  })
+
   it('does not replace a newer live stream with a stale foreground load', async () => {
     let resolveLoad!: (value: {
       success: boolean

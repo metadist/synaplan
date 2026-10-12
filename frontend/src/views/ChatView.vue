@@ -653,6 +653,7 @@ import { iamApi } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { canComposeChat, isSharedConversationLocked } from '@/utils/sharedConversationLock'
 import { chatGoneStatus, continueOutcomeAfterRecheck } from '@/utils/chatAccessError'
+import { shouldReloadTranscriptAfterVersionLink } from '@/utils/editTranscript'
 import SharedConversationBanner from '@/components/iam/SharedConversationBanner.vue'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
@@ -3400,15 +3401,29 @@ function buildIncognitoHistorySnapshot(): IncognitoHistoryEntry[] {
  */
 function recordVersionLink(
   link: { kind: 'again' | 'edit'; previousId: number } | undefined,
-  createdId: number | undefined
+  createdId: number | undefined,
+  editedChatId: number | undefined
 ): void {
   if (!link || !createdId || createdId === link.previousId) return
   void (async () => {
     try {
-      // Do not reload the transcript here. The new answer is already on screen,
-      // and a reload that lands while the next Again is opening replaces that
-      // bubble and closes its model list.
+      // Again must not reload: a reload while the next Again is opening
+      // replaces that bubble and closes its model list. An edit reloads
+      // after the link so the open transcript matches the saved question.
+      // A chat switch during the stream must not load this chat over the
+      // one the person is looking at now.
       await chatApi.linkTurn(createdId, link.kind, link.previousId)
+      if (
+        shouldReloadTranscriptAfterVersionLink({
+          kind: link.kind,
+          incognito: incognitoStore.active,
+          editedChatId,
+          activeChatId: chatsStore.activeChatId,
+        }) &&
+        editedChatId != null
+      ) {
+        await historyStore.loadMessages(editedChatId)
+      }
     } catch (err) {
       console.error('Failed to record the answer version', err)
       showErrorToast(t('chat.versionLinkFailed'))
@@ -4965,7 +4980,7 @@ const streamAIResponse = async (
 
             historyStore.finishStreamingMessage(messageId)
             if (typeof data.messageId === 'number') {
-              recordVersionLink(options?.linkVersion, data.messageId)
+              recordVersionLink(options?.linkVersion, data.messageId, chatId)
             }
 
             // Issue #1070: the streamed state is only a live preview — the
@@ -5216,7 +5231,7 @@ const streamAIResponse = async (
             }
             historyStore.finishStreamingMessage(messageId)
             if (typeof data.messageId === 'number') {
-              recordVersionLink(options?.linkVersion, data.messageId)
+              recordVersionLink(options?.linkVersion, data.messageId, chatId)
             }
 
             // Clean up streaming resources after error
@@ -5728,6 +5743,8 @@ async function selectMessageVersion(messageId: number, kind: 'answer' | 'edit'):
 
 async function editUserMessage(message: Message, text: string): Promise<void> {
   const previousId = message.backendMessageId
+  if (!isGuestMode.value && !incognitoStore.active && chatsStore.activeChatId == null) return
+  historyStore.applySavedEdit(message.id, text)
   await streamAIResponse(text, {
     linkVersion: previousId ? { kind: 'edit', previousId } : undefined,
   })
