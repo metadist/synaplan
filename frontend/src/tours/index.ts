@@ -1,5 +1,8 @@
 import type { TourDefinition } from './types'
 
+/** Getting-started card on an empty chat. Dismissing it is stored like a tour. */
+export const CHECKLIST_SEEN_ID = 'checklist.dismissed'
+
 const definitions: TourDefinition[] = [
   {
     id: 'chats',
