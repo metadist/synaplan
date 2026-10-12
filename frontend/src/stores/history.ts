@@ -718,13 +718,15 @@ export const useHistoryStore = defineStore('history', () => {
 
   const clear = () => {
     // Drop any load that is still in flight. Incognito clears the transcript
-    // while the shared chat's messages may still be arriving.
+    // while the shared chat's messages may still be arriving. The dropped
+    // load no longer clears the loading flag, so it is cleared here.
     loadGeneration += 1
     stopInProgressPolling()
     messages.value = []
     currentOffset.value = 0
     hasMoreMessages.value = false
     activeRun.value = null
+    isLoadingMessages.value = false
   }
 
   const loadMessages = async (chatId: number, offset = 0, limit = 50, silent = false) => {
