@@ -8,6 +8,7 @@ use App\Entity\McpServerConfig;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\UserRepository;
+use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
@@ -59,6 +60,7 @@ final readonly class McpActionRunner implements TaskRunner
         private MultitaskRoutingConfig $routingConfig,
         private PromptService $promptService,
         private LoggerInterface $logger,
+        private AtlassianToolArguments $atlassianArguments,
         private ?ToolExecutionGate $executionGate = null,
         private ?ToolsConfig $toolsConfig = null,
         private ?UserRepository $users = null,
@@ -126,7 +128,12 @@ final readonly class McpActionRunner implements TaskRunner
             return NodeResult::failed(sprintf("the tool '%s' declares itself destructive and is not allowed", $tool));
         }
 
-        $arguments = $this->resolveArguments($node, $context);
+        $arguments = $this->atlassianArguments->complete(
+            $server,
+            $catalogTool,
+            $this->resolveArguments($node, $context),
+            (string) $context->message->getText(),
+        );
 
         $gated = $this->consultGate($context, $node, $serverId, $tool, $arguments);
         if (null !== $gated) {
