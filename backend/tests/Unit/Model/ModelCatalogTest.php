@@ -1197,6 +1197,66 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Meta Muse Wonder — standard pay-as-you-go id only (BIDs 396–397).
+     * Contributor mode is not sold on Model API, and Muse Wonder Full is
+     * Muse Code only.
+     */
+    public function testMuseWonderModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $wonder = ModelCatalog::find('meta:muse-wonder-1.0');
+
+        $this->assertCount(2, $wonder, 'Expected muse-wonder-1.0 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($wonder, 'tag'));
+        $this->assertSame(396, ModelCatalog::findBidByKey('meta:muse-wonder-1.0:chat'));
+        $this->assertSame(397, ModelCatalog::findBidByKey('meta:muse-wonder-1.0:pic2text'));
+
+        foreach ($wonder as $variant) {
+            $this->assertSame('Meta', $variant['service']);
+            $this->assertSame('muse-wonder-1.0', $variant['providerId']);
+            $this->assertSame('muse-wonder-1.0', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(4.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(20.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.20, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('US', $variant['json']['meta']['jurisdiction'] ?? null);
+            $this->assertSame('api.meta.ai', $variant['json']['meta']['host'] ?? null);
+        }
+
+        $chat = ModelCatalog::find('meta:muse-wonder-1.0:chat')[0];
+        $this->assertSame('high', $chat['json']['reasoning_effort_default'] ?? null);
+        $this->assertSame('1048576', $chat['json']['meta']['context_window'] ?? null);
+        $this->assertContains('tool_use', $chat['json']['features'] ?? []);
+        $this->assertContains('reasoning', $chat['json']['features'] ?? []);
+
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+        $this->assertNotContains('muse-wonder-1.0-contributor', $providerIds);
+    }
+
+    /**
+     * Muse Image is one text-to-image row that also edits (BIDs 398).
+     * Muse Voice Transcribe is the file speech-to-text row (BID 399).
+     */
+    public function testMuseImageAndTranscribeAreAvailableWithExpectedPrices(): void
+    {
+        $image = ModelCatalog::find('meta:muse-image-1.0:text2pic')[0];
+        $this->assertSame(398, $image['id']);
+        $this->assertSame('text2pic', $image['tag']);
+        $this->assertSame('muse-image-1.0', $image['providerId']);
+        $this->assertEqualsWithDelta(0.0, (float) $image['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.01, (float) $image['priceOut'], 1e-9);
+        $this->assertSame('per_image', $image['json']['pricing_mode'] ?? null);
+        $this->assertContains('pic2pic', $image['json']['features'] ?? []);
+
+        $speech = ModelCatalog::find('meta:muse-voice-transcribe-1.0:sound2text')[0];
+        $this->assertSame(399, $speech['id']);
+        $this->assertSame('sound2text', $speech['tag']);
+        $this->assertSame('muse-voice-transcribe-1.0', $speech['providerId']);
+        $this->assertEqualsWithDelta(0.18, (float) $speech['priceIn'], 1e-9);
+        $this->assertSame('perhour', $speech['inUnit']);
+        $this->assertSame('per_second', $speech['json']['pricing_mode'] ?? null);
+        $this->assertSame(600, $speech['json']['meta']['max_audio_seconds'] ?? null);
+    }
+
+    /**
      * Cerebras Shared Inference — Qwen 3.8 27B (chat + vision) and GPT OSS
      * 120B (text only), BIDs 383–385. Cached input is billed at the full
      * input rate, so the authored cache price must equal priceIn; without it

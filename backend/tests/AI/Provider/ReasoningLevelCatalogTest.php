@@ -71,6 +71,10 @@ final class ReasoningLevelCatalogTest extends TestCase
             ReasoningLevelCatalog::levels('Meta', 'muse-spark-1.3', ['reasoning']),
         );
         self::assertSame(
+            ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+            ReasoningLevelCatalog::levels('Meta', 'muse-wonder-1.0', ['reasoning']),
+        );
+        self::assertSame(
             ['low', 'high', 'max'],
             ReasoningLevelCatalog::levels('Hugging Face', 'moonshotai/kimi-k3', ['reasoning']),
         );

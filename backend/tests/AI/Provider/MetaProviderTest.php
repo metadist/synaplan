@@ -9,6 +9,8 @@ use App\AI\Provider\MetaProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 /**
  * Unit tests for MetaProvider.
@@ -35,7 +37,8 @@ class MetaProviderTest extends TestCase
 
         $this->assertContains('chat', $capabilities);
         $this->assertContains('vision', $capabilities);
-        $this->assertNotContains('speech_to_text', $capabilities);
+        $this->assertContains('image_generation', $capabilities);
+        $this->assertContains('speech_to_text', $capabilities);
     }
 
     public function testDefaultModels(): void
@@ -142,9 +145,176 @@ class MetaProviderTest extends TestCase
         $this->assertArrayNotHasKey('reasoning_effort', $request);
     }
 
-    private function makeProvider(?string $apiKey = 'test-key'): MetaProvider
+    public function testGenerateImagePostsToTheGenerationsEndpoint(): void
     {
-        return new MetaProvider(new NullLogger(), $apiKey);
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured = ['method' => $method, 'url' => $url, 'body' => $options['body'] ?? null];
+
+            return new MockResponse((string) json_encode([
+                'data' => [['b64_json' => base64_encode('PNG')]],
+                'output_format' => 'png',
+            ]));
+        });
+
+        $images = $this->makeProvider(httpClient: $client)->generateImage('a red fox', [
+            'model' => 'muse-image-1.0',
+            'size' => '1024x1024',
+        ]);
+
+        $this->assertSame('POST', $captured['method']);
+        $this->assertStringEndsWith('/images/generations', $captured['url']);
+        $body = json_decode((string) $captured['body'], true);
+        $this->assertSame('muse-image-1.0', $body['model']);
+        $this->assertSame('b64_json', $body['response_format']);
+        $this->assertSame('png', $body['output_format']);
+        $this->assertSame('1024x1024', $body['size']);
+        $this->assertArrayNotHasKey('images', $body);
+        $this->assertStringStartsWith('data:image/png;base64,', $images[0]['url']);
+    }
+
+    public function testGenerateImageWithAReferenceUsesTheEditsEndpoint(): void
+    {
+        $png = tempnam(sys_get_temp_dir(), 'meta-img');
+        $this->assertNotFalse($png);
+        file_put_contents($png, 'png-bytes');
+
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured = ['url' => $url, 'body' => $options['body'] ?? null];
+
+            return new MockResponse((string) json_encode([
+                'data' => [['b64_json' => base64_encode('PNG')]],
+                'output_format' => 'png',
+            ]));
+        });
+
+        try {
+            $this->makeProvider(httpClient: $client)->generateImage('add a red hat', [
+                'model' => 'muse-image-1.0',
+                'images' => [$png],
+            ]);
+        } finally {
+            unlink($png);
+        }
+
+        $this->assertStringEndsWith('/images/edits', $captured['url']);
+        $body = json_decode((string) $captured['body'], true);
+        $this->assertSame('add a red hat', $body['prompt']);
+        $this->assertStringStartsWith('data:', $body['images'][0]['image_url']);
+    }
+
+    public function testTranscribeSendsWavAndBillsWholeSeconds(): void
+    {
+        $wav = $this->writeWav(16000, 16000);
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $raw = self::requestBody($options['body'] ?? '');
+            $captured = ['url' => $url, 'raw' => $raw];
+
+            return new MockResponse((string) json_encode([
+                'transcript' => 'How is the weather?',
+                'audioDurationMs' => 8240,
+                'turns' => [],
+            ]));
+        });
+
+        try {
+            $result = $this->makeProvider(httpClient: $client)->transcribe($wav, [
+                'model' => 'muse-voice-transcribe-1.0',
+                'language' => 'de-DE',
+            ]);
+        } finally {
+            unlink($wav);
+        }
+
+        $this->assertStringEndsWith('/asr/transcribe', $captured['url']);
+        $this->assertStringContainsString('"audioEncoding":"WAV"', $captured['raw']);
+        $this->assertStringContainsString('"mode":"PUSH_TO_TALK"', $captured['raw']);
+        $this->assertStringContainsString('"languageBias":["German"]', $captured['raw']);
+        $this->assertStringContainsString('audio/wav', $captured['raw']);
+        $this->assertSame('How is the weather?', $result['text']);
+        $this->assertSame(8.0, $result['duration']);
+    }
+
+    public function testTranscribeRejectsAudioLongerThanTenMinutes(): void
+    {
+        $wav = $this->writeWav(16000, 32000 * 601);
+
+        try {
+            $this->expectException(ProviderException::class);
+            $this->expectExceptionMessage('10 minutes');
+            $this->makeProvider(httpClient: new MockHttpClient())->transcribe($wav);
+        } finally {
+            unlink($wav);
+        }
+    }
+
+    public function testMaskedEditAndTranslationAreRefused(): void
+    {
+        $provider = $this->makeProvider();
+
+        try {
+            $provider->editImage('/tmp/a.png', '/tmp/mask.png', 'change it');
+            $this->fail('Masked editing should be refused.');
+        } catch (ProviderException $e) {
+            $this->assertStringContainsString('mask', $e->getMessage());
+        }
+
+        $this->expectException(ProviderException::class);
+        $provider->translateAudio('/tmp/a.wav', 'en');
+    }
+
+    private static function requestBody(mixed $body): string
+    {
+        if (is_string($body)) {
+            return $body;
+        }
+
+        if ($body instanceof \Closure) {
+            $raw = '';
+            while ('' !== $chunk = $body(65536)) {
+                if (!is_string($chunk)) {
+                    break;
+                }
+                $raw .= $chunk;
+            }
+
+            return $raw;
+        }
+
+        if (is_iterable($body)) {
+            return implode('', iterator_to_array($body));
+        }
+
+        return '';
+    }
+
+    private function makeProvider(?string $apiKey = 'test-key', ?MockHttpClient $httpClient = null): MetaProvider
+    {
+        return new MetaProvider(new NullLogger(), $apiKey, httpClient: $httpClient);
+    }
+
+    /**
+     * Minimal mono 16-bit PCM WAV. The data chunk size can exceed the bytes
+     * written, which is how the 10-minute guard is tested without a huge file.
+     */
+    private function writeWav(int $sampleRate, int $dataBytes): string
+    {
+        $header = 'RIFF'.pack('V', 36 + $dataBytes).'WAVE';
+        $header .= 'fmt '.pack('V', 16);
+        $header .= pack('v', 1);
+        $header .= pack('v', 1);
+        $header .= pack('V', $sampleRate);
+        $header .= pack('V', $sampleRate * 2);
+        $header .= pack('v', 2);
+        $header .= pack('v', 16);
+        $header .= 'data'.pack('V', $dataBytes);
+        $path = tempnam(sys_get_temp_dir(), 'meta-wav');
+        $this->assertNotFalse($path);
+        file_put_contents($path, $header);
+
+        return $path;
     }
 
     /**

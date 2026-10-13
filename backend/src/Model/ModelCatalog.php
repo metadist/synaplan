@@ -5542,13 +5542,18 @@ class ModelCatalog
                 'features' => ['timestamps', 'diarization', 'multilingual'],
             ],
         ],
-        // ==================== META (Muse Spark) ====================
-        // Snapshot 2026-09-23 from https://developer.meta.com/ai/models/muse-spark/
-        // and https://dev.meta.ai/docs/api-reference/ (USD per 1M).
-        // OpenAI-compatible Chat Completions at https://api.meta.ai/v1.
-        // Standard tier only: muse-spark-1.3 is not used to improve Meta's
-        // products. The contributor id (muse-spark-1.3-contributor) is cheaper
-        // and is excluded on purpose.
+        // ==================== META (Muse Spark and Muse Wonder) ====================
+        // OpenAI-compatible Chat Completions at https://api.meta.ai/v1 (USD per 1M).
+        // Standard tier only: prompts are not used to train Meta's models.
+        // Spark snapshot 2026-09-23 from https://developer.meta.com/ai/models/muse-spark/.
+        // The contributor id (muse-spark-1.3-contributor) is cheaper and is
+        // excluded on purpose.
+        // Wonder snapshot 2026-10-13 from https://dev.meta.ai/docs/models and
+        // https://dev.meta.ai/docs/pricing-rate-limits. Pay-as-you-go is
+        // muse-wonder-1.0 only: Contributor mode is not sold on Model API, and
+        // Muse Wonder Full exists only inside Muse Code. Meta publishes a
+        // 1,048,576-token context and no separate output cap, so the request
+        // cap matches Muse Spark (32,768). Reasoning tokens count against it.
         [
             'id' => 369,
             'service' => 'Meta',
@@ -5600,6 +5605,123 @@ class ModelCatalog
                 'cache_read_price_per_1M' => 0.15,
                 'meta' => [
                     'supports_images' => true,
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 396,
+            'service' => 'Meta',
+            'name' => 'Muse Wonder',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-wonder-1.0',
+            'priceIn' => 4.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 20.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Wonder — Meta\'s most capable model for complex coding and long-running agents. 1,048,576-token context. Text and image input. Reasoning depth is configurable. Preview. Prompts are processed by Meta.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'muse-wonder-1.0'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.20,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '1048576',
+                    'max_output' => '32768',
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 397,
+            'service' => 'Meta',
+            'name' => 'Muse Wonder (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-wonder-1.0',
+            'priceIn' => 4.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 20.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Wonder image understanding — describe images and extract text (OCR-style) via the chat endpoint. Preview. Prompts are processed by Meta.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'muse-wonder-1.0'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.20,
+                'meta' => [
+                    'supports_images' => true,
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        // Muse Image snapshot 2026-10-13 from https://dev.meta.ai/docs/image-generation
+        // and https://dev.meta.ai/docs/pricing-rate-limits. Flat $0.01 per image
+        // the API returns, including built-in search. priceIn stays 0 so the
+        // per_image path does not bill the prompt a second time.
+        [
+            'id' => 398,
+            'service' => 'Meta',
+            'name' => 'Muse Image',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-image-1.0',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.01,
+            'outUnit' => 'perImage',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Image — generate a picture from a description, or attach a picture and describe the change. $0.01 per image returned, including built-in web search. Preview. Prompts are processed by Meta.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.01],
+                'params' => ['model' => 'muse-image-1.0'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => [
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        // Muse Voice Transcribe snapshot 2026-10-13 from
+        // https://dev.meta.ai/docs/speech-to-text and
+        // https://dev.meta.ai/docs/pricing-rate-limits. $0.18 per hour, billed
+        // on whole seconds. The file endpoint only; the live WebSocket is not
+        // wired. Recordings are converted to 16 kHz mono WAV and capped at 10 minutes.
+        [
+            'id' => 399,
+            'service' => 'Meta',
+            'name' => 'Muse Voice Transcribe',
+            'tag' => 'sound2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-voice-transcribe-1.0',
+            'priceIn' => 0.18,
+            'inUnit' => 'perhour',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Voice Transcribe — turn a recording into text. Up to 10 minutes per file. $0.18 per hour of audio. Preview. Audio is processed by Meta.',
+                'pricing_mode' => 'per_second',
+                'params' => ['model' => 'muse-voice-transcribe-1.0'],
+                'features' => ['multilingual'],
+                'meta' => [
+                    'max_audio_seconds' => 600,
                     'host' => 'api.meta.ai',
                     'jurisdiction' => 'US',
                 ],

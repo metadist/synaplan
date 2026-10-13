@@ -822,7 +822,7 @@
     },
     "meta": {
       "title": "Meta-API-Schlüssel",
-      "message": "Erstelle einen API-Schlüssel im Meta Model API-Dashboard (API keys) und füge ihn hier ein. Damit steht Muse Spark zur Verfügung. Prompts werden von Meta verarbeitet."
+      "message": "Erstelle einen API-Schlüssel im Meta Model API-Dashboard (API keys) und füge ihn hier ein. Damit stehen Muse Spark, Muse Wonder, Muse Image und Muse Voice Transcribe zur Verfügung. Prompts werden von Meta verarbeitet."
     },
     "cerebras": {
       "title": "Cerebras-API-Schlüssel",

@@ -480,6 +480,8 @@ services:
         tags:
             - { name: 'app.ai.chat', key: 'meta' }
             - { name: 'app.ai.vision', key: 'meta' }
+            - { name: 'app.ai.image_generation', key: 'meta' }
+            - { name: 'app.ai.speech_to_text', key: 'meta' }
 
     App\AI\Provider\CerebrasProvider:
         arguments:

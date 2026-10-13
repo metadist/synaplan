@@ -311,17 +311,22 @@ subscription plans are unsuitable for a production platform key. Get a key at
 [a2agent.me](https://a2agent.me/) under **dashboard → API keys**. Integration
 guides: [a2agent.me/integrations](https://a2agent.me/integrations).
 
-### Meta (Muse Spark)
+### Meta (Muse Spark and Muse Wonder)
 
 ```bash
 META_API_KEY=your_key_here
 ```
 
-Muse Spark 1.3 (chat and image understanding, 1M context) through the Meta Model API
-at `https://api.meta.ai/v1`. Meta's own SDK reads `MODEL_API_KEY`; Synaplan stores the
-same secret as `META_API_KEY`. Create a key at [dev.meta.ai](https://dev.meta.ai/)
-under **API keys → Create API key** (the key is shown only once).
-Docs: [dev.meta.ai/docs/authentication](https://dev.meta.ai/docs/authentication).
+Muse Spark 1.3, Muse Wonder (`muse-wonder-1.0`), Muse Image, and Muse Voice Transcribe
+through the Meta Model API at `https://api.meta.ai/v1`. Spark and Wonder do chat and
+image understanding with a 1M context. Spark stays the chat default: Wonder costs more
+and is meant for complex, long-running work. Muse Image generates and edits pictures
+at $0.01 per image. Muse Voice Transcribe turns a recording into text ($0.18 per hour,
+up to 10 minutes). The live transcription WebSocket is not used.
+Meta's own SDK reads `MODEL_API_KEY`; Synaplan stores the same secret as `META_API_KEY`.
+Create a key at [dev.meta.ai](https://dev.meta.ai/) under **API keys → Create API key**
+(the key is shown only once).
+Docs: [dev.meta.ai/docs/models](https://dev.meta.ai/docs/models).
 
 ### Cerebras
 
