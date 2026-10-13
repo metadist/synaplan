@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f5375d0303fe55ecb6b3c76fc4818080",
+    "content-hash": "14163768af77e4cc9882e07439411388",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -98,16 +98,16 @@
         },
         {
             "name": "api-platform/doctrine-orm",
-            "version": "v5.0.2",
+            "version": "v5.0.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-orm.git",
-                "reference": "dde36a3e2918c1538021aa6471c72d990158303f"
+                "reference": "73bc9eebd4f1320b72a3b48af1ef758922571423"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/dde36a3e2918c1538021aa6471c72d990158303f",
-                "reference": "dde36a3e2918c1538021aa6471c72d990158303f",
+                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/73bc9eebd4f1320b72a3b48af1ef758922571423",
+                "reference": "73bc9eebd4f1320b72a3b48af1ef758922571423",
                 "shasum": ""
             },
             "require": {
@@ -181,9 +181,9 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-orm/tree/v5.0.2"
+                "source": "https://github.com/api-platform/doctrine-orm/tree/v5.0.3"
             },
-            "time": "2026-10-01T14:00:43+00:00"
+            "time": "2026-10-09T14:13:14+00:00"
         },
         {
             "name": "api-platform/documentation",
@@ -960,16 +960,16 @@
         },
         {
             "name": "api-platform/symfony",
-            "version": "v5.0.2",
+            "version": "v5.0.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/symfony.git",
-                "reference": "580de5ee414656e05b48026574c99c29be2876ad"
+                "reference": "76146db515b3822f9fd3b4a3915a39f65f7fe30e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/symfony/zipball/580de5ee414656e05b48026574c99c29be2876ad",
-                "reference": "580de5ee414656e05b48026574c99c29be2876ad",
+                "url": "https://api.github.com/repos/api-platform/symfony/zipball/76146db515b3822f9fd3b4a3915a39f65f7fe30e",
+                "reference": "76146db515b3822f9fd3b4a3915a39f65f7fe30e",
                 "shasum": ""
             },
             "require": {
@@ -1023,6 +1023,7 @@
                 "api-platform/json-api": "to support the JSON-API format",
                 "api-platform/ramsey-uuid": "To support Ramsey's UUID identifiers.",
                 "api-platform/test": "To use the deprecated ApiPlatform\\Symfony\\Bundle\\Test classes.",
+                "ext-deepclone": "To speed up the PHP files metadata cache with symfony/var-exporter 8.1+ (install symfony/deepclone with PIE).",
                 "phpstan/phpdoc-parser": "To support extracting metadata from PHPDoc.",
                 "psr/cache-implementation": "To use metadata caching.",
                 "symfony/cache": "To have metadata caching when using Symfony integration.",
@@ -1087,9 +1088,9 @@
                 "symfony"
             ],
             "support": {
-                "source": "https://github.com/api-platform/symfony/tree/v5.0.2"
+                "source": "https://github.com/api-platform/symfony/tree/v5.0.3"
             },
-            "time": "2026-10-01T08:25:48+00:00"
+            "time": "2026-10-09T14:34:35+00:00"
         },
         {
             "name": "api-platform/validator",
@@ -2770,16 +2771,16 @@
         },
         {
             "name": "doctrine/orm",
-            "version": "3.7.4",
+            "version": "3.7.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/orm.git",
-                "reference": "84e21e325e3da22e46d7facbccdc9258f2332b1e"
+                "reference": "00c2fd70da291cca1ec75f4dae5344fe3df588fa"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/orm/zipball/84e21e325e3da22e46d7facbccdc9258f2332b1e",
-                "reference": "84e21e325e3da22e46d7facbccdc9258f2332b1e",
+                "url": "https://api.github.com/repos/doctrine/orm/zipball/00c2fd70da291cca1ec75f4dae5344fe3df588fa",
+                "reference": "00c2fd70da291cca1ec75f4dae5344fe3df588fa",
                 "shasum": ""
             },
             "require": {
@@ -2854,9 +2855,9 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/orm/issues",
-                "source": "https://github.com/doctrine/orm/tree/3.7.4"
+                "source": "https://github.com/doctrine/orm/tree/3.7.5"
             },
-            "time": "2026-10-05T18:31:26+00:00"
+            "time": "2026-10-09T05:58:13+00:00"
         },
         {
             "name": "doctrine/persistence",
@@ -13968,7 +13969,7 @@
     "packages-dev": [
         {
             "name": "api-platform/test",
-            "version": "v5.0.2",
+            "version": "v5.0.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/test.git",
@@ -14039,7 +14040,7 @@
             ],
             "support": {
                 "issues": "https://github.com/api-platform/test/issues",
-                "source": "https://github.com/api-platform/test/tree/v5.0.2"
+                "source": "https://github.com/api-platform/test/tree/v5.0.3"
             },
             "time": "2026-09-22T14:19:04+00:00"
         },
