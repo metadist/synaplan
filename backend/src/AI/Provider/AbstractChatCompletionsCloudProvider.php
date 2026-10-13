@@ -40,7 +40,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
      * saved in the admin UI (or imported from env) apply without a restart.
      */
     public function __construct(
-        private readonly LoggerInterface $logger,
+        protected readonly LoggerInterface $logger,
         private readonly ?string $apiKey = null,
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
         private readonly ?ProviderKeyStore $keyStore = null,
@@ -70,7 +70,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
 
     abstract protected function envVarHint(): string;
 
-    private function resolveApiKey(): ?string
+    protected function resolveApiKey(): ?string
     {
         if (null !== $this->apiKey && '' !== $this->apiKey) {
             return $this->apiKey;
@@ -292,7 +292,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
         $this->assertApiKey();
     }
 
-    private function assertApiKey(): void
+    protected function assertApiKey(): void
     {
         if (null === $this->client()) {
             throw ProviderException::missingApiKey($this->getName(), $this->envVarName());
@@ -383,7 +383,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
         return $imageUrl;
     }
 
-    private function imageToDataUrl(string $imageUrl): string
+    protected function imageToDataUrl(string $imageUrl): string
     {
         return $this->prepareImageUrl($this->resolveImageUrl($imageUrl));
     }

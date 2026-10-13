@@ -2502,7 +2502,7 @@ final readonly class SystemConfigService
             'META_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true,
-                'description' => 'Meta Model API key — Muse Spark. Create it at https://dev.meta.ai/ (API keys)',
+                'description' => 'Meta Model API key — Muse Spark, Muse Wonder, Muse Image, and Muse Voice Transcribe. Create it at https://dev.meta.ai/ (API keys)',
                 'default' => '', 'source' => 'database',
             ],
             'CEREBRAS_API_KEY' => [

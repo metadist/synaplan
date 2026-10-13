@@ -258,7 +258,7 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
 | **TrustedTokens** | ✅ verified 2026-09-17 (V4 Flash, Flash-0731 and V4 Pro retired) | https://trustedtokens.eu/api/billing/models |
 | **A2Agent** | ✅ verified 2026-09-14 (public group rate) | https://a2agent.me/models |
-| **Meta** | ✅ verified 2026-09-23 (Muse Spark 1.3 standard tier) | https://developer.meta.com/ai/models/muse-spark/ |
+| **Meta** | ✅ verified 2026-10-13 (Spark, Wonder, Image, Voice Transcribe) | https://dev.meta.ai/docs/pricing-rate-limits |
 | **Cerebras** | ✅ verified 2026-10-03 (pay-as-you-go; matches LiteLLM) | https://inference-docs.cerebras.ai/models/overview |
 | **xAI Grok Imagine + voice** | ✅ verified 2026-09-24 (chat rows are synced; grok-4.7 cache + long-context corrected) | https://docs.x.ai/docs/models · https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
@@ -332,13 +332,16 @@ The gateway resells each model under **its upstream vendor's own id**, so `deeps
 | 364 | `MiniMax-M3` | $0.30 / $1.20 | $0.30 / $1.20 | 1M |
 | 365 / 366 | `qwen3.8-flash` (chat + vision) | $0.15 / $0.47 | $0.15 / $0.47 | 1M |
 
-### Meta (verified 2026-09-23)
+### Meta (verified 2026-10-13)
 
-OpenAI-compatible Chat Completions at `https://api.meta.ai/v1`. Catalog stores the **standard** Muse Spark 1.3 rate from https://developer.meta.com/ai/models/muse-spark/ (not used to improve Meta's products). The contributor id `muse-spark-1.3-contributor` ($0.10 / $0.20, prompts used to improve Meta's products) is intentionally absent. Cache reads are $0.15 / 1M. `reasoning_effort` values are `minimal` / `low` / `medium` / `high` / `xhigh` / `max`; `none` returns HTTP 400, so Thinking off sends `minimal`. Not in LiteLLM → `unmatched` bucket. Keys are created at https://dev.meta.ai/ (API keys). Synaplan's env var is `META_API_KEY` (Meta's SDK calls the same secret `MODEL_API_KEY`).
+OpenAI-compatible Chat Completions at `https://api.meta.ai/v1`. Catalog stores **standard** rates (prompts are not used to train Meta's models). Sources: https://dev.meta.ai/docs/pricing-rate-limits and https://dev.meta.ai/docs/models. The Spark contributor id `muse-spark-1.3-contributor` ($0.10 / $0.20, prompts used to improve Meta's products) is intentionally absent. Muse Wonder has no Contributor mode on pay-as-you-go, and Muse Wonder Full is Muse Code only, so neither id is seeded. `reasoning_effort` values are `minimal` / `low` / `medium` / `high` / `xhigh` / `max`; `none` returns HTTP 400, so Thinking off sends `minimal`. Muse Image is a flat $0.01 per image the API returns (`pricing_mode: per_image`, `priceIn` 0 so the prompt is not billed again); failed or filtered images are not billed, and built-in search is included. Muse Voice Transcribe is $0.18 per hour on whole seconds, rounded down (`pricing_mode: per_second`, `inUnit: perhour`). The file endpoint is what we call; the live WebSocket is not. Not in LiteLLM → `unmatched` bucket. Keys are created at https://dev.meta.ai/ (API keys). Synaplan's env var is `META_API_KEY` (Meta's SDK calls the same secret `MODEL_API_KEY`).
 
 | BID | Model | Catalog in/out | Official (cache) | Context |
 | --- | ----- | -------------- | ---------------- | ------- |
 | 369 / 370 | `muse-spark-1.3` (chat + vision) | $1.25 / $4.25 | $1.25 / $4.25 (cache $0.15) | 1M |
+| 396 / 397 | `muse-wonder-1.0` (chat + vision) | $4.00 / $20.00 | $4.00 / $20.00 (cache $0.20) | 1,048,576 |
+| 398 | `muse-image-1.0` (generate + edit) | — / $0.01 per image | $0.01 per returned image (search included) | n/a |
+| 399 | `muse-voice-transcribe-1.0` | $0.18 per hour | $0.18 per hour, whole seconds | max 10 min |
 
 ### Cerebras (verified 2026-10-03)
 
