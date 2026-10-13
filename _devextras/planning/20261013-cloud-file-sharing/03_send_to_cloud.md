@@ -1,6 +1,8 @@
 # Goal 1 — Synaplan files into the cloud
 
 Plan of record: [`00_master_plan.md`](./00_master_plan.md) (decisions 11–12).
+The other direction — Synaplan reading files from the cloud for a run — is
+[`07_files_into_runs.md`](./07_files_into_runs.md).
 
 ## 1. Four ways a file reaches the cloud
 
@@ -56,8 +58,10 @@ Rules:
   `RedisService::getAndDelete()`), expires after 5 minutes, and only its own
   instance may claim it (C4).
 - **One endpoint per app** receives every Synaplan notification:
-  `{type: delivery | watches_changed | identity_revoked, id}`. All three
-  types work the same way — the app fetches with its own credential.
+  `{type: delivery | pickup | watches_changed | identity_revoked, id}`. All
+  four types work the same way — the app fetches with its own credential. A
+  `pickup` is this protocol in reverse: Synaplan asks for files and the app
+  uploads them into the ticket ([`07`](./07_files_into_runs.md) §4).
 - **Reachability.** Synaplan calls only the delivery URL registered for the
   instance, on the instance's host, over https (local-dev exception as in
   `WebDavClient::allowsInsecureLocal()`). `SsrfGuard` applies unless a

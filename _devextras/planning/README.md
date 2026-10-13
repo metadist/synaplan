@@ -34,7 +34,7 @@ paths were renamed on 2026-09-17.
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts: apps like SISmass create Synaplan accounts for their customers, with a token trial and purchase without a Synaplan login (AA1–AA8, not started) |
 | [`20261007-mcp-tool-errors/`](./20261007-mcp-tool-errors/issue-mcp-tool-error-fallback.md) | Partner report (Backblaze B2 MCP): a tool error drops the plan to legacy chat or skips the answer step. Implemented on this branch, pending merge |
 | [`20260929-synaplan-federation/`](./20260929-synaplan-federation/00_master_plan.md) | Synaplan Federation v1.0, reviewed and queued: next sprint is the opt-in knowledge link ([`01_review.md`](./20260929-synaplan-federation/01_review.md)); data model + 15k storage math in [`02_federation_data_model.md`](./20260929-synaplan-federation/02_federation_data_model.md) |
-| [`20261013-cloud-file-sharing/`](./20261013-cloud-file-sharing/00_master_plan.md) | Nextcloud, ownCloud.online and OpenCloud on one level: copy Synaplan files into the cloud, one identity model (organisation login), the bird indicator, watched folders and automations (CF0–CF6, §3 unticked). Would absorb More-Nextcloud S3 and the roadmap's folder watch |
+| [`20261013-cloud-file-sharing/`](./20261013-cloud-file-sharing/00_master_plan.md) | Nextcloud, ownCloud.online and OpenCloud on one level: copy Synaplan files into the cloud, one identity model (organisation login), the bird indicator, watched folders and automations that run on files picked up from the cloud — including file work in the sandbox (CF0–CF6, §3 unticked). Would absorb More-Nextcloud S3 and the roadmap's folder watch |
 
 ## Archive
 

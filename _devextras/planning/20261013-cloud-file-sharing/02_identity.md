@@ -97,7 +97,12 @@ code exchange). They never read file contents, chats or memories (C5):
 3. read the descriptions of active watches on this cloud, to show the eyes to
    everyone with access (`04` §B.8),
 4. bind an organisation-login user (with the user's token),
-5. report a deleted / disabled / re-enabled platform user.
+5. report a deleted / disabled / re-enabled platform user,
+6. fulfil a pickup Synaplan asked for — claim it, send the listing, upload
+   the files into that ticket, report the result (`07` §4). The ticket names
+   the person and the checked selector; the instance never picks whose
+   Synaplan receives files,
+7. report what a person lets Synaplan read (`07` §5).
 
 This stays inside Wave 6 §0 #5 — "API key for editors and bots; platform-links
 handshake or OIDC for hosted apps … do not invent a fourth scheme". No
@@ -216,8 +221,9 @@ seen and counts) instead of platform links only.
 | Turned off (sso) | "Turned off on 13 Oct" | **Turn back on** | "OpenCloud can use your Synaplan account again. Paused folders stay paused until you resume them." |
 
 Every card also lists what the app can do in one line ("Summarize, translate,
-make files searchable, copy results into your OpenCloud, watch folders") and
-links to **Watched folders** filtered to that cloud. Empty state (no
+make files searchable, copy results into your OpenCloud, watch folders"),
+what Synaplan may read there ("the folders you watch, Invoices/2026" — set in
+the cloud, `07` §5) and links to **Watched folders** filtered to that cloud. Empty state (no
 connection): one sentence that names where to start ("Start in Nextcloud:
 Settings → Synaplan") + **How to connect** (U5).
 
@@ -272,9 +278,11 @@ Settings → Synaplan") + **How to connect** (U5).
 | `POST` | `/api/v1/platform-links/lifecycle` | instance | `{external_id, event: deleted \| disabled \| enabled}` |
 | `GET` | `/api/v1/me/platform-links` | session | Existing; adds mode, status, last seen, counts |
 | `POST` | `/api/v1/me/platform-links/{id}/resume` | session | Turn an organisation-login connection back on |
+| `PUT` | `/api/v1/platform-links/read-scope` | instance | What a person lets Synaplan read (`07` §5) |
 
-Full OpenAPI annotations on every endpoint; `make -C frontend generate-schemas`
-and `vue-tsc` after each change.
+Pickup endpoints (`/api/v1/platform-links/pickups/{id}/…`) are listed in
+[`07`](./07_files_into_runs.md) §11. Full OpenAPI annotations on every
+endpoint; `make -C frontend generate-schemas` and `vue-tsc` after each change.
 
 ---
 
@@ -283,7 +291,7 @@ and `vue-tsc` after each change.
 | Table | Change |
 | ----- | ------ |
 | `BPLATFORMINSTANCES` | `BDELIVERYURL VARCHAR(512) NULL`, `BOIDCCLIENTID VARCHAR(191) NULL`, `BCAPABILITIES JSON NULL`, `BAPPVERSION VARCHAR(32) NULL`, `BAPPROVEDADDRS JSON NULL` |
-| `BEXTERNALIDENTITIES` | `BMODE VARCHAR(16) NULL`, `BSTATUS VARCHAR(16) NOT NULL DEFAULT 'active'`, `BREVOKEDAT BIGINT NULL` |
+| `BEXTERNALIDENTITIES` | `BMODE VARCHAR(16) NULL`, `BSTATUS VARCHAR(16) NOT NULL DEFAULT 'active'`, `BREVOKEDAT BIGINT NULL`, `BREADSCOPE JSON NULL` (mirror of the app's read setting, `07` §5) |
 
 Raw idempotent `ADD COLUMN IF NOT EXISTS`; no Schema API (Galera rule 2).
 

@@ -81,12 +81,16 @@ mail "Summary: report.pdf" with 4–5 sentences, **Open in Nextcloud** and **See
 this run in Synaplan**, readable on a phone. Drop 30 files → 20 mails this
 hour; the row says "10 files waiting until 10:00".
 
-**J-CF-9 — My instruction, with the path** (CF5)
-Watch `Invoices` → **Run my instruction**: "Extract vendor, date and total
-from {file.name} and answer as a table" → output **Mail me**. Drop an invoice →
-a mail with the table. Switch output to **Save next to the file** →
-`invoice.answer.md` appears. **Edit in Synaplan** opens the Steps editor; "Ask
-me before this step" makes the next file wait in Approvals.
+**J-CF-9 — My instruction, tried on a real file** (CF5)
+Watch `Invoices` → **Run my instruction**: "Extract vendor, date and total and
+answer as a table" → **Try it on a file** (`invoice-0912.pdf` preselected).
+Synaplan opens a chat with that invoice attached and the table as the answer.
+Ada adds "also the IBAN" and checks again. **Do this for every new file in
+“Invoices”** → output **Mail me** → the watch is on. A new invoice → a mail
+with the table for *that* invoice; no path is typed anywhere. Switch output to
+**Save next to the file** → `invoice-1003.answer.md` appears. **Edit in
+Synaplan** opens the Steps editor; "Ask me before this step" makes the next
+file wait in Approvals.
 
 **J-CF-10 — Shared folder, no surprise** (CF5)
 Bob opens the shared `Incoming-DE` → eyes → sidebar: "Ada's Synaplan watches
@@ -108,6 +112,28 @@ dropped file is not processed. Reconnect → "Resume 2 watched folders?" →
 Against a Synaplan without the new capabilities, each app shows summarize,
 translate and the Make-searchable dialog as before — no bird, no Watch menu, no
 From Synaplan, no console errors, one info line in the server log.
+
+**J-CF-13 — New files together, with file work** (CF5)
+File work is on. Ada watches `Exports` → **Run my instruction**: "Merge the
+CSV files into one Excel sheet with a chart of revenue per month" → **What
+should each run get? New files together** (10 minutes) → **Try it on files**
+with yesterday's three CSVs. The trial chat shows the file-work card and
+`revenue.xlsx` with the chart. **Do this for every new file in “Exports”** →
+"This task does file work. Let it run without asking each time?" → **Yes**.
+The ERP drops three CSVs at 06:00 → one run at 06:10 with the three files
+attached → `revenue.xlsx` next to them; the run names its three inputs and
+its output. With **Ask me each time**, the run waits in Approvals: "Run file
+work on 3 files from Exports?". On an installation without file work, the
+dialog never mentions it.
+
+**J-CF-14 — Pick up files from a chat** (CF3)
+In Synaplan: "Take the PDFs in my Nextcloud folder Invoices/2026 and make one
+Excel table of vendor, date and total." A card: "Read 12 files from Nextcloud
+› Invoices/2026" with the file chips → the table as a file → **Copy to
+cloud**. Asking for `HR/Contracts`: "Synaplan may not read HR/Contracts in your
+Nextcloud. Nothing was read." with **Open in Nextcloud**; there, right-click →
+**Let Synaplan read this folder**; asking again works. With Nextcloud stopped:
+"Synaplan could not reach files.example.org. Nothing was read."
 
 ---
 
@@ -193,9 +219,12 @@ From Synaplan, no console errors, one info line in the server log.
 │  (•) Translate them         into [ English ▾ ]                     │
 │                             save in [ Next to the original ▾ ]     │
 │  ( ) Summarize them and mail me                                    │
-│  ( ) Run my instruction                                            │
+│  ( ) Run my instruction   [ Extract vendor, date and total…      ] │
+│                           [ Try it on a file ]                     │
 │  ( ) Use one of my tasks                                           │
 │                                                                     │
+│  What should each run get?                                         │
+│  (•) The new file  ( ) New files together  ( ) The whole folder    │
 │  ☐ Also the 7 files already in this folder                         │
 │  Only: [✓] Documents  [✓] PDF  [ ] Images     ☐ Include sub-folders │
 │                                                                     │
@@ -246,6 +275,47 @@ preset, the language, the target and the shared-folder state.
    system cron.  How to set it up ↗
 ```
 
+### W9 — Reading files in a run (Synaplan chat or task run card)
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│ [NC] Read 12 files from Nextcloud › Invoices/2026         │
+│  [inv-0101.pdf] [inv-0102.pdf] [inv-0115.pdf] … +9        │
+│  2 files were larger than 100 MB and were left out.       │
+└──────────────────────────────────────────────────────────┘
+ Outside what Synaplan may read:
+ "Synaplan may not read HR/Contracts in your Nextcloud. Nothing was read."
+                                                   [ Open in Nextcloud ]
+```
+
+### W10 — Trial result → automate (Synaplan chat, files came from a cloud folder)
+
+```text
+ … answer, file-work card, revenue.xlsx …
+┌──────────────────────────────────────────────────────────┐
+│ These files came from Nextcloud › Exports.                │
+│ [ Do this for every new file in “Exports” ]               │
+└──────────────────────────────────────────────────────────┘
+ → What should each run get?  (•) New files together (10 min)  ( ) The new file
+   ( ) The whole folder
+ → This task does file work. Let it run without asking each time?
+   [ Ask me each time ]  [ Yes ]
+ → "New files in Exports are merged into one Excel with a chart and saved
+   next to them. Runs on its own (as you)."            [ Cancel ] [ Start ]
+```
+
+### W11 — What Synaplan may read (cloud personal settings)
+
+```text
+ What may Synaplan read in your Nextcloud?
+ (•) Only folders I watch
+ ( ) Also folders I allow      Invoices/2026  [Remove]
+                               Specs          [Remove]
+                               [ Add a folder ]          ← native folder picker
+ ( ) All my files              Synaplan can read every file you can open.
+ Right-click any folder → "Let Synaplan read this folder" adds it here.
+```
+
 ---
 
 ## 3. Copy — key strings in five locales
@@ -275,11 +345,23 @@ reused, not re-translated; the existing key is named.
 | Status | Connected through your organisation login | Über den Organisations-Login verbunden | Conectado mediante el inicio de sesión de la organización | Connecté via la connexion de l’organisation | Kurum girişi ile bağlı |
 | Action | Turn off for {app} | Für {app} ausschalten | Desactivar para {app} | Désactiver pour {app} | {app} için kapat |
 | Trigger | Runs on its own (as you) *(core `assistants.triggers.runsAsYou`)* | — reuse | — reuse | — reuse | — reuse |
+| Question | What should each run get? | Was soll jeder Lauf bekommen? | ¿Qué debe recibir cada ejecución? | Que doit recevoir chaque exécution ? | Her çalıştırma neyi almalı? |
+| File set | The new file | Die neue Datei | El archivo nuevo | Le nouveau fichier | Yeni dosya |
+| File set | New files together | Neue Dateien gemeinsam | Archivos nuevos juntos | Les nouveaux fichiers ensemble | Yeni dosyalar birlikte |
+| File set | The whole folder | Den ganzen Ordner | La carpeta entera | Le dossier entier | Klasörün tamamı |
+| Button | Try it on a file | An einer Datei ausprobieren | Probarlo con un archivo | L’essayer sur un fichier | Bir dosyada dene |
+| Button | Do this for every new file in “{folder}” | Das für jede neue Datei in „{folder}“ tun | Hacer esto con cada archivo nuevo de «{folder}» | Faire ceci pour chaque nouveau fichier de « {folder} » | Bunu “{folder}” içindeki her yeni dosya için yap |
+| Question | This task does file work. Let it run without asking each time? | Diese Aufgabe nutzt Dateiarbeit. Ohne Rückfrage ausführen? | Esta tarea usa trabajo con archivos. ¿Ejecutarla sin preguntar cada vez? | Cette tâche fait du travail sur fichiers. L’exécuter sans demander à chaque fois ? | Bu görev dosya çalışması yapıyor. Her seferinde sormadan çalışsın mı? |
+| Card | Read {count} files from {app} › {folder} | {count} Dateien aus {app} › {folder} gelesen | Se leyeron {count} archivos de {app} › {folder} | {count} fichiers lus depuis {app} › {folder} | {app} › {folder} içinden {count} dosya okundu |
+| Menu | Let Synaplan read this folder | Synaplan diesen Ordner lesen lassen | Permitir que Synaplan lea esta carpeta | Autoriser Synaplan à lire ce dossier | Synaplan'ın bu klasörü okumasına izin ver |
+| Setting | Only folders I watch · Also folders I allow · All my files | Nur Ordner, die ich beobachte · Auch Ordner, die ich freigebe · Alle meine Dateien | Solo las carpetas que vigilo · También las carpetas que permito · Todos mis archivos | Seulement les dossiers que je surveille · Aussi les dossiers que j’autorise · Tous mes fichiers | Yalnızca izlediğim klasörler · İzin verdiğim klasörler de · Tüm dosyalarım |
+| Refusal | Synaplan may not read {folder} in your {app}. Nothing was read. | Synaplan darf {folder} in deinem {app} nicht lesen. Es wurde nichts gelesen. | Synaplan no puede leer {folder} en tu {app}. No se leyó nada. | Synaplan n’est pas autorisé à lire {folder} dans votre {app}. Rien n’a été lu. | Synaplan, {app} içindeki {folder} klasörünü okuyamaz. Hiçbir şey okunmadı. |
 | Empty (Watched folders) | Watch a folder from Nextcloud, ownCloud.online or OpenCloud: right-click it and choose Watch with Synaplan. | Beobachte einen Ordner in Nextcloud, ownCloud.online oder OpenCloud: Rechtsklick auf den Ordner, dann „Mit Synaplan beobachten“. | Vigila una carpeta de Nextcloud, ownCloud.online u OpenCloud: haz clic derecho y elige «Vigilar con Synaplan». | Surveillez un dossier de Nextcloud, ownCloud.online ou OpenCloud : clic droit, puis « Surveiller avec Synaplan ». | Nextcloud, ownCloud.online veya OpenCloud'daki bir klasörü izleyin: sağ tıklayıp “Synaplan ile izle”yi seçin. |
 
 Translator notes:
 
-- Placeholders (`{app}`, `{file.name}`) keep their names in every locale.
+- Placeholders (`{app}`, `{folder}`, `{count}`) keep their names in every
+  locale.
 - German form of address follows the namespace the string lands in — the
   core's `files` namespace says *du*, `assistants.triggers` says *Sie*. The
   cloud apps ship Nextcloud's informal `de`; a formal `de_DE` is optional.

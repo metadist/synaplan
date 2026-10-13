@@ -39,6 +39,11 @@ not a chat message.
 | CF3.3 Nextcloud inbound, From Synaplan | `synaplan-nextcloud` | planned | |
 | CF3.4 ownCloud.online inbound, From Synaplan | `synaplan-owncloud-online` | planned | |
 | CF3.5 OpenCloud inbound, binary save, From Synaplan | `synaplan-opencloud` | planned | |
+| CF3.6 Pickup protocol, `folder_fetch`, read-scope mirror, WebDAV list/get | `synaplan` | planned | Schema ask recorded (`BCLOUDPICKUPS`, `BREADSCOPE`) |
+| CF3.7 "Read N files" run card, refusal sentence, read scope on Apps card | `synaplan` | planned | |
+| CF3.8 Nextcloud pickup handler, read setting | `synaplan-nextcloud` | planned | After CF-S5 |
+| CF3.9 ownCloud.online pickup handler, read setting | `synaplan-owncloud-online` | planned | After CF-S4 |
+| CF3.10 OpenCloud pickup handler, read setting | `synaplan-opencloud` | planned | After CF-S1, CF-S3 |
 | CF4.1 Status, file detail, source events | `synaplan` | planned | |
 | CF4.2 Glyph kit | `synaplan` + design | planned | |
 | CF4.3 Nextcloud bird, sidebar | `synaplan-nextcloud` | planned | |
@@ -50,6 +55,9 @@ not a chat message.
 | CF5.4 Nextcloud watches | `synaplan-nextcloud` | planned | |
 | CF5.5 ownCloud.online watches | `synaplan-owncloud-online` | planned | |
 | CF5.6 OpenCloud watches | `synaplan-opencloud` | planned | |
+| CF5.7 Files attached to runs, file sets, run limits | `synaplan` | planned | |
+| CF5.8 Try it on a file, then automate; unattended file-work consent | `synaplan` | planned | |
+| CF5.9 Dialog file sets and trial in the three apps | all three apps | planned | |
 | CF6.x Beyond the apps | various | optional | |
 
 ## Decisions
@@ -57,6 +65,7 @@ not a chat message.
 | Date | Decision |
 | ---- | -------- |
 | 2026-10-13 | Track opened from the product owner's request: copy generated files into the cloud, one login story and user handling, synchronized file handling (bird, bird with eyes, automations). Master-plan §3 rows 1–26 proposed; **none ticked**. |
+| 2026-10-13 | Product-owner clarification: "A pure path in a specific prompt has no meaning … pick up files or file lists from the file sharing app … fetch files and process those on Synaplan automatically, even in the code sandbox with specific tools." Added [`07_files_into_runs.md`](./07_files_into_runs.md) and §3 rows 27–32 (files not paths, what each run gets, `folder_fetch` + pickup, read scope, file work, try then automate). The `{file.path}` placeholders are withdrawn. Rows proposed, **not ticked**. |
 
 ## Review log
 
@@ -78,6 +87,18 @@ not a chat message.
 
 No stack was walked for this plan; CF0.7 reproduces D1–D3 in a browser
 before the fixes merge.
+
+**2026-10-13 (files, not paths).** Re-checked against the core: a task run
+is a normal `Message` (`SavedTaskRunner::run()`), `Message::addFile()` exists
+and `MessagePreProcessor` extracts every attachment; `CodeRunRunner` mounts
+`inputFileIds` or the message's attachments into the sandbox and stores `/out/`
+results as files; unattended file work waits for approval unless the task's
+`BALLOWUNATTENDED` is set; `save_to_folder` takes earlier steps' attachments
+and a folder channel. The design therefore attaches every cloud file to the
+run message instead of inventing a second input path. Watch runs stay pushed
+by the app (they work when Synaplan cannot reach the cloud); fetching more
+files during a run uses a ticket-bound pickup, which needs Synaplan to reach
+the cloud until the CF6.2 pull mode.
 
 Open questions for the product owner, besides §3:
 

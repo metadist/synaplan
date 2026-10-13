@@ -1,11 +1,14 @@
 # Goal 3 — file state, watched folders, automations
 
-Plan of record: [`00_master_plan.md`](./00_master_plan.md) (decisions 13–21).
+Plan of record: [`00_master_plan.md`](./00_master_plan.md) (decisions 13–21,
+27–32).
 
 Three parts: **A** what the AI knows about a cloud file (the bird), **B**
 watching files and folders (the bird with eyes), **C** what happens to what
 arrives (automations). **D** covers clouds without the app; **E** sums up API
-and schema.
+and schema. How the files themselves reach a run — one file, files that
+arrived together, the whole folder, or files fetched during the run, and how
+file work in the sandbox gets them — is [`07_files_into_runs.md`](./07_files_into_runs.md).
 
 ---
 
@@ -160,6 +163,7 @@ task**. A folder may carry several watches; the eyes tooltip lists them.
 | Reacts to | New files (default); changed files (default on for Keep searchable, off for tasks) |
 | File types | Documents (PDF, Word, ODF, text, Markdown, presentations, spreadsheets) by default; images opt-in |
 | Action | Keep searchable (knowledge folder) or run a task |
+| What each run gets (task watches) | **The new file** (default) · **New files together** (collection window) · **The whole folder** — always as files attached to the run, never as a path ([`07`](./07_files_into_runs.md) §2) |
 | State | active · paused (reason) · needs attention (reason) · stopped |
 
 ### B.2 States and reasons
@@ -271,10 +275,14 @@ resume (B.5).
 | --------------------- | ---- | ----------------------------- | ------ | ------------------------- |
 | **Keep them searchable** | Keep searchable | — (upload with `group_key`, `intake=direct`) | Knowledge folder "Nextcloud · Specs" (name editable) | "New and changed files become searchable by AI in your knowledge folder “Nextcloud · Specs”." |
 | **Translate them** | Task | `extract_text` → `translate` (language) → `document_generation` (Word, ODF and PDF inputs → a new DOCX; Markdown and text stay Markdown and text) → `save_to_folder` (platform, next to the original or a chosen folder, name `<stem>.<lang>.<ext>`) | A new file in the cloud; the translation also stays in Synaplan → Generated | "Each new file is translated to English and saved next to it. The layout of the translation is simplified." |
-| **Summarize them and mail me** | Task | `extract_text` → `summarize` ("4–5 sentences") → `email_me` (subject "Summary: {file.name}"; body: summary, **Open in Nextcloud**, **See this run in Synaplan**) | An HTML mail to the owner's Synaplan address | "For each new file you get a mail with 4–5 sentences to ada@example.org." |
-| **Run my instruction** | Task | `chat` with the instruction, the file attached and `{file.name}`, `{file.path}`, `{file.link}` filled in → `email_me` (default) or `save_to_folder` or nothing | Mail, a file next to the original, or only the run history | "For each new file, Synaplan runs your instruction and mails you the answer." |
-| **Use one of my tasks** | Task | The chosen task's own steps | As the task defines | "“Contract check” will run for every new file in Incoming-DE instead of when you start it." |
+| **Summarize them and mail me** | Task | `extract_text` → `summarize` ("4–5 sentences") → `email_me` (subject "Summary: " + the file's name; body: summary, **Open in Nextcloud**, **See this run in Synaplan**) | An HTML mail to the owner's Synaplan address | "For each new file you get a mail with 4–5 sentences to ada@example.org." |
+| **Run my instruction** | Task | The steps of a tested turn ([`07`](./07_files_into_runs.md) §7): whatever the instruction needed on the attached files — text steps, `file_analysis`, **file work** in the sandbox (`code_run`), `folder_fetch` for more files, custom or MCP tools — then `email_me`, `save_to_folder` or nothing | Mail, files next to the original, or only the run history | "For each new file, Synaplan does what you tried on report.pdf and mails you the answer." |
+| **Use one of my tasks** | Task | The chosen task's own steps, with the run's files attached | As the task defines | "“Contract check” will run for every new file in Incoming-DE instead of when you start it." |
 
+- **Files, not paths** ([`07`](./07_files_into_runs.md) §1): every preset works
+  on the files attached to the run — one file, the files that arrived
+  together, or the whole folder (B.1). Names and folders are context and the
+  base for output names, never the thing processed.
 - Presets create the task **in Synaplan** through the watch call (`POST
   /api/v1/cloud/watches` with `preset` and its inputs); the app never needs
   the Saved Tasks API. The created task is an ordinary task: editable in the
@@ -282,37 +290,51 @@ resume (B.5).
 - "Use one of my tasks" lists tasks whose trigger is **Manual** (a task has one
   trigger); binding changes it to the file trigger and the consequence
   sentence says so.
-- "Run my instruction" offers the person's **Shortcuts** as starting points;
-  the instruction can be edited before saving.
+- "Run my instruction" is **tried on one file first** and pins the steps of
+  that turn ([`07`](./07_files_into_runs.md) §7); the person's **Shortcuts**
+  are offered as starting points. Translate and Summarize ship as templates
+  and start at once; **Try it on a file** is offered for them too.
+- A preset whose steps include **file work** asks once whether it may run
+  without asking each time ([`07`](./07_files_into_runs.md) §6); otherwise each
+  run waits in Approvals, as Compute's unattended policy requires.
 
 ### C.2 The `file_event` trigger and its payload
 
 `SavedTask::TRIGGER_TYPES` gains `file_event`; `triggerConfig = {watch_id}`.
 The run is queued like a webhook run (`RunSavedTaskCommand` with
-`trigger_payload`), so steps read the file with the existing
-`StepInputResolver` (`{ "from": "trigger", "field": "file.path" }`).
+`trigger_payload`), and `SavedTaskRunner::run()` **attaches the run's files to
+the run message** (`Message::addFile()`) before processing. The files are
+what the steps work on; the payload only describes them — for output names,
+links back and provenance. Steps can still read a field with the existing
+`StepInputResolver` (`{ "from": "trigger", "field": "files" }`).
 
 ```json
 {
-  "file": {
-    "event": "created",
-    "name": "contract.docx",
-    "path": "Incoming-DE/contract.docx",
-    "folder": "Incoming-DE",
-    "folder_id": "1234",
-    "id": "5678",
-    "version": "a1b2c3",
-    "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "size": 48213,
-    "modified": "2026-10-13T09:10:00Z",
-    "link": "https://files.example.org/f/5678",
-    "cloud": "Nextcloud",
-    "host": "files.example.org",
-    "synaplan_file_id": 991
-  },
-  "watch": { "id": 17, "name": "Incoming-DE" }
+  "set": { "kind": "together", "count": 2, "skipped": [] },
+  "files": [
+    {
+      "synaplan_file_id": 991,
+      "event": "created",
+      "name": "contract.docx",
+      "folder": "Incoming-DE",
+      "folder_id": "1234",
+      "id": "5678",
+      "version": "a1b2c3",
+      "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "size": 48213,
+      "modified": "2026-10-13T09:10:00Z",
+      "link": "https://files.example.org/f/5678"
+    },
+    { "synaplan_file_id": 992, "event": "created", "name": "annex.pdf", "…": "…" }
+  ],
+  "watch": { "id": 17, "name": "Incoming-DE", "cloud": "Nextcloud", "host": "files.example.org" }
 }
 ```
+
+`set.kind` is `new_file`, `together` or `whole_folder`; `skipped` names files
+left out by a limit, with the reason. The run message also carries a short
+"Files in this run" block (name, folder, change time) as context for the
+model.
 
 Task card and trigger row, one generated sentence (UX contract §4.8):
 "When a file arrives in **Nextcloud › Incoming-DE** → translate it to English
@@ -325,8 +347,13 @@ and save it next to the original · **Runs on its own (as you)** · Last: today
   hidden (`BEPHEMERAL`), kept 7 days for retries, then removed by the
   ephemeral reaper; never listed in the Library. Keep-searchable files skip
   Incoming (`intake=direct`, CF0.3) and live in their knowledge folder.
+- Every step reaches the attached files through the paths it uses today:
+  text extraction for text steps, the sandbox mount for file work, the
+  conversation's files for document steps ([`07`](./07_files_into_runs.md)
+  §6). A step that needs more files uses `folder_fetch` (`07` §3).
 - Outputs into the cloud go through the copy protocol (`03`), with the "next
-  to the original" target and the replace-only-our-own-files rule.
+  to the original" target (the watched folder for a multi-file run) and the
+  replace-only-our-own-files rule.
 - Approvals stay available through the Steps editor ("Ask me before this
   step"). Presets do not ask by default — the person chose the action in the
   dialog — except when a preset writes into a folder the owner does not own:
@@ -344,13 +371,15 @@ and save it next to the original · **Runs on its own (as you)** · Last: today
 
 Failures also show on the watch row and in the cloud sidebar; the owner gets
 a cloud notification for a failed file (not for every success — the output
-file or the mail is the success signal).
+file or the mail is the success signal). Fetching more files and file work
+have their own sentences in [`07`](./07_files_into_runs.md) §10.
 
 ### C.5 Where automations are managed — the answer to the open question
 
 | Job | Where | Why |
 | --- | ----- | --- |
 | Start watching | **In the cloud**: right-click → **Watch with Synaplan…** | The person is looking at the folder; the native picker knows it; no path is typed |
+| Try an instruction on a real file | **In Synaplan**, a trial chat opened from the cloud dialog; **Do this for every new file** pins it | The result is seen before anything runs unattended ([`07`](./07_files_into_runs.md) §7) |
 | See that something is watched | **Both**: eyes + sidebar in the cloud; **Tasks → Watched folders** in Synaplan | Ten-second findability from either place (U2) |
 | Pause, resume, stop | **Both**, same three controls | Undo is a click where the person is (U3) |
 | Change the preset or the language | In the cloud dialog (re-open) | Small change, same place it was made |
@@ -379,8 +408,9 @@ WebDAV server) Synaplan itself scans the folder on a schedule. This is the
 roadmap's "Folder watch (scheduled scan, seen-state per file) — same shape as
 URL watch".
 
-- `WebDavClient` gains `list()` (PROPFIND depth 1 with etag, size, modified,
-  and the server's file id where offered) and `get()`.
+- Uses `WebDavClient::list()` (PROPFIND depth 1 with etag, size, modified,
+  and the server's file id where offered) and `get()`, added in CF3.6 for
+  `folder_fetch`.
 - Same watch model with a connection instead of an identity, same ledger, same
   presets; outputs through the WebDAV destination.
 - Runs in the single scheduler's `hourly` lane (or `tasks` for shorter
@@ -412,13 +442,14 @@ URL watch".
 
 Synaplan web uses session-authenticated equivalents for the **Watched
 folders** tab (list, pause, resume, stop, edit) under the existing Saved
-Tasks controller family.
+Tasks controller family. Pickups, whole-folder snapshots, trials and the
+`folder_fetch` capability are listed in [`07`](./07_files_into_runs.md) §11.
 
 ### E.2 Schema (ask recorded)
 
 | Table | Columns |
 | ----- | ------- |
-| `BCLOUDWATCHES` | `BID`, `BOWNERID`, `BIDENTITYID` (nullable), `BCONNECTIONID` (nullable, D), `BTARGETID`, `BTARGETKIND` (`folder` / `file`), `BTARGETPATH`, `BRECURSIVE`, `BEVENTS` (JSON), `BFILTER` (JSON), `BACTION` (`searchable` / `task`), `BPRESET`, `BGROUPKEY` (nullable), `BTASKID` (nullable), `BSTATE`, `BREASON`, `BCOUNTS` (JSON), `BLASTEVENTAT`, `BLASTRUNAT`, `BLASTSTATUS`, `BCREATEDIN` (`cloud` / `synaplan`), `BCREATED`, `BUPDATED` |
+| `BCLOUDWATCHES` | `BID`, `BOWNERID`, `BIDENTITYID` (nullable), `BCONNECTIONID` (nullable, D), `BTARGETID`, `BTARGETKIND` (`folder` / `file`), `BTARGETPATH`, `BRECURSIVE`, `BEVENTS` (JSON), `BFILTER` (JSON), `BACTION` (`searchable` / `task`), `BPRESET`, `BFILESET` (`new_file` / `together` / `whole_folder`), `BWINDOWSEC`, `BMAXFILES`, `BGROUPKEY` (nullable), `BTASKID` (nullable), `BSTATE`, `BREASON`, `BCOUNTS` (JSON), `BLASTEVENTAT`, `BLASTRUNAT`, `BLASTSTATUS`, `BCREATEDIN` (`cloud` / `synaplan`), `BCREATED`, `BUPDATED` |
 | `BCLOUDWATCHITEMS` | `BID`, `BWATCHID`, `BSOURCEID`, `BVERSION`, `BSTATE` (`waiting` / `running` / `done` / `skipped` / `failed`), `BREASON`, `BFILEID`, `BRUNID`, `BDELIVERYID`, `BCREATED`, `BUPDATED`; unique (`BWATCHID`, `BSOURCEID`, `BVERSION`) |
 | `BCLOUDDELIVERIES` | see [`03`](./03_send_to_cloud.md) §4 |
 | `BFILES` | `BSOURCEDELETEDAT BIGINT NULL` — set by a delete source event: the file is hidden from the Library and has no vectors; the ephemeral reaper removes it after 7 days; a restore event clears it and re-vectorizes |

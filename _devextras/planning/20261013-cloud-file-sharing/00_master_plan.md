@@ -16,8 +16,9 @@
 | [`02_identity.md`](./02_identity.md) | Goal 2 — four connection modes, one identity row, credentials, lifecycle |
 | [`03_send_to_cloud.md`](./03_send_to_cloud.md) | Goal 1 — copy Synaplan files into a linked cloud; add from Synaplan inside the cloud |
 | [`04_file_state_and_watches.md`](./04_file_state_and_watches.md) | Goal 3 — the bird, the sidebar, watched folders, automations |
-| [`05_journeys_and_wireframes.md`](./05_journeys_and_wireframes.md) | Journeys J-CF-1…12, wireframes, copy in five locales |
+| [`05_journeys_and_wireframes.md`](./05_journeys_and_wireframes.md) | Journeys J-CF-1…14, wireframes, copy in five locales |
 | [`06_sprints.md`](./06_sprints.md) | Spikes CF-S1…S5 and sprints CF0–CF6 |
+| [`07_files_into_runs.md`](./07_files_into_runs.md) | Files, not paths: what a run receives, fetching more files (`folder_fetch` + pickup), what Synaplan may read, file work in the sandbox, try it on a file |
 | [`STATUS.md`](./STATUS.md) | Step ledger, decision log, review log |
 
 ---
@@ -57,6 +58,14 @@ Asked on 2026-10-13:
    automations on watched entities — RAG it, translate it, summarize it in 4–5
    sentences and mail me, call a specific prompt with the path. Where to manage
    the automations was left open; §3 row 17 answers it.
+
+Clarified in review the same day: a path inside a prompt means nothing on its
+own. A run must receive **files or file lists** from the cloud, fetch more
+files when it needs them, and process them on Synaplan automatically — also as
+file work in the sandbox with its tools. "Call a specific prompt with the
+path" therefore reads as **run an instruction on the files**; the path is a
+label or a selector, never the input ([`07`](./07_files_into_runs.md), §3 rows
+27–32).
 
 "One level" in this plan:
 
@@ -110,7 +119,7 @@ Defects that block the floor today (detail in `01` §4):
 | 2 | **Source of truth** | Synaplan owns file state, watches, runs and copies. The apps keep caches and work queues, never a second copy of the rules. | |
 | 3 | **Connection modes** | Four modes with the same names in all three admin screens: **Organisation login**, **Connect your Synaplan account**, **Accounts created by the administrator**, **One shared account**. Nextcloud's stored `shared` / `provision` / `link` values stay. | |
 | 4 | **One identity row** | Every per-person mode ends in `BEXTERNALIDENTITIES (client, instance, platform user id)`. Organisation-login users get theirs through a **bind** call on first use, checked against the instance's registered OIDC client (`azp`). | |
-| 5 | **Credentials** | Interactive: the person's own (organisation login token, or the scoped key from linking / provisioning). Unattended (watch uploads, reconciliation): the person's scoped key — organisation-login users get a **background key** when they turn on their first watch. The instance credential only for instance operations (claim a copy, report source changes, read watch descriptions, bind, report lifecycle). No fourth scheme (Wave 6 §0 #5). | |
+| 5 | **Credentials** | Interactive: the person's own (organisation login token, or the scoped key from linking / provisioning). Unattended (watch uploads, reconciliation): the person's scoped key — organisation-login users get a **background key** when they turn on their first watch. The instance credential only for instance operations (claim a copy, fulfil a pickup Synaplan asked for, report source changes and read scope, read watch descriptions, bind, report lifecycle). No fourth scheme (Wave 6 §0 #5). | |
 | 6 | **Instance registration** | All three clouds register as platform instances, OpenCloud too. `BPLATFORMINSTANCES` gains delivery URL, OIDC client id and capabilities. **Schema ask recorded** (Galera-safe `ADD COLUMN IF NOT EXISTS`). | |
 | 7 | **Nextcloud organisation login** | Through `user_oidc` token exchange, once spike CF-S2 confirms the API and version floor. People without an OIDC session (local admin) see the Connect card. | |
 | 8 | **ownCloud.online** | Connect, accounts-by-administrator and shared now. Organisation login only when the hoster enables OIDC for it (v2). | |
@@ -121,7 +130,7 @@ Defects that block the floor today (detail in `01` §4):
 | 13 | **Indicator glyphs** | Bird = searchable by AI, with a small state badge (updating · changed · could not). Bird with eyes = watched. Icon + tooltip + `aria-label`, never colour alone. Same set in all three apps; a white-labelled instance may replace both through runtime config. | |
 | 14 | **Indicator data** | One batched status call per folder view (`POST /api/v1/cloud/status`, built on `check-stale`, adding vector state, knowledge folder and watch coverage), cached ≤ 60 s. No local mirror table in v1. | |
 | 15 | **Follow the source** | A searchable file follows its cloud file: change → "Changed", re-added automatically when "Keep it up to date" is on (default on); delete → out of answers and the Library at once, the copy kept 7 days so a restore brings it back, then deleted. The app reports these as instance-level source events. | |
-| 16 | **Watch actions** | Two kinds: **Keep searchable** (sync into a knowledge folder, no task) and **Run a task** (one task per watch). Presets: Keep searchable · Translate · Summarize and mail me · Run my instruction · Use one of my tasks. | |
+| 16 | **Watch actions** | Two kinds: **Keep searchable** (sync into a knowledge folder, no task) and **Run a task** (one task per watch). Presets: Keep searchable · Translate · Summarize and mail me · Run my instruction (on the files, tried first — row 32) · Use one of my tasks. | |
 | 17 | **Where automations live** | Created where the files are (right-click → **Watch with Synaplan…**). Managed, edited and audited in Synaplan: **Tasks → Watched folders** (beside Watched pages), the task's trigger row, the knowledge-folder badge. No automation editor inside the clouds, no Nextcloud Flow in v1. | |
 | 18 | **Event model** | App events (Nextcloud node events, ownCloud hooks, OpenCloud event bus) with a 60 s quiet period, plus reconciliation (hourly default) for missed events. A new watch offers "also the N files already there" — on for Keep searchable, off for task presets. Nextcloud / ownCloud watches need system cron; the admin screen says so. | |
 | 19 | **Idempotency and loops** | One run per (watch, file id, version). A watch never fires on a file Synaplan wrote. Every run ends in a terminal state with one sentence. | |
@@ -132,6 +141,12 @@ Defects that block the floor today (detail in `01` §4):
 | 24 | **Locales** | All three apps ship en, de, es, fr, tr with the core's words and a parity check in CI. | |
 | 25 | **CI** | Nextcloud and ownCloud.online get GitHub CI with an `All Checks Passed` gate and an `AGENTS.md`, like OpenCloud and the desktop repo. | |
 | 26 | **ownCloud data fix** | A one-off migration relabels old ownCloud.online uploads as `owncloud`: rows with `BSOURCE = 'web_upload'` and a `BSOURCEID` whose owner has an `owncloud` identity row — after a dry-run count in the PR. Alternative: the app re-uploads on the next Update. | |
+| 27 | **Files, not paths** | Every run works on Synaplan files attached to its message (`Message::addFile()`), pushed by the watch or picked up from the cloud. A path is a label (provenance, links, output names) or a selector that a pickup turns into files first — never the input of a processing step. The `{file.path}` placeholders of the first draft are withdrawn. | |
+| 28 | **What each run gets** | Task watches choose: **The new file** (default) · **New files together** (window 10 min from the first file, max 50) · **The whole folder** (at most once per window, listing first, unchanged files never re-sent). All three are pushed by the app, so watches keep working when Synaplan cannot reach the cloud. Windowing lives in the core. | |
+| 29 | **Fetching during a run** | New read-class capability **`folder_fetch`** (list or fetch by folder, pattern, changed-since) for tasks and chat. Linked clouds answer through a **pickup**: notify-then-fetch in reverse — a single-use ticket bound to the person, the selector and the checked read scope; the app uploads into the ticket with its instance credential; listing first; inline ≤ 25 s, then background; the step waits ≤ 10 min and reports partial results honestly. WebDAV folders are read directly. | |
+| 30 | **What Synaplan may read** | Set by the person **in the cloud**: only folders I watch (default) · also folders I allow (right-click → **Let Synaplan read this folder**) · all my files. The app enforces it and reports it to Synaplan, which pre-checks, tells the planner and shows it on the Apps card. Admin cap per app (default: folders people allow). | |
+| 31 | **File work on cloud files** | Watch tasks and chats may use file work (`code_run`) on the attached files where Compute is on: Python / Node images with their libraries, no network, Compute quotas. Unattended file work asks once at creation and sets the task's existing "allow unattended" flag; otherwise each run waits in Approvals. Pinned scripts process whatever is mounted, never a test file's name. | |
+| 32 | **Try it, then automate** | "Run my instruction" is tried on one real file first: the app uploads it with the person's credential, Synaplan opens a trial chat, the person checks the result; **Do this for every new file** pins exactly that turn's steps into the watch task. The same button appears under any chat whose files came from one cloud folder. | |
 
 ---
 
@@ -145,11 +160,11 @@ Defects that block the floor today (detail in `01` §4):
  App server part (PHP app / Go service)
    interactive calls ──── person-held credential ────────────► /api/v1/files · /summary · /v1/chat/completions
                           (OIDC token or scoped key)            /api/v1/cloud/status · /api/v1/cloud/watches
-   unattended work ────── person's scoped key ───────────────► /api/v1/cloud/watches/{id}/files · …/reconcile
+   unattended work ────── person's scoped key ───────────────► /api/v1/cloud/watches/{id}/files · …/snapshots · …/reconcile
                           (SSO: background key)
-   instance operations ── instance credential ───────────────► /api/v1/platform-links/…  claim copy · source events ·
-                          (platform links, existing)             watches (read) · sso/bind · lifecycle
-   inbound endpoint ◄──── notify {type, id} (no secret) ─────── deliveries · watches_changed · identity_revoked
+   instance operations ── instance credential ───────────────► /api/v1/platform-links/…  claim copy · fulfil pickup ·
+                          (platform links, existing)             source events · read scope · watches (read) · sso/bind · lifecycle
+   inbound endpoint ◄──── notify {type, id} (no secret) ─────── delivery · pickup · watches_changed · identity_revoked
                           → the app fetches with its own credential
 
                                                                BEXTERNALIDENTITIES   one row per person per cloud
@@ -158,11 +173,14 @@ Defects that block the floor today (detail in `01` §4):
                                                                BCLOUDWATCHES         what is watched, what happens
                                                                BCLOUDWATCHITEMS      seen-state ledger (watch, file, version)
                                                                BCLOUDDELIVERIES      copy ledger
-                                                               BSAVEDTASKS           trigger `file_event` → runs → approvals →
-                                                                                     translate · summarize · email_me · save
+                                                               BCLOUDPICKUPS         pickup ledger
+                                                               BSAVEDTASKS           trigger `file_event` → run message with the
+                                                                                     files attached → text steps · file work
+                                                                                     (sandbox) · folder_fetch · tools → approvals
+                                                                                     → email_me · save next to the original
 ```
 
-Three new core pieces; everything else is wiring of what exists:
+Four new core pieces; everything else is wiring of what exists:
 
 1. **Identity consolidation** — bind and attribution for organisation-login
    users, a background key, lifecycle calls, Apps cards for all three clouds
@@ -173,13 +191,21 @@ Three new core pieces; everything else is wiring of what exists:
 3. **File state and watches** — a batched status call, source events, the watch
    model with its ledger, the Keep-searchable sync, the `file_event` task
    trigger and four task presets ([`04`](./04_file_state_and_watches.md)).
+4. **Files into runs** — the run's files attached to its message, three file
+   sets per watch, `folder_fetch` with the pickup protocol, the read scope,
+   consent for unattended file work, and "try it on a file, then automate"
+   ([`07`](./07_files_into_runs.md)).
 
 Reused as they are: `source_id` / `source_etag` / stale lifecycle (CORE-4),
 Saved Task runs with terminal states and approvals, step inputs `{from:
 trigger, field: …}` (`StepInputResolver`), `translate` / `summarize` /
-`email_me` / `save_to_folder` capabilities, platform-links handshake,
-`OidcBearerAuthenticator`, the WebDAV destination for clouds without the app,
-the URL-watch shape (one row per target, seen-state, Tasks tab).
+`email_me` / `save_to_folder` capabilities, message attachments
+(`Message::addFile()`) with their extraction (`MessagePreProcessor`), file work
+that mounts a run's attachments into the sandbox (`CodeRunRunner`), the task's
+"allow unattended" flag (`BALLOWUNATTENDED`), "Schedule this" step pinning,
+platform-links handshake, `OidcBearerAuthenticator`, the WebDAV destination for
+clouds without the app, the URL-watch shape (one row per target, seen-state,
+Tasks tab).
 
 ---
 
@@ -207,6 +233,11 @@ the URL-watch shape (one row per target, seen-state, Tasks tab).
 | Sidebar "Synaplan" (five questions) | add | add | add | CF4 |
 | Follow the source (change, delete) | add | add | add (CF-S3) | CF4 |
 | Watched folders + presets | add | add | add | CF5 |
+| What each run gets: the new file, new files together, the whole folder | add | add | add | CF5 |
+| What Synaplan may read (set in the cloud) | add | add | add (CF-S1) | CF3 |
+| Fetch more files during a run (`folder_fetch` through a pickup) | add | add | add (CF-S3) | CF3 |
+| File work in the sandbox on cloud files | core, where Compute is on | core | core | CF5 |
+| Try it on a file, then automate | add | add | add | CF5 |
 | Watching folders without the app (WebDAV) | — | — | — | CF6 |
 
 ---
@@ -221,10 +252,10 @@ Detail, steps and exits: [`06_sprints.md`](./06_sprints.md).
 | **CF0 — Fix and align** | D1–D3 in the core, docs truth, STATUS hygiene, first walks of J-NC-1…3 | Per-user modes work end to end in Nextcloud and ownCloud.online | Never cut |
 | **CF1 — Parity floor** | ownCloud.online link mode, consent, tests, CI; Nextcloud CI and key encryption; five locales; OpenCloud chat + binary save | `01` §5 matrix shows no unexplained gap below Nextcloud 1.6 | OpenCloud chat may move after CF5 |
 | **CF2 — One identity** | Registration for all three, bind and attribution, background key, lifecycle, Apps cards, Nextcloud organisation login, OpenCloud link mode | J-CF-1, J-CF-2, J-CF-11 walked | OpenCloud link mode may move to CF6 |
-| **CF3 — Copy to cloud** | `platform` destination, notify-then-fetch, copy ledger, Library menu, New → From Synaplan in all three | J-CF-3, J-CF-4 walked | — |
+| **CF3 — Files both ways** | Out: `platform` destination, notify-then-fetch, copy ledger, Library menu, New → From Synaplan. In: pickup protocol, `folder_fetch`, read scope set in the cloud, WebDAV `list()` / `get()` | J-CF-3, J-CF-4, J-CF-14 walked | — |
 | **CF4 — Searchable state** | Status call, source events, bird, sidebar, glyph kit | J-CF-5 walked | OpenCloud row bird waits for an extension point (sidebar ships) |
-| **CF5 — Watched folders and automations** | Watch model, ledger, `file_event` trigger, presets, event sources, reconciliation, Tasks → Watched folders | J-CF-6…10, J-CF-12 walked | "Use one of my tasks" may follow |
-| **CF6 — Beyond the apps** | WebDAV feeder (roadmap "folder watch"), pull-mode copies, ownCloud.online organisation login, Nextcloud Flow / Assistant provider | Per item | Optional |
+| **CF5 — Watched folders and automations** | Watch model, ledger, `file_event` trigger with files attached, three file sets, presets, try it on a file, unattended file work consent, event sources, reconciliation, Tasks → Watched folders | J-CF-6…13 walked | "Use one of my tasks" and "The whole folder" may follow |
+| **CF6 — Beyond the apps** | WebDAV feeder (roadmap "folder watch"), pull mode for copies and pickups, ownCloud.online organisation login, Nextcloud Flow / Assistant provider | Per item | Optional |
 
 Order: CF-S and CF0 together → CF1 → CF2 → CF3 and CF4 in parallel → CF5 →
 CF6. Partner-repo steps in one wave may run in parallel once that wave's core
@@ -250,6 +281,9 @@ step is merged and released.
 | C12 | Mobile: core PHP `backend-only`, core UI `ota-candidate`; new frontend paths classified in `.github/mobile-impact-policy.json` | `node scripts/mobile-impact.mjs` |
 | C13 | The public repos carry no hostnames, IPs or secrets of real installations | Review + secret scans |
 | C14 | Cost is visible: each file a task watch handles is one task run on the owner's quota; caps per watch and per instance | Quota tests + watch dialog copy |
+| C15 | No processing step receives only a path: a run's inputs are Synaplan files attached to its message; a run whose files could not be read ends with a sentence that names them | Runner tests: a payload without attachments fails closed |
+| C16 | A pickup ticket is single-use, expires after 10 minutes, belongs to one instance, one person and one selector checked against the read scope; the app re-checks the scope and reads as that person | Ticket tests (replay, expiry, wrong instance, out-of-scope selector) |
+| C17 | Unattended file work runs only on a task whose owner allowed it; the sandbox keeps egress off; a pinned script never depends on the test file's name | Compute pause tests (`SavedTaskComputePauseTest` family) + replay on a differently named file |
 
 ---
 
@@ -272,8 +306,11 @@ step is merged and released.
 
 ## 9. Out of scope (v1)
 
-- Pull-mode copies for clouds Synaplan cannot reach (CF6 candidate; "New →
-  From Synaplan" covers them meanwhile).
+- Pull mode for copies and pickups for clouds Synaplan cannot reach (CF6
+  candidate). Meanwhile "New → From Synaplan" covers copies, and watch runs
+  are pushed by the app, so they keep working.
+- LibreOffice in file work (Compute v2); v1 file work has the Python and Node
+  images.
 - Nextcloud Flow operation, Nextcloud Assistant / TaskProcessing provider,
   Talk bot.
 - Layout-preserving translation. v1 writes a new document with simplified
@@ -305,6 +342,12 @@ step is merged and released.
 7. Five locales, host light and dark themes, WCAG AA on the glyphs.
 8. All gates green in four repos; the journeys are Playwright tests for
    Nextcloud and OpenCloud and walked by hand on ownCloud.
+9. A watch with **New files together** and a tried instruction that uses file
+   work turns three new CSV exports into one Excel with a chart, saved next to
+   them; the run names its three input files and its output.
+10. In a Synaplan chat, "take the PDFs from my Nextcloud folder Invoices/2026
+    and make one table" reads the files (the card names them) and produces the
+    table; a folder Synaplan may not read gets the sentence with the way out.
 
 ---
 
@@ -327,6 +370,11 @@ terms are copied from `frontend/src/i18n/locales/*/files.json` and
 | Link mode | Connect your Synaplan account | Synaplan-Konto verbinden | Conectar tu cuenta de Synaplan | Connecter votre compte Synaplan | Synaplan hesabını bağla |
 | Saved task | Task | Aufgabe | Tarea | Tâche | Görev |
 | Outside product | App | App | App | App | Uygulama |
+| Sandbox runs (core) | File work | Dateiarbeit | Trabajo con archivos | Travail sur fichiers | Dosya çalışması |
+| Read permission | Let Synaplan read this folder | Synaplan diesen Ordner lesen lassen | Permitir que Synaplan lea esta carpeta | Autoriser Synaplan à lire ce dossier | Synaplan'ın bu klasörü okumasına izin ver |
+| File set | The new file · New files together · The whole folder | Die neue Datei · Neue Dateien gemeinsam · Den ganzen Ordner | El archivo nuevo · Archivos nuevos juntos · La carpeta entera | Le nouveau fichier · Les nouveaux fichiers ensemble · Le dossier entier | Yeni dosya · Yeni dosyalar birlikte · Klasörün tamamı |
+| Trial | Try it on a file | An einer Datei ausprobieren | Probarlo con un archivo | L’essayer sur un fichier | Bir dosyada dene |
+| Automate a tried turn | Do this for every new file | Das für jede neue Datei tun | Hacer esto con cada archivo nuevo | Faire ceci pour chaque nouveau fichier | Bunu her yeni dosya için yap |
 
 ¹ The core says "Send to cloud" in `en` and "copy" in the other four locales.
 "Copy" says what happens (the file stays in Synaplan); CF3.2 aligns `en`.
@@ -334,8 +382,8 @@ terms are copied from `frontend/src/i18n/locales/*/files.json` and
 **Banned in primary copy** (apps and core surfaces of this track), on top of
 the UX-contract list: RAG, vector, embedding, chunk, index (as a verb), token
 exchange, OIDC, webhook, PROPFIND, NATS, CS3, reva, etag, `source_id`, instance
-secret, cron, provisioning. Admin screens may name "OpenID Connect" and
-"background jobs" under **Advanced**.
+secret, cron, provisioning, path, selector, pickup, ticket. Admin screens may
+name "OpenID Connect" and "background jobs" under **Advanced**.
 
 ---
 
