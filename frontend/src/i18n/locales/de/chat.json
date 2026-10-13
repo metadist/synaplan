@@ -448,6 +448,7 @@
     "infoAiModel": "KI-Modell",
     "infoProvider": "Anbieter",
     "infoAudioModel": "Audio-Modell",
+    "infoLiveModel": "Live-Modell",
     "infoTokens": "Tokens",
     "infoCost": "Kosten",
     "edit": "Bearbeiten",

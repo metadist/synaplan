@@ -3402,6 +3402,7 @@ function applyAssistantChatModelFooter(
   // through whenever the backend ships it so the voice-reply badge
   // appears live (no page reload required). See issue #583.
   const nestedAudio = data.aiModels?.audio
+  const nestedVoice = data.aiModels?.voice
 
   if (resolvedModel && resolvedProvider) {
     message.modelLabel = resolvedModel
@@ -3414,12 +3415,14 @@ function applyAssistantChatModelFooter(
       },
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
       ...(nestedAudio ? { audio: nestedAudio } : {}),
+      ...(nestedVoice ? { voice: nestedVoice } : {}),
     }
-  } else if (nestedChat || nestedSorting || nestedAudio) {
+  } else if (nestedChat || nestedSorting || nestedAudio || nestedVoice) {
     message.aiModels = {
       ...(nestedChat ? { chat: nestedChat } : {}),
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
       ...(nestedAudio ? { audio: nestedAudio } : {}),
+      ...(nestedVoice ? { voice: nestedVoice } : {}),
     }
   }
 }

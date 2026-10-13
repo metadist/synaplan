@@ -63,6 +63,8 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   const budgetWrap = ref(false)
   let audio: LiveVoiceAudioSession | null = null
   let sessionId: number | null = null
+  let sessionChatId: number | null = null
+  let adoptingChat = false
   let connectTimer: ReturnType<typeof setTimeout> | undefined
   let starting = false
   let ignoreClose = false
@@ -99,8 +101,12 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     for (const role of ['user', 'assistant'] as const) {
       const id = liveTurns[role]
       if (!id) continue
+      const message = history.messages.find((item) => item.id === id)
+      const part = message?.parts.find((item) => item.type === 'text')
+      const text = part?.content ?? ''
       history.finishStreamingMessage(id)
       delete liveTurns[role]
+      if (text.trim() !== '') noteSavedTurn(role, text)
     }
   }
 
@@ -113,13 +119,49 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
       if (final) {
         history.finishStreamingMessage(existing)
         delete liveTurns[role]
+        noteSavedTurn(role, text)
       }
       return
     }
     const id = history.addStreamingMessage(role)
     history.updateStreamingMessage(id, text)
-    if (final) history.finishStreamingMessage(id)
-    else liveTurns[role] = id
+    if (final) {
+      history.finishStreamingMessage(id)
+      noteSavedTurn(role, text)
+    } else {
+      liveTurns[role] = id
+    }
+  }
+
+  function noteSavedTurn(role: 'user' | 'assistant', text: string) {
+    const chatId = sessionChatId ?? chats.activeChatId
+    if (chatId === null || incognito.active) return
+    const trimmed = text.trim()
+    const preview = trimmed.length > 30 ? `${trimmed.slice(0, 30)}…` : trimmed
+    chats.bumpChatActivity(chatId, {
+      firstMessagePreview: role === 'user' && preview !== '' ? preview : undefined,
+    })
+  }
+
+  async function adoptSpokenChat(chatId: number | null | undefined): Promise<void> {
+    if (typeof chatId !== 'number') {
+      sessionChatId = chats.activeChatId
+      return
+    }
+    sessionChatId = chatId
+    if (chatId === chats.activeChatId && chats.chats.some((chat) => chat.id === chatId)) return
+    adoptingChat = true
+    try {
+      if (!chats.chats.some((chat) => chat.id === chatId)) await chats.loadChats()
+      if (chats.activeChatId !== chatId) chats.setActiveChat(chatId)
+    } finally {
+      adoptingChat = false
+    }
+  }
+
+  function refreshSpokenChat() {
+    if (incognito.active || sessionChatId === null) return
+    void chats.loadChats()
   }
 
   function teardown() {
@@ -129,6 +171,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     audio = null
     level.value = 0
     outLevel.value = 0
+    refreshSpokenChat()
   }
 
   async function allowConsent(): Promise<void> {
@@ -196,6 +239,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         client: 'web',
         incognito: incognito.active,
       })
+      await adoptSpokenChat(session.chatId)
       const inRate = session.audio?.inRate
       const outRate = session.audio?.outRate
       if (inRate === undefined || outRate === undefined) {
@@ -208,6 +252,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         onReady: () => apply({ type: 'ready' }),
         onState: (state) => apply({ type: 'state', state }),
         onTranscript: (role, text, final) => showTurn(role, text, final),
+        onReply: (details) => history.attachSpokenReply(details),
         onPlaybackIdle: () => apply({ type: 'audio_idle' }),
         onInterrupted: () => {
           outLevel.value = 0
@@ -319,6 +364,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   function dismiss() {
     phase.value = 'idle'
     sessionId = null
+    sessionChatId = null
     budgetWarn.value = false
     budgetWrap.value = false
   }
@@ -327,6 +373,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     () => chats.activeChatId,
     (next, previous) => {
       if (
+        !adoptingChat &&
         previous !== undefined &&
         next !== previous &&
         phase.value !== 'idle' &&

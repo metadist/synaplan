@@ -14,6 +14,7 @@ use App\Repository\VoiceSessionRepository;
 use App\Service\CostCalculationService;
 use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
+use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -111,12 +112,11 @@ final readonly class VoiceLiveUsageService
 
         $meta = $this->readMetadata($session);
         $meta['last_tick'] = time();
-        $voice = $this->voiceCost($session, $meter, $this->asBool($meta['zero_cost'] ?? false));
-        $meta['voice_cost'] = $voice->totalCost;
-        $meta['media_usage'] = ['duration_seconds' => round($meter->seconds, 3)];
+        $voice = $this->rememberMeter($meta, $session, $meter);
+        $folded = $this->meterFromSnapshot($meta['voice_meter'] ?? []);
         $total = $this->money((float) $voice->totalCost + $this->asFloat($meta['answer_cost'] ?? 0));
-        $prompt = $meter->textInTokens + $meter->audioInTokens + $meter->audioCacheTokens + $this->asInt($meta['answer_prompt_tokens'] ?? 0);
-        $completion = $meter->textOutTokens + $meter->audioOutTokens + $this->asInt($meta['answer_completion_tokens'] ?? 0);
+        $prompt = $folded->textInTokens + $folded->audioInTokens + $folded->audioCacheTokens + $this->asInt($meta['answer_prompt_tokens'] ?? 0);
+        $completion = $folded->textOutTokens + $folded->audioOutTokens + $this->asInt($meta['answer_completion_tokens'] ?? 0);
 
         $session->setSeconds((int) round($meter->seconds));
         $this->writeUseLog($session, $meta, $total, $prompt, $completion, $voice, 'running', $latencyMs);
@@ -217,6 +217,82 @@ final readonly class VoiceLiveUsageService
         $markup = 1.0 + ($this->rateLimit->getMarkupPercent() / 100.0);
 
         return $raw * (1.0 + self::ANSWER_ALLOWANCE) * $markup;
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private function rememberMeter(array &$meta, VoiceSession $session, VoiceLiveMeter $meter): CostResult
+    {
+        $folded = $this->foldMeter($meta['voice_meter'] ?? [], $meter);
+        $voice = $this->voiceCost($session, $folded, $this->asBool($meta['zero_cost'] ?? false));
+        $meta['voice_meter'] = [
+            'seconds' => $folded->seconds,
+            'audio_in' => $folded->audioInTokens,
+            'audio_out' => $folded->audioOutTokens,
+            'audio_cache' => $folded->audioCacheTokens,
+            'text_in' => $folded->textInTokens,
+            'text_out' => $folded->textOutTokens,
+            'cost' => $voice->totalCost,
+            'price_known' => false !== ($voice->priceSnapshot['price_known'] ?? true),
+        ];
+        $meta['voice_cost'] = $voice->totalCost;
+        $meta['media_usage'] = ['duration_seconds' => round($folded->seconds, 3)];
+
+        return $voice;
+    }
+
+    private function foldMeter(mixed $current, VoiceLiveMeter $meter): VoiceLiveMeter
+    {
+        $current = is_array($current) ? $current : [];
+
+        return new VoiceLiveMeter(
+            seconds: max($this->asFloat($current['seconds'] ?? 0), $meter->seconds),
+            audioInTokens: max($this->asInt($current['audio_in'] ?? 0), $meter->audioInTokens),
+            audioOutTokens: max($this->asInt($current['audio_out'] ?? 0), $meter->audioOutTokens),
+            audioCacheTokens: max($this->asInt($current['audio_cache'] ?? 0), $meter->audioCacheTokens),
+            textInTokens: max($this->asInt($current['text_in'] ?? 0), $meter->textInTokens),
+            textOutTokens: max($this->asInt($current['text_out'] ?? 0), $meter->textOutTokens),
+            textItems: max($this->asInt($current['text_items'] ?? 0), $meter->textItems),
+        );
+    }
+
+    private function meterFromSnapshot(mixed $snapshot): VoiceLiveMeter
+    {
+        return $this->foldMeter($snapshot, new VoiceLiveMeter());
+    }
+
+    /**
+     * @param array<string, mixed> $snapshot
+     * @param list<string>         $keys
+     */
+    private function tokenSum(array $snapshot, array $keys): int
+    {
+        $sum = 0;
+        foreach ($keys as $key) {
+            $sum += $this->asInt($snapshot[$key] ?? 0);
+        }
+
+        return $sum;
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private function persistMetadata(VoiceSession $session, array $meta): void
+    {
+        $useLogId = $session->getUseLogId();
+        if (null === $useLogId) {
+            return;
+        }
+        $this->em->getConnection()->executeStatement(
+            'UPDATE BUSELOG SET BMETADATA = :metadata WHERE BID = :id AND BUSERID = :user_id',
+            [
+                'metadata' => json_encode($meta, \JSON_THROW_ON_ERROR),
+                'id' => $useLogId,
+                'user_id' => $session->getUserId(),
+            ],
+        );
     }
 
     private function voiceCost(VoiceSession $session, VoiceLiveMeter $meter, bool $zeroCost): CostResult
@@ -391,6 +467,102 @@ final readonly class VoiceLiveUsageService
     public function isIncognito(VoiceSession $session): bool
     {
         return $this->asBool($this->readMetadata($session)['incognito'] ?? false);
+    }
+
+    /**
+     * What the person is billed for one Synaplan answer: provider cost plus markup.
+     */
+    public function chargedAmount(VoiceSession $session, string $rawCost): string
+    {
+        if ($this->asBool($this->readMetadata($session)['zero_cost'] ?? false)) {
+            return '0.000000';
+        }
+
+        return $this->money((float) $rawCost * (1.0 + ($this->rateLimit->getMarkupPercent() / 100.0)));
+    }
+
+    /**
+     * Remember which Synaplan answer the next spoken reply belongs to.
+     *
+     * @param array<string, mixed> $reply
+     */
+    public function savePendingReply(VoiceSession $session, array $reply): void
+    {
+        $this->mergeMetadata($session, ['pending_reply' => $reply]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function takePendingReply(VoiceSession $session): ?array
+    {
+        $meta = $this->readMetadata($session);
+        $pending = $meta['pending_reply'] ?? null;
+        if (!is_array($pending)) {
+            return null;
+        }
+        unset($meta['pending_reply']);
+        $this->persistMetadata($session, $meta);
+
+        return $pending;
+    }
+
+    /**
+     * Fold a fresher meter into the session snapshot. A late smaller report
+     * never walks the totals backwards.
+     */
+    public function noteMeter(VoiceSession $session, VoiceLiveMeter $meter): void
+    {
+        if (null === $session->getUseLogId()) {
+            return;
+        }
+        $meta = $this->readMetadata($session);
+        $this->rememberMeter($meta, $session, $meter);
+        $this->persistMetadata($session, $meta);
+    }
+
+    /**
+     * Usage of the live model since the last spoken reply took its share.
+     * Advances the mark so the next reply only sees what happened after this.
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string, priceKnown: bool}|null
+     */
+    public function claimVoiceUsage(VoiceSession $session): ?array
+    {
+        if (null === $session->getUseLogId()) {
+            return null;
+        }
+        $meta = $this->readMetadata($session);
+        $meter = is_array($meta['voice_meter'] ?? null) ? $meta['voice_meter'] : null;
+        if (null === $meter) {
+            return null;
+        }
+        $mark = is_array($meta['voice_meter_mark'] ?? null) ? $meta['voice_meter_mark'] : [];
+        $prompt = max(0, $this->tokenSum($meter, ['audio_in', 'audio_cache', 'text_in']) - $this->tokenSum($mark, ['audio_in', 'audio_cache', 'text_in']));
+        $completion = max(0, $this->tokenSum($meter, ['audio_out', 'text_out']) - $this->tokenSum($mark, ['audio_out', 'text_out']));
+        $raw = max(0.0, $this->asFloat($meter['cost'] ?? 0) - $this->asFloat($mark['cost'] ?? 0));
+        if (0 === $prompt + $completion && $raw < 0.0000005) {
+            return null;
+        }
+        $meta['voice_meter_mark'] = $meter;
+        $this->persistMetadata($session, $meta);
+
+        $model = $this->em->find(Model::class, $session->getModelId());
+
+        return [
+            'promptTokens' => $prompt,
+            'completionTokens' => $completion,
+            'totalTokens' => $prompt + $completion,
+            'cost' => $this->asBool($meta['zero_cost'] ?? false)
+                ? '0.000000'
+                : $this->money($raw * (1.0 + ($this->rateLimit->getMarkupPercent() / 100.0))),
+            'modelKey' => RecordedUsage::modelKey(
+                $model instanceof Model ? $model->getService() : $session->getProvider(),
+                $model instanceof Model ? $model->getName() : '',
+            ),
+            'kind' => 'LIVE',
+            'priceKnown' => false !== ($meter['price_known'] ?? true),
+        ];
     }
 
     /**

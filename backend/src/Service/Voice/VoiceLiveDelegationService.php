@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Voice;
 
+use App\DTO\CostResult;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Entity\VoiceSession;
@@ -31,6 +32,7 @@ final readonly class VoiceLiveDelegationService
         private ModelConfigService $modelConfig,
         private UserRepository $users,
         private LoggerInterface $logger,
+        private VoiceReplyStamp $replies = new VoiceReplyStamp(),
     ) {
     }
 
@@ -84,7 +86,14 @@ final readonly class VoiceLiveDelegationService
             return ['text' => 'I could not reach the answer. Please try again.', 'facts' => []];
         }
 
-        $this->charge($session, $user, $response);
+        $cost = $this->charge($session, $user, $response);
+        if (!$incognito) {
+            $this->usage->savePendingReply($session, $this->replies->fromProcess(
+                $result,
+                $this->usage->chargedAmount($session, $cost->totalCost),
+                false !== ($cost->priceSnapshot['price_known'] ?? true),
+            ));
+        }
 
         return ['text' => mb_substr($text, 0, self::SPOKEN_CHARS), 'facts' => []];
     }
@@ -92,7 +101,7 @@ final readonly class VoiceLiveDelegationService
     /**
      * @param array<string, mixed> $response
      */
-    private function charge(VoiceSession $session, User $user, array $response): void
+    private function charge(VoiceSession $session, User $user, array $response): CostResult
     {
         $usage = is_array($response['usage'] ?? null) ? $response['usage'] : [];
         $prompt = $this->tokens($usage, 'prompt_tokens', 'input_tokens');
@@ -103,6 +112,8 @@ final readonly class VoiceLiveDelegationService
             : $this->modelConfig->getDefaultModel('CHAT', (int) $user->getId());
         $cost = $this->costs->calculateCost($prompt, $completion, 0, 0, $modelId);
         $this->usage->addAnswer($session, $cost->totalCost, $prompt, $completion);
+
+        return $cost;
     }
 
     /**

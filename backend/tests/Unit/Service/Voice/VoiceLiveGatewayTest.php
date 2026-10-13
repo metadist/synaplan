@@ -221,6 +221,7 @@ final class VoiceLiveGatewayTest extends TestCase
         ]);
         $usage = $this->createStub(VoiceLiveUsageService::class);
         $usage->method('isIncognito')->willReturn(false);
+        $usage->method('chargedAmount')->willReturn('0.000000');
         $costs = $this->createStub(CostCalculationService::class);
         $costs->method('calculateCost')->willReturn(new CostResult('0', '0', '0', '0', [], 0));
         $users = $this->createStub(UserRepository::class);
@@ -238,6 +239,62 @@ final class VoiceLiveGatewayTest extends TestCase
         self::assertSame('It is four.', $answer['text']);
     }
 
+    public function testADelegatedAnswerRemembersBothModelsForTheSpokenReply(): void
+    {
+        $processor = $this->createStub(MessageProcessor::class);
+        $processor->method('process')->willReturn([
+            'success' => true,
+            'response' => [
+                'content' => 'It is four.',
+                'usage' => ['prompt_tokens' => 11, 'completion_tokens' => 7],
+                'metadata' => ['provider' => 'Anthropic', 'model' => 'Claude Sonnet', 'model_id' => 5],
+            ],
+            'classification' => [
+                'topic' => 'general',
+                'language' => 'de',
+                'sorting_provider' => 'Anthropic',
+                'sorting_model_name' => 'Claude Sorter',
+                'sorting_model_id' => 9,
+                'sorting_usage' => [
+                    'cost' => '0.002000',
+                    'tokens' => 40,
+                    'prompt_tokens' => 30,
+                    'completion_tokens' => 10,
+                    'price_known' => true,
+                ],
+            ],
+        ]);
+        $usage = $this->createMock(VoiceLiveUsageService::class);
+        $usage->method('isIncognito')->willReturn(false);
+        $usage->method('chargedAmount')->willReturn('0.030000');
+        $usage->expects($this->once())->method('savePendingReply')->with(
+            $this->isInstanceOf(VoiceSession::class),
+            $this->callback(static function (array $pending): bool {
+                $extra = $pending['usage_extra'][0] ?? null;
+
+                return 'general' === ($pending['topic'] ?? null)
+                    && 'Claude Sonnet' === ($pending['chat']['model'] ?? null)
+                    && 'Claude Sorter' === ($pending['sorting']['model'] ?? null)
+                    && 11 === ($pending['usage']['prompt_tokens'] ?? null)
+                    && '0.030000' === ($pending['cost'] ?? null)
+                    && is_array($extra)
+                    && 'SORT' === ($extra['kind'] ?? null)
+                    && 40 === ($extra['totalTokens'] ?? null);
+            }),
+        );
+        $costs = $this->createStub(CostCalculationService::class);
+        $costs->method('calculateCost')->willReturn(new CostResult('0.030000', '0', '0', '0', ['price_known' => true], 11));
+        $users = $this->createStub(UserRepository::class);
+        $users->method('find')->willReturn((new User())->setMail('voice@synaplan.internal'));
+        $transcripts = $this->createStub(VoiceTranscriptWriter::class);
+        $transcripts->method('record')->willReturn(null);
+
+        $service = new VoiceLiveDelegationService($processor, $usage, $transcripts, $costs, $this->createStub(ModelConfigService::class), $users, new NullLogger());
+        $answer = $service->answer((new VoiceSession())->setUserId(4)->setStatus('live'), 'What time is it?');
+
+        self::assertSame('It is four.', $answer['text']);
+    }
+
     public function testInstructionsNameThePersonAndRefuseADirectAnswer(): void
     {
         $user = (new User())->setMail('ada@synaplan.internal');
@@ -246,5 +303,27 @@ final class VoiceLiveGatewayTest extends TestCase
         self::assertStringContainsString('ada@synaplan.internal', $text);
         self::assertStringContainsString('Ask Synaplan', $text);
         self::assertStringContainsString('User: Hello', $text);
+        self::assertStringContainsString('language the person is speaking', $text);
+        self::assertStringContainsString('English', $text);
+        self::assertStringNotContainsString('Speak in en', $text);
+    }
+
+    public function testInstructionsFollowTheSpokenLanguageAndUseTheAppLanguageOnlyAsFallback(): void
+    {
+        $user = (new User())->setMail('ada@synaplan.internal');
+        $text = (new VoiceLiveInstructions())->build($user, '', 'de');
+
+        self::assertStringContainsString('Deutsch, wenn die Person Deutsch spricht', $text);
+        self::assertStringContainsString('use German', $text);
+        self::assertStringNotContainsString('Speak in de', $text);
+    }
+
+    public function testSmallTalkIsAnsweredByTheVoiceAndFactsGoToSynaplan(): void
+    {
+        $text = (new VoiceLiveInstructions())->build((new User())->setMail('ada@synaplan.internal'), '');
+
+        self::assertStringContainsString('greetings, small talk', $text);
+        self::assertStringContainsString('without asking Synaplan', $text);
+        self::assertStringContainsString('Ask Synaplan for everything else: facts', $text);
     }
 }

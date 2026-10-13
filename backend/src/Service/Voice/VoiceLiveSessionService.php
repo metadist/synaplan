@@ -6,6 +6,7 @@ namespace App\Service\Voice;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Chat;
+use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Entity\VoiceSession;
@@ -19,6 +20,7 @@ use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Repository\VoiceSessionRepository;
 use App\Service\Infrastructure\RedisService;
+use App\Service\Message\MessageApiFormatter;
 use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -52,6 +54,7 @@ final readonly class VoiceLiveSessionService
         private LoggerInterface $logger,
         private string $publicWsPath,
         private VoiceLiveCompatibleEndpoint $compatible,
+        private MessageApiFormatter $formatter,
     ) {
     }
 
@@ -348,11 +351,13 @@ final readonly class VoiceLiveSessionService
         $session = $this->openSession($sessionId);
         $decision = $this->usage->tick($session, $this->meter($body), $this->intOrNull($body['latencyMs'] ?? null));
         $this->rememberProviderSession($session, $body);
+        $updated = $this->transcripts->attributeVoice($session);
 
         return [
             'action' => $decision->action,
             'allowedSeconds' => $decision->allowedSeconds,
             'reason' => $decision->reason,
+            'details' => $updated instanceof Message ? $this->replyDetails($updated) : null,
         ];
     }
 
@@ -366,12 +371,14 @@ final readonly class VoiceLiveSessionService
 
     /**
      * @param array<string, mixed> $body
+     *
+     * @return array<string, mixed>
      */
-    public function recordTranscript(int $sessionId, array $body): void
+    public function recordTranscript(int $sessionId, array $body): array
     {
         $turns = $body['turns'] ?? null;
         if (!is_array($turns)) {
-            return;
+            return ['ok' => true];
         }
         /** @var list<array{role?: mixed, text?: mixed, startMs?: mixed, endMs?: mixed}> $chunks */
         $chunks = [];
@@ -380,7 +387,20 @@ final readonly class VoiceLiveSessionService
                 $chunks[] = $turn;
             }
         }
-        $this->transcripts->record($this->openSession($sessionId), $chunks);
+        // The browser marks the session ended as soon as the person hangs up,
+        // while the last sentence may still be on its way. Keep that sentence.
+        $session = $this->em->find(VoiceSession::class, $sessionId);
+        if (!$session instanceof VoiceSession) {
+            throw new VoiceLiveRejectedException(404, ['error' => 'Session not found']);
+        }
+        $message = $this->transcripts->record($session, $chunks, $this->meter($body));
+
+        return [
+            'ok' => true,
+            'details' => $message instanceof Message && 'OUT' === $message->getDirection()
+                ? $this->replyDetails($message)
+                : null,
+        ];
     }
 
     /**
@@ -399,6 +419,7 @@ final readonly class VoiceLiveSessionService
             $reason = 'network_lost';
         }
         $this->usage->close($session, $reason, $this->meter($body), $this->intOrNull($body['latencyMs'] ?? null));
+        $this->transcripts->attributeVoice($session);
         $this->concurrency->release($session->getProvider());
         $this->logger->info('Live voice session closed', [
             'session_id' => $session->getId(),
@@ -439,6 +460,25 @@ final readonly class VoiceLiveSessionService
             'seconds' => $session->getSeconds(),
             'endReason' => $session->getEndReason(),
             'provider' => strtolower($session->getProvider()),
+        ];
+    }
+
+    /**
+     * The same model, topic and usage fields the history API returns, so the
+     * open conversation can show them before the next reload.
+     *
+     * @return array<string, mixed>
+     */
+    private function replyDetails(Message $message): array
+    {
+        $row = $this->formatter->format($message);
+
+        return [
+            'role' => 'assistant',
+            'topic' => $row['topic'] ?? null,
+            'aiModels' => $row['aiModels'] ?? null,
+            'usage' => $row['usage'] ?? null,
+            'usageExtra' => $row['usageExtra'] ?? null,
         ];
     }
 

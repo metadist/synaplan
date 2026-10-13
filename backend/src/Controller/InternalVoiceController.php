@@ -56,9 +56,7 @@ final class InternalVoiceController extends AbstractController
     public function transcript(int $id, Request $request): JsonResponse
     {
         return $this->run($request, function (array $body) use ($id): array {
-            $this->sessions->recordTranscript($id, $body);
-
-            return ['ok' => true];
+            return $this->sessions->recordTranscript($id, $body);
         });
     }
 

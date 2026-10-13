@@ -453,6 +453,7 @@
     "infoAiModel": "Modèle IA",
     "infoProvider": "Fournisseur",
     "infoAudioModel": "Modèle audio",
+    "infoLiveModel": "Modèle en direct",
     "infoTokens": "Jetons",
     "infoCost": "Coût",
     "edit": "Modifier",

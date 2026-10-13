@@ -6,6 +6,7 @@ namespace App\Service\Voice;
 
 use App\Entity\Chat;
 use App\Entity\Message;
+use App\Entity\Model;
 use App\Entity\User;
 use App\Entity\VoiceSession;
 use App\Repository\MessageRepository;
@@ -29,16 +30,20 @@ final readonly class VoiceTranscriptWriter
         private VoiceTurnSegmenter $segmenter,
         private ChatTitleService $titles,
         private LoggerInterface $logger,
+        private VoiceReplyStamp $stamp = new VoiceReplyStamp(),
     ) {
     }
 
     /**
      * @param list<array{role?: mixed, text?: mixed, startMs?: mixed, endMs?: mixed}> $chunks
      */
-    public function record(VoiceSession $session, array $chunks): ?Message
+    public function record(VoiceSession $session, array $chunks, ?VoiceLiveMeter $meter = null): ?Message
     {
         if ($this->usage->isIncognito($session) || null === $session->getChatId()) {
             return null;
+        }
+        if ($meter instanceof VoiceLiveMeter) {
+            $this->usage->noteMeter($session, $meter);
         }
 
         $chat = $this->em->find(Chat::class, $session->getChatId());
@@ -56,6 +61,29 @@ final readonly class VoiceTranscriptWriter
     }
 
     /**
+     * Put the live model's usage since the previous reply on the latest
+     * spoken answer. Returns that message only when something was added.
+     */
+    public function attributeVoice(VoiceSession $session): ?Message
+    {
+        if ($this->usage->isIncognito($session) || null === $session->getChatId()) {
+            return null;
+        }
+        $message = $this->latestSpokenReply($session);
+        if (!$message instanceof Message) {
+            return null;
+        }
+        $delta = $this->usage->claimVoiceUsage($session);
+        if (null === $delta) {
+            return null;
+        }
+        $this->stamp->mergeLiveUsage($message, $delta);
+        $this->em->flush();
+
+        return $message;
+    }
+
+    /**
      * @param array{role: string, text: string, startMs: int, endMs: int} $turn
      */
     private function storeTurn(VoiceSession $session, Chat $chat, User $user, array $turn): Message
@@ -64,6 +92,12 @@ final readonly class VoiceTranscriptWriter
         $latest = $this->messages->findOneBy(['chatId' => $chat->getId()], ['id' => 'DESC']);
         if ($latest instanceof Message && $latest->getDirection() === $direction) {
             if ($latest->getText() === $turn['text']) {
+                if ('OUT' === $direction) {
+                    $this->describeSpokenReply($session, $latest);
+                    $this->em->flush();
+                    $this->attributeVoice($session);
+                }
+
                 return $latest;
             }
             $merged = $latest->getMeta('voice_session_id') === (string) $session->getId()
@@ -71,9 +105,8 @@ final readonly class VoiceTranscriptWriter
                 : null;
             if (null !== $merged) {
                 $latest->setText($merged);
-                $this->em->flush();
 
-                return $latest;
+                return $this->finishTurn($session, $chat, $user, $latest);
             }
         }
 
@@ -98,24 +131,74 @@ final readonly class VoiceTranscriptWriter
         $message->setMeta('source', 'live_voice');
         $message->setMeta('voice_session_id', (string) $session->getId());
         $message->setMeta('voice_provider', $session->getProvider());
-        $model = $this->em->find(\App\Entity\Model::class, $session->getModelId());
-        $message->setMeta('voice_model', $model instanceof \App\Entity\Model ? $model->getProviderId() : '');
+        $model = $this->em->find(Model::class, $session->getModelId());
+        $message->setMeta('voice_model', $model instanceof Model ? $model->getProviderId() : '');
         $message->setMeta('start_ms', (string) $turn['startMs']);
         $message->setMeta('end_ms', (string) $turn['endMs']);
 
         $this->em->persist($message);
-        $this->em->flush();
-
-        if ('IN' === $direction) {
-            $this->titleIfNeeded($chat, $user);
-        }
-
+        $stored = $this->finishTurn($session, $chat, $user, $message);
         $this->logger->info('Live voice transcript turn stored', [
             'session_id' => $session->getId(),
             'role' => $turn['role'],
         ]);
 
+        return $stored;
+    }
+
+    private function finishTurn(VoiceSession $session, Chat $chat, User $user, Message $message): Message
+    {
+        if ('OUT' === $message->getDirection()) {
+            $this->describeSpokenReply($session, $message);
+        }
+        $chat->updateTimestamp();
+        $this->em->flush();
+        // The first user sentence is stored before the answer exists, so a
+        // title is only possible once the reply is in the same chat.
+        $this->titleIfNeeded($chat, $user);
+        if ('OUT' === $message->getDirection()) {
+            $this->attributeVoice($session);
+        }
+
         return $message;
+    }
+
+    /**
+     * Name the live model on the spoken answer. When Synaplan was asked,
+     * also copy that model's topic, tokens and cost. A reply that already
+     * carries one answer does not take the next one.
+     */
+    private function describeSpokenReply(VoiceSession $session, Message $message): void
+    {
+        $model = $this->em->find(Model::class, $session->getModelId());
+        if ($model instanceof Model) {
+            $this->stamp->applyVoiceModel($message, $model);
+        }
+        if ('1' === $message->getMeta('voice_reply_applied')) {
+            return;
+        }
+        $pending = $this->usage->takePendingReply($session);
+        if (null === $pending) {
+            return;
+        }
+        $this->stamp->apply($message, $pending);
+    }
+
+    private function latestSpokenReply(VoiceSession $session): ?Message
+    {
+        $chatId = $session->getChatId();
+        if (null === $chatId) {
+            return null;
+        }
+        $recent = $this->messages->findBy(['chatId' => $chatId], ['id' => 'DESC'], 8);
+        foreach ($recent as $candidate) {
+            if ('OUT' === $candidate->getDirection()
+                && $candidate->getMeta('voice_session_id') === (string) $session->getId()) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function titleIfNeeded(Chat $chat, User $user): void

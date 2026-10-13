@@ -203,6 +203,11 @@ export interface Message {
       model: string
       model_id: number | null
     }
+    voice?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
   } | null // AI model metadata
   webSearch?: {
     enabled?: boolean
@@ -629,6 +634,20 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  const attachSpokenReply = (details: {
+    topic?: string | null
+    aiModels?: Message['aiModels']
+    usage?: MessageUsage | null
+    usageExtra?: MessageUsage[] | null
+  }) => {
+    const message = [...messages.value].reverse().find((item) => item.role === 'assistant')
+    if (!message) return
+    if (typeof details.topic === 'string' && details.topic !== '') message.topic = details.topic
+    if (details.aiModels) message.aiModels = details.aiModels
+    if (details.usage) message.usage = details.usage
+    if (details.usageExtra && details.usageExtra.length > 0) message.usageExtra = details.usageExtra
+  }
+
   const finishStreamingMessage = (id: string, parts?: Part[]) => {
     const message = messages.value.find((m) => m.id === id)
     if (message) {
@@ -979,6 +998,7 @@ export const useHistoryStore = defineStore('history', () => {
     addMessage,
     addStreamingMessage,
     updateStreamingMessage,
+    attachSpokenReply,
     finishStreamingMessage,
     finishLiveThinking,
     markSuperseded,

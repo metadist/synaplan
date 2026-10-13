@@ -40,7 +40,6 @@
         :class="[
           'flex flex-col relative group/bubble min-w-0 max-w-full',
           role === 'user' ? 'bubble-user' : 'bubble-ai',
-          role === 'assistant' && isStreaming ? 'bubble-streaming' : '',
         ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
       >
@@ -707,6 +706,26 @@
                       </router-link>
                     </div>
 
+                    <!-- Live model that spoke this reply. When it asked Synaplan,
+                         the Synaplan model is the AI Model row below. -->
+                    <div
+                      v-if="aiModels?.voice && isKnownModelName(aiModels.voice.model)"
+                      class="flex items-center justify-between gap-2"
+                      data-testid="info-live-model"
+                    >
+                      <span class="text-xs txt-tertiary">{{ t('chatMessage.infoLiveModel') }}</span>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl text-xs font-medium bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 transition-colors cursor-pointer"
+                        @click="handleInfoModelClick('voice')"
+                      >
+                        <Icon icon="mdi:microphone" class="w-3.5 h-3.5" />
+                        <span class="font-semibold truncate max-w-[10rem]">{{
+                          shortenModel(aiModels.voice.model)
+                        }}</span>
+                      </button>
+                    </div>
+
                     <!-- AI Model (the model actually used for this response,
                          after topic sorting/routing). Hidden when the backend
                          did not record a concrete model (e.g. "unknown") so
@@ -1338,6 +1357,11 @@ interface Props {
       model: string
       model_id: number | null
     }
+    voice?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
   } | null // AI model metadata
   webSearch?: {
     enabled?: boolean
@@ -1915,7 +1939,8 @@ watch(infoPopoverOpen, (open) => {
 
 const hasMessageMetadata = computed(() => {
   if (props.topic) return true
-  if (props.aiModels?.chat || props.aiModels?.sorting || props.aiModels?.audio) return true
+  if (props.aiModels?.chat || props.aiModels?.sorting || props.aiModels?.audio || props.aiModels?.voice)
+    return true
   // Only count legacy model/provider as metadata when neither is a
   // channel-source token, otherwise we'd light up the info popover
   // with nothing meaningful to show (issue #653).
@@ -1932,7 +1957,7 @@ const closeInfoPopover = () => {
   infoPopoverOpen.value = false
 }
 
-const handleInfoModelClick = (modelType: 'chat' | 'sorting' | 'audio') => {
+const handleInfoModelClick = (modelType: 'chat' | 'sorting' | 'audio' | 'voice') => {
   showModelDetails(modelType)
   closeInfoPopover()
 }
@@ -2029,7 +2054,7 @@ const getModelForOption = (option: ModelOption): AIModel | undefined => {
 }
 
 // Navigate to AI models configuration with highlight
-const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
+const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio' | 'voice') => {
   if (modelType === 'chat') {
     const capabilityMap: Record<string, string> = {
       vision: 'PIC2TEXT',
@@ -2046,6 +2071,8 @@ const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
     router.push({ path: '/ai/models', query: { highlight: 'SORT' } })
   } else if (modelType === 'audio') {
     router.push({ path: '/ai/models', query: { highlight: 'TEXT2SOUND' } })
+  } else if (modelType === 'voice') {
+    router.push({ path: '/ai/models', query: { highlight: 'VOICE_LIVE' } })
   } else {
     router.push('/ai/models')
   }

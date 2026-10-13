@@ -8,6 +8,35 @@ export interface LiveVoiceSocketHandlers {
   onEnded: (reason: string) => void
   onUsage: (secondsLeft: number | null) => void
   onWarn: (secondsLeft: number) => void
+  onReply: (details: {
+    topic?: string | null
+    aiModels?: {
+      chat?: { provider: string; model: string; model_id: number | null }
+      sorting?: { provider: string; model: string; model_id: number | null }
+      audio?: { provider: string; model: string; model_id: number | null }
+      voice?: { provider: string; model: string; model_id: number | null }
+    } | null
+    usage?: {
+      promptTokens: number
+      completionTokens: number
+      totalTokens: number
+      cost: string | null
+      modelKey: string
+      kind: string
+      priceKnown?: boolean
+    } | null
+    usageExtra?:
+      | {
+          promptTokens: number
+          completionTokens: number
+          totalTokens: number
+          cost: string
+          modelKey: string
+          kind: string
+          priceKnown?: boolean
+        }[]
+      | null
+  }) => void
   onLevel: (level: number) => void
   onOutLevel: (level: number) => void
   onAudioOut: () => void
@@ -138,6 +167,35 @@ export function applyControlMessage(
     reason?: string
     secondsLeft?: number
     final?: boolean
+    details?: {
+      topic?: string | null
+      aiModels?: {
+        chat?: { provider: string; model: string; model_id: number | null }
+        sorting?: { provider: string; model: string; model_id: number | null }
+        audio?: { provider: string; model: string; model_id: number | null }
+        voice?: { provider: string; model: string; model_id: number | null }
+      } | null
+      usage?: {
+        promptTokens: number
+        completionTokens: number
+        totalTokens: number
+        cost: string | null
+        modelKey: string
+        kind: string
+        priceKnown?: boolean
+      } | null
+      usageExtra?:
+        | {
+            promptTokens: number
+            completionTokens: number
+            totalTokens: number
+            cost: string
+            modelKey: string
+            kind: string
+            priceKnown?: boolean
+          }[]
+        | null
+    }
   }
   try {
     message = JSON.parse(raw) as typeof message
@@ -156,6 +214,7 @@ export function applyControlMessage(
   if (message.type === 'transcript' && (role === 'user' || role === 'assistant') && message.text) {
     handlers.onTranscript(role, message.text, message.final === true)
   }
+  if (message.type === 'reply' && message.details) handlers.onReply(message.details)
   if (message.type === 'interrupted') {
     onInterrupted?.()
     handlers.onInterrupted()

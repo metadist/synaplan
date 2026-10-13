@@ -18,6 +18,12 @@ export function shouldDropAudio(bufferedAmount, limit = AUDIO_BUFFER_LIMIT) {
   return bufferedAmount > limit
 }
 
+/** The spoken answer's models and cost, once the transcript has been stored. */
+export function replyFrame(role, json) {
+  if (role !== 'assistant' || !json || typeof json.details !== 'object' || json.details === null) return null
+  return { type: 'reply', details: json.details }
+}
+
 /**
  * One client socket. Redeems the ticket, opens the provider, and relays PCM.
  * Logs carry ids and reasons only — never audio and never transcript text.
@@ -89,11 +95,30 @@ export function handleConnection(socket, request, deps) {
     return { status: response.status, json }
   }
 
+  const saving = new Set()
+
+  const usagePayload = () => {
+    const payload = { ...meter }
+    if (!(payload.seconds > 0)) payload.seconds = (Date.now() - startedAt) / 1000
+    return payload
+  }
+
   const storeTurn = (role, text) => {
-    if (!sessionId || !role || !text) return
-    void post(`/internal/voice/sessions/${sessionId}/transcript`, {
+    if (!sessionId || !role || !text) return Promise.resolve()
+    const job = post(`/internal/voice/sessions/${sessionId}/transcript`, {
       turns: [{ role, text, startMs: 0, endMs: 0 }],
+      meter: usagePayload(),
+    }).then((result) => {
+      if (result.status >= 400) {
+        log({ event: 'transcript_callback_failed', status: result.status })
+        return
+      }
+      const frame = replyFrame(role, result.json)
+      if (frame) send(frame)
     }).catch(() => log({ event: 'transcript_callback_failed' }))
+    saving.add(job)
+    void job.finally(() => saving.delete(job))
+    return job
   }
 
   const finish = async (reason) => {
@@ -103,8 +128,9 @@ export function handleConnection(socket, request, deps) {
     clearInterval(idleTimer)
     clearTimeout(wrapTimer)
     clearTimeout(parkTimer)
-    for (const [role, text] of openTurn) storeTurn(role, text)
+    for (const [role, text] of openTurn) void storeTurn(role, text)
     openTurn.clear()
+    while (saving.size > 0) await Promise.all([...saving])
     if (sessionId) parkedSessions.delete(sessionId)
     const latencyMs = Date.now() - startedAt
     try {
@@ -135,11 +161,12 @@ export function handleConnection(socket, request, deps) {
 
   const reportUsage = async () => {
     if (!sessionId || ended) return
-    const payload = { ...meter }
-    if (!(payload.seconds > 0)) payload.seconds = (Date.now() - startedAt) / 1000
+    const payload = usagePayload()
     try {
       const result = await post(`/internal/voice/sessions/${sessionId}/usage`, { meter: payload })
       send({ type: 'usage', seconds: payload.seconds, secondsLeft: result.json.allowedSeconds })
+      const frame = replyFrame('assistant', result.json)
+      if (frame) send(frame)
       applyDecision(result.json)
     } catch {
       log({ event: 'usage_callback_failed' })
@@ -200,7 +227,7 @@ export function handleConnection(socket, request, deps) {
         if (ended) return
         if (turn.final) {
           openTurn.delete(turn.role)
-          storeTurn(turn.role, turn.text)
+          void storeTurn(turn.role, turn.text)
         } else {
           openTurn.set(turn.role, turn.text)
         }

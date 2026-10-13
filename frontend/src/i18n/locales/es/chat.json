@@ -440,6 +440,7 @@
     "copy": "Copiar mensaje",
     "infoAiModel": "Modelo de IA",
     "infoAudioModel": "Modelo de audio",
+    "infoLiveModel": "Modelo en vivo",
     "infoTokens": "Tokens",
     "infoCost": "Coste",
     "edit": "Editar",

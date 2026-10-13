@@ -653,6 +653,31 @@ class ChatHandlerTest extends TestCase
         $this->assertStringContainsString('I created the document.', $encoded);
     }
 
+    public function testASpokenQuestionGetsAShortSpokenAnswer(): void
+    {
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $calls = [];
+        $this->aiFacade
+            ->expects($this->exactly(2))
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$calls): array {
+                $calls[] = ['messages' => $messages, 'options' => $options];
+
+                return ['content' => 'Fine.', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $classification = ['topic' => 'CHAT', 'language' => 'de'];
+        $this->handler->handle($this->plainMessage('Wie spät ist es?'), [], $classification, null, ['source' => 'live_voice']);
+        $this->handler->handle($this->plainMessage('Wie spät ist es?'), [], $classification);
+
+        $this->assertSame(600, $calls[0]['options']['max_tokens'] ?? null);
+        $this->assertStringContainsString('spoken aloud', (string) $calls[0]['messages'][0]['content']);
+        $this->assertArrayNotHasKey('max_tokens', $calls[1]['options']);
+        $this->assertStringNotContainsString('spoken aloud', (string) json_encode($calls[1]['messages']));
+    }
+
     public function testHandleStripsALeadingEchoedTimestamp(): void
     {
         $message = $this->plainMessage('Make an audio of that.');

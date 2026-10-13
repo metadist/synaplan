@@ -642,29 +642,14 @@
   }
 
   /*
-   * The assistant bubble has an absolute-positioned copy button pinned to the
-   * top-right (top-2 right-2). On short answers the text would slide under it,
-   * so the rendered markdown gets a floated, button-sized pseudo-spacer at the
-   * top-right that the content naturally wraps around. shape-outside lets text
-   * hug the spacer's edge cleanly instead of leaving a rectangular gap.
+   * The copy button sits on the top-right of the bubble. A floated spacer
+   * made the shrink-wrapped bubble wrap a short answer early ("Klar, einen"
+   * / "Moment bitte.") and then collapse to that narrow width. Padding is
+   * part of the box, so the bubble grows to the whole sentence and the
+   * button still has a clear gutter.
    */
-  .bubble-ai .markdown-content [data-testid='message-text']::before {
-    content: '';
-    float: right;
-    width: 2.5rem;
-    height: 1.5rem;
-    margin: 0 0 0.25rem 0.5rem;
-    shape-outside: inset(0);
-    pointer-events: none;
-  }
-
-  /*
-   * While the answer is still arriving the copy button is invisible. The
-   * spacer would make each new word fall onto the next line and jump back
-   * up as the bubble grows, so it stays out until the answer is finished.
-   */
-  .bubble-ai.bubble-streaming .markdown-content [data-testid='message-text']::before {
-    content: none;
+  .bubble-ai .markdown-content [data-testid='message-text'] {
+    padding-inline-end: 1.5rem;
   }
 
   .bubble-user {

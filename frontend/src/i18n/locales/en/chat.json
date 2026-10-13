@@ -453,6 +453,7 @@
     "infoAiModel": "AI Model",
     "infoProvider": "Provider",
     "infoAudioModel": "Audio Model",
+    "infoLiveModel": "Live model",
     "infoTokens": "Tokens",
     "infoCost": "Cost",
     "edit": "Edit",

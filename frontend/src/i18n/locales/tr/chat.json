@@ -440,6 +440,7 @@
     "copy": "Mesajı kopyala",
     "infoAiModel": "Yapay Zeka Modeli",
     "infoAudioModel": "Ses Modeli",
+    "infoLiveModel": "Canlı model",
     "infoTokens": "Token",
     "infoCost": "Maliyet",
     "edit": "Düzenle",
