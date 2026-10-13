@@ -9,11 +9,20 @@ not a chat message.
 
 | Step | Repo | State | Notes |
 | ---- | ---- | ----- | ----- |
-| CF-S1 OpenCloud web extension points | `synaplan-opencloud` | planned | |
+| E-1 Cleanup and baseline | workstation | **in progress** | §2.1 of `10` done 2026-10-13; §2.2 waits for confirmation; scheduler container exited (127) — cause open |
+| E-2 Nextcloud stack v2 (MariaDB, cron, `user_oidc`, test users) | `synaplan-nextcloud` | planned | after E-3 |
+| E-3 Keycloak clients and users for the clouds | `synaplan` | planned | additive block in `_docker/keycloak/setup.sh` |
+| E-4 OpenCloud refresh to 8.1.0 | `synaplan-opencloud` | planned | config volume reset needs confirmation |
+| E-5 ownCloud.online Docker stack | `synaplan-owncloud-online` | planned | port 8083; may finish during CF1.2 |
+| E-6 `env-check.sh`, fixtures, cloud helpers | `synaplan` | planned | `_devextras/testing/cloud-apps/` |
+| E-7 Developer docs | all | planned | |
+| E-8 Refresh policy | STATUS | recurring | monthly or on `max-version` change |
+| CF-S1 OpenCloud web extension points | `synaplan-opencloud` | planned | timebox 2 days |
 | CF-S2 Nextcloud organisation login (`user_oidc`) | `synaplan-nextcloud` | planned | |
 | CF-S3 OpenCloud unattended access | `synaplan-opencloud` | planned | |
 | CF-S4 ownCloud 11 Files APIs | `synaplan-owncloud-online` | planned | Needs a test tenant on 11.0.10 from the hoster |
 | CF-S5 Nextcloud Files APIs at scale | `synaplan-nextcloud` | planned | |
+| CF0.0 Local stacks ready (E-1…E-6) | workstation, repos | planned | gate for CF0.7 |
 | CF0.1 Scope map for the paths the apps call (D1) | `synaplan` | planned | |
 | CF0.2 `owncloud` source (D2) | `synaplan` | planned | Data fix per §3 row 26 |
 | CF0.3 `intake=direct` (D3) | `synaplan` | planned | |
@@ -66,6 +75,7 @@ not a chat message.
 | ---- | -------- |
 | 2026-10-13 | Track opened from the product owner's request: copy generated files into the cloud, one login story and user handling, synchronized file handling (bird, bird with eyes, automations). Master-plan §3 rows 1–26 proposed; **none ticked**. |
 | 2026-10-13 | Product-owner clarification: "A pure path in a specific prompt has no meaning … pick up files or file lists from the file sharing app … fetch files and process those on Synaplan automatically, even in the code sandbox with specific tools." Added [`07_files_into_runs.md`](./07_files_into_runs.md) and §3 rows 27–32 (files not paths, what each run gets, `folder_fetch` + pickup, read scope, file work, try then automate). The `{file.path}` placeholders are withdrawn. Rows proposed, **not ticked**. |
+| 2026-10-13 | Second review ("prepare for vibe coding"): added [`08_agent_briefs.md`](./08_agent_briefs.md) (rules R1–R14, done D1–D10, ask A1–A7, one brief per spike and step), [`09_functional_tests.md`](./09_functional_tests.md) (three layers per sprint, fixtures, accounts, regression set) and [`10_local_environments.md`](./10_local_environments.md) (pins, inventory, cleanup, E-1…E-8). The three open questions of the first review became §3 rows 33–35; dev-mode test hooks are row 36. Rows proposed, **not ticked**. Local cleanup of `10` §2.1 executed; `10` §2.2 waits for the owner. |
 
 ## Review log
 
@@ -100,10 +110,54 @@ by the app (they work when Synaplan cannot reach the cloud); fetching more
 files during a run uses a ticket-bound pickup, which needs Synaplan to reach
 the cloud until the CF6.2 pull mode.
 
-Open questions for the product owner, besides §3:
+Open questions for the product owner, besides §3 — turned into tickable
+rows with a proposed default in the second review:
 
-1. Is ownCloud.online an active hoster target this quarter? It sets the
-   priority of CF1.1 / CF1.2 and whether BW-Tech can give us a test tenant.
-2. OpenCloud chat parity (CF1.5): before the three goals, or after CF5?
+1. Is ownCloud.online an active hoster target this quarter? → `00` §3 row 33.
+2. OpenCloud chat parity (CF1.5): before the three goals, or after CF5? →
+   row 34.
 3. Which comes first if capacity is short: Nextcloud organisation login
-   (CF2.6) or OpenCloud Connect mode (CF2.7)?
+   (CF2.6) or OpenCloud Connect mode (CF2.7)? → row 35.
+
+**2026-10-13 (second review — ready for coding agents).** Read every file
+for fuzzy or unclear statements and for sections too thin to hand to an
+agent. Findings and what changed:
+
+- **Steps without work orders.** `06` named steps but not files, tests or
+  acceptance. Every spike and step now has a brief in `08` (repo, branch,
+  depends-on, reads, touches, build list, tests, acceptance, don'ts) plus the
+  rules an agent follows before, during and after (`08` §0), a PR template and
+  the dependency / parallelism map (`08` §1).
+- **"Walk the journeys" was the whole test plan.** `09` now fixes three
+  layers per sprint with named scripts and their assertions, click-by-click
+  checklists with the expected sentence and where it is found, fixtures and
+  accounts (Ada, Bob, admins), stability, performance (status call p95 <
+  1.5 s on 500 ids), accessibility, locale and flag-off checks, and the
+  regression set run after every sprint.
+- **Environments were a sentence** ("Nextcloud `make dev-up` on `:8081`, …").
+  `10` pins every stack, records what was found on the maintainer
+  workstation (a running Nextcloud 31 on SQLite without cron or `user_oidc`;
+  dead OpenCloud 6.0.0 containers against a compose pinned to 8.1.0; no
+  ownCloud.online stack at all, only a host Apache install on `:8088`; the
+  scheduler container exited; a 7 GB bare Nextcloud 34 dev checkout and two
+  tarballs with the App Store signing key in the web root), what was removed,
+  what needs the owner's word, and eight environment briefs E-1…E-8 with
+  acceptance. `06` gained step CF0.0 (stacks ready) as the gate for CF0.7.
+- **Spikes had no end.** Timebox of two working days, a `spike/…` branch
+  that is never merged, yes / no / partly per question, overrun = answer
+  (decision 34).
+- **Tests needed back doors the plan never named.** Decision 36 and `08`
+  §0.8 define the only three dev switches per app and two `APP_ENV`-gated
+  core values; `09` uses nothing else.
+- **Endpoint drift.** `02` §8 lacked the turn-off and disconnect routes the
+  Apps card uses; added. CF2.2 now adds all four `BEXTERNALIDENTITIES`
+  columns at once so later briefs touch that table without a migration.
+- **Vague wording fixed in place:** CF1.2's "local ownCloud stack (Docker,
+  fixed port, joins the Synaplan network)" → the E-5 stack with its image,
+  tag source, database, cron sidecar and port; rollout step 3 → the pinned
+  stacks and the regression set.
+
+Not changed on purpose: the protocol numbers (30 s copy budget, 25 s inline
+pickup, 60 s quiet period, 10 min window, 5 / 10 min tickets, 7-day grace,
+50 files / 200 MB per run) — they were already explicit and `09` tests them
+as written. No product code was touched.

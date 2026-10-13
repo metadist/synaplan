@@ -2,7 +2,8 @@
 
 | | |
 | - | - |
-| **Status** | Plan, 2026-10-13. **No code until §3 is ticked.** Verified by code reading against `synaplan` `main` `5487e2678` (5.4.0), `synaplan-nextcloud` `400ec02` (1.6.0), `synaplan-owncloud-online` `3b916f6` (1.0.0), `synaplan-opencloud` `5cc1351` (v1.0.0). No live walk yet — the first walk is step CF0.7. |
+| **Status** | Plan, 2026-10-13; second review the same day (agent briefs, functional tests, local environments — `08`–`10`). **No code until §3 is ticked.** Verified by code reading against `synaplan` `main` `5487e2678` (5.4.0), `synaplan-nextcloud` `400ec02` (1.6.0), `synaplan-owncloud-online` `3b916f6` (1.0.0), `synaplan-opencloud` `5cc1351` (v1.0.0). No live walk yet — the first walk is step CF0.7. |
+| **How it is built** | One brief per step for a coding agent ([`08`](./08_agent_briefs.md)), three test layers per sprint ([`09`](./09_functional_tests.md)), pinned local stacks ([`10`](./10_local_environments.md)). Environment briefs E-1…E-8 run before CF0.7. |
 | **Repos** | `synaplan` (core API, Library, Tasks, Apps), `synaplan-nextcloud`, `synaplan-owncloud-online`, `synaplan-opencloud`, `synaplan-docs` |
 | **User-facing names** | **Searchable by AI** (bird) · **Watch with Synaplan** / **Watched folders** (bird with eyes) · **Copy to cloud** · **Organisation login** · **Connect your Synaplan account**. Full table in §11. |
 | **Binding contracts** | UX rules U1–U12 ([`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)), AGENTS.md "Perfect UX & Stability", Wave 6 decision §0 #5 "do not invent a fourth auth scheme" ([`../20260917-backend-integrations/00_master_plan.md`](../20260917-backend-integrations/00_master_plan.md)), Galera migration rules, API-key scope enforcement (`backend/src/Security/ApiKeyScope.php`). |
@@ -19,6 +20,9 @@
 | [`05_journeys_and_wireframes.md`](./05_journeys_and_wireframes.md) | Journeys J-CF-1…14, wireframes, copy in five locales |
 | [`06_sprints.md`](./06_sprints.md) | Spikes CF-S1…S5 and sprints CF0–CF6 |
 | [`07_files_into_runs.md`](./07_files_into_runs.md) | Files, not paths: what a run receives, fetching more files (`folder_fetch` + pickup), what Synaplan may read, file work in the sandbox, try it on a file |
+| [`08_agent_briefs.md`](./08_agent_briefs.md) | The work orders: rules for an agent, definition of done, one brief per spike and step (repo, branch, files, build list, tests, acceptance) |
+| [`09_functional_tests.md`](./09_functional_tests.md) | Three test layers per sprint: unit and contract, integration scripts, browser walks with expected results; fixtures, accounts, regression set |
+| [`10_local_environments.md`](./10_local_environments.md) | Local stacks for Synaplan, Keycloak, Nextcloud, OpenCloud, ownCloud.online: pins, requirements, inventory of what was found, cleanup, update briefs E-1…E-8, `env-check.sh` |
 | [`STATUS.md`](./STATUS.md) | Step ledger, decision log, review log |
 
 ---
@@ -147,6 +151,10 @@ Defects that block the floor today (detail in `01` §4):
 | 30 | **What Synaplan may read** | Set by the person **in the cloud**: only folders I watch (default) · also folders I allow (right-click → **Let Synaplan read this folder**) · all my files. The app enforces it and reports it to Synaplan, which pre-checks, tells the planner and shows it on the Apps card. Admin cap per app (default: folders people allow). | |
 | 31 | **File work on cloud files** | Watch tasks and chats may use file work (`code_run`) on the attached files where Compute is on: Python / Node images with their libraries, no network, Compute quotas. Unattended file work asks once at creation and sets the task's existing "allow unattended" flag; otherwise each run waits in Approvals. Pinned scripts process whatever is mounted, never a test file's name. | |
 | 32 | **Try it, then automate** | "Run my instruction" is tried on one real file first: the app uploads it with the person's credential, Synaplan opens a trial chat, the person checks the result; **Do this for every new file** pins exactly that turn's steps into the watch task. The same button appears under any chat whose files came from one cloud folder. | |
+| 33 | **ownCloud.online priority** | ownCloud.online stays a full target of CF0–CF5 at parity with Nextcloud. CF-S4 asks the hoster for a test tenant on 11.0.10; without one, the local E-5 stack built from the BW-Tech checkout at the hoster's tag is the reference and the STATUS entry says so. | |
+| 34 | **OpenCloud chat timing** | CF1.5 (chat about a file, research chat, media, binary save) stays in CF1. It moves after CF5 only if CF-S1 or CF-S3 overrun their two-day timebox — recorded in STATUS, not decided ad hoc. | |
+| 35 | **If capacity is short in CF2** | Nextcloud organisation login (CF2.6) before OpenCloud Connect mode (CF2.7's cut line): Nextcloud is the installed base, and OpenCloud already has organisation login. CF2.7's registration, consent, bind and lifecycle are not cut. | |
+| 36 | **Dev-mode test hooks in the apps** | Three admin-CLI-only switches per app (`dev_hold_inbound`, `dev_mute_events`, `dev_allow_self_write`) and two `APP_ENV=dev\|test`-only core values (`CLOUD_DELIVERY_TTL_SEC`, `CLOUD_DELIVERY_UNCONFIRMED_SEC`) so the integration scripts can test the pending, reconcile and loop-guard paths (`08` §0.8). Never visible in a UI. | |
 
 ---
 
@@ -259,7 +267,10 @@ Detail, steps and exits: [`06_sprints.md`](./06_sprints.md).
 
 Order: CF-S and CF0 together → CF1 → CF2 → CF3 and CF4 in parallel → CF5 →
 CF6. Partner-repo steps in one wave may run in parallel once that wave's core
-step is merged and released.
+step is merged and released. Every step has a brief in [`08`](./08_agent_briefs.md)
+and its sprint has a test plan in [`09`](./09_functional_tests.md); the
+dependency and parallelism map is `08` §1. Spikes are timeboxed to two working
+days each and end in a STATUS entry, never in merged code.
 
 ---
 
@@ -294,8 +305,9 @@ step is merged and released.
    feature is published only after a core release answers that capability in
    `instances/self`; apps hide what the core lacks.
 3. Docs first, then enable on web.synaplan.com once every journey is walked on
-   local stacks of all three clouds (Nextcloud `make dev-up` on `:8081`,
-   OpenCloud `docker compose` on `:9200`, a local ownCloud from CF1.2).
+   the local stacks of all three clouds pinned in [`10`](./10_local_environments.md)
+   (Nextcloud `:8081` on both matrix images, OpenCloud `:9200`, ownCloud.online
+   `:8083`), with the `09` §7 regression set green.
 4. New installs seed the flags on; existing installs get an activation
    migration with a named list.
 5. **Rollback:** flag off → capabilities disappear → apps hide watch, bird and

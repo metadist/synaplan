@@ -1,6 +1,8 @@
 # Cloud file sharing — Nextcloud, ownCloud.online and OpenCloud on one level
 
-**Status:** Plan, 2026-10-13. No product code. Master-plan §3 is unticked.
+**Status:** Plan, 2026-10-13, reviewed twice the same day (second review:
+agent briefs, functional tests, local environments). No product code.
+Master-plan §3 is unticked.
 **Plan of record:** [`00_master_plan.md`](./00_master_plan.md).
 
 Asked for on 2026-10-13:
@@ -26,7 +28,11 @@ Asked for on 2026-10-13:
 | [`05_journeys_and_wireframes.md`](./05_journeys_and_wireframes.md) | Journeys J-CF-1…14, wireframes, copy in five locales |
 | [`06_sprints.md`](./06_sprints.md) | Spikes CF-S1…S5, sprints CF0–CF6, gates per repo |
 | [`07_files_into_runs.md`](./07_files_into_runs.md) | Files, not paths: what a run receives, fetching more files, what Synaplan may read, file work in the sandbox, try it on a file |
+| [`08_agent_briefs.md`](./08_agent_briefs.md) | Work orders for coding agents: rules, definition of done, PR template, one brief per spike and step |
+| [`09_functional_tests.md`](./09_functional_tests.md) | Per sprint: unit and contract tests, integration scripts, browser walks with expected results; fixtures, accounts, regression set |
+| [`10_local_environments.md`](./10_local_environments.md) | Local stacks (Synaplan + Keycloak, Nextcloud, OpenCloud, ownCloud.online): pins, requirements, inventory, cleanup, update briefs E-1…E-8, `env-check.sh` |
 | [`STATUS.md`](./STATUS.md) | Step ledger, decision log, review log |
 
 Reading order for a reviewer: `00` §0–§3 → `01` §4 (defects) → `05` §1
-(journeys) → the goal files.
+(journeys) → the goal files. For a coding agent: `08` §0 → the brief → the
+sections it cites → `09` for the sprint → `10` for the stack.

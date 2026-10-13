@@ -277,7 +277,9 @@ Settings → Synaplan") + **How to connect** (U5).
 | `POST` | `/api/v1/platform-links/sso/background-key` | bearer + instance | Mint `files rag cloud:watch`, label "OpenCloud: cloud.example.org (jdoe) — while you are away"; plaintext once |
 | `POST` | `/api/v1/platform-links/lifecycle` | instance | `{external_id, event: deleted \| disabled \| enabled}` |
 | `GET` | `/api/v1/me/platform-links` | session | Existing; adds mode, status, last seen, counts |
+| `POST` | `/api/v1/me/platform-links/{id}/turn-off` | session | Turn an organisation-login connection off: identity `paused`, the app's bearer calls answer `403 platform_disconnected`, watches pause (CF5) |
 | `POST` | `/api/v1/me/platform-links/{id}/resume` | session | Turn an organisation-login connection back on |
+| `DELETE` | `/api/v1/me/platform-links/{id}` | session | Existing disconnect for linked and provisioned identities; now also revokes the identity row and pauses watches |
 | `PUT` | `/api/v1/platform-links/read-scope` | instance | What a person lets Synaplan read (`07` §5) |
 
 Pickup endpoints (`/api/v1/platform-links/pickups/{id}/…`) are listed in

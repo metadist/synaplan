@@ -4,6 +4,12 @@ Plan of record: [`00_master_plan.md`](./00_master_plan.md). No step starts
 before §3 there is ticked. Every sprint with an `ota-candidate` step names its
 journeys and carries the five exit bullets of the UX contract §6.
 
+Each step below has a work order in [`08_agent_briefs.md`](./08_agent_briefs.md)
+(same numbering) and each sprint a test plan in
+[`09_functional_tests.md`](./09_functional_tests.md); the stacks are pinned in
+[`10_local_environments.md`](./10_local_environments.md). A sprint exits when
+its `09` section is green and its walks are in STATUS.
+
 ## 0. Order and gates
 
 ```text
@@ -31,9 +37,13 @@ through their own channel and are marked **app release**.
 
 ## 1. Spikes (parallel to CF0)
 
-Each spike ends with a dated STATUS entry that answers its questions with
-evidence (version, code pointer, a two-minute recording or a test). A "no"
-answer moves the dependent step to its fallback, recorded in the same entry.
+Each spike is **timeboxed to two working days** on a `spike/…` branch that is
+never merged. It ends with a dated STATUS entry that answers every question
+with **yes / no / partly**, the version tested and a code pointer or test. A
+"no" answer moves the dependent step to its fallback, recorded in the same
+entry together with the briefs whose text changes. An overrun is itself an
+answer ("not within two days") and triggers decision 34 where it applies.
+Briefs: `08` §2.
 
 | Spike | Questions | Blocks | Fallback if "no" |
 | ----- | --------- | ------ | ---------------- |
@@ -51,10 +61,11 @@ answer moves the dependent step to its fallback, recorded in the same entry.
 what the code does.
 
 **User-flow:** J-NC-1…3 (first walks, roadmap §3.1), J-CF-2 baseline on
-ownCloud.online (provision mode).
+ownCloud.online (provision mode). **Briefs:** `08` §3 · **Tests:** `09` §1.
 
 | Step | Repo | Content | Class |
 | ---- | ---- | ------- | ----- |
+| CF0.0 | workstation, `synaplan`, app repos | **Local stacks ready** (`10` §4, briefs E-1…E-6): cleanup confirmed, scheduler running, Nextcloud stack v2 (MariaDB, cron, `user_oidc`, `ada` / `bob`), Keycloak clients and users for the clouds, OpenCloud on 8.1.0, ownCloud.online Docker stack (may finish during CF1.2), `env-check.sh` and fixtures. Nothing in CF0.7 is walked on a stack that is not green here. | env |
 | CF0.1 | `synaplan` | **D1.** Exact scope branches: `chat` → `POST /api/v1/summary/generate`, `POST /v1/chat/completions`, `GET /v1/models`, `POST /api/v1/media/generate` and the media download path; `memories` → `GET /api/v1/config/memory-service/check`. Contract fixture of every path each app calls (`01` §2); allow tests for the fixture, deny tests for neighbours (`/v1/messages`, `/v1/images/generations`, `/api/v1/admin/*`). | backend-only |
 | CF0.2 | `synaplan` | **D2.** `owncloud` in `File::SOURCES` and `INCOMING_SOURCES` (same as `nextcloud`); source label "ownCloud.online" and filter in the Library, five locales; data fix per decision 26 (dry-run count in the PR). | backend-only + ota-candidate |
 | CF0.3 | `synaplan` | **D3.** Upload option `intake=direct`: with a `group_key`, the file skips Incoming. Default behaviour unchanged (C10). | backend-only |
@@ -76,12 +87,12 @@ files; walks recorded. Never cut.
 ownCloud.online or OpenCloud without a reason in `01` §5.2; all three apps
 speak the core's words in five locales and have a CI gate.
 
-**User-flow:** J-CF-2.
+**User-flow:** J-CF-2. **Briefs:** `08` §4 · **Tests:** `09` §2.
 
 | Step | Repo | Content | Class |
 | ---- | ---- | ------- | ----- |
 | CF1.1 | `synaplan-owncloud-online` | Mode enum (`shared` / `provision` / `link`); link mode ported from Nextcloud (`PlatformLinkService`, `LinkController`, routes, personal settings page, admin **Register this instance**); consent gate on every AI surface (D5); MIME filters on the four actions (D6); per-user keys encrypted (D4); chat launcher on every page like Nextcloud. | app release |
-| CF1.2 | `synaplan-owncloud-online` | PHPUnit suite mirroring Nextcloud's; `.github/workflows/ci.yml` with `All Checks Passed`; `AGENTS.md`; local ownCloud stack (Docker, fixed port, joins the Synaplan network) for walks and E2E (CF-S4). | app repo |
+| CF1.2 | `synaplan-owncloud-online` | PHPUnit suite mirroring Nextcloud's; `.github/workflows/ci.yml` with `All Checks Passed`; `AGENTS.md`; consumes the E-5 Docker stack (`10` §3.4: BW-Tech checkout at the hoster's tag in `php:8.4-apache`, MariaDB 10.11, cron sidecar, port `8083`, Synaplan network) for walks and E2E (CF-S4). | app repo |
 | CF1.3 | `synaplan-nextcloud` | CI workflow with `All Checks Passed`; `AGENTS.md`; per-user keys encrypted with transparent migration (D4); Playwright against `make dev-up` for J-NC-1 and summarize; user disabled / re-enabled listener (prepares CF2.4). | app release |
 | CF1.4 | all three | Five locales (en, de, es, fr, tr) with the words of `00` §11 (D12); "Add to AI Knowledge" / "Add to knowledge…" → **Make searchable by AI** (D13); locale parity check in each CI. | app releases |
 | CF1.5 | `synaplan-opencloud` | Chat about a file and research chat (SSE through the Go service to `/v1/chat/completions` with the exchanged token), media generation, binary **Save to Files** (D7). **Cut line** — may move after CF5. | app release |
@@ -103,6 +114,7 @@ speak the core's words in five locales and have a CI gate.
 stops every cloud connection; Nextcloud gains organisation login.
 
 **User-flow:** J-CF-1, J-CF-2 (re-walk), J-CF-11 (identity half).
+**Briefs:** `08` §5 · **Tests:** `09` §3.
 
 | Step | Repo | Content | Class |
 | ---- | ---- | ------- | ----- |
@@ -135,7 +147,7 @@ stops every cloud connection; Nextcloud gains organisation login.
 run — chat or task — can pick up files or file lists from the cloud inside
 what the person lets Synaplan read.
 
-**User-flow:** J-CF-3, J-CF-4, J-CF-14.
+**User-flow:** J-CF-3, J-CF-4, J-CF-14. **Briefs:** `08` §6 · **Tests:** `09` §4.
 
 | Step | Repo | Content | Class |
 | ---- | ---- | ------- | ----- |
@@ -170,7 +182,7 @@ what the person lets Synaplan read.
 platform allows it and in the sidebar everywhere; searchable files follow
 their source.
 
-**User-flow:** J-CF-5.
+**User-flow:** J-CF-5. **Briefs:** `08` §7 · **Tests:** `09` §5.
 
 | Step | Repo | Content | Class |
 | ---- | ---- | ------- | ----- |
@@ -198,7 +210,8 @@ their source.
 every run in Synaplan, and can pause or stop from both sides.
 
 **User-flow:** J-CF-6, J-CF-7, J-CF-8, J-CF-9, J-CF-10, J-CF-11 (full),
-J-CF-12, J-CF-13.
+J-CF-12, J-CF-13. **Briefs:** `08` §8 (build order CF5.1 → 5.2 → 5.7 → 5.8
+→ 5.3 → apps) · **Tests:** `09` §6.
 
 | Step | Repo | Content | Class |
 | ---- | ---- | ------- | ----- |
@@ -232,6 +245,9 @@ for existing ones (decision 22).
 ---
 
 ## 8. CF6 — Beyond the apps (optional)
+
+No briefs or test plans yet; an item gets both (in the shape of `08` and
+`09`) when it is scheduled, never before.
 
 | Step | Repo | Content |
 | ---- | ---- | ------- |
