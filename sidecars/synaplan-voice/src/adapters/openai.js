@@ -1,4 +1,5 @@
 import WebSocket from 'ws'
+import { createTurnAssembler } from '../turns.js'
 
 function listen(map, event, fn) {
   const list = map.get(event) ?? []
@@ -23,7 +24,7 @@ export function createOpenAiAdapter({
   const host = region === 'eu' ? 'eu.api.openai.com' : 'api.openai.com'
   const socketUrl = url ?? `wss://${host}/v1/live/sessions`
   const listeners = new Map()
-  const state = { heard: '' }
+  const state = {}
   let ws = null
   let lastInjectAt = 0
   let opened = false
@@ -72,8 +73,12 @@ export function createOpenAiAdapter({
           applyLiveServerEvent(event, state, (name, payload) => emit(listeners, name, payload))
         })
         ws.on('close', () => {
-          if (!opened) reject(new Error('provider_closed'))
-          else emit(listeners, 'closed')
+          if (!opened) {
+            reject(new Error('provider_closed'))
+            return
+          }
+          state.turns?.commitAll()
+          emit(listeners, 'closed')
         })
       })
     },
@@ -106,7 +111,7 @@ export function createOpenAiAdapter({
  */
 export function createLiveSideband({ apiKey, url, WebSocketImpl = WebSocket } = {}) {
   const listeners = new Map()
-  const state = { heard: '' }
+  const state = {}
   let ws = null
   let opened = false
   let lastInjectAt = 0
@@ -140,8 +145,12 @@ export function createLiveSideband({ apiKey, url, WebSocketImpl = WebSocket } = 
           applyLiveServerEvent(event, state, (name, payload) => emit(listeners, name, payload))
         })
         ws.on('close', () => {
-          if (!opened) reject(new Error('provider_closed'))
-          else emit(listeners, 'closed')
+          if (!opened) {
+            reject(new Error('provider_closed'))
+            return
+          }
+          state.turns?.commitAll()
+          emit(listeners, 'closed')
         })
       })
     },
@@ -172,50 +181,37 @@ export function createLiveSideband({ apiKey, url, WebSocketImpl = WebSocket } = 
   }
 }
 
+/**
+ * GPT-Live sends transcript deltas for both speakers on one full-duplex
+ * stream and no turn-complete event, so the turn assembler decides where a
+ * turn ends. state.now can pin the clock in tests.
+ */
 export function applyLiveServerEvent(event, state, emit) {
-  if (event.type === 'session.input_transcript.delta') remember(state, emit, 'user', event.delta)
-  if (event.type === 'session.input_transcript.done') {
-    if (event.transcript) state.heard = String(event.transcript)
-    commit(state, emit, 'user')
-  }
+  state.emitTranscript = (turn) => emit('transcript', turn)
+  state.turns ??= createTurnAssembler((turn) => state.emitTranscript(turn), state.now ? { now: state.now } : {})
+  const turns = state.turns
+
+  if (event.type === 'session.input_transcript.delta') turns.append('user', event.delta)
+  if (event.type === 'session.input_transcript.done') turns.commit('user', event.transcript)
   if (event.type === 'session.output_audio.delta' && event.delta) {
     emit('audio', Buffer.from(event.delta, 'base64'))
   }
-  if (event.type === 'session.output_transcript.delta') {
-    remember(state, emit, 'assistant', event.delta ?? event.transcript)
-  }
-  if (event.type === 'session.output_transcript.done') {
-    if (event.transcript) state.spoken = String(event.transcript)
-    commit(state, emit, 'assistant')
-  }
+  if (event.type === 'session.output_transcript.delta') turns.append('assistant', event.delta ?? event.transcript)
+  if (event.type === 'session.output_transcript.done') turns.commit('assistant', event.transcript)
   if (event.type === 'session.delegation.created' && event.delegation?.target === 'client') {
-    emit('delegate', { id: event.delegation.id, question: state.heard || String(event.delegation.task ?? '') })
+    emit('delegate', { id: event.delegation.id, question: turns.text('user') || String(event.delegation.task ?? '') })
   }
   if (event.type === 'session.usage.updated') emit('usage', mapOpenAiUsage(event.usage))
-  if (event.type === 'session.interrupted') emit('interrupted')
+  if (event.type === 'session.interrupted') {
+    turns.commit('assistant')
+    emit('interrupted')
+  }
   if (event.type === 'error') emit('error', new Error('provider_error'))
   if (event.type === 'session.closed') {
-    commit(state, emit, 'user')
-    commit(state, emit, 'assistant')
+    turns.commitAll()
     if (event.usage) emit('usage', mapOpenAiUsage(event.usage))
     emit('closed')
   }
-}
-
-function remember(state, emit, role, piece) {
-  const mine = role === 'user' ? 'heard' : 'spoken'
-  const otherKey = role === 'user' ? 'spoken' : 'heard'
-  const otherRole = role === 'user' ? 'assistant' : 'user'
-  if (state[otherKey]) commit(state, emit, otherRole)
-  state[mine] = `${state[mine] ?? ''}${piece ?? ''}`
-  if (state[mine] !== '') emit('transcript', { role, text: state[mine], final: false })
-}
-
-function commit(state, emit, role) {
-  const mine = role === 'user' ? 'heard' : 'spoken'
-  const text = String(state[mine] ?? '')
-  state[mine] = ''
-  if (text !== '') emit('transcript', { role, text, final: true })
 }
 
 export function mapOpenAiUsage(usage = {}) {

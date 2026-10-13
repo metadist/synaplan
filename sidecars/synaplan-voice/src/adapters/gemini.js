@@ -1,4 +1,5 @@
 import WebSocket from 'ws'
+import { createTurnAssembler } from '../turns.js'
 
 function listen(map, event, fn) {
   const list = map.get(event) ?? []
@@ -21,6 +22,7 @@ export function createGeminiAdapter({
 } = {}) {
   const socketUrl = url ?? `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey ?? ''}`
   const listeners = new Map()
+  const turns = createTurnAssembler((turn) => emit(listeners, 'transcript', turn))
   let ws = null
   let config = null
   let handle = ''
@@ -86,14 +88,12 @@ export function createGeminiAdapter({
         clearTimeout(timer)
         resolve()
       }
-      const input = event.serverContent?.inputTranscription?.text
-      if (input && event.serverContent?.inputTranscription?.finished) {
-        emit(listeners, 'transcript', { role: 'user', text: String(input), final: true })
-      }
-      const output = event.serverContent?.outputTranscription?.text
-      if (output && event.serverContent?.outputTranscription?.finished) {
-        emit(listeners, 'transcript', { role: 'assistant', text: String(output), final: true })
-      }
+      const input = event.serverContent?.inputTranscription
+      if (input?.text) turns.append('user', String(input.text))
+      if (input?.finished) turns.commit('user')
+      const output = event.serverContent?.outputTranscription
+      if (output?.text) turns.append('assistant', String(output.text))
+      if (output?.finished) turns.commit('assistant')
       for (const part of event.serverContent?.modelTurn?.parts ?? []) {
         if (part.inlineData?.data) emit(listeners, 'audio', Buffer.from(part.inlineData.data, 'base64'))
       }
@@ -106,7 +106,11 @@ export function createGeminiAdapter({
         })
       }
       if (event.usageMetadata) emit(listeners, 'usage', mapGeminiUsage(event.usageMetadata))
-      if (event.serverContent?.interrupted) emit(listeners, 'interrupted')
+      if (event.serverContent?.interrupted) {
+        turns.commit('assistant')
+        emit(listeners, 'interrupted')
+      }
+      if (event.serverContent?.turnComplete) turns.commit('assistant')
     })
     ws.on('close', () => {
       clearTimeout(timer)
@@ -143,6 +147,7 @@ export function createGeminiAdapter({
     close() {
       closing = true
       ws?.close()
+      turns.commitAll()
       emit(listeners, 'closed')
     },
     resumptionHandle: () => handle,

@@ -8,6 +8,8 @@ class PcmPlaybackProcessor extends AudioWorkletProcessor {
     this.silence = 0
     this.playing = false
     this.idleSent = false
+    this.levelSum = 0
+    this.levelCount = 0
     this.port.onmessage = (event) => {
       if (event.data?.type === 'config') {
         this.sourceRate = event.data.sourceRate
@@ -25,6 +27,9 @@ class PcmPlaybackProcessor extends AudioWorkletProcessor {
         this.silence = 0
         this.playing = false
         this.idleSent = false
+        this.levelSum = 0
+        this.levelCount = 0
+        this.port.postMessage({ type: 'level', level: 0 })
       }
     }
   }
@@ -51,10 +56,18 @@ class PcmPlaybackProcessor extends AudioWorkletProcessor {
       const frac = this.fraction - index
       const sample = current[index] + (current[nextIndex] - current[index]) * frac
       output[i] = sample
+      this.levelSum += sample * sample
       wrote = true
       this.fraction += step
     }
     if (wrote) {
+      this.levelCount += output.length
+      if (this.levelCount >= sampleRate / 10) {
+        const level = Math.min(1, Math.sqrt(this.levelSum / this.levelCount) * 4)
+        this.port.postMessage({ type: 'level', level })
+        this.levelSum = 0
+        this.levelCount = 0
+      }
       this.silence = 0
       return true
     }
@@ -63,6 +76,9 @@ class PcmPlaybackProcessor extends AudioWorkletProcessor {
       if (this.silence > sampleRate * 0.3) {
         this.idleSent = true
         this.playing = false
+        this.levelSum = 0
+        this.levelCount = 0
+        this.port.postMessage({ type: 'level', level: 0 })
         this.port.postMessage({ type: 'idle' })
       }
     }

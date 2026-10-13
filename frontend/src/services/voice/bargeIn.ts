@@ -28,7 +28,10 @@ export function feedBargeIn(detector: BargeInDetector, levelDb: number, time: nu
     detector.speechSince = null
     return false
   }
-  const threshold = Math.max(detector.speechThresholdDb, detector.echoPeakDb + detector.echoMarginDb)
+  const threshold = Math.max(
+    detector.speechThresholdDb,
+    detector.echoPeakDb + detector.echoMarginDb
+  )
   if (levelDb < threshold) {
     detector.speechSince = null
     return false
@@ -82,7 +85,9 @@ export function startBargeInMonitor(onSpeech: () => void): () => void {
       stop()
       return
     }
-    const AudioCtx = window.AudioContext ?? (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    const AudioCtx =
+      window.AudioContext ??
+      (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AudioCtx) {
       stop()
       return

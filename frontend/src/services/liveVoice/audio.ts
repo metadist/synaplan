@@ -9,6 +9,7 @@ export interface LiveVoiceSocketHandlers {
   onUsage: (secondsLeft: number | null) => void
   onWarn: (secondsLeft: number) => void
   onLevel: (level: number) => void
+  onOutLevel: (level: number) => void
   onAudioOut: () => void
   onSocketClosed: () => void
 }
@@ -45,8 +46,11 @@ export async function openLiveVoiceAudio(input: {
 
   const playback = new AudioWorkletNode(input.context, 'pcm-playback')
   playback.port.postMessage({ type: 'config', sourceRate: input.outRate })
-  playback.port.onmessage = (event: MessageEvent<{ type?: string }>) => {
+  playback.port.onmessage = (event: MessageEvent<{ type?: string; level?: number }>) => {
     if (event.data?.type === 'idle') input.handlers.onPlaybackIdle()
+    if (event.data?.type === 'level' && typeof event.data.level === 'number') {
+      input.handlers.onOutLevel(event.data.level)
+    }
   }
   playback.connect(input.context.destination)
 
@@ -115,8 +119,10 @@ export async function openLiveVoiceAudio(input: {
 }
 
 /** Little-endian PCM16 bytes. A typed-array copy would keep only the low byte of each sample. */
-export function pcm16Frame(pcm: Int16Array): Uint8Array {
-  return new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength).slice()
+export function pcm16Frame(pcm: Int16Array): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(pcm.byteLength)
+  bytes.set(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength))
+  return bytes
 }
 
 export function applyControlMessage(

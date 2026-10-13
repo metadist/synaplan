@@ -28,14 +28,16 @@ export async function openDirectVoice(input: {
   analyser.fftSize = 256
   source.connect(analyser)
   const samples = new Uint8Array(analyser.fftSize)
+  let remoteSource: MediaStreamAudioSourceNode | null = null
+  let remoteAnalyser: AnalyserNode | null = null
+  let lastOutLevelAt = 0
   const pumpLevel = () => {
-    analyser.getByteTimeDomainData(samples)
-    let sum = 0
-    for (const value of samples) {
-      const centered = (value - 128) / 128
-      sum += centered * centered
+    input.handlers.onLevel(rmsLevel(analyser, samples))
+    const now = performance.now()
+    if (remoteAnalyser && now - lastOutLevelAt >= 100) {
+      lastOutLevelAt = now
+      input.handlers.onOutLevel(rmsLevel(remoteAnalyser, samples))
     }
-    input.handlers.onLevel(Math.min(1, Math.sqrt(sum / samples.length) * 4))
     levelTimer = window.requestAnimationFrame(pumpLevel)
   }
   pumpLevel()
@@ -43,13 +45,20 @@ export async function openDirectVoice(input: {
   for (const track of input.mic.getTracks()) peer.addTrack(track, input.mic)
   peer.createDataChannel('oai-events')
   peer.ontrack = (event) => {
-    remote.srcObject = event.streams[0] ?? new MediaStream([event.track])
+    const stream = event.streams[0] ?? new MediaStream([event.track])
+    remote.srcObject = stream
     void remote.play().catch(() => undefined)
+    remoteSource?.disconnect()
+    remoteSource = input.context.createMediaStreamSource(stream)
+    remoteAnalyser = input.context.createAnalyser()
+    remoteAnalyser.fftSize = 256
+    remoteSource.connect(remoteAnalyser)
     input.handlers.onAudioOut()
   }
 
   const stop = () => {
     window.cancelAnimationFrame(levelTimer)
+    remoteSource?.disconnect()
     peer.close()
     remote.pause()
     remote.srcObject = null
@@ -115,6 +124,16 @@ export async function openDirectVoice(input: {
       stop()
     },
   }
+}
+
+function rmsLevel(analyser: AnalyserNode, samples: Uint8Array<ArrayBuffer>): number {
+  analyser.getByteTimeDomainData(samples)
+  let sum = 0
+  for (const value of samples) {
+    const centered = (value - 128) / 128
+    sum += centered * centered
+  }
+  return Math.min(1, Math.sqrt(sum / samples.length) * 4)
 }
 
 function waitForIce(peer: RTCPeerConnection): Promise<void> {

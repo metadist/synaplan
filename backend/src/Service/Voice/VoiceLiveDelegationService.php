@@ -15,7 +15,9 @@ use Psr\Log\LoggerInterface;
 
 /**
  * One spoken question goes through the user's normal chat pipeline.
- * The answer is added to the live-voice usage row. It is not a MESSAGES row.
+ * The answer is added to the live-voice usage row. It is not a MESSAGES row:
+ * the assistant speaks it, and the spoken transcript is the one reply the
+ * chat keeps, so a delegated answer never shows up twice.
  */
 final readonly class VoiceLiveDelegationService
 {
@@ -83,18 +85,6 @@ final readonly class VoiceLiveDelegationService
         }
 
         $this->charge($session, $user, $response);
-        if (!$incognito) {
-            $metadata = is_array($response['metadata'] ?? null) ? $response['metadata'] : [];
-            $this->transcripts->record($session, [[
-                'role' => 'assistant',
-                'text' => $text,
-                'startMs' => 0,
-                'endMs' => 0,
-            ]], [
-                'provider' => is_string($metadata['provider'] ?? null) ? $metadata['provider'] : '',
-                'model' => is_string($metadata['model'] ?? null) ? $metadata['model'] : '',
-            ]);
-        }
 
         return ['text' => mb_substr($text, 0, self::SPOKEN_CHARS), 'facts' => []];
     }

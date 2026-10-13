@@ -658,6 +658,15 @@
     pointer-events: none;
   }
 
+  /*
+   * While the answer is still arriving the copy button is invisible. The
+   * spacer would make each new word fall onto the next line and jump back
+   * up as the bubble grows, so it stays out until the answer is finished.
+   */
+  .bubble-ai.bubble-streaming .markdown-content [data-testid='message-text']::before {
+    content: none;
+  }
+
   .bubble-user {
     background: var(--brand-fill) !important;
     color: #ffffff !important;

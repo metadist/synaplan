@@ -50,6 +50,16 @@ final class VoiceLiveGatewayTest extends TestCase
         self::assertCount(3, $turns);
     }
 
+    public function testASpokenTurnThatExtendsTheStoredQuestionIsTheSameTurn(): void
+    {
+        $segmenter = new VoiceTurnSegmenter();
+
+        self::assertSame('Wie ist der Verkehr, bitte?', $segmenter->sameTurn('wie ist der  Verkehr', 'Wie ist der Verkehr, bitte?'));
+        self::assertSame('Wie ist der Verkehr, bitte?', $segmenter->sameTurn('Wie ist der Verkehr, bitte?', 'Wie ist der Verkehr'));
+        self::assertNull($segmenter->sameTurn('Wie ist der Verkehr?', 'Danke, tschüss'));
+        self::assertNull($segmenter->sameTurn('', 'Hallo'));
+    }
+
     public function testATicketCanBeRedeemedOnce(): void
     {
         $redis = $this->createStub(RedisService::class);
@@ -200,6 +210,32 @@ final class VoiceLiveGatewayTest extends TestCase
 
         self::assertSame('It is four.', $answer['text']);
         self::assertSame([], $answer['facts']);
+    }
+
+    public function testDelegationKeepsOnlyTheQuestionAndLeavesTheReplyToTheSpokenTranscript(): void
+    {
+        $processor = $this->createStub(MessageProcessor::class);
+        $processor->method('process')->willReturn([
+            'success' => true,
+            'response' => ['content' => 'It is four.', 'usage' => [], 'metadata' => ['model_id' => 5]],
+        ]);
+        $usage = $this->createStub(VoiceLiveUsageService::class);
+        $usage->method('isIncognito')->willReturn(false);
+        $costs = $this->createStub(CostCalculationService::class);
+        $costs->method('calculateCost')->willReturn(new CostResult('0', '0', '0', '0', [], 0));
+        $users = $this->createStub(UserRepository::class);
+        $users->method('find')->willReturn((new User())->setMail('voice@synaplan.internal'));
+
+        $transcripts = $this->createMock(VoiceTranscriptWriter::class);
+        $transcripts->expects($this->once())->method('record')->with(
+            $this->isInstanceOf(VoiceSession::class),
+            self::callback(static fn (array $turns): bool => 1 === count($turns) && 'user' === $turns[0]['role']),
+        )->willReturn(null);
+
+        $service = new VoiceLiveDelegationService($processor, $usage, $transcripts, $costs, $this->createStub(ModelConfigService::class), $users, new NullLogger());
+        $answer = $service->answer((new VoiceSession())->setUserId(4)->setStatus('live'), 'What time is it?');
+
+        self::assertSame('It is four.', $answer['text']);
     }
 
     public function testInstructionsNameThePersonAndRefuseADirectAnswer(): void

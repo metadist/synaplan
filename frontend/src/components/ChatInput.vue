@@ -23,11 +23,7 @@
     <!-- On mobile the horizontal padding matches the drawer toggle's left
          offset (left-3 = 12px) so the composer aligns with the menu button and
          uses the full width; md+ keeps the roomier px-4. -->
-    <div
-      class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4"
-      :inert="liveActive"
-      :class="liveActive ? 'invisible' : ''"
-    >
+    <div v-show="!liveActive" class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4">
       <!-- File and Quote Display (above input) -->
       <div
         v-if="uploadedFiles.length > 0 || quote || pastedBlocks.length > 0"
@@ -510,14 +506,11 @@
       @save="savePastedBlock"
     />
 
-    <div
-      v-if="liveActive"
-      class="absolute inset-0 z-10 overflow-y-auto bg-chat-input-area px-3 py-2 md:px-4 md:py-4"
-    >
+    <div v-if="liveActive" class="px-3 py-2 md:px-4 md:py-4">
       <div class="mx-auto max-w-[70rem]">
         <LiveVoicePanel
           :phase="livePhase"
-          :status="liveStatus"
+          :muted="liveMuted"
           :company-line="$t('chatInput.liveVoice.companyLine', { company: liveCompany })"
           :touches-line="$t('chatInput.liveVoice.touchesLine')"
           :owner-line="$t('chatInput.liveVoice.ownerLine')"
@@ -533,9 +526,6 @@
           "
           :end-label="$t('chatInput.liveVoice.end')"
           :settings-label="$t('chatInput.liveVoice.settings')"
-          :caption-text="liveCaptionText"
-          :show-caption="liveCaptions"
-          :level="liveLevel"
           :warn-banner="
             liveBudgetWarn && livePhase !== 'ended'
               ? $t('chatInput.liveVoice.warnBanner', { seconds: liveSecondsLeft ?? 0 })
@@ -566,7 +556,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Ref } from 'vue'
+import {
+  ref,
+  computed,
+  watch,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  type ComputedRef,
+  type Ref,
+} from 'vue'
 import { storeToRefs } from 'pinia'
 import {
   ArrowUpIcon,
@@ -610,6 +609,7 @@ import { liveVoiceButtonVisible } from '@/services/liveVoice/visibility'
 import { liveCostBudget, type LiveVoiceCostBudget } from '@/services/api/liveVoiceApi'
 import type { LimitCheckResult } from '@/composables/useLimitCheck'
 import LiveVoicePanel from '@/components/chat/LiveVoicePanel.vue'
+import type { LiveVoiceStageState } from '@/services/liveVoice/orb'
 import LiveVoiceConsentDialog from '@/components/chat/LiveVoiceConsentDialog.vue'
 import { speechFailureMessageKey } from '@/utils/speechFailure'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
@@ -2168,6 +2168,7 @@ const {
   muted: liveMuted,
   captions: liveCaptions,
   level: liveLevel,
+  outLevel: liveOutLevel,
   secondsLeft: liveSecondsLeft,
   captionText: liveCaptionText,
   activeModel: liveModel,
@@ -2207,6 +2208,20 @@ const liveStatus = computed(() => {
   if (phase === 'connecting') return t('chatInput.liveVoice.connecting')
   if (phase === 'ended') return t(liveTerminalMessageKey.value)
   return t('chatInput.liveVoice.listening')
+})
+
+/** The orb, status and caption line the chat shows above the messages while a conversation runs. */
+const liveStage = computed<LiveVoiceStageState | null>(() => {
+  if (!liveActive.value || livePhase.value === 'ended') return null
+  return {
+    phase: livePhase.value,
+    status: liveStatus.value,
+    micLevel: liveLevel.value,
+    outLevel: liveOutLevel.value,
+    muted: liveMuted.value,
+    captionText: liveCaptionText.value,
+    showCaption: liveCaptions.value,
+  }
 })
 
 const liveModelLabel = computed(() => liveModel.value?.name ?? '')
@@ -2465,6 +2480,7 @@ defineExpose<{
   submitText: (text: string) => Promise<boolean>
   startDictation: () => Promise<boolean>
   armSummarize: () => void
+  liveStage: ComputedRef<LiveVoiceStageState | null>
 }>({
   textareaRef,
   uploadFiles,
@@ -2473,6 +2489,7 @@ defineExpose<{
   submitText,
   startDictation,
   armSummarize,
+  liveStage,
 })
 </script>
 

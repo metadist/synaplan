@@ -44,6 +44,8 @@
         </div>
       </Transition>
 
+      <LiveVoiceStage v-if="liveStage && !needsProviderSetup" v-bind="liveStage" />
+
       <!-- First-run: no usable AI provider — replace the chat, do not let
            the user send messages that can only fail with HTTP 500. -->
       <div
@@ -159,7 +161,9 @@
           </div>
 
           <div
-            v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
+            v-else-if="
+              historyStore.messages.length === 0 && !historyStore.isLoadingMessages && !liveStage
+            "
             class="flex flex-col items-center justify-center px-6 py-8 gap-6"
             data-testid="state-empty"
           >
@@ -627,6 +631,7 @@ import MarketingNews from '@/components/MarketingNews.vue'
 import CompanionLinks from '@/components/CompanionLinks.vue'
 import AssistantStarterPrompts from '@/components/assistants/AssistantStarterPrompts.vue'
 import SelfAwareEmptyHint from '@/components/chat/SelfAwareEmptyHint.vue'
+import LiveVoiceStage from '@/components/chat/LiveVoiceStage.vue'
 import { parsePlatformDocs } from '@/components/chat/refs/DocRefPill'
 import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
@@ -1229,6 +1234,10 @@ const isEmptyLanding = computed(
     historyStore.messages.length === 0 &&
     !historyStore.isLoadingMessages
 )
+
+// A running live conversation puts its orb above the messages, and the
+// welcome cards step aside until the first words arrive.
+const liveStage = computed(() => chatInputRef.value?.liveStage ?? null)
 
 // Runtime-config first-run signal: the default chat model has no usable
 // provider. Replace the composer with a tombstone so a fresh install cannot

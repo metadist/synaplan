@@ -50,4 +50,32 @@ final class VoiceTurnSegmenter
 
         return $turns;
     }
+
+    /**
+     * The text to keep when a stored turn and a new one are the same words.
+     * A spoken question is stored once when it is handed to Synaplan and
+     * again when the speaker's turn closes; the longer version wins.
+     * Returns null when the two texts are different turns.
+     */
+    public function sameTurn(string $stored, string $next): ?string
+    {
+        $storedKey = $this->normalized($stored);
+        $nextKey = $this->normalized($next);
+        if ('' === $storedKey || '' === $nextKey) {
+            return null;
+        }
+        if (str_starts_with($nextKey, $storedKey)) {
+            return $next;
+        }
+        if (str_starts_with($storedKey, $nextKey)) {
+            return $stored;
+        }
+
+        return null;
+    }
+
+    private function normalized(string $text): string
+    {
+        return mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $text)));
+    }
 }

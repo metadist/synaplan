@@ -18,11 +18,12 @@
       <ServiceIcon :service="displayProvider" :size="24" />
     </div>
 
-    <!-- Wrapper for thinking blocks + bubble -->
+    <!-- Wrapper for thinking blocks + bubble. The assistant bubble grows
+         with its text, up to the column width. -->
     <div
       :class="[
-        'flex flex-col flex-1 min-w-0 md:flex-none md:max-w-[60rem] gap-2',
-        role === 'user' ? 'items-end' : '',
+        'flex flex-col flex-1 min-w-0 max-w-[min(100%,60rem)] gap-2',
+        role === 'user' ? 'items-end md:flex-none md:w-fit' : 'md:flex-initial md:w-max',
       ]"
     >
       <!-- Thinking blocks (ABOVE bubble, only for assistant) -->
@@ -39,6 +40,7 @@
         :class="[
           'flex flex-col relative group/bubble min-w-0 max-w-full',
           role === 'user' ? 'bubble-user' : 'bubble-ai',
+          role === 'assistant' && isStreaming ? 'bubble-streaming' : '',
         ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
       >

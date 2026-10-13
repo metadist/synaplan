@@ -2457,6 +2457,26 @@ class ChatHandlerTest extends TestCase
         $this->assertSame(['prior answer'], $assistantContents);
     }
 
+    public function testASpokenQuestionReachesTheModelAsPlainTextOnce(): void
+    {
+        $current = new Message();
+        $current->setDirection('IN');
+        $current->setText('Wie ist der Verkehr auf der A3?');
+        $current->setUnixTimestamp(time());
+        $current->setDateTime(date('YmdHis'));
+
+        $method = new \ReflectionMethod(ChatHandler::class, 'buildMessages');
+
+        /** @var list<array{role: string, content: mixed}> $voice */
+        $voice = $method->invoke($this->handler, 'system', [$current], $current, ['plain_user_turn' => true]);
+        $this->assertSame(['system', 'user'], array_column($voice, 'role'));
+        $this->assertSame('Wie ist der Verkehr auf der A3?', $voice[1]['content']);
+
+        /** @var list<array{role: string, content: mixed}> $channel */
+        $channel = $method->invoke($this->handler, 'system', [], $current, []);
+        $this->assertStringContainsString('"BTEXT"', (string) $channel[1]['content']);
+    }
+
     /**
      * @param array<string, mixed> $options
      */

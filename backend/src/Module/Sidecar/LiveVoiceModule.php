@@ -48,6 +48,7 @@ final class LiveVoiceModule implements FeatureModuleInterface
             'LIVE_VOICE_GATEWAY_URL',
             'LIVE_VOICE_GATEWAY_SECRET',
             'LIVE_VOICE_PUBLIC_WS_PATH',
+            'LIVE_VOICE_COMPATIBLE_WS_URL',
         );
     }
 

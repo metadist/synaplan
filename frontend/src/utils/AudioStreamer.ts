@@ -175,19 +175,22 @@ export class AudioStreamer {
       this.failChunk('provider_error')
     })
 
-    audio.play().then(() => {
-      if (this.stopped || this.failed) return
-      const started = this.onPlaybackStart
-      this.onPlaybackStart = undefined
-      started?.()
-    }).catch((e) => {
-      console.warn('AudioStreamer: Auto-play prevented', e)
-      this.isPlaying = false
-      this.currentAudio = null
-      this.playIndex++
-      this.tryPlayNext()
-      this.checkFinished()
-    })
+    audio
+      .play()
+      .then(() => {
+        if (this.stopped || this.failed) return
+        const started = this.onPlaybackStart
+        this.onPlaybackStart = undefined
+        started?.()
+      })
+      .catch((e) => {
+        console.warn('AudioStreamer: Auto-play prevented', e)
+        this.isPlaying = false
+        this.currentAudio = null
+        this.playIndex++
+        this.tryPlayNext()
+        this.checkFinished()
+      })
   }
 
   public stop(): void {

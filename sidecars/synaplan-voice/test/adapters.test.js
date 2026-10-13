@@ -32,7 +32,8 @@ test('OpenAI usage seconds are copied through', () => {
 })
 
 test('GPT-Live transcript pieces are kept without a done event', () => {
-  const state = { heard: '' }
+  let clock = 0
+  const state = { now: () => clock }
   const turns = []
   let usage = null
   const emit = (name, payload) => {
@@ -40,13 +41,15 @@ test('GPT-Live transcript pieces are kept without a done event', () => {
     if (name === 'usage') usage = payload
   }
   applyLiveServerEvent({ type: 'session.input_transcript.delta', delta: 'What ' }, state, emit)
+  clock = 300
   applyLiveServerEvent({ type: 'session.input_transcript.delta', delta: 'time is it?' }, state, emit)
+  clock = 2000
   applyLiveServerEvent({ type: 'session.output_transcript.delta', delta: 'Four.' }, state, emit)
   applyLiveServerEvent({ type: 'session.closed', usage: { seconds: 7 } }, state, emit)
   assert.deepEqual(
     turns.map((turn) => [turn.role, turn.text, turn.final]),
     [
-      ['user', 'What ', false],
+      ['user', 'What', false],
       ['user', 'What time is it?', false],
       ['user', 'What time is it?', true],
       ['assistant', 'Four.', false],
@@ -54,6 +57,33 @@ test('GPT-Live transcript pieces are kept without a done event', () => {
     ],
   )
   assert.equal(usage.seconds, 7)
+})
+
+test('GPT-Live keeps one message per speaker when their words interleave', () => {
+  let clock = 0
+  const state = { now: () => clock }
+  const finals = []
+  const emit = (name, payload) => {
+    if (name === 'transcript' && payload.final) finals.push([payload.role, payload.text])
+  }
+  const words = [
+    ['session.output_transcript.delta', 'Sure, '],
+    ['session.input_transcript.delta', 'mhm '],
+    ['session.output_transcript.delta', 'here is '],
+    ['session.input_transcript.delta', 'okay '],
+    ['session.output_transcript.delta', 'the plan.'],
+  ]
+  for (const [type, delta] of words) {
+    applyLiveServerEvent({ type, delta }, state, emit)
+    clock += 120
+  }
+  assert.deepEqual(finals, [])
+  applyLiveServerEvent({ type: 'session.interrupted' }, state, emit)
+  applyLiveServerEvent({ type: 'session.closed' }, state, emit)
+  assert.deepEqual(finals, [
+    ['assistant', 'Sure, here is the plan.'],
+    ['user', 'mhm okay'],
+  ])
 })
 
 test('Gemini adapter resumes on GoAway with the new handle', async () => {

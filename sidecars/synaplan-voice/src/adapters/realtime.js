@@ -1,4 +1,5 @@
 import WebSocket from 'ws'
+import { createTurnAssembler } from '../turns.js'
 
 function listen(map, event, fn) {
   const list = map.get(event) ?? []
@@ -29,8 +30,15 @@ export function createRealtimeAdapter({
   let opened = false
   let textItems = 0
   const seenItems = new Set()
-  const pendingInput = new Map()
+  const turns = createTurnAssembler((turn) => emit(listeners, 'transcript', turn), { autoCommit: false })
+  let openInput = null
   let totals = emptyUsage()
+
+  const inputItem = (itemId) => {
+    const id = String(itemId ?? 'input')
+    if (openInput !== null && openInput !== id) turns.commit('user')
+    openInput = id
+  }
 
   const send = (payload) => {
     if (ws && ws.readyState === WebSocketImpl.OPEN) ws.send(JSON.stringify(payload))
@@ -88,22 +96,32 @@ export function createRealtimeAdapter({
           }
           const audio = event.delta && (event.type === 'response.output_audio.delta' || event.type === 'response.audio.delta')
           if (audio) emit(listeners, 'audio', Buffer.from(event.delta, 'base64'))
+          if (event.type === 'conversation.item.input_audio_transcription.delta') {
+            inputItem(event.item_id)
+            turns.append('user', String(event.delta ?? ''))
+          }
           if (event.type === 'conversation.item.input_audio_transcription.updated') {
-            pendingInput.set(String(event.item_id ?? 'input'), String(event.transcript ?? ''))
+            inputItem(event.item_id)
+            turns.replace('user', String(event.transcript ?? ''))
           }
           if (event.type === 'conversation.item.input_audio_transcription.completed') {
-            emit(listeners, 'transcript', { role: 'user', text: String(event.transcript ?? ''), final: true })
+            inputItem(event.item_id)
+            turns.commit('user', String(event.transcript ?? ''))
+            openInput = null
           }
           if (event.type === 'conversation.item.done' || event.type === 'conversation.item.added' || event.type === 'conversation.item.created') {
             const item = event.item ?? {}
             noteTextItem(item)
-            const pending = pendingInput.get(String(item.id ?? event.item_id ?? ''))
-            if (event.type === 'conversation.item.done' && pending) {
-              emit(listeners, 'transcript', { role: 'user', text: pending, final: true })
+            if (event.type === 'conversation.item.done' && openInput !== null && String(item.id ?? event.item_id ?? '') === openInput) {
+              turns.commit('user')
+              openInput = null
             }
           }
+          if (event.type === 'response.output_audio_transcript.delta' || event.type === 'response.audio_transcript.delta') {
+            turns.append('assistant', String(event.delta ?? ''))
+          }
           if (event.type === 'response.output_audio_transcript.done' || event.type === 'response.audio_transcript.done') {
-            emit(listeners, 'transcript', { role: 'assistant', text: String(event.transcript ?? ''), final: true })
+            turns.commit('assistant', String(event.transcript ?? ''))
           }
           if (event.type === 'response.function_call_arguments.done' && event.name === 'consult_synaplan') {
             emit(listeners, 'tool', {
@@ -116,8 +134,12 @@ export function createRealtimeAdapter({
           if (event.type === 'error') emit(listeners, 'error', new Error('provider_error'))
         })
         ws.on('close', () => {
-          if (!opened) reject(new Error('provider_closed'))
-          else emit(listeners, 'closed')
+          if (!opened) {
+            reject(new Error('provider_closed'))
+            return
+          }
+          turns.commitAll()
+          emit(listeners, 'closed')
         })
       })
     },

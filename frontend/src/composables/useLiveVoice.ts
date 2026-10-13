@@ -55,6 +55,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   const muted = ref(false)
   const captions = ref(captionsPreferred())
   const level = ref(0)
+  const outLevel = ref(0)
   const secondsLeft = ref<number | null>(null)
   const captionText = ref('')
   const activeModel = ref<LiveVoiceModel | null>(null)
@@ -127,6 +128,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     audio?.close()
     audio = null
     level.value = 0
+    outLevel.value = 0
   }
 
   async function allowConsent(): Promise<void> {
@@ -173,6 +175,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     ignoreClose = false
     budgetWarn.value = false
     budgetWrap.value = false
+    captionText.value = ''
     const context = new AudioContext()
     const resumed = context.resume()
     const micPromise = navigator.mediaDevices.getUserMedia({
@@ -206,7 +209,10 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         onState: (state) => apply({ type: 'state', state }),
         onTranscript: (role, text, final) => showTurn(role, text, final),
         onPlaybackIdle: () => apply({ type: 'audio_idle' }),
-        onInterrupted: () => apply({ type: 'interrupted' }),
+        onInterrupted: () => {
+          outLevel.value = 0
+          apply({ type: 'interrupted' })
+        },
         onWrapUp: () => {
           budgetWrap.value = true
           muted.value = true
@@ -228,6 +234,9 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         },
         onLevel: (value) => {
           level.value = value
+        },
+        onOutLevel: (value) => {
+          outLevel.value = value
         },
         onAudioOut: () => apply({ type: 'audio' }),
         onSocketClosed: () => {
@@ -342,6 +351,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     muted,
     captions,
     level,
+    outLevel,
     secondsLeft,
     captionText,
     activeModel,

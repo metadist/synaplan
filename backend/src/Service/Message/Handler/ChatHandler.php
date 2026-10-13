@@ -88,6 +88,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
      */
     private const ECHOED_HISTORY_STAMP = '/^\[\d{14}\]:\s*/';
 
+    /** Processing source of a question delegated from a live voice call. */
+    private const SOURCE_LIVE_VOICE = 'live_voice';
+
     /** Flat attachment cut used only when no context budget is available. */
     private const LEGACY_ATTACHMENT_CHARS = 10000;
 
@@ -1003,6 +1006,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'quoted_text' => $options['quoted_text'] ?? null,
             'quoted_message_id' => $options['quoted_message_id'] ?? null,
             'attachment_text' => $this->fitAttachmentText($message, $modelId, null),
+            'plain_user_turn' => self::SOURCE_LIVE_VOICE === ($options['source'] ?? null),
         ]);
 
         if (null !== $systemPromptFallback) {
@@ -2645,6 +2649,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
     private function buildMessages(?string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
     {
+        // A spoken question is a chat turn, not a channel record: the model
+        // must read the words, not a BTEXT/BDATETIME envelope it then describes.
+        if (true === ($options['plain_user_turn'] ?? false)) {
+            return $this->buildStreamingMessages($systemPrompt, $thread, $currentMessage, $options);
+        }
+
         $messages = [];
         if (null !== $systemPrompt) {
             $messages[] = [

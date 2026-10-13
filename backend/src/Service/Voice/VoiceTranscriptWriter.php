@@ -16,7 +16,8 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Writes closed transcript turns into the chat. Incognito writes nothing.
- * A repeated turn (same speaker, same text) is stored once.
+ * A repeated turn (same speaker, same text) is stored once, and a turn that
+ * only extends the speaker's last message of the same call updates it.
  */
 final readonly class VoiceTranscriptWriter
 {
@@ -33,9 +34,8 @@ final readonly class VoiceTranscriptWriter
 
     /**
      * @param list<array{role?: mixed, text?: mixed, startMs?: mixed, endMs?: mixed}> $chunks
-     * @param array{provider?: string, model?: string}|null                           $answerModel
      */
-    public function record(VoiceSession $session, array $chunks, ?array $answerModel = null): ?Message
+    public function record(VoiceSession $session, array $chunks): ?Message
     {
         if ($this->usage->isIncognito($session) || null === $session->getChatId()) {
             return null;
@@ -49,7 +49,7 @@ final readonly class VoiceTranscriptWriter
 
         $last = null;
         foreach ($this->segmenter->segment($chunks) as $turn) {
-            $last = $this->storeTurn($session, $chat, $user, $turn, $answerModel);
+            $last = $this->storeTurn($session, $chat, $user, $turn);
         }
 
         return $last;
@@ -57,14 +57,24 @@ final readonly class VoiceTranscriptWriter
 
     /**
      * @param array{role: string, text: string, startMs: int, endMs: int} $turn
-     * @param array{provider?: string, model?: string}|null               $answerModel
      */
-    private function storeTurn(VoiceSession $session, Chat $chat, User $user, array $turn, ?array $answerModel): Message
+    private function storeTurn(VoiceSession $session, Chat $chat, User $user, array $turn): Message
     {
         $direction = 'assistant' === $turn['role'] ? 'OUT' : 'IN';
         $latest = $this->messages->findOneBy(['chatId' => $chat->getId()], ['id' => 'DESC']);
-        if ($latest instanceof Message && $latest->getDirection() === $direction && $latest->getText() === $turn['text']) {
-            return $latest;
+        if ($latest instanceof Message && $latest->getDirection() === $direction) {
+            if ($latest->getText() === $turn['text']) {
+                return $latest;
+            }
+            $merged = $latest->getMeta('voice_session_id') === (string) $session->getId()
+                ? $this->segmenter->sameTurn($latest->getText(), $turn['text'])
+                : null;
+            if (null !== $merged) {
+                $latest->setText($merged);
+                $this->em->flush();
+
+                return $latest;
+            }
         }
 
         $locale = substr($user->getLocale(), 0, 2);
@@ -92,10 +102,6 @@ final readonly class VoiceTranscriptWriter
         $message->setMeta('voice_model', $model instanceof \App\Entity\Model ? $model->getProviderId() : '');
         $message->setMeta('start_ms', (string) $turn['startMs']);
         $message->setMeta('end_ms', (string) $turn['endMs']);
-        if ('OUT' === $direction && is_array($answerModel)) {
-            $message->setMeta('ai_chat_provider', (string) ($answerModel['provider'] ?? ''));
-            $message->setMeta('ai_chat_model', (string) ($answerModel['model'] ?? ''));
-        }
 
         $this->em->persist($message);
         $this->em->flush();
