@@ -1081,6 +1081,12 @@ let assistantChatBootstrapped = assistantThreadReady.value
 let suppressNextChatHistoryLoad = false
 let suppressBottomScrollForFocus = false
 let historyLoadedChatId: number | null = null
+// The history load the activeChatId watcher has in flight. The boot path joins
+// it instead of starting a second load for the same chat: a second load makes
+// the first response stale, so the spinner waits for the slower request.
+let watcherHistoryLoad: { chatId: number; done: Promise<void> } | null = null
+// False until the mount has settled the first chat selection.
+let chatBootSettled = false
 let programmaticMessageScroll = false
 let messageFocusGeneration = 0
 let messageFocusQueue: Promise<void> = Promise.resolve()
@@ -1699,9 +1705,11 @@ onMounted(async () => {
 
   if (!authStore.isAuthenticated) {
     await guestStore.initSession()
+    if (isViewUnmounted) return
 
     if (guestStore.chatId) {
       const rawMessages = await guestStore.loadMessages()
+      if (isViewUnmounted) return
       if (rawMessages.length > 0) {
         historyStore.clear()
         // Use the SAME row mapper as the authenticated reload path (issue
@@ -1711,6 +1719,7 @@ onMounted(async () => {
         const loaded: Message[] = rawMessages.map((m) => mapApiMessageRow(m))
         historyStore.messages.push(...loaded)
         await nextTick()
+        if (isViewUnmounted) return
         scrollToBottom()
       }
 
@@ -1719,6 +1728,7 @@ onMounted(async () => {
       void resumeActiveRunIfAny()
     }
 
+    if (isViewUnmounted) return
     const restricted = route.query.restricted as string | undefined
     if (restricted) {
       featureGateKey.value = restricted
@@ -1727,11 +1737,13 @@ onMounted(async () => {
     }
 
     setTimeout(() => {
+      if (isViewUnmounted) return
       if (chatInputRef.value?.textareaRef) {
         chatInputRef.value.textareaRef.focus()
       }
     }, 100)
 
+    if (isViewUnmounted) return
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
     window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
     window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
@@ -1764,6 +1776,10 @@ onMounted(async () => {
   })
 
   await Promise.all([chatsLoaded, modelsLoaded])
+  // The user may already have left the chat. route.query would then be the
+  // page they are on, and router.replace would rewrite it. The same leftover
+  // boot is what warns that the composer ref is gone.
+  if (isViewUnmounted) return
 
   // Deep link: /?chat=<id> opens that thread (Saved Tasks). Without it the
   // view reopened the last active chat. /?chat=<id>&message=<id> also scrolls
@@ -1787,15 +1803,23 @@ onMounted(async () => {
   } else if (requestedChatId !== null) {
     chatsStore.setActiveChat(requestedChatId)
   }
+  if (isViewUnmounted) return
 
   // If no active chat, create one. A message deep link loads through
   // enqueueMessageFocus, which owns that chat's history.
   if (!focusTarget) {
-    if (!chatsStore.activeChatId) {
+    const bootChatId = chatsStore.activeChatId
+    if (!bootChatId) {
       await chatsStore.createChat('New Chat')
-    } else {
-      // Load messages for active chat
-      await historyStore.loadMessages(chatsStore.activeChatId)
+    } else if (watcherHistoryLoad?.chatId === bootChatId) {
+      // The selection changed while the list was loading (boot restore or a
+      // New Chat click); the watcher loads this chat and resumes its run.
+      await watcherHistoryLoad.done
+    } else if (historyLoadedChatId !== bootChatId && !incognitoStore.active) {
+      // Load messages for active chat. An incognito session started during
+      // boot keeps its transcript; ending it loads this chat.
+      await historyStore.loadMessages(bootChatId)
+      if (isViewUnmounted) return
       if (chatsStore.activeChatId !== null) {
         historyLoadedChatId = chatsStore.activeChatId
       }
@@ -1804,6 +1828,7 @@ onMounted(async () => {
       void resumeActiveRunIfAny()
     }
   }
+  if (isViewUnmounted) return
 
   // Start chat from an assistant must not reopen an unrelated last thread.
   // A ?chat= deep link (Saved Tasks) keeps that thread even if agentId is set.
@@ -1814,9 +1839,13 @@ onMounted(async () => {
       await openFreshAssistantChatIfNeeded()
     }
   } finally {
-    assistantThreadReady.value = true
-    assistantChatBootstrapped = true
+    if (!isViewUnmounted) {
+      assistantThreadReady.value = true
+      assistantChatBootstrapped = true
+      chatBootSettled = true
+    }
   }
+  if (isViewUnmounted) return
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
   // freshly loaded history (no-op when the admin switch is off / not authed).
@@ -1828,12 +1857,14 @@ onMounted(async () => {
   // Scroll to newest message after initial load. A message deep link already
   // scrolled to that message inside enqueueMessageFocus.
   await nextTick()
+  if (isViewUnmounted) return
   if (!focusTarget) {
     scrollToBottom(true)
   }
 
   // Auto-focus ChatInput after mounting with delay
   setTimeout(() => {
+    if (isViewUnmounted) return
     if (chatInputRef.value?.textareaRef) {
       chatInputRef.value.textareaRef.focus()
     } else {
@@ -2265,11 +2296,16 @@ watch(
   () => chatsStore.activeChatId,
   async (newChatId, oldChatId) => {
     const focusAtStart = messageFocusGeneration
+    // The first selection while the view boots (from no chat) is the list
+    // arriving, not a pick. An incognito session started meanwhile keeps its
+    // transcript; ending that session restores this chat.
+    const bootSelectionUnderIncognito =
+      oldChatId == null && !chatBootSettled && incognitoStore.active
     // Picking a chat from the sidebar while incognito is active ends the
     // session (the incognito transcript is meant to be discarded). The
     // incognito watcher above restores nothing here — this watcher loads the
     // newly selected chat below.
-    if (oldChatId !== newChatId && incognitoStore.active) {
+    if (oldChatId !== newChatId && incognitoStore.active && !bootSelectionUnderIncognito) {
       void incognitoStore.endSession()
     }
 
@@ -2312,11 +2348,17 @@ watch(
       if (oldChatId !== newChatId) {
         historyLoadedChatId = null
       }
-      const skippedHistoryLoad = suppressNextChatHistoryLoad
+      const skippedHistoryLoad = suppressNextChatHistoryLoad || bootSelectionUnderIncognito
       if (suppressNextChatHistoryLoad) {
         suppressNextChatHistoryLoad = false
-      } else {
-        await historyStore.loadMessages(newChatId)
+      } else if (!bootSelectionUnderIncognito) {
+        const done = historyStore.loadMessages(newChatId)
+        watcherHistoryLoad = { chatId: newChatId, done }
+        try {
+          await done
+        } finally {
+          if (watcherHistoryLoad?.done === done) watcherHistoryLoad = null
+        }
         if (chatsStore.activeChatId === newChatId) {
           historyLoadedChatId = newChatId
         }

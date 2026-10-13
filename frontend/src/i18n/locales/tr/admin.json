@@ -837,7 +837,7 @@
     },
     "meta": {
       "title": "Meta API anahtarı",
-      "message": "Meta Model API panelinde (API keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, Muse Spark'ı açar. İstemleri Meta işler."
+      "message": "Meta Model API panelinde (API keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, Muse Spark, Muse Wonder, Muse Image ve Muse Voice Transcribe'ı açar. İstemleri Meta işler."
     },
     "cerebras": {
       "title": "Cerebras API anahtarı",

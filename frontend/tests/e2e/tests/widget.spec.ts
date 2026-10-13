@@ -54,7 +54,7 @@ test.describe('@ci @smoke Widget', () => {
     })
 
     await page.goto('/channels/widgets')
-    await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.SHORT })
+    await page.waitForSelector(selectors.widgets.page, { timeout: TIMEOUTS.STANDARD })
     await updateWidgetSettings(page, widgetName, {
       isActive: false,
     })

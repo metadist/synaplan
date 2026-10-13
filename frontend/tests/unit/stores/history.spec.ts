@@ -1086,5 +1086,32 @@ describe('History Store', () => {
 
       expect(store.messages).toEqual([])
     })
+
+    it('does not leave a cleared transcript in the loading state', async () => {
+      vi.resetModules()
+      let release: (value: unknown) => void = () => {}
+      const getChatMessages = vi.fn(
+        () =>
+          new Promise((resolve) => {
+            release = resolve
+          })
+      )
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      const pending = store.loadMessages(7)
+      await vi.waitFor(() => {
+        expect(getChatMessages).toHaveBeenCalled()
+      })
+      expect(store.isLoadingMessages).toBe(true)
+
+      store.clear()
+      expect(store.isLoadingMessages).toBe(false)
+
+      release({ success: true, messages: [], pagination: { hasMore: false } })
+      await pending
+      expect(store.isLoadingMessages).toBe(false)
+    })
   })
 })

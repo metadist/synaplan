@@ -22,6 +22,17 @@ function workerEmail(workerIndex: number): string {
 
 type WorkerCredentials = { user: string; pass: string }
 
+/**
+ * Marks the daily upgrade reminder (usePaywallPrompt) as just shown. Its
+ * throttle lives in localStorage and every test gets a fresh context, so it
+ * would otherwise be due on every chat mount once the account has messages,
+ * and the full-screen paywall would cover the chat and swallow the clicks the
+ * specs are making.
+ */
+function paywallReminderShown(): { name: string; value: string } {
+  return { name: PAYWALL_LAST_SHOWN_KEY, value: String(Date.now()) }
+}
+
 type StorageState = {
   cookies: {
     name: string
@@ -80,12 +91,7 @@ export const test = base.extend<
               // Session hint: tells the app a session exists, so an expired
               // access cookie triggers a token refresh instead of a logout.
               { name: 'sh', value: '1' },
-              // Mark the daily upgrade reminder (usePaywallPrompt) as just
-              // shown. Its throttle lives in localStorage and every test gets a
-              // fresh context, so it would otherwise be due on every mount and
-              // the full-screen paywall would cover the chat and swallow the
-              // clicks the specs are making.
-              { name: PAYWALL_LAST_SHOWN_KEY, value: String(Date.now()) },
+              paywallReminderShown(),
             ],
           },
         ]
@@ -109,9 +115,15 @@ export const test = base.extend<
 /**
  * For specs that must start logged out (login/registration/guest flows).
  * Usage: `test.use(LOGGED_OUT)` at describe/file level.
+ *
+ * No session, but the reminder throttle stays: these specs log in through the
+ * UI, often as the worker account that earlier tests filled with chats.
  */
 export const LOGGED_OUT: { storageState: StorageState } = {
-  storageState: { cookies: [], origins: [] },
+  storageState: {
+    cookies: [],
+    origins: [{ origin: new URL(URLS.BASE_URL).origin, localStorage: [paywallReminderShown()] }],
+  },
 }
 
 export { expect, type Locator, type Page } from '@playwright/test'

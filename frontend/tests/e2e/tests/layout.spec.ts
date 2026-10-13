@@ -14,6 +14,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { test, expect, LOGGED_OUT, type Page } from '../test-setup'
 import { openApp } from '../helpers/auth'
+import { ChatHelper } from '../helpers/chat'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
 
@@ -118,6 +119,24 @@ async function waitForAnimationsSettled(page: Page) {
       .map((animation) => animation.finished.catch(() => undefined))
     await Promise.all(pending)
   })
+}
+
+async function axeIn(page: Page, selector: string, surface: string) {
+  await waitForAnimationsSettled(page)
+  const results = await new AxeBuilder({ page })
+    .include(selector)
+    .withTags(['wcag2a', 'wcag2aa'])
+    .analyze()
+  const severe = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+  expect(severe, `${surface}: ${severe.map((v) => v.id).join(', ')}`).toEqual([])
+}
+
+async function paintTheme(page: Page, mode: 'light' | 'dark') {
+  await page.evaluate((dark) => {
+    localStorage.setItem('theme', dark ? 'dark' : 'light')
+    document.documentElement.classList.toggle('dark', dark)
+    document.documentElement.classList.remove('theme-oled')
+  }, mode === 'dark')
 }
 
 async function axeBlocking(page: Page, surface: string) {
@@ -519,6 +538,9 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
     await openApp(page)
     await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     if (!isMobileViewport(page)) {
+      // openApp reopens the worker account's last chat, which earlier tests
+      // filled; the empty-chat scan needs a chat that is actually empty.
+      await new ChatHelper(page).startNewChat()
       await axeBlocking(page, 'empty-chat')
       await page.locator(NAV.sidebarV2Assistants).click()
       await expect(page.locator(NAV.sidebarPanel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
@@ -540,6 +562,37 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
       await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await axeBlocking(page, 'login')
     })
+  })
+
+  test('a sent message keeps its edit controls readable in light and dark', async ({ page }) => {
+    test.skip(
+      isMobileViewport(page),
+      'Phone chrome hides the desktop rail. The contrast scan runs on desktop.'
+    )
+    await openApp(page)
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    const chat = new ChatHelper(page)
+    await chat.startNewChat()
+    const previous = await chat.sendMessage('Hello from the contrast check')
+    await chat.waitForAnswer(previous, true)
+    // Edit is shown once the message is stored. The optimistic row has no id.
+    await page.reload()
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    const edit = page.getByTestId('btn-message-edit').last()
+    await expect(edit).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+    await paintTheme(page, 'light')
+    await axeIn(page, '[data-testid="user-message-bubble"]', 'user-message-light')
+    await paintTheme(page, 'dark')
+    await axeIn(page, '[data-testid="user-message-bubble"]', 'user-message-dark')
+
+    await edit.click()
+    await expect(page.getByTestId('message-edit-form')).toBeVisible()
+    await axeIn(page, '[data-testid="user-message-bubble"]', 'user-message-edit-dark')
+    await paintTheme(page, 'light')
+    await axeIn(page, '[data-testid="user-message-bubble"]', 'user-message-edit-light')
+    await page.getByTestId('btn-message-edit-cancel').click()
+    await expect(page.getByTestId('message-edit-form')).toBeHidden()
   })
 
   test('AI models — light and dark', async ({ page }) => {

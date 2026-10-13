@@ -509,6 +509,8 @@
       "deletePrompt": "Promptu Sil",
       "saveChanges": "Değişiklikleri Kaydet",
       "noPrompts": "Henüz konu yok.",
+      "loading": "Konular yükleniyor…",
+      "loadFailed": "Konular yüklenemedi. Yeniden deneyin.",
       "noPromptsMatch": "Aramanızla eşleşen konu yok.",
       "workingLanguageHint": "Konular arayüz dilinizde gösterilir. Oluşturduğunuz konular yalnızca bu dilde görünür."
     },

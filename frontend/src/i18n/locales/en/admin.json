@@ -841,7 +841,7 @@
     },
     "meta": {
       "title": "Meta API key",
-      "message": "Create an API key in the Meta Model API dashboard (API keys), then paste it here. This unlocks Muse Spark. Prompts are processed by Meta."
+      "message": "Create an API key in the Meta Model API dashboard (API keys), then paste it here. This unlocks Muse Spark, Muse Wonder, Muse Image, and Muse Voice Transcribe. Prompts are processed by Meta."
     },
     "cerebras": {
       "title": "Cerebras API key",

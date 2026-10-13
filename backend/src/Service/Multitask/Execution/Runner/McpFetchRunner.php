@@ -6,6 +6,7 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
@@ -52,6 +53,7 @@ final readonly class McpFetchRunner implements TaskRunner
         private MultitaskRoutingConfig $routingConfig,
         private PromptService $promptService,
         private LoggerInterface $logger,
+        private AtlassianToolArguments $atlassianArguments,
     ) {
     }
 
@@ -114,7 +116,12 @@ final readonly class McpFetchRunner implements TaskRunner
             return NodeResult::failed(sprintf("the tool '%s' can modify data and is not allowed (read-only)", $tool));
         }
 
-        $arguments = $this->resolveArguments($node, $context);
+        $arguments = $this->atlassianArguments->complete(
+            $server,
+            $catalogTool,
+            $this->resolveArguments($node, $context),
+            (string) $context->message->getText(),
+        );
 
         try {
             $result = $this->client->callTool($server, $tool, $arguments);

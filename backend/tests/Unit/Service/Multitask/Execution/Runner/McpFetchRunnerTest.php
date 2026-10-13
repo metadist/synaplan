@@ -13,6 +13,7 @@ use App\Repository\McpServerConfigRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Service\EncryptionService;
+use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpToolRegistry;
@@ -40,6 +41,9 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 final class McpFetchRunnerTest extends TestCase
 {
     private const USER_ID = 7;
+
+    /** @var array<string, mixed>|null */
+    private ?array $lastCallArguments = null;
 
     /** @var list<array<string, mixed>> */
     private array $serverTools = [
@@ -78,6 +82,10 @@ final class McpFetchRunnerTest extends TestCase
             $body = json_decode((string) ($options['body'] ?? ''), true);
             $rpcMethod = is_array($body) ? ($body['method'] ?? '') : '';
 
+            if ('tools/call' === $rpcMethod && is_array($body['params']['arguments'] ?? null)) {
+                $this->lastCallArguments = $body['params']['arguments'];
+            }
+
             $result = match ($rpcMethod) {
                 'tools/list' => ['tools' => $this->serverTools],
                 'tools/call' => ['content' => [['type' => 'text', 'text' => $callToolResultText]], 'isError' => $toolIsError],
@@ -114,6 +122,7 @@ final class McpFetchRunnerTest extends TestCase
             new MultitaskRoutingConfig($configRepo),
             $this->promptService($topicMetaRows),
             $logger ?? new NullLogger(),
+            new AtlassianToolArguments($client, new NullLogger()),
         );
     }
 
@@ -140,10 +149,10 @@ final class McpFetchRunnerTest extends TestCase
         return new PromptService($prompts, $metaRepo, $this->createMock(EntityManagerInterface::class), new NullLogger());
     }
 
-    private function context(): NodeContext
+    private function context(string $text = 'Look up Acme GmbH in our CRM'): NodeContext
     {
         $message = $this->createMock(Message::class);
-        $message->method('getText')->willReturn('Look up Acme GmbH in our CRM');
+        $message->method('getText')->willReturn($text);
         $message->method('getUserId')->willReturn(self::USER_ID);
         $message->method('getFiles')->willReturn(new ArrayCollection([]));
         $message->method('getFileText')->willReturn('');
@@ -294,6 +303,39 @@ final class McpFetchRunnerTest extends TestCase
         self::assertTrue($result->isReportableFailure());
         self::assertStringContainsString('could not be reached', (string) $result->error);
         self::assertStringNotContainsString('reported an error', (string) $result->error);
+    }
+
+    public function testJiraIssueCallReceivesTheSiteFromThePastedLink(): void
+    {
+        $server = $this->server();
+        $server->setUrl('https://mcp.atlassian.com/v2/mcp');
+        $this->serverTools = [[
+            'name' => 'getJiraIssue',
+            'description' => 'Get one issue',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'cloudId' => ['type' => 'string'],
+                    'issueIdOrKey' => ['type' => 'string'],
+                    'view' => ['type' => 'string', 'enum' => ['compact', 'evidence', 'full']],
+                ],
+                'required' => ['cloudId', 'issueIdOrKey'],
+            ],
+            'annotations' => ['readOnlyHint' => true],
+        ]];
+
+        $result = $this->runner(server: $server)->run(
+            new TaskNode('n1', Capability::McpFetch, [], ['arguments' => ['issueIdOrKey' => 'IN1-1']], [
+                'server_id' => 3,
+                'tool' => 'getJiraIssue',
+            ]),
+            $this->context('Was steht hier? https://deskfiler.atlassian.net/browse/IN1-1?atlOrigin=ignored'),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('https://deskfiler.atlassian.net', $this->lastCallArguments['cloudId'] ?? null);
+        self::assertSame('IN1-1', $this->lastCallArguments['issueIdOrKey'] ?? null);
+        self::assertSame('full', $this->lastCallArguments['view'] ?? null);
     }
 
     public function testEmptyContentStillReachesTheAnswer(): void

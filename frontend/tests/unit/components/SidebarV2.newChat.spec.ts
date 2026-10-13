@@ -7,6 +7,7 @@ import SidebarV2 from '@/components/SidebarV2.vue'
 import { httpClient } from '@/services/api/httpClient'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
+import { useIncomingStore } from '@/stores/incoming'
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: vi.fn().mockResolvedValue({
     success: true,
@@ -56,7 +57,10 @@ vi.mock('@/services/authService', () => ({
   },
 }))
 
-const mountSidebar = async ({ guest = false } = {}) => {
+const mountSidebar = async ({
+  guest = false,
+  beforeMount,
+}: { guest?: boolean; beforeMount?: () => void } = {}) => {
   const pinia = createPinia()
   setActivePinia(pinia)
   if (!guest) {
@@ -64,6 +68,7 @@ const mountSidebar = async ({ guest = false } = {}) => {
       ReturnType<typeof useAuthStore>['user']
     >
   }
+  beforeMount?.()
 
   const router = createRouter({
     history: createMemoryHistory(),
@@ -138,6 +143,19 @@ describe('SidebarV2 New Chat lock', () => {
     pending.release(null)
     await flushPromises()
     expect(button.attributes('disabled')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('marks the chat list loaded while the incoming lookup is still pending', async () => {
+    const wrapper = await mountSidebar({
+      beforeMount: () => {
+        vi.spyOn(useIncomingStore(), 'load').mockReturnValue(new Promise<void>(() => {}))
+      },
+    })
+
+    expect(
+      wrapper.get('[data-testid="section-sidebar-chats"]').attributes('data-chats-loading')
+    ).toBe('false')
     wrapper.unmount()
   })
 

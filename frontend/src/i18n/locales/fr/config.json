@@ -367,6 +367,8 @@
       "deletePrompt": "Supprimer l’instruction",
       "saveChanges": "Enregistrer les modifications",
       "noPrompts": "Pas encore de thèmes.",
+      "loading": "Chargement des thèmes…",
+      "loadFailed": "Les thèmes n’ont pas pu être chargés. Réessayez.",
       "language": "Langue",
       "workingLanguage": "Travail en : {language}",
       "workingLanguageHint": "Les thèmes s’affichent dans la langue de l’interface. Ceux que vous créez n’apparaissent que dans cette langue.",

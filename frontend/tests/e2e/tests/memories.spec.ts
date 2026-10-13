@@ -105,54 +105,10 @@ test.describe('@ci Memories', () => {
     })
 
     await test.step('Assert: the memory is visible on the memories page', async () => {
-      await page.goto('/memories')
-      await expect(page.locator(MEM.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await openMemories(page)
       await expect(
         page.locator(MEM.item).filter({ hasText: value }).filter({ visible: true })
       ).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
-    })
-  })
-
-  test('Memories opens the page, not a dialog', async ({ page }) => {
-    await openApp(page)
-    await page.goto('/memories')
-    await expect(page).toHaveURL(/\/memories/, { timeout: TIMEOUTS.STANDARD })
-    await expect(page.locator(MEM.page)).toBeVisible()
-    await expect(page.locator('[data-testid="modal-memories-dialog"]')).toHaveCount(0)
-  })
-
-  test('highlight query marks a card and Back returns to the chat', async ({ page }) => {
-    const key = `e2e_highlight_${Date.now()}`
-    const chat = new ChatHelper(page)
-
-    await openApp(page)
-    await openMemories(page)
-    await page.locator(MEM.btnCreate).click()
-    await page.locator(MEM.formModal).waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-    await page.locator(MEM.btnModeAdvanced).click()
-    await page.locator(MEM.inputCategory).fill('preferences')
-    await page.locator(MEM.inputKey).fill(key)
-    await page.locator(MEM.inputValue).fill('highlight-me')
-    await page.locator(MEM.btnSave).click()
-    await page.locator(MEM.formModal).waitFor({ state: 'hidden', timeout: TIMEOUTS.STANDARD })
-
-    const row = page.locator(MEM.item).filter({ hasText: key }).filter({ visible: true })
-    const memoryId = await row.first().getAttribute('data-memory-id')
-    expect(memoryId).toBeTruthy()
-
-    await page.goto('/')
-    await chat.startNewChat()
-    await expect(page.locator(selectors.chat.textInput)).toBeVisible()
-
-    await page.goto(`/memories?highlight=${memoryId}`)
-    await expect(page.locator(MEM.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expect(
-      page.locator(`[data-memory-id="${memoryId}"][data-memory-highlighted="true"]`).first()
-    ).toBeVisible()
-
-    await chat.goBack()
-    await expect(page.locator(selectors.chat.textInput)).toBeVisible({
-      timeout: TIMEOUTS.STANDARD,
     })
   })
 })

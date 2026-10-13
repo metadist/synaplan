@@ -837,7 +837,7 @@
     },
     "meta": {
       "title": "Clave API de Meta",
-      "message": "Crea una clave API en el panel de Meta Model API (API keys) y pégala aquí. Así se activa Muse Spark. Los prompts los procesa Meta."
+      "message": "Crea una clave API en el panel de Meta Model API (API keys) y pégala aquí. Así se activan Muse Spark, Muse Wonder, Muse Image y Muse Voice Transcribe. Los prompts los procesa Meta."
     },
     "cerebras": {
       "title": "Clave API de Cerebras",

@@ -294,8 +294,7 @@ test.describe('@ci Navigation journeys', () => {
       await page.goto('/')
       await chat.startNewChat()
       await expect(page.locator(CHAT.textInput)).toBeVisible()
-      await page.goto(`/memories?highlight=${memoryId}`)
-      await expect(page.locator(MEM.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await openMemories(page, `/memories?highlight=${memoryId}`)
       await expect(
         page.locator(`[data-memory-id="${memoryId}"][data-memory-highlighted="true"]`).first()
       ).toBeVisible()

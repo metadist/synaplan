@@ -354,6 +354,8 @@
       "deletePrompt": "Prompt löschen",
       "saveChanges": "Änderungen speichern",
       "noPrompts": "Noch keine Themen.",
+      "loading": "Themen werden geladen…",
+      "loadFailed": "Die Themen konnten nicht geladen werden. Versuch es noch einmal.",
       "language": "Sprache",
       "workingLanguage": "Arbeitssprache: {language}",
       "workingLanguageHint": "Themen werden in deiner Oberflächensprache angezeigt. Selbst angelegte Themen erscheinen nur in dieser Sprache.",

@@ -11,6 +11,7 @@ use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\Mcp\ConfluenceLinkedPageReader;
+use App\Service\Mcp\JiraLinkedIssueReader;
 use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -71,6 +72,7 @@ final readonly class MessageProcessor
         private AgentConfig $agentConfig,
         private ?WebResearchService $webResearch = null,
         private ?ConfluenceLinkedPageReader $confluencePages = null,
+        private ?JiraLinkedIssueReader $jiraIssues = null,
     ) {
     }
 
@@ -1247,7 +1249,11 @@ final readonly class MessageProcessor
         }
 
         $classification = $this->readConfluenceLinks($message, $urls, $classification, $statusCallback, $promptMetadata);
-        $handled = is_array($classification['confluence_mcp_urls'] ?? null) ? $classification['confluence_mcp_urls'] : [];
+        $classification = $this->readJiraLinks($message, $urls, $classification, $statusCallback, $promptMetadata);
+        $handled = array_merge(
+            is_array($classification['confluence_mcp_urls'] ?? null) ? $classification['confluence_mcp_urls'] : [],
+            is_array($classification['jira_mcp_urls'] ?? null) ? $classification['jira_mcp_urls'] : [],
+        );
         $urls = array_values(array_filter(
             $urls,
             static fn (string $url): bool => !in_array($url, $handled, true),
@@ -1362,6 +1368,47 @@ final readonly class MessageProcessor
     }
 
     /**
+     * A pasted Jira link is behind a login. Read the epic, ticket or bug
+     * through the user's Atlassian connection and keep the public reader
+     * away from it.
+     *
+     * @param list<string>         $urls
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $promptMetadata
+     *
+     * @return array<string, mixed>
+     */
+    private function readJiraLinks(Message $message, array $urls, array $classification, ?callable $statusCallback, array $promptMetadata): array
+    {
+        if (null === $this->jiraIssues || true !== ($promptMetadata['tool_mcp'] ?? null)) {
+            return $classification;
+        }
+
+        $read = $this->jiraIssues->read(
+            $urls,
+            $message->getUserId(),
+            $this->mcpServerAllowlist($promptMetadata),
+            function () use ($statusCallback): void {
+                $this->notify($statusCallback, 'fetching_urls', 'Reading the Jira issue from your connection...');
+            },
+        );
+        if (!$read->attempted()) {
+            return $classification;
+        }
+
+        $prompt = $read->prompt();
+        if ('' !== $prompt) {
+            $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
+            $classification['url_content'] = '' !== $existing ? $existing."\n\n".$prompt : $prompt;
+        }
+        $classification['jira_mcp_urls'] = $read->handledUrls();
+        $classification['jira_mcp_handled'] = $read->coversAll($urls);
+        $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $read->successCount();
+
+        return $classification;
+    }
+
+    /**
      * An assistant pin replaces the topic's tool flags for this turn, the
      * same way the internet-search flag already does.
      *
@@ -1400,6 +1447,9 @@ final readonly class MessageProcessor
     {
         if ($shouldSearch && !$userRequestedSearch && true === ($classification['confluence_mcp_handled'] ?? false)) {
             return [false, 'confluence_page_read_via_connection'];
+        }
+        if ($shouldSearch && !$userRequestedSearch && true === ($classification['jira_mcp_handled'] ?? false)) {
+            return [false, 'jira_issue_read_via_connection'];
         }
 
         return [$shouldSearch, $triggerReason];

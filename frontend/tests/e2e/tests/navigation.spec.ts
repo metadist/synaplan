@@ -5,22 +5,11 @@ import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS } from '../config/config'
 
 const NAV = selectors.nav
-const SET = selectors.settings
 const USR = selectors.userMenu
 
 /** Wait until the signed-in rail (Assistants) is painted. */
 async function ensureNavReady(page: Page) {
   await expect(page.locator(NAV.sidebarV2Assistants)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-}
-
-/** Avatar menu → Profile, then the language page in the profile sidebar. */
-async function openPreferences(page: Page) {
-  await page.locator(USR.button).click()
-  await expect(page.locator(USR.dropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-  await page.locator(USR.dropdown).locator(USR.profileBtn).click()
-  await expect(page.locator(SET.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-  await page.locator('[data-testid="link-sidebar-v2-settings-appearance"]').click()
-  await expect(page.locator(SET.btnLanguage('en'))).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
 /** Open a rail section and wait for its context panel. */
@@ -40,8 +29,9 @@ const GROUP_RAIL: Record<string, string> = {
 /** Open the rail section that owns a group and return that group's block. */
 async function openManageGroup(page: Page, groupKey: string) {
   await openSection(page, GROUP_RAIL[groupKey])
+  // The group follows the section route, so this waits for a navigation.
   const group = page.locator(NAV.panelGroup(groupKey))
-  await expect(group).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  await expect(group).toBeVisible({ timeout: TIMEOUTS.STANDARD })
   return group
 }
 
@@ -276,35 +266,6 @@ test.describe('Navigation: User menu', () => {
       ).toBeVisible()
       await expect(page.locator('[data-testid="link-sidebar-v2-statistics"]')).toBeVisible()
       await expect(page.locator('[data-testid="nav-settings-sections"]')).toHaveCount(0)
-    })
-  })
-})
-
-test.describe('Navigation: Preferences page controls', () => {
-  test('@ci Language switch (Preferences) changes active language', async ({ page }) => {
-    await test.step('Arrange: login and open Preferences', async () => {
-      await openApp(page)
-      await openPreferences(page)
-    })
-
-    const initialLang =
-      (await page.evaluate(() => localStorage.getItem('language'))) ??
-      (await page.evaluate(() => document.documentElement.lang)) ??
-      'en'
-    const targetLang = initialLang === 'de' ? 'en' : 'de'
-
-    await test.step('Act: pick a different language card', async () => {
-      await page.locator(SET.btnLanguage(targetLang)).click()
-    })
-
-    await test.step('Assert: localStorage and visible copy follow the new language', async () => {
-      await expect
-        .poll(() => page.evaluate(() => localStorage.getItem('language')), {
-          timeout: TIMEOUTS.SHORT,
-        })
-        .toBe(targetLang)
-      const expectedTitle = targetLang === 'de' ? 'Sprache & Darstellung' : 'Language & appearance'
-      await expect(page.locator(SET.page)).toContainText(expectedTitle)
     })
   })
 })

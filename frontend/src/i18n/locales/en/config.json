@@ -369,6 +369,8 @@
       "deletePrompt": "Delete Prompt",
       "saveChanges": "Save Changes",
       "noPrompts": "No topics yet.",
+      "loading": "Loading topics…",
+      "loadFailed": "Topics could not be loaded. Try again.",
       "language": "Language",
       "workingLanguage": "Working in: {language}",
       "workingLanguageHint": "Topics are shown in your interface language. Topics you create appear only in this language.",

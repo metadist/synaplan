@@ -13,6 +13,7 @@ use App\Repository\McpServerConfigRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Service\EncryptionService;
+use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpToolRegistry;
@@ -117,6 +118,7 @@ final class McpActionRunnerTest extends TestCase
             new MultitaskRoutingConfig($configRepo),
             $this->promptService($topicMetaRows),
             $logger ?? new NullLogger(),
+            new AtlassianToolArguments($client, new NullLogger()),
         );
     }
 

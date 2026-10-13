@@ -2322,3 +2322,43 @@ input[type='week']:not(:disabled)::-webkit-calendar-picker-indicator {
   background: rgba(255, 255, 255, 0.1);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
+
+/*
+ * Controls that sit on the user bubble. The fill is a deep blue in light and
+ * dark, and charcoal in OLED. --on-brand is the ink for the small brand chip
+ * and flips to near-black in dark mode, so it fails on this fill. Light ink
+ * in every theme. Nested cards and menus keep their own ink.
+ */
+.bubble-user .btn-secondary,
+.dark .bubble-user .btn-secondary {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.72);
+}
+.bubble-user .btn-secondary:hover,
+.dark .bubble-user .btn-secondary:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.28);
+  border-color: #fff;
+}
+.bubble-user .icon-ghost,
+.dark .bubble-user .icon-ghost,
+.bubble-user .txt-secondary,
+.dark .bubble-user .txt-secondary {
+  color: #fff;
+}
+.bubble-user .icon-ghost:hover,
+.bubble-user .icon-ghost:focus-visible,
+.dark .bubble-user .icon-ghost:hover,
+.dark .bubble-user .icon-ghost:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+.bubble-user .surface-card .txt-secondary,
+.bubble-user .surface-elevated .txt-secondary,
+.bubble-user .dropdown-panel .txt-secondary,
+.dark .bubble-user .surface-card .txt-secondary,
+.dark .bubble-user .surface-elevated .txt-secondary,
+.dark .bubble-user .dropdown-panel .txt-secondary {
+  color: var(--txt-secondary);
+}
