@@ -32,6 +32,10 @@ at it. Only states that ask for attention or confirm success show a glyph;
 | Watch paused | bird with eyes, pause badge | "Watching paused — open to resume" | watch `paused` |
 | Watch needs attention | bird with eyes, alert badge | "Watching stopped — open to see why" | watch `attention` |
 
+A watched file shows the bird with eyes in place of the bird; the badges keep
+their meaning (arrows: updating, alert: could not or needs attention, pause:
+paused) and the tooltip names both states.
+
 ### A.2 Glyph kit (decision 13)
 
 - Two base glyphs — **bird** and **bird with eyes** — monochrome SVG at 16 and
@@ -51,7 +55,7 @@ at it. Only states that ask for attention or confirm success show a glyph;
 ```text
  folder opens → app collects the visible rows (~50 ms) → one call:
  POST /api/v1/cloud/status   (person credential, scope `files`)
-   { instance_id, items: [ { id: "5678", version: "a1b2c3" }, … up to 500 ] }
+   { items: [ { id: "5678", version: "a1b2c3" }, … up to 500 ] }
  ← { items: [ { id, state, knowledge_folder, file_id, kept_up_to_date } ],
      watches: [ { id, target_id, sentence, state } ] }      ← watches touching these rows
  cache per (id, version) for 60 s; invalidate after any Synaplan action
@@ -59,13 +63,16 @@ at it. Only states that ask for attention or confirm success show a glyph;
 
 - Built on `check-stale` (`FileController::checkStale`,
   `FileRepository::findByUserSourceIds`), which already answers current /
-  stale / missing per `(source, source_id, etag)`. The new call adds
-  `vector_state`, the knowledge folder and watch coverage; `check-stale`
-  itself also gains `vector_state` (additive, CF0.4).
+  stale / missing per `(source, source_id, etag)` — scoped to the cloud
+  instance from CF2.9 (D17). The new call adds `vector_state`, the knowledge
+  folder and watch coverage; `check-stale` itself also gains `vector_state`
+  (additive, CF0.4).
+- The instance comes from the person's credential — the identity row behind
+  the key, or the token's `azp` — never from the request body (C19).
 - No per-row HTTP, no local mirror table in v1. A failed status call shows no
   glyphs and one quiet line in the sidebar ("Couldn't check Synaplan right
   now") — never a toast per folder.
-- Folder rows get their eyes from the app's watch cache (B.8), not from the
+- Folder rows get their eyes from the app's watch index (B.8), not from the
   status call.
 
 ### A.4 Rendering per platform
@@ -91,8 +98,10 @@ or disappears, the copy follows.
 
 - The app reports changes as **instance-level source events**
   (`POST /api/v1/platform-links/sources/events`): one batched call per minute
-  with `{id, event, version, path}`. Synaplan filters to files it holds from
-  this cloud; the instance never learns who indexed what.
+  with `{id, event, version, path}`. Synaplan matches `(this instance, remote
+  id)` (C19) — an older row without an instance only when its owner has no
+  other identity for that client (E.2) — so an event never touches a copy
+  from another cloud; the instance never learns who indexed what.
 - "Keep it up to date" is a checkbox in the **Make searchable** dialog,
   default **on**. Files inside a Keep-searchable watch are always kept up to
   date. Re-uploads run as the copy's owner (per-user or background key).
@@ -132,9 +141,9 @@ or disappears, the copy follows.
 | How do I stop it? | **Remove from Synaplan**, **Pause**, **Stop watching** — on the same surface (U3) |
 | Where did it come from? | "Created in Nextcloud on 13 Oct" / "Copied from Synaplan from your chat …" |
 
-The data comes from `GET /api/v1/cloud/files/{id}?instance_id=…` (person
-credential, `files`): state, knowledge folder, covering watches, provenance
-from the copy ledger.
+The data comes from `GET /api/v1/cloud/files/{id}` (person credential,
+`files`; the instance comes from the credential, as in A.3): state, knowledge
+folder, covering watches, provenance from the copy ledger.
 
 ### A.7 Cloud-side overview
 
@@ -160,11 +169,18 @@ task**. A folder may carry several watches; the eyes tooltip lists them.
 | Owner | Synaplan user, through a cloud identity (or a WebDAV connection, D) |
 | Target | Folder or file, by the platform's stable id; display path refreshed from events |
 | Scope | This folder only (default) / with sub-folders |
-| Reacts to | New files (default); changed files (default on for Keep searchable, off for tasks) |
+| Reacts to | Folders: new files (default); changed files (default on for Keep searchable, off for tasks). Files: new versions of that file |
 | File types | Documents (PDF, Word, ODF, text, Markdown, presentations, spreadsheets) by default; images opt-in |
 | Action | Keep searchable (knowledge folder) or run a task |
 | What each run gets (task watches) | **The new file** (default) · **New files together** (collection window) · **The whole folder** — always as files attached to the run, never as a path ([`07`](./07_files_into_runs.md) §2) |
 | State | active · paused (reason) · needs attention (reason) · stopped |
+
+**A watch on one file** reacts to new versions of that file (always on) and
+to its deletion; other files in the folder never trigger it. Each run gets
+that file, so the dialog has no file-set question, no sub-folder option and
+no type filter, and its presets read in the singular (Keep it searchable ·
+Translate it · Summarize it and mail me). Renaming or moving the file keeps
+the watch, because the target is the stable id (J-CF-15).
 
 ### B.2 States and reasons
 
@@ -175,7 +191,7 @@ task**. A folder may carry several watches; the eyes tooltip lists them.
 | paused | `identity_off` | "Paused — Nextcloud is disconnected from your Synaplan account" | Connect / turn back on |
 | paused | `platform_user_disabled` | "Paused — your Nextcloud account is disabled" | Resumes when re-enabled |
 | paused | `permission` | "Paused — Synaplan needs your permission to watch folders" | `02` §4.2 card |
-| attention | `target_gone` | "Stopped — the folder was deleted" | Stop watching |
+| attention | `target_gone` | "Stopped — the folder was deleted" (a file watch: "Stopped — the file was deleted") | Stop watching; restoring it from the trash within 7 days resumes the watch |
 | attention | `no_access` | "Stopped — you can no longer open this folder" | Stop watching |
 | attention | `task_gone` | "Stopped — the task it ran was deleted" | Pick another task |
 | attention | `policy_off` | "Stopped — your administrator turned off watching shared folders" | Ask the administrator, or stop watching |
@@ -191,8 +207,9 @@ task**. A folder may carry several watches; the eyes tooltip lists them.
 | Runner | Background job every minute — **needs system cron**; the admin screen warns when background jobs run in AJAX / webcron mode | Same | Go service goroutine |
 | Unattended credential | Owner's per-user key from preferences | Same | Owner's key from the store (CF-S3) |
 
-**Matching.** The job walks the file's parents to the storage root and
-intersects their ids with the watched targets from the cache (B.8). Shares
+**Matching.** The job takes the file's own id (file watches) and its
+parents' ids up to the storage root and intersects them with the watched
+targets in the watch index (B.8). Shares
 keep the folder id, so a file dropped into a shared folder matches the
 owner's watch. Type filters apply before anything is uploaded.
 
@@ -241,14 +258,33 @@ produce one run, not five.
   read".
 - Summarize-and-mail sends at most 20 mails per watch per hour; more files
   wait for the next hour (the row says so).
+- Active watches: at most **50 per person** and **5 000 per instance**; a
+  Synaplan admin can change the instance cap. The dialog says so before
+  **Start watching**: "You already watch 50 folders and files with Synaplan,
+  the most allowed. Stop one in Tasks → Watched folders to start another." or
+  "files.example.org already has 5 000 watched folders, the most Synaplan
+  allows. Ask your administrator." The caps also bound the app's watch index
+  (B.8).
 
 ### B.8 Shared folders and visibility (decision 21)
 
 - A watch runs as its owner and on the owner's plan.
-- The app keeps a cache of **all active watches of its instance**
-  (`GET /api/v1/platform-links/watches`, instance credential: target id, owner
-  display name, sentence, state). It refreshes on the `watches_changed` notify
-  and every 10 minutes.
+- The app keeps a local **watch index**: the active watches on its instance
+  with target id, owner display name, sentence and state. It serves the eyes
+  for everyone with access and the event matching of B.3. It is filled from
+  `GET /api/v1/platform-links/watches` (instance credential), which is
+  **paginated** (at most 500 per page, opaque `cursor`) and **incremental**:
+  after the first full walk the app asks only for what changed since its last
+  cursor (`since`; created, changed and stopped watches, stopped ones as
+  tombstones) and gets `304` through `ETag` when nothing changed. The app
+  syncs on the `watches_changed` notification and every 10 minutes, and walks
+  the whole list again once a day or when Synaplan answers `410` to an
+  expired cursor.
+- The index is bounded by the caps of B.7 (5 000 watches per instance).
+  Nextcloud and ownCloud.online keep it in an app table keyed by target id,
+  never in per-request memory; the OpenCloud Go service keeps it in memory
+  and rebuilds it with the paginated walk when it starts. CF-S3, CF-S4 and
+  CF-S5 measure sync and matching at the cap.
 - Everyone who can open a watched folder sees the eyes and the sentence:
   "Ada's Synaplan watches this folder: new files are translated to English and
   saved in Incoming-EN. Only Ada can change this." Their files are processed;
@@ -436,7 +472,7 @@ URL watch".
 | `POST` | `/api/v1/cloud/watches/{id}/files` | person or background key, `cloud:watch` | Upload one file version (multipart + id, version, path, mime, event) |
 | `POST` | `/api/v1/cloud/watches/{id}/reconcile` | person or background key, `cloud:watch` | Compare a listing with the ledger |
 | `POST` | `/api/v1/platform-links/sources/events` | instance | Changed / moved / deleted files from this cloud (A.5) |
-| `GET` | `/api/v1/platform-links/watches` | instance | Descriptions of active watches on this cloud (B.8) |
+| `GET` | `/api/v1/platform-links/watches` | instance | Active watches on this cloud for the app's watch index: pages of ≤ 500 (`cursor`), changes since a cursor (`since`, with tombstones), `ETag` / `304`, `410` for an expired cursor (B.8) |
 | `POST` | `/api/v1/files/check-stale` | existing | Adds `vector_state` per item |
 | `POST` | `/api/v1/files/upload` | existing | Adds `intake=direct` (skip Incoming when a knowledge folder is named) |
 
@@ -452,7 +488,7 @@ Tasks controller family. Pickups, whole-folder snapshots, trials and the
 | `BCLOUDWATCHES` | `BID`, `BOWNERID`, `BIDENTITYID` (nullable), `BCONNECTIONID` (nullable, D), `BTARGETID`, `BTARGETKIND` (`folder` / `file`), `BTARGETPATH`, `BRECURSIVE`, `BEVENTS` (JSON), `BFILTER` (JSON), `BACTION` (`searchable` / `task`), `BPRESET`, `BFILESET` (`new_file` / `together` / `whole_folder`), `BWINDOWSEC`, `BMAXFILES`, `BGROUPKEY` (nullable), `BTASKID` (nullable), `BSTATE`, `BREASON`, `BCOUNTS` (JSON), `BLASTEVENTAT`, `BLASTRUNAT`, `BLASTSTATUS`, `BCREATEDIN` (`cloud` / `synaplan`), `BCREATED`, `BUPDATED` |
 | `BCLOUDWATCHITEMS` | `BID`, `BWATCHID`, `BSOURCEID`, `BVERSION`, `BSTATE` (`waiting` / `running` / `done` / `skipped` / `failed`), `BREASON`, `BFILEID`, `BRUNID`, `BDELIVERYID`, `BCREATED`, `BUPDATED`; unique (`BWATCHID`, `BSOURCEID`, `BVERSION`) |
 | `BCLOUDDELIVERIES` | see [`03`](./03_send_to_cloud.md) §4 |
-| `BFILES` | `BSOURCEDELETEDAT BIGINT NULL` — set by a delete source event: the file is hidden from the Library and has no vectors; the ephemeral reaper removes it after 7 days; a restore event clears it and re-vectorizes |
+| `BFILES` | `BSOURCEINSTANCE VARCHAR(64) NULL` (CF2.9) — the platform instance a cloud file came from, taken from the credential; every lookup matches (instance, remote id); an older row without one is matched and scoped only when its owner has no other identity for that client; index (`BSOURCE`, `BSOURCEINSTANCE`, `BSOURCEID`) for source events (C19). `BSOURCEDELETEDAT BIGINT NULL` (CF4.1) — set by a delete source event: the file is hidden from the Library and has no vectors; the ephemeral reaper removes it after 7 days; a restore event clears it and re-vectorizes |
 | `BSAVEDTASKS` | no column change; `BTRIGGERTYPE` accepts `file_event` |
 
 Raw idempotent SQL; children (`BCLOUDWATCHITEMS`) are deleted before their

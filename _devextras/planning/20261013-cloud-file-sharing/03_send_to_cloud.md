@@ -23,15 +23,22 @@ ownCloud.online and for text in OpenCloud. Ways 2 and 4 are new.
 ## 2. Protocol — notify, then fetch
 
 Synaplan stores only a hash of each instance secret
-(`BPLATFORMINSTANCES.BSECRETHASH`), so it cannot sign a call to the app. It
-does not need to: the call carries nothing but an id, and the app fetches
-everything with its own credential.
+(`BPLATFORMINSTANCES.BSECRETHASH`), so it cannot prove a call to the app with
+that secret. It signs every notification with its own **notify key**
+instead: an Ed25519 key pair made with the existing `FederationSigner` and
+kept encrypted in `BCONFIG` (`EncryptionService`), the way
+`FederationIdentityStore` keeps the federation key. The app gets the public
+half with its instance credential (`GET instances/self` → `notify_keys`). A
+notification carries only an id; the app verifies it locally before it calls
+Synaplan, then fetches everything with its own credential.
 
 ```text
  Synaplan                                           Cloud app (inbound endpoint)
  ────────                                           ─────────────────────────────
  Copy to cloud → ledger row (queued), ticket in Redis (5 min, single use)
- POST <delivery URL> {type: "delivery", id} ──────► 
+ POST <delivery URL> {type: "delivery", id,
+   instance_id, ts, kid, sig} ────────────────────► check sig, instance, ts, seen ids
+                                                    (any check fails → 401, no call back)
                                                     POST /api/v1/platform-links/deliveries/{id}/claim
                                          ◄───────── (instance credential)
  GETDEL ticket → {platform uid, name, mime, size,
@@ -57,11 +64,25 @@ Rules:
 - **Single use** — the ticket is read with `GETDEL` (same as link codes,
   `RedisService::getAndDelete()`), expires after 5 minutes, and only its own
   instance may claim it (C4).
+- **Signed, and checked before any call back.** The body is
+  `{type, id, instance_id, ts, kid, sig}`; `sig` is an Ed25519 signature over
+  the canonical JSON of the rest (`FederationSigner::signBody()`). The app
+  answers `401` and calls nobody unless the signature verifies with a key from
+  its cached `notify_keys`, `instance_id` is its own, `ts` is within five
+  minutes of its clock and `(type, id)` is not among the ids it saw in the
+  last ten minutes. Rejected requests are rate-limited per source address and
+  summed up in one log line per minute, not logged one by one. The app
+  refreshes its keys on its own schedule — hourly, on admin save, at start —
+  never because a request names an unknown `kid`; otherwise a forger could
+  trigger exactly the calls this rule prevents. Rotation
+  (`app:platform-links:rotate-notify-key`) lists the new key at once, signs
+  with it from the next hour on and drops the old key after 24 hours (C20).
 - **One endpoint per app** receives every Synaplan notification:
   `{type: delivery | pickup | watches_changed | identity_revoked, id}`. All
-  four types work the same way — the app fetches with its own credential. A
-  `pickup` is this protocol in reverse: Synaplan asks for files and the app
-  uploads them into the ticket ([`07`](./07_files_into_runs.md) §4).
+  four types are signed and checked the same way; the app then fetches with
+  its own credential. A `pickup` is this protocol in reverse: Synaplan asks
+  for files and the app uploads them into the ticket
+  ([`07`](./07_files_into_runs.md) §4).
 - **Reachability.** Synaplan calls only the delivery URL registered for the
   instance, on the instance's host, over https (local-dev exception as in
   `WebDavClient::allowsInsecureLocal()`). `SsrfGuard` applies unless a
@@ -110,7 +131,7 @@ Conflicts:
 
 | Piece | Nextcloud | ownCloud.online | OpenCloud |
 | ----- | --------- | --------------- | --------- |
-| Inbound endpoint | Public route `api/v1/inbound` (`#[PublicPage]`, `#[NoCSRFRequired]`), registered as delivery URL through `instances/self` | Same pattern | `/api/synaplan/inbound` behind an unprotected proxy route (CF-S3) |
+| Inbound endpoint | Public route `api/v1/inbound` (`#[PublicPage]`, `#[NoCSRFRequired]`, `#[AnonRateLimit]`), registered as delivery URL through `instances/self`; verifies every notification before anything else (§2) | Same pattern; the per-address limit as a counter in the app's cache | `/api/synaplan/inbound` behind an unprotected proxy route (CF-S3); the same checks in the Go service |
 | Claim + download + write | `IRootFolder::getUserFolder($uid)` (pattern of `MediaController::save`) | Same | CS3 upload as the user via service account / impersonation (CF-S3); the binary-save code replaces the text-only `SaveToSpace` |
 | Notify the person | Notifications app: "Synaplan copied Q3 plan.docx to Synaplan/Documents" with a link (CF-S5) | Notifications (CF-S4) | User notifications (CF-S1) |
 | Personal setting "Save files from Synaplan to" | Personal settings + file picker | New personal settings page (CF1.1) | `accountExtension` (CF-S1) |
@@ -151,9 +172,14 @@ One sentence, what did not happen, the recovery (U8). Mapped from
 
 ## 8. Security
 
-- The notify call carries no secret and no data. A forged notify makes the
-  app ask Synaplan for an unknown id and get a 404.
-- The claim works once, within 5 minutes, only for its instance (C4).
+- A notification carries no data, only an id, and is signed with Synaplan's
+  notify key. The app checks it before it calls Synaplan (§2): a forged,
+  replayed, stale or misaddressed notification ends at the inbound endpoint
+  with `401` — no claim, no download, no log line per request (C20).
+- The claim works once, within 5 minutes, only for its instance (C4). Failed
+  claims (unknown, used or expired ids) are counted per instance; above 120
+  in a minute Synaplan answers `429`, so a faulty app cannot hammer it
+  either.
 - The app writes only into the storage of the platform user the identity
   names, and refuses when that user or identity is unknown locally.
 - The one-time download URL is valid for 5 minutes.

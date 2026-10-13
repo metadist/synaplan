@@ -135,6 +135,23 @@ Nextcloud. Nothing was read." with **Open in Nextcloud**; there, right-click →
 **Let Synaplan read this folder**; asking again works. With Nextcloud stopped:
 "Synaplan could not reach files.example.org. Nothing was read."
 
+**J-CF-15 — Watch one file** (CF5)
+Ada right-clicks the single file `price-list.docx` in `Projects/Q3` →
+**Watch with Synaplan…** → "What should happen when this file changes?" →
+**Translate it** → English → **Start watching**. The dialog asks nothing
+about what each run gets, and "Also translate the current version" stays off.
+The file row shows the bird with eyes; the sidebar says "Watched by you —
+when this file changes, it is translated to English and saved next to it."
+Ada saves a new version → after the quiet period `price-list.en.docx` holds
+the new translation (Synaplan replaces only what it wrote for this watch); a
+new file in `Projects/Q3` starts nothing. Synaplan → Tasks → **Watched
+folders** lists it as a file: "price-list.docx · Nextcloud · Last: 10:02 · 1
+translated". Renaming the file keeps the watch. **Pause** in the sidebar → a
+new version → nothing; **Resume** → "Also handle the change made while
+paused?" → translated. Deleting the file → "Stopped — the file was deleted";
+restoring it from the trash within 7 days → watching again. **Stop
+watching** → the eyes are gone; `price-list.en.docx` stays.
+
 ---
 
 ## 2. Wireframes
@@ -238,6 +255,12 @@ Nextcloud. Nothing was read." with **Open in Nextcloud**; there, right-click →
 The last paragraph is generated from the choice (U3): it changes with the
 preset, the language, the target and the shared-folder state.
 
+On a single file (J-CF-15) the title names the file, the question reads
+**What should happen when this file changes?**, the presets read in the
+singular, and the file-set block, the type filter and the sub-folder option
+are absent. The backfill line becomes "Also translate the current version"
+(off for tasks, on for Keep it searchable).
+
 ### W7 — Tasks → Watched folders (Synaplan)
 
 ```text
@@ -248,6 +271,12 @@ preset, the language, the target and the shared-folder state.
  │ the original · Runs on its own (as you)                            │
  │ Last: today 09:12 · 3 done · 1 failed (“scan.pdf has no readable   │
  │ text”)                                                              │
+ │ [ Open in Nextcloud ]  [ Edit task ]  [ Stop watching ]            │
+ ├────────────────────────────────────────────────────────────────────┤
+ │ [NC] price-list.docx (file) · Nextcloud · files.example.org [on ●] │
+ │ When this file changes → translate it to English and save it next  │
+ │ to the original · Runs on its own (as you)                         │
+ │ Last: today 10:02 · 1 translated                                   │
  │ [ Open in Nextcloud ]  [ Edit task ]  [ Stop watching ]            │
  ├────────────────────────────────────────────────────────────────────┤
  │ [OC] Specs · OpenCloud · cloud.example.org                  [on ●] │
@@ -336,6 +365,7 @@ reused, not re-translated; the existing key is named.
 | Preset | Summarize them and mail me | Zusammenfassen und mir mailen | Resumirlos y enviármelos por correo | Les résumer et me les envoyer par e-mail | Özetle ve bana e-postayla gönder |
 | Preset | Run my instruction | Meine Anweisung ausführen | Ejecutar mi instrucción | Exécuter mon instruction | Talimatımı çalıştır |
 | Preset | Use one of my tasks | Eine meiner Aufgaben verwenden | Usar una de mis tareas | Utiliser une de mes tâches | Görevlerimden birini kullan |
+| Presets (file watch) | Keep it searchable · Translate it · Summarize it and mail me | Durchsuchbar halten · Übersetzen · Zusammenfassen und mir mailen | Mantenerlo consultable · Traducirlo · Resumirlo y enviármelo por correo | Le garder recherchable · Le traduire · Le résumer et me l’envoyer par e-mail | Aranabilir tut · Çevir · Özetle ve bana e-postayla gönder |
 | Button | Start watching | Beobachten starten | Empezar a vigilar | Commencer la surveillance | İzlemeye başla |
 | Controls | Pause · Resume · Stop watching | Pausieren · Fortsetzen · Nicht mehr beobachten | Pausar · Reanudar · Dejar de vigilar | Mettre en pause · Reprendre · Arrêter la surveillance | Duraklat · Sürdür · İzlemeyi durdur |
 | Copy out | Copy to cloud *(core `files.push.action`, en aligned)* | In die Cloud kopieren | Copiar a la nube | Copier vers le cloud | Buluta kopyala |
@@ -346,6 +376,7 @@ reused, not re-translated; the existing key is named.
 | Action | Turn off for {app} | Für {app} ausschalten | Desactivar para {app} | Désactiver pour {app} | {app} için kapat |
 | Trigger | Runs on its own (as you) *(core `assistants.triggers.runsAsYou`)* | — reuse | — reuse | — reuse | — reuse |
 | Question | What should each run get? | Was soll jeder Lauf bekommen? | ¿Qué debe recibir cada ejecución? | Que doit recevoir chaque exécution ? | Her çalıştırma neyi almalı? |
+| Question (file watch) | What should happen when this file changes? | Was soll passieren, wenn sich diese Datei ändert? | ¿Qué debe ocurrir cuando cambie este archivo? | Que doit-il se passer quand ce fichier change ? | Bu dosya değiştiğinde ne olsun? |
 | File set | The new file | Die neue Datei | El archivo nuevo | Le nouveau fichier | Yeni dosya |
 | File set | New files together | Neue Dateien gemeinsam | Archivos nuevos juntos | Les nouveaux fichiers ensemble | Yeni dosyalar birlikte |
 | File set | The whole folder | Den ganzen Ordner | La carpeta entera | Le dossier entier | Klasörün tamamı |

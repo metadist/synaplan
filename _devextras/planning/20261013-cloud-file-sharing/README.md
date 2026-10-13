@@ -1,8 +1,9 @@
 # Cloud file sharing — Nextcloud, ownCloud.online and OpenCloud on one level
 
 **Status:** Plan, 2026-10-13, reviewed twice the same day (second review:
-agent briefs, functional tests, local environments). No product code.
-Master-plan §3 is unticked.
+agent briefs, functional tests, local environments), then updated for the
+six Copilot findings on [#2467](https://github.com/metadist/synaplan/pull/2467).
+No product code. Master-plan §3 is unticked.
 **Plan of record:** [`00_master_plan.md`](./00_master_plan.md).
 
 Asked for on 2026-10-13:
@@ -21,11 +22,11 @@ Asked for on 2026-10-13:
 | File | Content |
 | ---- | ------- |
 | [`00_master_plan.md`](./00_master_plan.md) | Pitch, what "one level" means, decisions to tick, architecture, parity target, waves, invariants, rollout, words |
-| [`01_baseline_and_gaps.md`](./01_baseline_and_gaps.md) | Verified state of the three apps and the core, 14 defects, gap matrix, platform constraints |
+| [`01_baseline_and_gaps.md`](./01_baseline_and_gaps.md) | Verified state of the three apps and the core, 17 defects, gap matrix, platform constraints |
 | [`02_identity.md`](./02_identity.md) | Goal 2 — four connection modes, one identity row, credentials, lifecycle |
 | [`03_send_to_cloud.md`](./03_send_to_cloud.md) | Goal 1 — copy Synaplan files into a linked cloud; add from Synaplan inside the cloud |
 | [`04_file_state_and_watches.md`](./04_file_state_and_watches.md) | Goal 3 — the bird, the sidebar, watched folders, automations |
-| [`05_journeys_and_wireframes.md`](./05_journeys_and_wireframes.md) | Journeys J-CF-1…14, wireframes, copy in five locales |
+| [`05_journeys_and_wireframes.md`](./05_journeys_and_wireframes.md) | Journeys J-CF-1…15, wireframes, copy in five locales |
 | [`06_sprints.md`](./06_sprints.md) | Spikes CF-S1…S5, sprints CF0–CF6, gates per repo |
 | [`07_files_into_runs.md`](./07_files_into_runs.md) | Files, not paths: what a run receives, fetching more files, what Synaplan may read, file work in the sandbox, try it on a file |
 | [`08_agent_briefs.md`](./08_agent_briefs.md) | Work orders for coding agents: rules, definition of done, PR template, one brief per spike and step |

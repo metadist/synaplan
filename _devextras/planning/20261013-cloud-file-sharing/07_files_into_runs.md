@@ -84,15 +84,17 @@ Synaplan may read, so the model asks for something it can get.
 
 ## 4. Pickup protocol — Synaplan asks, the app delivers
 
-Mirror of the copy protocol (`03` §2). Synaplan stores only a hash of the
-instance secret, so the notify call carries an id and nothing else.
+Mirror of the copy protocol (`03` §2): the notification carries an id and
+nothing else, signed with Synaplan's notify key, and the app verifies it
+before it claims (C20).
 
 ```text
  Synaplan (run step folder_fetch)                    Cloud app (inbound endpoint)
  ────────────────────────────────                    ─────────────────────────────
  check selector against the person's read scope
  ledger row BCLOUDPICKUPS (queued), ticket in Redis (single use, 10 min)
- POST <delivery URL> {type: "pickup", id} ──────────►
+ POST <delivery URL> {type: "pickup", id, …, sig} ──►
+                                                     verify as for copies (03 §2), else 401
                                                      POST /api/v1/platform-links/pickups/{id}/claim
                                          ◄────────── (instance credential)
  → {platform uid, selector, read scope, limits, mode}

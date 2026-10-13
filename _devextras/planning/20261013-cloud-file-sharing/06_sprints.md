@@ -49,9 +49,9 @@ Briefs: `08` §2.
 | ----- | --------- | ------ | ---------------- |
 | **CF-S1 — OpenCloud web extension points** (8.1 SDK) | Row indicator or custom component in the resource list? Create-menu extension for "From Synaplan"? Context action on folders ("Watch with Synaplan", "Let Synaplan read this folder")? `sidebarPanel` for files and folders? `accountExtension` for a settings page? User notifications from an extension? Private-link format `/f/<id>`? | CF2.7, CF3.5, CF3.10, CF4.5, CF5.6 | Sidebar + action label + Synaplan app view; file an upstream issue |
 | **CF-S2 — Nextcloud organisation login** | Can an app get the login token or an exchanged token from `user_oidc` (events, version floor, `store_login_token`)? Does the exchanged token carry `azp`? Refresh behaviour? Works with Keycloak and with openDesk's Nubus? | CF2.6 | Nextcloud stays on Connect / Accounts by administrator; organisation login moves to CF6 |
-| **CF-S3 — OpenCloud unattended access** | Service account or impersonation to list folders and read and write a user's files without a request (copies, pickups, whole-folder snapshots)? Event bus consumer for upload finished, move, trash, restore, user deleted — config and delivery guarantees? Unprotected proxy route for `/api/synaplan/inbound`? Persistent store for per-user keys (encryption)? Project spaces: events and writes? | CF2.7, CF3.5, CF3.10, CF4.5, CF5.6 | Copies only through "From Synaplan"; no pickups from OpenCloud (attach in the chat instead); watches on OpenCloud reconcile-only; Connect mode to CF6 |
-| **CF-S4 — ownCloud 11 Files APIs** | FileList plugin to decorate rows? Detail tab? New-file menu plugin? File hooks or dispatcher events (create, write, rename, delete, restore)? Notifications app? Background jobs and cron mode detection? How long may a request run (inline pickup budget)? Private link? Does a local `owncloud/server` image behave like BW-Tech's 11.0.10 — can the hoster give us a test tenant? | CF1.2, CF3.4, CF3.9, CF4.4, CF5.5 | Sidebar-only state; reconcile-only watches; pickups fully in background jobs |
-| **CF-S5 — Nextcloud Files APIs at scale** (30–34) | Inline row rendering with one batched call on a 5 000-file folder (virtual scroll)? Sidebar tab API across 30–34? List header for the current folder? New-file menu entry? Node events for group folders, external storage, trash and restore? Notifications? Private link `/f/<fileid>`? Inline pickup budget inside a request and background-job latency with system cron? | CF3.3, CF3.8, CF4.3, CF5.4 | Glyph only on folders + sidebar; reconcile-only for external storage; pickups fully in background jobs |
+| **CF-S3 — OpenCloud unattended access** | Service account or impersonation to list folders and read and write a user's files without a request (copies, pickups, whole-folder snapshots)? Event bus consumer for upload finished, move, trash, restore, user deleted — config and delivery guarantees? Unprotected proxy route for `/api/synaplan/inbound`? Persistent store for per-user keys (encryption)? Project spaces: events and writes? Memory and rebuild time of the in-memory watch index at the cap (5 000 watches, `04` §B.8)? | CF2.7, CF3.5, CF3.10, CF4.5, CF5.6 | Copies only through "From Synaplan"; no pickups from OpenCloud (attach in the chat instead); watches on OpenCloud reconcile-only; Connect mode to CF6; a lower instance cap for OpenCloud |
+| **CF-S4 — ownCloud 11 Files APIs** | FileList plugin to decorate rows? Detail tab? New-file menu plugin? File hooks or dispatcher events (create, write, rename, delete, restore)? Notifications app? Background jobs and cron mode detection? How long may a request run (inline pickup budget)? Private link? Does a local `owncloud/server` image behave like BW-Tech's 11.0.10 — can the hoster give us a test tenant? Watch index at the cap (5 000 targets in an app table): first sync, incremental sync, matching cost per file event? | CF1.2, CF3.4, CF3.9, CF4.4, CF5.5 | Sidebar-only state; reconcile-only watches; pickups fully in background jobs; a lower instance cap |
+| **CF-S5 — Nextcloud Files APIs at scale** (30–34) | Inline row rendering with one batched call on a 5 000-file folder (virtual scroll)? Sidebar tab API across 30–34? List header for the current folder? New-file menu entry? Node events for group folders, external storage, trash and restore? Notifications? Private link `/f/<fileid>`? Inline pickup budget inside a request and background-job latency with system cron? Watch index at the cap (5 000 targets): sync time, table size, matching cost per node event on both matrix images? | CF3.3, CF3.8, CF4.3, CF5.4 | Glyph only on folders + sidebar; reconcile-only for external storage; pickups fully in background jobs; a lower instance cap |
 
 ---
 
@@ -118,14 +118,15 @@ stops every cloud connection; Nextcloud gains organisation login.
 
 | Step | Repo | Content | Class |
 | ---- | ---- | ------- | ----- |
-| CF2.1 | `synaplan` | Schema (`02` §9); `instances/self` adds `capabilities`; `PATCH instances/self` (delivery URL, OIDC client id, app version); OpenCloud instances in Admin → People → Platform instances; private-address approval dialog with stored addresses. | backend-only + ota-candidate |
-| CF2.2 | `synaplan` | `sso/status`, `sso/bind`; bearer attribution in `OidcBearerAuthenticator` (`azp` → instance → identity row, `BLASTSEEN`, `403 platform_disconnected`); audit rows. | backend-only |
+| CF2.1 | `synaplan` | Schema (`02` §9); `instances/self` adds `capabilities`; `PATCH instances/self` (delivery URL, OIDC client id, app version, server id); OpenCloud instances in Admin → People → Platform instances; private-address approval dialog with stored addresses. | backend-only + ota-candidate |
+| CF2.2 | `synaplan` | **D15.** Canonical identity rows (`02` §3.1): provisioning with the instance credential writes `(client, instance, uid)` and binds the key; `identities/adopt` for existing rows; `BMODE` on existing rows. `sso/status`, `sso/bind`; bearer attribution in `OidcBearerAuthenticator` (`azp` → instance → identity row, `BLASTSEEN`, `403 platform_disconnected`); audit rows. | backend-only |
 | CF2.3 | `synaplan` | `sso/background-key`; scope `cloud:watch`; scope map for `/api/v1/cloud/*` (`02` §4.1). | backend-only |
-| CF2.4 | `synaplan` | `lifecycle` endpoint with the effects of `02` §7 (identities and keys now; watch effects arrive with CF5.1). | backend-only |
+| CF2.4 | `synaplan` | **D16.** `lifecycle` endpoint with the effects of `02` §7 (identities and keys now; watch effects arrive with CF5.1): the account goes only while that cloud alone manages it, and the generic admin delete answers `409 account_in_use` to API keys for an account the rule keeps (C18). | backend-only |
 | CF2.5 | `synaplan` | Apps: `opencloud` card; mode-aware status for the three cloud cards from identity rows (D9); Turn off / Turn back on / Disconnect with consequence sentences; `GET /api/v1/me/platform-links` extended; `POST …/{id}/resume`. | ota-candidate + backend-only |
-| CF2.6 | `synaplan-nextcloud` | Organisation login (after CF-S2): token through `user_oidc`, cache, **Check organisation login**, Connect card as fallback, bind on consent, lifecycle calls, four-mode admin screen (W8). | app release |
+| CF2.6 | `synaplan-nextcloud` | Organisation login (after CF-S2): token through `user_oidc`, cache, **Check organisation login**, Connect card as fallback, bind on consent, four-mode admin screen (W8). Whatever CF-S2 answers: lifecycle calls — user deletion calls `lifecycle` instead of the admin delete (D16) — provisioning with the instance credential and the one-time adoption job (D15). | app release |
 | CF2.7 | `synaplan-opencloud` | Register as an instance (admin key or pending approval); consent card + bind (W1); lifecycle from user-deleted events (CF-S3); account extension "Synaplan" (CF-S1). Connect-your-account mode with the key store (CF-S3) — **cut line**, may move to CF6. | app release |
-| CF2.8 | `synaplan-owncloud-online` | Lifecycle calls (delete, disable, enable); four-mode admin copy with organisation login shown as "not available on ownCloud.online". | app release |
+| CF2.8 | `synaplan-owncloud-online` | Lifecycle calls (delete, disable, enable) — `preDelete` stops calling the admin delete (D16); provisioning with the instance credential and the one-time adoption job (D15); four-mode admin copy with organisation login shown as "not available on ownCloud.online". | app release |
+| CF2.9 | `synaplan` | **D17.** `BFILES.BSOURCEINSTANCE` from the credential; upload, overwrite and `check-stale` match (instance, remote id) (C19); older rows are scoped only where the owner has one identity for that client — up front by the migration (dry-run counts in the PR), later on first match. | backend-only |
 
 **Exit (five bullets):**
 
@@ -151,11 +152,11 @@ what the person lets Synaplan read.
 
 | Step | Repo | Content | Class |
 | ---- | ---- | ------- | ----- |
-| CF3.1 | `synaplan` | `BCLOUDDELIVERIES`; `PlatformDestinationProvider`; `DestinationResult::pending()`; notify client (registered URL, host match, https, `SsrfGuard` unless approved); claim and result endpoints; sweep for `unconfirmed` in the scheduler; `save_to_folder` accepts platform targets incl. `next_to`. | backend-only |
+| CF3.1 | `synaplan` | `BCLOUDDELIVERIES`; `PlatformDestinationProvider`; `DestinationResult::pending()`; notify key (`03` §2: Ed25519 through `FederationSigner`, key pair encrypted in `BCONFIG`, `notify_keys` in `instances/self`, rotation command); notify client (signed, registered URL, host match, https, `SsrfGuard` unless approved); claim and result endpoints; sweep for `unconfirmed` in the scheduler; `save_to_folder` accepts platform targets incl. `next_to`. | backend-only |
 | CF3.2 | `synaplan` | `FilePushMenu.vue` lists linked clouds with their landing folder; toast with **Open in …**; **Sent to** on the file detail; `en` "Send to cloud" → "Copy to cloud". | ota-candidate |
-| CF3.3 | `synaplan-nextcloud` | Inbound endpoint; claim and write; notification; personal "Save files from Synaplan to"; **New → From Synaplan…**; Save to Files for every generated kind; own-write guard. | app release |
+| CF3.3 | `synaplan-nextcloud` | Inbound endpoint that verifies every notification before it calls back (C20); claim and write; notification; personal "Save files from Synaplan to"; **New → From Synaplan…**; Save to Files for every generated kind; own-write guard. | app release |
 | CF3.4 | `synaplan-owncloud-online` | Same (CF-S4). | app release |
-| CF3.5 | `synaplan-opencloud` | Inbound endpoint behind an unprotected proxy route; claim and write through impersonation (CF-S3); binary save; From Synaplan (CF-S1); notification. | app release |
+| CF3.5 | `synaplan-opencloud` | Inbound endpoint behind an unprotected proxy route, with the same checks; claim and write through impersonation (CF-S3); binary save; From Synaplan (CF-S1); notification. | app release |
 | CF3.6 | `synaplan` | **Pickup protocol** (`07` §4): `BCLOUDPICKUPS`, ticket in Redis (single use, 10 min), claim / listing / files / result endpoints, inline-then-background, step wait ≤ 10 min, partial results. **`folder_fetch`** capability and runner: list or fetch, files attached to the run message, linked clouds as folder channels with their readable folders. Read-scope mirror (`PUT /api/v1/platform-links/read-scope`, `BREADSCOPE`) and pre-check. `WebDavClient::list()` / `get()` for WebDAV channels (moved forward from CF6.1). | backend-only |
 | CF3.7 | `synaplan` | Run card "Read 12 files from Nextcloud › Invoices/2026" (W9) in chat and task runs; refusal sentence with **Open in …**; "Synaplan may read: …" on the cloud's Apps card. | ota-candidate |
 | CF3.8 | `synaplan-nextcloud` | Pickup handler: claim, resolve the selector in the person's view, scope check, listing, uploads, result (inline 25 s, rest in a background job). Read setting in personal settings (W11), right-click **Let Synaplan read this folder**, admin cap, scope report. | app release |
@@ -210,15 +211,15 @@ their source.
 every run in Synaplan, and can pause or stop from both sides.
 
 **User-flow:** J-CF-6, J-CF-7, J-CF-8, J-CF-9, J-CF-10, J-CF-11 (full),
-J-CF-12, J-CF-13. **Briefs:** `08` §8 (build order CF5.1 → 5.2 → 5.7 → 5.8
+J-CF-12, J-CF-13, J-CF-15 (one file). **Briefs:** `08` §8 (build order CF5.1 → 5.2 → 5.7 → 5.8
 → 5.3 → apps) · **Tests:** `09` §6.
 
 | Step | Repo | Content | Class |
 | ---- | ---- | ------- | ----- |
-| CF5.1 | `synaplan` | Schema `BCLOUDWATCHES`, `BCLOUDWATCHITEMS`; watch API (person) and watch read (instance); ledger idempotency; `file_event` trigger; upload and reconcile endpoints; loop guard; limits; working copies (hidden, 7-day retention); states and reasons; `watches_changed` notify; lifecycle effects on watches; scheduler sweeps for stuck items. | backend-only |
+| CF5.1 | `synaplan` | Schema `BCLOUDWATCHES`, `BCLOUDWATCHITEMS`; watch API (person) and the paginated, incremental watch read for the apps' index (instance); caps of 50 active watches per person and 5 000 per instance; folder and file targets; ledger idempotency; `file_event` trigger; upload and reconcile endpoints; loop guard; limits; working copies (hidden, 7-day retention); states and reasons; `watches_changed` notify; lifecycle effects on watches; scheduler sweeps for stuck items. | backend-only |
 | CF5.2 | `synaplan` | Presets → task templates: Translate, Summarize and mail me, Use one of my tasks; Keep-searchable sync; mail with links back. "Run my instruction" has no template — it pins a tried turn (CF5.8). | backend-only |
 | CF5.3 | `synaplan` | Tasks → **Watched folders** tab (W7); task trigger row for `file_event`; run detail with its files and **Open in …**; knowledge-folder badge with **Stop syncing**; empty states. | ota-candidate |
-| CF5.4 | `synaplan-nextcloud` | Watch dialog (W6) and the watch-permission card (`02` §4.2); eyes from the watch cache; list header; sidebar watch section; job-list queue with quiet period; reconciliation job; admin policy (shared folders) and cron warning; Watched folders list on the app page. | app release |
+| CF5.4 | `synaplan-nextcloud` | Watch dialog (W6, with its single-file variant) and the watch-permission card (`02` §4.2); the watch index (app table, incremental sync) for eyes and event matching; list header; sidebar watch section; job-list queue with quiet period; reconciliation job; admin policy (shared folders) and cron warning; Watched folders list on the app page. | app release |
 | CF5.5 | `synaplan-owncloud-online` | Same (CF-S4). | app release |
 | CF5.6 | `synaplan-opencloud` | Same with the event bus and impersonation (CF-S3); folder context action; sidebar; app view list. | app release |
 | CF5.7 | `synaplan` | **Files into runs** (`07` §2, §6): `SavedTaskRunner::run()` attaches the run's files to the run message; payload `files` + `set`; "Files in this run" block; file sets — core windowing for **New files together** (scheduler `tasks` lane), snapshots for **The whole folder**; run limits (50 files, 200 MB). Runner test: a payload without attachments fails closed (C15). | backend-only |
@@ -227,15 +228,17 @@ J-CF-12, J-CF-13. **Briefs:** `08` §8 (build order CF5.1 → 5.2 → 5.7 → 5.
 
 **Exit (five bullets):**
 
-1. J-CF-6 … J-CF-13 walked on all three clouds (OpenCloud reconcile-only if
-   CF-S3 found no events; J-CF-13 where Compute is on).
-2. Every watch and every run is found in ten seconds: eyes + sidebar in the
-   cloud, Tasks → Watched folders in Synaplan, the app page list.
-3. Preset consequence sentences, reasons and failure sentences in five
-   locales.
-4. Empty Watched folders state, failing file, paused and flag-off states
-   shown; an older core shows no Watch menu (J-CF-12); with Compute off the
-   dialog and the trial never mention file work.
+1. J-CF-6 … J-CF-13 and J-CF-15 walked on all three clouds (OpenCloud
+   reconcile-only if CF-S3 found no events; J-CF-13 where Compute is on).
+2. Every watch — on a folder or on a single file — and every run is found in
+   ten seconds: eyes + sidebar in the cloud, Tasks → Watched folders in
+   Synaplan, the app page list.
+3. Preset consequence sentences (plural and singular), reasons and failure
+   sentences in five locales.
+4. Empty Watched folders state, failing file, paused, deleted target, cap
+   reached and flag-off states shown; an older core shows no Watch menu
+   (J-CF-12); with Compute off the dialog and the trial never mention file
+   work.
 5. Dark + V2 + 320 px for the Synaplan tab; host themes for the dialog and
    sidebar.
 

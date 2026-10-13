@@ -2,7 +2,7 @@
 
 | | |
 | - | - |
-| **Status** | Plan, 2026-10-13; second review the same day (agent briefs, functional tests, local environments — `08`–`10`). **No code until §3 is ticked.** Verified by code reading against `synaplan` `main` `5487e2678` (5.4.0), `synaplan-nextcloud` `400ec02` (1.6.0), `synaplan-owncloud-online` `3b916f6` (1.0.0), `synaplan-opencloud` `5cc1351` (v1.0.0). No live walk yet — the first walk is step CF0.7. |
+| **Status** | Plan, 2026-10-13; second review the same day (agent briefs, functional tests, local environments — `08`–`10`); the six Copilot findings on [#2467](https://github.com/metadist/synaplan/pull/2467) folded in the same day (STATUS review log). **No code until §3 is ticked.** Verified by code reading against `synaplan` `main` `5487e2678` (5.4.0), `synaplan-nextcloud` `400ec02` (1.6.0), `synaplan-owncloud-online` `3b916f6` (1.0.0), `synaplan-opencloud` `5cc1351` (v1.0.0). No live walk yet — the first walk is step CF0.7. |
 | **How it is built** | One brief per step for a coding agent ([`08`](./08_agent_briefs.md)), three test layers per sprint ([`09`](./09_functional_tests.md)), pinned local stacks ([`10`](./10_local_environments.md)). Environment briefs E-1…E-8 run before CF0.7. |
 | **Repos** | `synaplan` (core API, Library, Tasks, Apps), `synaplan-nextcloud`, `synaplan-owncloud-online`, `synaplan-opencloud`, `synaplan-docs` |
 | **User-facing names** | **Searchable by AI** (bird) · **Watch with Synaplan** / **Watched folders** (bird with eyes) · **Copy to cloud** · **Organisation login** · **Connect your Synaplan account**. Full table in §11. |
@@ -13,11 +13,11 @@
 | File | Content |
 | ---- | ------- |
 | `00_master_plan.md` (this) | Pitch, what "one level" means, decisions, architecture, parity target, waves, invariants, rollout |
-| [`01_baseline_and_gaps.md`](./01_baseline_and_gaps.md) | Verified state of the three apps and the core, 14 defects, gap matrix, platform constraints |
+| [`01_baseline_and_gaps.md`](./01_baseline_and_gaps.md) | Verified state of the three apps and the core, 17 defects, gap matrix, platform constraints |
 | [`02_identity.md`](./02_identity.md) | Goal 2 — four connection modes, one identity row, credentials, lifecycle |
 | [`03_send_to_cloud.md`](./03_send_to_cloud.md) | Goal 1 — copy Synaplan files into a linked cloud; add from Synaplan inside the cloud |
 | [`04_file_state_and_watches.md`](./04_file_state_and_watches.md) | Goal 3 — the bird, the sidebar, watched folders, automations |
-| [`05_journeys_and_wireframes.md`](./05_journeys_and_wireframes.md) | Journeys J-CF-1…14, wireframes, copy in five locales |
+| [`05_journeys_and_wireframes.md`](./05_journeys_and_wireframes.md) | Journeys J-CF-1…15, wireframes, copy in five locales |
 | [`06_sprints.md`](./06_sprints.md) | Spikes CF-S1…S5 and sprints CF0–CF6 |
 | [`07_files_into_runs.md`](./07_files_into_runs.md) | Files, not paths: what a run receives, fetching more files (`folder_fetch` + pickup), what Synaplan may read, file work in the sandbox, try it on a file |
 | [`08_agent_briefs.md`](./08_agent_briefs.md) | The work orders: rules for an agent, definition of done, one brief per spike and step (repo, branch, files, build list, tests, acceptance) |
@@ -123,18 +123,18 @@ Defects that block the floor today (detail in `01` §4):
 | 2 | **Source of truth** | Synaplan owns file state, watches, runs and copies. The apps keep caches and work queues, never a second copy of the rules. | |
 | 3 | **Connection modes** | Four modes with the same names in all three admin screens: **Organisation login**, **Connect your Synaplan account**, **Accounts created by the administrator**, **One shared account**. Nextcloud's stored `shared` / `provision` / `link` values stay. | |
 | 4 | **One identity row** | Every per-person mode ends in `BEXTERNALIDENTITIES (client, instance, platform user id)`. Organisation-login users get theirs through a **bind** call on first use, checked against the instance's registered OIDC client (`azp`). | |
-| 5 | **Credentials** | Interactive: the person's own (organisation login token, or the scoped key from linking / provisioning). Unattended (watch uploads, reconciliation): the person's scoped key — organisation-login users get a **background key** when they turn on their first watch. The instance credential only for instance operations (claim a copy, fulfil a pickup Synaplan asked for, report source changes and read scope, read watch descriptions, bind, report lifecycle). No fourth scheme (Wave 6 §0 #5). | |
-| 6 | **Instance registration** | All three clouds register as platform instances, OpenCloud too. `BPLATFORMINSTANCES` gains delivery URL, OIDC client id and capabilities. **Schema ask recorded** (Galera-safe `ADD COLUMN IF NOT EXISTS`). | |
+| 5 | **Credentials** | Interactive: the person's own (organisation login token, or the scoped key from linking / provisioning). Unattended (watch uploads, reconciliation): the person's scoped key — organisation-login users get a **background key** when they turn on their first watch. The instance credential only for instance operations (claim a copy, fulfil a pickup Synaplan asked for, report source changes and read scope, read watch descriptions, bind, adopt a provisioned person with that person's key, report lifecycle). No fourth scheme (Wave 6 §0 #5). | |
+| 6 | **Instance registration** | All three clouds register as platform instances, OpenCloud too. `BPLATFORMINSTANCES` gains delivery URL, OIDC client id, capabilities and the cloud's own server id. **Schema ask recorded** (Galera-safe `ADD COLUMN IF NOT EXISTS`). | |
 | 7 | **Nextcloud organisation login** | Through `user_oidc` token exchange, once spike CF-S2 confirms the API and version floor. People without an OIDC session (local admin) see the Connect card. | |
 | 8 | **ownCloud.online** | Connect, accounts-by-administrator and shared now. Organisation login only when the hoster enables OIDC for it (v2). | |
 | 9 | **OpenCloud** | Consent card, bind and background key now. Connect-your-account for clouds with their own identity provider (key store per CF-S3). Accounts-by-administrator is a cut line. | |
 | 10 | **Consent** | One first-use card in all three apps, same sentence (`05` §3) — organisation-login users included. No Synaplan account is created silently by a file action. | |
-| 11 | **Copy protocol** | **Notify, then fetch.** Synaplan POSTs a one-time copy id to the registered delivery URL; the app claims it with its instance credential, writes the file and answers in the same request (≤ 30 s); a result callback covers slow writes. A cloud Synaplan cannot reach gets an honest failure; pull mode is v2. An instance a Synaplan admin **approved** may sit on a private address (approval = allowlist, said in the approval dialog); all other targets keep the `SsrfGuard` policy. The WebDAV folder app stays the path without an installed app. | |
+| 11 | **Copy protocol** | **Notify, then fetch.** Synaplan POSTs a one-time copy id to the registered delivery URL, signed with its notify key (row 37); the app verifies it, claims it with its instance credential, writes the file and answers in the same request (≤ 30 s); a result callback covers slow writes. A cloud Synaplan cannot reach gets an honest failure; pull mode is v2. An instance a Synaplan admin **approved** may sit on a private address (approval = allowlist, said in the approval dialog); all other targets keep the `SsrfGuard` policy. The WebDAV folder app stays the path without an installed app. | |
 | 12 | **Where copies land** | `Synaplan/<Documents\|Images\|Audio\|Video\|Calendar>` in the person's home — the folders the apps already use for "Save to Files" — or the folder the person picked in the cloud's own settings with the native folder picker. Task outputs may say "next to the original". Never a typed path in Synaplan. | |
 | 13 | **Indicator glyphs** | Bird = searchable by AI, with a small state badge (updating · changed · could not). Bird with eyes = watched. Icon + tooltip + `aria-label`, never colour alone. Same set in all three apps; a white-labelled instance may replace both through runtime config. | |
 | 14 | **Indicator data** | One batched status call per folder view (`POST /api/v1/cloud/status`, built on `check-stale`, adding vector state, knowledge folder and watch coverage), cached ≤ 60 s. No local mirror table in v1. | |
 | 15 | **Follow the source** | A searchable file follows its cloud file: change → "Changed", re-added automatically when "Keep it up to date" is on (default on); delete → out of answers and the Library at once, the copy kept 7 days so a restore brings it back, then deleted. The app reports these as instance-level source events. | |
-| 16 | **Watch actions** | Two kinds: **Keep searchable** (sync into a knowledge folder, no task) and **Run a task** (one task per watch). Presets: Keep searchable · Translate · Summarize and mail me · Run my instruction (on the files, tried first — row 32) · Use one of my tasks. | |
+| 16 | **Watch actions** | A watch looks at one folder or one file; a file watch reacts to new versions of that file only (J-CF-15). Two kinds: **Keep searchable** (sync into a knowledge folder, no task) and **Run a task** (one task per watch). Presets: Keep searchable · Translate · Summarize and mail me · Run my instruction (on the files, tried first — row 32) · Use one of my tasks. | |
 | 17 | **Where automations live** | Created where the files are (right-click → **Watch with Synaplan…**). Managed, edited and audited in Synaplan: **Tasks → Watched folders** (beside Watched pages), the task's trigger row, the knowledge-folder badge. No automation editor inside the clouds, no Nextcloud Flow in v1. | |
 | 18 | **Event model** | App events (Nextcloud node events, ownCloud hooks, OpenCloud event bus) with a 60 s quiet period, plus reconciliation (hourly default) for missed events. A new watch offers "also the N files already there" — on for Keep searchable, off for task presets. Nextcloud / ownCloud watches need system cron; the admin screen says so. | |
 | 19 | **Idempotency and loops** | One run per (watch, file id, version). A watch never fires on a file Synaplan wrote. Every run ends in a terminal state with one sentence. | |
@@ -155,6 +155,11 @@ Defects that block the floor today (detail in `01` §4):
 | 34 | **OpenCloud chat timing** | CF1.5 (chat about a file, research chat, media, binary save) stays in CF1. It moves after CF5 only if CF-S1 or CF-S3 overrun their two-day timebox — recorded in STATUS, not decided ad hoc. | |
 | 35 | **If capacity is short in CF2** | Nextcloud organisation login (CF2.6) before OpenCloud Connect mode (CF2.7's cut line): Nextcloud is the installed base, and OpenCloud already has organisation login. CF2.7's registration, consent, bind and lifecycle are not cut. | |
 | 36 | **Dev-mode test hooks in the apps** | Three admin-CLI-only switches per app (`dev_hold_inbound`, `dev_mute_events`, `dev_allow_self_write`) and two `APP_ENV=dev\|test`-only core values (`CLOUD_DELIVERY_TTL_SEC`, `CLOUD_DELIVERY_UNCONFIRMED_SEC`) so the integration scripts can test the pending, reconcile and loop-guard paths (`08` §0.8). Never visible in a UI. | |
+| 37 | **Notification proof** | Every notification to an app (`delivery`, `pickup`, `watches_changed`, `identity_revoked`) is signed with an installation-wide Ed25519 notify key: the existing `FederationSigner`, the key pair encrypted in `BCONFIG` like `FederationIdentityStore`. The app gets the public key with its instance credential (`instances/self`) and checks signature, instance, time (± 5 min) and a ten-minute list of seen ids before it calls Synaplan; anything else gets `401`, no call back, and a per-address rate limit (`03` §2). Not chosen: rate limits alone (each forged request would still cost a call to Synaplan) and an HMAC per instance (Synaplan would have to keep every instance secret readable). | |
+| 38 | **Deleting a person in one cloud** | Revokes that identity and the keys bound to it and stops its watches. The Synaplan account goes with it only while that cloud alone manages it: provisioned for this identity, no other active identity, no password of its own, not an administrator (`02` §7). For an account the rule keeps, the generic admin delete answers `409 account_in_use` when an API key calls it — the call today's app releases make. | |
+| 39 | **Provisioned identities** | Provisioning writes the canonical row when the call carries the instance credential: client and instance from the credential, the bare platform user id, the minted key bound to the row. Rows written the old way are adopted by a one-time job in each app — instance credential **and** the person's key on each call (`02` §3.1). A row no app adopts keeps today's behaviour. | |
+| 40 | **Files remember their cloud** | `BFILES.BSOURCEINSTANCE` names the platform instance a cloud file came from; upload, overwrite, status, source events and watches match (instance, remote id) (C19). The instance comes from the credential, never from the request. A row written before (no instance) is matched — and given the instance — only when its owner has no other identity for that client; the migration does this up front, the PR shows the counts, and rows of owners with two instances of one client stay unscoped. **Schema ask recorded.** | |
+| 41 | **Watch index** | Each app keeps a local index of the active watches on its instance (eyes for everyone, event matching), filled from a paginated, incremental instance call (≤ 500 per page, a `since` cursor with tombstones, `ETag`). Caps bound it: 50 active watches per person, 5 000 per instance (a Synaplan admin may change the instance cap). CF-S3, CF-S4 and CF-S5 measure sync and matching at the cap (`04` §B.7, §B.8). | |
 
 ---
 
@@ -172,12 +177,12 @@ Defects that block the floor today (detail in `01` §4):
                           (SSO: background key)
    instance operations ── instance credential ───────────────► /api/v1/platform-links/…  claim copy · fulfil pickup ·
                           (platform links, existing)             source events · read scope · watches (read) · sso/bind · lifecycle
-   inbound endpoint ◄──── notify {type, id} (no secret) ─────── delivery · pickup · watches_changed · identity_revoked
-                          → the app fetches with its own credential
+   inbound endpoint ◄──── notify {type, id}, signed ─────────── delivery · pickup · watches_changed · identity_revoked
+                          → the app verifies, then fetches with its own credential
 
                                                                BEXTERNALIDENTITIES   one row per person per cloud
                                                                BPLATFORMINSTANCES    + delivery URL, OIDC client, capabilities
-                                                               BFILES                source · source_id · etag · vector state
+                                                               BFILES                source · instance · source_id · etag · vector state
                                                                BCLOUDWATCHES         what is watched, what happens
                                                                BCLOUDWATCHITEMS      seen-state ledger (watch, file, version)
                                                                BCLOUDDELIVERIES      copy ledger
@@ -190,9 +195,10 @@ Defects that block the floor today (detail in `01` §4):
 
 Four new core pieces; everything else is wiring of what exists:
 
-1. **Identity consolidation** — bind and attribution for organisation-login
-   users, a background key, lifecycle calls, Apps cards for all three clouds
-   ([`02`](./02_identity.md)).
+1. **Identity consolidation** — canonical rows for provisioned people, bind
+   and attribution for organisation-login users, a background key, lifecycle
+   calls that never delete an account still in use, files that remember their
+   cloud, Apps cards for all three clouds ([`02`](./02_identity.md)).
 2. **Copies to linked clouds** — the `platform` destination beside `webdav`,
    the notify-then-fetch protocol and a copy ledger
    ([`03`](./03_send_to_cloud.md)).
@@ -259,10 +265,10 @@ Detail, steps and exits: [`06_sprints.md`](./06_sprints.md).
 | **CF-S** | Five spikes, parallel to CF0: OpenCloud web extension points, Nextcloud `user_oidc` token exchange, OpenCloud unattended access, ownCloud 11 Files APIs, Nextcloud Files APIs at scale | Each answer is a dated STATUS entry | — |
 | **CF0 — Fix and align** | D1–D3 in the core, docs truth, STATUS hygiene, first walks of J-NC-1…3 | Per-user modes work end to end in Nextcloud and ownCloud.online | Never cut |
 | **CF1 — Parity floor** | ownCloud.online link mode, consent, tests, CI; Nextcloud CI and key encryption; five locales; OpenCloud chat + binary save | `01` §5 matrix shows no unexplained gap below Nextcloud 1.6 | OpenCloud chat may move after CF5 |
-| **CF2 — One identity** | Registration for all three, bind and attribution, background key, lifecycle, Apps cards, Nextcloud organisation login, OpenCloud link mode | J-CF-1, J-CF-2, J-CF-11 walked | OpenCloud link mode may move to CF6 |
+| **CF2 — One identity** | Registration for all three, canonical identity rows, bind and attribution, background key, lifecycle, files that remember their cloud, Apps cards, Nextcloud organisation login, OpenCloud link mode | J-CF-1, J-CF-2, J-CF-11 walked | OpenCloud link mode may move to CF6 |
 | **CF3 — Files both ways** | Out: `platform` destination, notify-then-fetch, copy ledger, Library menu, New → From Synaplan. In: pickup protocol, `folder_fetch`, read scope set in the cloud, WebDAV `list()` / `get()` | J-CF-3, J-CF-4, J-CF-14 walked | — |
 | **CF4 — Searchable state** | Status call, source events, bird, sidebar, glyph kit | J-CF-5 walked | OpenCloud row bird waits for an extension point (sidebar ships) |
-| **CF5 — Watched folders and automations** | Watch model, ledger, `file_event` trigger with files attached, three file sets, presets, try it on a file, unattended file work consent, event sources, reconciliation, Tasks → Watched folders | J-CF-6…13 walked | "Use one of my tasks" and "The whole folder" may follow |
+| **CF5 — Watched folders and automations** | Watch model, ledger, `file_event` trigger with files attached, three file sets, presets, try it on a file, unattended file work consent, event sources, reconciliation, Tasks → Watched folders | J-CF-6…13 and J-CF-15 walked | "Use one of my tasks" and "The whole folder" may follow |
 | **CF6 — Beyond the apps** | WebDAV feeder (roadmap "folder watch"), pull mode for copies and pickups, ownCloud.online organisation login, Nextcloud Flow / Assistant provider | Per item | Optional |
 
 Order: CF-S and CF0 together → CF1 → CF2 → CF3 and CF4 in parallel → CF5 →
@@ -291,10 +297,13 @@ days each and end in a STATUS entry, never in merged code.
 | C11 | Galera: raw idempotent `addSql`, no Schema API, children before parents | Migration review |
 | C12 | Mobile: core PHP `backend-only`, core UI `ota-candidate`; new frontend paths classified in `.github/mobile-impact-policy.json` | `node scripts/mobile-impact.mjs` |
 | C13 | The public repos carry no hostnames, IPs or secrets of real installations | Review + secret scans |
-| C14 | Cost is visible: each file a task watch handles is one task run on the owner's quota; caps per watch and per instance | Quota tests + watch dialog copy |
+| C14 | Cost is visible: each file a task watch handles is one task run on the owner's quota; caps per watch and per instance, and on active watches per person and per instance | Quota and cap tests + watch dialog copy |
 | C15 | No processing step receives only a path: a run's inputs are Synaplan files attached to its message; a run whose files could not be read ends with a sentence that names them | Runner tests: a payload without attachments fails closed |
 | C16 | A pickup ticket is single-use, expires after 10 minutes, belongs to one instance, one person and one selector checked against the read scope; the app re-checks the scope and reads as that person | Ticket tests (replay, expiry, wrong instance, out-of-scope selector) |
 | C17 | Unattended file work runs only on a task whose owner allowed it; the sandbox keeps egress off; a pinned script never depends on the test file's name | Compute pause tests (`SavedTaskComputePauseTest` family) + replay on a differently named file |
+| C18 | Removing a person in one cloud never deletes a Synaplan account that another connection or the person's own sign-in still uses; only that identity and its keys go | Lifecycle tests: a sole provisioned account is deleted; the same account with a second identity, a password or the admin role is kept and only the identity revoked; the generic admin delete called with an API key answers 409 for a kept account |
+| C19 | A cloud file is identified by (instance, remote id): no upload, overwrite, status answer, source event or watch from one cloud touches a copy from another | Repository tests with two instances sharing remote id `5678`; `cf2-file-instance.sh` |
+| C20 | An app calls Synaplan for a notification only after verifying it: signature with a published notify key, its own instance id, a timestamp within five minutes, an id not seen in the last ten minutes | App tests with a mocked HTTP client (zero calls for forged, replayed, stale and misaddressed notifications); `cf3-inbound.sh` |
 
 ---
 

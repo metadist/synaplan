@@ -45,6 +45,7 @@ uses these names; a walk with other accounts is recorded as such.
 | `spec.pdf` | 2 pages of text, title "Widget spec" | J-CF-5, status checks |
 | `contract.docx` | 1 page German text, heading "Vertrag" | J-CF-7 translate |
 | `contract-scan.pdf` | 1 page image only, no text layer | J-CF-7 "no readable text" |
+| `price-list.docx` | 1 page German price list, two versions (`price-list-v2.docx` changes three prices) | J-CF-15 file watch |
 | `report.pdf` | 3 pages of text, 10 numbered findings | J-CF-8 summarize |
 | `invoice-0912.pdf`, `invoice-1003.pdf` | one-page invoices with vendor, date, total, IBAN | J-CF-9, J-CF-14 |
 | `export-01.csv`, `export-02.csv`, `export-03.csv` | `month,revenue` with 12 rows each | J-CF-13 file work |
@@ -190,17 +191,21 @@ registered as a platform instance (CF2.7); Nextcloud `user_oidc` configured
 
 `ApiKeyScopeTest` (`cloud:watch`, `/api/v1/cloud/*` map); handshake-style
 tests for `sso/bind` (wrong `azp`, unknown instance, revoked identity, replay);
-lifecycle tests (deleted / disabled / enabled); `OidcBearerAuthenticator`
-attribution test (`BLASTSEEN`, `403 platform_disconnected`); migration review
-(C11).
+canonical rows and adoption (`02` §3.1: with and without the instance
+credential, someone else's key, wrong server id, replay); lifecycle tests
+(deleted / disabled / enabled) with the deletion policy (each keep-condition;
+the admin delete with an API key → 409 — C18); instance-scoped file lookups
+(C19); `OidcBearerAuthenticator` attribution test (`BLASTSEEN`,
+`403 platform_disconnected`); migration review (C11).
 
 ### L2
 
 | Script | Asserts |
 | ------ | ------- |
-| `cf2-identity.sh` | Register a fake instance with `client=opencloud` (as `fake-instance.sh` does), `PATCH instances/self` with delivery URL and `oidc_client_id=opencloud`; `GET instances/self` lists `capabilities` ⊇ `{sso_bind, lifecycle}`. Get a token for `ada` from Keycloak (`opencloud` public client, password grant — enabled in dev), exchange it for audience `synaplan-app` through `synaplan-opencloud`; `GET sso/status` → `bound=false`; `POST sso/bind` → 200, identity row `mode=sso`; `sso/status` → `bound=true`. Bind with a token whose `azp` is `synaplan-app` → **403**. `POST sso/background-key` → key with scopes exactly `files rag cloud:watch`; the key appears in Ada's API keys with the linked-platform badge (API list). `POST lifecycle {external_id: ada, event: disabled}` → identity `status=paused`; `enabled` → `active`; `deleted` → `revoked`, the background key answers 401 |
+| `cf2-identity.sh` | Register a fake instance with `client=opencloud` (as `fake-instance.sh` does), `PATCH instances/self` with delivery URL and `oidc_client_id=opencloud`; `GET instances/self` lists `capabilities` ⊇ `{sso_bind, lifecycle}`. Get a token for `ada` from Keycloak (`opencloud` public client, password grant — enabled in dev), exchange it for audience `synaplan-app` through `synaplan-opencloud`; `GET sso/status` → `bound=false`; `POST sso/bind` → 200, identity row `mode=sso`; `sso/status` → `bound=true`. Bind with a token whose `azp` is `synaplan-app` → **403**. `POST sso/background-key` → key with scopes exactly `files rag cloud:watch`; the key appears in Ada's API keys with the linked-platform badge (API list). `POST lifecycle {external_id: ada, event: disabled}` → identity `status=paused`; `enabled` → `active`; `deleted` → `revoked`, the background key answers 401. **Adoption block:** a second fake instance (`client=nextcloud`, `PATCH instances/self {server_id}`); provision `p1` with the admin key **and** that instance's credential → row `(nextcloud, <instance>, p1)`, `mode=provision`, the minted key bound; provision `p2` the old way (`external_id: <server_id>:p2`, no instance credential) → legacy row; `POST identities/adopt` with p2's key → canonical row, key bound; the same call with p1's key for `p2` → **403**. **Deletion block:** `lifecycle {external_id: p2, event: deleted}` → p2's account is gone; provision `p3` with a password (test tooling) → `deleted` revokes the identity and keeps the account (`platform_link.account_kept` in the audit log); the generic admin delete for p3 with the admin API key → **409** `account_in_use` |
+| `cf2-file-instance.sh` | Two fake `nextcloud` instances, one Synaplan user linked on both (two keys). Upload `spec.pdf` with `source_id=5678` through each key → two `BFILES` rows with different `BSOURCEINSTANCE`; `overwrite=1` through key A replaces only A's row; `check-stale` through key B answers B's etag; an upload with the person's own API key (no identity) and `source_id=5678` matches neither (C19) |
 | `cf2-apps-card.sh` | `GET /api/v1/me/platform-links` as Ada lists the OpenCloud row with `mode`, `status`, `last_seen`; `POST …/{id}/turn-off` (the endpoint CF2.5 names) → the next bearer call from the instance answers `403 platform_disconnected`; `…/resume` → 200 again |
-| `cf2-flag-off.sh` | `disable_flag`; every new route (`sso/*`, `lifecycle`, `read-scope`, `me/platform-links/{id}/resume`) answers **404**; `enable_flag` |
+| `cf2-flag-off.sh` | `disable_flag`; every new route (`sso/*`, `identities/adopt`, `lifecycle`, `read-scope`, `me/platform-links/{id}/resume`) answers **404**; `enable_flag` |
 
 ### L3
 
@@ -215,6 +220,7 @@ attribution test (`BLASTSEEN`, `403 platform_disconnected`); migration review
 | 7 | all three | Cloud admin disables `ada` (Nextcloud: `occ user:disable ada`) | Synaplan Apps card: "Paused — your Nextcloud account was disabled"; re-enable → active again |
 | 8 | Synaplan | Admin → People → Platform instances | The OpenCloud instance is listed with mode counts; approving a private delivery address shows the dialog that says it becomes an allowlist entry |
 | 9 | all three | J-CF-12 identity part: point the app at a core with `PLATFORM_LINKS.ENABLED=0` | Bind and consent changes hidden; summarize still works in shared mode; one info line in the server log, no error toast |
+| 10 | Nextcloud and ownCloud.online (provision in one, link in the other) | delete a person who also uses Synaplan elsewhere | The account one cloud provisioned for Ada gets a password (forgot-password mail in MailHog) and connects the other cloud; the first cloud's admin deletes `ada` → the other cloud keeps working as Ada, the Synaplan account stays, Synaplan → Apps no longer lists the first cloud for her. Walked once in each direction (C18) |
 
 ---
 
@@ -228,7 +234,9 @@ and OpenCloud equivalents).
 ### L1
 
 Copy protocol tests (C4: replay, expiry 5 min, wrong instance, wrong user);
-`DestinationResult::pending()` only from the `platform` provider;
+notify signing and rotation (core) and each app's verifier — forged,
+replayed, stale and other-instance notifications → `401` with no outbound
+call (C20); `DestinationResult::pending()` only from the `platform` provider;
 `PlatformDestinationProvider` unit tests; pickup ticket tests (C16);
 `FolderFetchRunner` tests (list vs fetch, attachments on the run message,
 fail-closed without files — C15); `WebDavClient::list()` / `get()` against a
@@ -241,6 +249,7 @@ local WebDAV fixture; read-scope pre-check tests; OpenAPI → generated schemas 
 | ------ | ------- |
 | `cf3-copy.sh` (`CLOUD=…`) | As Ada: upload `chart.png`; `POST /api/v1/files/{id}/send {destination: platform, identity_id, target: kind_folder}` → 200 within 30 s with `remote_path = Synaplan/Images/chart.png` and an `open_url`; the cloud helper finds the file as Ada; send again → `chart (2).png`; `db_query` shows two `BCLOUDDELIVERIES` rows `delivered`. Stop the cloud container; send → the failure code `unreachable` and the sentence "Synaplan could not reach …. Nothing was copied."; no ledger row left `queued`. Start the cloud; set the app's `dev_hold_inbound` switch (`08` §0.8); send → **202** `pending`; with `CLOUD_DELIVERY_UNCONFIRMED_SEC=60` on the backend the sweep marks the row `unconfirmed` within 90 s and the person's "Sent to" shows the sentence; clear the switch |
 | `cf3-ticket.sh` | Claim a delivery id twice → second **409/410**; claim with another instance's credential → **403**; claim after expiry → **410** (backend started with `CLOUD_DELIVERY_TTL_SEC=5`) |
+| `cf3-inbound.sh` (`CLOUD=…`) | Send the app's inbound URL 1 000 notifications that must fail — no `sig`, signed with another key, another `instance_id`, `ts` ten minutes old, a replay of a valid one — every answer is **401** (or **429** once the per-address limit hits), and the backend log shows no claim call from that instance meanwhile (C20); then one real copy → claimed and `delivered` |
 | `cf3-pickup.sh` (`CLOUD=…`) | Put `invoice-0912.pdf` and `invoice-1003.pdf` in Ada's `Invoices` (helper); set Ada's read scope in the cloud to **Only folders I watch** (helper `occ` / API) — then a task with one `folder_fetch` step (`folder: Invoices`, `pattern: *.pdf`) run through the Saved Tasks API ends `failed` with the sentence "Synaplan may not read Invoices in your …. Nothing was read."; set **Also folders I allow** + allow `Invoices` → the run's message has two attachments with the right names; `BCLOUDPICKUPS` row `done`, `listed=2`, `sent=2`; run again → `sent=0` (versions reused); add `big-101mb.bin` → `partial`, skipped lists it with reason size; 21st pickup in the hour → the limit sentence |
 | `cf3-webdav.sh` | `folder_fetch` on a plain WebDAV connection (the Synaplan dev WebDAV fixture) lists and fetches without a pickup |
 | `cf3-flag-off.sh` | `disable_flag`: `GET /api/v1/me/platform-links` answers **404** (existing behaviour), so the Copy-to-cloud menu lists no linked clouds; `folder_fetch` is absent from the planner's capability list; claim / pickup / read-scope routes **404**; `enable_flag` |
@@ -311,7 +320,10 @@ scheduler running; `--compute` for J-CF-13; Ada's cloud key carries
 ### L1
 
 Watch API tests; ledger unique key (C6); loop guard three layers (C7);
-quiet period and windowing (`BWINDOWSEC`, `BMAXFILES`) with a fake clock;
+file targets (only new versions of that file; deletion and restore); watch
+index paging, `since` with tombstones, `304`, `410`; caps (50 per person,
+5 000 per instance); quiet period and windowing (`BWINDOWSEC`, `BMAXFILES`)
+with a fake clock;
 `file_event` trigger payload (`files`, `set`) and `SavedTaskRunner` attaching
 files (C15 fail-closed); presets → task templates; trial and `from-message`
 tests (pinning rejects a script that names the test file — C17);
@@ -323,7 +335,8 @@ render test (4–5 sentences, two links, plain-text part).
 
 | Script | Asserts |
 | ------ | ------- |
-| `cf5-watch.sh` (`CLOUD=…`) | Create a **Summarize and mail me** watch on `Reports` through `POST /api/v1/cloud/watches` (Ada's key with `cloud:watch`); the row is `active`; upload `report.pdf` version `v1` to `…/watches/{id}/files` → one `BCLOUDWATCHITEMS` row → run → MailHog has one mail "Summary: report.pdf" with 4–5 sentences (count sentences in the plain-text part), **Open in …** and **See this run in Synaplan** links; upload `v1` again → "already handled", no second run or mail (C6); `PATCH {state: paused}` → upload `v2` → no run; resume → the resume answer lists 1 waiting file → run; `DELETE` → row gone, the task is deleted with it, the item ledger rows deleted first (C11 order) |
+| `cf5-watch.sh` (`CLOUD=…`) | Create a **Summarize and mail me** watch on `Reports` through `POST /api/v1/cloud/watches` (Ada's key with `cloud:watch`); the row is `active`; upload `report.pdf` version `v1` to `…/watches/{id}/files` → one `BCLOUDWATCHITEMS` row → run → MailHog has one mail "Summary: report.pdf" with 4–5 sentences (count sentences in the plain-text part), **Open in …** and **See this run in Synaplan** links; upload `v1` again → "already handled", no second run or mail (C6); `PATCH {state: paused}` → upload `v2` → no run; resume → the resume answer lists 1 waiting file → run; `DELETE` → row gone, the task is deleted with it, the item ledger rows deleted first (C11 order). **File block:** a Translate watch with `target_kind: file` on `Projects/Q3/price-list.docx` — a new version → one run and `price-list.en.docx`; a second new version → the output is replaced, not duplicated (copy-ledger remote id); another file in `Projects/Q3` → no run; trash the file → the watch reads `attention: target_gone`; restore → `active` |
+| `cf5-index.sh` | Seed 5 000 watches over 100 test identities on a fake instance (dev command); `GET platform-links/watches?limit=500` → 10 pages, each ≤ 500, no watch twice; change one watch → `since=<cursor>` returns exactly that one; stop one → a tombstone; nothing changed → **304**; an expired cursor → **410**; the 51st watch of one person and the 5 001st of the instance → **409** with the sentences of `04` §B.7 |
 | `cf5-quiet.sh` | Upload `v1`, `v2`, `v3` of the same file within 40 s → one run (for `v3`) after the 60 s quiet period; the server clock is read inside the container |
 | `cf5-loop.sh` | With the app's `dev_allow_self_write` switch (`08` §0.8): a **Translate** watch on `Incoming-DE` writing into `Incoming-DE` itself: one run produces `contract.en.docx`; the app's own-write guard and the copy-ledger lookup leave it unprocessed; no second run within 5 min (C7) |
 | `cf5-reconcile.sh` | Set the app's `dev_mute_events` switch; upload two files; `POST …/watches/{id}/reconcile` with the folder listing → the answer names the two ids to process → runs; a listing without a known id → the answer says to forget it and the item is `skipped: gone` |
@@ -350,6 +363,7 @@ render test (4–5 sentences, two links, plain-text part).
 | 11 | Synaplan | Watched folders tab (W7) | Empty state sentence + action when Ada has no watch; rows with cloud, folder, preset, last run, counts; Pause / Resume / Stop from the row with the kind-specific consequence sentence; run detail shows the files with **Open in …** |
 | 12 | all three | stability | Kill the `cron` container during a run → the item ends `failed` with a sentence within 30 min (sweep), never "running"; stop Synaplan for 5 min while files arrive → the app's job list retries; after start, every file has one run |
 | 13 | all three | cost (C14) | Each handled file is one task run in Ada's usage; at the plan limit the row says "Your Synaplan limit for today is reached — n files wait until tomorrow." |
+| 14 | all three | J-CF-15 | Watch the single file `Projects/Q3/price-list.docx` → **Translate it**; the dialog asks "What should happen when this file changes?" and has no file-set block; the row shows the bird with eyes; a new version replaces `price-list.en.docx`; another file in `Projects/Q3` starts nothing; Tasks → Watched folders lists it as a file; Pause / Resume from the sidebar; delete → "Stopped — the file was deleted"; restore → watching; **Stop watching** → eyes gone, the translation stays |
 
 After the exits: `cloud_files` on for new installs and the activation
 migration (decision 22) — verified by a fresh install (`docker compose down -v`

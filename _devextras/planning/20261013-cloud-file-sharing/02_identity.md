@@ -44,18 +44,54 @@ Rules for all modes:
 ## 3. The identity row
 
 `BEXTERNALIDENTITIES (BSOURCE = client, BINSTANCEID = instance, BEXTERNALID =
-platform user id) → BUSERID, BAPIKEYID` exists and is written today by linking
-and provisioning. This plan makes it the rule for every per-person mode.
+platform user id) → BUSERID, BAPIKEYID` exists. Linking writes it in exactly
+that shape (Synaplan's platform instance id, the bare platform user id, the
+minted key). Provisioning does not (D15): it writes `BINSTANCEID = ''` and
+`BEXTERNALID = '<cloud instanceid>:<uid>'`, and the key it mints next is not
+bound to the row. This plan makes the canonical shape the rule for every
+per-person mode; §3.1 brings provisioned rows into it before anything looks
+them up by instance.
 
 | Mode | Who writes the row | When |
 | ---- | ------------------ | ---- |
 | Organisation login | **new** `POST /api/v1/platform-links/sso/bind` | When the person clicks **Use Synaplan** on the consent card |
 | Connect your account | `PlatformLinkExchangeService` (exists) | Code exchange |
-| Accounts by administrator | `AdminUserProvisioningService::upsertIdentity` (exists) | Provisioning |
+| Accounts by administrator | `AdminUserProvisioningService` — canonical when the call carries the instance credential (§3.1) | Provisioning; existing rows through adoption (§3.1) |
 | One shared account | — (no per-person row; the instance row names the shared key's owner) | — |
 
 The row gains two columns (schema ask, §9): `BMODE` (`sso` / `link` /
-`provision`) and `BSTATUS` (`active` / `revoked`), plus `BREVOKEDAT`.
+`provision`) and `BSTATUS` (`active` / `paused` / `revoked`), plus
+`BREVOKEDAT`.
+
+### 3.1 Provisioned rows into the canonical shape (CF2.2)
+
+1. **The writer.** `POST /api/v1/admin/users` and
+   `POST /api/v1/admin/users/{id}/api-keys` accept the instance credential
+   beside the admin key. With it, Synaplan writes `(client, platform instance,
+   platform uid)` — client and instance from the credential, the bare uid
+   from the body — sets `BMODE = provision` and binds the minted key to the
+   row. Without it (older app releases, clouds that never registered) both
+   calls behave as today. The admin screen therefore registers the cloud
+   (decision 6) before it provisions anyone.
+2. **Adoption of existing rows.** After the upgrade each app runs a one-time
+   background job: for every local user with a stored per-user key it calls
+   `POST /api/v1/platform-links/identities/adopt` with the instance credential
+   **and that user's key**. Synaplan rewrites the key owner's row
+   `(client, '', '<server id>:<uid>')` to the canonical tuple and binds that
+   key. The server id must be the one the instance reported through
+   `PATCH instances/self` (`server_id`, the cloud's own `instanceid`).
+   Checked twice, like bind: an instance cannot adopt a person without that
+   person's key, and a key cannot pick an instance. A repeated call answers
+   200 with the canonical row.
+3. **What stays.** A row no app adopts keeps today's behaviour: provisioning
+   still finds the person through the user details, nothing shows it as a
+   connection, and lifecycle calls cannot reach it — its cloud's old release
+   uses the generic admin delete, which follows the rule of §7. A migration
+   sets `BMODE` on existing rows: `link` where an instance and a key are set,
+   `provision` for the legacy shape, `NULL` for `oidc:` rows.
+4. **No second row.** Provisioning without the instance credential finds an
+   adopted person through the user details (`external_source`,
+   `external_id`) and never writes a second row for them.
 
 What the row powers:
 
@@ -94,15 +130,18 @@ code exchange). They never read file contents, chats or memories (C5):
 
 1. claim a copy and report its result (`03` §2),
 2. report source changes and deletions for files from this cloud (`04` §A.5),
-3. read the descriptions of active watches on this cloud, to show the eyes to
-   everyone with access (`04` §B.8),
+3. read the descriptions of active watches on this cloud — in pages, then
+   only what changed — to show the eyes to everyone with access and to match
+   file events (`04` §B.8),
 4. bind an organisation-login user (with the user's token),
 5. report a deleted / disabled / re-enabled platform user,
 6. fulfil a pickup Synaplan asked for — claim it, send the listing, upload
    the files into that ticket, report the result (`07` §4). The ticket names
    the person and the checked selector; the instance never picks whose
    Synaplan receives files,
-7. report what a person lets Synaplan read (`07` §5).
+7. report what a person lets Synaplan read (`07` §5),
+8. adopt a provisioned person's identity row — only together with that
+   person's key (§3.1).
 
 This stays inside Wave 6 §0 #5 — "API key for editors and bots; platform-links
 handshake or OIDC for hosted apps … do not invent a fourth scheme". No
@@ -254,7 +293,7 @@ Settings → Synaplan") + **How to connect** (U5).
 
 | Event | Synaplan | The app |
 | ----- | -------- | ------- |
-| Platform user deleted | `lifecycle(deleted)`: identity revoked, keys revoked, watches stopped; provisioned Synaplan account deleted (today's behaviour) | Nextcloud `BeforeUserDeletedEvent` (exists), ownCloud `preDelete` (exists), OpenCloud user-deleted event (CF-S3) |
+| Platform user deleted | `lifecycle(deleted)`: this identity revoked, the keys bound to it revoked, its watches stopped. The Synaplan account is deleted only while this cloud alone manages it (rule below); otherwise it stays and the audit row says why | Nextcloud `BeforeUserDeletedEvent`, ownCloud `preDelete` (both exist; today they call the generic admin delete — D16), OpenCloud user-deleted event (CF-S3) |
 | Platform user disabled | `lifecycle(disabled)`: watches paused with reason "Your Nextcloud account was disabled" | Nextcloud user-changed event (`enabled`), ownCloud equivalent (CF-S4) |
 | Re-enabled | `lifecycle(enabled)`: watches paused by that reason resume; the owner is told | Same events |
 | Disconnect in Synaplan | Identity revoked, key revoked, watches paused; notify `identity_revoked` | Clears local key, shows Connect / "turned off" |
@@ -264,18 +303,43 @@ Settings → Synaplan") + **How to connect** (U5).
 | Organisation login session ends | — | Interactive actions ask to sign in again; unattended work continues on the background key |
 | Background key revoked | Watches of that person pause: "Allow watching again" | §4.2 card |
 
+**Deleting a person in one cloud** (decision 38, C18). `lifecycle(deleted)`
+always revokes that identity and the keys bound to it and stops its watches.
+It deletes the Synaplan account only while that cloud alone manages it — all
+four hold:
+
+1. the account was provisioned for this identity (`BPROVIDERID = 'external'`,
+   and its user details name this cloud and platform user);
+2. no other identity row of the account is still active — another cloud,
+   another instance, organisation login (`oidc:<issuer>`), Outlook;
+3. it has no sign-in of its own — no password, so nobody could have signed
+   in to create keys or connect it elsewhere;
+4. it is not an administrator.
+
+Otherwise the account stays with the person's other connections, and the
+audit row `platform_link.account_kept` names the reason ("also used from
+cloud.example.org"). Today's app releases call the generic admin delete
+instead (D16); until every release calls `lifecycle`, that endpoint applies
+the same rule — for the identity the account was provisioned for — when an
+API key calls it, and answers `409 account_in_use` for an account the rule
+keeps. A Synaplan administrator deleting a user in the admin screen is
+unchanged.
+
 ---
 
 ## 8. API additions
 
 | Method | Path | Auth | Purpose |
 | ------ | ---- | ---- | ------- |
-| `GET` | `/api/v1/platform-links/instances/self` | instance | Existing; adds `capabilities` (`sso_bind`, `lifecycle`, `deliveries`, `cloud_status`, `watches`) so apps hide what the core lacks |
-| `PATCH` | `/api/v1/platform-links/instances/self` | instance | Set delivery URL, OIDC client id, app version |
+| `GET` | `/api/v1/platform-links/instances/self` | instance | Existing; adds `capabilities` (`sso_bind`, `identity_adopt`, `lifecycle`, `deliveries`, `cloud_status`, `watches`) so apps hide what the core lacks, and from CF3.1 `notify_keys` (`[{kid, public_key}]`, `03` §2) |
+| `PATCH` | `/api/v1/platform-links/instances/self` | instance | Set delivery URL, OIDC client id, app version, server id (the cloud's own `instanceid`, §3.1) |
 | `GET` | `/api/v1/platform-links/sso/status` | bearer + instance | Is this person bound (show the consent card or not) |
 | `POST` | `/api/v1/platform-links/sso/bind` | bearer + instance | Write the identity row (mode `sso`) |
 | `POST` | `/api/v1/platform-links/sso/background-key` | bearer + instance | Mint `files rag cloud:watch`, label "OpenCloud: cloud.example.org (jdoe) — while you are away"; plaintext once |
-| `POST` | `/api/v1/platform-links/lifecycle` | instance | `{external_id, event: deleted \| disabled \| enabled}` |
+| `POST` | `/api/v1/platform-links/identities/adopt` | key + instance | Bring a provisioned person's legacy row into the canonical shape and bind that key (§3.1) |
+| `POST` | `/api/v1/platform-links/lifecycle` | instance | `{external_id, event: deleted \| disabled \| enabled}`; `deleted` removes the account only under the rule of §7 |
+| `POST` | `/api/v1/admin/users`, `/api/v1/admin/users/{id}/api-keys` | admin key (+ instance) | Existing; with the instance credential they write the canonical row and bind the key (§3.1) |
+| `DELETE` | `/api/v1/admin/users/{id}` | admin | Existing; called with an API key it answers `409 account_in_use` for an account the rule of §7 keeps |
 | `GET` | `/api/v1/me/platform-links` | session | Existing; adds mode, status, last seen, counts |
 | `POST` | `/api/v1/me/platform-links/{id}/turn-off` | session | Turn an organisation-login connection off: identity `paused`, the app's bearer calls answer `403 platform_disconnected`, watches pause (CF5) |
 | `POST` | `/api/v1/me/platform-links/{id}/resume` | session | Turn an organisation-login connection back on |
@@ -292,7 +356,7 @@ endpoint; `make -C frontend generate-schemas` and `vue-tsc` after each change.
 
 | Table | Change |
 | ----- | ------ |
-| `BPLATFORMINSTANCES` | `BDELIVERYURL VARCHAR(512) NULL`, `BOIDCCLIENTID VARCHAR(191) NULL`, `BCAPABILITIES JSON NULL`, `BAPPVERSION VARCHAR(32) NULL`, `BAPPROVEDADDRS JSON NULL` |
+| `BPLATFORMINSTANCES` | `BDELIVERYURL VARCHAR(512) NULL`, `BOIDCCLIENTID VARCHAR(191) NULL`, `BCAPABILITIES JSON NULL`, `BAPPVERSION VARCHAR(32) NULL`, `BAPPROVEDADDRS JSON NULL`, `BSERVERID VARCHAR(64) NULL` (the cloud's own `instanceid`, for adoption — §3.1) |
 | `BEXTERNALIDENTITIES` | `BMODE VARCHAR(16) NULL`, `BSTATUS VARCHAR(16) NOT NULL DEFAULT 'active'`, `BREVOKEDAT BIGINT NULL`, `BREADSCOPE JSON NULL` (mirror of the app's read setting, `07` §5) |
 
 Raw idempotent `ADD COLUMN IF NOT EXISTS`; no Schema API (Galera rule 2).
@@ -302,7 +366,13 @@ Raw idempotent `ADD COLUMN IF NOT EXISTS`; no Schema API (Galera rule 2).
 ## 10. Security notes
 
 - Bind needs the person's live token, the instance credential and a matching
-  `azp` (§3).
+  `azp` (§3). Adoption needs the person's key, the instance credential and
+  the server id the instance reported (§3.1).
+- Deleting a person in one cloud never deletes an account another connection
+  or the person's own sign-in still uses (§7, C18).
+- Notifications to the apps are signed with Synaplan's notify key; the key
+  pair lives encrypted in `BCONFIG` like the federation key, and only its
+  public half leaves Synaplan (`03` §2).
 - The background key is scoped, labelled, visible in the person's API keys
   with the *linked platform* badge, and revoked with the identity.
 - Scope additions are exact paths; `ApiKeyScopeTest` pins allows and denials

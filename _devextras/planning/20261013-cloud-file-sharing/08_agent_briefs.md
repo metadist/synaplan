@@ -124,7 +124,7 @@ the app's `README.md` under "Development":
 
 | Switch | Effect | Introduced by |
 | ------ | ------ | ------------- |
-| `dev_hold_inbound` | The inbound endpoint accepts a notification and does nothing until the switch is cleared (tests the `pending` / `unconfirmed` path) | CF3.3 / CF3.4 / CF3.5 |
+| `dev_hold_inbound` | The inbound endpoint accepts a verified notification and does nothing until the switch is cleared (tests the `pending` / `unconfirmed` path) | CF3.3 / CF3.4 / CF3.5 |
 | `dev_mute_events` | File events are not forwarded (tests reconciliation) | CF4.3 / CF4.4 / CF4.5 |
 | `dev_allow_self_write` | A watch may write its output into its own folder (tests the loop guard) | CF5.4 / CF5.5 / CF5.6 |
 
@@ -148,6 +148,7 @@ CF0.1 ‖ CF0.2 ‖ CF0.3 ‖ CF0.4   → release → CF0.5 ‖ CF0.6 → CF0.7 
 CF1.1 → CF1.2 (ownCloud)  ‖  CF1.3 (Nextcloud)  ‖  CF1.5 (OpenCloud)  → CF1.4 (all three, last)
 
 CF2.1 → CF2.2 → CF2.3 → CF2.4 → CF2.5 → release → CF2.6 ‖ CF2.7 ‖ CF2.8
+CF2.2 → CF2.9 → release                                     (beside CF2.3–CF2.5; CF4.1 needs it)
 
 CF3.1 → CF3.2 → release → CF3.3 ‖ CF3.4 ‖ CF3.5
 CF3.6 → CF3.7 → release → CF3.8 ‖ CF3.9 ‖ CF3.10            (CF3.6 may start with CF3.1)
@@ -198,7 +199,7 @@ change. No spike code is merged. Stack per `10`.
 | - | - |
 | Repo | `synaplan-opencloud` (Go service) on the E-4 stack |
 | Reads | `06` §1 row S3; `02` §4; `03` §5; `07` §4; `04` §B.3 |
-| Questions | (1) Service account or impersonation that lists and reads/writes a user's files without a request? (2) Event bus (NATS) consumer for upload finished, move, trash, restore, user deleted — config and delivery guarantees? (3) Unprotected proxy route for `/api/synaplan/inbound`? (4) Encrypted persistent store for per-user keys (Connect mode)? (5) Project spaces: events and writes? |
+| Questions | (1) Service account or impersonation that lists and reads/writes a user's files without a request? (2) Event bus (NATS) consumer for upload finished, move, trash, restore, user deleted — config and delivery guarantees? (3) Unprotected proxy route for `/api/synaplan/inbound`? (4) Encrypted persistent store for per-user keys (Connect mode)? (5) Project spaces: events and writes? (6) Memory and rebuild time of the in-memory watch index at the cap — 5 000 watches over 10 pages (`04` §B.8)? |
 | Method | Enable the service account and NATS exposure under `dev/docker/` (env overrides, documented); write a throw-away Go command that lists `ada`'s `Invoices` and uploads one file as `ada`; subscribe to the bus and print events while uploading in the UI; add a proxy route and call it unauthenticated |
 | Blocks | CF2.7, CF3.5, CF3.10, CF4.5, CF5.6 |
 
@@ -208,7 +209,7 @@ change. No spike code is merged. Stack per `10`.
 | - | - |
 | Repo | `synaplan-owncloud-online` on the E-5 stack (or the host install until E-5 is green — say which) |
 | Reads | `06` §1 row S4; `04` §A.4; `03` §5; `07` §4 |
-| Questions | (1) FileList plugin to decorate rows? (2) Detail tab API? (3) New-file menu plugin? (4) File hooks / dispatcher events for create, write, rename, delete, restore? (5) Notifications app available on the hoster's 11.0.10? (6) Background jobs and cron-mode detection? (7) Request time budget for inline pickups? (8) Private link format? (9) Does the local checkout behave like the hoster's 11.0.10 — ask the hoster for a test tenant and record the answer |
+| Questions | (1) FileList plugin to decorate rows? (2) Detail tab API? (3) New-file menu plugin? (4) File hooks / dispatcher events for create, write, rename, delete, restore? (5) Notifications app available on the hoster's 11.0.10? (6) Background jobs and cron-mode detection? (7) Request time budget for inline pickups? (8) Private link format? (9) Does the local checkout behave like the hoster's 11.0.10 — ask the hoster for a test tenant and record the answer (10) Watch index at the cap: an app table of 5 000 targets — first sync over 10 pages, incremental sync, matching cost per file event (`04` §B.8)? |
 | Blocks | CF1.2, CF3.4, CF3.9, CF4.4, CF5.5 |
 
 ### CF-S5 — Nextcloud Files APIs at scale (30–34)
@@ -217,7 +218,7 @@ change. No spike code is merged. Stack per `10`.
 | - | - |
 | Repo | `synaplan-nextcloud` on both matrix images |
 | Reads | `06` §1 row S5; `04` §A.3, §A.4, §B.3 |
-| Questions | (1) Inline row rendering with one batched call on the 5 000-file `many/` folder (virtual scroll) — frame drops? (2) Sidebar tab API across 30–34 — one code path or two? (3) List header for the current folder? (4) New-file menu entry? (5) Node events for group folders, external storage, trash and restore? (6) Notifications API? (7) Private link `/f/<fileid>`? (8) Inline pickup budget inside a request; background-job latency with the `cron` container |
+| Questions | (1) Inline row rendering with one batched call on the 5 000-file `many/` folder (virtual scroll) — frame drops? (2) Sidebar tab API across 30–34 — one code path or two? (3) List header for the current folder? (4) New-file menu entry? (5) Node events for group folders, external storage, trash and restore? (6) Notifications API? (7) Private link `/f/<fileid>`? (8) Inline pickup budget inside a request; background-job latency with the `cron` container (9) Watch index at the cap: 5 000 targets synced over 10 pages and matched per node event — sync time, table size, matching cost on both images (`04` §B.8)? |
 | Blocks | CF3.3, CF3.8, CF4.3, CF5.4 |
 
 ---
@@ -418,38 +419,39 @@ Wave contract: `02` (all), `05` W1, W2, W8, `06` §4. Tests: `09` §3.
 | Branch | `feat/cf2-1-instance-capabilities` |
 | Depends on | — (schema ask: `00` §3 row 6 ticked) |
 | Reads | `02` §8 (first two rows), §9 (`BPLATFORMINSTANCES`), §6.2; `03` §2 (reachability test); `PlatformInstance.php`, `PlatformInstanceController.php`, `AdminPlatformInstanceController.php`, `RedirectUriPolicy.php`, `SsrfGuard.php` |
-| Touches | migration (`ADD COLUMN IF NOT EXISTS` × 5), entity, `PlatformInstanceService`, `GET`/`PATCH instances/self` (+ OpenAPI), admin list + approval dialog (`frontend/src/components/…admin platform instances` — find the existing view by `AdminPlatformInstanceController` routes), five locales |
+| Touches | migration (`ADD COLUMN IF NOT EXISTS` × 6), entity, `PlatformInstanceService`, `GET`/`PATCH instances/self` (+ OpenAPI), admin list + approval dialog (`frontend/src/components/…admin platform instances` — find the existing view by `AdminPlatformInstanceController` routes), five locales |
 
 **Build**
 
-1. Columns `BDELIVERYURL`, `BOIDCCLIENTID`, `BCAPABILITIES`, `BAPPVERSION`, `BAPPROVEDADDRS`.
-2. `GET instances/self` adds `capabilities` (this release: `[]` until CF2.2 adds `sso_bind`; the list grows per brief). `PATCH instances/self {delivery_url, oidc_client_id, app_version}`: `delivery_url` must be https (or local-dev http per `WebDavClient::allowsInsecureLocal()`), on the instance's registered host, and pass `SsrfGuard` unless the instance has an approved address; store the reachability result ("Synaplan can reach this cloud: yes / no") from a `HEAD` at save time.
+1. Columns `BDELIVERYURL`, `BOIDCCLIENTID`, `BCAPABILITIES`, `BAPPVERSION`, `BAPPROVEDADDRS`, `BSERVERID`.
+2. `GET instances/self` adds `capabilities` (this release: `[]` until CF2.2 adds `sso_bind`; the list grows per brief). `PATCH instances/self {delivery_url, oidc_client_id, app_version, server_id}` (`server_id` = the cloud's own `instanceid`, stored for adoption — `02` §3.1): `delivery_url` must be https (or local-dev http per `WebDavClient::allowsInsecureLocal()`), on the instance's registered host, and pass `SsrfGuard` unless the instance has an approved address; store the reachability result ("Synaplan can reach this cloud: yes / no") from a `HEAD` at save time.
 3. Admin → People → Platform instances: `client=opencloud` listed; approval dialog with the allowlist sentence (`05` §3) writing `BAPPROVEDADDRS`.
 
 **Tests** — migration review (C11); `PlatformInstanceServiceTest` (URL rules, SSRF, approved address); controller test for `PATCH`; OpenAPI → schemas → `vue-tsc`.
 
 **Acceptance** — `cf2-identity.sh` first block (register, PATCH, capabilities); L3 row 8.
 
-### CF2.2 — SSO status, bind, bearer attribution
+### CF2.2 — Canonical identity rows, SSO status, bind, bearer attribution
 
 | | |
 | - | - |
 | Repo · class · type | `synaplan` · backend-only · `feat(platform-links)` |
-| Branch | `feat/cf2-2-sso-bind-attribution` |
+| Branch | `feat/cf2-2-identity-rows-sso-bind` |
 | Depends on | CF2.1 |
-| Reads | `02` §3, §5.1, §8 (`sso/status`, `sso/bind`), §9 (`BEXTERNALIDENTITIES` columns), §10; `OidcBearerAuthenticator.php`, `OidcUserService::oidcSource()`, `ExternalIdentity.php` |
-| Touches | migration (`BMODE`, `BSTATUS`, `BREVOKEDAT`, `BREADSCOPE` — all four now, so later briefs add no migration to this table), entity, new `PlatformSsoService`, routes in `PlatformLinkController` (+ OpenAPI), authenticator (attribution), audit rows |
+| Reads | `02` §3, §3.1, §5.1, §8 (`sso/status`, `sso/bind`, `identities/adopt`, admin users), §9 (`BEXTERNALIDENTITIES` columns), §10; `01` §4 D15; `OidcBearerAuthenticator.php`, `OidcUserService::oidcSource()`, `ExternalIdentity.php`, `ExternalIdentityRepository::upsert()`, `AdminUserProvisioningService.php`, `AdminUserProvisioningController.php`, `PlatformLinkExchangeService.php` |
+| Touches | migration (`BMODE`, `BSTATUS`, `BREVOKEDAT`, `BREADSCOPE` — all four now, so later briefs add no migration to this table — plus `BMODE` on existing rows), entity, `AdminUserProvisioningService` + `AdminUserProvisioningController` (instance credential → canonical row, key bound), new `PlatformSsoService`, routes in `PlatformLinkController` (`sso/*`, `identities/adopt`; + OpenAPI), authenticator (attribution), audit rows |
 
 **Build**
 
-1. `GET sso/status` (bearer + instance credential) → `{bound, mode, status}`.
-2. `POST sso/bind`: requires a live bearer whose `azp` equals the instance's `BOIDCCLIENTID`, writes the identity row (`mode=sso`, `status=active`), audit `platform_link.bound`.
-3. Attribution: every bearer call whose `azp` maps to an instance updates `BLASTSEEN`; a bearer call for a revoked or paused identity answers `403 platform_disconnected` with the sentence of `02` §6.3.
-4. `capabilities` += `sso_bind`.
+1. Canonical rows (`02` §3.1): provisioning and key minting with the instance credential write `(client, instance, uid)`, `BMODE = provision`, and bind the minted key; without the credential both behave as today. `POST identities/adopt` (key + instance credential) rewrites the key owner's legacy row `(client, '', '<server id>:<uid>')` when the server id equals the instance's `BSERVERID`, binds that key, and answers 200 again on a replay. The migration sets `BMODE` on existing rows (`link`, `provision`, `NULL` for `oidc:`). Provisioning without the credential never writes a second row for an adopted person.
+2. `GET sso/status` (bearer + instance credential) → `{bound, mode, status}`.
+3. `POST sso/bind`: requires a live bearer whose `azp` equals the instance's `BOIDCCLIENTID`, writes the identity row (`mode=sso`, `status=active`), audit `platform_link.bound`.
+4. Attribution: every bearer call whose `azp` maps to an instance updates `BLASTSEEN`; a bearer call for a revoked or paused identity answers `403 platform_disconnected` with the sentence of `02` §6.3.
+5. `capabilities` += `sso_bind`, `identity_adopt`.
 
-**Tests** — handshake-style tests: wrong `azp`, unknown instance, revoked identity, replay of bind (idempotent 200), paused → 403. Authenticator unit test.
+**Tests** — handshake-style tests: wrong `azp`, unknown instance, revoked identity, replay of bind (idempotent 200), paused → 403. Authenticator unit test. Canonical rows: provisioning with and without the instance credential; adoption with the person's key (canonical row, key bound), with someone else's key (403), with a wrong server id (403), without the instance credential (401), replayed (200, still one row); provisioning after adoption writes no second row.
 
-**Acceptance** — `cf2-identity.sh` bind block; L3 row 1.
+**Acceptance** — `cf2-identity.sh` bind and adoption blocks; L3 row 1.
 
 ### CF2.3 — Background key and `cloud:watch`
 
@@ -472,14 +474,14 @@ Wave contract: `02` (all), `05` W1, W2, W8, `06` §4. Tests: `09` §3.
 | Repo · class · type | `synaplan` · backend-only · `feat(platform-links)` |
 | Branch | `feat/cf2-4-lifecycle` |
 | Depends on | CF2.3 |
-| Reads | `02` §7, §8 (`lifecycle`) |
-| Touches | `PlatformLinkController` (+ OpenAPI), `PlatformSsoService` or a new `PlatformLifecycleService`, tests; `capabilities` += `lifecycle` |
+| Reads | `02` §7 (incl. "Deleting a person in one cloud"), §8 (`lifecycle`, admin delete); `01` §4 D16; C18; `AdminController::deleteUser()`, `AdminUserProvisioningService::PROVIDER_ID` |
+| Touches | `PlatformLinkController` (+ OpenAPI), `PlatformSsoService` or a new `PlatformLifecycleService`, new `Service/PlatformLink/ProvisionedAccountPolicy.php`, `AdminController.php` (API-key path of the delete, + OpenAPI `409`), tests; `capabilities` += `lifecycle` |
 
-**Build** — `POST lifecycle {external_id, event}`: `deleted` → identity revoked, keys revoked, provisioned account deleted (today's behaviour kept); `disabled` → identity `paused` with reason; `enabled` → `active`. Watch effects arrive in CF5.1 through a hook this brief leaves (`LifecycleEffect` interface, no-op implementation). Audit rows.
+**Build** — `POST lifecycle {external_id, event}`: `deleted` → this identity revoked and the keys bound to it revoked; the account is deleted only when `ProvisionedAccountPolicy` finds all four conditions of `02` §7, otherwise it stays and the audit row `platform_link.account_kept` names the reason; `disabled` → identity `paused` with reason; `enabled` → `active`. The generic admin delete (`AdminController::deleteUser()`) asks the same policy when an API key calls it and answers `409 account_in_use` for an account the policy keeps; a session admin in the admin screen is unchanged. Watch effects arrive in CF5.1 through a hook this brief leaves (`LifecycleEffect` interface, no-op implementation). Audit rows.
 
-**Tests** — three events × (sso identity, linked identity, provisioned account); idempotency.
+**Tests** — three events × (sso identity, linked identity, provisioned account); idempotency. Policy: a sole provisioned account is deleted; failing any one condition keeps it (provisioned for another identity, a second active identity, a password, the admin role) with only the identity revoked; a legacy provisioned account whose minted key is not bound to its row is still deleted; the admin delete with an API key → 409 for a kept account and 200 for a sole one; a session admin delete is unchanged.
 
-**Acceptance** — `cf2-identity.sh` lifecycle block; L3 row 7.
+**Acceptance** — `cf2-identity.sh` lifecycle and deletion blocks; L3 rows 7 and 10.
 
 ### CF2.5 — Apps cards for three clouds
 
@@ -493,17 +495,17 @@ Wave contract: `02` (all), `05` W1, W2, W8, `06` §4. Tests: `09` §3.
 
 **Acceptance** — `cf2-apps-card.sh`; L3 rows 1–2 and 6; D7 (dark, V2, 320 px).
 
-### CF2.6 — Nextcloud organisation login (after CF-S2 = yes)
+### CF2.6 — Nextcloud: organisation login (after CF-S2 = yes), identity rows, lifecycle
 
 | | |
 | - | - |
 | Repo · class · type | `synaplan-nextcloud` · app release · `feat(app)` |
 | Branch | `feat/cf2-6-organisation-login` |
-| Depends on | CF2.5 released; CF-S2 yes; CF1.3 |
-| Reads | `02` §5.1, §4.2, §7; `05` W1, W8; the CF-S2 STATUS entry |
-| Touches | `lib/Service/SynaplanClient.php` (bearer path), new `lib/Service/OrganisationLoginService.php` (token from `user_oidc`, cache, refresh), `lib/Controller/ConsentController.php` (bind on consent), `lib/Settings/Admin*` + `src/settings.ts` (four-mode screen W8, **Check organisation login**), Connect card fallback for users without an OIDC session, `lib/Listener/UserDeletedListener.php` + `UserChangedListener.php` → `lifecycle` calls, `appinfo/info.xml` (`user_oidc` optional dependency, version floor from the spike), `l10n/` |
+| Depends on | CF2.5 released; CF1.3; CF-S2 yes for the organisation-login part only — identity rows and lifecycle ship whatever the spike answers |
+| Reads | `02` §3.1, §5.1, §4.2, §7; `01` §4 D15, D16; `05` W1, W8; the CF-S2 STATUS entry |
+| Touches | `lib/Service/SynaplanClient.php` (bearer path), new `lib/Service/OrganisationLoginService.php` (token from `user_oidc`, cache, refresh), `lib/Controller/ConsentController.php` (bind on consent), `lib/Settings/Admin*` + `src/settings.ts` (four-mode screen W8, **Check organisation login**, registration also in provision mode — decision 6), Connect card fallback for users without an OIDC session, `lib/Service/UserAccountService.php` (provisioning and key minting with the instance credential; `deleteRemoteAccount()` replaced by `lifecycle(deleted)` — D16), new `lib/BackgroundJob/AdoptIdentitiesJob.php` (one-time, once registered and `capabilities` has `identity_adopt`: per user with a stored key → `identities/adopt` — D15), `PATCH instances/self` with `server_id` on admin save, `lib/Listener/UserDeletedListener.php` + `UserChangedListener.php` → `lifecycle` calls, `appinfo/info.xml` (`user_oidc` optional dependency, version floor from the spike), `l10n/` |
 
-**Acceptance** — L3 rows 3–4 and 6–7 on Nextcloud; Playwright spec "organisation login consent" with Keycloak on the dev stack (`NC_OIDC=1`).
+**Acceptance** — after the upgrade on the dev stack, the adoption job leaves no legacy row for this cloud's provisioned users (`db_query` on `BEXTERNALIDENTITIES`) and a second run changes nothing; L3 rows 3–4, 6–7 and 10 on Nextcloud; Playwright spec "organisation login consent" with Keycloak on the dev stack (`NC_OIDC=1`).
 
 ### CF2.7 — OpenCloud: register, consent + bind, lifecycle, account extension (Connect mode = cut line)
 
@@ -523,9 +525,32 @@ Wave contract: `02` (all), `05` W1, W2, W8, `06` §4. Tests: `09` §3.
 | Repo · class · type | `synaplan-owncloud-online` · app release · `feat(app)` |
 | Branch | `feat/cf2-8-lifecycle-admin-copy` |
 | Depends on | CF2.5 released; CF1.1 |
-| Touches | user hooks (`preDelete`, disable / enable) → `lifecycle` calls; admin screen copy per W8 with "not available on ownCloud.online" for organisation login; `l10n/` |
+| Touches | user hooks → `lifecycle` calls (`preDelete` → `lifecycle(deleted)` instead of `deleteRemoteAccount()` — D16; disable / enable); provisioning and key minting with the instance credential, the one-time adoption job and `PATCH instances/self` with `server_id` (D15, as in CF2.6); admin screen copy per W8 with "not available on ownCloud.online" for organisation login; `l10n/` |
 
-**Acceptance** — L3 rows 5–7 on ownCloud.online.
+**Acceptance** — the adoption check of CF2.6 on the E-5 stack; L3 rows 5–7 and 10 on ownCloud.online.
+
+### CF2.9 — Files remember their cloud (D17)
+
+| | |
+| - | - |
+| Repo · class · type | `synaplan` · backend-only · `fix(files)` |
+| Branch | `fix/cf2-9-file-source-instance` |
+| Depends on | CF2.2 (canonical identity rows, bearer attribution); schema ask `00` §3 row 40 ticked |
+| Reads | `01` §4 D17; `04` §A.3, §A.5, §E.2 (`BFILES.BSOURCEINSTANCE`); C19; `File.php` (indexes), `FileRepository::findForOverwrite()` / `findByUserSourceIds()`, `FileUploadService.php` (overwrite path), `FileController::checkStale`, `ExternalIdentityRepository::findOneByApiKeyId()` |
+| Touches | migration (`ADD COLUMN IF NOT EXISTS BSOURCEINSTANCE`, index, backfill), `File.php`, `FileRepository.php`, `FileUploadService.php`, `FileController.php`, new `Service/PlatformLink/SourceInstanceResolver.php`, tests |
+
+**Build**
+
+1. `BFILES.BSOURCEINSTANCE VARCHAR(64) NULL` and the index (`BSOURCE`, `BSOURCEINSTANCE`, `BSOURCEID`) for instance-level source events; per-user lookups keep `idx_file_user_source_sid`.
+2. `SourceInstanceResolver`: per-user key → its identity row (`BAPIKEYID`) → instance; bearer token → `azp` → instance (CF2.2). Nothing else — no request field names the instance. No identity (shared key, personal key) → `null`.
+3. Upload stores it; `findForOverwrite()` and `findByUserSourceIds()` (so `check-stale` too) match it: a lookup with an instance never matches another instance's rows, and a lookup without an instance matches only rows without one.
+4. Rows written before CF2.9 carry no instance. A lookup for instance X matches such a row only when its owner has no other identity row for that client, in any shape, and then stores X on it — so people whose row becomes canonical later (adoption, a first bind) keep their files. The migration does the same up front for every such owner (raw SQL, Galera-safe); the PR text carries the dry-run counts (filled, left empty). Rows of owners with two identities for one client stay unscoped and never match a scoped lookup.
+
+**Tests** — two instances of the same client sharing remote id `5678` for one user: upload, overwrite and `check-stale` never cross; an upload without an identity keeps today's behaviour and matches neither; a row without an instance is matched and scoped for an owner with one identity of that client, and never for an owner with two.
+
+**Acceptance** — `cf2-file-instance.sh`.
+
+**Don't** — read the instance from a request field; touch rows of other sources.
 
 ---
 
@@ -540,16 +565,16 @@ Wave contract: `03` (all), `07` §3–§5, §8–§11, `05` W3, W4, W9, W11, `06
 | Repo · class · type | `synaplan` · backend-only · `feat(files)` |
 | Branch | `feat/cf3-1-platform-destination` |
 | Depends on | CF2.4 (schema ask: `00` §3 row 11 ticked) |
-| Reads | `03` §2, §3, §4, §6, §8; C4, C8; `Destination/{DestinationProvider,DestinationResult,DestinationRegistry,WebDavDestinationProvider,FileSendService,RequestedFolderDelivery}.php`, `FileSendController.php`, `RedisService::getAndDelete()`, `LinkCodeService.php` (ticket pattern), `SavedTaskTickService.php` (sweep pattern), `Execution/Runner/SaveToFolderRunner.php` |
-| Touches | migration `BCLOUDDELIVERIES` (columns of `03` §4), new `Entity/CloudDelivery.php` + repository, new `Destination/PlatformDestinationProvider.php`, `DestinationResult::pending()`, new `Service/PlatformLink/DeliveryNotifier.php` (POST `{type, id}` to the delivery URL, 30 s budget, host match, https / local-dev rule, `SsrfGuard` unless approved), claim + result routes in `PlatformLinkController` (+ OpenAPI), sweep in the scheduler's `tasks` lane (`queued` > 10 min → `unconfirmed`), `SaveToFolderRunner` + `RequestedFolderDelivery` accepting a `platform` target incl. `next_to`, test-only env `CLOUD_DELIVERY_TTL_SEC` and `CLOUD_DELIVERY_UNCONFIRMED_SEC` (§0.8), `capabilities` += `deliveries` |
+| Reads | `03` §2, §3, §4, §6, §8; C4, C8, C20; `Destination/{DestinationProvider,DestinationResult,DestinationRegistry,WebDavDestinationProvider,FileSendService,RequestedFolderDelivery}.php`, `FileSendController.php`, `RedisService::getAndDelete()`, `LinkCodeService.php` (ticket pattern), `SavedTaskTickService.php` (sweep pattern), `Execution/Runner/SaveToFolderRunner.php`, `Service/Federation/{FederationSigner,FederationIdentityStore}.php` and `EncryptionService.php` (signing and key-storage pattern) |
+| Touches | migration `BCLOUDDELIVERIES` (columns of `03` §4), new `Entity/CloudDelivery.php` + repository, new `Destination/PlatformDestinationProvider.php`, `DestinationResult::pending()`, new `Service/PlatformLink/NotifyKeyStore.php` (Ed25519 pair from `FederationSigner::generate()`, encrypted in `BCONFIG` group `PLATFORM_LINKS` like `FederationIdentityStore`, created on first use) + console command `app:platform-links:rotate-notify-key`, `GET instances/self` += `notify_keys`, new `Service/PlatformLink/DeliveryNotifier.php` (POST the signed `{type, id, instance_id, ts, kid, sig}` to the delivery URL, 30 s budget, host match, https / local-dev rule, `SsrfGuard` unless approved), claim + result routes in `PlatformLinkController` (+ OpenAPI) with a per-instance failed-claim counter (`429` above 120 a minute), sweep in the scheduler's `tasks` lane (`queued` > 10 min → `unconfirmed`), `SaveToFolderRunner` + `RequestedFolderDelivery` accepting a `platform` target incl. `next_to`, test-only env `CLOUD_DELIVERY_TTL_SEC` and `CLOUD_DELIVERY_UNCONFIRMED_SEC` (§0.8), `capabilities` += `deliveries` |
 
-**Build order** — ledger + entity → provider returning `pending()` when the notify budget is exceeded → notifier → claim (`GETDEL`, instance-bound, returns platform uid, name, mime, size, target, on_conflict, one-time download URL) → result (idempotent) → sweep → `save_to_folder` integration.
+**Build order** — ledger + entity → notify key, signing and `notify_keys` → provider returning `pending()` when the notify budget is exceeded → notifier → claim (`GETDEL`, instance-bound, returns platform uid, name, mime, size, target, on_conflict, one-time download URL) → result (idempotent) → sweep → `save_to_folder` integration.
 
-**Tests** — C4 suite (replay 409/410, expiry, wrong instance, wrong user), notifier (budget, host rule, SSRF, approved address), provider (`success` / `pending` / `failure` with `DestinationFailureCode`), sweep, `SaveToFolderRunner` platform target.
+**Tests** — C4 suite (replay 409/410, expiry, wrong instance, wrong user), signing (a body verifies with the published key and fails with any other; rotation lists both keys for 24 hours and signs with the new one from the next hour), failed-claim limit, notifier (budget, host rule, SSRF, approved address), provider (`success` / `pending` / `failure` with `DestinationFailureCode`), sweep, `SaveToFolderRunner` platform target.
 
-**Acceptance** — `cf3-copy.sh` and `cf3-ticket.sh` with a stub inbound endpoint (the script starts a tiny local HTTP responder on the Docker network) before any app brief exists.
+**Acceptance** — `cf3-copy.sh` and `cf3-ticket.sh` with a stub inbound endpoint (the script starts a tiny local HTTP responder on the Docker network that verifies each notification with the published key) before any app brief exists.
 
-**Don't** — sign the notify call (Synaplan has only a hash); put anything but `{type, id}` in it.
+**Don't** — authenticate the notification with the instance secret (Synaplan keeps only its hash); put anything but `{type, id, instance_id, ts, kid, sig}` in it.
 
 ### CF3.2 — Copy-to-cloud menu, toast, Sent to
 
@@ -570,18 +595,20 @@ Wave contract: `03` (all), `07` §3–§5, §8–§11, `05` W3, W4, W9, W11, `06
 | Repo · class · type | `synaplan-nextcloud` · app release · `feat(app)` |
 | Branch | `feat/cf3-3-inbound-from-synaplan` |
 | Depends on | CF3.2 released; CF-S5 (private link, notifications, new-file menu) |
-| Reads | `03` §2, §3, §5 (Nextcloud column), §6; `05` W4; `lib/Controller/MediaController.php` (`KIND_FOLDERS`, `IRootFolder::getUserFolder`) |
-| Touches | new `lib/Controller/InboundController.php` (`#[PublicPage]`, `#[NoCSRFRequired]`, route `api/v1/inbound`, dispatches on `type`), new `lib/Service/DeliveryService.php` (claim, download, resolve user, target, conflict rule, write, result; own-write memory 10 min), registration of the delivery URL through `PATCH instances/self` on admin save, notification "Synaplan copied … to …" with link, personal setting "Save files from Synaplan to" (file picker), `src/files-init.ts` new-file menu entry **New → From Synaplan…** + picker component (`GET /api/v1/files`, Generated first), Save to Files for every generated kind in the chat, `l10n/` |
+| Reads | `03` §2, §3, §5 (Nextcloud column), §6, §8; C20; `05` W4; `lib/Controller/MediaController.php` (`KIND_FOLDERS`, `IRootFolder::getUserFolder`) |
+| Touches | new `lib/Controller/InboundController.php` (`#[PublicPage]`, `#[NoCSRFRequired]`, `#[AnonRateLimit]`, route `api/v1/inbound`; verifies before it dispatches on `type`), new `lib/Service/NotificationVerifier.php` (signature with the `notify_keys` cached from `instances/self` — refreshed hourly, on admin save and at start, never on an unknown `kid`; own `instance_id`; `ts` ± 5 min; seen ids for 10 minutes in the distributed cache), new `lib/Service/DeliveryService.php` (claim, download, resolve user, target, conflict rule, write, result; own-write memory 10 min), registration of the delivery URL through `PATCH instances/self` on admin save, notification "Synaplan copied … to …" with link, personal setting "Save files from Synaplan to" (file picker), `src/files-init.ts` new-file menu entry **New → From Synaplan…** + picker component (`GET /api/v1/files`, Generated first), Save to Files for every generated kind in the chat, `l10n/` |
 
-**Acceptance** — `CLOUD=nextcloud cf3-copy.sh`; L3 rows 1–6 on Nextcloud; Playwright "copy lands in Synaplan/Images".
+**Tests** — `NotificationVerifierTest` and `InboundControllerTest`: forged, replayed, stale and other-instance notifications → `401` and zero outbound calls (HTTP client mock); an unknown `kid` → `401` without a key refresh.
+
+**Acceptance** — `CLOUD=nextcloud cf3-copy.sh` and `cf3-inbound.sh`; L3 rows 1–6 on Nextcloud; Playwright "copy lands in Synaplan/Images".
 
 ### CF3.4 — ownCloud.online: same (CF-S4)
 
-Branch `feat/cf3-4-inbound-from-synaplan`; depends on CF3.2 released, CF1.1, CF-S4. Same Build list as CF3.3 with ownCloud's APIs (file hooks, notifications app per the spike). Acceptance: `CLOUD=owncloud cf3-copy.sh`; L3 rows 1–6 by hand.
+Branch `feat/cf3-4-inbound-from-synaplan`; depends on CF3.2 released, CF1.1, CF-S4. Same Build list and tests as CF3.3 with ownCloud's APIs (file hooks, notifications app per the spike; the per-address limit as a counter in the app's cache). Acceptance: `CLOUD=owncloud cf3-copy.sh` and `cf3-inbound.sh`; L3 rows 1–6 by hand.
 
 ### CF3.5 — OpenCloud: inbound behind the proxy, impersonated write, binary save, From Synaplan
 
-Branch `feat/cf3-5-inbound-from-synaplan`; depends on CF3.2 released, CF1.5, CF-S1, CF-S3. Go: `handler/inbound.go` (unprotected proxy route), `service/delivery.go` (claim, download, write as the user through the service account), notification; web: create-menu extension "From Synaplan…" + picker. Acceptance: `CLOUD=opencloud cf3-copy.sh`; L3 rows 1–4 and 6; Playwright spec.
+Branch `feat/cf3-5-inbound-from-synaplan`; depends on CF3.2 released, CF1.5, CF-S1, CF-S3. Go: `handler/inbound.go` (unprotected proxy route; the checks of CF3.3 with Go tests, keys from `instances/self`), `service/delivery.go` (claim, download, write as the user through the service account), notification; web: create-menu extension "From Synaplan…" + picker. Acceptance: `CLOUD=opencloud cf3-copy.sh` and `cf3-inbound.sh`; L3 rows 1–4 and 6; Playwright spec.
 
 ### CF3.6 — Pickup protocol, `folder_fetch`, read-scope mirror, WebDAV `list()` / `get()`
 
@@ -643,9 +670,9 @@ Wave contract: `04` §A, §E.1 (status, files, sources/events), `05` W5, `06` §
 | - | - |
 | Repo · class · type | `synaplan` · backend-only · `feat(files)` |
 | Branch | `feat/cf4-1-cloud-status-source-events` |
-| Depends on | CF0.4; CF2.2 (identity rows) |
+| Depends on | CF0.4; CF2.2 (identity rows); CF2.9 (files carry their instance) |
 | Reads | `04` §A.1, §A.3, §A.5, §A.6, §E.1, §E.2 (`BFILES.BSOURCEDELETEDAT`); `00` §3 row 22; `Module/Federation/FederationModule.php`, `ModuleRegistry.php`, `backend/.env.minimal`, `docker-compose.minimal.yml`; `FileRepository::findByUserSourceIds`, the ephemeral reaper |
-| Touches | new `Module/CloudFiles/CloudFilesModule.php` (decisive env `CLOUD_FILES_ENABLED`, default off; drives runtime config block `cloud_files`, gate 404, `capabilities` `cloud_status`), `.env.minimal`, `docker-compose.minimal.yml`; migration `BSOURCEDELETEDAT`; new `Controller/CloudFileController.php` (`POST /api/v1/cloud/status` — batch ≤ 500 ids, states per §A.1, cache ≤ 60 s keyed by user + instance + ids hash, header `X-Synaplan-Cache: hit|miss`; `GET /api/v1/cloud/files/{id}`), `PlatformLinkController` `POST sources/events` (changed → `changed` + re-vectorize when "keep up to date"; moved → path update; deleted → `BSOURCEDELETEDAT`, hidden, vectors removed; restored → cleared, re-vectorized); reaper: delete after 7 days; dev command `app:cloud-files:reap --now=<date>` for the test; OpenAPI, schemas |
+| Touches | new `Module/CloudFiles/CloudFilesModule.php` (decisive env `CLOUD_FILES_ENABLED`, default off; drives runtime config block `cloud_files`, gate 404, `capabilities` `cloud_status`), `.env.minimal`, `docker-compose.minimal.yml`; migration `BSOURCEDELETEDAT`; new `Controller/CloudFileController.php` (`POST /api/v1/cloud/status` — batch ≤ 500 ids, states per §A.1, cache ≤ 60 s keyed by user + instance + ids hash, header `X-Synaplan-Cache: hit\|miss`; `GET /api/v1/cloud/files/{id}`), `PlatformLinkController` `POST sources/events` (matching (instance, remote id) — C19; changed → `changed` + re-vectorize when "keep up to date"; moved → path update; deleted → `BSOURCEDELETEDAT`, hidden, vectors removed; restored → cleared, re-vectorized); reaper: delete after 7 days; dev command `app:cloud-files:reap --now=<date>` for the test; OpenAPI, schemas |
 
 **Tests** — state matrix, cache, batch limit, each event type, reaper, gate (404 when off, no runtime block, capability absent).
 
@@ -697,11 +724,11 @@ Wave contract: `04` §B, §C, §E; `07` §2, §6, §7; `05` W6, W7, W10; `06` §
 | Branch | `feat/cf5-1-watch-model` |
 | Depends on | CF4.1; CF3.1 (copy ledger for the loop guard); CF2.4 (`LifecycleEffect` hook); schema ask `00` §3 rows 16–21 ticked |
 | Reads | `04` §B.1–§B.9, §C.2, §E.1, §E.2; `07` §2 (payload `files` + `set`); C6–C9, C14; `UrlWatch.php` + its service (shape to copy), `SavedTask.php` (`BTRIGGERTYPE`), `SavedTaskWebhookIngress.php` (payload size + trigger payload pattern), `SavedTaskTickService.php` |
-| Touches | migrations `BCLOUDWATCHES`, `BCLOUDWATCHITEMS` (children-before-parent delete order in the service); entities + repositories; new `Service/CloudWatch/{CloudWatchService,WatchItemLedger,QuietPeriod,LoopGuard,WatchLimits}.php`; `SavedTask` trigger `file_event`; person API `GET/POST/PATCH/DELETE /api/v1/cloud/watches`, `GET …/options`, `POST …/{id}/files` (multipart; `(watch, source id, version)` unique → "already handled"), `POST …/{id}/reconcile`; instance API `GET platform-links/watches`; `watches_changed` notify through the CF3.1 notifier; working copies (hidden, 7-day retention) unless the watch keeps them searchable; states and reasons (`active`, `paused:<reason>`, `stopped:<reason>`, incl. `policy_off`, `disconnected`, `disabled`); limits (100 / 500 per watch per hour, 1 000 per instance, 100 MB per file) with the waiting counts; sweep for `running` > 30 min; `LifecycleEffect` implementation (pause / resume / stop watches); `capabilities` += `watches`; OpenAPI, schemas |
+| Touches | migrations `BCLOUDWATCHES`, `BCLOUDWATCHITEMS` (children-before-parent delete order in the service); entities + repositories; new `Service/CloudWatch/{CloudWatchService,WatchItemLedger,QuietPeriod,LoopGuard,WatchLimits}.php`; `SavedTask` trigger `file_event`; person API `GET/POST/PATCH/DELETE /api/v1/cloud/watches`, `GET …/options`, `POST …/{id}/files` (multipart; `(watch, source id, version)` unique → "already handled"), `POST …/{id}/reconcile`; folder and file targets (a file watch matches only new versions of that file; deletion → `target_gone`, a restore within 7 days → active — `04` §B.1, §B.2); instance API `GET platform-links/watches` for the apps' watch index (pages of ≤ 500 with `cursor`, `since` with tombstones, `ETag` / `304`, `410` for an expired cursor — `04` §B.8); `watches_changed` notify through the CF3.1 notifier; working copies (hidden, 7-day retention) unless the watch keeps them searchable; states and reasons (`active`, `paused:<reason>`, `stopped:<reason>`, incl. `policy_off`, `disconnected`, `disabled`); limits (100 / 500 per watch per hour, 1 000 per instance, 100 MB per file) with the waiting counts; caps of 50 active watches per person and 5 000 per instance (`409` with the sentences of `04` §B.7); dev-only command `app:cloud-watches:seed-test` (`APP_ENV=dev\|test`) for the index test; sweep for `running` > 30 min; `LifecycleEffect` implementation (pause / resume / stop watches); `capabilities` += `watches`; OpenAPI, schemas |
 
-**Tests** — ledger unique key (C6); quiet period with a fake clock; loop guard three layers (C7) incl. a translate watch writing into its own folder; limits and waiting counts; reconcile answers (process / forget); lifecycle effects (C9); sweep (C8); scope `cloud:watch` on every route; flag off → 404.
+**Tests** — ledger unique key (C6); quiet period with a fake clock; loop guard three layers (C7) incl. a translate watch writing into its own folder; file targets (only new versions of that file match; deletion and restore); limits and waiting counts; caps per person and per instance; watch index (pages without duplicates, one change → one item in `since`, a stopped watch → a tombstone, nothing changed → `304`, expired cursor → `410`); reconcile answers (process / forget); lifecycle effects (C9); sweep (C8); scope `cloud:watch` on every route; flag off → 404.
 
-**Acceptance** — `cf5-watch.sh` (Summarize preset arrives with CF5.2; until then the script uses a manual task), `cf5-quiet.sh`, `cf5-loop.sh`, `cf5-reconcile.sh`, `cf5-limits.sh`, `cf5-lifecycle.sh`, `cf5-flag-off.sh` — all with the stub app.
+**Acceptance** — `cf5-watch.sh` (Summarize preset arrives with CF5.2; until then the script uses a manual task), `cf5-quiet.sh`, `cf5-loop.sh`, `cf5-reconcile.sh`, `cf5-limits.sh`, `cf5-index.sh`, `cf5-lifecycle.sh`, `cf5-flag-off.sh` — all with the stub app.
 
 ### CF5.2 — Presets → task templates, Keep-searchable sync, mail with links
 
@@ -765,9 +792,9 @@ Wave contract: `04` §B, §C, §E; `07` §2, §6, §7; `05` W6, W7, W10; `06` §
 | Branch | `feat/cf5-4-watches` |
 | Depends on | CF5.3 released; CF4.3; CF-S5 |
 | Reads | `04` §B (all), §C.1, §C.5; `02` §4.2; `05` W6; `07` §2 (file-set choice arrives in CF5.9 — leave the dialog slot) |
-| Touches | files action **Watch with Synaplan…** (folders and files) → dialog W6 (presets, inputs from `GET …/options`, "Also the n files already here", **Start watching**); permission card (`02` §4.2) → re-link with `cloud:watch` / re-mint / background key by mode; eyes from the watch cache (`GET platform-links/watches` every 60 s + `watches_changed`), list header, sidebar watch section (owner, description, Pause / Stop for the owner only); node events → job list with the 60 s quiet period → `POST …/{id}/files`; hourly reconciliation job (`…/reconcile`); own-write guard; admin policy "Allow watching shared folders" and the cron-mode warning; Watched folders list on the app page; `l10n/` |
+| Touches | files action **Watch with Synaplan…** (folders, and single files with the file variant of W6) → dialog W6 (presets, inputs from `GET …/options`, "Also the n files already here", **Start watching**, the cap sentences of `04` §B.7); permission card (`02` §4.2) → re-link with `cloud:watch` / re-mint / background key by mode; the watch index in an app table keyed by target id (`04` §B.8: synced incrementally on `watches_changed` and every 10 minutes, a full walk daily or on `410`) for the eyes and for matching node events, list header, sidebar watch section (owner, description, Pause / Stop for the owner only); node events → job list with the 60 s quiet period → `POST …/{id}/files`; hourly reconciliation job (`…/reconcile`); own-write guard; admin policy "Allow watching shared folders" and the cron-mode warning; Watched folders list on the app page; `l10n/` |
 
-**Acceptance** — `CLOUD=nextcloud cf5-*.sh`; L3 rows 1–4, 6–8, 10, 12–13 on Nextcloud; Playwright "watch a folder, drop a file, see the run".
+**Acceptance** — `CLOUD=nextcloud cf5-*.sh`; L3 rows 1–4, 6–8, 10, 12–14 on Nextcloud; Playwright "watch a folder, drop a file, see the run".
 
 ### CF5.5 — ownCloud.online: same (CF-S4)
 
@@ -785,7 +812,7 @@ Branch `feat/cf5-6-watches`; depends on CF5.3 released, CF4.5, CF-S1, CF-S3. Fol
 | Branch | `feat/cf5-9-file-sets-trial` in each |
 | Depends on | CF5.8 released; CF5.4 / CF5.5 / CF5.6 |
 | Reads | `07` §2, §7; `05` W6 (file-set block), W10; `00` §11 (file-set terms, trial terms) |
-| Touches | dialog block **What should each run get?** (three choices with their one-sentence consequences; window and max shown for "together"); **Try it on a file / files** (upload with the person's credential to `POST /api/v1/cloud/trials`, open the chat URL); whole-folder snapshot push (`…/snapshots` listing → upload the requested versions → `…/close`) in the job list; `l10n/` |
+| Touches | dialog block **What should each run get?** (three choices with their one-sentence consequences; window and max shown for "together"; absent for a file watch); **Try it on a file / files** (upload with the person's credential to `POST /api/v1/cloud/trials`, open the chat URL); whole-folder snapshot push (`…/snapshots` listing → upload the requested versions → `…/close`) in the job list; `l10n/` |
 
 **Acceptance** — L3 rows 5 and 9 on all three; `cf5-fileset.sh`, `cf5-trial.sh` against the real apps.
 
