@@ -1,32 +1,16 @@
 <?php
 
-namespace App\Tests\Unit\Service\Message\Handler;
+declare(strict_types=1);
 
-use App\AI\Service\AiFacade;
-use App\AI\StructuredOutput\StructuredOutputConfig;
-use App\AI\ToolCalling\ToolCallingCapability;
-use App\AI\ToolCalling\ToolCallingTranslator;
-use App\AI\ToolCalling\ToolCallParser;
-use App\Repository\ConfigRepository;
+namespace App\Tests\Unit\Service\Vision;
+
 use App\Repository\ModelRepository;
-use App\Repository\PromptRepository;
-use App\Service\Feedback\FeedbackConfigService;
-use App\Service\File\DocumentGeneratorService;
-use App\Service\File\DocumentImageCatalog;
-use App\Service\File\DocumentImageReferenceResolver;
-use App\Service\File\UserUploadPathBuilder;
-use App\Service\Memory\MemoryExtractionDispatcher;
-use App\Service\Memory\UserMemoryService;
-use App\Service\Message\Capability\SystemCapabilityRegistry;
-use App\Service\Message\Handler\ChatHandler;
-use App\Service\Message\PerfPipelineFlag;
-use App\Service\Message\Routing\RoutingToolset;
-use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
-use App\Service\Prompt\TimeContextBuilder;
-use App\Service\RAG\VectorSearchService;
-use App\Service\RateLimitService;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\File\ConversationFileCatalog;
+use App\Service\File\GeneratedImageVisionFlag;
+use App\Service\Message\ChatMessageAssembler;
+use App\Service\Message\ConversationHistoryRenderer;
+use App\Service\Vision\VisionAttachmentEncoder;
+use App\Service\Vision\VisionModelResolver;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -37,12 +21,12 @@ use Psr\Log\NullLogger;
  * the inline payload stays within budget, and skip the image entirely if it
  * still cannot be reduced enough — never send a payload that 400s.
  */
-class ChatHandlerVisionImageTest extends TestCase
+final class VisionAttachmentEncoderTest extends TestCase
 {
-    /** Mirrors ChatHandler::MAX_VISION_BASE64_LENGTH. */
+    /** Mirrors VisionAttachmentEncoder::MAX_VISION_BASE64_LENGTH. */
     private const MAX_VISION_BASE64_LENGTH = 450000;
 
-    private ChatHandler $handler;
+    private VisionAttachmentEncoder $encoder;
     private string $uploadDir;
 
     protected function setUp(): void
@@ -50,36 +34,14 @@ class ChatHandlerVisionImageTest extends TestCase
         $this->uploadDir = sys_get_temp_dir().'/synaplan-chat-vision-'.bin2hex(random_bytes(8));
         mkdir($this->uploadDir, 0o775, true);
 
-        $this->handler = new ChatHandler(
-            $this->createMock(AiFacade::class),
-            $this->createMock(PromptRepository::class),
-            $this->createMock(PromptService::class),
-            $this->createMock(ModelConfigService::class),
-            $this->createMock(ModelRepository::class),
-            new NullLogger(),
-            $this->createMock(VectorSearchService::class),
-            $this->createMock(EntityManagerInterface::class),
+        $catalog = $this->createStub(ConversationFileCatalog::class);
+        $this->encoder = new VisionAttachmentEncoder(
             $this->uploadDir,
-            new UserUploadPathBuilder(),
-            $this->createMock(UserMemoryService::class),
-            new FeedbackConfigService($this->createStub(ConfigRepository::class)),
-            $this->createMock(RateLimitService::class),
-            $this->createMock(MemoryExtractionDispatcher::class),
-            $this->createMock(PerfPipelineFlag::class),
-            $this->createMock(DocumentGeneratorService::class),
-            $this->createMock(DocumentImageReferenceResolver::class),
-            $this->createMock(DocumentImageCatalog::class),
-            new TimeContextBuilder(),
-            new \App\Service\Knowledge\KnowledgeContextFormatter(),
-            $this->createMock(\App\Service\Vision\VisionModelResolver::class),
-            $this->createMock(\App\Service\Digest\DigestSearchService::class),
-            $this->createMock(\App\Service\Digest\MessageDigestConfig::class),
-            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
-            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
-            $this->createMock(StructuredOutputConfig::class),
-            new ToolCallingTranslator(new ToolCallingCapability()),
-            new ToolCallParser(),
-            new RoutingToolset(new SystemCapabilityRegistry()),
+            $catalog,
+            $this->createStub(GeneratedImageVisionFlag::class),
+            $this->createStub(ModelRepository::class),
+            $this->createStub(VisionModelResolver::class),
+            new NullLogger(),
         );
     }
 
@@ -219,22 +181,16 @@ class ChatHandlerVisionImageTest extends TestCase
             ->setText('what is this?')
             ->setFilePath('photo.jpg');
 
-        $method = new \ReflectionMethod(ChatHandler::class, 'buildCurrentMessageContent');
-        $method->setAccessible(true);
+        $messages = new ChatMessageAssembler($this->encoder, new ConversationHistoryRenderer($this->createStub(ConversationFileCatalog::class)), new NullLogger());
 
         $this->expectException(\App\Service\Exception\VisionImageUnprocessableException::class);
 
-        $method->invoke($this->handler, $message, true, []);
+        $messages->streaming(null, [], $message, ['include_images' => true]);
     }
 
     private function invokeImageToBase64DataUrl(string $relativePath): ?string
     {
-        $method = new \ReflectionMethod(ChatHandler::class, 'imageToBase64DataUrl');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->handler, $relativePath);
-
-        return null === $result ? null : (string) $result;
+        return $this->encoder->toBase64DataUrl($relativePath);
     }
 
     private function base64Payload(string $dataUrl): string

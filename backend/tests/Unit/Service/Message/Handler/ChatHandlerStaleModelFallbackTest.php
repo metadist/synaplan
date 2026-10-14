@@ -31,6 +31,7 @@ use App\Service\Prompt\TimeContextBuilder;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\Vision\VisionModelResolver;
+use App\Tests\Support\ChatHandlerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -133,7 +134,7 @@ final class ChatHandlerStaleModelFallbackTest extends TestCase
     {
         $repo = $this->createMock(ModelRepository::class);
 
-        return new ChatHandler(
+        return ChatHandlerFactory::create(
             $this->createMock(AiFacade::class),
             $this->createMock(PromptRepository::class),
             $this->createMock(PromptService::class),

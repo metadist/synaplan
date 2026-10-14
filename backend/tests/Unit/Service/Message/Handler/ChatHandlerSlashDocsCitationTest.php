@@ -37,6 +37,7 @@ use App\Service\Prompt\TimeContextBuilder;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\Vision\VisionModelResolver;
+use App\Tests\Support\ChatHandlerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -190,7 +191,7 @@ final class ChatHandlerSlashDocsCitationTest extends TestCase
         $configRepository = $this->createMock(ConfigRepository::class);
         $configRepository->method('getValue')->willReturn(null);
 
-        return new ChatHandler(
+        return ChatHandlerFactory::create(
             $aiFacade,
             $this->createMock(PromptRepository::class),
             $promptService,

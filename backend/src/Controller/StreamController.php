@@ -3738,7 +3738,7 @@ class StreamController extends AbstractController
 
     /**
      * Store AI-generated file in the file system and create File entity
-     * Same logic as ChatHandler::storeGeneratedFile.
+     * Same logic as {@see \App\Service\File\GeneratedFileWriter::store()}.
      */
     /**
      * Persist the multi-task output files as File entities so they survive a

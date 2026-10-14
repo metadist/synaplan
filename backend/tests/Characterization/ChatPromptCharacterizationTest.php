@@ -36,6 +36,7 @@ use App\Service\Prompt\TimeContextBuilder;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Tests\Characterization\Support\CleanupSnapshot;
+use App\Tests\Support\ChatHandlerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -166,7 +167,7 @@ final class ChatPromptCharacterizationTest extends TestCase
         $digest = $this->createMock(\App\Service\Digest\MessageDigestConfig::class);
         $digest->method('isEnabled')->willReturn(false);
 
-        $this->handler = new ChatHandler(
+        $this->handler = ChatHandlerFactory::create(
             $this->aiFacade,
             $this->createMock(PromptRepository::class),
             $prompts,

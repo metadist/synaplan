@@ -2,37 +2,16 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Service\Message\Handler;
+namespace App\Tests\Unit\Service\Prompt;
 
-use App\AI\Service\AiFacade;
-use App\AI\StructuredOutput\StructuredOutputConfig;
-use App\AI\ToolCalling\ToolCallingCapability;
-use App\AI\ToolCalling\ToolCallingTranslator;
-use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\File;
 use App\Entity\Message;
-use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
-use App\Repository\ModelRepository;
-use App\Repository\PromptRepository;
-use App\Service\Feedback\FeedbackConfigService;
 use App\Service\File\ConversationFileCatalog;
-use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageCatalog;
-use App\Service\File\DocumentImageReferenceResolver;
-use App\Service\File\UserUploadPathBuilder;
-use App\Service\Memory\MemoryExtractionDispatcher;
-use App\Service\Memory\UserMemoryService;
-use App\Service\Message\Capability\SystemCapabilityRegistry;
-use App\Service\Message\Handler\ChatHandler;
-use App\Service\Message\PerfPipelineFlag;
-use App\Service\Message\Routing\RoutingToolset;
-use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
+use App\Service\Prompt\ChatPromptBlocks;
+use App\Service\Prompt\ChatSystemPromptBuilder;
 use App\Service\Prompt\TimeContextBuilder;
-use App\Service\RAG\VectorSearchService;
-use App\Service\RateLimitService;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -41,7 +20,7 @@ use Psr\Log\NullLogger;
  * placed into a document because the model was never told it exists. The
  * officemaker system prompt now carries the catalog of usable markers.
  */
-class ChatHandlerDocumentImageContextTest extends TestCase
+final class ChatPromptImageContextTest extends TestCase
 {
     private string $uploadDir;
 
@@ -115,13 +94,7 @@ class ChatHandlerDocumentImageContextTest extends TestCase
      */
     private function buildMediaEditContext(string $topic, array $options): string
     {
-        $method = new \ReflectionMethod(ChatHandler::class, 'buildMediaEditContext');
-
-        return (string) $method->invoke(
-            (new \ReflectionClass(ChatHandler::class))->newInstanceWithoutConstructor(),
-            $topic,
-            $options,
-        );
+        return ChatPromptBlocks::mediaEditContext($topic, $options);
     }
 
     /**
@@ -135,10 +108,7 @@ class ChatHandlerDocumentImageContextTest extends TestCase
         $threadMessage = (new Message())->setUserId(7);
         (new \ReflectionProperty(Message::class, 'id'))->setValue($threadMessage, 500);
 
-        $method = new \ReflectionMethod(ChatHandler::class, 'buildDocumentImageContext');
-
-        return (string) $method->invoke(
-            $this->handler(new DocumentImageCatalog(new ConversationFileCatalog($repository, $this->uploadDir))),
+        return $this->promptBuilder(new DocumentImageCatalog(new ConversationFileCatalog($repository, $this->uploadDir)))->documentImageContext(
             (new Message())->setUserId(7),
             [$threadMessage],
             $topic,
@@ -146,38 +116,13 @@ class ChatHandlerDocumentImageContextTest extends TestCase
         );
     }
 
-    private function handler(DocumentImageCatalog $catalog): ChatHandler
+    private function promptBuilder(DocumentImageCatalog $catalog): ChatSystemPromptBuilder
     {
-        return new ChatHandler(
-            $this->createMock(AiFacade::class),
-            $this->createMock(PromptRepository::class),
-            $this->createMock(PromptService::class),
-            $this->createMock(ModelConfigService::class),
-            $this->createMock(ModelRepository::class),
-            new NullLogger(),
-            $this->createMock(VectorSearchService::class),
-            $this->createMock(EntityManagerInterface::class),
-            $this->uploadDir,
-            new UserUploadPathBuilder(),
-            $this->createMock(UserMemoryService::class),
-            new FeedbackConfigService($this->createStub(ConfigRepository::class)),
-            $this->createMock(RateLimitService::class),
-            $this->createMock(MemoryExtractionDispatcher::class),
-            $this->createMock(PerfPipelineFlag::class),
-            $this->createMock(DocumentGeneratorService::class),
-            $this->createMock(DocumentImageReferenceResolver::class),
-            $catalog,
+        return new ChatSystemPromptBuilder(
             new TimeContextBuilder(),
-            new \App\Service\Knowledge\KnowledgeContextFormatter(),
-            $this->createMock(\App\Service\Vision\VisionModelResolver::class),
-            $this->createMock(\App\Service\Digest\DigestSearchService::class),
-            $this->createMock(\App\Service\Digest\MessageDigestConfig::class),
-            $this->createMock(ConversationFileCatalog::class),
-            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
-            $this->createMock(StructuredOutputConfig::class),
-            new ToolCallingTranslator(new ToolCallingCapability()),
-            new ToolCallParser(),
-            new RoutingToolset(new SystemCapabilityRegistry()),
+            $catalog,
+            $this->createStub(ConversationFileCatalog::class),
+            new NullLogger(),
         );
     }
 
