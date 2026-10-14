@@ -136,6 +136,38 @@ ChatHandler (≤ 300 lines)   orchestrates stages, owns the sink
 `handle()` and `handleStream()` collapse into one `run(ChatRequest, ChatSink)`;
 `BufferedChatSink` and `StreamingChatSink` are the only difference.
 
+**As delivered (G5–G7).** `ChatHandler` is 229 lines with 9 dependencies and
+orchestrates seven stages in `App\Service\Message\Chat\`:
+
+```
+ChatHandler                    handle() buffered, handleStream() streamed
+  1 ChatTurnContextLoader      runtime profile, topic prompt, knowledge base, memories → ChatTurn
+  2 ChatModelSelector          Again > widget > assistant > prompt > default, retired-model swap, vision fallback → ChatModelChoice
+  3 ChatSystemPromptAssembler  section order per channel → ChatSystemPrompt (system role or user-turn fallback)
+  4 ChatMessageAssembler       thread + current turn; OpenAI previous_response_id on the stream
+  5 ChatRequestOptions         document schema, routing tools, token ceiling, assistant sampling, reasoning level
+  6 ChatReplyGenerator         document tool loop or chat call; cut-off and empty-answer checks → ChatReply
+  7 PendingMemoryExtraction    memory job, dispatched now or handed back to StreamController (#881)
+```
+
+The stages lean on the G5/G6 collaborators: `ChatKnowledgeContextLoader`,
+`ChatMemoryContextLoader`, `ChatSystemPromptBuilder` (sections that read
+state), `ChatPromptBlocks` (pure sections), `VisionAttachmentEncoder`,
+`ChatDocumentOutput` (office hints, tool edits, buffered file delivery),
+`GeneratedFileWriter` and `RoutingHandoffResolver`.
+
+The single `run(ChatRequest, ChatSink)` was not built. The two paths differ in
+more than the sink, and the snapshots pin those differences: the streamed
+turn checks a deferred routing decision after the system prompt, the buffered
+one before it; only the stream carries widget API data and the continuation
+and voice-mode rules; only a live-voice question gets the spoken-answer rule;
+a vision swap names the model by provider id (buffered) or through
+`ModelConfigService` (streamed); only the buffered path delivers generated
+files itself. Each stage therefore has a `forBufferedTurn()` and a
+`forStreamedTurn()` that share their private sections, so every remaining
+difference is named in the stage that owns it. Aligning them is behaviour
+work, one difference per PR with its snapshot diff — a V3 candidate (§7).
+
 ### StreamController (4,430 lines, 36 deps → transport + orchestration)
 
 ```
@@ -227,3 +259,7 @@ Domain-first layout (`src/Widget/{Controller,Service,Repository}`), the
 `AI` ↔ `Service` layer split, domain-to-domain deptrac rules, the
 `Plugin\Sdk` namespace with `class_alias` shims, PHPStan 5 → 8, mirroring
 `tests/` to `src/`. None of these needs to be decided before V2 ends.
+
+From G7: align the buffered and streamed chat turn (§3, "As delivered
+(G5–G7)") one difference at a time, each PR with its prompt-snapshot diff,
+until a single `run()` with two sinks is a mechanical step.

@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Service\Message;
+namespace App\Service\Message\Chat;
 
-use App\Entity\Model;/**
+use App\Entity\Model;
+use App\Service\Message\SlashCommandCopy; /**
  * The canned replies a slash command gets instead of a model answer:
  * a usage hint for a bare command that needs an argument, and the
  * not-found reply when /docs matches nothing.

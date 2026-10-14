@@ -13,7 +13,7 @@ use App\Service\Feedback\FeedbackConfigService;
 use App\Service\Feedback\FeedbackConstants;
 use App\Service\Infrastructure\PerfTimer;
 use App\Service\Knowledge\KnowledgeContextFormatter;
-use App\Service\Message\ConversationHistoryRenderer;
+use App\Service\Message\Chat\ConversationHistoryRenderer;
 use App\Service\Message\ProgressCallback;
 use App\Service\ModelConfigService;
 use Psr\Log\LoggerInterface;

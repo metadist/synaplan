@@ -32,15 +32,19 @@ use App\Service\Memory\ChatMemoryContextLoader;
 use App\Service\Memory\MemoryExtractionDispatcher;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Memory\UserMemoryService;
-use App\Service\Message\ChatGenerationOptions;
-use App\Service\Message\ChatMessageAssembler;
-use App\Service\Message\ConversationHistoryRenderer;
+use App\Service\Message\Chat\ChatMessageAssembler;
+use App\Service\Message\Chat\ChatModelSelector;
+use App\Service\Message\Chat\ChatReplyGenerator;
+use App\Service\Message\Chat\ChatRequestOptions;
+use App\Service\Message\Chat\ChatSystemPromptAssembler;
+use App\Service\Message\Chat\ChatTurnContextLoader;
+use App\Service\Message\Chat\ConversationHistoryRenderer;
+use App\Service\Message\Chat\SlashCommandReplies;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\PerfPipelineFlag;
 use App\Service\Message\Routing\RoutingHandoffResolver;
 use App\Service\Message\Routing\RoutingToolset;
 use App\Service\Message\SlashCommandCopy;
-use App\Service\Message\SlashCommandReplies;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginContextProviderInterface;
 use App\Service\Prompt\ChatSystemPromptBuilder;
@@ -60,10 +64,11 @@ use Psr\Log\LoggerInterface;
  * Builds a ChatHandler from its leaf services, the way the container wires
  * the collaborator classes.
  *
- * The parameters are the handler's former constructor, so the behaviour
- * tests of a chat turn keep their mocks: they hand in repositories, the AI
- * facade and config doubles, and get the real prompt, knowledge, memory,
- * vision, message and document collaborators around them.
+ * The parameters are the leaf services the handler used to take directly,
+ * so the behaviour tests of a chat turn keep their mocks: they hand in
+ * repositories, the AI facade and config doubles, and get the real turn
+ * stages — context, model choice, prompt, messages, options, reply — and
+ * their collaborators around them.
  */
 final class ChatHandlerFactory
 {
@@ -114,27 +119,27 @@ final class ChatHandlerFactory
         $history = new ConversationHistoryRenderer($conversationFileCatalog);
         $vision = new VisionAttachmentEncoder($uploadDir, $conversationFileCatalog, $generatedImageVisionFlag, $modelRepository, $visionModelResolver, $logger);
         $fileWriter = new GeneratedFileWriter($documentGenerator, $documentImageReferenceResolver, $userUploadPathBuilder, $uploadDir, $em, $logger, $documentThumbnailDispatcher);
+        $messages = new ChatMessageAssembler($vision, $history, $logger, $contextCondenser, $modelContextWindow);
+        $documents = new ChatDocumentOutput($modelRepository, $em, $fileWriter, $logger, $generatedDocumentStore, $documentEditCoordinator, $unreadSourceGuard);
+        $sections = new ChatSystemPromptBuilder($timeContextBuilder, $documentImageCatalog, $conversationFileCatalog, $logger, $pluginContextProviders, $selfAwarePromptDecorator, $platformDocsRetriever);
 
         return new ChatHandler(
-            $aiFacade,
-            $promptService,
-            $modelConfigService,
-            $modelRepository,
-            $em,
-            $rateLimitService,
-            $structuredOutputConfig,
-            new ChatGenerationOptions($structuredOutputConfig),
-            new ChatKnowledgeContextLoader($vectorSearchService, $knowledgeContextFormatter, $logger),
-            new ChatMemoryContextLoader($memoryService, $modelConfigService, $feedbackConfig, $knowledgeContextFormatter, $digestSearchService, $digestConfig, $history, $logger),
-            new ChatSystemPromptBuilder($timeContextBuilder, $documentImageCatalog, $conversationFileCatalog, $logger, $pluginContextProviders, $selfAwarePromptDecorator, $platformDocsRetriever),
-            $vision,
-            new ChatMessageAssembler($vision, $history, $logger, $contextCondenser, $modelContextWindow),
-            new ChatDocumentOutput($modelRepository, $em, $fileWriter, $logger, $generatedDocumentStore, $documentEditCoordinator),
+            new ChatTurnContextLoader(
+                $promptService,
+                new ChatKnowledgeContextLoader($vectorSearchService, $knowledgeContextFormatter, $logger),
+                new ChatMemoryContextLoader($memoryService, $modelConfigService, $feedbackConfig, $knowledgeContextFormatter, $digestSearchService, $digestConfig, $history, $logger),
+                new SlashCommandReplies($slashCommandCopy),
+                $em,
+                $logger,
+            ),
+            new ChatModelSelector($modelConfigService, $modelRepository, $vision, $logger),
+            new ChatSystemPromptAssembler($sections, $documents, $messages, $logger),
+            $messages,
+            new ChatRequestOptions($structuredOutputConfig, $rateLimitService),
+            new ChatReplyGenerator($aiFacade, $documents, $logger),
+            $documents,
             new RoutingHandoffResolver($toolCallingTranslator, $toolCallParser, $routingToolset, $logger),
-            new SlashCommandReplies($slashCommandCopy),
             new PendingMemoryExtraction($memoryExtractionDispatcher, $perfPipelineFlag, $logger),
-            $logger,
-            $unreadSourceGuard,
         );
     }
 }

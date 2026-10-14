@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Service\Message;
+namespace App\Service\Message\Chat;
 
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
+use App\Service\Message\GeneratedMediaTextRenderer;
 
 /**
  * How earlier turns of a thread appear to the model: file markers in

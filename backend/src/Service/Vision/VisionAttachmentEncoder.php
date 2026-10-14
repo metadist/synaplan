@@ -405,7 +405,7 @@ final readonly class VisionAttachmentEncoder
      * only fires when the current message itself carries an image attachment;
      * a generated picture sitting in history is not enough to change the
      * user's chosen model. In that case the always-on prose reference from
-     * {@see \App\Service\Message\ConversationHistoryRenderer::mediaReferences()} is the only trace the model gets.
+     * {@see \App\Service\Message\Chat\ConversationHistoryRenderer::mediaReferences()} is the only trace the model gets.
      */
     public function shouldIncludeGeneratedImages(?int $modelId, ?int $effectiveUserId): bool
     {

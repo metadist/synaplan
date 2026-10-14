@@ -27,6 +27,39 @@ final readonly class PendingMemoryExtraction
     }
 
     /**
+     * Queue the extraction for a finished turn, or hand it back when the
+     * caller persists the outgoing assistant message first and dispatches
+     * after that write (`defer_memory_extraction`, #881).
+     *
+     * @param array<int, array{role: string, content: string}|Message> $thread
+     * @param array<string, mixed>                                     $memoryContext the turn's memories {@see ChatMemoryContextLoader::loadMemories()}
+     * @param array<string, mixed>                                     $options       the turn options (`incognito`, `defer_memory_extraction`)
+     *
+     * @return ExtractMemoriesCommand|null the deferred command; null when it was dispatched or skipped
+     */
+    public function afterTurn(Message $message, string $aiResponse, array $thread, array $memoryContext, array $options): ?ExtractMemoriesCommand
+    {
+        $command = $this->build(
+            $message,
+            $aiResponse,
+            $thread,
+            $memoryContext['memories'] ?? [],
+            (bool) ($memoryContext['disabledByRequest'] ?? false),
+            (bool) ($memoryContext['disabledByUser'] ?? false),
+            $memoryContext['requestDisableContext'] ?? [],
+            !empty($options['incognito']),
+        );
+
+        if (!empty($options['defer_memory_extraction'])) {
+            return $command;
+        }
+
+        $this->dispatch($command);
+
+        return null;
+    }
+
+    /**
      * Build the (skip-aware) extraction payload without touching the bus.
      *
      * Honours the `PERF.V2_PIPELINE_ENABLED` kill switch and the same
@@ -52,7 +85,7 @@ final readonly class PendingMemoryExtraction
      * @param array<int, array<string, mixed>>                         $loadedMemories
      * @param bool                                                     $disabledByRequest     true when the caller (widget channel / `disable_memories` option) opted out
      * @param bool                                                     $disabledByUser        true when the user's profile setting has memories disabled
-     * @param array<string, mixed>                                     $requestDisableContext optional log context describing which request-level lever fired (channel, classification source, disable_memories flag) — built by {@see loadMemoriesContext()}
+     * @param array<string, mixed>                                     $requestDisableContext optional log context describing which request-level lever fired (channel, classification source, disable_memories flag) — built by {@see ChatMemoryContextLoader::loadMemories()}
      * @param bool                                                     $incognito             true for incognito turns: memories were READ normally, but nothing from the conversation may be extracted/written
      */
     public function build(

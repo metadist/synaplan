@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service\Message;
+namespace App\Service\Message\Chat;
 
 use App\Entity\File;
 use App\Entity\Message;
@@ -36,6 +36,68 @@ final readonly class ChatMessageAssembler
         private ?ContextCondenser $contextCondenser = null,
         private ?ModelContextWindow $modelContextWindow = null,
     ) {
+    }
+
+    /**
+     * The messages of a buffered turn: system prompt, thread, and the current
+     * turn with its attachment text, images, quoted excerpt and any web
+     * results the system role could not take.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function forBufferedTurn(ChatTurn $turn, ChatModelChoice $model, ChatSystemPrompt $prompt): array
+    {
+        $options = $prompt->options;
+        $messages = $this->buffered($prompt->prompt, $turn->thread, $turn->message, [
+            'search_results' => $prompt->searchResults,
+            'rag_context' => $turn->knowledge->context,
+            'include_images' => $model->includeImages,
+            'include_generated_images' => $options['include_generated_images'] ?? false,
+            'quoted_text' => $options['quoted_text'] ?? null,
+            'quoted_message_id' => $options['quoted_message_id'] ?? null,
+            'attachment_text' => $this->fitAttachmentText($turn->message, $model->modelId, null),
+            'plain_user_turn' => $turn->isLiveVoice(),
+        ]);
+
+        return $this->withUserTurnFallback($messages, $prompt);
+    }
+
+    /**
+     * The messages of a streamed turn, and the request options the provider
+     * call needs with them: an OpenAI turn continues the stored response of
+     * the previous answer.
+     *
+     * @param array<string, mixed> $options the turn options after the system prompt took its parts
+     *
+     * @return array{0: list<array<string, mixed>>, 1: array<string, mixed>}
+     */
+    public function forStreamedTurn(ChatTurn $turn, ChatModelChoice $model, ChatSystemPrompt $prompt, array $options): array
+    {
+        if ('openai' === $model->provider) {
+            $previousResponseId = $this->previousResponseId($turn->thread);
+            if (null !== $previousResponseId) {
+                $options['previous_response_id'] = $previousResponseId;
+                $this->logger->info('ChatHandler: Using previous_response_id for stateful conversation', [
+                    'previous_response_id' => $previousResponseId,
+                ]);
+            }
+        }
+
+        $options['attachment_text'] = $this->fitAttachmentText($turn->message, $model->modelId, is_int($options['max_tokens'] ?? null) ? $options['max_tokens'] : null);
+        $messages = $this->streaming($prompt->prompt, $turn->thread, $turn->message, $options);
+        unset($options['attachment_text']);
+
+        return [$this->withUserTurnFallback($messages, $prompt), $options];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function withUserTurnFallback(array $messages, ChatSystemPrompt $prompt): array
+    {
+        return null === $prompt->userTurnFallback ? $messages : $this->prependSystemPrompt($messages, $prompt->userTurnFallback);
     }
 
     public function buffered(?string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array

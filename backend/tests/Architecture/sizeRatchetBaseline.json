@@ -8,9 +8,9 @@
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 62,
-        "constructorParams": 76,
-        "methodLines": 160
+        "fileLines": 61,
+        "constructorParams": 75,
+        "methodLines": 158
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -57,7 +57,6 @@
         "src/Service/Iam/ShareService.php": 853,
         "src/Service/Media/MediaGenerationService.php": 846,
         "src/Service/Memory/UserMemoryService.php": 1022,
-        "src/Service/Message/Handler/ChatHandler.php": 1535,
         "src/Service/Message/Handler/FileAnalysisHandler.php": 2046,
         "src/Service/Message/Handler/MediaGenerationHandler.php": 2351,
         "src/Service/Message/MessageClassifier.php": 2082,
@@ -124,7 +123,6 @@
         "src/Service/File/FileUploadService.php::FileUploadService": 12,
         "src/Service/Iam/UserDeletionService.php::UserDeletionService": 36,
         "src/Service/Mcp/McpOAuthState.php::McpOAuthState": 11,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler": 19,
         "src/Service/Message/Handler/FileAnalysisHandler.php::FileAnalysisHandler": 11,
         "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler": 23,
         "src/Service/Message/MessageClassifier.php::MessageClassifier": 21,
@@ -261,8 +259,6 @@
         "src/Service/Memory/MemoryExtractionService.php::MemoryExtractionService::extractMemoriesViaAi": 185,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::searchRelevantMemories": 142,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::storeInQdrant": 101,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler::handle": 677,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler::handleStream": 694,
         "src/Service/Message/Handler/FileAnalysisHandler.php::FileAnalysisHandler::handleStream": 104,
         "src/Service/Message/Handler/FileAnalysisHandler.php::FileAnalysisHandler::routeFiles": 205,
         "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler::detachMediaToAsyncJob": 166,
