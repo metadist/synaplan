@@ -4,17 +4,23 @@ Plan of record: [`00_master_plan.md`](./00_master_plan.md). Binding:
 [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) — U1 (journey
 before Vue), U10 (walk before merge), §6 (sprint-file contract).
 
-Each journey is an acceptance demo, walked in a browser against local stacks
-(Nextcloud `make -C synaplan-nextcloud dev-up` on `:8081`, OpenCloud
-`docker compose` on `:9200` with Synaplan's `--profile oidc`, a local ownCloud
-from CF1.2) and recorded as a dated STATUS entry. A journey that only passes
-on Nextcloud is not walked.
+Each journey is an acceptance demo, walked in a browser against the local
+stacks of [`10`](./10_local_environments.md) (Nextcloud on `:8081`, OpenCloud
+on `:9200` with Synaplan's `--profile oidc`, ownCloud.online on `:8083`) and
+recorded as a dated STATUS entry. Journeys are walked on the cloud of the
+current phase (`00` row 42): Nextcloud in P1, OpenCloud in P2,
+ownCloud.online in P3. A journey is done for the plan when it is walked on all
+three clouds — at the latest at the P3 exit. J-NC-1…3 are defined in
+[`../20260903_more_nextcloud/00_master_plan.md`](../20260903_more_nextcloud/00_master_plan.md)
+§5.
 
 ---
 
 ## 1. Journeys
 
-**J-CF-1 — Same login, nothing to connect** (CF2)
+**J-CF-1 — Same login, nothing to connect** (CF2; walked in P1 on Nextcloud
+when CF-S2 says yes, otherwise first in P2 on OpenCloud — in P1 the reference
+client's `sso` profile proves the core side either way)
 OpenCloud with organisation login. Ada opens a PDF's menu → Synaplan →
 Summarize. First time only, a card: "Use Synaplan in OpenCloud? Synaplan is
 your organisation's AI assistant at ai.example.org. Files you send to it are
@@ -23,8 +29,8 @@ ada@example.org." **Use Synaplan** → the summary. In Synaplan → Apps →
 OpenCloud: "Connected through your organisation login · last used just now".
 **Turn off for OpenCloud** shows its consequence; the next Summarize in
 OpenCloud says "You turned Synaplan off for this app in Synaplan." with **Open
-Synaplan**; **Turn back on** restores it. Walked again on Nextcloud with
-`user_oidc` after CF2.6.
+Synaplan**; **Turn back on** restores it. Walked on Nextcloud with `user_oidc`
+in P1 when CF-S2 says yes (CF2.6), and on OpenCloud in P2 (CF2.7).
 
 **J-CF-2 — Connect from ownCloud.online** (CF1)
 J-NC-1…3 on ownCloud.online: Settings → Synaplan → **Connect Synaplan** →
@@ -285,8 +291,11 @@ are absent. The backfill line becomes "Also translate the current version"
  │ [ Open in OpenCloud ]  [ Open knowledge folder ]  [ Stop syncing ] │
  └────────────────────────────────────────────────────────────────────┘
 
- Empty: "Watch a folder from Nextcloud, ownCloud.online or OpenCloud:
-         right-click it and choose Watch with Synaplan."  [ Show my connected clouds ]
+ Empty, with a connected cloud whose app can watch (row 43):
+        "Watch a folder or a file from Nextcloud: right-click it and choose
+         Watch with Synaplan."  [ Show my connected clouds ]
+ Empty, with none: "Watching starts in your cloud: connect one under Apps,
+         then right-click a folder or a file there."  [ Open Apps ]
 ```
 
 ### W8 — Admin: connection mode (cloud app)
@@ -301,7 +310,8 @@ are absent. The backfill line becomes "Also translate the current version"
                                 Not for teams with private documents.
  Watching folders   [✓] allowed   [ ] also on shared folders
  ⚠ Background jobs run only when someone opens a page. Watched folders need
-   system cron.  How to set it up ↗
+   background jobs that run on a schedule.  How to set it up ↗
+ Advanced ▸ (names the technical setting: "cron" mode for background jobs)
 ```
 
 ### W9 — Reading files in a run (Synaplan chat or task run card)
@@ -337,7 +347,7 @@ are absent. The backfill line becomes "Also translate the current version"
 
 ```text
  What may Synaplan read in your Nextcloud?
- (•) Only folders I watch
+ (•) Only what I watch
  ( ) Also folders I allow      Invoices/2026  [Remove]
                                Specs          [Remove]
                                [ Add a folder ]          ← native folder picker
@@ -385,14 +395,17 @@ reused, not re-translated; the existing key is named.
 | Question | This task does file work. Let it run without asking each time? | Diese Aufgabe nutzt Dateiarbeit. Ohne Rückfrage ausführen? | Esta tarea usa trabajo con archivos. ¿Ejecutarla sin preguntar cada vez? | Cette tâche fait du travail sur fichiers. L’exécuter sans demander à chaque fois ? | Bu görev dosya çalışması yapıyor. Her seferinde sormadan çalışsın mı? |
 | Card | Read {count} files from {app} › {folder} | {count} Dateien aus {app} › {folder} gelesen | Se leyeron {count} archivos de {app} › {folder} | {count} fichiers lus depuis {app} › {folder} | {app} › {folder} içinden {count} dosya okundu |
 | Menu | Let Synaplan read this folder | Synaplan diesen Ordner lesen lassen | Permitir que Synaplan lea esta carpeta | Autoriser Synaplan à lire ce dossier | Synaplan'ın bu klasörü okumasına izin ver |
-| Setting | Only folders I watch · Also folders I allow · All my files | Nur Ordner, die ich beobachte · Auch Ordner, die ich freigebe · Alle meine Dateien | Solo las carpetas que vigilo · También las carpetas que permito · Todos mis archivos | Seulement les dossiers que je surveille · Aussi les dossiers que j’autorise · Tous mes fichiers | Yalnızca izlediğim klasörler · İzin verdiğim klasörler de · Tüm dosyalarım |
+| Setting | Only what I watch · Also folders I allow · All my files | Nur was ich beobachte · Auch Ordner, die ich freigebe · Alle meine Dateien | Solo lo que vigilo · También las carpetas que permito · Todos mis archivos | Seulement ce que je surveille · Aussi les dossiers que j’autorise · Tous mes fichiers | Yalnızca izlediklerim · İzin verdiğim klasörler de · Tüm dosyalarım |
 | Refusal | Synaplan may not read {folder} in your {app}. Nothing was read. | Synaplan darf {folder} in deinem {app} nicht lesen. Es wurde nichts gelesen. | Synaplan no puede leer {folder} en tu {app}. No se leyó nada. | Synaplan n’est pas autorisé à lire {folder} dans votre {app}. Rien n’a été lu. | Synaplan, {app} içindeki {folder} klasörünü okuyamaz. Hiçbir şey okunmadı. |
-| Empty (Watched folders) | Watch a folder from Nextcloud, ownCloud.online or OpenCloud: right-click it and choose Watch with Synaplan. | Beobachte einen Ordner in Nextcloud, ownCloud.online oder OpenCloud: Rechtsklick auf den Ordner, dann „Mit Synaplan beobachten“. | Vigila una carpeta de Nextcloud, ownCloud.online u OpenCloud: haz clic derecho y elige «Vigilar con Synaplan». | Surveillez un dossier de Nextcloud, ownCloud.online ou OpenCloud : clic droit, puis « Surveiller avec Synaplan ». | Nextcloud, ownCloud.online veya OpenCloud'daki bir klasörü izleyin: sağ tıklayıp “Synaplan ile izle”yi seçin. |
+| Empty (Watched folders), a cloud can watch | Watch a folder or a file from {apps}: right-click it and choose Watch with Synaplan. | Beobachte einen Ordner oder eine Datei in {apps}: Rechtsklick darauf, dann „Mit Synaplan beobachten“. | Vigila una carpeta o un archivo de {apps}: haz clic derecho y elige «Vigilar con Synaplan». | Surveillez un dossier ou un fichier de {apps} : clic droit, puis « Surveiller avec Synaplan ». | {apps} içindeki bir klasörü veya dosyayı izleyin: sağ tıklayıp “Synaplan ile izle”yi seçin. |
+| Empty (Watched folders), no cloud can watch | Watching starts in your cloud: connect one under Apps, then right-click a folder or a file there. | Beobachten beginnt in deiner Cloud: Verbinde sie unter Apps und klicke dort mit rechts auf einen Ordner oder eine Datei. | La vigilancia empieza en tu nube: conéctala en Apps y luego haz clic derecho en una carpeta o un archivo allí. | La surveillance commence dans votre cloud : connectez-le dans Apps, puis faites un clic droit sur un dossier ou un fichier. | İzleme bulutunuzda başlar: Uygulamalar bölümünden bağlayın, sonra orada bir klasöre veya dosyaya sağ tıklayın. |
+| Approval (Synaplan admin) | {host} is on a private network ({address}). Synaplan will call it to deliver copies and requests. Approve only clouds you run. | {host} liegt in einem privaten Netz ({address}). Synaplan ruft diese Adresse auf, um Kopien und Anfragen zuzustellen. Gib nur Clouds frei, die du selbst betreibst. | {host} está en una red privada ({address}). Synaplan la llamará para entregar copias y solicitudes. Aprueba solo nubes que gestionas tú. | {host} se trouve sur un réseau privé ({address}). Synaplan l’appellera pour livrer des copies et des demandes. N’approuvez que des clouds que vous gérez. | {host} özel bir ağda ({address}). Synaplan kopyaları ve istekleri iletmek için bu adresi çağıracak. Yalnızca kendi işlettiğiniz bulutları onaylayın. |
+| Rejected pinned script (C17) | This step uses the name of the file you tried it on ({file}), so it would fail on other files. Change it to work on whatever files a run gets. | Dieser Schritt nutzt den Namen der Testdatei ({file}) und würde bei anderen Dateien scheitern. Ändere ihn so, dass er mit den Dateien jedes Laufs arbeitet. | Este paso usa el nombre del archivo de prueba ({file}), así que fallaría con otros archivos. Cámbialo para que funcione con los archivos de cada ejecución. | Cette étape utilise le nom du fichier d’essai ({file}) et échouerait avec d’autres fichiers. Modifiez-la pour qu’elle fonctionne avec les fichiers de chaque exécution. | Bu adım denediğiniz dosyanın adını ({file}) kullanıyor, bu yüzden başka dosyalarda başarısız olur. Her çalıştırmanın aldığı dosyalarla çalışacak şekilde değiştirin. |
 
 Translator notes:
 
-- Placeholders (`{app}`, `{folder}`, `{count}`) keep their names in every
-  locale.
+- Placeholders (`{app}`, `{apps}`, `{folder}`, `{count}`, `{host}`,
+  `{address}`, `{file}`) keep their names in every locale.
 - German form of address follows the namespace the string lands in — the
   core's `files` namespace says *du*, `assistants.triggers` says *Sie*. The
   cloud apps ship Nextcloud's informal `de`; a formal `de_DE` is optional.

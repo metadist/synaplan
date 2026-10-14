@@ -2,8 +2,9 @@
 
 | | |
 | - | - |
-| **Status** | Plan, 2026-10-13; second review the same day (agent briefs, functional tests, local environments — `08`–`10`); the six Copilot findings on [#2467](https://github.com/metadist/synaplan/pull/2467) folded in the same day (STATUS review log). **§3 rows 1–36 agreed 2026-10-14.** Rows 37–41 are still proposed. A brief starts when every row it cites is agreed; CF0.1–CF0.4 cite only agreed rows. Verified by code reading against `synaplan` `main` `5487e2678` (5.4.0), `synaplan-nextcloud` `400ec02` (1.6.0), `synaplan-owncloud-online` `3b916f6` (1.0.0), `synaplan-opencloud` `5cc1351` (v1.0.0). No live walk yet — the first walk is step CF0.7. |
-| **How it is built** | One brief per step for a coding agent ([`08`](./08_agent_briefs.md)), three test layers per sprint ([`09`](./09_functional_tests.md)), pinned local stacks ([`10`](./10_local_environments.md)). Environment briefs E-1…E-8 run before CF0.7. |
+| **Status** | Plan, 2026-10-13; second review the same day (agent briefs, functional tests, local environments — `08`–`10`); the six Copilot findings on [#2467](https://github.com/metadist/synaplan/pull/2467) folded in the same day; third review 2026-10-14 for the Nextcloud-first order (STATUS review log). **§3 rows 1–36 and 42 agreed 2026-10-14.** Rows 37–41 and 43–46 are proposed. A brief starts when every row it cites is agreed; CF0.1–CF0.4 cite only agreed rows. Verified by code reading against `synaplan` `main` `5487e2678` (5.4.0), `synaplan-nextcloud` `400ec02` (1.6.0), `synaplan-owncloud-online` `3b916f6` (1.0.0), `synaplan-opencloud` `5cc1351` (v1.0.0). No live walk yet — the first walk is step CF0.7. |
+| **Delivery order** | Three phases, one cloud at a time (row 42): **P1** Synaplan core + Nextcloud through CF0–CF5, ending with the core API frozen as contract v1; **P2** OpenCloud; **P3** ownCloud.online. §6. |
+| **How it is built** | One brief per step for a coding agent ([`08`](./08_agent_briefs.md)), three test layers per sprint, run per phase ([`09`](./09_functional_tests.md)), pinned local stacks ([`10`](./10_local_environments.md)), a reference client that plays the app side of every protocol (row 45). Environment briefs E-1…E-4 and E-6 run before CF0.7, E-9 before CF2.1. |
 | **Repos** | `synaplan` (core API, Library, Tasks, Apps), `synaplan-nextcloud`, `synaplan-owncloud-online`, `synaplan-opencloud`, `synaplan-docs` |
 | **User-facing names** | **Searchable by AI** (bird) · **Watch with Synaplan** / **Watched folders** (bird with eyes) · **Copy to cloud** · **Organisation login** · **Connect your Synaplan account**. Full table in §11. |
 | **Binding contracts** | UX rules U1–U12 ([`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)), AGENTS.md "Perfect UX & Stability", Wave 6 decision §0 #5 "do not invent a fourth auth scheme" ([`../20260917-backend-integrations/00_master_plan.md`](../20260917-backend-integrations/00_master_plan.md)), Galera migration rules, API-key scope enforcement (`backend/src/Security/ApiKeyScope.php`). |
@@ -13,16 +14,16 @@
 | File | Content |
 | ---- | ------- |
 | `00_master_plan.md` (this) | Pitch, what "one level" means, decisions, architecture, parity target, waves, invariants, rollout |
-| [`01_baseline_and_gaps.md`](./01_baseline_and_gaps.md) | Verified state of the three apps and the core, 17 defects, gap matrix, platform constraints |
+| [`01_baseline_and_gaps.md`](./01_baseline_and_gaps.md) | Verified state of the three apps and the core, 20 defects, gap matrix, platform constraints |
 | [`02_identity.md`](./02_identity.md) | Goal 2 — four connection modes, one identity row, credentials, lifecycle |
 | [`03_send_to_cloud.md`](./03_send_to_cloud.md) | Goal 1 — copy Synaplan files into a linked cloud; add from Synaplan inside the cloud |
 | [`04_file_state_and_watches.md`](./04_file_state_and_watches.md) | Goal 3 — the bird, the sidebar, watched folders, automations |
 | [`05_journeys_and_wireframes.md`](./05_journeys_and_wireframes.md) | Journeys J-CF-1…15, wireframes, copy in five locales |
-| [`06_sprints.md`](./06_sprints.md) | Spikes CF-S1…S5 and sprints CF0–CF6 |
+| [`06_sprints.md`](./06_sprints.md) | Phases P0–P3, spikes CF-S1…S5 and sprints CF0–CF6 |
 | [`07_files_into_runs.md`](./07_files_into_runs.md) | Files, not paths: what a run receives, fetching more files (`folder_fetch` + pickup), what Synaplan may read, file work in the sandbox, try it on a file |
 | [`08_agent_briefs.md`](./08_agent_briefs.md) | The work orders: rules for an agent, definition of done, one brief per spike and step (repo, branch, files, build list, tests, acceptance) |
 | [`09_functional_tests.md`](./09_functional_tests.md) | Three test layers per sprint: unit and contract, integration scripts, browser walks with expected results; fixtures, accounts, regression set |
-| [`10_local_environments.md`](./10_local_environments.md) | Local stacks for Synaplan, Keycloak, Nextcloud, OpenCloud, ownCloud.online: pins, requirements, inventory of what was found, cleanup, update briefs E-1…E-8, `env-check.sh` |
+| [`10_local_environments.md`](./10_local_environments.md) | Local stacks for Synaplan, Keycloak, Nextcloud, OpenCloud, ownCloud.online: pins, requirements, inventory of what was found, cleanup, update briefs E-1…E-9, `env-check.sh` |
 | [`STATUS.md`](./STATUS.md) | Step ledger, decision log, review log |
 
 ---
@@ -117,8 +118,10 @@ Defects that block the floor today (detail in `01` §4):
 
 ## 3. Decision checklist — a brief starts when every row it cites is agreed
 
-Rows 1–36 agreed 2026-10-14 (the proposed default, unchanged). Rows 37–41
-are still proposed; briefs that cite them wait.
+Rows 1–36 agreed 2026-10-14 (the proposed defaults). Row 42 agreed the same
+day by the product owner; it amended rows 33–35, marked in place. Rows 37–41
+and 43–46 are proposed; briefs that cite them wait. Row 11's signing clause
+takes effect with row 37.
 
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
@@ -154,15 +157,20 @@ are still proposed; briefs that cite them wait.
 | 30 | **What Synaplan may read** | Set by the person **in the cloud**: only folders I watch (default) · also folders I allow (right-click → **Let Synaplan read this folder**) · all my files. The app enforces it and reports it to Synaplan, which pre-checks, tells the planner and shows it on the Apps card. Admin cap per app (default: folders people allow). | yes |
 | 31 | **File work on cloud files** | Watch tasks and chats may use file work (`code_run`) on the attached files where Compute is on: Python / Node images with their libraries, no network, Compute quotas. Unattended file work asks once at creation and sets the task's existing "allow unattended" flag; otherwise each run waits in Approvals. Pinned scripts process whatever is mounted, never a test file's name. | yes |
 | 32 | **Try it, then automate** | "Run my instruction" is tried on one real file first: the app uploads it with the person's credential, Synaplan opens a trial chat, the person checks the result; **Do this for every new file** pins exactly that turn's steps into the watch task. The same button appears under any chat whose files came from one cloud folder. | yes |
-| 33 | **ownCloud.online priority** | ownCloud.online stays a full target of CF0–CF5 at parity with Nextcloud. CF-S4 asks the hoster for a test tenant on 11.0.10; without one, the local E-5 stack built from the BW-Tech checkout at the hoster's tag is the reference and the STATUS entry says so. | yes |
-| 34 | **OpenCloud chat timing** | CF1.5 (chat about a file, research chat, media, binary save) stays in CF1. It moves after CF5 only if CF-S1 or CF-S3 overrun their two-day timebox — recorded in STATUS, not decided ad hoc. | yes |
-| 35 | **If capacity is short in CF2** | Nextcloud organisation login (CF2.6) before OpenCloud Connect mode (CF2.7's cut line): Nextcloud is the installed base, and OpenCloud already has organisation login. CF2.7's registration, consent, bind and lifecycle are not cut. | yes |
+| 33 | **ownCloud.online priority** | ownCloud.online stays a full target at parity with Nextcloud, delivered in P3 (row 42). CF-S4 runs in P1, before the contract freeze, on the host install (BW-Tech checkout at 11.0.11 + 39 commits) and asks the hoster which version it runs and for a test tenant. E-5, the first brief of P3, pins `OCO_TAG` to that version (default `v11.0.10`, the version the app README names) and becomes the reference; without a tenant the STATUS entry says so. *Amended 2026-10-14 by row 42.* | yes |
+| 34 | **OpenCloud chat timing** | CF1.5 (chat about a file, research chat, media, binary save) is the first step of P2. It needs OIDC bearer tokens on `/v1/chat/completions` (CF2.2) and adds nothing to the contract, so it may run during P1 when a second agent is free. *Amended 2026-10-14 by row 42.* | yes |
+| 35 | **If capacity is short in CF2** | In P1, Nextcloud organisation login (CF2.6) is the only conditional step; it follows CF-S2. In P2, OpenCloud's registration, consent, bind and lifecycle are not cut; its Connect-your-account mode (CF2.7's cut line) may move to CF6. *Amended 2026-10-14 by row 42.* | yes |
 | 36 | **Dev-mode test hooks in the apps** | Three admin-CLI-only switches per app (`dev_hold_inbound`, `dev_mute_events`, `dev_allow_self_write`) and two `APP_ENV=dev\|test`-only core values (`CLOUD_DELIVERY_TTL_SEC`, `CLOUD_DELIVERY_UNCONFIRMED_SEC`) so the integration scripts can test the pending, reconcile and loop-guard paths (`08` §0.8). Never visible in a UI. | yes |
 | 37 | **Notification proof** | Every notification to an app (`delivery`, `pickup`, `watches_changed`, `identity_revoked`) is signed with an installation-wide Ed25519 notify key: the existing `FederationSigner`, the key pair encrypted in `BCONFIG` like `FederationIdentityStore`. The app gets the public key with its instance credential (`instances/self`) and checks signature, instance, time (± 5 min) and a ten-minute list of seen ids before it calls Synaplan; anything else gets `401`, no call back, and a per-address rate limit (`03` §2). Not chosen: rate limits alone (each forged request would still cost a call to Synaplan) and an HMAC per instance (Synaplan would have to keep every instance secret readable). | |
 | 38 | **Deleting a person in one cloud** | Revokes that identity and the keys bound to it and stops its watches. The Synaplan account goes with it only while that cloud alone manages it: provisioned for this identity, no other active identity, no password of its own, not an administrator (`02` §7). For an account the rule keeps, the generic admin delete answers `409 account_in_use` when an API key calls it — the call today's app releases make. | |
 | 39 | **Provisioned identities** | Provisioning writes the canonical row when the call carries the instance credential: client and instance from the credential, the bare platform user id, the minted key bound to the row. Rows written the old way are adopted by a one-time job in each app — instance credential **and** the person's key on each call (`02` §3.1). A row no app adopts keeps today's behaviour. | |
 | 40 | **Files remember their cloud** | `BFILES.BSOURCEINSTANCE` names the platform instance a cloud file came from; upload, overwrite, status, source events and watches match (instance, remote id) (C19). The instance comes from the credential, never from the request. A row written before (no instance) is matched — and given the instance — only when its owner has no other identity for that client; the migration does this up front, the PR shows the counts, and rows of owners with two instances of one client stay unscoped. **Schema ask recorded.** | |
-| 41 | **Watch index** | Each app keeps a local index of the active watches on its instance (eyes for everyone, event matching), filled from a paginated, incremental instance call (≤ 500 per page, a `since` cursor with tombstones, `ETag`). Caps bound it: 50 active watches per person, 5 000 per instance (a Synaplan admin may change the instance cap). CF-S3, CF-S4 and CF-S5 measure sync and matching at the cap (`04` §B.7, §B.8). | |
+| 41 | **Watch index** | Each app keeps a local index of the active watches on its instance (eyes for everyone, event matching), filled from a paginated, incremental instance call (≤ 500 per page, a `since` cursor with tombstones, `ETag`). Caps bound it: 50 active watches per person, 5 000 per instance (installation-wide `BCONFIG` `CLOUD_FILES.WATCHES_PER_INSTANCE`; a Synaplan admin may change it). CF-S3, CF-S4 and CF-S5 measure sync and matching at the cap (`04` §B.7, §B.8). | |
+| 42 | **Delivery order** | Three phases, one cloud at a time. **P1:** the Synaplan core and the Nextcloud app through CF0–CF5, tested end to end. **P2:** OpenCloud. **P3:** ownCloud.online. The core API the apps use is completed in P1 and frozen at its exit (row 44); P2 and P3 build on it. All five spikes answer before the freeze, because their answers can change the core. The end state of rows 1–36 does not change. | yes (product owner, 2026-10-14) |
+| 43 | **What each app supports** | Each app reports its features with its instance credential (`PATCH instances/self` → `app_capabilities`: `deliveries`, `pickups`, `read_scope`, `source_events`, `watches`, `trials`, `file_sets`). Every Synaplan surface that offers a cloud — Copy to cloud, folder channels for `folder_fetch`, the Watched-folders empty state, the Apps card's feature line — offers only clouds whose app reports the feature. A cloud on an older app release never shows a dead control while another cloud already has the feature. | |
+| 44 | **Cloud-apps contract v1** | At the P1 exit the app-facing API is frozen as contract v1: every path, body, status and error code, capability name, notification format and limit, written as fixtures in `backend/tests/Fixtures/cloud-apps-contract/` (README with the source commit, notify test vectors) and vendored byte for byte into each app repo with a checksum test — the pattern of the desktop contract. `instances/self` answers `contract: 1`. Afterwards only optional fields and new capabilities may be added; anything else is a contract v2 decision. | |
+| 45 | **Reference client** | A small test app in `_devextras/testing/cloud-apps/fixture-app/` (PHP built-in server like `messages-gateway/fixture-upstream.php`, container `cloud-fixture` on the Synaplan network) plays the app side of every protocol in two profiles: `keyed` (per-user keys, numeric file ids, bare etags — like Nextcloud) and `sso` (OIDC bearer through Keycloak plus background key, OpenCloud-style ids `storage$space!node` of about 110 characters, quoted etags). Every core brief from CF2.1 on is accepted against it; journeys are walked in the app briefs. It proves in P1 the paths only OpenCloud and ownCloud.online use later. | |
+| 46 | **Switching on per phase** | Replaces the timing of row 22 once agreed: `cloud_files` goes on for new installs, on web.synaplan.com and through the activation migration after the P1 exit — the core is complete then, surfaces follow each app's features (row 43), and older app releases are untouched (C1). P2 and P3 publish only their app releases. | |
 
 ---
 
@@ -257,29 +265,50 @@ Tasks tab).
 | Try it on a file, then automate | add | add | add | CF5 |
 | Watching folders without the app (WebDAV) | — | — | — | CF6 |
 
+Delivered per phase (row 42): every core piece and the Nextcloud column in
+P1, the OpenCloud column in P2, the ownCloud.online column in P3. The table
+is the state at the end of P3.
+
 ---
 
-## 6. Waves
+## 6. Phases and waves
 
-Detail, steps and exits: [`06_sprints.md`](./06_sprints.md).
+Detail, steps and exits: [`06_sprints.md`](./06_sprints.md); dependency map
+and parallel work: `08` §1; tests per phase: `09` §8.
 
-| Wave | Content | Exit | Cut line |
-| ---- | ------- | ---- | -------- |
-| **CF-S** | Five spikes, parallel to CF0: OpenCloud web extension points, Nextcloud `user_oidc` token exchange, OpenCloud unattended access, ownCloud 11 Files APIs, Nextcloud Files APIs at scale | Each answer is a dated STATUS entry | — |
-| **CF0 — Fix and align** | D1–D3 in the core, docs truth, STATUS hygiene, first walks of J-NC-1…3 | Per-user modes work end to end in Nextcloud and ownCloud.online | Never cut |
-| **CF1 — Parity floor** | ownCloud.online link mode, consent, tests, CI; Nextcloud CI and key encryption; five locales; OpenCloud chat + binary save | `01` §5 matrix shows no unexplained gap below Nextcloud 1.6 | OpenCloud chat may move after CF5 |
-| **CF2 — One identity** | Registration for all three, canonical identity rows, bind and attribution, background key, lifecycle, files that remember their cloud, Apps cards, Nextcloud organisation login, OpenCloud link mode | J-CF-1, J-CF-2, J-CF-11 walked | OpenCloud link mode may move to CF6 |
-| **CF3 — Files both ways** | Out: `platform` destination, notify-then-fetch, copy ledger, Library menu, New → From Synaplan. In: pickup protocol, `folder_fetch`, read scope set in the cloud, WebDAV `list()` / `get()` | J-CF-3, J-CF-4, J-CF-14 walked | — |
-| **CF4 — Searchable state** | Status call, source events, bird, sidebar, glyph kit | J-CF-5 walked | OpenCloud row bird waits for an extension point (sidebar ships) |
-| **CF5 — Watched folders and automations** | Watch model, ledger, `file_event` trigger with files attached, three file sets, presets, try it on a file, unattended file work consent, event sources, reconciliation, Tasks → Watched folders | J-CF-6…13 and J-CF-15 walked | "Use one of my tasks" and "The whole folder" may follow |
-| **CF6 — Beyond the apps** | WebDAV feeder (roadmap "folder watch"), pull mode for copies and pickups, ownCloud.online organisation login, Nextcloud Flow / Assistant provider | Per item | Optional |
+### 6.1 Phases (row 42)
 
-Order: CF-S and CF0 together → CF1 → CF2 → CF3 and CF4 in parallel → CF5 →
-CF6. Partner-repo steps in one wave may run in parallel once that wave's core
-step is merged and released. Every step has a brief in [`08`](./08_agent_briefs.md)
-and its sprint has a test plan in [`09`](./09_functional_tests.md); the
-dependency and parallelism map is `08` §1. Spikes are timeboxed to two working
-days each and end in a STATUS entry, never in merged code.
+| Phase | Builds | Starts when | Exit |
+| ----- | ------ | ----------- | ---- |
+| **P0 — Ready** | Local stacks E-1…E-4 and E-6 (E-5 is P3) | The rows the first briefs cite are agreed | `env-check.sh --cloud nextcloud --oidc` green |
+| **P1 — Core + Nextcloud** | Every `synaplan` step of CF0–CF5 except CF2.11, and every `synaplan-nextcloud` step; the reference client E-9 before CF2.1; spikes CF-S2 and CF-S5 at the start, CF-S1, CF-S3 and CF-S4 answered before CF3.1 and CF5.1 merge | P0 exit | Nextcloud journeys walked; reference client green in both profiles; the current OpenCloud and ownCloud.online releases still work against the new core; contract v1 frozen (CF5.10) |
+| **P2 — OpenCloud** | Every `synaplan-opencloud` step and the OpenCloud Apps card (CF2.11) | P1 exit (CF1.5 may start earlier, row 34) | OpenCloud journeys walked against contract v1 |
+| **P3 — ownCloud.online** | Every `synaplan-owncloud-online` step, on the E-5 stack | P2 exit | ownCloud.online journeys walked; §5 has no open cell |
+
+One cloud at a time. A core change in P2 or P3 is additive (row 44), needs a
+dated STATUS decision, and runs with the reference-client suite and the
+Nextcloud regression set.
+
+### 6.2 Waves inside a phase
+
+| Wave | Content | Exit (on the phase's cloud) | Cut line |
+| ---- | ------- | --------------------------- | -------- |
+| **CF-S** | Five spikes: Nextcloud organisation login (CF-S2) and Nextcloud Files APIs at scale (CF-S5) at the start of P1; OpenCloud web extension points (CF-S1), OpenCloud unattended access (CF-S3) and ownCloud 11 Files APIs (CF-S4) during P1, before the freeze | Each answer is a dated STATUS entry | — |
+| **CF0 — Fix and align** | D1–D3 in the core, docs truth, STATUS hygiene, first walks of J-NC-1…3 | Per-user modes work end to end in Nextcloud; the current OpenCloud and ownCloud.online releases are unchanged or better | Never cut |
+| **CF1 — Parity floor** | Nextcloud CI, key encryption, E2E, five locales (P1); OpenCloud chat, media, binary save, locales (P2); ownCloud.online link mode, consent, tests, CI, locales (P3) | No unexplained gap below Nextcloud 1.6 for the phase's cloud (`01` §5.2) | OpenCloud chat may move after CF5 of P2 |
+| **CF2 — One identity** | Core: instance columns, app capabilities, canonical identity rows, bind and attribution, OIDC bearer on chat, background key, lifecycle, files that remember their cloud, Apps cards. Apps: Nextcloud identity basics and organisation login (P1), OpenCloud registration and bind (P2), ownCloud.online lifecycle (P3) | J-CF-1 (where the cloud has organisation login), J-CF-2 / J-NC-1, identity half of J-CF-11 | Nextcloud organisation login follows CF-S2; OpenCloud link mode may move to CF6 |
+| **CF3 — Files both ways** | Out: `platform` destination, signed notify-then-fetch, copy ledger, Library menu, New → From Synaplan. In: pickup protocol, `folder_fetch`, read scope set in the cloud, WebDAV `list()` / `get()` | J-CF-3, J-CF-4, J-CF-14 | — |
+| **CF4 — Searchable state** | Status call, source events with re-upload, bird, sidebar, glyph kit | J-CF-5 | OpenCloud row bird waits for an extension point (sidebar ships) |
+| **CF5 — Watched folders and automations** | Watch model, ledger, `file_event` trigger with files attached, three file sets, presets, try it on a file, unattended file-work consent, event sources, reconciliation, Tasks → Watched folders; in P1 also the contract freeze (CF5.10) | J-CF-6…13 and J-CF-15 | "Use one of my tasks" and "The whole folder" may follow |
+| **CF6 — Beyond the apps** | WebDAV feeder (roadmap "folder watch"), pull mode for copies and pickups, ownCloud.online organisation login, Nextcloud Flow / Assistant provider | Per item | Optional, after P3 |
+
+Order inside a phase: CF0 → CF1 → CF2 → CF3 and CF4 (their core steps in
+parallel) → CF5. An app step starts when the core steps it depends on are
+merged to `main`; an app **release** is published only after a Synaplan
+release answers the capability (C1). Every step has a brief in
+[`08`](./08_agent_briefs.md) and every sprint a test plan in
+[`09`](./09_functional_tests.md). Spikes are timeboxed to two working days
+each and end in a STATUS entry, never in merged code.
 
 ---
 
@@ -295,8 +324,8 @@ days each and end in a STATUS entry, never in merged code.
 | C6 | One run per (watch, file id, version); replays and reconciliation never run twice | Ledger unique key + tests |
 | C7 | A watch never fires on a file Synaplan itself wrote | Copy ledger lookup + app own-write guard, tested with a translate watch writing into its own folder |
 | C8 | Every run, copy and sync item ends in a terminal state with one sentence; nothing stays "running" | Scheduler sweep + tests |
-| C9 | Disconnect on either side, user deletion or instance revocation stops processing at once; watches pause, not vanish; reconnect offers to resume | Lifecycle tests + J-CF-11 |
-| C10 | Incoming keeps its meaning for unsolicited pushes; only intakes that name a knowledge folder skip it | Upload tests |
+| C9 | Disconnect on either side, turning a connection off or revoking the instance stops processing at once; watches pause, not vanish; reconnect offers to resume. Deleting the person in the cloud stops their watches (decision 38) | Lifecycle tests + J-CF-11 |
+| C10 | Incoming keeps its meaning for unsolicited pushes; a cloud upload that names a knowledge folder other than the default skips it (CF0.3) | Upload tests |
 | C11 | Galera: raw idempotent `addSql`, no Schema API, children before parents | Migration review |
 | C12 | Mobile: core PHP `backend-only`, core UI `ota-candidate`; new frontend paths classified in `.github/mobile-impact-policy.json` | `node scripts/mobile-impact.mjs` |
 | C13 | The public repos carry no hostnames, IPs or secrets of real installations | Review + secret scans |
@@ -307,21 +336,27 @@ days each and end in a STATUS entry, never in merged code.
 | C18 | Removing a person in one cloud never deletes a Synaplan account that another connection or the person's own sign-in still uses; only that identity and its keys go | Lifecycle tests: a sole provisioned account is deleted; the same account with a second identity, a password or the admin role is kept and only the identity revoked; the generic admin delete called with an API key answers 409 for a kept account |
 | C19 | A cloud file is identified by (instance, remote id): no upload, overwrite, status answer, source event or watch from one cloud touches a copy from another | Repository tests with two instances sharing remote id `5678`; `cf2-file-instance.sh` |
 | C20 | An app calls Synaplan for a notification only after verifying it: signature with a published notify key, its own instance id, a timestamp within five minutes, an id not seen in the last ten minutes | App tests with a mocked HTTP client (zero calls for forged, replayed, stale and misaddressed notifications); `cf3-inbound.sh` |
+| C21 | Synaplan offers a cloud for a feature only when its app reports the feature (`app_capabilities`, row 43); an app offers a feature only when the core reports it (`capabilities`) | Surface tests with an instance that reports nothing: no copy target, no folder channel, no watch hint; app tests against a core without capabilities (J-CF-12) |
+| C22 | After the P1 exit the app-facing API changes only additively; the contract fixtures vendored into each app repo match the core byte for byte | Checksum test in each app repo; contract tests in the core (row 44) |
 
 ---
 
 ## 8. Rollout
 
-1. **CF0 ships as fixes** (no flag): it makes already-shipped modes work.
-2. Core CF2–CF5 merge behind flags. An app release that uses a new core
-   feature is published only after a core release answers that capability in
-   `instances/self`; apps hide what the core lacks.
-3. Docs first, then enable on web.synaplan.com once every journey is walked on
-   the local stacks of all three clouds pinned in [`10`](./10_local_environments.md)
-   (Nextcloud `:8081` on both matrix images, OpenCloud `:9200`, ownCloud.online
-   `:8083`), with the `09` §7 regression set green.
-4. New installs seed the flags on; existing installs get an activation
-   migration with a named list.
+1. **CF0 ships as fixes** (no flag): it makes already-shipped modes work for
+   the current releases of all three apps.
+2. Core steps merge behind flags during P1. An app release that uses a new
+   core feature is published only after a Synaplan release answers that
+   capability in `instances/self`; apps hide what the core lacks, and
+   Synaplan hides clouds whose app lacks a feature (row 43, C21).
+3. **After the P1 exit:** docs first, then the Nextcloud app release, then
+   `cloud_files` on for new installs and on web.synaplan.com with the
+   activation migration for existing installs (row 46; until it is agreed,
+   row 22's timing — after the CF5 walks — applies). The walks run on the
+   stacks pinned in [`10`](./10_local_environments.md) with the `09` §7
+   regression set green.
+4. **P2 and P3** each end with their app release and the docs page for that
+   cloud; no core switch.
 5. **Rollback:** flag off → capabilities disappear → apps hide watch, bird and
    copy surfaces. Copies already made, files already searchable and keys stay
    valid.
@@ -349,6 +384,11 @@ days each and end in a STATUS entry, never in merged code.
 ---
 
 ## 10. Success criteria
+
+The ten criteria hold for all three clouds at the end of P3. Each phase exit
+checks them for its own cloud (`09` §8); the P1 exit also needs contract v1
+frozen, the reference client green in both profiles, and the current
+OpenCloud and ownCloud.online releases still working against the new core.
 
 1. A Nextcloud, an ownCloud.online and an OpenCloud user each connect (or sign
    in with the organisation login), make a file searchable, see the bird

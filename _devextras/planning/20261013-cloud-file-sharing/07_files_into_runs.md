@@ -37,8 +37,8 @@ get?**
 | Choice | A run starts when | The run's attachments | Fits |
 | ------ | ----------------- | --------------------- | ---- |
 | **The new file** (default) | A file arrived or changed and stayed quiet for 60 s | That one file | Translate it, summarize it, extract fields from it |
-| **New files together** | The collection window closes: 10 minutes after the first file (editable 1 minute – 24 hours), or at 50 files | Every file that arrived in the window | "Merge this morning's CSV exports into one Excel", one digest mail for many files |
-| **The whole folder** | Something in the folder changed, at most once per window (default 1 hour) | Every file in the folder that passes the type filter, up to the run limit | "Rebuild the price list from all supplier sheets", "compare all versions" |
+| **New files together** | The collection window closes: 10 minutes after the first file (`BWINDOWSEC` default 600, editable 60 – 86 400), or at 50 files (`BMAXFILES`) | Every file that arrived in the window | "Merge this morning's CSV exports into one Excel", one digest mail for many files |
+| **The whole folder** | Something in the folder changed, at most once per window (`BWINDOWSEC` default 3 600, editable 600 – 86 400) | Every file in the folder that passes the type filter, up to the run limit | "Rebuild the price list from all supplier sheets", "compare all versions" |
 
 How the files arrive — always **pushed by the app**, so watches keep working
 when Synaplan cannot reach the cloud (outbound HTTPS from the cloud only):
@@ -133,6 +133,21 @@ Rules:
   Synaplan web can read from OpenCloud without a stored key for that person.
   One shared account: absent (there is no person to read as).
 
+Wire shapes (ids and versions are the cloud's strings, at most 255
+characters, compared exactly as sent):
+
+| Call | Request | Answer |
+| ---- | ------- | ------ |
+| `claim` | — | `200 {id, external_id, mode: list \| fetch, selector: {folder_id?, folder_path?, pattern?, changed_since?, recursive}, read_scope: {mode, folders: [{id, path}]}, limits: {max_files: 50, max_bytes: 209715200, max_file_bytes: 104857600}, expires_at}`; errors as for copy claims (`404`, `403 wrong_instance`, `409 already_claimed`, `410 expired`) |
+| `listing` | `{items: [{id, version, name, folder, size, mime}]}` (≤ 500 per call, repeatable) | `{upload: [id…], reuse: [{id, file_id}], skip: [{id, reason: too_large \| type_not_read \| over_limit}]}` |
+| `files` | multipart `file` + `id`, `version` — one file per call | `200 {file_id}`; an id not in the last `upload` list → `409` |
+| `result` | `{status: done \| partial \| failed, listed, sent, skipped: [{id, name, reason}], error_code?}` | `200 {state}`; idempotent |
+
+Uploads into a pickup need the instance credential of the instance that
+claimed it, while the pickup is `claimed` and not expired — no second token.
+`mode: list` ends after `listing` (no files, the step gets the names);
+`mode: fetch` continues with `files`.
+
 ---
 
 ## 5. What Synaplan may read
@@ -142,9 +157,9 @@ cloud**, where the files are.
 
 | Setting (cloud personal settings) | Synaplan may read |
 | --------------------------------- | ----------------- |
-| **Only folders I watch** (default) | Watched folders and files |
-| **Also folders I allow** | Plus folders added with right-click → **Let Synaplan read this folder** (listed in personal settings, removable there) |
-| **All my files** | Everything the person can open; shown with a warning sentence |
+| **Only what I watch** (default; `mode: watched`) | Watched folders and files |
+| **Also folders I allow** (`mode: allowed`) | Plus folders added with right-click → **Let Synaplan read this folder** (listed in personal settings, removable there) |
+| **All my files** (`mode: all`) | Everything the person can open; shown with a warning sentence |
 
 - The app is authoritative and enforces it on every pickup. It reports changes
   to Synaplan (`PUT /api/v1/platform-links/read-scope`, instance call:
@@ -280,6 +295,7 @@ becomes a knowledge folder and the AI searches it) — the limits steer there.
 | Too many files | "Incoming has 312 files; a run takes at most 50. Nothing was read." | Narrow the types, or Keep searchable |
 | File work needs approval | "Waiting for your approval to run file work on contract.docx." | Approvals inbox (existing) |
 | File work off on this installation | — (the step and the dialog option are absent) | — |
+| Pinned script names the test file (C17) | "This step uses the name of the file you tried it on (invoice-0912.pdf), so it would fail on other files. Change it to work on whatever files a run gets." | The Steps editor opens at that step |
 
 ---
 
@@ -287,20 +303,20 @@ becomes a knowledge folder and the AI searches it) — the limits steer there.
 
 | Method | Path | Auth | Purpose |
 | ------ | ---- | ---- | ------- |
-| `POST` | `/api/v1/platform-links/pickups/{id}/claim` | instance | Read the ticket: platform uid, selector, scope, limits, mode |
-| `POST` | `/api/v1/platform-links/pickups/{id}/listing` | instance | Send the listing; answer = ids to upload |
-| `POST` | `/api/v1/platform-links/pickups/{id}/files` | instance + ticket | Upload one file into the ticket |
-| `POST` | `/api/v1/platform-links/pickups/{id}/result` | instance | Close: status, counts, skipped with reasons |
+| `POST` | `/api/v1/platform-links/pickups/{id}/claim` | instance | Read the ticket: platform uid, selector, scope, limits, mode (§4 shapes) |
+| `POST` | `/api/v1/platform-links/pickups/{id}/listing` | instance (the claiming one) | Send the listing; answer = ids to upload, reuse, skip |
+| `POST` | `/api/v1/platform-links/pickups/{id}/files` | instance (the claiming one, while claimed) | Upload one file into the pickup |
+| `POST` | `/api/v1/platform-links/pickups/{id}/result` | instance (the claiming one) | Close: status, counts, skipped with reasons |
 | `PUT` | `/api/v1/platform-links/read-scope` | instance | Report a person's read scope |
 | `POST` | `/api/v1/cloud/watches/{id}/snapshots` | person / background key, `cloud:watch` | Whole-folder listing; answer = versions to upload |
 | `POST` | `/api/v1/cloud/watches/{id}/snapshots/{sid}/close` | person / background key, `cloud:watch` | Start the whole-folder run |
 | `POST` | `/api/v1/cloud/trials` | person, `cloud:watch` | Create the trial chat for "Try it on a file": uploaded file, instruction, watched folder; returns the chat URL |
-| `POST` | `/api/v1/cloud/watches/from-message/{id}` | session | "Do this for every new file": watch + task from that turn's pinned steps |
+| `POST` | `/api/v1/cloud/watches/from-message/{id}` | session only (API keys get `403`, `02` §4.1) | "Do this for every new file": watch + task from that turn's pinned steps |
 
 | Change | Detail |
 | ------ | ------ |
 | `Capability::FolderFetch` (`folder_fetch`) | New runner beside `UrlFetchRunner` / `McpFetchRunner`; read class; hidden when no folder channel is connected |
 | `SavedTaskRunner::run()` | Accepts the run's files and attaches them to the run message before processing |
 | `BCLOUDPICKUPS` (schema ask) | `BID`, `BOWNERID`, `BIDENTITYID` / `BCONNECTIONID`, `BRUNID`, `BMESSAGEID`, `BMODE` (`list` / `fetch`), `BSELECTOR` (JSON), `BSTATE` (`queued` / `claimed` / `done` / `partial` / `failed`), `BLISTED`, `BSENT`, `BSKIPPED` (JSON), `BERRORCODE`, `BCREATED`, `BFINISHED` |
-| `BCLOUDWATCHES` (schema ask, `04` §E.2) | adds `BFILESET` (`new_file` / `together` / `whole_folder`), `BWINDOWSEC`, `BMAXFILES` |
-| `BEXTERNALIDENTITIES` (schema ask, `02` §9) | adds `BREADSCOPE` (JSON mirror of the app's setting) |
+| `BCLOUDWATCHES` (schema ask, `04` §E.2) | created by CF5.1 with `BFILESET` (`new_file` / `together` / `whole_folder`), `BWINDOWSEC`, `BMAXFILES`; CF5.7 adds no column |
+| `BEXTERNALIDENTITIES` (schema ask, `02` §9) | `BREADSCOPE` (JSON mirror of the app's setting) is added by CF2.2 with the other identity columns; CF3.6 only writes it |

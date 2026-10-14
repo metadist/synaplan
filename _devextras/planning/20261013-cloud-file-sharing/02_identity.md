@@ -1,6 +1,7 @@
 # Goal 2 — one login story, one way of handling people
 
-Plan of record: [`00_master_plan.md`](./00_master_plan.md) (decisions 3–10).
+Plan of record: [`00_master_plan.md`](./00_master_plan.md) (decisions 3–10,
+38–40, 43).
 
 ## 1. Target
 
@@ -82,7 +83,10 @@ The row gains two columns (schema ask, §9): `BMODE` (`sso` / `link` /
    `PATCH instances/self` (`server_id`, the cloud's own `instanceid`).
    Checked twice, like bind: an instance cannot adopt a person without that
    person's key, and a key cannot pick an instance. A repeated call answers
-   200 with the canonical row.
+   200 with the canonical row. If the canonical row already exists — the
+   person linked the same cloud before — Synaplan binds the key to that row,
+   deletes the legacy row and answers 200; it never writes a second row for
+   the same `(client, instance, uid)` (unique key `uniq_extid_source`).
 3. **What stays.** A row no app adopts keeps today's behaviour: provisioning
    still finds the person through the user details, nothing shows it as a
    connection, and lifecycle calls cannot reach it — its cloud's old release
@@ -108,11 +112,25 @@ What the row powers:
 client registered for that instance. A different app cannot bind people to an
 instance, and an instance cannot bind a user without that user's live token.
 
+**Which client is `azp`.** The instance registers as `oidc_client_id` the
+client id that appears as `azp` in the tokens the app sends to Synaplan — not
+the client people log in with. For OpenCloud that is its token-exchange
+client (`synaplan-opencloud` in dev), because the exchanged token is issued
+to it; for Nextcloud it is whatever CF-S2 records. The exchanged token's
+audience is Synaplan's own OIDC client (`OIDC_CLIENT_ID`, `synaplan-app` in
+dev). `cf2-identity.sh` decodes a real exchanged token and checks `azp`
+before it asserts on bind.
+
 **Attribution.** `OidcBearerAuthenticator` already validates the token. When
 `azp` matches a registered instance, it now touches the identity row's
 `BLASTSEEN` and refuses with `403 platform_disconnected` when the row is
-revoked. Tokens from clients that are not registered behave exactly as today
-(C1).
+paused or revoked. Tokens from clients that are not registered behave exactly
+as today (C1).
+
+**Bearer tokens on chat (D18).** Today the `openai_compat` firewall (`^/v1`)
+accepts only API keys. CF2.2 adds `OidcBearerAuthenticator` to that firewall
+for exactly `POST /v1/chat/completions` and `GET /v1/models`, with the same
+attribution; every other `/v1/*` path still refuses bearer tokens.
 
 ---
 
@@ -151,10 +169,13 @@ handshake or OIDC for hosted apps … do not invent a fourth scheme". No
 
 | Change | Why |
 | ------ | --- |
-| `chat` gains exact branches `POST /api/v1/summary/generate`, `POST /v1/chat/completions`, `GET /v1/models`; `chat` also covers `POST /api/v1/media/generate` and the media download path; `memories` covers `GET /api/v1/config/memory-service/check` | D1 — the paths the apps already call. Exact method + path branches before the `/v1/` prefix, same pattern as the app-accounts plan's `app:ai` (C3) |
+| `chat` gains exact branches `POST /api/v1/summary/generate`, `POST /v1/chat/completions`, `GET /v1/models`, `POST /api/v1/media/generate` | D1 — the paths the apps already call. Exact method + path branches before the `/v1/` prefix, same pattern as the app-accounts plan's `app:ai` (C3). Generated media is downloaded through `/api/v1/files/uploads/…` (`StaticUploadController`), which `files` already covers |
+| `GET /api/v1/config/memory-service/check` is allowed for `chat` **or** `memories` | Provisioned keys carry `chat files rag` only (`ApiKeyScope::provisionedPlatformScopes()`), and the apps call this check before every chat |
 | `files` covers `POST /api/v1/cloud/status` and `GET /api/v1/cloud/files/*` | Reading the state of my own files is file access |
-| **new** `cloud:watch` covers `/api/v1/cloud/watches*` | Watching runs tasks while the person is away — a new permission, granted on purpose |
-| Background key = `files rag cloud:watch` | Enough to upload watched files and run the person's watch tasks, nothing else |
+| **new** `cloud:watch` covers `/api/v1/cloud/watches` and `/api/v1/cloud/watches/*` except `from-message`, and `POST /api/v1/cloud/trials` | Watching runs tasks while the person is away — a new permission, granted on purpose. A trial uploads a file to try a watch on |
+| `POST /api/v1/cloud/watches/from-message/*` is **session only**: API keys get `403` | It pins a turn of a chat in Synaplan web; no app calls it |
+| `POST /api/v1/platform-links/identities/adopt` accepts a key with any of `chat`, `files`, `rag` (plus the instance credential) | The person's own provisioned key proves the person |
+| Background key = `files rag cloud:watch` | Enough to upload watched files, re-upload files kept up to date and run the person's watch tasks, nothing else |
 
 A contract fixture lists every Synaplan path each app calls (from `01` §2) and
 asserts allow for its scope set and deny for the neighbours.
@@ -187,7 +208,7 @@ shows one extra card:
  Person (cloud UI)        Cloud app server                       Identity provider          Synaplan
  ─────────────────        ────────────────                       ─────────────────          ────────
  first Synaplan action ─► no identity yet? → consent card
- clicks "Use Synaplan" ─► token for audience "synaplan" ───────► token exchange ──► token
+ clicks "Use Synaplan" ─► token for Synaplan's client ─────────► token exchange ──► token
                           POST /platform-links/sso/bind  (Bearer + instance credential + platform uid) ─────► check azp,
                                                                                                     write row (mode sso)
  every later action ───► Bearer token (cached until expiry − 30 s) ───────────────────────────────► runs as the person
@@ -207,8 +228,10 @@ shows one extra card:
 - **Admin check** in each app: "Check organisation login" exchanges a token for
   the admin's own session and calls `GET /api/v1/auth/me`. Result is a sentence:
   "Works — Synaplan sees you as ada@example.org", or "Your identity provider
-  refused a Synaplan token. Ask its administrator to allow token exchange from
-  'nextcloud' to 'synaplan'."
+  did not let Nextcloud sign you in to Synaplan. Ask its administrator to
+  allow it." The **Advanced** section below names the technical setting
+  (OpenID Connect token exchange from the Nextcloud client to Synaplan's
+  client).
 - **Open in Synaplan** links (runs, files, watched folders) land on Synaplan's
   login page; with OIDC auto-redirect on (`LoginView.vue`, `auto_redirect`)
   the person arrives without a click.
@@ -247,9 +270,14 @@ until an administrator sets a new key."
 
 ### 6.1 Apps cards (Nextcloud, ownCloud.online, OpenCloud)
 
-`frontend/src/apps/catalog.ts` gains an `opencloud` entry; `status.ts`
-reads identity rows (`GET /api/v1/me/platform-links`, extended with mode, last
-seen and counts) instead of platform links only.
+`status.ts` reads identity rows (`GET /api/v1/me/platform-links`, extended
+with mode, status, last seen and counts) instead of platform links only
+(CF2.5, P1). The cards render in
+`frontend/src/components/config/LinkedPlatformsConfiguration.vue`, which the
+Outlook connection shares — the Outlook flow must stay unchanged (C2).
+`frontend/src/apps/catalog.ts` gains the `opencloud` entry in P2 (CF2.11):
+before CF2.7 binds them, people who use OpenCloud through their organisation
+login have no identity row, and a card saying "not connected" would be wrong.
 
 | Mode | Status sentence | Primary action | Consequence of the action |
 | ---- | --------------- | -------------- | ------------------------- |
@@ -258,9 +286,11 @@ seen and counts) instead of platform links only.
 | Accounts by admin | "Managed by files.example.org" | — | — |
 | Shared | "files.example.org uses your account for everyone there" | **Disconnect** | §5.4 |
 | Turned off (sso) | "Turned off on 13 Oct" | **Turn back on** | "OpenCloud can use your Synaplan account again. Paused folders stay paused until you resume them." |
+| Paused (cloud account disabled) | "Paused — your Nextcloud account is disabled" | — | Resumes when the cloud's administrator enables the account again |
 
-Every card also lists what the app can do in one line ("Summarize, translate,
-make files searchable, copy results into your OpenCloud, watch folders"),
+Every card also lists what the app can do in one line, built from the
+features the app reports (`app_capabilities`, row 43) — "Summarize, translate,
+make files searchable, copy results into your OpenCloud, watch folders" —
 what Synaplan may read there ("the folders you watch, Invoices/2026" — set in
 the cloud, `07` §5) and links to **Watched folders** filtered to that cloud. Empty state (no
 connection): one sentence that names where to start ("Start in Nextcloud:
@@ -272,9 +302,13 @@ Settings → Synaplan") + **How to connect** (U5).
   OpenCloud instances too, with mode, app version, "Synaplan can reach this
   cloud: yes / no" (checked when the delivery URL is saved) and the number of
   people connected.
-- Approving an instance whose host resolves to a private address says so:
-  "Synaplan will send copies to files.internal (10.0.0.5). Approve only clouds
-  you run." The resolved addresses are stored; a later change asks again.
+- Approving a delivery address on a private network says so:
+  "files.example.lan is on a private network (192.168.10.20). Synaplan will
+  call it to deliver copies and requests. Approve only clouds you run." The
+  approval stores the **hostname** (`BAPPROVEDHOSTS`), not the address, so a
+  container restart that changes the address does not break it; Synaplan
+  still refuses the hostname if it resolves to loopback or link-local
+  addresses. Removing the approval is one click in the same row.
 - User detail shows one badge per identity with its mode.
 
 ### 6.3 Errors the apps show
@@ -294,10 +328,11 @@ Settings → Synaplan") + **How to connect** (U5).
 | Event | Synaplan | The app |
 | ----- | -------- | ------- |
 | Platform user deleted | `lifecycle(deleted)`: this identity revoked, the keys bound to it revoked, its watches stopped. The Synaplan account is deleted only while this cloud alone manages it (rule below); otherwise it stays and the audit row says why | Nextcloud `BeforeUserDeletedEvent`, ownCloud `preDelete` (both exist; today they call the generic admin delete — D16), OpenCloud user-deleted event (CF-S3) |
-| Platform user disabled | `lifecycle(disabled)`: watches paused with reason "Your Nextcloud account was disabled" | Nextcloud user-changed event (`enabled`), ownCloud equivalent (CF-S4) |
+| Platform user disabled | `lifecycle(disabled)`: identity `paused`; watches paused with reason `platform_user_disabled` ("Paused — your Nextcloud account is disabled", `04` §B.2) | Nextcloud user-changed event (`enabled`), ownCloud equivalent (CF-S4) |
 | Re-enabled | `lifecycle(enabled)`: watches paused by that reason resume; the owner is told | Same events |
-| Disconnect in Synaplan | Identity revoked, key revoked, watches paused; notify `identity_revoked` | Clears local key, shows Connect / "turned off" |
-| Disconnect in the cloud | Key revoked (exists); identity revoked; watches paused | Personal settings (exists in Nextcloud) |
+| Disconnect in Synaplan | Identity row kept with `BSTATUS = revoked` (today the row is deleted — D19), key revoked, watches paused (`identity_off`); `identity_revoked` notification from CF3.1 on | Clears the local key on the notification, or at the latest on the next call (401); shows Connect / "turned off" |
+| Disconnect in the cloud | Key revoked (exists); identity row `revoked`; watches paused | Personal settings (exists in Nextcloud) |
+| Connecting again | The link exchange finds the row by `(client, instance, uid)` and sets it `active` with the new key; paused watches stay paused until the person answers "Resume 2 watched folders?" | Connect card (exists) |
 | Synaplan account deleted | Rows, keys and watches go with the account | Next call 401 → Connect card |
 | Instance revoked | Every identity of the instance revoked; watches paused | Admin screen explains (§6.3) |
 | Organisation login session ends | — | Interactive actions ask to sign in again; unattended work continues on the background key |
@@ -331,8 +366,8 @@ unchanged.
 
 | Method | Path | Auth | Purpose |
 | ------ | ---- | ---- | ------- |
-| `GET` | `/api/v1/platform-links/instances/self` | instance | Existing; adds `capabilities` (`sso_bind`, `identity_adopt`, `lifecycle`, `deliveries`, `cloud_status`, `watches`) so apps hide what the core lacks, and from CF3.1 `notify_keys` (`[{kid, public_key}]`, `03` §2) |
-| `PATCH` | `/api/v1/platform-links/instances/self` | instance | Set delivery URL, OIDC client id, app version, server id (the cloud's own `instanceid`, §3.1) |
+| `GET` | `/api/v1/platform-links/instances/self` | instance | Existing; adds `capabilities` (§8.1) so apps hide what the core lacks, `contract` (`1` from CF5.10, absent before), the stored `app_capabilities`, `delivery_url` and `reachable`, and from CF3.1 `notify_keys` (`[{kid, public_key}]`, `03` §2) |
+| `PATCH` | `/api/v1/platform-links/instances/self` | instance | Body `{delivery_url?, oidc_client_id?, app_version?, server_id?, app_capabilities?}` — every field optional, a missing field keeps its value. `server_id` is the cloud's own `instanceid` (§3.1); `app_capabilities` is a list of the names in §8.1 and replaces the stored list; names the core does not know are ignored, so a newer app keeps working with an older core (C1). `delivery_url` is checked by the delivery-origin rule of `03` §2; the answer carries `reachable` from the probe |
 | `GET` | `/api/v1/platform-links/sso/status` | bearer + instance | Is this person bound (show the consent card or not) |
 | `POST` | `/api/v1/platform-links/sso/bind` | bearer + instance | Write the identity row (mode `sso`) |
 | `POST` | `/api/v1/platform-links/sso/background-key` | bearer + instance | Mint `files rag cloud:watch`, label "OpenCloud: cloud.example.org (jdoe) — while you are away"; plaintext once |
@@ -343,12 +378,33 @@ unchanged.
 | `GET` | `/api/v1/me/platform-links` | session | Existing; adds mode, status, last seen, counts |
 | `POST` | `/api/v1/me/platform-links/{id}/turn-off` | session | Turn an organisation-login connection off: identity `paused`, the app's bearer calls answer `403 platform_disconnected`, watches pause (CF5) |
 | `POST` | `/api/v1/me/platform-links/{id}/resume` | session | Turn an organisation-login connection back on |
-| `DELETE` | `/api/v1/me/platform-links/{id}` | session | Existing disconnect for linked and provisioned identities; now also revokes the identity row and pauses watches |
+| `DELETE` | `/api/v1/me/platform-links/{id}` | session | Existing disconnect for linked identities and shared keys. Changed: the row stays with `BSTATUS = revoked` (D19), the bound key is revoked, watches pause (`identity_off`). For an identity created by the administrator it answers `403 managed_by_administrator` (§5.3) |
 | `PUT` | `/api/v1/platform-links/read-scope` | instance | What a person lets Synaplan read (`07` §5) |
 
-Pickup endpoints (`/api/v1/platform-links/pickups/{id}/…`) are listed in
-[`07`](./07_files_into_runs.md) §11. Full OpenAPI annotations on every
+Copy endpoints (`/api/v1/platform-links/deliveries/{id}/…`) are listed in
+[`03`](./03_send_to_cloud.md) §4, pickup endpoints
+(`/api/v1/platform-links/pickups/{id}/…`) in [`07`](./07_files_into_runs.md)
+§11, status, source events and watches in
+[`04`](./04_file_state_and_watches.md) §E.1. Full OpenAPI annotations on every
 endpoint; `make -C frontend generate-schemas` and `vue-tsc` after each change.
+
+### 8.1 Capabilities, both ways
+
+The core tells the app what it supports (`capabilities` in `instances/self`);
+the app tells the core what it supports (`app_capabilities` through `PATCH
+instances/self`, row 43). A name appears only once the brief that builds it
+is merged; an app hides a feature whose core capability is missing (R11), and
+Synaplan offers a cloud only for features its app reports (C21).
+
+| Core capability | Added by | | App capability | Reported by | Synaplan uses it for |
+| --------------- | -------- | - | -------------- | ----------- | -------------------- |
+| `sso_bind`, `identity_adopt` | CF2.2 | | `deliveries` | CF3.3 / CF3.4 / CF3.5 | Listing the cloud under **Copy to cloud** and as a task output |
+| `lifecycle` | CF2.4 | | `pickups`, `read_scope` | CF3.8 / CF3.9 / CF3.10 | Offering the cloud as a `folder_fetch` channel; the "Synaplan may read" line |
+| `deliveries` | CF3.1 | | `source_events` | CF4.3 / CF4.4 / CF4.5 | Offering "Keep it up to date" and re-upload requests |
+| `pickups`, `read_scope` | CF3.6 | | `watches` | CF5.4 / CF5.5 / CF5.6 | Naming the cloud in the Watched-folders empty state and the Apps card line |
+| `cloud_status`, `source_events` | CF4.1 | | `trials`, `file_sets` | CF5.9 (per app) | Showing **Do this for every new file** for chats whose files came from that cloud |
+| `watches` | CF5.1 | | | | |
+| `trials`, `file_sets` | CF5.8 / CF5.7 | | | | |
 
 ---
 
@@ -356,7 +412,7 @@ endpoint; `make -C frontend generate-schemas` and `vue-tsc` after each change.
 
 | Table | Change |
 | ----- | ------ |
-| `BPLATFORMINSTANCES` | `BDELIVERYURL VARCHAR(512) NULL`, `BOIDCCLIENTID VARCHAR(191) NULL`, `BCAPABILITIES JSON NULL`, `BAPPVERSION VARCHAR(32) NULL`, `BAPPROVEDADDRS JSON NULL`, `BSERVERID VARCHAR(64) NULL` (the cloud's own `instanceid`, for adoption — §3.1) |
+| `BPLATFORMINSTANCES` | `BDELIVERYURL VARCHAR(512) NULL`, `BREACHABLE TINYINT NULL` (probe result, `03` §2), `BOIDCCLIENTID VARCHAR(191) NULL`, `BAPPCAPABILITIES JSON NULL` (what the app reports, §8.1), `BAPPVERSION VARCHAR(32) NULL`, `BAPPROVEDHOSTS JSON NULL` (approved private hostnames, §6.2), `BSERVERID VARCHAR(64) NULL` (the cloud's own `instanceid`, for adoption — §3.1) |
 | `BEXTERNALIDENTITIES` | `BMODE VARCHAR(16) NULL`, `BSTATUS VARCHAR(16) NOT NULL DEFAULT 'active'`, `BREVOKEDAT BIGINT NULL`, `BREADSCOPE JSON NULL` (mirror of the app's read setting, `07` §5) |
 
 Raw idempotent `ADD COLUMN IF NOT EXISTS`; no Schema API (Galera rule 2).
