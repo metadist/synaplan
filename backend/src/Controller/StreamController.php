@@ -54,6 +54,7 @@ use App\Service\ModelConfigService;
 use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Realtime\SseOutput;
 use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\UsageStatsService;
 use App\Service\Usage\UsageTaximeterConfig;
@@ -784,11 +785,7 @@ class StreamController extends AbstractController
         $response->headers->set('Connection', 'keep-alive');
 
         $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $reasoningEffort, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory, $pinnedAgentId, $draftRequested, $pinnedAgentVersionId) {
-            // Disable output buffering
-            while (ob_get_level()) {
-                ob_end_clean();
-            }
-            ob_implicit_flush(1);
+            SseOutput::begin($this->sseCaptureMode);
             set_time_limit(0);
             // Detach-on-navigation (issues #1142 / #1223 / #1225): keep the turn
             // alive when the client disconnects (chat switch / page leave /
