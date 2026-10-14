@@ -1,7 +1,7 @@
 # UX overhaul — navigation, every sub page, guided tours
 
 **Status:** 2026-10-09 — opened. Replaces the open steps NV10–NV23 of
-[`../20260914-navigation-consolidation/00_master_plan.md`](../20260914-navigation-consolidation/00_master_plan.md).
+[`../20260914-navigation-consolidation/00_master_plan.md`](../2026-archive/20260914-navigation-consolidation/00_master_plan.md).
 **Binding contracts:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
 (U1–U12, §6 sprint-file contract) and AGENTS.md "Perfect UX & Stability".
 **Class:** every step is `ota-candidate` unless marked `backend-only`.

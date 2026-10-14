@@ -1,6 +1,6 @@
 # Status — Secure Compute
 
-Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
+Track 5 of [`../20260903_roadmap.md`](../2026-archive/20260903_roadmap/20260903_roadmap.md). Plan of record:
 [`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03.**
 
 ## Steps

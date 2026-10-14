@@ -207,4 +207,4 @@ item for the compute v1.x release.
 - Anthropic-compatible Messages gateway: [ANTHROPIC_COMPATIBLE_API.md](./ANTHROPIC_COMPATIBLE_API.md)
 - Feature flags: [FEATURE_FLAGS.md](./FEATURE_FLAGS.md)
 - User docs (when published): [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute)
-- Plan of record: `_devextras/planning/202609_secure_compute/`
+- Plan of record: `_devextras/planning/20260903_secure_compute/`

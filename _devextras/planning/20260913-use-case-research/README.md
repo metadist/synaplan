@@ -12,7 +12,7 @@ this change.
 turn that answer into work. Every case is written so a non-technical reader
 can recognise their own situation.
 **Companion:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
-(U1–U12, binding) and [`../20260925_roadmap.md`](../20260925_roadmap.md)
+(U1–U12, binding) and [`../ROADMAP.md`](../ROADMAP.md)
 (live plan). This file does not replace either; it feeds them.
 
 ---

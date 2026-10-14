@@ -6,7 +6,7 @@ nodes (`backend/src/Service/Multitask/`). Besides the generator/answer nodes
 that pull external information into the turn and hand it downstream as
 citable text via `$nX.text`.
 
-Planning docs: `_devextras/planning/release4.0/08_mcp-data-nodes-and-skill-registry.md`
+Planning docs: `_devextras/planning/2026-archive/20260623-release4.0/08_mcp-data-nodes-and-skill-registry.md`
 and `09_external-data-nodes.md` (locked decisions).
 
 ## The uniform data-node contract

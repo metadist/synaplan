@@ -2,11 +2,10 @@
 
 **Status:** Binding from 2026-09-07. Copy and journeys are reviewed **before**
 the Vue is built, not after. This is the UX contract for every remaining
-sprint in the live plan
-[`20260925_roadmap.md`](./20260925_roadmap.md)
-(2026-09-17 reference, now a stub:
-[`20260917_roadmap.md`](./20260917_roadmap.md);
-archived overviews:
+sprint in the live plan [`ROADMAP.md`](./ROADMAP.md) (frozen earlier
+overviews:
+[`2026-archive/20260925_roadmap/20260925_roadmap.md`](./2026-archive/20260925_roadmap/20260925_roadmap.md),
+[`2026-archive/20260917_roadmap/20260917_roadmap.md`](./2026-archive/20260917_roadmap/20260917_roadmap.md),
 [`2026-archive/20260910_roadmap/20260910_roadmap_update.md`](./2026-archive/20260910_roadmap/20260910_roadmap_update.md),
 [`2026-archive/20260903_roadmap/20260903_roadmap.md`](./2026-archive/20260903_roadmap/20260903_roadmap.md)).
 **Lesson:** IAM sharing (S2/S3) shipped as APIs plus a dialog. Recipients
@@ -16,7 +15,7 @@ real user-flow after the fact. That must not happen again.
 **Owner:** product owner + the track that owns the surface. A UI PR that
 cannot walk its named journey is not done.
 
-Companion wireframes: [`20260907_ux_user_flows/`](./20260907_ux_user_flows/).
+Companion wireframes: [`20260907_ux_user_flows/`](./20260907_ux_user_flows).
 
 ---
 
