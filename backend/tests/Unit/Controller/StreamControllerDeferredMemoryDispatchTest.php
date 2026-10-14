@@ -27,7 +27,7 @@ use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\Usage\UsageStatsService;
 use App\Service\Usage\UsageTaximeterConfig;

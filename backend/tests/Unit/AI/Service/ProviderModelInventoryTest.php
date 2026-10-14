@@ -9,7 +9,7 @@ use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderModelInventory;
 use App\AI\Service\ProviderModelListing;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;

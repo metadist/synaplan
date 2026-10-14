@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\AI\Credential;
 
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
 
 /**

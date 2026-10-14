@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Infrastructure;
 
 /**
  * Lightweight per-request performance timer.

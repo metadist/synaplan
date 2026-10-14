@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Stt;
 
 /**
  * Why a recording did not become text.

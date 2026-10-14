@@ -2,7 +2,7 @@
 
 namespace App\Tests\Integration;
 
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

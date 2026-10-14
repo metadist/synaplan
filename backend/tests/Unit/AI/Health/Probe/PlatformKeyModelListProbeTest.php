@@ -8,7 +8,7 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Health\Probe\PlatformKeyModelListProbe;
 use App\AI\Service\ProviderModelInventoryInterface;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;

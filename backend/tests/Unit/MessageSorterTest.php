@@ -17,7 +17,7 @@ use App\Service\Message\ConnectedSystemsHint;
 use App\Service\Message\MessageSorter;
 use App\Service\ModelConfigService;
 use App\Service\Notification\DiscordNotificationService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;

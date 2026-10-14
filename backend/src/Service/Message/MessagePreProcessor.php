@@ -12,7 +12,7 @@ use App\Service\File\TikaClient;
 use App\Service\RateLimitService;
 use App\Service\Stt\SpeechLanguageContext;
 use App\Service\Stt\TranscriptionLanguageDecider;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use Psr\Log\LoggerInterface;
 
 /**

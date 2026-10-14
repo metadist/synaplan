@@ -35,24 +35,13 @@ final class ServiceRootTest extends TestCase
     ];
 
     /**
-     * Loose files still waiting for their move PR, grouped by the step that
-     * removes them (02_service_root_map.md). Delete a name in the same PR
-     * that moves the file. Only shrinks; never add to it.
+     * Loose files still waiting for their move PR (02_service_root_map.md).
+     * Empty since C8 (2026-10-14): the 69 files are in their domain folders.
+     * It only shrinks; never add to it — a new service starts in its folder.
+     *
+     * @var list<string>
      */
-    private const PENDING_MOVE = [
-        // C8 — Media/, Stt/, Prompt/, Security/, Infrastructure/, App\Monolog\
-        'CircuitBreaker',
-        'EncryptionService',
-        'MediaGenerationService',
-        'MediaGenerationServiceInterface',
-        'MonologFormatterFactory',
-        'PerfTimer',
-        'PromptService',
-        'SpeechFailure',
-        'TtsTextSanitizer',
-        'WebSpeechConfig',
-        'WhisperService',
-    ];
+    private const PENDING_MOVE = [];
 
     public function testEveryRootFileIsPermanentOrPendingMove(): void
     {

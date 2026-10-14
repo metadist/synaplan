@@ -15,7 +15,7 @@ use App\Entity\Model;
 use App\Model\ModelCatalog;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 #[AutoconfigureTag('app.bundle.section')]

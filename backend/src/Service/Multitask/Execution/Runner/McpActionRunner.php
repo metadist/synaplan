@@ -20,7 +20,7 @@ use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\Policy\PolicyOutcome;

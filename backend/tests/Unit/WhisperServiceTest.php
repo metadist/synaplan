@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit;
 
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 

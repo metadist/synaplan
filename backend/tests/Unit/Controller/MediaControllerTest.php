@@ -9,7 +9,7 @@ use App\Controller\MediaController;
 use App\Entity\User;
 use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
-use App\Service\MediaGenerationServiceInterface;
+use App\Service\Media\MediaGenerationServiceInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

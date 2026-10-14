@@ -5,9 +5,9 @@ deptrac:
     App\DTO\Bundle\BundleImportRequest:
       - App\Bundle\ImportOptions
     App\Entity\InboundEmailHandler:
-      - App\Service\EncryptionService
+      - App\Service\Security\EncryptionService
     App\Entity\McpServerConfig:
-      - App\Service\EncryptionService
+      - App\Service\Security\EncryptionService
       - App\Service\Mcp\McpOAuthState
     App\Entity\ModelHealth:
       - App\AI\Health\ModelHealthState

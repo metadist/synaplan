@@ -22,7 +22,7 @@ use App\Service\Model\Exception\InvalidPromptModelException;
 use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\TaskPlanner;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;

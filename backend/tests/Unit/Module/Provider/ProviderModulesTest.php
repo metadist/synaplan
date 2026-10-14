@@ -10,7 +10,7 @@ use App\Module\Provider\GoogleAiModule;
 use App\Module\Provider\HiggsfieldModule;
 use App\Module\Provider\TheHiveModule;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

@@ -690,7 +690,7 @@ services:
             $ttlSeconds: 7200
 
     # Whisper Service for Audio Transcription
-    App\Service\WhisperService:
+    App\Service\Stt\WhisperService:
         arguments:
             $whisperBinary: '%env(WHISPER_BINARY)%'
             $whisperModelsPath: '%env(WHISPER_MODELS_PATH)%'
@@ -798,15 +798,15 @@ services:
             - { name: 'app.message.handler' }
 
     # Circuit Breaker
-    App\Service\CircuitBreaker: ~
+    App\Service\Infrastructure\CircuitBreaker: ~
 
     # Media Generation Service (synchronous endpoint for external integrations)
-    App\Service\MediaGenerationService:
+    App\Service\Media\MediaGenerationService:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
-    App\Service\MediaGenerationServiceInterface:
-        alias: App\Service\MediaGenerationService
+    App\Service\Media\MediaGenerationServiceInterface:
+        alias: App\Service\Media\MediaGenerationService
 
     App\Service\Desktop\DesktopGeneratedMediaService:
         arguments:
@@ -880,7 +880,7 @@ services:
             $environment: '%kernel.environment%'
 
     # Encryption Service (for sensitive data like IMAP passwords)
-    App\Service\EncryptionService:
+    App\Service\Security\EncryptionService:
         arguments:
             $secretKey: '%env(APP_SECRET)%'
 
@@ -1469,14 +1469,14 @@ services:
             $qdrantUrl: '%env(QDRANT_URL)%'
 
     # Monolog Formatter Factory (for env-based log format switching)
-    App\Service\MonologFormatterFactory:
+    App\Monolog\MonologFormatterFactory:
         arguments:
             $logFormat: '%env(default:default_log_format:LOG_FORMAT)%'
 
     # Monolog formatter service created by factory
     app.monolog_formatter:
         class: Monolog\Formatter\FormatterInterface
-        factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']
+        factory: ['@App\Monolog\MonologFormatterFactory', 'createFormatter']
 
     # Stamps the request correlation id onto every log record (see RequestIdSubscriber).
     App\Monolog\RequestIdProcessor:

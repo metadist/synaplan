@@ -8,7 +8,7 @@ use App\Repository\InboundEmailHandlerRepository;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Email\InboundEmailHandlerService;
 use App\Service\Email\MailHandlerLogService;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;

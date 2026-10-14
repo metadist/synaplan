@@ -13,8 +13,8 @@ use App\Plug\Extraction\ExtractorRejectedException;
 use App\Plug\PlugConfigService;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\Office\StructuredTextExtractor;
-use App\Service\SpeechFailure;
-use App\Service\WhisperService;
+use App\Service\Stt\SpeechFailure;
+use App\Service\Stt\WhisperService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Process\Process;
 

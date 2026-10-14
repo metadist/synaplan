@@ -6,7 +6,7 @@ namespace App\Tests\Unit\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\WhisperProvider;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

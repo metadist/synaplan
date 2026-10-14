@@ -5,7 +5,7 @@ namespace App\Controller;
 use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\Entity\User;
-use App\Service\TtsTextSanitizer;
+use App\Service\Media\TtsTextSanitizer;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

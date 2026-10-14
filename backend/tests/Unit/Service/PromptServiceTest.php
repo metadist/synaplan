@@ -8,7 +8,7 @@ use App\Entity\Prompt;
 use App\Entity\PromptMeta;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Media;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
@@ -13,8 +13,9 @@ use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
-use App\Service\Media\RenderedImageSize;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -44,7 +45,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
      * (e.g. "8K") to a provider. Sourced from the mediamaker capability's
      * parameter schema ({@see SystemCapabilityRegistry}) — the single place
      * this enum is declared — so it cannot drift from
-     * {@see Message\MessageSorter::SUPPORTED_VIDEO_RESOLUTIONS}
+     * {@see \App\Service\Message\MessageSorter::SUPPORTED_VIDEO_RESOLUTIONS}
      * or {@see \App\AI\StructuredOutput\Schema\SortClassificationSchema}.
      */
     private const SUPPORTED_VIDEO_RESOLUTIONS = SystemCapabilityRegistry::MEDIAMAKER_VIDEO_RESOLUTIONS;

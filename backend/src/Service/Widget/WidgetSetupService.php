@@ -16,7 +16,7 @@ use App\Entity\Widget;
 use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\LanguageDirectiveBuilder;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\Research\UrlContentService;
 use Doctrine\ORM\EntityManagerInterface;

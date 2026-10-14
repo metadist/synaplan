@@ -21,7 +21,7 @@ use App\Service\Message\AgainHandler;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Message\MessageEnqueueService;
 use App\Service\ModelConfigService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;

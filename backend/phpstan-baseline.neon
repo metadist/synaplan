@@ -337,10 +337,10 @@ parameters:
 			path: src/Service/Auth/OidcTokenService.php
 
 		-
-			message: '#^Property App\\Service\\PromptService\:\:\$logger is never read, only written\.$#'
+			message: '#^Property App\\Service\\Prompt\\PromptService\:\:\$logger is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Service/PromptService.php
+			path: src/Service/Prompt/PromptService.php
 
 		-
 			message: '#^Property App\\Service\\Usage\\StorageQuotaService\:\:\$em is never read, only written\.$#'
@@ -358,13 +358,13 @@ parameters:
 			message: '#^Strict comparison using \=\=\= between '''' and lowercase\-string&non\-empty\-string will always evaluate to false\.$#'
 			identifier: identical.alwaysFalse
 			count: 1
-			path: src/Service/WhisperService.php
+			path: src/Service/Stt/WhisperService.php
 
 		-
 			message: '#^Variable \$processedAudio in isset\(\) always exists and is not nullable\.$#'
 			identifier: isset.variable
 			count: 1
-			path: src/Service/WhisperService.php
+			path: src/Service/Stt/WhisperService.php
 
 		-
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
@@ -571,7 +571,7 @@ parameters:
 			path: tests/Unit/Service/MediaGenerationServiceTest.php
 
 		-
-			message: '#^Call to function method_exists\(\) with App\\Service\\WhisperService and ''translateToEnglish'' will always evaluate to true\.$#'
+			message: '#^Call to function method_exists\(\) with App\\Service\\Stt\\WhisperService and ''translateToEnglish'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
 			path: tests/Unit/WhisperServiceTest.php

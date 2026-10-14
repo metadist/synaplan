@@ -25,7 +25,7 @@ use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\Notification\SlackNotificationService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\Research\UrlContentService;

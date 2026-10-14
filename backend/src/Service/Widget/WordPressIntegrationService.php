@@ -13,7 +13,7 @@ use App\Repository\UserRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;

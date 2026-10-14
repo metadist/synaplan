@@ -7,7 +7,7 @@ namespace App\AI\Credential;
 use App\AI\Import\ListedModelPrice;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 

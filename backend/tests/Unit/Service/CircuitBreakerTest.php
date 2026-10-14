@@ -6,8 +6,8 @@ namespace App\Tests\Unit\Service;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\StructuredOutputViolationException;
-use App\Service\CircuitBreaker;
 use App\Service\Exception\StreamCancelledException;
+use App\Service\Infrastructure\CircuitBreaker;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;

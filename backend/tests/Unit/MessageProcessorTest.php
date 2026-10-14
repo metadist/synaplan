@@ -23,7 +23,7 @@ use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanStore;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\Research\ReadPagesResult;
 use App\Service\Research\UrlContentResult;
 use App\Service\Research\UrlContentService;
@@ -416,7 +416,7 @@ class MessageProcessorTest extends TestCase
                         }
                     }
 
-                    return $passedOptions['perf_timer'] instanceof \App\Service\PerfTimer;
+                    return $passedOptions['perf_timer'] instanceof \App\Service\Infrastructure\PerfTimer;
                 })
             )
             ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);

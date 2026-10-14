@@ -8,7 +8,7 @@ use App\AI\Exception\ProviderException;
 use App\Entity\User;
 use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
-use App\Service\MediaGenerationServiceInterface;
+use App\Service\Media\MediaGenerationServiceInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

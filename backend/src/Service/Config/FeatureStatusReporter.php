@@ -19,7 +19,7 @@ use App\Repository\ModelRepository;
 use App\Service\Compute\ComputeFeatureStatusBuilder;
 use App\Service\Infrastructure\RedisService;
 use App\Service\Memory\UserMemoryService;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use Doctrine\DBAL\Connection;
 
 /**

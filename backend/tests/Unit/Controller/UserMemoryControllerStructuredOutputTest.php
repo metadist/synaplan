@@ -12,7 +12,7 @@ use App\Entity\User;
 use App\Service\Digest\LongTermMemoryService;
 use App\Service\Memory\UserMemoryService;
 use App\Service\ModelConfigService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

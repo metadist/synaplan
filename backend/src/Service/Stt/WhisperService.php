@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Stt;
 
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Process\Exception\ProcessFailedException;

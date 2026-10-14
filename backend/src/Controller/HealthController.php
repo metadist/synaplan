@@ -4,7 +4,7 @@ namespace App\Controller;
 
 use App\AI\Service\ProviderRegistry;
 use App\Service\Infrastructure\RedisService;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;

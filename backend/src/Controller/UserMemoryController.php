@@ -14,7 +14,7 @@ use App\Service\Digest\LongTermMemoryService;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\Memory\UserMemoryService;
 use App\Service\ModelConfigService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

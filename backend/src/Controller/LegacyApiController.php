@@ -12,7 +12,7 @@ use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Model\Exception\InvalidPromptModelException;
 use App\Service\Model\PromptModelEligibilityValidator;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\Widget\WidgetService;
 use App\Service\Widget\WordPressIntegrationService;
 use Psr\Log\LoggerInterface;

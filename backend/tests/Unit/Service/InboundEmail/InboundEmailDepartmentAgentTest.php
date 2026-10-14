@@ -11,9 +11,9 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\Email\InboundEmailHandlerService;
 use App\Service\Email\MailHandlerLogService;
-use App\Service\EncryptionService;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 

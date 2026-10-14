@@ -7,7 +7,7 @@ namespace App\Tests\Unit\AI\Credential;
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

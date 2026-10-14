@@ -11,7 +11,7 @@ use App\Service\Auth\RegistrationConfig;
 use App\Service\Chat\GuestChatConfig;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\Contract\ComputeHealth;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

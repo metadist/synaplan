@@ -11,7 +11,7 @@ use App\Entity\User;
 use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\File\UserUploadPathBuilder;
-use App\Service\MediaGenerationService;
+use App\Service\Media\MediaGenerationService;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;

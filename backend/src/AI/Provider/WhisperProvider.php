@@ -6,7 +6,7 @@ namespace App\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\SpeechToTextProviderInterface;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 
 /**
  * Local whisper.cpp speech-to-text. No API key — availability is the
