@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\Entity\User;
-use App\Service\BillingService;
-use App\Service\PremiumFeatureGate;
+use App\Service\Billing\BillingService;
+use App\Service\Billing\PremiumFeatureGate;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

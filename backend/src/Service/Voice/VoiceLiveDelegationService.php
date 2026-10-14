@@ -9,9 +9,9 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Entity\VoiceSession;
 use App\Repository\UserRepository;
-use App\Service\CostCalculationService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\Usage\CostCalculationService;
 use Psr\Log\LoggerInterface;
 
 /**

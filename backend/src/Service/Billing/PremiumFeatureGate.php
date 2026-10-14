@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Billing;
 
 use App\Entity\User;
+use App\Service\RateLimitService;
+use App\Service\Usage\StorageQuotaService;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**

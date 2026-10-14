@@ -9,7 +9,7 @@ use App\Entity\Model;
 use App\Entity\ModelPriceHistory;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
-use App\Service\CostCalculationService;
+use App\Service\Usage\CostCalculationService;
 use App\Service\Voice\VoiceLiveMeter;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

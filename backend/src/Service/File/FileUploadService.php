@@ -10,7 +10,7 @@ use App\Repository\FileRepository;
 use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
-use App\Service\StorageQuotaService;
+use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;

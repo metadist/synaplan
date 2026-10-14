@@ -10,7 +10,7 @@ use App\Entity\User;
 use App\Service\Email\InboundEmailAttachmentStore;
 use App\Service\File\FileStorageService;
 use App\Service\Security\SsrfGuard;
-use App\Service\StorageQuotaService;
+use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;

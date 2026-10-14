@@ -10,7 +10,7 @@ use App\Entity\User;
 use App\Service\File\FileHelper;
 use App\Service\File\FileStorageService;
 use App\Service\Security\SsrfGuard;
-use App\Service\StorageQuotaService;
+use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;

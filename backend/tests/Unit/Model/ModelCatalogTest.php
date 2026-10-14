@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Model;
 
 use App\Model\ModelCatalog;
-use App\Service\CostCalculationService;
+use App\Service\Usage\CostCalculationService;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

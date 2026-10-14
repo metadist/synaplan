@@ -7,10 +7,10 @@ namespace App\Tests\Unit\Module\Commerce;
 use App\Module\Channel\WhatsappModule;
 use App\Module\Commerce\MobileIapModule;
 use App\Module\Commerce\StripeBillingModule;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
 use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
-use App\Service\IapPricingService;
+use App\Service\Iap\IapPricingService;
 use PHPUnit\Framework\TestCase;
 
 final class CommerceAndChannelModulesTest extends TestCase

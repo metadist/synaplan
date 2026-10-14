@@ -41,7 +41,7 @@ use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\WorkflowsConfig;
 use App\Service\SmartSearch\SmartSearchConfig;
 use App\Service\Tool\ToolsConfig;
-use App\Service\UsageTaximeterConfig;
+use App\Service\Usage\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
 
 /**

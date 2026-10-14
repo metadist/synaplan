@@ -12,7 +12,7 @@ use App\Service\Iap\Exception\IapVerificationException;
  *
  * The real {@see GooglePlayVerifier} calls the Play Developer API
  * (`purchases.subscriptionsv2.get`) with a service account; the interface lets
- * {@see \App\Service\MobilePurchaseService} be tested with a fake instead.
+ * {@see MobilePurchaseService} be tested with a fake instead.
  */
 interface GooglePlayVerifierInterface
 {

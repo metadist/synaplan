@@ -13,7 +13,7 @@ use App\Repository\WidgetRepository;
 use App\Service\Agent\AgentAccess;
 use App\Service\Agent\AgentConfig;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Iam\AccessGate;
 use App\Service\Iam\IamConfig;

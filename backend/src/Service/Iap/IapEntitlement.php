@@ -8,7 +8,7 @@ namespace App\Service\Iap;
  * MOBILE-APP SEAM (Epic 5.4): a store-agnostic, server-verified snapshot of one
  * IAP subscription. Both the verify endpoint and the store-to-server
  * notifications (Apple ASSN V2 / Google RTDN) produce this same value object,
- * so {@see \App\Service\MobilePurchaseService} has a single code path.
+ * so {@see MobilePurchaseService} has a single code path.
  *
  * Never construct this from client-supplied data directly — it is only ever
  * returned by a verifier that has cryptographically checked the receipt

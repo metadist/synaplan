@@ -35,7 +35,7 @@ use App\Service\Media\MediaAccessTokenService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
-use App\Service\StorageQuotaService;
+use App\Service\Usage\StorageQuotaService;
 use App\Service\Widget\WidgetService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;

@@ -1,11 +1,13 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Usage;
 
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
+use App\Service\Billing\BillingService;
 use App\Service\File\FileStorageService;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 

@@ -8,7 +8,7 @@ namespace App\AI\Messages;
  * Token usage extracted from an Anthropic Messages API response (or synthesized
  * by a non-Anthropic translator into the same shape).
  *
- * Field mapping into {@see \App\Service\CostCalculationService::calculateCost()}:
+ * Field mapping into {@see \App\Service\Usage\CostCalculationService::calculateCost()}:
  *   cachedTokens          = cache_read_input_tokens
  *   cacheCreationTokens   = cache_creation_input_tokens (TOTAL, both TTLs)
  *   cacheCreation1hTokens = cache_creation.ephemeral_1h_input_tokens (subset of the above)

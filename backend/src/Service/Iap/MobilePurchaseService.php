@@ -2,18 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Iap;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\Exception\IapConflictException;
+use App\Service\Iap\Exception\IapNotConfiguredException;
 use App\Service\Iap\Exception\IapVerificationException;
-use App\Service\Iap\GooglePlayVerifierInterface;
-use App\Service\Iap\IapEntitlement;
-use App\Service\Iap\IapEntitlementState;
-use App\Service\Iap\IapPlatform;
-use App\Service\Iap\RedeemResult;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -116,7 +111,7 @@ final readonly class MobilePurchaseService
     /**
      * Verify + decode an Apple App Store Server Notification V2 signedPayload.
      *
-     * @throws Iap\Exception\IapNotConfiguredException
+     * @throws IapNotConfiguredException
      * @throws IapVerificationException
      */
     public function verifyAppleNotification(string $signedPayload): IapEntitlement

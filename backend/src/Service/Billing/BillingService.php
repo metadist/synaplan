@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Billing;
 
 /**
  * Centralized service to check if billing/Stripe is properly configured.

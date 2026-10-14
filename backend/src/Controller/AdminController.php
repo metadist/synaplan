@@ -13,7 +13,7 @@ use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\GroupService;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\UserDeletionService;
-use App\Service\UsageStatsService;
+use App\Service\Usage\UsageStatsService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;

@@ -11,9 +11,9 @@ use App\Entity\VoiceSession;
 use App\Exception\VoiceLiveBusyException;
 use App\Repository\ConfigRepository;
 use App\Repository\VoiceSessionRepository;
-use App\Service\CostCalculationService;
-use App\Service\PremiumFeatureGate;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\RateLimitService;
+use App\Service\Usage\CostCalculationService;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 

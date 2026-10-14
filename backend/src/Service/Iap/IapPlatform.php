@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Iap;
 
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
 
 /**
  * MOBILE-APP SEAM (Epic 5.4): the native in-app-purchase channels.

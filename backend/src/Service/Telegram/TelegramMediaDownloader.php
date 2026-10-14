@@ -9,7 +9,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Service\File\FileStorageService;
 use App\Service\Message\MessagePreProcessor;
-use App\Service\StorageQuotaService;
+use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 

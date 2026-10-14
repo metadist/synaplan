@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Iap;
+
+use App\Service\Billing\BillingService;
 
 /**
  * MOBILE-APP SEAM (Epic 5.5): channel-aware IAP pricing / product mapping.
