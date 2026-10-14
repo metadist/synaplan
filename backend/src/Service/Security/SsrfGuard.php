@@ -28,6 +28,19 @@ final readonly class SsrfGuard
     private const ALLOWED_SCHEMES = ['http', 'https'];
 
     /**
+     * IPv4 ranges {@see isOperatorNetworkIp} accepts, as [network, prefix bits].
+     *
+     * @var list<array{0: string, 1: int}>
+     */
+    private const OPERATOR_V4_RANGES = [
+        ['10.0.0.0', 8],
+        ['172.16.0.0', 12],
+        ['192.168.0.0', 16],
+        ['127.0.0.0', 8],
+        ['100.64.0.0', 10],
+    ];
+
+    /**
      * True when the URL must NOT be fetched: bad/missing scheme or host, a
      * blocked literal host/IP, or a hostname resolving to a blocked IP.
      */
@@ -88,20 +101,26 @@ final readonly class SsrfGuard
      * answer is blocked. Callers that already passed {@see isBlockedHost} get
      * the pin list compute may connect to.
      *
+     * With $allowOperatorNetwork the ranges an operator's own network uses
+     * ({@see isOperatorNetworkIp}) are kept as well. That mode is for targets
+     * an administrator configures — a self-hosted AI gateway on the LAN — never
+     * for a URL a user typed. Link-local (the cloud metadata range) and every
+     * other reserved range stay blocked in both modes.
+     *
      * @return list<string>
      */
-    public function pinnedIps(string $host): array
+    public function pinnedIps(string $host, bool $allowOperatorNetwork = false): array
     {
         $host = strtolower(trim($host, "[] \t"));
         if ('' === $host) {
             return [];
         }
         if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
-            return $this->isBlockedIp($host) ? [] : [$host];
+            return $this->isBlockedIp($host, $allowOperatorNetwork) ? [] : [$host];
         }
         $ips = [];
         foreach ($this->resolveIps($host) as $ip) {
-            if (!$this->isBlockedIp($ip)) {
+            if (!$this->isBlockedIp($ip, $allowOperatorNetwork)) {
                 $ips[] = $ip;
             }
         }
@@ -111,9 +130,63 @@ final readonly class SsrfGuard
 
     /**
      * True when the IP is private, loopback, link-local, reserved or otherwise
-     * not globally routable.
+     * not globally routable. With $allowOperatorNetwork the operator's own
+     * ranges ({@see isOperatorNetworkIp}) pass; everything else that is not
+     * globally routable is still blocked.
      */
-    public function isBlockedIp(string $ip): bool
+    public function isBlockedIp(string $ip, bool $allowOperatorNetwork = false): bool
+    {
+        if ($allowOperatorNetwork && $this->isOperatorNetworkIp($ip)) {
+            return false;
+        }
+
+        return $this->isNotGloballyRoutable($ip);
+    }
+
+    /**
+     * The ranges a self-hosted service legitimately lives in: RFC 1918
+     * (10/8, 172.16/12, 192.168/16), loopback (127/8, ::1), IPv6 ULA
+     * (fc00::/7) and shared address space 100.64/10 (CGNAT, overlay VPNs such
+     * as Tailscale). Deliberately NOT included: link-local 169.254/16 and
+     * fe80::/10 — that is where cloud metadata services (169.254.169.254)
+     * answer — nor 0/8, multicast, broadcast, documentation or benchmarking
+     * prefixes, which no real gateway uses.
+     */
+    public function isOperatorNetworkIp(string $ip): bool
+    {
+        $ip = trim($ip, "[] \t");
+        if (false !== filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV4)) {
+            $long = ip2long($ip);
+            if (false === $long) {
+                return false;
+            }
+            foreach (self::OPERATOR_V4_RANGES as [$network, $bits]) {
+                $mask = -1 << (32 - $bits);
+                if (($long & $mask) === (ip2long($network) & $mask)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if (false !== filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV6)) {
+            $packed = inet_pton($ip);
+            if (false === $packed) {
+                return false;
+            }
+            if ($packed === inet_pton('::1')) {
+                return true;
+            }
+
+            // fc00::/7 — the first byte is 0xfc or 0xfd.
+            return 0xFC === (ord($packed[0]) & 0xFE);
+        }
+
+        return false;
+    }
+
+    private function isNotGloballyRoutable(string $ip): bool
     {
         // NO_PRIV_RANGE: RFC 1918 + IPv6 ULA. NO_RES_RANGE: loopback,
         // link-local, 0.0.0.0/8, 240/4 and friends. GLOBAL_RANGE (PHP ≥ 8.2)

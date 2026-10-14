@@ -569,6 +569,7 @@ synaplan/
 
 - **[Discord](https://discord.com/invite/kQB3eDjWfF)** — chat with the team and community; the fastest place for self-hosting and configuration questions
 - **[GitHub Issues](https://github.com/metadist/synaplan/issues)** — bugs and feature requests
+- **[Security policy](SECURITY.md)** — how to report a vulnerability privately, and what happens next
 - **[www.synaplan.com](https://www.synaplan.com)** — product, hosting and enterprise contact
 
 ## Contributing
