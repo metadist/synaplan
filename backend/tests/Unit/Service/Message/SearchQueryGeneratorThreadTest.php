@@ -85,6 +85,57 @@ final class SearchQueryGeneratorThreadTest extends TestCase
         $this->assertSame('kebab price munich', $query);
     }
 
+    /**
+     * Copilot on #2491: length alone must not pull the thread in. A long
+     * question that opens a new topic is distilled by the model, but without
+     * the previous turns — otherwise it is bent back to the subject the user
+     * just left.
+     */
+    public function testALongSelfContainedQuestionIsDistilledWithoutTheThread(): void
+    {
+        $question = 'What are the current visa requirements, processing times and fees for a German citizen who wants to work remotely from Japan for six months starting next spring';
+        $thread = "User: Summarize this paper: The Narrative AI Advantage\nAssistant: I need the full text.";
+
+        $this->ai->expects($this->once())
+            ->method('chat')
+            ->with($this->callback(static function (array $messages): bool {
+                $user = $messages[1]['content'] ?? '';
+
+                return !str_contains($user, 'Previous conversation') && !str_contains($user, 'Narrative AI');
+            }))
+            ->willReturn(['content' => 'japan remote work visa german citizen requirements fees', 'provider' => 'groq', 'model' => 'test-model']);
+
+        $this->assertSame('japan remote work visa german citizen requirements fees', $this->generator->generate($question, null, null, $thread));
+    }
+
+    /**
+     * Copilot on #2491: an empty answer from the provider must take the same
+     * thread-aware fallback as a malformed one, not search the instruction.
+     */
+    public function testAnEmptyProviderAnswerFallsBackToThePreviousSubject(): void
+    {
+        $question = 'Ich erwarte, dass du dir den Text selber suchst';
+        $thread = "User: Fasse mir folgendes Paper zusammen: The Narrative AI Advantage? A Field Experiment\nAssistant: I would need the full text.";
+
+        $this->ai->expects($this->once())->method('chat')
+            ->willReturn(['content' => '  ', 'provider' => 'groq', 'model' => 'test-model']);
+
+        $query = $this->generator->generate($question, null, null, $thread);
+
+        $this->assertStringContainsString('The Narrative AI Advantage', $query);
+        $this->assertStringNotContainsString('selber suchst', $query);
+    }
+
+    public function testDependsOnThreadIsAboutReferenceNotLength(): void
+    {
+        $this->ai->expects($this->never())->method('chat');
+
+        $this->assertTrue(SearchQueryGenerator::dependsOnThread('explain that in more detail'));
+        $this->assertTrue(SearchQueryGenerator::dependsOnThread('look up the paper yourself'));
+        $this->assertFalse(SearchQueryGenerator::dependsOnThread('kebab price munich'));
+        $this->assertFalse(SearchQueryGenerator::dependsOnThread(str_repeat('visa requirements japan remote work ', 8)));
+    }
+
     public function testResolvesAgainstThreadMatchesTheReportedFollowUpOnly(): void
     {
         $this->ai->expects($this->never())->method('chat');

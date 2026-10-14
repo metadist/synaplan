@@ -58,9 +58,13 @@ final readonly class SearchQueryGenerator
      */
     public function generate(string $userQuestion, ?int $userId = null, ?string $attachmentContext = null, ?string $threadContext = null): string
     {
+        // The thread is handed to the model only when the question leans on
+        // it — a pronoun, or an instruction to go and get something named
+        // earlier. A long but self-contained question in a busy chat is
+        // distilled on its own; given the thread it would be answered as a
+        // continuation of a topic the user has just left.
         $threadContext = self::blankToNull($threadContext);
-        $resolveThread = null !== $threadContext
-            && ($this->messageNeedsLlmRewrite($userQuestion) || self::resolvesAgainstThread($userQuestion));
+        $resolveThread = null !== $threadContext && self::dependsOnThread($userQuestion);
 
         $this->logger->info('SearchQueryGenerator: Starting query generation', [
             'user_id' => $userId,
@@ -80,7 +84,7 @@ final readonly class SearchQueryGenerator
         // With attachment context the short-circuit never applies: the whole
         // point is resolving the question's referent against the file content,
         // which only the model can do.
-        if (null === $attachmentContext && !$resolveThread && !$this->messageNeedsLlmRewrite($userQuestion)) {
+        if (null === $attachmentContext && !$this->messageNeedsLlmRewrite($userQuestion, null !== $threadContext)) {
             $cleaned = $this->fallbackExtraction($userQuestion);
 
             $this->logger->info('SearchQueryGenerator: Skipped LLM rewrite (heuristic short-circuit)', [
@@ -170,8 +174,13 @@ final readonly class SearchQueryGenerator
 
             // Remove any surrounding quotes
             $searchQuery = trim($searchQuery, '"\'');
+            if ('' === $searchQuery) {
+                $this->logger->warning('SearchQueryGenerator: Generated query empty, using fallback');
 
-            return $searchQuery ?: $this->fallbackExtraction($userQuestion);
+                return $this->fallbackQuery($userQuestion, $attachmentContext, $threadContext);
+            }
+
+            return $searchQuery;
         } catch (\App\AI\Exception\ProviderException $e) {
             $this->logger->error('SearchQueryGenerator: AI Provider failed', [
                 'error' => $e->getMessage(),
@@ -252,13 +261,15 @@ final readonly class SearchQueryGenerator
      * Brave search query.
      *
      * Heuristic: the model is only worth the round-trip when the question is
-     * either very long (likely needs distillation) or contains conversation-
-     * relative pronouns that require context to disambiguate ("explain that",
-     * "what about it").
+     * very long (likely needs distillation), contains a pronoun that points
+     * back ("explain that", "what about it"), or — when there is a thread to
+     * resolve against — tells the assistant to fetch something named earlier
+     * ("search for the text yourself"). Only the last two reasons also hand
+     * the thread to the model — see {@see dependsOnThread()}.
      *
      * Plain factual queries ("strait of hormuz history") work fine as-is.
      */
-    private function messageNeedsLlmRewrite(string $userQuestion): bool
+    private function messageNeedsLlmRewrite(string $userQuestion, bool $hasThread): bool
     {
         $trimmed = trim($userQuestion);
         if ('' === $trimmed) {
@@ -271,6 +282,32 @@ final readonly class SearchQueryGenerator
             return true;
         }
 
+        if (self::hasReferentialExpression($trimmed)) {
+            return true;
+        }
+
+        return $hasThread && self::resolvesAgainstThread($userQuestion);
+    }
+
+    /**
+     * The question cannot be searched without the turns before it: it uses a
+     * pronoun or demonstrative that points back ("explain that"), or it tells
+     * the assistant to fetch something named earlier ("look up the paper
+     * yourself"). Length alone is not a reason — a long question that
+     * introduces a new topic must not be bent back to the previous one.
+     */
+    public static function dependsOnThread(string $userQuestion): bool
+    {
+        $trimmed = trim($userQuestion);
+        if ('' === $trimmed) {
+            return false;
+        }
+
+        return self::hasReferentialExpression($trimmed) || self::resolvesAgainstThread($userQuestion);
+    }
+
+    private static function hasReferentialExpression(string $trimmed): bool
+    {
         // Pronouns / referential expressions that need conversation context.
         // The list is intentionally conservative — common words like "the"
         // and definite articles ("der/die/das" in DE, "le/la/les" in FR)

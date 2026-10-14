@@ -257,7 +257,8 @@ final readonly class MessageProcessor
                 $conversationHistory = $this->messageRepository->findConversationHistory(
                     $message->getUserId(),
                     $message->getTrackingId(),
-                    10
+                    10,
+                    $message->getId(),
                 );
                 $this->logger->debug('Using legacy trackingId history for streaming', [
                     'tracking_id' => $message->getTrackingId(),
@@ -460,7 +461,7 @@ final readonly class MessageProcessor
                         $message->getText(),
                         $message->getUserId(),
                         $attachmentContext ?? $this->linkedPageContext($classification),
-                        $this->threadContextForSearch($conversationHistory),
+                        $this->threadContextForSearch($conversationHistory, $message),
                     );
                     $perfTimer->stop('search_query');
 
@@ -745,7 +746,8 @@ final readonly class MessageProcessor
                 $conversationHistory = $this->messageRepository->findConversationHistory(
                     $message->getUserId(),
                     $message->getTrackingId(),
-                    10
+                    10,
+                    $message->getId(),
                 );
                 $this->logger->debug('Using legacy trackingId history for non-streaming', [
                     'tracking_id' => $message->getTrackingId(),
@@ -963,7 +965,7 @@ final readonly class MessageProcessor
                         $message->getText(),
                         $message->getUserId(),
                         $attachmentContext ?? $this->linkedPageContext($classification),
-                        $this->threadContextForSearch($conversationHistory),
+                        $this->threadContextForSearch($conversationHistory, $message),
                     );
 
                     $language = $this->resolveSearchLanguage($classification, $message);
@@ -1595,16 +1597,31 @@ final readonly class MessageProcessor
      * The previous turns, so a follow-up that does not repeat the subject
      * ("search for the text yourself") can be searched as that subject.
      *
-     * @param array<int, Message|array{role?: string, content?: string, text?: string}> $conversationHistory
+     * The message being answered is never part of its own context: both
+     * history queries already leave it out by id, and this guard also covers
+     * a history that was built before the message had an id.
+     *
+     * @param array<int, Message|array{role?: string, content?: string, text?: string}> $conversationHistory oldest first
      */
-    private function threadContextForSearch(array $conversationHistory): ?string
+    private function threadContextForSearch(array $conversationHistory, Message $current): ?string
     {
         if ([] === $conversationHistory) {
             return null;
         }
 
+        $previous = array_values(array_filter($conversationHistory, static function (Message|array $entry) use ($current): bool {
+            if (!$entry instanceof Message) {
+                return true;
+            }
+            if (null !== $current->getId() && $entry->getId() === $current->getId()) {
+                return false;
+            }
+
+            return !('IN' === $entry->getDirection() && $entry->getText() === $current->getText());
+        }));
+
         $lines = [];
-        foreach (array_slice($conversationHistory, -4) as $entry) {
+        foreach (array_slice($previous, -4) as $entry) {
             if ($entry instanceof Message) {
                 $role = 'IN' === $entry->getDirection() ? 'User' : 'Assistant';
                 $text = $entry->getText();
