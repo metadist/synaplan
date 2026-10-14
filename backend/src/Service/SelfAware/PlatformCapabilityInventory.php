@@ -12,7 +12,7 @@ use App\Repository\ConnectionRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\Agent\AgentConfig;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
 use App\Service\Capability\CapabilityService;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Desktop\DesktopAgentConfig;

@@ -1013,13 +1013,13 @@ services:
             $frontendUrl: '%env(FRONTEND_URL)%'
 
     # Billing Service (checks if Stripe is configured)
-    App\Service\BillingService:
+    App\Service\Billing\BillingService:
         arguments:
             $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
             $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
 
     # Native IAP product ↔ tier mapping (Epic 5.5)
-    App\Service\IapPricingService:
+    App\Service\Iap\IapPricingService:
         arguments:
             $iapProductPro: '%env(IAP_PRODUCT_PRO)%'
             $iapProductTeam: '%env(IAP_PRODUCT_TEAM)%'

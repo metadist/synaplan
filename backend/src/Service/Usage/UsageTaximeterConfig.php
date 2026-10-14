@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Usage;
 
 use App\Repository\ConfigRepository;
 
@@ -10,7 +10,7 @@ use App\Repository\ConfigRepository;
  * Platform-wide on/off switch for the in-chat usage taximeter
  * (consumption bar / ring + per-message token-cost badge).
  *
- * Mirrors {@see MarketingNews\MarketingNewsConfig}: a single
+ * Mirrors {@see \App\Service\MarketingNews\MarketingNewsConfig}: a single
  * global master switch (BCONFIG group {@see self::CONFIG_GROUP}, setting
  * {@see self::KEY_ENABLED}, ownerId 0). The one deliberate difference is the
  * default: the taximeter is a transparency feature and defaults to ON when no

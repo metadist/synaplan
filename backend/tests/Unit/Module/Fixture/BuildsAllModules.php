@@ -26,12 +26,12 @@ use App\Module\Sidecar\PiperTtsModule;
 use App\Module\Sidecar\SearxngModule;
 use App\Module\Sidecar\TikaModule;
 use App\Repository\ModelRepository;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
 use App\Service\Chat\ChatArtifactsConfig;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
-use App\Service\IapPricingService;
+use App\Service\Iap\IapPricingService;
 
 /**
  * Builds every v1 feature-module descriptor with stub collaborators, in the

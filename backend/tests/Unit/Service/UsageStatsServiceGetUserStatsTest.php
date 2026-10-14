@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Service;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\RateLimitService;
-use App\Service\UsageStatsService;
+use App\Service\Usage\UsageStatsService;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Service\Iap\Exception\IapNotConfiguredException;
-use App\Service\MobilePurchaseService;
+use App\Service\Iap\MobilePurchaseService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 

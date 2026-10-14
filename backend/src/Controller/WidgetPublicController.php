@@ -10,7 +10,7 @@ use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\AiResponseSanitizer;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunRecorder;

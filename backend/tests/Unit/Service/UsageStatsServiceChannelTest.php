@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Service;
 
 use App\Repository\ConfigRepository;
 use App\Service\RateLimitService;
-use App\Service\UsageStatsService;
+use App\Service\Usage\UsageStatsService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

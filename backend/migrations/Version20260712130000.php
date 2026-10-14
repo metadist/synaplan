@@ -38,7 +38,7 @@ use Doctrine\Migrations\AbstractMigration;
  * with no Schema API, so it is safe on the shared MariaDB Galera cluster.
  *
  * @see \App\Model\ModelCatalog
- * @see \App\Service\CostCalculationService::calculateMediaCost()
+ * @see \App\Service\Usage\CostCalculationService::calculateMediaCost()
  * @see Version20260712120000
  */
 final class Version20260712130000 extends AbstractMigration

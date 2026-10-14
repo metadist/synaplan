@@ -343,16 +343,16 @@ parameters:
 			path: src/Service/PromptService.php
 
 		-
-			message: '#^Property App\\Service\\StorageQuotaService\:\:\$em is never read, only written\.$#'
+			message: '#^Property App\\Service\\Usage\\StorageQuotaService\:\:\$em is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Service/StorageQuotaService.php
+			path: src/Service/Usage/StorageQuotaService.php
 
 		-
-			message: '#^Property App\\Service\\UsageStatsService\:\:\$configRepository is never read, only written\.$#'
+			message: '#^Property App\\Service\\Usage\\UsageStatsService\:\:\$configRepository is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Service/UsageStatsService.php
+			path: src/Service/Usage/UsageStatsService.php
 
 		-
 			message: '#^Strict comparison using \=\=\= between '''' and lowercase\-string&non\-empty\-string will always evaluate to false\.$#'

@@ -11,7 +11,7 @@ use App\Module\Gate\ModuleGateConfig;
 use App\Module\Http\ModuleGateListener;
 use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
 use App\Tests\Unit\Module\Fixture\BuildsAllModules;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

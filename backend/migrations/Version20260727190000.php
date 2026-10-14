@@ -11,7 +11,7 @@ use Doctrine\Migrations\AbstractMigration;
  * Fix two Ollama rows that carry a non-zero output price under the "free" unit.
  *
  * BID 3 (`deepseek-r1:32b`, 0.91) and BID 6 (`mistral:7b`, 0.475) store BOUTUNIT = '-'
- * while their input side is authored `per1M`. {@see \App\Service\CostCalculationService::normaliseToPerUnit()}
+ * while their input side is authored `per1M`. {@see \App\Service\Usage\CostCalculationService::normaliseToPerUnit()}
  * maps '-' (like '' and 'free') to 0.0, so every output token on these two models has
  * been billed at zero while input was charged normally — an inconsistency, not an
  * intentional free tier: every other Ollama row prices both sides `per1M`.

@@ -36,7 +36,7 @@ use Doctrine\Migrations\AbstractMigration;
  * safe on the shared MariaDB Galera cluster.
  *
  * @see \App\Model\ModelCatalog
- * @see \App\Service\CostCalculationService::calculateMediaCost()
+ * @see \App\Service\Usage\CostCalculationService::calculateMediaCost()
  */
 final class Version20260712140000 extends AbstractMigration
 {

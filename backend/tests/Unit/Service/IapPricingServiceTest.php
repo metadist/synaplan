@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
-use App\Service\IapPricingService;
+use App\Service\Iap\IapPricingService;
 use PHPUnit\Framework\TestCase;
 
 /**

@@ -10,7 +10,7 @@ use App\Service\Iap\Exception\IapVerificationException;
 /**
  * MOBILE-APP SEAM (Epic 5.4): verifies Apple StoreKit 2 data server-side.
  *
- * The interface exists so {@see \App\Service\MobilePurchaseService} can be unit
+ * The interface exists so {@see MobilePurchaseService} can be unit
  * tested with a fake — the real {@see AppleStoreKitVerifier} performs the JWS
  * cert-chain verification (Apple App Store Server Library) and needs real
  * credentials, which are account-bound and unavailable in tests / CI.

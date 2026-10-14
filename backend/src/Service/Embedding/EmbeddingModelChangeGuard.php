@@ -7,9 +7,9 @@ namespace App\Service\Embedding;
 use App\Entity\RevectorizeRun;
 use App\Entity\User;
 use App\Repository\RevectorizeRunRepository;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Embedding\Exception\CooldownActiveException;
 use App\Service\Embedding\Exception\PremiumRequiredException;
-use App\Service\PremiumFeatureGate;
 
 /**
  * EmbeddingModelChangeGuard — single decision point for "may this user

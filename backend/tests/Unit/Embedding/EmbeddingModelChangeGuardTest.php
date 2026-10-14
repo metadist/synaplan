@@ -7,11 +7,11 @@ namespace App\Tests\Unit\Embedding;
 use App\Entity\RevectorizeRun;
 use App\Entity\User;
 use App\Repository\RevectorizeRunRepository;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\CooldownActiveException;
 use App\Service\Embedding\Exception\PremiumRequiredException;
-use App\Service\PremiumFeatureGate;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

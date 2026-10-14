@@ -23,7 +23,7 @@ use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
-use App\Service\StorageQuotaService;
+use App\Service\Usage\StorageQuotaService;
 use App\Service\UserMemoryService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;

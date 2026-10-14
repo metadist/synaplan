@@ -7,7 +7,7 @@ namespace App\Command;
 use App\Message\CrawlWidgetUrlMessage;
 use App\Repository\PromptMetaRepository;
 use App\Repository\WidgetRepository;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;

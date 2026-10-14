@@ -7,7 +7,7 @@ use App\Entity\File;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
-use App\Service\StorageQuotaService;
+use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 

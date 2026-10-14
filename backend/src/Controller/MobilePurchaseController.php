@@ -9,7 +9,7 @@ use App\Service\Iap\Exception\IapConflictException;
 use App\Service\Iap\Exception\IapNotConfiguredException;
 use App\Service\Iap\Exception\IapVerificationException;
 use App\Service\Iap\IapPlatform;
-use App\Service\MobilePurchaseService;
+use App\Service\Iap\MobilePurchaseService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Seed;
 
-use App\Service\UsageTaximeterConfig;
+use App\Service\Usage\UsageTaximeterConfig;
 use Doctrine\DBAL\Connection;
 
 /**
