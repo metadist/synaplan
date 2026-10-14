@@ -45,20 +45,21 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 
 /**
- * What ChatHandler hands to the model.
+ * What ChatHandler hands to the model, on both pipelines.
  *
- * The two public pipelines (handle / handleStream) share this assembly. The
- * snapshot is the non-streaming call: system-prompt sections in order, the
- * user content blocks, and the tool definitions. A split that changes a line
- * here is a behaviour change.
+ * `handle()` and `handleStream()` assemble the prompt separately
+ * (`buildMessages` versus `buildStreamingMessages`, and the quoted
+ * reference lands in a different place relative to web results). Each
+ * pipeline has its own snapshot. The clock is frozen (2026-06-17 19:05 UTC,
+ * profile timezone Europe/Berlin) so the date block does not move.
  *
- * The clock is frozen (2026-06-17 19:05 UTC, profile timezone Europe/Berlin)
- * so the date block does not move. Record with UPDATE_CLEANUP_V2_SNAPSHOTS=1.
+ * Record with UPDATE_CLEANUP_V2_SNAPSHOTS=1.
  */
 #[AllowMockObjectsWithoutExpectations]
 final class ChatPromptCharacterizationTest extends TestCase
 {
-    private const SNAPSHOT = __DIR__.'/__snapshots__/chat_prompt.json';
+    private const BUFFERED_SNAPSHOT = __DIR__.'/__snapshots__/chat_prompt.json';
+    private const STREAMING_SNAPSHOT = __DIR__.'/__snapshots__/chat_prompt_stream.json';
 
     private AiFacade&MockObject $aiFacade;
     private ModelConfigService&MockObject $modelConfig;
@@ -84,7 +85,11 @@ final class ChatPromptCharacterizationTest extends TestCase
     /** @var array{messages: array<int, mixed>|string, options: array<string, mixed>}|null */
     private ?array $lastCapture = null;
 
+    /** @var array{messages: array<int, mixed>|string, options: array<string, mixed>}|null */
+    private ?array $lastStreamCapture = null;
+
     private int $chatCalls = 0;
+    private int $streamCalls = 0;
 
     protected function setUp(): void
     {
@@ -117,11 +122,23 @@ final class ChatPromptCharacterizationTest extends TestCase
         $this->vectorSearch->method('semanticSearch')->willReturnCallback(function (mixed ...$args): array {
             return $this->ragHits;
         });
+        $this->vectorSearch->method('semanticSearchByVector')->willReturnCallback(function (mixed ...$args): array {
+            return $this->ragHits;
+        });
 
         $this->aiFacade->method('chat')->willReturnCallback(
             function (array|string $messages, ?int $userId = null, array $options = []): array {
                 ++$this->chatCalls;
                 $this->lastCapture = ['messages' => $messages, 'options' => $options];
+
+                return ['content' => 'ok', 'provider' => $this->provider, 'model' => $this->modelName];
+            },
+        );
+        $this->aiFacade->method('chatStream')->willReturnCallback(
+            function (array|string $messages, callable $streamCallback, ?int $userId = null, array $options = []): array {
+                ++$this->streamCalls;
+                $this->lastStreamCapture = ['messages' => $messages, 'options' => $options];
+                $streamCallback('ok');
 
                 return ['content' => 'ok', 'provider' => $this->provider, 'model' => $this->modelName];
             },
@@ -182,14 +199,26 @@ final class ChatPromptCharacterizationTest extends TestCase
         );
     }
 
-    public function testPromptAssemblyMatchesTheSnapshot(): void
+    public function testBufferedPromptAssemblyMatchesTheSnapshot(): void
     {
         $actual = [];
         foreach ($this->cases() as $id => $case) {
-            $actual[$id] = $this->assemble($case);
+            $actual[$id] = $this->assembleBuffered($case);
         }
 
-        CleanupSnapshot::assertSame(self::SNAPSHOT, $actual, 'chat prompt');
+        self::assertContains('handoff_mediamaker', $actual['routing_handoff']['tool_names']);
+        CleanupSnapshot::assertSame(self::BUFFERED_SNAPSHOT, $actual, 'buffered chat prompt');
+    }
+
+    public function testStreamingPromptAssemblyMatchesTheSnapshot(): void
+    {
+        $actual = [];
+        foreach ($this->cases() as $id => $case) {
+            $actual[$id] = $this->assembleStreaming($case);
+        }
+
+        self::assertContains('handoff_mediamaker', $actual['routing_handoff']['tool_names']);
+        CleanupSnapshot::assertSame(self::STREAMING_SNAPSHOT, $actual, 'streaming chat prompt');
     }
 
     /**
@@ -197,7 +226,54 @@ final class ChatPromptCharacterizationTest extends TestCase
      *
      * @return array<string, mixed>
      */
-    private function assemble(array $case): array
+    private function assembleBuffered(array $case): array
+    {
+        $this->applyCase($case);
+        $this->lastCapture = null;
+        $this->chatCalls = 0;
+        $this->streamCalls = 0;
+
+        $this->handler->handle($case['message'], $case['thread'], $case['classification'], null, $case['options']);
+
+        self::assertSame(1, $this->chatCalls, 'The buffered pipeline should hand exactly one message array to the model.');
+        self::assertSame(0, $this->streamCalls, 'The buffered pipeline must not open a stream.');
+        self::assertIsArray($this->lastCapture);
+
+        return $this->normalize($this->lastCapture);
+    }
+
+    /**
+     * @param array<string, mixed> $case
+     *
+     * @return array<string, mixed>
+     */
+    private function assembleStreaming(array $case): array
+    {
+        $this->applyCase($case);
+        $this->lastStreamCapture = null;
+        $this->streamCalls = 0;
+        $this->chatCalls = 0;
+
+        $this->handler->handleStream(
+            $case['message'],
+            $case['thread'],
+            $case['classification'],
+            static function (string|array $chunk, array $metadata = []): void {},
+            null,
+            $case['options'],
+        );
+
+        self::assertSame(1, $this->streamCalls, 'The streaming pipeline should hand exactly one message array to the model.');
+        self::assertSame(0, $this->chatCalls, 'The streaming pipeline must not use the buffered call.');
+        self::assertIsArray($this->lastStreamCapture);
+
+        return $this->normalize($this->lastStreamCapture);
+    }
+
+    /**
+     * @param array<string, mixed> $case
+     */
+    private function applyCase(array $case): void
     {
         $this->memoryHits = $case['memories'];
         $this->negativeFeedback = $case['negative'];
@@ -205,15 +281,6 @@ final class ChatPromptCharacterizationTest extends TestCase
         $this->ragHits = $case['rag'];
         $this->provider = $case['provider'];
         $this->modelName = $case['model'];
-        $this->lastCapture = null;
-        $this->chatCalls = 0;
-
-        $this->handler->handle($case['message'], $case['thread'], $case['classification'], null, $case['options']);
-
-        self::assertSame(1, $this->chatCalls, 'ChatHandler should hand exactly one message array to the model.');
-        self::assertIsArray($this->lastCapture);
-
-        return $this->normalize($this->lastCapture);
     }
 
     /**

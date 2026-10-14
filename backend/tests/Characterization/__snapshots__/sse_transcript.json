@@ -318,6 +318,119 @@
             "status": "complete"
         }
     ],
+    "persisted_chat": [
+        {
+            "shape": {
+                "runId": "string",
+                "status": "string"
+            },
+            "status": "run_started"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "started"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "preprocessing"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "classifying"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "classified"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "generating"
+        },
+        {
+            "shape": {
+                "chunk": "string",
+                "status": "string"
+            },
+            "status": "data"
+        },
+        {
+            "shape": {
+                "marks": "list",
+                "phases": "list",
+                "status": "string",
+                "total_ms": "float"
+            },
+            "status": "perf"
+        },
+        {
+            "shape": {
+                "aiModels": {
+                    "chat": {
+                        "model": "string",
+                        "model_id": "null",
+                        "provider": "string"
+                    }
+                },
+                "language": "string",
+                "messageId": "int",
+                "model": "string",
+                "model_id": "null",
+                "originalMediaType": "null",
+                "originalTopic": "null",
+                "provider": "string",
+                "ragSources": "null",
+                "searchResults": "null",
+                "status": "string",
+                "topic": "string",
+                "trackId": "string",
+                "usage": {
+                    "completionTokens": "int",
+                    "cost": "string",
+                    "kind": "string",
+                    "modelKey": "string",
+                    "priceKnown": "bool",
+                    "promptTokens": "int",
+                    "totalTokens": "int"
+                }
+            },
+            "status": "complete"
+        }
+    ],
     "plain_chat": [
         {
             "shape": {

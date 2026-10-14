@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Characterization;
 
 use App\Controller\StreamController;
+use App\Entity\Chat;
 use App\Entity\GuestSession;
 use App\Entity\Message;
 use App\Entity\UseLog;
@@ -16,6 +17,7 @@ use App\Tests\Characterization\Support\CleanupSnapshot;
 use App\Tests\Characterization\Support\PayloadShape;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -25,9 +27,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *
  * The wire format is `data: {"status": "<name>", ...}`. This locks the
  * ordered status names and the JSON key/type shape for five requests:
- * plain chat, a turn that forwards the RAG / memory / web-search / URL-fetch
- * statuses, a provider error, a cancellation, and a guest who has used the
- * trial. MessageProcessor is scripted so the transcript does not depend on a
+ * plain incognito chat, the same turn persisted on a real chat (so `run_started`
+ * and a numeric `messageId` are part of the contract), a turn that forwards
+ * the RAG / memory / web-search / URL-fetch statuses, a provider error, a
+ * cancellation, and a guest who has used the trial. MessageProcessor is scripted so the transcript does not depend on a
  * live model; StreamController is the real one, so a split that changes the
  * frames fails here.
  *
@@ -68,6 +71,10 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
         self::assertContains('complete', $knowledge);
         self::assertSame('guest_limit_reached', $actual['guest_limit'][0]['status'] ?? null);
         self::assertNotContains('complete', array_column($actual['cancelled'], 'status'));
+        self::assertContains('run_started', array_column($actual['persisted_chat'], 'status'));
+        self::assertNotContains('run_started', array_column($actual['plain_chat'], 'status'));
+        self::assertSame('int', $this->completeField($actual['persisted_chat'], 'messageId'));
+        self::assertSame('null', $this->completeField($actual['plain_chat'], 'messageId'));
 
         CleanupSnapshot::assertSame(self::SNAPSHOT, $actual, 'SSE transcript');
     }
@@ -90,44 +97,59 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
         $flag = new \ReflectionProperty(StreamController::class, 'sseCaptureMode');
         $flag->setValue($controller, true);
 
-        if ('guest' === $scenario['kind']) {
-            $this->installGuestLimit($controller);
-            $request = Request::create('/api/v1/messages/stream', 'GET', [
-                'guestSession' => 'guest-limit',
-                'message' => 'Hello',
-            ]);
-            $actor = null;
-        } else {
-            $processor = new \ReflectionProperty(StreamController::class, 'messageProcessor');
-            $processor->setValue($controller, $this->scriptedProcessor($scenario));
-            $request = Request::create(
-                '/api/v1/messages/stream',
-                'POST',
-                [],
-                [],
-                [],
-                ['CONTENT_TYPE' => 'application/json'],
-                json_encode([
+        $chatId = null;
+        try {
+            if ('guest' === $scenario['kind']) {
+                $this->installGuestLimit($controller);
+                $request = Request::create('/api/v1/messages/stream', 'GET', [
+                    'guestSession' => 'guest-limit',
+                    'message' => 'Hello',
+                ]);
+                $actor = null;
+            } else {
+                if ('persisted' === $scenario['kind']) {
+                    $chatId = $this->openChat($client, $user);
+                }
+                $processor = new \ReflectionProperty(StreamController::class, 'messageProcessor');
+                $processor->setValue($controller, $this->scriptedProcessor($scenario));
+                $body = [
                     'message' => 'Hello, how are you today?',
-                    'incognito' => true,
                     'trackId' => 4242,
                     'language' => 'en',
-                ], JSON_THROW_ON_ERROR),
-            );
-            $actor = $user;
-        }
+                ];
+                if (null === $chatId) {
+                    $body['incognito'] = true;
+                } else {
+                    $body['chatId'] = $chatId;
+                }
+                $request = Request::create(
+                    '/api/v1/messages/stream',
+                    'POST',
+                    [],
+                    [],
+                    [],
+                    ['CONTENT_TYPE' => 'application/json'],
+                    json_encode($body, JSON_THROW_ON_ERROR),
+                );
+                $actor = $user;
+            }
 
-        $response = $controller->streamMessage($request, $actor);
-        self::assertInstanceOf(StreamedResponse::class, $response);
+            $response = $controller->streamMessage($request, $actor);
+            self::assertInstanceOf(StreamedResponse::class, $response);
 
-        ob_start();
-        try {
-            $response->sendContent();
+            ob_start();
+            try {
+                $response->sendContent();
+            } finally {
+                $raw = (string) ob_get_clean();
+            }
+
+            return $this->shaped($this->frames($raw));
         } finally {
-            $raw = (string) ob_get_clean();
+            if (null !== $chatId) {
+                $this->forgetChat($chatId);
+            }
         }
-
-        return $this->shaped($this->frames($raw));
     }
 
     /**
@@ -190,6 +212,12 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
         return [
             'plain_chat' => [
                 'kind' => 'stream',
+                'statuses' => ['started', 'preprocessing', 'classifying', 'classified', 'generating'],
+                'chunks' => ['Hello.'],
+                'result' => $success,
+            ],
+            'persisted_chat' => [
+                'kind' => 'persisted',
                 'statuses' => ['started', 'preprocessing', 'classifying', 'classified', 'generating'],
                 'chunks' => ['Hello.'],
                 'result' => $success,
@@ -337,5 +365,54 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
         }
 
         return $shaped;
+    }
+
+    private function openChat(KernelBrowser $client, User $user): int
+    {
+        $em = $client->getContainer()->get(EntityManagerInterface::class);
+        $chat = (new Chat())
+            ->setUserId((int) $user->getId())
+            ->setTitle('cleanup-v2 characterization');
+        $em->persist($chat);
+        $em->flush();
+        $id = $chat->getId();
+        self::assertNotNull($id);
+
+        return $id;
+    }
+
+    private function forgetChat(int $chatId): void
+    {
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+        $em = $client->getContainer()->get(EntityManagerInterface::class);
+        foreach ($em->getRepository(Message::class)->findBy(['chatId' => $chatId]) as $message) {
+            $em->remove($message);
+        }
+        $em->flush();
+        $chat = $em->find(Chat::class, $chatId);
+        if (null !== $chat) {
+            $em->remove($chat);
+            $em->flush();
+        }
+        self::ensureKernelShutdown();
+    }
+
+    /**
+     * @param list<array{status: mixed, shape: array<string, mixed>|string}> $events
+     */
+    private function completeField(array $events, string $field): string
+    {
+        foreach ($events as $event) {
+            if ('complete' !== $event['status'] || !is_array($event['shape'])) {
+                continue;
+            }
+            $value = $event['shape'][$field] ?? null;
+            self::assertIsString($value);
+
+            return $value;
+        }
+
+        self::fail('The transcript has no complete frame.');
     }
 }

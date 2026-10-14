@@ -15,11 +15,12 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 /**
  * Key-and-type contract of GET /api/v1/config/runtime.
  *
- * Three profiles, matching the cleanup V2 plan:
- *   - anonymous: the public payload the test kernel (CI's env) actually boots
- *   - authenticated: the same install with the fixture user signed in
- *   - oidc: REGISTRATION_ENABLED and GUEST_CHAT_ENABLED pinned off, which is
- *     how an SSO-only install hides local sign-up and the guest trial
+ * Three profiles, with the operator pins set explicitly so a stored ACCESS
+ * row or an ambient env value cannot change the result:
+ *   - anonymous: registration and guest chat pinned on
+ *   - authenticated: the same pins, with the fixture user signed in
+ *   - oidc: both pins off, which is how an SSO-only install hides local
+ *     sign-up and the guest trial
  *
  * A second kernel for `.env.minimal` is not booted here. Sidecar and billing
  * switches are container bindings, so they cannot be flipped inside this
@@ -33,17 +34,26 @@ final class RuntimeConfigCharacterizationTest extends WebTestCase
 {
     private const SNAPSHOT = __DIR__.'/__snapshots__/runtime_config.json';
 
+    /** @var array<string, string> */
+    private const AUTH_ON = [
+        'REGISTRATION_ENABLED' => 'true',
+        'GUEST_CHAT_ENABLED' => 'true',
+    ];
+
+    /** @var array<string, string> */
+    private const AUTH_OFF = [
+        'REGISTRATION_ENABLED' => 'false',
+        'GUEST_CHAT_ENABLED' => 'false',
+    ];
+
     public function testRuntimePayloadShapeMatchesTheThreeProfiles(): void
     {
         $client = static::createClient();
 
         $actual = [
-            'anonymous' => $this->profile($client, null),
-            'authenticated' => $this->profile($client, $this->fixtureUser($client)),
-            'oidc' => $this->withEnv([
-                'REGISTRATION_ENABLED' => 'false',
-                'GUEST_CHAT_ENABLED' => 'false',
-            ], fn (): array => $this->profile($client, null)),
+            'anonymous' => $this->withEnv(self::AUTH_ON, fn (): array => $this->profile($client, null)),
+            'authenticated' => $this->withEnv(self::AUTH_ON, fn (): array => $this->profile($client, $this->fixtureUser($client))),
+            'oidc' => $this->withEnv(self::AUTH_OFF, fn (): array => $this->profile($client, null)),
         ];
 
         self::assertFalse($actual['oidc']['signals']['auth.registrationEnabled']);

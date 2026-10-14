@@ -1,0 +1,122 @@
+{
+    "plain": {
+        "max_tokens": null,
+        "messages": [
+            {
+                "content": "You are the Synaplan test assistant. Answer clearly.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.\n\n## User location context\n- Approximate country (from network geolocation, ISO 3166-1 alpha-2): DE.\n- This is an approximate, IP-based signal — not a precise location. If the exact location matters, ask the user to confirm.\n\n## Current date and time\n- Current local time for the user: Wednesday, 17 June 2026, 21:05 (Europe/Berlin, UTC+02:00).\n- ISO 8601: 2026-06-17T21:05:00+02:00.\nUse this as \"now\" when resolving relative dates and times (e.g. \"today\", \"tomorrow\", \"in 2 hours\", \"next Monday\"). Do not restate this block unless the user asks about the current date or time.",
+                "role": "system"
+            },
+            {
+                "content": "Hello, how are you today?",
+                "role": "user"
+            }
+        ],
+        "model": "test-model",
+        "provider": "test",
+        "temperature": 0.7,
+        "tool_choice": null,
+        "tool_names": []
+    },
+    "routing_handoff": {
+        "max_tokens": null,
+        "messages": [
+            {
+                "content": "You are the Synaplan test assistant. Answer clearly.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.\n\n## User location context\n- Approximate country (from network geolocation, ISO 3166-1 alpha-2): DE.\n- This is an approximate, IP-based signal — not a precise location. If the exact location matters, ask the user to confirm.\n\n## Current date and time\n- Current local time for the user: Wednesday, 17 June 2026, 21:05 (Europe/Berlin, UTC+02:00).\n- ISO 8601: 2026-06-17T21:05:00+02:00.\nUse this as \"now\" when resolving relative dates and times (e.g. \"today\", \"tomorrow\", \"in 2 hours\", \"next Monday\"). Do not restate this block unless the user asks about the current date or time.",
+                "role": "system"
+            },
+            {
+                "content": "Draw a cat",
+                "role": "user"
+            }
+        ],
+        "model": "claude-sonnet-5",
+        "provider": "anthropic",
+        "temperature": 0.7,
+        "tool_choice": "auto",
+        "tool_names": [
+            "handoff_docsummary",
+            "handoff_mediamaker",
+            "handoff_officemaker"
+        ]
+    },
+    "with_attachment": {
+        "max_tokens": null,
+        "messages": [
+            {
+                "content": "You are the Synaplan test assistant. Answer clearly.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.\n\n## User location context\n- Approximate country (from network geolocation, ISO 3166-1 alpha-2): DE.\n- This is an approximate, IP-based signal — not a precise location. If the exact location matters, ask the user to confirm.\n\n## Current date and time\n- Current local time for the user: Wednesday, 17 June 2026, 21:05 (Europe/Berlin, UTC+02:00).\n- ISO 8601: 2026-06-17T21:05:00+02:00.\nUse this as \"now\" when resolving relative dates and times (e.g. \"today\", \"tomorrow\", \"in 2 hours\", \"next Monday\"). Do not restate this block unless the user asks about the current date or time.",
+                "role": "system"
+            },
+            {
+                "content": "Summarize the attached note.\n\n\n---\n\n\nUser provided :\n\nBudget line: paper.\nBudget line: ink.\n\n",
+                "role": "user"
+            }
+        ],
+        "model": "test-model",
+        "provider": "test",
+        "temperature": 0.7,
+        "tool_choice": null,
+        "tool_names": []
+    },
+    "with_history": {
+        "max_tokens": null,
+        "messages": [
+            {
+                "content": "You are the Synaplan test assistant. Answer clearly.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.\n\n## User location context\n- Approximate country (from network geolocation, ISO 3166-1 alpha-2): DE.\n- This is an approximate, IP-based signal — not a precise location. If the exact location matters, ask the user to confirm.\n\n## Current date and time\n- Current local time for the user: Wednesday, 17 June 2026, 21:05 (Europe/Berlin, UTC+02:00).\n- ISO 8601: 2026-06-17T21:05:00+02:00.\nUse this as \"now\" when resolving relative dates and times (e.g. \"today\", \"tomorrow\", \"in 2 hours\", \"next Monday\"). Do not restate this block unless the user asks about the current date or time.",
+                "role": "system"
+            },
+            {
+                "content": "What day is it?",
+                "role": "user"
+            },
+            {
+                "content": "Wednesday.",
+                "role": "assistant"
+            },
+            {
+                "content": "And the day after?",
+                "role": "user"
+            }
+        ],
+        "model": "test-model",
+        "provider": "test",
+        "temperature": 0.7,
+        "tool_choice": null,
+        "tool_names": []
+    },
+    "with_knowledge": {
+        "max_tokens": null,
+        "messages": [
+            {
+                "content": "You are the Synaplan test assistant. Answer clearly.\n\n## Knowledge Base Context (relevant to your task):\n[Source 1] move.md\nThe office moves in July.\n\nUse this context to provide accurate and specific answers.\nCite a source as [1], [2], matching the Source numbers above. Only cite numbers from this list.\n\n\n## User Memories (relevant to this conversation):\n[ID: 42] city: The office is in Münster.\n\nOnly use memories that are directly relevant to the user's current question. Ignore memories that are not clearly related.\nREFERENCES: Use [Memory:ID] (clickable). Rules:\n- ONE ID per bracket. Good: [Memory:42] and [Memory:15]. Bad: [Memory:42, 15].\n- Only use IDs from the list above. Never invent IDs.\n\n\n## User Feedback (corrections from previous conversations):\n\n### Things to AVOID (user-reported false positives) - Reference as [Feedback:ID]:\n- ❌ [Feedback:7] Do not claim the office is in Berlin.\n\n### Correct information (user-confirmed) - Reference as [Feedback:ID]:\n- ✅ [Feedback:8] The move is scheduled for July.\n\nREFERENCES: Use [Feedback:ID] (clickable). Rules:\n- ONE ID per bracket. Good: [Feedback:123] and [Feedback:456]. Bad: [Feedback:123, 456].\n- Avoid repeating ❌ claims. Prefer ✅ information.\n- If ❌ and ✅ entries contradict each other, mention the conflict to the user.\n\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.\n\n## User location context\n- Approximate country (from network geolocation, ISO 3166-1 alpha-2): DE.\n- This is an approximate, IP-based signal — not a precise location. If the exact location matters, ask the user to confirm.\n\n## Current date and time\n- Current local time for the user: Wednesday, 17 June 2026, 21:05 (Europe/Berlin, UTC+02:00).\n- ISO 8601: 2026-06-17T21:05:00+02:00.\nUse this as \"now\" when resolving relative dates and times (e.g. \"today\", \"tomorrow\", \"in 2 hours\", \"next Monday\"). Do not restate this block unless the user asks about the current date or time.",
+                "role": "system"
+            },
+            {
+                "content": "What did we decide about the office move?",
+                "role": "user"
+            }
+        ],
+        "model": "test-model",
+        "provider": "test",
+        "temperature": 0.7,
+        "tool_choice": null,
+        "tool_names": []
+    },
+    "with_web_and_quote": {
+        "max_tokens": null,
+        "messages": [
+            {
+                "content": "You are the Synaplan test assistant. Answer clearly.\n\nPage: https://example.com/php\nPHP 8.4 was released.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.\n\n## User location context\n- Approximate country (from network geolocation, ISO 3166-1 alpha-2): DE.\n- This is an approximate, IP-based signal — not a precise location. If the exact location matters, ask the user to confirm.\n\n## Current date and time\n- Current local time for the user: Wednesday, 17 June 2026, 21:05 (Europe/Berlin, UTC+02:00).\n- ISO 8601: 2026-06-17T21:05:00+02:00.\nUse this as \"now\" when resolving relative dates and times (e.g. \"today\", \"tomorrow\", \"in 2 hours\", \"next Monday\"). Do not restate this block unless the user asks about the current date or time.\n\n## Quoted reference from the conversation\nThe user selected the following excerpt from an earlier message and wants it used as the primary reference point for their request. Treat it as the focus of their follow-up. Do not mention this block or describe how it was provided:\n\n\"\"\"\nWe should wait for the next PHP release.\n\"\"\"\n",
+                "role": "system"
+            },
+            {
+                "content": "Is that still true?",
+                "role": "user"
+            }
+        ],
+        "model": "test-model",
+        "provider": "test",
+        "temperature": 0.7,
+        "tool_choice": null,
+        "tool_names": []
+    }
+}
