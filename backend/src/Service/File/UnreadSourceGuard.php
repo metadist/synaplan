@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\File;
 
-use App\Service\UrlContentService;
+use App\Service\Research\UrlContentService;
 
 /**
  * Refuses file generation when the message names a source URL no fetch

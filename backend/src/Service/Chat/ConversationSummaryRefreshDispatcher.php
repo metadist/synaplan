@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Chat;
 
 use App\Message\DigestOtherChatsCommand;
 use App\Message\RefreshConversationSummaryCommand;

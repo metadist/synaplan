@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Message;
 
 use App\Entity\Message;
 use App\Entity\User;
@@ -10,7 +10,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Service zum Enqueuen von Messages für async Processing.
+ * Enqueues messages for asynchronous processing.
  */
 final readonly class MessageEnqueueService
 {
@@ -22,9 +22,9 @@ final readonly class MessageEnqueueService
     }
 
     /**
-     * Erstellt Message und queued sie für async Processing.
+     * Creates the message and queues it for asynchronous processing.
      *
-     * @param array $options Optionale Parameter (files, reasoning, etc.)
+     * @param array $options optional parameters (files, reasoning, etc.)
      *
      * @return array ['tracking_id' => ..., 'message_id' => ...]
      */

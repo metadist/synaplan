@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Message;
 
 use App\Repository\ConfigRepository;
 
@@ -10,7 +10,7 @@ use App\Repository\ConfigRepository;
  * Phase 4 rollout switch for the **backgrounded memory extraction** half
  * of the performance overhaul.
  *
- * Currently consulted only by {@see Message\Handler\ChatHandler}
+ * Currently consulted only by {@see Handler\ChatHandler}
  * to gate the dispatch of `ExtractMemoriesCommand` to the async worker.
  * The other Phase 1 wins (classifier fast-path, Gemini `thinkingConfig`,
  * shared embeddings, etc.) have their own dedicated BCONFIG keys or are

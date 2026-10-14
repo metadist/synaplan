@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Feedback;
 
 /**
  * Shared constants for the feedback system (false positives, positive examples, contradictions).

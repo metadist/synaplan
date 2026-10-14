@@ -4,8 +4,8 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Chat\GuestSessionService;
 use App\Service\Email\EmailChatService;
-use App\Service\GuestSessionService;
 use App\Service\Iam\UserDeletionService;
 use App\Service\Profile\ToursSeen;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;

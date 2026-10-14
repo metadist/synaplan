@@ -6,9 +6,9 @@ namespace App\Tests\Unit\Service\Message;
 
 use App\Entity\User;
 use App\Service\Digest\MessageReferenceResolver;
+use App\Service\Memory\UserMemoryService;
 use App\Service\Message\ExternalReplyReferences;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
-use App\Service\UserMemoryService;
 use PHPUnit\Framework\TestCase;
 
 final class ExternalReplyReferencesTest extends TestCase

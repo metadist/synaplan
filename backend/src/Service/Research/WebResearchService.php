@@ -7,7 +7,6 @@ namespace App\Service\Research;
 use App\Plug\PlugConfigService;
 use App\Service\Context\CondensedText;
 use App\Service\Context\ContextCondenser;
-use App\Service\UrlContentService;
 use Psr\Log\LoggerInterface;
 
 /**

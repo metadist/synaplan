@@ -480,7 +480,7 @@ final readonly class VectorizationService
 
     /**
      * Desktop folders always use DEFAULTMODEL.VECTORIZE — the same model
-     * {@see \App\Service\UserMemoryService::embedUserQuery} uses for search.
+     * {@see \App\Service\Memory\UserMemoryService::embedUserQuery} uses for search.
      * A project EMBED hint must not open a second vector space.
      */
     private function resolveEmbeddingModelId(?int $requested, string $groupKey, int $userId): ?int

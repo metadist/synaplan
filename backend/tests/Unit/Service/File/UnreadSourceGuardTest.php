@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\File;
 
 use App\Service\File\UnreadSourceGuard;
-use App\Service\UrlContentService;
+use App\Service\Research\UrlContentService;
 use PHPUnit\Framework\TestCase;
 
 final class UnreadSourceGuardTest extends TestCase

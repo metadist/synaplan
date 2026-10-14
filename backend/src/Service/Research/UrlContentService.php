@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Research;
 
 use App\Service\File\FileHelper;
 use App\Service\Security\SsrfGuard;

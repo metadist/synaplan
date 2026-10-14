@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Memory;
 
 use App\Message\ExtractMemoriesCommand;
 use Psr\Log\LoggerInterface;
@@ -12,7 +12,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Forwards a prepared {@see ExtractMemoriesCommand} to the messenger bus.
  *
  * Single source of truth for the dispatch + log + swallow-failures
- * contract that both {@see Message\Handler\ChatHandler} (for
+ * contract that both {@see \App\Service\Message\Handler\ChatHandler} (for
  * the synchronous fallback path) and
  * {@see \App\Controller\StreamController} (for the deferred SSE path
  * fixing the issue #881 race) need.

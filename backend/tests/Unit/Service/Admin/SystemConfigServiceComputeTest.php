@@ -8,10 +8,10 @@ use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
 use App\Service\Auth\RegistrationConfig;
+use App\Service\Chat\GuestChatConfig;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\Contract\ComputeHealth;
 use App\Service\EncryptionService;
-use App\Service\GuestChatConfig;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

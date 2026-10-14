@@ -8,7 +8,7 @@ use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Repository\MessageRepository;
 use App\Repository\ModelRepository;
-use App\Service\FeedbackExampleService;
+use App\Service\Feedback\FeedbackExampleService;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobCanceller;
 use App\Service\Media\MediaJobService;

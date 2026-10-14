@@ -40,23 +40,6 @@ final class ServiceRootTest extends TestCase
      * that moves the file. Only shrinks; never add to it.
      */
     private const PENDING_MOVE = [
-        // C7 — Message/, Chat/, Memory/, Feedback/, Research/
-        'AiResponseSanitizer',
-        'ContentModerationService',
-        'ConversationSummaryRefreshDispatcher',
-        'FeedbackConfigService',
-        'FeedbackConstants',
-        'FeedbackContradictionService',
-        'FeedbackExampleService',
-        'GuestChatConfig',
-        'GuestSessionService',
-        'MemoryExtractionDispatcher',
-        'MemoryExtractionService',
-        'MessageEnqueueService',
-        'PastedContentText',
-        'PerfPipelineFlag',
-        'UrlContentService',
-        'UserMemoryService',
         // C8 — Media/, Stt/, Prompt/, Security/, Infrastructure/, App\Monolog\
         'CircuitBreaker',
         'EncryptionService',

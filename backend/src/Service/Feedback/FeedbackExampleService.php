@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Feedback;
 
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\FeedbackPreviewSchema;
@@ -13,7 +13,10 @@ use App\Entity\User;
 use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\PromptRepository;
 use App\Service\Exception\MemoryServiceUnavailableException;
+use App\Service\Memory\UserMemoryService;
+use App\Service\ModelConfigService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RateLimitService;
 use Psr\Log\LoggerInterface;
 
 final readonly class FeedbackExampleService

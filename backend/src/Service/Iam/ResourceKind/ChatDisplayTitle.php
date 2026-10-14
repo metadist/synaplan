@@ -7,7 +7,7 @@ namespace App\Service\Iam\ResourceKind;
 use App\AI\Messages\AnthropicContentText;
 use App\Entity\Chat;
 use App\Entity\Message;
-use App\Service\PastedContentText;
+use App\Service\Chat\PastedContentText;
 
 /**
  * The name a shared chat shows in a list.

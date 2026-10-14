@@ -13,6 +13,7 @@ use App\Service\Digest\MessageReferenceResolver;
 use App\Service\File\FileTypeResolver;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Memory\UserMemoryService;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessagePreProcessor;
@@ -20,7 +21,6 @@ use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
-use App\Service\UserMemoryService;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 

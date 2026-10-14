@@ -12,7 +12,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Realtime\Notifier\ChatActivityNotifier;
 use App\Service\Agent\AgentConfig;
-use App\Service\ConversationSummaryRefreshDispatcher;
+use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Email\EmailChatService;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;

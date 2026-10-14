@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Service\Auth\RegistrationConfig;
+use App\Service\Chat\GuestChatConfig;
 
 /**
  * Deployment-level switch for the browser's Web Speech API as the speech-to-

@@ -7,7 +7,7 @@ namespace App\AI\StructuredOutput\Schema;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 
 /**
- * JSON schema for {@see \App\Service\FeedbackExampleService}'s per-source
+ * JSON schema for {@see \App\Service\Feedback\FeedbackExampleService}'s per-source
  * summarization calls — shared by both the knowledge-base variant
  * (`summarizeSourcesWithAi()`) and the web-research variant
  * (`summarizeWebSourcesWithAi()`), which return the identical

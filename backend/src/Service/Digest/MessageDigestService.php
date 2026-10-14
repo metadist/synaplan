@@ -24,7 +24,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Digests one batch of messages into searchable one-liners.
  *
- * Out-of-band sibling of {@see \App\Service\MemoryExtractionService}: the
+ * Out-of-band sibling of {@see \App\Service\Memory\MemoryExtractionService}: the
  * daily digest job (never the chat hot path) hands a batch of a user's
  * messages to the memory model, which picks the KEY messages and writes one
  * retrieval-friendly title per message. Rows go to MariaDB (authoritative)

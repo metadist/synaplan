@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Service\Auth\RegistrationConfig;
-use App\Service\GuestChatConfig;
+use App\Service\Chat\GuestChatConfig;
 use App\Service\Setup\SetupConstants;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Attribute\AsCommand;

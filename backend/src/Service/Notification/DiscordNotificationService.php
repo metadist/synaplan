@@ -5,7 +5,7 @@ namespace App\Service\Notification;
 use App\AI\Health\ModelHealthAlert;
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Service\AiResponseSanitizer;
+use App\Service\Message\AiResponseSanitizer;
 use App\Service\ModelDiscovery\ModelDiscoveryDigest;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
