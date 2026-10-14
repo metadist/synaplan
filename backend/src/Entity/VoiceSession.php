@@ -46,7 +46,7 @@ class VoiceSession
     #[ORM\Column(name: 'BENDED', type: 'integer', nullable: true)]
     private ?int $ended = null;
 
-    #[ORM\Column(name: 'BSECONDS', type: 'integer')]
+    #[ORM\Column(name: 'BSECONDS', type: 'integer', options: ['default' => 0])]
     private int $seconds = 0;
 
     #[ORM\Column(name: 'BUSELOGID', type: 'integer', nullable: true)]
