@@ -9,24 +9,17 @@ use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\GuestSession;
 use App\Entity\Message;
-use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\WidgetSession;
 use App\Message\ExtractMemoriesCommand;
-use App\Service\Agent\AgentConfig;
-use App\Service\Agent\AgentRuntimeResolver;
-use App\Service\Agent\AgentService;
-use App\Service\Agent\Exception\AgentArchivedException;
-use App\Service\Agent\Exception\AgentNotAccessibleException;
-use App\Service\Agent\Exception\AgentNotPublishedException;
-use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Chat\ChatTitleService;
 use App\Service\Chat\ConversationSummaryRefreshDispatcher;
-use App\Service\Chat\GuestChatConfig;
 use App\Service\Chat\GuestSessionService;
 use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunRecorder;
 use App\Service\Chat\Run\ChatRunService;
+use App\Service\Chat\Stream\StreamRequestRejected;
+use App\Service\Chat\Stream\StreamRequestResolver;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
@@ -55,16 +48,15 @@ use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\Realtime\SseOutput;
+use App\Service\Realtime\SseWriter;
 use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\UsageStatsService;
 use App\Service\Usage\UsageTaximeterConfig;
-use App\Service\Widget\WidgetService;
 use App\Service\Widget\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -76,47 +68,15 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 #[OA\Tag(name: 'Messages')]
 class StreamController extends AbstractController
 {
-    /**
-     * Server-side cap for a quoted-reference excerpt ("Mention in chat").
-     *
-     * The quote travels as a query parameter on the SSE (GET) stream URL, so an
-     * over-long excerpt could exceed reverse-proxy request limits (e.g. Nginx's
-     * 8 KB default). Kept in sync with the frontend cap (MAX_QUOTE_LENGTH in
-     * useMessageQuoting.ts); 1000 chars is generous for a reference point and
-     * stays URL-safe even worst-case encoded.
-     */
-    private const MAX_QUOTED_TEXT_LENGTH = 1000;
-
-    /**
-     * Server-side caps for the incognito conversation history sent by the
-     * client. Mirrors the persisted-chat window
-     * ({@see MessageProcessor::HISTORY_MAX_MESSAGES}) so an incognito turn gets
-     * the same context budget as a persisted chat — and a crafted request
-     * cannot bloat the AI prompt.
-     */
-    private const MAX_INCOGNITO_HISTORY_MESSAGES = MessageProcessor::HISTORY_MAX_MESSAGES;
-    private const MAX_INCOGNITO_HISTORY_CHARS = MessageProcessor::HISTORY_MAX_CHARS;
-
-    /**
-     * UI locales accepted as a BLANG seed, mirroring the SPA's
-     * `supportedLanguages` (frontend/src/i18n/index.ts) and
-     * {@see User::getLocale()}. Anything else falls back to `en` so a crafted
-     * value cannot poison BMESSAGES.BLANG (varchar(2)).
-     *
-     * @var list<string>
-     */
-    private const SUPPORTED_UI_LANGUAGES = ['de', 'en', 'es', 'fr', 'tr'];
-
     public function __construct(
+        private StreamRequestResolver $streamRequests,
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
         private MessageProcessor $messageProcessor,
         private LoggerInterface $logger,
         private ModelConfigService $modelConfigService,
-        private WidgetService $widgetService,
         private WidgetSessionService $widgetSessionService,
         private GuestSessionService $guestSessionService,
-        private GuestChatConfig $guestChatConfig,
         private RateLimitService $rateLimitService,
         private string $uploadDir,
         private UserUploadPathBuilder $userUploadPathBuilder,
@@ -133,13 +93,9 @@ class StreamController extends AbstractController
         private GeneratedFileRegistrar $generatedFileRegistrar,
         private UsageStatsService $usageStatsService,
         private UsageTaximeterConfig $usageTaximeterConfig,
-        private PremiumFeatureGate $premiumFeatureGate,
         private ChatRunService $chatRunService,
         private ChatErrorPresenter $chatErrorPresenter,
         private ChatErrorNotifier $chatErrorNotifier,
-        private AgentConfig $agentConfig,
-        private AgentService $agentService,
-        private AgentRuntimeResolver $agentRuntimeResolver,
         private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
         private ?ProviderDisplayNames $providerDisplayNames = null,
@@ -185,105 +141,6 @@ class StreamController extends AbstractController
         ]);
 
         return '__FILE_GENERATION_FAILED__';
-    }
-
-    /**
-     * Merge stream parameters from the query string and (for POST) the JSON
-     * body into one bag. Body values override query values; only scalar body
-     * values are accepted, and booleans are normalized to '1'/'0' so the
-     * existing `'1' === $params->get(...)` flag checks work for JSON `true`.
-     *
-     * @return InputBag<bool|float|int|string>
-     */
-    private function resolveStreamParams(Request $request): InputBag
-    {
-        $params = new InputBag($request->query->all());
-
-        if (!$request->isMethod('POST')) {
-            return $params;
-        }
-
-        $decoded = json_decode($request->getContent(), true);
-        if (!is_array($decoded)) {
-            return $params;
-        }
-
-        foreach ($decoded as $key => $value) {
-            if (is_bool($value)) {
-                $params->set((string) $key, $value ? '1' : '0');
-            } elseif (is_scalar($value)) {
-                $params->set((string) $key, (string) $value);
-            }
-        }
-
-        return $params;
-    }
-
-    /**
-     * Extract the incognito conversation history from the request.
-     *
-     * `resolveStreamParams()` deliberately accepts only scalar body values, so
-     * the `history` array is read straight from the JSON body here (the GET
-     * variant may pass it as a JSON-encoded string query parameter). Entries
-     * are validated to `{role, content}` pairs, roles are normalized to
-     * user/assistant, and the result is capped to the same message/char
-     * budget as {@see \App\Repository\MessageRepository::findChatHistory()}.
-     *
-     * @return list<array{role: 'user'|'assistant', content: string}>
-     */
-    private function parseIncognitoHistory(Request $request): array
-    {
-        $raw = null;
-
-        if ($request->isMethod('POST')) {
-            $decoded = json_decode($request->getContent(), true);
-            if (is_array($decoded) && isset($decoded['history']) && is_array($decoded['history'])) {
-                $raw = $decoded['history'];
-            }
-        }
-
-        if (null === $raw) {
-            $queryHistory = $request->query->get('history');
-            if (is_string($queryHistory) && '' !== $queryHistory) {
-                $decoded = json_decode($queryHistory, true);
-                if (is_array($decoded)) {
-                    $raw = $decoded;
-                }
-            }
-        }
-
-        if (!is_array($raw)) {
-            return [];
-        }
-
-        $entries = [];
-        foreach ($raw as $entry) {
-            if (!is_array($entry)) {
-                continue;
-            }
-            $role = is_string($entry['role'] ?? null) ? strtolower(trim($entry['role'])) : '';
-            $content = is_string($entry['content'] ?? null) ? trim($entry['content']) : '';
-            if ('' === $content || !in_array($role, ['user', 'assistant'], true)) {
-                continue;
-            }
-            $entries[] = ['role' => $role, 'content' => $content];
-        }
-
-        // Keep the NEWEST messages within the caps (mirror of findChatHistory),
-        // then restore chronological order.
-        $entries = array_slice($entries, -self::MAX_INCOGNITO_HISTORY_MESSAGES);
-        $kept = [];
-        $totalChars = 0;
-        foreach (array_reverse($entries) as $entry) {
-            $length = strlen($entry['content']);
-            if ([] !== $kept && ($totalChars + $length) > self::MAX_INCOGNITO_HISTORY_CHARS) {
-                break;
-            }
-            $kept[] = $entry;
-            $totalChars += $length;
-        }
-
-        return array_reverse($kept);
     }
 
     #[Route('/stream', name: 'stream', methods: ['GET', 'POST'])]
@@ -478,304 +335,43 @@ class StreamController extends AbstractController
         Request $request,
         #[CurrentUser] ?User $user,
     ): Response {
-        // Unified parameter access for both transports: the legacy GET puts
-        // everything in the query string (EventSource can't POST), which
-        // breaks on long pasted texts — proxies reject oversized request
-        // lines with HTTP 431/414 before PHP ever runs. The POST variant
-        // carries the same parameters in a JSON body; body values override
-        // query parameters so a client can mix both (e.g. keep ?token= for
-        // the query authenticator while POSTing the message).
-        $params = $this->resolveStreamParams($request);
-
-        // Widget-Mode: Check for Widget headers if no authenticated user
-        $isWidgetMode = false;
-        $isGuestMode = false;
-        $widget = null;
-        $widgetSession = null;
-        $guestSession = null;
-        $fixedTaskPromptTopic = null;
-
-        if (!$user) {
-            $widgetId = $request->headers->get('X-Widget-Id');
-            $sessionId = $request->headers->get('X-Widget-Session');
-
-            if ($widgetId && $sessionId) {
-                // Widget authentication
-                $widget = $this->widgetService->getWidgetById($widgetId);
-                if (!$widget) {
-                    return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
-                }
-
-                if (!$this->widgetService->isWidgetActive($widget)) {
-                    return $this->json([
-                        'error' => 'Widget is not active',
-                        'reason' => 'owner_limits_exceeded',
-                    ], Response::HTTP_SERVICE_UNAVAILABLE);
-                }
-
-                // Validate test mode: only allow if authenticated user is widget owner
-                // This prevents malicious users from marking sessions as test to avoid statistics
-                $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
-
-                // Get or create widget session
-                $widgetSession = $this->widgetSessionService->getOrCreateSession($widgetId, $sessionId, $isValidatedTestMode);
-
-                // Check session rate limits (anonymous limits)
-                $limitCheck = $this->widgetSessionService->checkSessionLimit($widgetSession);
-                if (!$limitCheck['allowed']) {
-                    return $this->json([
-                        'error' => 'Rate limit exceeded',
-                        'reason' => $limitCheck['reason'],
-                        'remaining' => $limitCheck['remaining'],
-                        'retryAfter' => $limitCheck['retry_after'],
-                    ], Response::HTTP_TOO_MANY_REQUESTS);
-                }
-
-                // Get widget owner as the "user" for this request
-                $ownerId = $widget->getOwnerId();
-                if (!$ownerId) {
-                    return $this->json(['error' => 'Widget owner not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
-                }
-
-                $user = $this->em->getRepository(User::class)->find($ownerId);
-                if (!$user) {
-                    return $this->json(['error' => 'Widget owner not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
-                }
-
-                // Get fixed task prompt from widget config
-                $fixedTaskPromptTopic = $widget->getTaskPromptTopic();
-
-                $isWidgetMode = true;
-                $this->logger->info('Widget request authenticated', [
-                    'widget_id' => $widgetId,
-                    'session_id' => $sessionId,
-                    'owner_id' => $user->getId(),
-                    'task_prompt' => $fixedTaskPromptTopic,
-                ]);
-            } else {
-                // Guest Mode: Check for guest session parameter (query or POST body)
-                $guestSessionId = $params->get('guestSession');
-                if ($guestSessionId) {
-                    if (!$this->guestChatConfig->isEnabled()) {
-                        // Distinguish "trial disabled" from "session expired" so
-                        // clients do not offer a new-trial/sign-up flow that the
-                        // instance cannot serve (issue #1517).
-                        return $this->json([
-                            'error' => 'Guest chat is disabled on this instance.',
-                            'code' => GuestChatConfig::DISABLED_CODE,
-                        ], Response::HTTP_FORBIDDEN);
-                    }
-
-                    $guestSession = $this->guestSessionService->getSession($guestSessionId);
-                    if ($guestSession && !$guestSession->isExpired()) {
-                        if (!$this->guestSessionService->checkLimit($guestSession)) {
-                            $response = new StreamedResponse();
-                            $response->headers->set('Content-Type', 'text/event-stream');
-                            $response->headers->set('Cache-Control', 'no-cache');
-                            $response->headers->set('X-Accel-Buffering', 'no');
-                            $response->setCallback(function () {
-                                $this->sendSSE('guest_limit_reached', [
-                                    'message' => 'Guest message limit reached',
-                                    'action' => 'signup_required',
-                                ]);
-                            });
-
-                            return $response;
-                        }
-
-                        $user = $this->guestSessionService->getProcessingUser();
-                        if (!$user) {
-                            return $this->json(['error' => 'Guest mode unavailable'], Response::HTTP_INTERNAL_SERVER_ERROR);
-                        }
-
-                        $isGuestMode = true;
-                        $this->logger->info('Guest request authenticated', [
-                            'session_id' => substr($guestSessionId, 0, 12).'...',
-                            'remaining' => $this->guestSessionService->getRemainingMessages($guestSession),
-                        ]);
-                    } else {
-                        return $this->json(['error' => 'Guest session not found or expired'], Response::HTTP_UNAUTHORIZED);
-                    }
-                } else {
-                    return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-                }
-            }
+        try {
+            $turn = $this->streamRequests->resolve($request, $user);
+        } catch (StreamRequestRejected $rejected) {
+            return $this->rejectedStream($rejected);
         }
 
-        // Check rate limit for authenticated users (not widget mode)
-        // We'll check this inside the stream to send a proper SSE error event
-
-        $messageText = $params->get('message', '');
-        $trackId = $params->get('trackId', time());
-        $chatId = $params->get('chatId', null);
-        $includeReasoning = '1' === $params->get('reasoning', '0');
-        $reasoningEffort = strtolower(trim((string) $params->get('reasoningEffort', '')));
-        if (!in_array($reasoningEffort, ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], true)) {
-            $reasoningEffort = '';
-        }
-        $webSearch = '1' === $params->get('webSearch', '0');
-        // UI locale from the SPA (vue-i18n). Seeds inbound BLANG so the
-        // classifier fast-path, sorter "leave BLANG as is" fallback, Brave
-        // search_lang/ui_lang, and ChatHandler language directive all prefer
-        // the interface language instead of a hardcoded English default.
-        $uiLanguage = $this->resolveUiLanguage($params->get('language'), $user);
-        $modelId = $params->get('modelId', null);
-
-        $voiceReply = '1' === $params->get('voiceReply', '0');
-        $isAgain = '1' === $params->get('isAgain', '0');
-        $fileIds = $params->get('fileIds', ''); // NEW: comma-separated list or single ID
-        $promptTopic = $params->get('promptTopic');
-        $promptId = $params->get('promptId');
-        $agentIdParam = $params->getInt('agentId') ?: null;
-        $pinnedAgentId = $this->resolvePinnedAgentId($user, $agentIdParam);
-        $draftRequested = $this->isTruthyFlag($params->get('draft'));
-        if ($draftRequested) {
-            $draftDenied = $this->denyDraftIfNotOwner($user, $pinnedAgentId);
-            if (null !== $draftDenied) {
-                return $draftDenied;
-            }
-        }
-        $pinnedAgentVersionId = null;
-        $agentAccessDenied = $this->denyAgentRuntime($user, $pinnedAgentId, $draftRequested, is_numeric($chatId) ? (int) $chatId : null, $pinnedAgentVersionId);
-        if (null !== $agentAccessDenied) {
-            return $agentAccessDenied;
-        }
-        // Typed accessor: `get()` would hand back an array for `ragGroupKey[]=…`,
-        // which then flows into a string-typed processing option and 500s
-        // downstream. `getString()` rejects non-scalar input with a clean 400,
-        // and we normalize the empty string to null so "no folder selected"
-        // behaves the same as an absent parameter.
-        $ragGroupKey = $params->getString('ragGroupKey') ?: null;
-        // Quoted reference the user selected from an earlier message ("Mention
-        // in chat"). `getString()` rejects array input with a clean 400. We trim
-        // and cap the excerpt server-side so a crafted request cannot bloat the
-        // stored meta or the AI prompt, and normalize empty to null.
-        $quotedText = trim($params->getString('quotedText'));
-        if (mb_strlen($quotedText) > self::MAX_QUOTED_TEXT_LENGTH) {
-            $quotedText = mb_substr($quotedText, 0, self::MAX_QUOTED_TEXT_LENGTH);
-        }
-        $quotedText = '' !== $quotedText ? $quotedText : null;
-        // `getInt()` rejects array input (e.g. `quotedMessageId[]=…`) with a clean
-        // 400 instead of silently coercing it to 0/1 and resolving the wrong
-        // message. 0 (absent/invalid) collapses to null.
-        $quotedMessageId = $params->getInt('quotedMessageId') ?: null;
-        $continueMessageId = $params->get('continueMessageId');
-        // Explicit opt-out from memory loading + extraction (used by public demo via synaplan.com/try-chat)
-        $disableMemories = '1' === $params->get('disableMemories', '0');
-
-        // Incognito mode: process the turn entirely in-memory. No BMESSAGES/
-        // BMESSAGEMETA/BCHATS/BSEARCHRESULTS/BMESSAGE_TASKS rows, no memory
-        // extraction (Qdrant writes), no WhatsApp forwarding. Memories, RAG
-        // and feedback are still READ; BUSELOG billing keeps running. Only
-        // for authenticated web users — widget/guest channels are excluded.
-        $incognito = '1' === $params->get('incognito', '0');
-        if ($isWidgetMode || $isGuestMode) {
-            $incognito = false;
-        }
-
-        $incognitoHistory = $incognito ? $this->parseIncognitoHistory($request) : [];
-
-        if ($incognito) {
-            // No persisted rows exist in incognito mode, so continuing a
-            // truncated response or resolving a quoted source message by DB id
-            // is impossible. The quoted text itself (context block) still works.
-            $continueMessageId = null;
-            $quotedMessageId = null;
-        }
-
-        // Parse fileIds (can be comma-separated string or single ID)
-        $fileIdArray = [];
-        if (!empty($fileIds)) {
-            $fileIdArray = array_map('intval', array_filter(explode(',', $fileIds)));
-        }
-
-        if (empty($messageText) && empty($fileIdArray) && !$continueMessageId) {
-            return $this->json(['error' => 'Message or file attachment is required'], Response::HTTP_BAD_REQUEST);
-        }
-
-        if (!$chatId && !$incognito) {
-            return $this->json(['error' => 'Chat ID is required'], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Resolve prompt selection: promptId takes precedence over promptTopic
-        if (!$isWidgetMode && $promptId) {
-            $promptEntity = $this->em->getRepository(Prompt::class)->find((int) $promptId);
-            if (!$promptEntity) {
-                return $this->json(['error' => 'PROMPT_NOT_FOUND', 'message' => 'No prompt found with ID '.$promptId], Response::HTTP_NOT_FOUND);
-            }
-            if (0 !== $promptEntity->getOwnerId() && $promptEntity->getOwnerId() !== $user->getId()) {
-                return $this->json(['error' => 'ACCESS_DENIED', 'message' => 'You do not have access to this prompt'], Response::HTTP_FORBIDDEN);
-            }
-            $fixedTaskPromptTopic = $promptEntity->getTopic();
-        } elseif (!$isWidgetMode && $promptTopic) {
-            $promptData = $this->promptService->getPromptWithMetadata($promptTopic, $user->getId());
-            if (!$promptData) {
-                return $this->json(['error' => 'PROMPT_NOT_FOUND', 'message' => 'No prompt found with topic "'.$promptTopic.'"'], Response::HTTP_BAD_REQUEST);
-            }
-            $fixedTaskPromptTopic = $promptTopic;
-        }
-
-        $this->logger->info('StreamController: Received request', [
-            'user_id' => $user->getId(),
-            'chat_id' => $chatId,
-            'has_model_id' => null !== $modelId,
-            'model_id' => $modelId,
-            'is_again' => $isAgain,
-            'file_ids' => $fileIdArray,
-            'file_count' => count($fileIdArray),
-        ]);
-
-        // Check rate limit BEFORE starting the stream (not widget/guest mode)
-        // Send as SSE event so EventSource can parse it (EventSource cannot read JSON error responses)
-        $rateLimitError = null;
-        if (!$isWidgetMode && !$isGuestMode) {
-            $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
-            if (!$rateLimitCheck['allowed']) {
-                $rateLimitError = [
-                    'status' => 'error',
-                    'error' => 'Rate limit exceeded',
-                    'limit_type' => $rateLimitCheck['limit_type'] ?? 'lifetime',
-                    'action_type' => 'MESSAGES',
-                    'limit' => $rateLimitCheck['limit'],
-                    'used' => $rateLimitCheck['used'],
-                    'remaining' => $rateLimitCheck['remaining'],
-                    'reset_at' => $rateLimitCheck['reset_at'] ?? null,
-                    'user_level' => $user->getUserLevel(),
-                    // LimitReachedModal offers a "Verify phone" secondary action for
-                    // ANONYMOUS users, so this flag MUST reflect actual phone
-                    // verification — not email verification (see #839).
-                    'phone_verified' => $user->hasVerifiedPhone(),
-                ];
-            } elseif ($this->premiumFeatureGate->isCostBudgetEnforced()) {
-                $budgetCheck = $this->rateLimitService->checkCostBudget($user);
-                if (!$budgetCheck['allowed']) {
-                    $rateLimitError = [
-                        'status' => 'error',
-                        'error' => 'Cost budget exceeded',
-                        // Stable machine-readable discriminator so the frontend
-                        // does not have to substring-match the human-readable
-                        // (i18n-able) error text. See ChatView error handling.
-                        'code' => 'COST_BUDGET_EXCEEDED',
-                        'limit_type' => 'monthly',
-                        'action_type' => 'MESSAGES',
-                        'limit' => $budgetCheck['budget'],
-                        'used' => $budgetCheck['used_cost'],
-                        'remaining' => $budgetCheck['remaining'],
-                        'topup_available' => true,
-                        'user_level' => $user->getUserLevel(),
-                        'phone_verified' => $user->hasVerifiedPhone(),
-                    ];
-                }
-            }
-        }
-
-        // Approximate user country from the Cloudflare edge geolocation header
-        // (CF-IPCountry). Resolved here, while the Request is in scope, and
-        // forwarded into the processing options so the chat handler can add a
-        // country-only location-awareness line to the system prompt. Country
-        // only by design — it is an imprecise, IP-derived signal. Empty/sentinel
-        // values ("XX" unknown, "T1" Tor) are dropped by the handler.
-        $clientCountry = $request->headers->get('CF-IPCountry');
+        $caller = $turn->caller;
+        $options = $turn->options;
+        $user = $caller->user;
+        $messageText = $turn->input->message;
+        $trackId = $turn->trackId;
+        $chatId = $turn->chatId;
+        $includeReasoning = $options->reasoning;
+        $reasoningEffort = $options->reasoningEffort;
+        $webSearch = $options->webSearch;
+        $uiLanguage = $caller->uiLanguage;
+        $modelId = $options->modelId;
+        $isAgain = $options->isAgain;
+        $fileIdArray = $turn->input->fileIds;
+        $isWidgetMode = $caller->isWidget();
+        $isGuestMode = $caller->isGuest();
+        $fixedTaskPromptTopic = $options->fixedTaskPromptTopic;
+        $ragGroupKey = $options->ragGroupKey;
+        $widgetSession = $caller->widgetSession;
+        $guestSession = $caller->guestSession;
+        $rateLimitError = $turn->rateLimitError;
+        $voiceReply = $options->voiceReply;
+        $continueMessageId = $turn->input->continueMessageId;
+        $disableMemories = $options->disableMemories;
+        $clientCountry = $caller->clientCountry;
+        $quotedText = $turn->input->quote?->text;
+        $quotedMessageId = $turn->input->quote?->messageId;
+        $incognito = $turn->incognito;
+        $incognitoHistory = $turn->incognitoHistory;
+        $pinnedAgentId = $options->agent?->agentId;
+        $draftRequested = $options->agent->draft ?? false;
+        $pinnedAgentVersionId = $options->agent?->versionId;
 
         // StreamedResponse für SSE
         $response = new StreamedResponse();
@@ -2472,6 +2068,27 @@ class StreamController extends AbstractController
     }
 
     /**
+     * The answer for a request that ends before a turn starts: its JSON
+     * error, or — for a guest who used the trial — one SSE event.
+     */
+    private function rejectedStream(StreamRequestRejected $rejected): Response
+    {
+        if (null === $rejected->sseEvent) {
+            return $this->json($rejected->payload, $rejected->httpStatus);
+        }
+
+        $response = new StreamedResponse();
+        $response->headers->set('Content-Type', 'text/event-stream');
+        $response->headers->set('Cache-Control', 'no-cache');
+        $response->headers->set('X-Accel-Buffering', 'no');
+        $response->setCallback(function () use ($rejected): void {
+            (new SseWriter($this->sseCaptureMode))->send((string) $rejected->sseEvent, $rejected->payload);
+        });
+
+        return $response;
+    }
+
+    /**
      * Owner scope for a resumable run, used to gate the re-attach endpoint.
      *
      * Widget and guest turns run under a shared processing user, so the user id
@@ -3028,63 +2645,6 @@ class StreamController extends AbstractController
         }
 
         $this->memoryExtractionDispatcher->dispatch($payload);
-    }
-
-    /**
-     * Owner-only draft test mode. Missing pin or a foreign assistant → 403.
-     */
-    private function denyDraftIfNotOwner(?User $user, ?int $agentId): ?JsonResponse
-    {
-        if (null === $user || null === $agentId || $agentId < 1) {
-            return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
-        }
-
-        try {
-            $this->agentService->requireOwned($agentId, (int) $user->getId());
-        } catch (AgentNotAccessibleException) {
-            return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
-        }
-
-        return null;
-    }
-
-    private function isTruthyFlag(mixed $value): bool
-    {
-        return true === $value || 1 === $value || '1' === (string) $value || 'true' === $value;
-    }
-
-    private function resolvePinnedAgentId(?User $user, ?int $agentId): ?int
-    {
-        if (null === $user || null === $agentId || $agentId < 1) {
-            return null;
-        }
-        if (!$this->agentConfig->isEnabled((int) $user->getId())) {
-            return null;
-        }
-
-        return $agentId;
-    }
-
-    /**
-     * @param-out int|null $agentVersionId
-     */
-    private function denyAgentRuntime(?User $user, ?int $agentId, bool $draft, ?int $chatId, ?int &$agentVersionId): ?JsonResponse
-    {
-        $agentVersionId = null;
-        if (null === $user || null === $agentId || $agentId < 1) {
-            return null;
-        }
-
-        try {
-            $profile = $this->agentRuntimeResolver->resolve($agentId, $user, $draft, $chatId);
-            $agentVersionId = $profile->agentVersionId;
-        } catch (AgentNotAccessibleException|AgentNotPublishedException) {
-            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
-        } catch (AgentArchivedException) {
-            return $this->json(['error' => 'archived'], Response::HTTP_GONE);
-        }
-
-        return null;
     }
 
     private function stampAgentId(Message $message, ?int $agentId, ?int $agentVersionId = null): void
@@ -4316,84 +3876,6 @@ class StreamController extends AbstractController
         ]);
 
         return $this->json(['success' => true]);
-    }
-
-    /**
-     * Resolve the inbound BLANG seed from the client UI locale.
-     *
-     * Preference: validated request `language` → user profile locale → `en`.
-     * Only the SPA-supported locales are accepted so a crafted value cannot
-     * poison BMESSAGES.BLANG (varchar(2)).
-     */
-    private function resolveUiLanguage(mixed $requested, ?User $user): string
-    {
-        $supported = self::SUPPORTED_UI_LANGUAGES;
-
-        if (is_string($requested)) {
-            $normalized = strtolower(trim($requested));
-            if (in_array($normalized, $supported, true)) {
-                return $normalized;
-            }
-        }
-
-        if ($user instanceof User) {
-            $profileLocale = strtolower($user->getLocale());
-            if (in_array($profileLocale, $supported, true)) {
-                return $profileLocale;
-            }
-        }
-
-        return 'en';
-    }
-
-    /**
-     * Validate test mode request.
-     *
-     * Test mode is only valid if:
-     * 1. X-Widget-Test-Mode header is set to 'true'
-     * 2. User is authenticated (has valid session/token)
-     * 3. Authenticated user is the widget owner
-     *
-     * This prevents malicious users from marking their sessions as test
-     * to avoid being counted in statistics.
-     *
-     * @param Request $request       The HTTP request
-     * @param int     $widgetOwnerId The widget owner's user ID
-     *
-     * @return bool True if test mode is validated, false otherwise
-     */
-    private function isValidatedTestMode(Request $request, int $widgetOwnerId): bool
-    {
-        // Check if test mode is requested
-        if ('true' !== $request->headers->get('X-Widget-Test-Mode')) {
-            return false;
-        }
-
-        // Try to get authenticated user from security context
-        $user = $this->getUser();
-
-        // No authenticated user - test mode not allowed
-        if (!$user instanceof User) {
-            $this->logger->debug('Test mode rejected: no authenticated user');
-
-            return false;
-        }
-
-        // Check if authenticated user is the widget owner
-        if ($user->getId() !== $widgetOwnerId) {
-            $this->logger->debug('Test mode rejected: user is not widget owner', [
-                'user_id' => $user->getId(),
-                'widget_owner_id' => $widgetOwnerId,
-            ]);
-
-            return false;
-        }
-
-        $this->logger->debug('Test mode validated for widget owner', [
-            'user_id' => $user->getId(),
-        ]);
-
-        return true;
     }
 
     /**

@@ -8,12 +8,10 @@ use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
 use App\Message\ExtractMemoriesCommand;
 use App\Repository\FileRepository;
-use App\Service\Billing\BillingService;
-use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Chat\ChatTitleService;
 use App\Service\Chat\ConversationSummaryRefreshDispatcher;
-use App\Service\Chat\GuestChatConfig;
 use App\Service\Chat\GuestSessionService;
+use App\Service\Chat\Stream\StreamRequestResolver;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
@@ -31,7 +29,6 @@ use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\Usage\UsageStatsService;
 use App\Service\Usage\UsageTaximeterConfig;
-use App\Service\Widget\WidgetService;
 use App\Service\Widget\WidgetSessionService;
 use App\Tests\Support\ChatRunServiceFactory;
 use Doctrine\ORM\EntityManagerInterface;
@@ -76,15 +73,14 @@ final class StreamControllerDeferredMemoryDispatchTest extends TestCase
         $this->memoryExtractionDispatcher = $this->createMock(MemoryExtractionDispatcher::class);
 
         $this->controller = new StreamController(
+            $this->createStub(StreamRequestResolver::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(AiFacade::class),
             $this->createMock(MessageProcessor::class),
             new NullLogger(),
             $this->createMock(ModelConfigService::class),
-            $this->createMock(WidgetService::class),
             $this->createMock(WidgetSessionService::class),
             $this->createMock(GuestSessionService::class),
-            $this->createStub(GuestChatConfig::class),
             $this->createMock(RateLimitService::class),
             '/tmp/upload',
             $this->createMock(UserUploadPathBuilder::class),
@@ -101,13 +97,9 @@ final class StreamControllerDeferredMemoryDispatchTest extends TestCase
             new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
             $this->createMock(UsageStatsService::class),
             $this->createMock(UsageTaximeterConfig::class),
-            new PremiumFeatureGate(new BillingService('', '')),
             ChatRunServiceFactory::withoutRedis(),
             $this->createMock(ChatErrorPresenter::class),
             $this->createMock(ChatErrorNotifier::class),
-            $this->createMock(\App\Service\Agent\AgentConfig::class),
-            $this->createMock(\App\Service\Agent\AgentService::class),
-            $this->createMock(\App\Service\Agent\AgentRuntimeResolver::class),
         );
     }
 

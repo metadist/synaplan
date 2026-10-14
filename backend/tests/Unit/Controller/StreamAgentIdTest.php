@@ -7,17 +7,11 @@ namespace App\Tests\Unit\Controller;
 use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
 use App\Entity\Message;
-use App\Entity\User;
 use App\Repository\FileRepository;
-use App\Service\Agent\AgentConfig;
-use App\Service\Agent\AgentRuntimeResolver;
-use App\Service\Agent\AgentService;
-use App\Service\Billing\BillingService;
-use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Chat\ChatTitleService;
 use App\Service\Chat\ConversationSummaryRefreshDispatcher;
-use App\Service\Chat\GuestChatConfig;
 use App\Service\Chat\GuestSessionService;
+use App\Service\Chat\Stream\StreamRequestResolver;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
@@ -35,32 +29,27 @@ use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\Usage\UsageStatsService;
 use App\Service\Usage\UsageTaximeterConfig;
-use App\Service\Widget\WidgetService;
 use App\Service\Widget\WidgetSessionService;
 use App\Tests\Support\ChatRunServiceFactory;
 use Doctrine\ORM\EntityManagerInterface;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 final class StreamAgentIdTest extends TestCase
 {
-    private AgentConfig&MockObject $agentConfig;
     private StreamController $controller;
 
     protected function setUp(): void
     {
-        $this->agentConfig = $this->createMock(AgentConfig::class);
         $this->controller = new StreamController(
+            $this->createStub(StreamRequestResolver::class),
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(AiFacade::class),
             $this->createMock(MessageProcessor::class),
             new NullLogger(),
             $this->createMock(ModelConfigService::class),
-            $this->createMock(WidgetService::class),
             $this->createMock(WidgetSessionService::class),
             $this->createMock(GuestSessionService::class),
-            $this->createStub(GuestChatConfig::class),
             $this->createMock(RateLimitService::class),
             '/tmp/upload',
             $this->createMock(UserUploadPathBuilder::class),
@@ -77,32 +66,10 @@ final class StreamAgentIdTest extends TestCase
             new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
             $this->createMock(UsageStatsService::class),
             $this->createMock(UsageTaximeterConfig::class),
-            new PremiumFeatureGate(new BillingService('', '')),
             ChatRunServiceFactory::withoutRedis(),
             $this->createMock(ChatErrorPresenter::class),
             $this->createMock(ChatErrorNotifier::class),
-            $this->agentConfig,
-            $this->createMock(AgentService::class),
-            $this->createMock(AgentRuntimeResolver::class),
         );
-    }
-
-    public function testFlagOffIgnoresAgentId(): void
-    {
-        $this->agentConfig->method('isEnabled')->willReturn(false);
-        $user = $this->createMock(User::class);
-        $user->method('getId')->willReturn(4);
-
-        self::assertNull($this->invokeResolve($user, 7));
-    }
-
-    public function testFlagOnPinsAgentId(): void
-    {
-        $this->agentConfig->expects(self::once())->method('isEnabled')->with(4)->willReturn(true);
-        $user = $this->createMock(User::class);
-        $user->method('getId')->willReturn(4);
-
-        self::assertSame(7, $this->invokeResolve($user, 7));
     }
 
     public function testStampWritesAgentIdOnIncomingAndOutgoing(): void
@@ -134,13 +101,6 @@ final class StreamAgentIdTest extends TestCase
         (new \ReflectionProperty(Message::class, 'id'))->setValue($message, $id);
 
         return $message;
-    }
-
-    private function invokeResolve(User $user, ?int $agentId): ?int
-    {
-        $method = new \ReflectionMethod(StreamController::class, 'resolvePinnedAgentId');
-
-        return $method->invoke($this->controller, $user, $agentId);
     }
 
     private function invokeStamp(Message $message, ?int $agentId): void
