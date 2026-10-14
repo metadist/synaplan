@@ -6,7 +6,7 @@ namespace App\Tests\Service;
 
 use App\Entity\UseLog;
 use App\Repository\MailHandlerLogRepository;
-use App\Service\MailHandlerLogService;
+use App\Service\Email\MailHandlerLogService;
 use Doctrine\DBAL\Exception\InvalidArgumentException as DbalInvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

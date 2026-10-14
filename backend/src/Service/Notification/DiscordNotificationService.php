@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Notification;
 
 use App\AI\Health\ModelHealthAlert;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\AiResponseSanitizer;
 use App\Service\ModelDiscovery\ModelDiscoveryDigest;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -681,7 +682,7 @@ final readonly class DiscordNotificationService
      *
      * Always includes the raw provider text so operators can diagnose; the
      * user-facing chat never sees this payload. Callers go through
-     * {@see Message\ChatErrorNotifier}, which throttles bursts.
+     * {@see \App\Service\Message\ChatErrorNotifier}, which throttles bursts.
      *
      * @param array<string, mixed> $metadata
      */

@@ -20,7 +20,7 @@ use App\Repository\TelegramBotRepository;
 use App\Repository\WidgetRepository;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Dropbox\DropboxOAuthConfig;
-use App\Service\EmailChatService;
+use App\Service\Email\EmailChatService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\PlatformLink\PlatformLinkExchangeService;

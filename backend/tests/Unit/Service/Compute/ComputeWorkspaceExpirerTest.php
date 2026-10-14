@@ -12,7 +12,7 @@ use App\Repository\UserRepository;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Compute\ComputeWorkspaceExpirer;
-use App\Service\InternalEmailService;
+use App\Service\Email\InternalEmailService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;

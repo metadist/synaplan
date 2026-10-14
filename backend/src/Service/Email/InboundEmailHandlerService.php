@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Email;
 
 use App\AI\Service\AiFacade;
 use App\Entity\InboundEmailHandler;
@@ -8,6 +8,9 @@ use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
 use App\Repository\UserRepository;
+use App\Service\EncryptionService;
+use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use App\Service\SavedTask\InboundEmailFilter;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\SavedTaskRunner;

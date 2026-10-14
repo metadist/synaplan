@@ -1,8 +1,7 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Email;
 
-use App\Service\Email\SmartEmailHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 

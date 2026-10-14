@@ -4,7 +4,7 @@ namespace App\Tests\Unit;
 
 use App\Entity\Message;
 use App\Repository\MessageRepository;
-use App\Service\EmailWebhookIdempotencyService;
+use App\Service\Email\EmailWebhookIdempotencyService;
 use PHPUnit\Framework\TestCase;
 
 class EmailWebhookIdempotencyServiceTest extends TestCase

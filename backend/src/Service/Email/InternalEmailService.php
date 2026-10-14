@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Email;
 
 use App\AI\Health\ModelHealthAlert;
-use App\Service\Email\MarkdownEmailFormatter;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -213,8 +212,8 @@ final readonly class InternalEmailService
         ?array $additionalAttachmentPaths = null,
         ?string $locale = null,
     ): void {
-        $fallbackAddress = $_ENV['SMART_EMAIL_ADDRESS'] ?? \App\Service\Email\SmartEmailHelper::getBaseAddress();
-        $smartAddress = ($originalRecipient && \App\Service\Email\SmartEmailHelper::isValidSmartAddress($originalRecipient))
+        $fallbackAddress = $_ENV['SMART_EMAIL_ADDRESS'] ?? SmartEmailHelper::getBaseAddress();
+        $smartAddress = ($originalRecipient && SmartEmailHelper::isValidSmartAddress($originalRecipient))
             ? $originalRecipient
             : $fallbackAddress;
         $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'smart@synaplan.net';

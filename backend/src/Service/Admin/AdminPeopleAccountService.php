@@ -7,9 +7,9 @@ namespace App\Service\Admin;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
+use App\Service\Email\InternalEmailService;
+use App\Service\Email\MailerConfig;
 use App\Service\Iam\AuditLogWriter;
-use App\Service\InternalEmailService;
-use App\Service\MailerConfig;
 use App\Service\UserLifecycleService;
 
 /**

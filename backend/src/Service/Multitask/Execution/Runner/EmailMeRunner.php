@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask\Execution\Runner;
 
 use App\Repository\UserRepository;
-use App\Service\InternalEmailService;
+use App\Service\Email\InternalEmailService;
 use App\Service\Microsoft\M365MailSender;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;

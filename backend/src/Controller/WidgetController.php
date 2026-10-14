@@ -19,7 +19,7 @@ use App\Service\Iam\AccessGate;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\WidgetKind;
-use App\Service\SlackNotificationService;
+use App\Service\Notification\SlackNotificationService;
 use App\Service\UrlContentService;
 use App\Service\UserMemoryService;
 use App\Service\Widget\WidgetService;

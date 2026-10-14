@@ -1,12 +1,11 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Email;
 
 use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\UserRepository;
-use App\Service\Email\SmartEmailHelper;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 

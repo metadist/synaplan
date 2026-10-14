@@ -714,7 +714,7 @@ services:
             $override: null
 
     # Discord Webhook Notification Service
-    App\Service\DiscordNotificationService:
+    App\Service\Notification\DiscordNotificationService:
         arguments:
             $webhookUrl: '%env(DISCORD_WEBHOOK_URL)%'
 
@@ -725,7 +725,7 @@ services:
 
     # WhatsApp Business API Service - Fully Dynamic Multi-Number Support
     # Uses cache + lock for atomic duplicate message detection (WhatsApp webhook retries)
-    App\Service\WhatsAppService:
+    App\Service\WhatsApp\WhatsAppService:
         arguments:
             $cache: '@cache.app'
             $lockFactory: '@lock.factory'
@@ -851,10 +851,10 @@ services:
             $cache: '@cache.model_config'
 
     # Internal Email Service (system emails - uses SMTP from ENV)
-    App\Service\InternalEmailService: ~
+    App\Service\Email\InternalEmailService: ~
 
     # Inbound Email Service (fetches emails from Gmail IMAP or Mailhog)
-    App\Service\InboundEmailService:
+    App\Service\Email\InboundEmailService:
         arguments:
             $mailhogApiUrl: 'http://mailhog:8025/api/v2'
             $gmailUsername: '%env(GMAIL_USERNAME)%'

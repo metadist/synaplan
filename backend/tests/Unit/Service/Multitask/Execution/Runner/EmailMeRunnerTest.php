@@ -9,7 +9,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ConnectionRepository;
 use App\Repository\UserRepository;
-use App\Service\InternalEmailService;
+use App\Service\Email\InternalEmailService;
 use App\Service\Microsoft\GraphClient;
 use App\Service\Microsoft\M365MailSender;
 use App\Service\Multitask\Execution\NodeContext;

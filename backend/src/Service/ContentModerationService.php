@@ -10,6 +10,7 @@ use App\Repository\ContentReportRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Service\Email\InternalEmailService;
 use Psr\Log\LoggerInterface;
 
 /**

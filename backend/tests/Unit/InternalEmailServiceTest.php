@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit;
 
-use App\Service\InternalEmailService;
+use App\Service\Email\InternalEmailService;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

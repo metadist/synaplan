@@ -7,7 +7,7 @@ namespace App\Controller;
 use App\DTO\Tool\ApprovalResponse;
 use App\Entity\User;
 use App\Message\ResumeApprovalCommand;
-use App\Service\MailerConfig;
+use App\Service\Email\MailerConfig;
 use App\Service\Tool\ApprovalNotFoundException;
 use App\Service\Tool\ApprovalService;
 use App\Service\Tool\ToolsConfig;

@@ -109,7 +109,7 @@ final class WhatsappModule implements FeatureModuleInterface
     public function serviceIds(): array
     {
         return [
-            'App\Service\WhatsAppService',
+            'App\Service\WhatsApp\WhatsAppService',
             'App\Controller\WebhookController',
             'App\Controller\WhatsAppAssistantController',
             'App\Controller\PhoneVerificationController',

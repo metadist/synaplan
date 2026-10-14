@@ -15,7 +15,7 @@ namespace App\Service\Email;
  * pipeline never sees the real question, so no reply is sent.
  *
  * This is a deliberately small, dependency-free recursive MIME walker (the
- * `imap_*` based parser in {@see \App\Service\InboundEmailHandlerService} needs a
+ * `imap_*` based parser in {@see InboundEmailHandlerService} needs a
  * live IMAP connection and cannot be reused on a plain string). It extracts the
  * first usable `text/plain` part, falling back to a tag-stripped `text/html`
  * part, and skips explicit attachments. Attachment handling stays the relay's

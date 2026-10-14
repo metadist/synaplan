@@ -10,9 +10,9 @@ use App\Repository\ApprovalRepository;
 use App\Repository\MessageRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Repository\UserRepository;
+use App\Service\Email\InternalEmailService;
+use App\Service\Email\MailerConfig;
 use App\Service\Iam\AuditLogWriter;
-use App\Service\InternalEmailService;
-use App\Service\MailerConfig;
 
 final readonly class ApprovalService
 {

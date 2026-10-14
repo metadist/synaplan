@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\AI\Health;
 
-use App\Service\DiscordNotificationService;
-use App\Service\InternalEmailService;
+use App\Service\Email\InternalEmailService;
+use App\Service\Notification\DiscordNotificationService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
