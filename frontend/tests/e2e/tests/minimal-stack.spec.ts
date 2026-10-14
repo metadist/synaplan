@@ -76,7 +76,8 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(expectedIds).toContain('opendesk_stt')
     expect(expectedIds).toContain('telegram')
     expect(expectedIds).toContain('federation')
-    expect(expectedIds).toHaveLength(17)
+    expect(expectedIds).toContain('live_voice')
+    expect(expectedIds).toHaveLength(18)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -152,13 +153,15 @@ test.describe('@minimal @ci Minimal stack', () => {
     expect(ids).toContain('opendesk_stt')
     expect(ids).toContain('telegram')
     expect(ids).toContain('federation')
-    expect(ids).toHaveLength(17)
+    expect(ids).toContain('live_voice')
+    expect(ids).toHaveLength(18)
     expect(modules.tika?.configured).toBe(false)
     expect(modules.opendesk_stt?.configured).toBe(false)
     expect(modules.higgsfield?.configured).toBe(false)
     expect(modules.whatsapp?.configured).toBe(false)
     expect(modules.compute?.configured).toBe(false)
     expect(modules.federation?.configured).toBe(false)
+    expect(modules.live_voice?.configured).toBe(false)
     for (const id of ids) {
       expect(modules[id]?.configured, `${id} configured`).toBe(false)
       expect(modules[id]?.gated, `${id} gated`).toBe(true)
