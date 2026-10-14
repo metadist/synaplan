@@ -105,4 +105,41 @@ final class SsrfGuardTest extends TestCase
         self::assertSame([], $this->guard->pinnedIps('10.1.2.3'));
         self::assertSame([], $this->guard->pinnedIps('localhost'));
     }
+
+    /**
+     * The operator-network mode is for addresses an administrator configures
+     * (a self-hosted gateway). It keeps the operator's own ranges and nothing
+     * else: link-local — where cloud metadata answers — stays blocked.
+     */
+    public function testOperatorNetworkModeKeepsPrivateRangesOnly(): void
+    {
+        foreach (['10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.0.10', '127.0.0.1', '127.8.9.10', '100.64.0.1', '100.127.255.254', '::1', 'fd12:3456::1', 'fc00::1'] as $ip) {
+            self::assertTrue($this->guard->isOperatorNetworkIp($ip), "operator range: {$ip}");
+            self::assertFalse($this->guard->isBlockedIp($ip, allowOperatorNetwork: true), "allowed with operator network: {$ip}");
+            self::assertTrue($this->guard->isBlockedIp($ip), "still blocked by default: {$ip}");
+        }
+
+        foreach (['169.254.169.254', '169.254.10.10', 'fe80::1', '0.0.0.0', '0.1.2.3', '192.0.0.1', '192.0.2.1', '198.18.0.1', '255.255.255.255', '2001:db8::1', '2002:7f00:1::1', '::'] as $ip) {
+            self::assertFalse($this->guard->isOperatorNetworkIp($ip), "not an operator range: {$ip}");
+            self::assertTrue($this->guard->isBlockedIp($ip, allowOperatorNetwork: true), "blocked even with operator network: {$ip}");
+        }
+
+        foreach (['172.15.255.255', '172.32.0.0', '100.63.255.255', '100.128.0.1', '8.8.8.8', '2606:4700:4700::1111'] as $ip) {
+            self::assertFalse($this->guard->isOperatorNetworkIp($ip), "public, not an operator range: {$ip}");
+            self::assertFalse($this->guard->isBlockedIp($ip, allowOperatorNetwork: true), "public stays allowed: {$ip}");
+        }
+
+        self::assertFalse($this->guard->isOperatorNetworkIp('not-an-ip'));
+        self::assertFalse($this->guard->isOperatorNetworkIp(''));
+    }
+
+    public function testPinnedIpsWithOperatorNetworkKeepsPrivateLiteralsAndDropsLinkLocal(): void
+    {
+        self::assertSame(['10.1.2.3'], $this->guard->pinnedIps('10.1.2.3', allowOperatorNetwork: true));
+        self::assertSame(['127.0.0.1'], $this->guard->pinnedIps('127.0.0.1', allowOperatorNetwork: true));
+        self::assertSame(['fd00::1'], $this->guard->pinnedIps('[fd00::1]', allowOperatorNetwork: true));
+        self::assertSame(['8.8.8.8'], $this->guard->pinnedIps('8.8.8.8', allowOperatorNetwork: true));
+        self::assertSame([], $this->guard->pinnedIps('169.254.169.254', allowOperatorNetwork: true));
+        self::assertSame([], $this->guard->pinnedIps('[fe80::1]', allowOperatorNetwork: true));
+    }
 }

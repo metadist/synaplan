@@ -398,6 +398,24 @@ local Ollama already offers instead of adding each by hand — see
   from a **successful** listing is recorded offline (`not offered by endpoint`) and soft-disabled
   only when `MODELHEALTH.AUTO_DISABLE_ENABLED=1`; an **unreachable** endpoint changes nothing.
 
+### Where an OpenAI-compatible endpoint may point
+
+Every base URL an administrator saves, tests or imports from is checked before the server
+connects to it ([GHSA-26f3-684h-hpjh](https://github.com/metadist/synaplan/security/advisories/GHSA-26f3-684h-hpjh)):
+
+- Only `http://` and `https://` URLs. The probe does not follow redirects and connects to the
+  address the hostname resolved to during the check, so a name cannot point somewhere else between
+  the check and the request.
+- **Your own network is allowed by default** — a LocalAI, vLLM or Ollama box on `10.x`, `172.16/12`,
+  `192.168.x`, loopback, an IPv6 ULA or an overlay-VPN address (`100.64/10`) is the normal case for a
+  self-hosted gateway. Link-local addresses (`169.254.0.0/16`, `fe80::/10` — where cloud metadata
+  services answer) and the other reserved ranges are always refused.
+- `OPENAI_COMPATIBLE_PUBLIC_UPSTREAMS_ONLY=1` switches to the public-only policy every
+  user-supplied URL already gets: private networks are refused when an endpoint is saved or probed.
+  Recommended for hosted and multi-tenant installations whose administrators are not the people
+  who run the servers. Endpoints saved before the flag was set keep serving chat until they are
+  edited; **Test** and **Import models** then name the flag in their error message.
+
 ---
 
 ## Database
