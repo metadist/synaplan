@@ -5,50 +5,30 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Controller;
 
 use App\AI\Credential\ChatReadinessService;
-use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Controller\ConfigController;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Entity\User;
-use App\Module\Gate\ModuleGateConfig;
-use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
-use App\Repository\UserRepository;
-use App\Service\Auth\DemoLoginHint;
-use App\Service\Auth\RegistrationConfig;
-use App\Service\Billing\BillingService;
-use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
-use App\Service\Chat\GuestChatConfig;
-use App\Service\Chat\ProgressNarrationConfig;
-use App\Service\Client\ClientContextResolver;
-use App\Service\Client\MobileVersionService;
 use App\Service\Config\FeatureStatusReporter;
 use App\Service\Config\LayeredConfigResolver;
-use App\Service\Email\MailerConfig;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
-use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Memory\UserMemoryService;
 use App\Service\ModelConfigService;
-use App\Service\Plugin\PluginManager;
-use App\Service\Setup\SetupStateService;
-use App\Service\Stt\WebSpeechConfig;
-use App\Service\Stt\WhisperService;
-use App\Service\Usage\UsageTaximeterConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Regression coverage for the #891 inconsistency: the AI Models Config
@@ -93,41 +73,16 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->configRepository,
             $this->modelRepository,
             $this->createStub(ProviderRegistry::class),
-            $this->createStub(WhisperService::class),
-            $this->createStub(PluginManager::class),
-            $this->createStub(BillingService::class),
             $this->createStub(UserMemoryService::class),
             $this->embeddingChangeGuard,
             $this->embeddingMetadata,
             $this->modelConfig,
-            new ClientContextResolver(),
-            $this->createStub(BrandingService::class),
-            $this->createStub(MobileVersionService::class),
-            $this->createStub(MarketingNewsConfig::class),
-            $this->createStub(UsageTaximeterConfig::class),
-            $this->createStub(ProgressNarrationConfig::class),
-            $this->createStub(RegistrationConfig::class),
-            $this->createStub(GuestChatConfig::class),
-            $this->createStub(WebSpeechConfig::class),
-            $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
-            $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
-            $this->createStub(\App\Service\Agent\AgentConfig::class),
-            $this->createStub(\App\Service\PlatformLink\PlatformLinksConfig::class),
             $this->createStub(IamConfig::class),
             $this->createStub(ChatReadinessService::class),
-            new DemoLoginHint(
-                $this->createStub(UserRepository::class),
-                $this->createStub(UserPasswordHasherInterface::class),
-                'test',
-            ),
-            $this->createStub(SetupStateService::class),
-            $this->createStub(AiProviderDisclosure::class),
             $this->createStub(LocalAiDownloadStatusService::class),
-            new MailerConfig(),
             new CapabilityService(),
             $this->createStub(FeatureStatusReporter::class),
-            $this->createStub(ModuleRegistry::class),
-            $this->createStub(ModuleGateConfig::class),
+            $this->createStub(\App\Service\Config\Runtime\RuntimeConfigAssembler::class),
             'http://qdrant.example',
         );
 
@@ -344,43 +299,17 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->configRepository,
             $this->modelRepository,
             $this->createStub(ProviderRegistry::class),
-            $this->createStub(WhisperService::class),
-            $this->createStub(PluginManager::class),
-            $this->createStub(BillingService::class),
             $this->createStub(UserMemoryService::class),
             $this->embeddingChangeGuard,
             $this->embeddingMetadata,
             $this->createStub(ModelConfigService::class),
-            new ClientContextResolver(),
-            $this->createStub(BrandingService::class),
-            $this->createStub(MobileVersionService::class),
-            $this->createStub(MarketingNewsConfig::class),
-            $this->createStub(UsageTaximeterConfig::class),
-            $this->createStub(ProgressNarrationConfig::class),
-            $this->createStub(RegistrationConfig::class),
-            $this->createStub(GuestChatConfig::class),
-            $this->createStub(WebSpeechConfig::class),
-            $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
-            $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
-            $this->createStub(\App\Service\Agent\AgentConfig::class),
-            $this->createStub(\App\Service\PlatformLink\PlatformLinksConfig::class),
             $iam,
             $this->createStub(ChatReadinessService::class),
-            new DemoLoginHint(
-                $this->createStub(UserRepository::class),
-                $this->createStub(UserPasswordHasherInterface::class),
-                'test',
-            ),
-            $this->createStub(SetupStateService::class),
-            $this->createStub(AiProviderDisclosure::class),
             $this->createStub(LocalAiDownloadStatusService::class),
-            new MailerConfig(),
             new CapabilityService(),
             $this->createStub(FeatureStatusReporter::class),
-            $this->createStub(ModuleRegistry::class),
-            $this->createStub(ModuleGateConfig::class),
+            $this->createStub(\App\Service\Config\Runtime\RuntimeConfigAssembler::class),
             'http://qdrant.example',
-            null,
             null,
             $resolver,
             $policy,
@@ -533,43 +462,17 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->configRepository,
             $this->modelRepository,
             $this->createStub(ProviderRegistry::class),
-            $this->createStub(WhisperService::class),
-            $this->createStub(PluginManager::class),
-            $this->createStub(BillingService::class),
             $this->createStub(UserMemoryService::class),
             $this->embeddingChangeGuard,
             $this->embeddingMetadata,
             $modelConfig,
-            new ClientContextResolver(),
-            $this->createStub(BrandingService::class),
-            $this->createStub(MobileVersionService::class),
-            $this->createStub(MarketingNewsConfig::class),
-            $this->createStub(UsageTaximeterConfig::class),
-            $this->createStub(ProgressNarrationConfig::class),
-            $this->createStub(RegistrationConfig::class),
-            $this->createStub(GuestChatConfig::class),
-            $this->createStub(WebSpeechConfig::class),
-            $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
-            $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
-            $this->createStub(\App\Service\Agent\AgentConfig::class),
-            $this->createStub(\App\Service\PlatformLink\PlatformLinksConfig::class),
             $iam,
             $this->createStub(ChatReadinessService::class),
-            new DemoLoginHint(
-                $this->createStub(UserRepository::class),
-                $this->createStub(UserPasswordHasherInterface::class),
-                'test',
-            ),
-            $this->createStub(SetupStateService::class),
-            $this->createStub(AiProviderDisclosure::class),
             $this->createStub(LocalAiDownloadStatusService::class),
-            new MailerConfig(),
             new CapabilityService(),
             $this->createStub(FeatureStatusReporter::class),
-            $this->createStub(ModuleRegistry::class),
-            $this->createStub(ModuleGateConfig::class),
+            $this->createStub(\App\Service\Config\Runtime\RuntimeConfigAssembler::class),
             'http://qdrant.example',
-            null,
             null,
             $resolver,
             $policy,

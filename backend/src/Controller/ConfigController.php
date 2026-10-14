@@ -7,59 +7,29 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Provider\ReasoningLevelCatalog;
-use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
-use App\Bundle\BundleConfig;
 use App\DTO\ImageModelRow;
 use App\DTO\ModelRow;
 use App\Entity\Config;
 use App\Entity\User;
 use App\Model\ModelCatalog;
-use App\Module\Gate\ModuleGateConfig;
-use App\Module\ModuleRegistry;
-use App\Module\Sidecar\LiveVoiceModule;
-use App\Module\Sidecar\OfficeConvertModule;
 use App\Repository\ConfigRepository;
 use App\Repository\GroupRepository;
 use App\Repository\ModelRepository;
-use App\Service\Agent\AgentConfig;
-use App\Service\Auth\DemoLoginHint;
-use App\Service\Auth\RegistrationConfig;
-use App\Service\Billing\BillingService;
-use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
-use App\Service\Chat\GuestChatConfig;
-use App\Service\Chat\ProgressNarrationConfig;
-use App\Service\Client\ClientContextResolver;
-use App\Service\Client\MobileVersionService;
-use App\Service\Compute\ComputeConfig;
 use App\Service\Config\FeatureStatusReporter;
 use App\Service\Config\LayeredConfigResolver;
-use App\Service\Desktop\DesktopAgentConfig;
-use App\Service\Document\DocumentToolsConfig;
-use App\Service\Email\MailerConfig;
+use App\Service\Config\Runtime\RuntimeConfigAssembler;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
-use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Memory\UserMemoryService;
 use App\Service\ModelConfigService;
-use App\Service\PlatformLink\PlatformLinksConfig;
-use App\Service\Plugin\PluginManager;
-use App\Service\SavedTask\SavedTaskConfig;
-use App\Service\SavedTask\WorkflowsConfig;
 use App\Service\SelfAware\CapabilityInventory;
-use App\Service\SelfAware\SelfAwareConfig;
-use App\Service\Setup\SetupStateService;
-use App\Service\SmartSearch\Interpret\SearchInterpreter;
-use App\Service\Stt\WebSpeechConfig;
-use App\Service\Stt\WhisperService;
-use App\Service\Tool\ToolsConfig;
 use App\Service\Usage\CostCalculationService;
-use App\Service\Usage\UsageTaximeterConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -86,52 +56,22 @@ class ConfigController extends AbstractController
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,
         private ProviderRegistry $providerRegistry,
-        private WhisperService $whisperService,
-        private PluginManager $pluginManager,
-        private BillingService $billingService,
         private UserMemoryService $memoryService,
         private EmbeddingModelChangeGuard $embeddingChangeGuard,
         private EmbeddingMetadataService $embeddingMetadata,
         private ModelConfigService $modelConfigService,
-        private ClientContextResolver $clientContextResolver,
-        private BrandingService $brandingService,
-        private MobileVersionService $mobileVersionService,
-        private MarketingNewsConfig $marketingNewsConfig,
-        private UsageTaximeterConfig $usageTaximeterConfig,
-        private ProgressNarrationConfig $progressNarrationConfig,
-        private RegistrationConfig $registrationConfig,
-        private GuestChatConfig $guestChatConfig,
-        private WebSpeechConfig $webSpeechConfig,
-        private SavedTaskConfig $savedTaskConfig,
-        private DesktopAgentConfig $desktopAgentConfig,
-        private AgentConfig $agentConfig,
-        private PlatformLinksConfig $platformLinksConfig,
         private IamConfig $iamConfig,
         private ChatReadinessService $chatReadiness,
-        private DemoLoginHint $demoLoginHint,
-        private SetupStateService $setupState,
-        private AiProviderDisclosure $aiProviderDisclosure,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
-        private MailerConfig $mailerConfig,
         private CapabilityService $capabilityService,
         private FeatureStatusReporter $featureStatusReporter,
-        private ModuleRegistry $modules,
-        private ModuleGateConfig $moduleGate,
+        private RuntimeConfigAssembler $runtimeConfig,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
-        private readonly ?SelfAwareConfig $selfAwareConfig = null,
         private readonly ?CapabilityInventory $capabilityInventory = null,
         private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
         private readonly ?GroupPolicyService $groupPolicyService = null,
-        private readonly ?BundleConfig $bundleConfig = null,
-        private readonly ?ToolsConfig $toolsConfig = null,
-        private readonly ?WorkflowsConfig $workflowsConfig = null,
-        private readonly ?DocumentToolsConfig $documentToolsConfig = null,
-        private readonly ?ComputeConfig $computeConfig = null,
         private readonly ?GroupRepository $groupRepository = null,
-        private readonly ?SearchInterpreter $searchInterpreter = null,
-        private readonly ?\App\Service\Chat\ChatWelcomeConfig $chatWelcomeConfig = null,
-        private readonly ?\App\Service\Chat\ChatActionPolicy $chatActionPolicy = null,
         private readonly ?CostCalculationService $costCalculationService = null,
     ) {
     }
@@ -569,265 +509,7 @@ class ConfigController extends AbstractController
     )]
     public function getRuntimeConfig(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
-        $recaptchaEnabled = ($_ENV['RECAPTCHA_ENABLED'] ?? 'false') === 'true';
-        $recaptchaSiteKey = $_ENV['RECAPTCHA_SITE_KEY'] ?? '';
-
-        // Only send site key if reCAPTCHA is enabled and site key is configured
-        $recaptchaConfig = [
-            'enabled' => $recaptchaEnabled && !empty($recaptchaSiteKey) && 'your_site_key_here' !== $recaptchaSiteKey,
-            'siteKey' => ($recaptchaEnabled && !empty($recaptchaSiteKey) && 'your_site_key_here' !== $recaptchaSiteKey) ? $recaptchaSiteKey : '',
-        ];
-
-        // Feature flags
-        // IMPORTANT: Qdrant reachability and `whisper --help` do not run here.
-        // Local Whisper counts when the binary and the default model file are
-        // on disk. The speech-provider scan below skips that provider so it
-        // does not fork either. Transcription and /api/v1/config/features/status
-        // still run the full probe. A client that gives up on this response
-        // reads every missing flag as off (nav, billing, groups).
-        $features = [
-            'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
-            'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
-            'savedTasks' => $this->savedTaskConfig->isEnabled($user?->getId()),
-            'desktopAgentEnabled' => $this->desktopAgentConfig->isEnabled($user?->getId()),
-            'platformLinksEnabled' => $this->platformLinksConfig->isEnabled($user?->getId()),
-            'agentsEnabled' => $this->agentConfig->isEnabled($user?->getId()),
-            'bundleEnabled' => null !== $this->bundleConfig && $this->bundleConfig->isEnabled($user?->getId()),
-            'iamGroups' => $this->iamConfig->isGroupsEnabled($user?->getId()),
-            'iamSharing' => $this->iamConfig->isSharingEnabled($user?->getId()),
-            'iamImpersonationDisabled' => $this->iamConfig->isImpersonationDisabled($user?->getId()),
-            'iamPolicies' => $this->iamConfig->isGroupPoliciesEnabled($user?->getId()),
-            'selfAware' => null !== $this->selfAwareConfig && $this->selfAwareConfig->isEnabled($user?->getId()),
-            'officeConvertEnabled' => $this->modules->get(OfficeConvertModule::ID)->isConfigured(),
-            'computeEnabled' => null !== $this->computeConfig && $this->computeConfig->isEnabled($user?->getId()),
-            'computeWorkspacesEnabled' => null !== $this->computeConfig && $this->computeConfig->workspacesEnabled($user?->getId()),
-            'documentToolsEnabled' => null !== $this->documentToolsConfig && $this->documentToolsConfig->isEnabled($user?->getId()),
-            'toolsRegistryEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($user?->getId()),
-            'toolsApprovalsEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($user?->getId()),
-            'toolsCustomHttpEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isCustomHttpEnabled($user?->getId()),
-            'workflowsBuilderEnabled' => null !== $this->workflowsConfig && $this->workflowsConfig->isBuilderEnabled($user?->getId()),
-            'smartSearchAi' => null !== $user && null !== $this->searchInterpreter && $this->searchInterpreter->isAvailable($user),
-        ];
-
-        // Speech-to-text configuration
-        // whisperEnabled: true when local Whisper.cpp is available (record-then-transcribe mode)
-        // speechToTextAvailable: true when ANY transcription method is available:
-        //   - Local Whisper.cpp, OR
-        //   - API-based providers with valid API keys (Groq Whisper, OpenAI Whisper, etc.)
-        // Frontend shows microphone button when: Web Speech API supported OR speechToTextAvailable
-        $whisperLocalEnabled = ($_ENV['WHISPER_ENABLED'] ?? 'true') === 'true';
-        $whisperLocalAvailable = $whisperLocalEnabled && $this->whisperService->isInstalled();
-
-        // API-key providers only. Local whisper is already decided above.
-        $apiProvidersAvailable = count($this->providerRegistry->getAvailableProviders(
-            'speech_to_text',
-            includeTest: false,
-            exclude: ['whisper'],
-        )) > 0;
-
-        $speech = [
-            'whisperEnabled' => $whisperLocalAvailable,
-            'webSpeechEnabled' => $this->webSpeechConfig->isEnabled(),
-            'speechToTextAvailable' => $whisperLocalAvailable || $apiProvidersAvailable,
-        ];
-
-        // Google Tag configuration (read from Config table, ownerId=0 for global config)
-        $googleTagEnabled = '1' === $this->configRepository->getValue(0, 'GOOGLE_TAG', 'ENABLED');
-        $googleTagIdRaw = $this->configRepository->getValue(0, 'GOOGLE_TAG', 'TAG_ID') ?? '';
-        // Sanitize tag ID to prevent XSS - only allow alphanumeric, dash, and underscore
-        // Valid formats: GTM-XXXXXXX or G-XXXXXXXXXX (where X is alphanumeric)
-        $googleTagId = '';
-        if (!empty($googleTagIdRaw)) {
-            // Validate format: GTM- followed by alphanumeric, or G- followed by alphanumeric
-            if (preg_match('/^(GTM-[A-Z0-9]+|G-[A-Z0-9]+)$/i', $googleTagIdRaw)) {
-                $googleTagId = $googleTagIdRaw;
-            }
-        }
-        $googleTagConfig = [
-            'enabled' => $googleTagEnabled && !empty($googleTagId),
-            'tagId' => ($googleTagEnabled && !empty($googleTagId)) ? $googleTagId : '',
-        ];
-
-        // Plugins
-        $plugins = [];
-        if ($user) {
-            $installedPlugins = $this->pluginManager->listInstalledPlugins($user->getId());
-            foreach ($installedPlugins as $plugin) {
-                $plugins[] = [
-                    'name' => $plugin->name,
-                    'version' => $plugin->version,
-                    'description' => $plugin->description,
-                    'capabilities' => $plugin->capabilities,
-                    'chatCommands' => $plugin->chatCommands,
-                ];
-            }
-        }
-
-        // Build information for debugging deployments (minimal: version + internal IP only).
-        // Version comes from APP_VERSION, which is set by the build/release pipeline. The
-        // fallback is deliberately neutral ('dev') rather than a hard-coded release number
-        // — hard-coding inevitably drifts behind reality and creates misleading debug output
-        // (PR #833 review).
-        $buildInfo = [
-            'version' => $_ENV['APP_VERSION'] ?? 'dev',
-            'ip' => $this->getInternalIp(),
-        ];
-
-        $unavailableProviders = [];
-        $setup = [
-            // Public on purpose: this is the ONLY signal the SPA has to route a
-            // virgin install into the wizard, and it is the one route the setup
-            // lockdown lets through. It leaks nothing — on every installation
-            // that has ever had a user it is simply false.
-            'wizardRequired' => $this->setupState->isSetupRequired(),
-            // Distinguishes "already set up" from "the operator switched the
-            // wizard off". Both leave wizardRequired false, but only the second
-            // one is permanent, which is what lets an SSO/OIDC deployment stop
-            // asking about the setup state altogether.
-            'wizardEnabled' => $this->setupState->isWizardEnabled(),
-            'demoLoginHint' => $this->demoLoginHint->isVisible(),
-        ];
-        if ($user) {
-            // READ ONLY. Repairing a broken default is an explicit action
-            // (`app:provider:auto-default` at container start, or an admin
-            // saving a key) — never a side effect of this GET.
-            $unavailableProviders = $this->chatReadiness->unavailableProviderNames();
-
-            // First-run signal: can a REAL AI provider answer chat for THIS
-            // user? The built-in TestProvider does not count — it is canned
-            // demo text. The frontend replaces chat with a setup tombstone
-            // (admins go to /admin/setup; others to the public docs) while
-            // this is false. Evaluated per user so a working per-user model
-            // override is honoured, exactly like the chat pipeline resolves it.
-            $setup['chatReady'] = $this->chatReadiness->isChatReady(userId: $user->getId());
-        }
-
-        // Realtime / WebSocket gateway settings.
-        // - enabled: master kill-switch so we can disable WS instantly without a deploy.
-        // - wsUrl:   empty string ⇒ frontend uses same-origin /connection/websocket
-        //            (Caddy reverse-proxies to centrifugo). Override only for setups
-        //            where Centrifugo lives on a separate hostname.
-        // There is no fallback transport: when realtime is disabled the dashboard
-        // simply skips its subscriptions (operators still see fresh data via the
-        // existing REST endpoints, just without push updates).
-        // Default OFF when unset: realtime needs a configured Centrifugo gateway,
-        // so a bare deployment without REALTIME_ENABLED must not advertise WS to
-        // the frontend (otherwise it would loop on connection errors). The
-        // official docker-compose files set REALTIME_ENABLED=true explicitly.
-        $realtimeEnabled = 'true' === ($_ENV['REALTIME_ENABLED'] ?? 'false');
-        $realtimeWsUrl = (string) ($_ENV['REALTIME_PUBLIC_WS_URL'] ?? '');
-        $realtimeConfig = [
-            'enabled' => $realtimeEnabled,
-            'wsUrl' => $realtimeWsUrl,
-        ];
-
-        // Client identity (Aspect 1 / mobile app Epic 2): server-confirmed signal derived
-        // from the User-Agent. The frontend uses this for server-truthful behaviour switches
-        // (Epic 5 payment gating) instead of trusting only Capacitor.isNativePlatform().
-        // The parsed version also feeds the forced-update gate (Epic 8).
-        $client = $this->clientContextResolver->fromRequest($request);
-        $clientConfig = [
-            'isMobileApp' => $client->isMobileApp,
-            'appVersion' => $client->appVersion,
-            'platform' => $client->platform(),
-        ];
-
-        // Forced-update gate (Epic 8.2): the operator configures a minimum
-        // supported app version; the server compares it against the parsed UA
-        // version and tells the app to block with a "please update" screen.
-        // Empty min-version ⇒ no gate (default), so web and unconfigured
-        // deployments are unaffected.
-        $storeUrls = $this->mobileVersionService->getStoreUrls();
-        $mobileConfig = [
-            'minVersion' => $this->mobileVersionService->getMinVersion(),
-            'updateRequired' => $this->mobileVersionService->isUpdateRequired($client),
-            'updateEnforceAfter' => $this->mobileVersionService->getUpdateEnforceAfter(),
-            'iosAppUrl' => $storeUrls['ios'],
-            'androidAppUrl' => $storeUrls['android'],
-        ];
-
-        $response = [
-            'billing' => [
-                'enabled' => $this->billingService->isEnabled(),
-            ],
-            'auth' => [
-                // Default ON; operators set REGISTRATION_ENABLED=false for
-                // SSO-/OIDC-only instances so no local sign-up is offered.
-                'registrationEnabled' => $this->registrationConfig->isEnabled(),
-                // Default ON; operators set GUEST_CHAT_ENABLED=false so
-                // unauthenticated visitors are sent to /login instead of the
-                // anonymous guest trial (issue #1517).
-                'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
-                'mailerConfigured' => $this->mailerConfig->isConfigured(),
-            ],
-            'recaptcha' => $recaptchaConfig,
-            'branding' => $this->brandingService->getBranding() + [
-                'resolvedLogoUrl' => $this->brandingService->getLogoUrl(false)
-                    ?? $request->getBasePath().'/synaplan-dark.svg',
-                'resolvedLogoDarkUrl' => $this->brandingService->getLogoUrl(true)
-                    ?? $request->getBasePath().'/synaplan-light.svg',
-                'resolvedIconUrl' => $this->brandingService->getIconUrl(false)
-                    ?? $request->getBasePath().'/single_bird-dark.svg',
-                'resolvedIconDarkUrl' => $this->brandingService->getIconUrl(true)
-                    ?? $request->getBasePath().'/single_bird-light.svg',
-            ],
-            'features' => $features,
-            'voiceLive' => [
-                'enabled' => $this->modules->get(LiveVoiceModule::ID)->isConfigured(),
-            ],
-            'speech' => $speech,
-            'plugins' => $plugins,
-            'googleTag' => $googleTagConfig,
-            'build' => $buildInfo,
-            'realtime' => $realtimeConfig,
-            'client' => $clientConfig,
-            'mobile' => $mobileConfig,
-            // MOBILE-APP SEAM (App Review 5.1.2(i)): the app's first-run consent
-            // screen has to name the AI providers, and it runs before sign-in —
-            // so the list ships with the public config. Empty on an instance
-            // with no usable chat provider; the client then falls back to
-            // wording without names.
-            'aiProviders' => $this->aiProviderDisclosure->chatProviderNames(),
-            'marketingNews' => [
-                'enabled' => $this->marketingNewsConfig->isEnabled(),
-            ],
-            'chatWelcome' => [
-                'showStoreCards' => $this->chatWelcomeConfig?->showStoreCards() ?? true,
-                'showWidgetPromo' => $this->chatWelcomeConfig?->showWidgetPromo() ?? true,
-            ],
-            'chatActions' => [
-                'export' => $this->chatActionPolicy?->canExport($user?->getId()) ?? true,
-                'share' => $this->chatActionPolicy?->canShare($user?->getId()) ?? true,
-            ],
-            'usageTaximeter' => [
-                'enabled' => $this->usageTaximeterConfig->isEnabled(),
-            ],
-            'progressNarration' => $this->progressNarrationConfig->toRuntimeConfig(),
-            'modules' => $this->moduleStates(),
-        ];
-
-        if ($user && !empty($unavailableProviders)) {
-            $response['unavailableProviders'] = $unavailableProviders;
-        }
-        $response['setup'] = $setup;
-
-        return $this->json($response);
-    }
-
-    /**
-     * @return array<string, array{configured: bool, gated: bool}>
-     */
-    private function moduleStates(): array
-    {
-        $states = [];
-        foreach ($this->modules->all() as $id => $module) {
-            $states[$id] = [
-                'configured' => $module->isConfigured(),
-                'gated' => $this->moduleGate->isGated($id),
-            ];
-        }
-
-        return $states;
+        return $this->json($this->runtimeConfig->assemble($request, $user));
     }
 
     /**
@@ -911,39 +593,6 @@ class ConfigController extends AbstractController
     public function getCapabilities(): JsonResponse
     {
         return $this->json($this->capabilityService->getCapabilities());
-    }
-
-    /**
-     * Get internal IP address (10.x.x.x range only, for debugging which server handled request).
-     */
-    private function getInternalIp(): string
-    {
-        // Check environment variable first (set by start scripts)
-        $synDbHost = $_ENV['SYNDBHOST'] ?? '';
-        if ('' !== $synDbHost && str_starts_with($synDbHost, '10.')) {
-            return $synDbHost;
-        }
-
-        // Try to find a 10.x.x.x IP from network interfaces
-        $hostname = gethostname();
-        if ($hostname) {
-            $ips = gethostbynamel($hostname);
-            if ($ips) {
-                foreach ($ips as $ip) {
-                    if (str_starts_with($ip, '10.')) {
-                        return $ip;
-                    }
-                }
-            }
-        }
-
-        // Fallback: try to get from SERVER_ADDR if in 10.x range
-        $serverAddr = $_SERVER['SERVER_ADDR'] ?? '';
-        if (str_starts_with($serverAddr, '10.')) {
-            return $serverAddr;
-        }
-
-        return 'dev';
     }
 
     /**
