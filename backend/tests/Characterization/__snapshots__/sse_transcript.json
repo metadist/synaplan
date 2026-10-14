@@ -1,0 +1,483 @@
+{
+    "cancelled": [
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "generating"
+        },
+        {
+            "shape": {
+                "chunk": "string",
+                "status": "string"
+            },
+            "status": "data"
+        }
+    ],
+    "guest_limit": [
+        {
+            "shape": {
+                "action": "string",
+                "message": "string",
+                "status": "string"
+            },
+            "status": "guest_limit_reached"
+        }
+    ],
+    "knowledge": [
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "started"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "preprocessing"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "classifying"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "classified"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "searching"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "search_complete"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "searching_files"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "fetching_urls"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "urls_fetched"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "pages_read"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "checking_memories"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "memories_loaded"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "docs_loaded"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "digests_loaded"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "feedback_loaded"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "generating"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "generated"
+        },
+        {
+            "shape": {
+                "chunk": "string",
+                "status": "string"
+            },
+            "status": "data"
+        },
+        {
+            "shape": {
+                "status": "string",
+                "type": "string",
+                "url": "string"
+            },
+            "status": "file"
+        },
+        {
+            "shape": {
+                "links": {
+                    "list": {
+                        "title": "string",
+                        "url": "string"
+                    }
+                },
+                "status": "string"
+            },
+            "status": "links"
+        },
+        {
+            "shape": {
+                "marks": "list",
+                "phases": "list",
+                "status": "string",
+                "total_ms": "float"
+            },
+            "status": "perf"
+        },
+        {
+            "shape": {
+                "aiModels": {
+                    "chat": {
+                        "model": "string",
+                        "model_id": "null",
+                        "provider": "string"
+                    }
+                },
+                "docs": {
+                    "list": {
+                        "slug": "string",
+                        "title": "string"
+                    }
+                },
+                "language": "string",
+                "memoryIds": {
+                    "list": "int"
+                },
+                "messageId": "null",
+                "model": "string",
+                "model_id": "null",
+                "originalMediaType": "null",
+                "originalTopic": "null",
+                "provider": "string",
+                "ragSources": {
+                    "list": {
+                        "chunkId": "string",
+                        "endLine": "int",
+                        "fileId": "int",
+                        "fileName": "string",
+                        "groupKey": "string",
+                        "n": "int",
+                        "score": "float",
+                        "startLine": "int"
+                    }
+                },
+                "searchResults": {
+                    "list": {
+                        "description": "string",
+                        "fetched": "bool",
+                        "final_url": "string",
+                        "published": "string",
+                        "source": "null",
+                        "thumbnail": "null",
+                        "title": "string",
+                        "url": "string"
+                    }
+                },
+                "status": "string",
+                "topic": "string",
+                "trackId": "string",
+                "usage": {
+                    "completionTokens": "int",
+                    "cost": "string",
+                    "kind": "string",
+                    "modelKey": "string",
+                    "priceKnown": "bool",
+                    "promptTokens": "int",
+                    "totalTokens": "int"
+                }
+            },
+            "status": "complete"
+        }
+    ],
+    "plain_chat": [
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "started"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "preprocessing"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "classifying"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "classified"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "generating"
+        },
+        {
+            "shape": {
+                "chunk": "string",
+                "status": "string"
+            },
+            "status": "data"
+        },
+        {
+            "shape": {
+                "marks": "list",
+                "phases": "list",
+                "status": "string",
+                "total_ms": "float"
+            },
+            "status": "perf"
+        },
+        {
+            "shape": {
+                "aiModels": {
+                    "chat": {
+                        "model": "string",
+                        "model_id": "null",
+                        "provider": "string"
+                    }
+                },
+                "language": "string",
+                "messageId": "null",
+                "model": "string",
+                "model_id": "null",
+                "originalMediaType": "null",
+                "originalTopic": "null",
+                "provider": "string",
+                "ragSources": "null",
+                "searchResults": "null",
+                "status": "string",
+                "topic": "string",
+                "trackId": "string",
+                "usage": {
+                    "completionTokens": "int",
+                    "cost": "string",
+                    "kind": "string",
+                    "modelKey": "string",
+                    "priceKnown": "bool",
+                    "promptTokens": "int",
+                    "totalTokens": "int"
+                }
+            },
+            "status": "complete"
+        }
+    ],
+    "provider_error": [
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "started"
+        },
+        {
+            "shape": {
+                "message": "string",
+                "metadata": {
+                    "stage": "string"
+                },
+                "status": "string",
+                "timestamp": "int"
+            },
+            "status": "generating"
+        },
+        {
+            "shape": {
+                "chunk": "string",
+                "status": "string"
+            },
+            "status": "data"
+        },
+        {
+            "shape": {
+                "aiModels": {
+                    "chat": {
+                        "model": "string",
+                        "model_id": "int",
+                        "provider": "string"
+                    }
+                },
+                "canRetryModel": "bool",
+                "errorDebug": "null",
+                "errorReason": "string",
+                "language": "string",
+                "messageId": "null",
+                "model": "string",
+                "model_id": "int",
+                "originalMediaType": "null",
+                "originalTopic": "string",
+                "provider": "string",
+                "status": "string",
+                "topic": "string",
+                "trackId": "string"
+            },
+            "status": "complete"
+        }
+    ]
+}
