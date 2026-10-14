@@ -9,10 +9,10 @@ not a chat message.
 
 | Step | Repo | State | Notes |
 | ---- | ---- | ----- | ----- |
-| E-1 Cleanup and baseline | workstation | **in progress** | §2.1 of `10` done 2026-10-13; §2.2 waits for confirmation; scheduler container exited (127) — cause open |
+| E-1 Cleanup and baseline | workstation | **in progress** | §2.1 done 2026-10-13; §2.2 volumes and signing keys done 2026-10-14. Still open: scheduler container exited (127) |
 | E-2 Nextcloud stack v2 (MariaDB, cron, `user_oidc`, test users) | `synaplan-nextcloud` | planned | after E-3 |
 | E-3 Keycloak clients and users for the clouds | `synaplan` | planned | additive block in `_docker/keycloak/setup.sh` |
-| E-4 OpenCloud refresh to 8.1.0 | `synaplan-opencloud` | planned | config volume reset needs confirmation |
+| E-4 OpenCloud refresh to 8.1.0 | `synaplan-opencloud` | planned | config volume removed 2026-10-14; fresh `init` is part of this step |
 | E-5 ownCloud.online Docker stack | `synaplan-owncloud-online` | planned | port 8083; may finish during CF1.2 |
 | E-6 `env-check.sh`, fixtures, cloud helpers | `synaplan` | planned | `_devextras/testing/cloud-apps/` |
 | E-7 Developer docs | all | planned | |
@@ -78,6 +78,7 @@ not a chat message.
 | 2026-10-13 | Product-owner clarification: "A pure path in a specific prompt has no meaning … pick up files or file lists from the file sharing app … fetch files and process those on Synaplan automatically, even in the code sandbox with specific tools." Added [`07_files_into_runs.md`](./07_files_into_runs.md) and §3 rows 27–32 (files not paths, what each run gets, `folder_fetch` + pickup, read scope, file work, try then automate). The `{file.path}` placeholders are withdrawn. Rows proposed, **not ticked**. |
 | 2026-10-13 | Second review ("prepare for vibe coding"): added [`08_agent_briefs.md`](./08_agent_briefs.md) (rules R1–R14, done D1–D10, ask A1–A7, one brief per spike and step), [`09_functional_tests.md`](./09_functional_tests.md) (three layers per sprint, fixtures, accounts, regression set) and [`10_local_environments.md`](./10_local_environments.md) (pins, inventory, cleanup, E-1…E-8). The three open questions of the first review became §3 rows 33–35; dev-mode test hooks are row 36. Rows proposed, **not ticked**. Local cleanup of `10` §2.1 executed; `10` §2.2 waits for the owner. |
 | 2026-10-13 | Copilot review of [#2467](https://github.com/metadist/synaplan/pull/2467) (six findings, review log below): §3 rows 37–41 added (notification proof, deleting a person in one cloud, provisioned identities, files remember their cloud, watch index); row 16 now says a watch may look at one file; row 11 notifications are signed. Defects D15–D17, invariants C18–C20, step CF2.9 and journey J-CF-15 added. Rows proposed, **not ticked**. |
+| 2026-10-14 | Product owner: the proposed defaults of §3 rows 1–36 stand. Rows 37–41 stay proposed — they were not in that confirmation. `10` §2.2 done: Nextcloud dev volume removed (container stays down until E-2), OpenCloud 6.0.0 config volume removed, signing-key tarballs moved to `synaplan-nextcloud/.local/` with a local README. |
 
 ## Review log
 

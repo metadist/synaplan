@@ -3,7 +3,8 @@
 **Status:** Plan, 2026-10-13, reviewed twice the same day (second review:
 agent briefs, functional tests, local environments), then updated for the
 six Copilot findings on [#2467](https://github.com/metadist/synaplan/pull/2467).
-No product code. Master-plan §3 is unticked.
+No product code. Master-plan §3 rows 1–36 agreed 2026-10-14. Rows 37–41
+are still proposed.
 **Plan of record:** [`00_master_plan.md`](./00_master_plan.md).
 
 Asked for on 2026-10-13:
