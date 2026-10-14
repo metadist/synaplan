@@ -17,7 +17,7 @@ binding and live in [`13_cross_platform.md`](./13_cross_platform.md).
   — `agent_checkin` / `agent_report_result` (dispatch shape; not implemented)
 - [`../20260709-hosting-partner-core-requirements/README.md`](../20260709-hosting-partner-core-requirements/README.md)
   §CORE-3 — API-key scope enforcement
-- [`docs/ANTHROPIC_COMPATIBLE_API.md`](../../../docs/ANTHROPIC_COMPATIBLE_API.md)
+- [`docs/ANTHROPIC_COMPATIBLE_API.md`](../../../../docs/ANTHROPIC_COMPATIBLE_API.md)
   — Messages gateway (`POST /v1/messages`)
 - [`../20260822-open-plugin-platform/README.md`](../20260822-open-plugin-platform/README.md)
   §3.4 — prompt-pack skills (server-side markdown; **not** this runtime)

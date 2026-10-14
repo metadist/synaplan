@@ -1,5 +1,14 @@
 # Status — Meta Model API (Muse Spark) + thinking levels
 
+> **Archived 2026-10-14.** The substance shipped outside this track:
+> `MetaProvider` + Muse Spark in the catalog
+> ([#2120](https://github.com/metadist/synaplan/pull/2120)), per-model
+> reasoning levels in chat ([#2247](https://github.com/metadist/synaplan/pull/2247)),
+> Muse Wonder / Image / Voice Transcribe
+> ([#2470](https://github.com/metadist/synaplan/pull/2470)). The §0
+> checklist below was never ticked; the step table is the September plan,
+> not what was built. Kept for the decision history.
+
 Plan of record: [`00_master_plan.md`](./00_master_plan.md).
 **Decision checklist (§0) NOT ticked — research only, no product code.**
 

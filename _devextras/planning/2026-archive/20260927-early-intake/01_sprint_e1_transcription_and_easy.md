@@ -1,7 +1,7 @@
 # E1 — Sound transcription, then three easy fixes
 
 **Sprint:** E1 of [`00_master_plan.md`](./00_master_plan.md).
-Row 1b–1c of [`../20260925_roadmap.md`](../20260925_roadmap.md).
+Row 1b–1c of [`../20260925_roadmap.md`](../20260925_roadmap/20260925_roadmap.md).
 Runs beside the UX close-out. It does not wait for that walk list to
 finish.
 **Goal:** Next feature sprint. Transcription is the first commit series.
@@ -11,7 +11,7 @@ finish.
 
 Journeys: **J-STT-1**, **J-STT-2**, **J-STT-3**, **J-EASY-1**,
 **J-EASY-2**, **J-EASY-3** in
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) spirit
+[`../20260907_ux_user_flows.md`](../../20260907_ux_user_flows.md) spirit
 and named in [`00_master_plan.md`](./00_master_plan.md) §1.
 Copy for any new sentence ships in all five locales in the same PR.
 

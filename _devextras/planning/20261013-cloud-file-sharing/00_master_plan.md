@@ -455,7 +455,7 @@ name "OpenID Connect" and "background jobs" under **Advanced**.
 | Plan | Relation |
 | ---- | -------- |
 | [`20260903_more_nextcloud/`](../20260903_more_nextcloud/STATUS.md) | S1 on `main` (#1745), S2 merged in `synaplan-nextcloud` #34. **S3 is absorbed here**: ownCloud.online parity → CF1.1, docs correction → CF0.5. The pairing-code fallback stays in S3 (not needed by these goals). STATUS is corrected once §3 is ticked (CF0.6). |
-| [`20260925_roadmap.md`](../20260925_roadmap.md) row 5 | "Folder watch (scheduled scan, seen-state per file)" is implemented by CF5 (with the apps) and CF6.1 (plain WebDAV). "Nextcloud S3" → this track. |
+| [`ROADMAP.md`](../ROADMAP.md) (folder watch in the use-case Q-list; Nextcloud S3 in row 13; the 2026-09-25 text is frozen at [`2026-archive/20260925_roadmap/`](../2026-archive/20260925_roadmap/20260925_roadmap.md) row 5) | "Folder watch (scheduled scan, seen-state per file)" is implemented by CF5 (with the apps) and CF6.1 (plain WebDAV). "Nextcloud S3" → this track. |
 | [`20260913-use-case-research/`](../20260913-use-case-research/README.md) | Case 1 ("translate every new document in a cloud folder") is J-CF-7; the intake half of Case 6 reuses CF5. |
 | [`2026-archive/20260908_url_watch/`](../2026-archive/20260908_url_watch/00_sprint.md) | Shape reused: one row per target, seen-state, a Tasks tab. |
 | [`20261001-single-scheduler/`](../20261001-single-scheduler/00_master_plan.md) | Reconciliation sweeps, copy timeouts and the WebDAV feeder run in its lanes (`tasks` / `hourly`). |

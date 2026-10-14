@@ -1,7 +1,7 @@
 # Status — Feature modules
 
 **Intermezzo** release of
-[`../../20260917_roadmap.md`](../../20260917_roadmap.md)
+[`../../20260917_roadmap.md`](../20260917_roadmap/20260917_roadmap.md)
 (frozen: [`../20260910_roadmap/20260910_roadmap_update.md`](../20260910_roadmap/20260910_roadmap_update.md))
 (after the two bugfixes; Wave 4 is on `main` via #1774; Intermezzo S1–S4
 closed 2026-09-13). Plan of record:

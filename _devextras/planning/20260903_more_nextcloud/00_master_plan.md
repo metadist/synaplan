@@ -1,7 +1,7 @@
 # More Nextcloud — link a platform user to an existing Synaplan account — master plan
 
 **Status:** Decisions ticked 2026-09-03 (log in [`STATUS.md`](./STATUS.md)).
-Track 6 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
+Track 6 of [`../20260903_roadmap.md`](../2026-archive/20260903_roadmap/20260903_roadmap.md).
 Needs `BEXTERNALIDENTITIES` from track 1 S1; otherwise independent and
 small. Can be pulled forward when a hoster asks.
 Sprint files: [`01_sprint_1_core_handshake.md`](./01_sprint_1_core_handshake.md) ·

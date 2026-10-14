@@ -1,5 +1,11 @@
 # Synaplan Desktop — Agent Skills client
 
+> **Archived 2026-10-14.** Phase A (server side: scopes, pairing, jobs and
+> check-in, `protocol: 1` frozen) is on `main`; the client (Phase B) is
+> built in the `synaplan-desktop` repository, which vendors this plan under
+> `_extras/planning/` and is the plan of record from here on. This copy is
+> the frozen source. User docs: [`docs/DESKTOP.md`](../../../../docs/DESKTOP.md).
+
 **Status:** Plan drafted 2026-08-29, **reordered 2026-08-30 to server-first**
 and **extended the same day with cross-platform parity**
 ([`13_cross_platform.md`](./13_cross_platform.md), master plan §0.3).

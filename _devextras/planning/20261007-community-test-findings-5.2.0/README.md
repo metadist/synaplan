@@ -1,11 +1,12 @@
 # Community test round on 5.2.0 — triage, fixing order, issue drafts
 
-**Status:** waves 1 and 2 are shipped (issues 01–15). In wave 3, the
-assistant-pin bug (issue 20) is shipped. Issues 16–24 are implemented on
-PR #2385 and are **not** on `main` until that PR merges — do not redo them.
-An extra release (OLED black, the model-import filter, and the remaining
-bugs that are not in #2385) is [#2386](https://github.com/metadist/synaplan/pull/2386).
-What that branch actually finishes is listed in §0. This folder remains the triage of record for the external
+**Status:** waves 1 and 2 are shipped (issues 01–15). Wave 3: the
+assistant-pin bug (issue 20) and issues 16–24 are on `main` via
+[#2385](https://github.com/metadist/synaplan/pull/2385) (merged 2026-10-07);
+OLED black, the model-import filter and the remaining bugs outside #2385
+landed with [#2386](https://github.com/metadist/synaplan/pull/2386) (same
+day). What those branches finished is listed in §0; the issues still open
+in waves 3–6 are marked in the §2 table. This folder remains the triage of record for the external
 hands-on test of Synaplan 5.2.0 (tested 2026-10-05/06 against Open WebUI
 0.11.4, same model and files in both apps). Two documents were delivered:
 *Synaplan 5.2.0 — Test Findings* (F1–F49, grouped by impact) and
@@ -19,7 +20,7 @@ install note (#2373).
 The testers ran 5.2.0. Shipped work is marked below; do not re-implement it.
 **Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
 (U1–U12) and the AGENTS.md Perfect-UX bar apply to every user-visible
-issue in [`issues/`](./issues/). Each UI issue names its journey.
+issue in [`issues/`](./issues). Each UI issue names its journey.
 
 The testers' own verdict, kept here because the order below follows it:
 the 5.2.0 rework is a big step forward; tool approvals with read / change /
@@ -86,7 +87,7 @@ reproducible are listed in §4, not turned into issues blindly.
 Waves are a dependency order, not a calendar. Waves 1 and 2, including
 issue 15, are on `main`. Wave 3 can start at issue 16.
 
-| Wave | Theme | Issues (see [`issues/`](./issues/)) | Findings | Effort | State |
+| Wave | Theme | Issues (see [`issues/`](./issues)) | Findings | Effort | State |
 | ---- | ----- | ----------------------------------- | -------- | ------ | ----- |
 | **1** | **Unblock the core jobs** — knowledge in assistants, big uploads, accounts, compute setup | 01 · 02 · 03 · 04 · 05 · 06 · 07 · 08 | F44 F46 F47 F13 F14 F24 | 01 S · 02 M · 03 M · 04 M · 05 S · 06 S · 07 S · 08 S | **Shipped** #2379 (01–07) and #2380 (08) |
 | **2** | **Make answers and runs checkable** — citations, step detail, honest failures, real prices | 09 · 10 · 11 · 12 · 13 · 14 · 15 | F40 F9 F26 F43(4,6) F35 F48 F2 F16 | 09 M · 10 M · 11 M · 12 S · 13 M · 14 M · 15 S | **Shipped** (#2377, #2380, #2382) |
@@ -276,13 +277,13 @@ Short, honest, for the product owner to adapt:
 - *Extra trusted CA?* — Issue 38, smallest form first (`EXTRA_CA_CERTS` PEM path + compose mount).
 - *Import dialog search, cached probes, prices?* — Prices shipped in #2382 (issue 15). Search, filter and cached probes are still issue 35.
 - *Docling default?* — Open (§6).
-- *What is planned for later parts of the UI rework?* — Point them at [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 and [`../20260914-navigation-consolidation/`](../20260914-navigation-consolidation/).
+- *What is planned for later parts of the UI rework?* — Point them at [`../ROADMAP.md`](../ROADMAP.md) and [`../20261009-ux-overhaul/`](../20261009-ux-overhaul/00_master_plan.md) (which replaced the navigation-consolidation steps).
 
 ---
 
 ## 7. Creating the issues
 
-Each file in [`issues/`](./issues/) is one GitHub issue in the repository's
+Each file in [`issues/`](./issues) is one GitHub issue in the repository's
 template shape (`.github/ISSUE_TEMPLATE/bug.md` / `feature.md`), with
 title, type and labels in the header HTML comments, plus
 `<!-- status: shipped -->` once the work has merged. Labels used:

@@ -3,7 +3,7 @@
 **Status:** Plan drafted 2026-09-17. Integrations-page code waits for
 [`00_master_plan.md`](./00_master_plan.md) §0. In-app transcription is
 row 1b of the live roadmap and is not this gate.
-**Live overview:** [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 and §4–§5 (row 1b in-app STT, row 2 openDesk minimum, rows 3–4 catalog and clients).
+**Live overview:** [`../ROADMAP.md`](../ROADMAP.md) row 10. The 2026-09-25 detail is frozen at [`../2026-archive/20260925_roadmap/20260925_roadmap.md`](../2026-archive/20260925_roadmap/20260925_roadmap.md) §1 and §4–§5 (row 1b in-app STT, row 2 openDesk minimum, rows 3–4 catalog and clients).
 **Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md).
 
 Use **your** Synaplan instance the way people use Claude Code today: point
