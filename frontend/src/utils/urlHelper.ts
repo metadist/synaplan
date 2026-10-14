@@ -1,15 +1,57 @@
+import { getNativeApiBaseUrl } from '@/services/api/nativeRuntime'
+import { getNativeServerUrl } from '@/services/api/nativeServer'
 import { useConfigStore } from '@/stores/config'
 
 /**
- * Public origin for links that leave the app (share URLs, absolute media).
- *
- * Never use `window.location.origin` for these: in the native shell that is
- * `capacitor://localhost` / `https://localhost`, which is not a reachable
- * platform URL. `appBaseUrl` already remaps the native case to the real
- * backend/web origin (Epic 3).
+ * True for the origins the native shell uses to serve the bundled SPA.
+ * iOS is `capacitor://localhost`, Android is `https://localhost` with no port.
+ * The Vite dev server (`http://localhost:5173`) is not one of these.
  */
-function publicAppBaseUrl(): string {
-  return useConfigStore().appBaseUrl.replace(/\/$/, '')
+export function isWebViewOrigin(origin: string): boolean {
+  if (origin.startsWith('capacitor://') || origin.startsWith('ionic://')) {
+    return true
+  }
+  try {
+    const url = new URL(origin)
+    return 'https:' === url.protocol && 'localhost' === url.hostname && '' === url.port
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The server the user picked in the app (shell API, then the bootstrap global).
+ * Empty when this page is not running inside the shell.
+ */
+function configuredServiceOrigin(): string {
+  const fromShell = getNativeServerUrl().trim()
+  if ('' !== fromShell && !isWebViewOrigin(fromShell)) {
+    return fromShell.replace(/\/$/, '')
+  }
+  const fromBootstrap = getNativeApiBaseUrl().trim()
+  if ('' !== fromBootstrap && !isWebViewOrigin(fromBootstrap)) {
+    return fromBootstrap.replace(/\/$/, '')
+  }
+  return ''
+}
+
+/**
+ * MOBILE-APP SEAM: public origin for links that leave the app (share URLs,
+ * absolute media, the shared-chat canonical address).
+ *
+ * The WebView origin (`capacitor://localhost` on iOS, `https://localhost` on
+ * Android) is not a link anyone else can open. Inside the shell these URLs
+ * use the server the user configured, even when the shell was not recognised
+ * via its User-Agent. On the plain web build this is the page origin.
+ */
+export function publicAppOrigin(): string {
+  const fromConfig = useConfigStore().appBaseUrl.replace(/\/$/, '')
+  const pageOrigin = 'undefined' === typeof window ? '' : window.location.origin
+  if (!isWebViewOrigin(pageOrigin) && !isWebViewOrigin(fromConfig)) {
+    return fromConfig
+  }
+  const configured = configuredServiceOrigin()
+  return '' !== configured ? configured : fromConfig
 }
 
 /**
@@ -27,7 +69,7 @@ export function normalizeMediaUrl(url: string | undefined | null): string {
   // Add leading slash if missing
   const normalizedPath = url.startsWith('/') ? url : `/${url}`
 
-  return `${publicAppBaseUrl()}${normalizedPath}`
+  return `${publicAppOrigin()}${normalizedPath}`
 }
 
 /**
@@ -36,5 +78,5 @@ export function normalizeMediaUrl(url: string | undefined | null): string {
  * Path is the SPA/crawler page (`/shared/{token}`), not the JSON API route.
  */
 export function buildChatShareUrl(shareToken: string): string {
-  return `${publicAppBaseUrl()}/shared/${shareToken}`
+  return `${publicAppOrigin()}/shared/${shareToken}`
 }

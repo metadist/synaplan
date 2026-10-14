@@ -384,6 +384,7 @@ import {
   isVideoFileType,
 } from '@/utils/mediaTypes'
 import { useConfigStore } from '@/stores/config'
+import { publicAppOrigin } from '@/utils/urlHelper'
 import { httpClient } from '@/services/api/httpClient'
 import { collapseApiToolTurn } from '@/utils/apiToolTurn'
 import { GetSharedChatResponseSchema } from '@/generated/api-schemas'
@@ -475,12 +476,11 @@ const pageDescription = computed(() => {
   return firstMessage.substring(0, 160) + (firstMessage.length > 160 ? '...' : '')
 })
 
-const currentUrl = computed(() => {
-  return window.location.href
-})
+const baseUrl = computed(() => publicAppOrigin())
 
-const baseUrl = computed(() => {
-  return window.location.origin
+const currentUrl = computed(() => {
+  if (!token.value) return baseUrl.value
+  return `${baseUrl.value}/shared/${currentLang.value}/${token.value}`
 })
 
 // Update document title and meta tags including hreflang

@@ -105,4 +105,50 @@ describe('SharedChatView knowledge sources', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="knowledge-source-passage"]').exists()).toBe(false)
   })
+
+  it.each(['capacitor://localhost', 'https://localhost'])(
+    'points canonical and og:url at the configured service from %s',
+    async (origin) => {
+      vi.stubGlobal('location', {
+        ...window.location,
+        origin,
+        href: `${origin}/shared/en/public-token`,
+      })
+      vi.stubGlobal('__SYNAPLAN_API_BASE_URL__', 'https://chat.example.test')
+
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: '/shared/:lang/:token', component: SharedChatView },
+          { path: '/register', component: { template: '<div />' } },
+        ],
+      })
+      await router.push('/shared/en/public-token')
+      await router.isReady()
+
+      mount(SharedChatView, {
+        global: {
+          plugins: [router],
+          stubs: {
+            MessageText: { template: '<p>{{ content }}</p>', props: ['content'] },
+            MessageImage: true,
+            MessageVideo: true,
+            MessageAudio: true,
+            MessageCode: true,
+            MessageJson: true,
+            BrandAttribution: true,
+          },
+        },
+      })
+      await flushPromises()
+
+      const expected = 'https://chat.example.test/shared/en/public-token'
+      expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(expected)
+      expect(document.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
+        expected
+      )
+
+      vi.unstubAllGlobals()
+    }
+  )
 })
