@@ -343,10 +343,21 @@ onBeforeUnmount(() => {
           <label for="admin-config-search" class="sr-only">{{
             $t('admin.config.search.label')
           }}</label>
+          <!--
+            Secret settings further down render as password inputs, so to a
+            password manager this page is a sign-in form and the first text
+            field — this one — is its username. Opt out explicitly, otherwise
+            the saved account e-mail lands here on every load and hides all
+            settings behind "No setting matches".
+          -->
           <input
             id="admin-config-search"
             v-model="searchQuery"
             type="search"
+            autocomplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore
             :placeholder="$t('admin.config.search.placeholder')"
             class="w-full max-w-xl px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="input-admin-config-search"

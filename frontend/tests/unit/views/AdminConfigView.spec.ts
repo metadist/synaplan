@@ -271,6 +271,19 @@ describe('AdminConfigView — topics', () => {
     expect(router.currentRoute.value.path).toBe('/admin/setup')
   })
 
+  it('keeps the password manager out of the search box', async () => {
+    const { wrapper } = await mountView()
+
+    // The secret settings below render as password inputs; without this the
+    // browser treats the search box as the username of a sign-in form and
+    // fills the saved account e-mail on every load.
+    const input = wrapper.get('[data-testid="input-admin-config-search"]')
+    expect(input.attributes('autocomplete')).toBe('off')
+    expect(input.attributes('data-1p-ignore')).toBeDefined()
+    expect(input.attributes('data-lpignore')).toBe('true')
+    expect(input.attributes('data-bwignore')).toBeDefined()
+  })
+
   it('shows one sentence and a clear action when nothing matches', async () => {
     const { wrapper } = await mountView()
 

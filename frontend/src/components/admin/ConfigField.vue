@@ -299,6 +299,14 @@ const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
     </div>
 
     <!-- Text/Password/URL/Email/Number Input -->
+    <!--
+      A settings page full of password inputs looks like a sign-in form to the
+      browser's password manager: it fills the saved account password into the
+      first secret field (and the e-mail into the text field before it), and
+      handleInput would then offer that password for saving as, say, a WhatsApp
+      token. `new-password` is the one value Chrome honours for "do not fill a
+      saved credential here"; `off` covers the other types and Firefox/Safari.
+    -->
     <div v-else class="flex gap-2">
       <div class="relative flex-1">
         <input
@@ -307,6 +315,10 @@ const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
           :value="localValue"
           :placeholder="placeholder"
           :disabled="disabled"
+          :autocomplete="schema.type === 'password' ? 'new-password' : 'off'"
+          data-1p-ignore
+          data-lpignore="true"
+          data-bwignore
           :class="[
             'w-full px-3 py-2 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none',
             schema.type === 'password' && 'pr-10',
