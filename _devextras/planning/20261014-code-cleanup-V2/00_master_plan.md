@@ -3,6 +3,10 @@
 **Status:** Queued 2026-10-14. Starts when
 [`../20261014-code-cleanup-V1/STATUS.md`](../20261014-code-cleanup-V1/STATUS.md)
 shows root files = 4 and deptrac green on `main`. Tick §0 before G1.
+**Priority:** Row 2 of [`../ROADMAP.md`](../ROADMAP.md); its exit
+**closes the cleanup window** and reopens feature work (first in line:
+the prompting flow, row 8, which builds on the chat pipeline G5–G9
+extract).
 **Goal:** No class in the chat hot path over 800 lines, no constructor over
 10 dependencies, no method over 100 lines — and a gate that keeps it so.
 The three worst offenders are split along seams measured in §1/§3; the

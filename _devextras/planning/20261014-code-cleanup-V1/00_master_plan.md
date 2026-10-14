@@ -1,6 +1,10 @@
 # Code cleanup V1 — enforce the layers, empty the Service root
 
 **Status:** Draft 2026-10-14. Tick §0 before the first PR.
+**Priority:** Row 1 of [`../ROADMAP.md`](../ROADMAP.md). Per the
+2026-10-14 decision, V1 and V2 form a **cleanup window**: feature work
+pauses until V2 meets its exit; only bug fixes, security fixes and release
+blockers land beside them.
 **Goal:** A developer who opens `backend/src` sees an order that holds, and
 CI keeps it that way. Two levers, both finishable in digestible PRs:
 (1) an architecture gate with a baseline, (4) the 73 loose files in

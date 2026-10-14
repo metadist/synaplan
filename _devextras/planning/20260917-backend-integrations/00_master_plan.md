@@ -8,7 +8,7 @@ same change as the alternative.
 No new rail item.
 **Class:** the page is `ota-candidate`. Adapters live in sibling or new
 repos (`backend-only` from this repo’s point of view).
-**Related:** live plan [`../ROADMAP.md`](../ROADMAP.md) (row 7); the 2026-09-25 text with the row 2 sketch is frozen at [`../2026-archive/20260925_roadmap/20260925_roadmap.md`](../2026-archive/20260925_roadmap/20260925_roadmap.md)
+**Related:** live plan [`../ROADMAP.md`](../ROADMAP.md) (row 9); the 2026-09-25 text with the row 2 sketch is frozen at [`../2026-archive/20260925_roadmap/20260925_roadmap.md`](../2026-archive/20260925_roadmap/20260925_roadmap.md)
 §1 (in-app transcription is row 1b and is not this page); catalog [`01_catalog.md`](./01_catalog.md);
 editors [`02_developer_clients.md`](./02_developer_clients.md); office
 [`03_office_and_mail.md`](./03_office_and_mail.md). Jitsi meeting notes are
