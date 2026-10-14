@@ -370,13 +370,13 @@ parameters:
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
-			path: src/Service/WidgetService.php
+			path: src/Service/Widget/WidgetService.php
 
 		-
 			message: '#^Parameter \#1 \$array \(list\<non\-empty\-string\>\) of array_values is already a list, call has no effect\.$#'
 			identifier: arrayValues.list
 			count: 1
-			path: src/Service/WidgetService.php
+			path: src/Service/Widget/WidgetService.php
 
 		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'

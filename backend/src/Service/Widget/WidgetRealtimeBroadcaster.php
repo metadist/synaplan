@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Widget;
 
 use App\Realtime\Channel\WidgetOperatorsChannel;
 use App\Realtime\Channel\WidgetSessionChannel;

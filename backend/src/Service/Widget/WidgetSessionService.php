@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Widget;
 
 use App\Entity\Chat;
 use App\Entity\WidgetSession;

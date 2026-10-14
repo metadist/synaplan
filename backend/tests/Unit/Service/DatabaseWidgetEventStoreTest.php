@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Service;
 
 use App\Entity\WidgetEvent;
 use App\Repository\WidgetEventRepository;
-use App\Service\DatabaseWidgetEventStore;
+use App\Service\Widget\DatabaseWidgetEventStore;
 use PHPUnit\Framework\TestCase;
 
 class DatabaseWidgetEventStoreTest extends TestCase

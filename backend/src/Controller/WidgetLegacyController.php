@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Service\WidgetService;
+use App\Service\Widget\WidgetService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;

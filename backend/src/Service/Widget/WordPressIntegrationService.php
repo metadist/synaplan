@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Widget;
 
 use App\Entity\ApiKey;
 use App\Entity\File;
@@ -13,6 +13,7 @@ use App\Repository\UserRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\PromptService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;

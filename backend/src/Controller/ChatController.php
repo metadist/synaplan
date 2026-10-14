@@ -23,7 +23,7 @@ use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
 use App\Service\PastedContentText;
 use App\Service\RAG\VectorSearchService;
-use App\Service\WidgetSessionService;
+use App\Service\Widget\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;

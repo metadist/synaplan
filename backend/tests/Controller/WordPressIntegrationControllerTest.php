@@ -2,7 +2,7 @@
 
 namespace App\Tests\Controller;
 
-use App\Service\WordPressIntegrationService;
+use App\Service\Widget\WordPressIntegrationService;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class WordPressIntegrationControllerTest extends WebTestCase

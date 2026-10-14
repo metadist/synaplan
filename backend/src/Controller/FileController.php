@@ -36,7 +36,7 @@ use App\Service\RAG\VectorStorage\VectorMigrationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
-use App\Service\WidgetService;
+use App\Service\Widget\WidgetService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

@@ -10,7 +10,7 @@ use App\Repository\FileRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\File\FileStorageService;
-use App\Service\HumanTakeoverService;
+use App\Service\Widget\HumanTakeoverService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
