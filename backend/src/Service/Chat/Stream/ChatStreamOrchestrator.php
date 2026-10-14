@@ -74,7 +74,10 @@ final readonly class ChatStreamOrchestrator
             $this->logCancelled($turn);
             $run?->finish(ChatRun::STATUS_CANCELLED);
         } catch (\Exception $e) {
-            $run?->finish(ChatRun::STATUS_ERROR, $this->failures->reportException($sse, $turn, $state, $e));
+            // Not inlined into finish(): a nullsafe call skips its arguments,
+            // and a turn without a run (incognito) must still report.
+            $errorMessageId = $this->failures->reportException($sse, $turn, $state, $e);
+            $run?->finish(ChatRun::STATUS_ERROR, $errorMessageId);
         } finally {
             $run?->finishFromRecordedOutcome();
             $sse->attachRun(null);
