@@ -314,3 +314,22 @@ Still open for the product owner: rows 37–41 and 43–46. CF0.1–CF0.4 and
 E-1…E-6 need none of them; E-9 needs row 45; CF2.1 needs rows 6 and 43, CF2.2
 row 39, CF2.4 row 38, CF2.9 and CF4.1 row 40, CF3.1 row 37, CF5.1 row 41,
 CF5.10 row 44. No product code was touched.
+
+**2026-10-14 (Copilot review re-checked).** The only Copilot review on
+[#2467](https://github.com/metadist/synaplan/pull/2467) covers the first
+commit; its six threads had no reply, so the PR still listed them as open.
+Each finding was re-checked against the current plan and the code it relies
+on:
+
+| Finding | Verdict | Where the plan answers it | Decision |
+| ------- | ------- | ------------------------- | -------- |
+| Account deletion removes identities other clouds still use (high) | Valid; fixed | `02` §7 "Deleting a person in one cloud", C18, CF2.4; `409 account_in_use` for the generic admin delete called with an API key (today both apps call it — `UserDeletedListener` → `deleteRemoteAccount()`) | 38, proposed |
+| Unauthenticated notifications amplify outbound calls (high) | Valid; fixed | `03` §2 signed notifications with checks before any call back, per-address limit, no key refresh on unknown `kid`, shared test vectors; failed-claim limit (`429`); C20 | 37, proposed |
+| File lookups collide across instances (high) | Valid; fixed, and extended now | `BFILES.BSOURCEINSTANCE` from the credential, C19, CF2.9. Gap found in this re-check: pickup reuse and whole-folder snapshots (added after the review) reused "held" files without naming the cloud — now matched by (instance, remote id, version) in `07` §2 / §4, CF3.6, CF5.7, C19 and the reuse checks in `cf3-pickup.sh` / `cf5-fileset.sh` | 40, proposed |
+| Provisioning omits the canonical identity tuple (medium) | Valid — for both apps, not only ownCloud.online (both send `external_id = '<instanceId>:<uid>'`); fixed | `02` §3.1, D15, CF2.2, CF2.10, CF2.8 | 39, proposed |
+| Unbounded active-watch cache (medium) | Valid; fixed | `04` §B.7–§B.8 paginated, incremental watch index with caps; spikes CF-S3/S4/S5 measure it; `cf5-index.sh` | 41, proposed |
+| No single-file watch journey (medium) | Valid; fixed | J-CF-15 gates CF5 (`05` §1, `06` CF5, `09` §6) | row 16, agreed |
+
+Each thread got a reply that names the fix. The fixes for the first five
+findings stand in the plan but take effect only when the product owner
+agrees rows 37–41.

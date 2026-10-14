@@ -50,9 +50,10 @@ when Synaplan cannot reach the cloud (outbound HTTPS from the cloud only):
   lives in the core, not in three apps.
 - **The whole folder:** the app sends a listing
   (`POST /api/v1/cloud/watches/{id}/snapshots`), Synaplan answers which
-  versions it does not hold yet, the app uploads only those, then closes the
+  versions it does not hold yet **from this cloud** — matched by (instance,
+  remote id, version), C19 — the app uploads only those, then closes the
   snapshot; the run gets the new uploads plus the copies Synaplan already
-  holds. Unchanged files are never sent twice.
+  holds from this cloud. Unchanged files are never sent twice.
 
 Every run also receives a short **"Files in this run"** block in its message
 text — name, folder, cloud, change time per file — so the model can refer to
@@ -119,7 +120,9 @@ Rules:
   issues a ticket; the app re-checks against its own copy of the scope and
   reads as the platform user, so cloud permissions apply too.
 - **Listing first.** Only versions Synaplan lacks are uploaded; files already
-  held (searchable or picked up before) are reused.
+  held from this cloud in that version (searchable or picked up before) are
+  reused. A held copy matches only by (instance, remote id, version) — a file
+  with the same id from another cloud is uploaded, never reused (C19).
 - **Inline, then background.** The app fulfils inside the notify request for
   up to 25 s and continues in a background job for the rest. The step waits
   up to **10 minutes** and shows progress on its card ("Reading files from
@@ -139,7 +142,7 @@ characters, compared exactly as sent):
 | Call | Request | Answer |
 | ---- | ------- | ------ |
 | `claim` | — | `200 {id, external_id, mode: list \| fetch, selector: {folder_id?, folder_path?, pattern?, changed_since?, recursive}, read_scope: {mode, folders: [{id, path}]}, limits: {max_files: 50, max_bytes: 209715200, max_file_bytes: 104857600}, expires_at}`; errors as for copy claims (`404`, `403 wrong_instance`, `409 already_claimed`, `410 expired`) |
-| `listing` | `{items: [{id, version, name, folder, size, mime}]}` (≤ 500 per call, repeatable) | `{upload: [id…], reuse: [{id, file_id}], skip: [{id, reason: too_large \| type_not_read \| over_limit}]}` |
+| `listing` | `{items: [{id, version, name, folder, size, mime}]}` (≤ 500 per call, repeatable) | `{upload: [id…], reuse: [{id, file_id}], skip: [{id, reason: too_large \| type_not_read \| over_limit}]}` — `reuse` names copies of the same (instance, id, version) the person already has |
 | `files` | multipart `file` + `id`, `version` — one file per call | `200 {file_id}`; an id not in the last `upload` list → `409` |
 | `result` | `{status: done \| partial \| failed, listed, sent, skipped: [{id, name, reason}], error_code?}` | `200 {state}`; idempotent |
 
