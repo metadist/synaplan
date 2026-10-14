@@ -394,9 +394,11 @@ final readonly class VoiceLiveSessionService
             throw new VoiceLiveRejectedException(404, ['error' => 'Session not found']);
         }
         $message = $this->transcripts->record($session, $chunks, $this->meter($body));
+        $messageId = $message instanceof Message ? $message->getId() : null;
 
         return [
             'ok' => true,
+            'messageId' => is_int($messageId) ? $messageId : null,
             'details' => $message instanceof Message && 'OUT' === $message->getDirection()
                 ? $this->replyDetails($message)
                 : null,

@@ -3,6 +3,7 @@ import type { LivePhase } from './machine'
 export interface LiveVoiceStageState {
   phase: LivePhase
   status: string
+  statusHint: string
   micLevel: number
   outLevel: number
   muted: boolean

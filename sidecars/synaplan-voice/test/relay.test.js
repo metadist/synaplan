@@ -5,13 +5,24 @@ import { WebSocket } from 'ws'
 import { createMockAdapter } from '../src/adapters/mock.js'
 import { verify } from '../src/hmac.js'
 import { createServer } from '../src/server.js'
-import { shouldDropAudio, disconnectPlan, replyFrame, CARPLAY_RECONNECT_MS } from '../src/session.js'
+import { shouldDropAudio, disconnectPlan, replyFrame, storedFrame, postUntilStored, CARPLAY_RECONNECT_MS } from '../src/session.js'
 
 const SECRET = 'test-secret'
 
 test('audio is dropped once the client buffer is over a megabyte', () => {
   assert.equal(shouldDropAudio(1_000_000), false)
   assert.equal(shouldDropAudio(1_000_001), true)
+})
+
+test('a rejected transcript is stored on the next attempt', async () => {
+  const statuses = [500, 200]
+  let calls = 0
+  const result = await postUntilStored(async () => {
+    calls += 1
+    return { status: statuses[calls - 1], json: { ok: true } }
+  }, { delay: async () => {} })
+  assert.equal(calls, 2)
+  assert.equal(result.status, 200)
 })
 
 test('a stored assistant reply carries its models back to the client', () => {
@@ -23,6 +34,23 @@ test('a stored assistant reply carries its models back to the client', () => {
   assert.deepEqual(replyFrame('assistant', { details }), { type: 'reply', details })
   assert.equal(replyFrame('user', { details }), null)
   assert.equal(replyFrame('assistant', { ok: true }), null)
+})
+
+test('a stored turn tells the client which chat row it became', () => {
+  assert.deepEqual(storedFrame('user', { messageId: 41 }, 'Hello'), {
+    type: 'stored',
+    role: 'user',
+    messageId: 41,
+    text: 'Hello',
+  })
+  assert.deepEqual(storedFrame('assistant', { messageId: 42, details: {} }, 'Hi'), {
+    type: 'stored',
+    role: 'assistant',
+    messageId: 42,
+    text: 'Hi',
+  })
+  assert.equal(storedFrame('user', { ok: true }, 'Hello'), null)
+  assert.equal(storedFrame('assistant', { messageId: 42 }, '  '), null)
 })
 
 test('only a CarPlay client parks the provider after the socket drops', () => {

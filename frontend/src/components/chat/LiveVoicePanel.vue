@@ -6,6 +6,8 @@ import type { LiveTerminalAction } from '@/services/liveVoice/terminal'
 
 const props = defineProps<{
   phase: LivePhase
+  status: string
+  statusHint: string
   muted: boolean
   companyLine: string
   touchesLine: string
@@ -31,6 +33,7 @@ const emit = defineEmits<{
 }>()
 
 const ended = computed(() => props.phase === 'ended')
+const connecting = computed(() => props.phase === 'connecting')
 
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
@@ -61,7 +64,23 @@ function onKeydown(event: KeyboardEvent) {
       {{ warnBanner }}
     </p>
 
-    <div v-if="!ended" class="flex flex-wrap items-center gap-2">
+    <div v-if="connecting" class="flex items-center gap-3" data-testid="live-voice-connecting">
+      <span class="live-connect-mark" aria-hidden="true" />
+      <div class="min-w-0 flex-1">
+        <p class="text-base font-semibold txt-primary">{{ status }}</p>
+        <p v-if="statusHint" class="text-sm txt-secondary">{{ statusHint }}</p>
+      </div>
+      <button
+        type="button"
+        class="btn-primary shrink-0 px-4 py-2.5 text-sm font-medium"
+        data-testid="btn-live-voice-end"
+        @click="emit('end')"
+      >
+        {{ endLabel }}
+      </button>
+    </div>
+
+    <div v-else-if="!ended" class="flex flex-wrap items-center gap-2">
       <button
         type="button"
         class="btn-secondary px-4 py-2.5 text-sm font-medium"
@@ -107,7 +126,7 @@ function onKeydown(event: KeyboardEvent) {
       </button>
     </div>
 
-    <p class="mt-3 text-xs txt-secondary">
+    <p v-if="!connecting" class="mt-3 text-xs txt-secondary">
       {{ ownerLine }} {{ companyLine }} {{ touchesLine }}
       <span v-if="budgetLabel" class="min-[480px]:hidden">{{ budgetLabel }}.</span>
       <RouterLink to="/settings/voice" class="underline" data-testid="link-live-voice-settings">
@@ -116,3 +135,28 @@ function onKeydown(event: KeyboardEvent) {
     </p>
   </section>
 </template>
+
+<style scoped>
+.live-connect-mark {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  border: 2px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  border-top-color: var(--brand);
+  animation: live-connect-spin 0.8s linear infinite;
+}
+
+@keyframes live-connect-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-connect-mark {
+    animation: none;
+    border-color: var(--brand);
+  }
+}
+</style>

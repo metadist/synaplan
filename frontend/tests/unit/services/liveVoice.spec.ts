@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { pcm16Frame } from '@/services/liveVoice/audio'
+import { applyControlMessage, pcm16Frame } from '@/services/liveVoice/audio'
+import { liveCueForTransition, liveCueSteps } from '@/services/liveVoice/cues'
 import { nextLivePhase } from '@/services/liveVoice/machine'
 import {
   orbBreath,
@@ -71,6 +72,34 @@ describe('live voice socket', () => {
       })
     ).toBe('ws://localhost:5173/voice/ws?ticket=one')
   })
+
+  it('passes a stored turn id through to the chat', () => {
+    const stored: { role: string; messageId: number; text: string }[] = []
+    const handlers = {
+      onReady: () => undefined,
+      onState: () => undefined,
+      onTranscript: () => undefined,
+      onStored: (role: 'user' | 'assistant', messageId: number, text: string) => {
+        stored.push({ role, messageId, text })
+      },
+      onPlaybackIdle: () => undefined,
+      onInterrupted: () => undefined,
+      onWrapUp: () => undefined,
+      onEnded: () => undefined,
+      onUsage: () => undefined,
+      onWarn: () => undefined,
+      onReply: () => undefined,
+      onLevel: () => undefined,
+      onOutLevel: () => undefined,
+      onAudioOut: () => undefined,
+      onSocketClosed: () => undefined,
+    }
+    applyControlMessage(
+      JSON.stringify({ type: 'stored', role: 'user', messageId: 41, text: 'Hello' }),
+      handlers
+    )
+    expect(stored).toEqual([{ role: 'user', messageId: 41, text: 'Hello' }])
+  })
 })
 
 describe('live voice phases', () => {
@@ -137,6 +166,36 @@ describe('live voice orb', () => {
     const down = 1 - smoothOrbLevel(1, 0)
     expect(up).toBeGreaterThan(down)
     expect(smoothOrbLevel(0.5, Number.NaN)).toBeLessThan(0.5)
+  })
+})
+
+describe('live voice cues', () => {
+  it('plays one tone for each moment a person needs to hear', () => {
+    expect(liveCueForTransition('idle', 'connecting')).toBe('open')
+    expect(liveCueForTransition('connecting', 'listening')).toBe('ready')
+    expect(liveCueForTransition('listening', 'thinking')).toBe('ask')
+    expect(liveCueForTransition('thinking', 'speaking')).toBeNull()
+    expect(liveCueForTransition('speaking', 'listening')).toBeNull()
+    expect(liveCueForTransition('listening', 'idle')).toBe('end')
+    expect(liveCueForTransition('connecting', 'ended', 'provider_error')).toBe('fail')
+    expect(liveCueForTransition('listening', 'ended', 'limit_budget')).toBe('end')
+    expect(liveCueForTransition('listening', 'listening')).toBeNull()
+  })
+
+  it('keeps every tone short and quiet', () => {
+    for (const cue of ['open', 'ready', 'ask', 'end', 'fail'] as const) {
+      const steps = liveCueSteps(cue)
+      expect(steps.length).toBeGreaterThan(0)
+      const duration = steps.reduce((sum, step) => sum + step.durationMs, 0)
+      expect(duration).toBeLessThan(400)
+      expect(
+        steps.every((step) => step.gain <= 0.06 && step.frequency >= 200 && step.frequency <= 800)
+      ).toBe(true)
+    }
+    const open = liveCueSteps('open')
+    const end = liveCueSteps('end')
+    expect(open[open.length - 1].frequency).toBeGreaterThan(open[0].frequency)
+    expect(end[end.length - 1].frequency).toBeLessThan(end[0].frequency)
   })
 })
 

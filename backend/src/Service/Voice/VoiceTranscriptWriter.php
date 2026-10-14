@@ -12,6 +12,7 @@ use App\Entity\VoiceSession;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use App\Service\Chat\ChatTitleService;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -52,9 +53,29 @@ final readonly class VoiceTranscriptWriter
             return null;
         }
 
+        // Two turns of one reply (the question and the answer) are stored at
+        // the same moment. Inserting a message takes a shared lock on the
+        // chat, and stamping the chat's time then wants it exclusive, so the
+        // two requests deadlock and one sentence is thrown away. Lock the
+        // chat first and keep the other request waiting instead.
         $last = null;
-        foreach ($this->segmenter->segment($chunks) as $turn) {
-            $last = $this->storeTurn($session, $chat, $user, $turn);
+        $this->em->beginTransaction();
+        try {
+            $this->em->lock($chat, LockMode::PESSIMISTIC_WRITE);
+            foreach ($this->segmenter->segment($chunks) as $turn) {
+                $last = $this->storeTurn($session, $chat, $user, $turn);
+            }
+            $this->em->commit();
+        } catch (\Throwable $e) {
+            $this->rollBackQuietly();
+            throw $e;
+        }
+
+        if ($last instanceof Message) {
+            $this->titleIfNeeded($chat, $user);
+            if ('OUT' === $last->getDirection()) {
+                $this->attributeVoice($session);
+            }
         }
 
         return $last;
@@ -95,7 +116,6 @@ final readonly class VoiceTranscriptWriter
                 if ('OUT' === $direction) {
                     $this->describeSpokenReply($session, $latest);
                     $this->em->flush();
-                    $this->attributeVoice($session);
                 }
 
                 return $latest;
@@ -153,14 +173,21 @@ final readonly class VoiceTranscriptWriter
         }
         $chat->updateTimestamp();
         $this->em->flush();
-        // The first user sentence is stored before the answer exists, so a
-        // title is only possible once the reply is in the same chat.
-        $this->titleIfNeeded($chat, $user);
-        if ('OUT' === $message->getDirection()) {
-            $this->attributeVoice($session);
-        }
 
         return $message;
+    }
+
+    private function rollBackQuietly(): void
+    {
+        $connection = $this->em->getConnection();
+        if (!$connection->isTransactionActive()) {
+            return;
+        }
+        try {
+            $this->em->rollback();
+        } catch (\Throwable) {
+            // A deadlock has already aborted the transaction.
+        }
     }
 
     /**

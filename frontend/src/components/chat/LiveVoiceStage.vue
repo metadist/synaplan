@@ -5,6 +5,7 @@ import type { LivePhase } from '@/services/liveVoice/machine'
 defineProps<{
   phase: LivePhase
   status: string
+  statusHint: string
   micLevel: number
   outLevel: number
   muted: boolean
@@ -20,12 +21,20 @@ defineProps<{
   >
     <LiveVoiceOrb :phase="phase" :mic-level="micLevel" :out-level="outLevel" :muted="muted" />
     <p
-      class="text-sm font-medium txt-primary"
+      class="max-w-sm text-center font-medium txt-primary"
+      :class="phase === 'connecting' ? 'text-lg font-semibold' : 'text-sm'"
       role="status"
       aria-live="polite"
       data-testid="live-voice-status"
     >
       {{ status }}
+    </p>
+    <p
+      v-if="statusHint"
+      class="max-w-sm text-center text-sm txt-secondary"
+      data-testid="live-voice-status-hint"
+    >
+      {{ statusHint }}
     </p>
     <p
       v-if="showCaption && captionText"

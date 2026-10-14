@@ -18,10 +18,41 @@ export function shouldDropAudio(bufferedAmount, limit = AUDIO_BUFFER_LIMIT) {
   return bufferedAmount > limit
 }
 
+export const TRANSCRIPT_ATTEMPTS = 3
+
+/**
+ * Posts one transcript until it is stored. A deadlock between the question
+ * and the answer returns 500 and drops the sentence unless it is sent again.
+ */
+export async function postUntilStored(send, { attempts = TRANSCRIPT_ATTEMPTS, delay = async () => {} } = {}) {
+  let result
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      result = await send()
+    } catch (error) {
+      if (attempt === attempts) throw error
+      await delay(attempt)
+      continue
+    }
+    if (!result || result.status < 500 || attempt === attempts) return result
+    await delay(attempt)
+  }
+  return result
+}
+
 /** The spoken answer's models and cost, once the transcript has been stored. */
 export function replyFrame(role, json) {
   if (role !== 'assistant' || !json || typeof json.details !== 'object' || json.details === null) return null
   return { type: 'reply', details: json.details }
+}
+
+/** The saved chat row, so the browser can show the actions under that bubble. */
+export function storedFrame(role, json, text) {
+  const messageId = json?.messageId
+  if (role !== 'user' && role !== 'assistant') return null
+  if (!Number.isInteger(messageId) || messageId <= 0) return null
+  if (typeof text !== 'string' || text.trim() === '') return null
+  return { type: 'stored', role, messageId, text }
 }
 
 /**
@@ -105,14 +136,18 @@ export function handleConnection(socket, request, deps) {
 
   const storeTurn = (role, text) => {
     if (!sessionId || !role || !text) return Promise.resolve()
-    const job = post(`/internal/voice/sessions/${sessionId}/transcript`, {
+    const job = postUntilStored(() => post(`/internal/voice/sessions/${sessionId}/transcript`, {
       turns: [{ role, text, startMs: 0, endMs: 0 }],
       meter: usagePayload(),
+    }), {
+      delay: (attempt) => new Promise((resolve) => setTimeout(resolve, 40 * attempt)),
     }).then((result) => {
-      if (result.status >= 400) {
-        log({ event: 'transcript_callback_failed', status: result.status })
+      if (!result || result.status >= 400) {
+        log({ event: 'transcript_callback_failed', status: result?.status })
         return
       }
+      const stored = storedFrame(role, result.json, text)
+      if (stored) send(stored)
       const frame = replyFrame(role, result.json)
       if (frame) send(frame)
     }).catch(() => log({ event: 'transcript_callback_failed' }))

@@ -242,6 +242,12 @@ onUnmounted(() => {
     data-testid="live-voice-orb"
   >
     <canvas ref="canvas" class="absolute inset-0 h-full w-full" />
+    <div
+      v-if="phase === 'connecting'"
+      class="live-orb__connect"
+      data-testid="live-voice-connecting-ring"
+      aria-hidden="true"
+    />
     <div class="live-orb__body">
       <div class="live-orb__cloud live-orb__cloud--a" />
       <div class="live-orb__cloud live-orb__cloud--b" />
@@ -361,6 +367,17 @@ onUnmounted(() => {
   border-radius: 9999px;
   background: radial-gradient(ellipse, color-mix(in srgb, #fff 85%, transparent), transparent 70%);
   filter: blur(3px);
+}
+
+.live-orb__connect {
+  position: absolute;
+  inset: 4%;
+  border-radius: 9999px;
+  border: 3px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  border-top-color: var(--brand);
+  border-right-color: var(--brand);
+  animation: live-orb-spin 0.9s linear infinite;
+  pointer-events: none;
 }
 
 .live-orb[data-phase='connecting'] {

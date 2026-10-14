@@ -510,6 +510,8 @@
       <div class="mx-auto max-w-[70rem]">
         <LiveVoicePanel
           :phase="livePhase"
+          :status="liveStatus"
+          :status-hint="liveStatusHint"
           :muted="liveMuted"
           :company-line="$t('chatInput.liveVoice.companyLine', { company: liveCompany })"
           :touches-line="$t('chatInput.liveVoice.touchesLine')"
@@ -2196,6 +2198,10 @@ const showLiveVoiceButton = computed(() =>
   })
 )
 
+const liveStatusHint = computed(() =>
+  livePhase.value === 'connecting' ? t('chatInput.liveVoice.connectingHint') : ''
+)
+
 const liveStatus = computed(() => {
   const phase = livePhase.value
   if (phase === 'thinking') return t('chatInput.liveVoice.thinking')
@@ -2216,6 +2222,7 @@ const liveStage = computed<LiveVoiceStageState | null>(() => {
   return {
     phase: livePhase.value,
     status: liveStatus.value,
+    statusHint: liveStatusHint.value,
     micLevel: liveLevel.value,
     outLevel: liveOutLevel.value,
     muted: liveMuted.value,

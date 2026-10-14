@@ -14,6 +14,11 @@ import { authService } from '@/services/authService'
 import { useChatsStore } from '@/stores/chats'
 import { chatGoneStatus } from '@/utils/chatAccessError'
 import { transcriptAfterSavedEdit } from '@/utils/editTranscript'
+import {
+  claimSpokenMessageId,
+  hasUnboundSpoken,
+  stampSpokenMessageIds,
+} from '@/utils/spokenMessageIds'
 import { createUuid } from '@/utils/uuid'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
@@ -634,6 +639,42 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  const claimSpokenMessage = (role: 'user' | 'assistant', messageId: number, text: string) => {
+    claimSpokenMessageId(messages.value, role, messageId, text)
+  }
+
+  const SPOKEN_ID_DELAYS_MS = [0, 400, 1200]
+
+  /**
+   * Spoken bubbles are drawn before the chat row exists. The buttons under
+   * them need that row's id, so pick it up as soon as the turn is stored
+   * and again after hang-up if the socket already closed.
+   */
+  const adoptSpokenIds = async (chatId: number, localIds: readonly string[]) => {
+    const wanted = new Set(localIds)
+    if (wanted.size === 0) return
+    const generation = loadGeneration
+    for (let attempt = 0; attempt < SPOKEN_ID_DELAYS_MS.length; attempt++) {
+      if (generation !== loadGeneration) return
+      const wait = SPOKEN_ID_DELAYS_MS[attempt] ?? 0
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
+      if (generation !== loadGeneration) return
+      if (!hasUnboundSpoken(messages.value, wanted)) return
+      try {
+        const { chatApi } = await import('@/services/api')
+        const response = (await chatApi.getChatMessages(chatId, 0, 50)) as {
+          success?: boolean
+          messages?: ApiLoadedMessageRow[]
+        }
+        if (generation !== loadGeneration) return
+        if (!response.success || !response.messages) continue
+        stampSpokenMessageIds(messages.value, response.messages.map(mapApiMessageRow), wanted)
+      } catch {
+        // The next attempt is the recovery. A reload still shows the buttons.
+      }
+    }
+  }
+
   const attachSpokenReply = (details: {
     topic?: string | null
     aiModels?: Message['aiModels']
@@ -998,6 +1039,8 @@ export const useHistoryStore = defineStore('history', () => {
     addMessage,
     addStreamingMessage,
     updateStreamingMessage,
+    claimSpokenMessage,
+    adoptSpokenIds,
     attachSpokenReply,
     finishStreamingMessage,
     finishLiveThinking,

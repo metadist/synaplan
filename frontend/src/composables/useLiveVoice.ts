@@ -20,6 +20,7 @@ import {
 import { liveVoiceSocketUrl } from '@/services/liveVoice/socket-url'
 import { openDirectVoice } from '@/services/liveVoice/webrtc'
 import { voiceCompany } from '@/services/liveVoice/company'
+import { liveCueForTransition, playLiveCue } from '@/services/liveVoice/cues'
 import { nextLivePhase, type LivePhase } from '@/services/liveVoice/machine'
 import {
   captionsPreferred,
@@ -62,13 +63,18 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   const budgetWarn = ref(false)
   const budgetWrap = ref(false)
   let audio: LiveVoiceAudioSession | null = null
+  let mic: MediaStream | null = null
+  let audioContext: AudioContext | null = null
+  let captureAbort: AbortController | null = null
   let sessionId: number | null = null
   let sessionChatId: number | null = null
   let adoptingChat = false
   let connectTimer: ReturnType<typeof setTimeout> | undefined
   let starting = false
   let ignoreClose = false
+  let liveRun = 0
   const liveTurns: { user?: string; assistant?: string } = {}
+  let spokenLocalIds = new Set<string>()
 
   const active = computed(() => phase.value !== 'idle')
   const company = computed(() =>
@@ -95,6 +101,14 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     reason.value = next
     apply({ type: 'fail' })
     teardown()
+    publishSpokenIds()
+  }
+
+  function publishSpokenIds(): void {
+    const chatId = sessionChatId
+    const spoken = [...spokenLocalIds]
+    if (chatId === null || spoken.length === 0) return
+    void history.adoptSpokenIds(chatId, spoken)
   }
 
   function closeLiveTurns() {
@@ -115,6 +129,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     if (incognito.active || text.trim() === '') return
     const existing = liveTurns[role]
     if (existing) {
+      spokenLocalIds.add(existing)
       history.updateStreamingMessage(existing, text)
       if (final) {
         history.finishStreamingMessage(existing)
@@ -124,6 +139,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
       return
     }
     const id = history.addStreamingMessage(role)
+    spokenLocalIds.add(id)
     history.updateStreamingMessage(id, text)
     if (final) {
       history.finishStreamingMessage(id)
@@ -164,11 +180,37 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     void chats.loadChats()
   }
 
+  function liveRunIs(run: number): boolean {
+    return run === liveRun
+  }
+
+  function stopStream(stream: MediaStream | null | undefined): void {
+    stream?.getTracks().forEach((track) => track.stop())
+  }
+
+  function dropSession(id: number | null): void {
+    if (id === null) return
+    void endLiveVoiceSession(id, 'user_end').catch(() => undefined)
+  }
+
+  /** Stops the microphone and the socket, including a call that is still connecting. */
+  function releaseCapture(): void {
+    captureAbort?.abort()
+    captureAbort = null
+    stopStream(mic)
+    mic = null
+    const context = audioContext
+    audioContext = null
+    if (context && context.state !== 'closed') context.close().catch(() => undefined)
+  }
+
   function teardown() {
     clearTimeout(connectTimer)
     closeLiveTurns()
-    audio?.close()
+    const current = audio
     audio = null
+    current?.close()
+    releaseCapture()
     level.value = 0
     outLevel.value = 0
     refreshSpokenChat()
@@ -219,16 +261,30 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     budgetWarn.value = false
     budgetWrap.value = false
     captionText.value = ''
+    const run = ++liveRun
+    spokenLocalIds = new Set()
+    captureAbort?.abort()
+    const controller = new AbortController()
+    captureAbort = controller
     const context = new AudioContext()
+    audioContext = context
     const resumed = context.resume()
-    const micPromise = navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    })
-    let mic: MediaStream | null = null
+    const micPromise = navigator.mediaDevices
+      .getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      })
+      .then((stream) => {
+        if (!liveRunIs(run)) stopStream(stream)
+        else mic = stream
+        return stream
+      })
+    let openedSessionId: number | null = null
     apply({ type: 'start' })
     try {
       await resumed
-      mic = await micPromise
+      if (!liveRunIs(run)) return
+      await micPromise
+      if (!liveRunIs(run) || mic === null) return
       const model = defaultModel()
       const voice = model ? preferredVoice(model.provider ?? '') : ''
       const session = await startLiveVoiceSession({
@@ -239,7 +295,10 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         client: 'web',
         incognito: incognito.active,
       })
+      openedSessionId = session.sessionId
+      if (!liveRunIs(run)) return
       await adoptSpokenChat(session.chatId)
+      if (!liveRunIs(run)) return
       const inRate = session.audio?.inRate
       const outRate = session.audio?.outRate
       if (inRate === undefined || outRate === undefined) {
@@ -249,50 +308,81 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
       activeModel.value = model ?? null
       secondsLeft.value = session.allowedSeconds ?? null
       const handlers: LiveVoiceSocketHandlers = {
-        onReady: () => apply({ type: 'ready' }),
-        onState: (state) => apply({ type: 'state', state }),
-        onTranscript: (role, text, final) => showTurn(role, text, final),
-        onReply: (details) => history.attachSpokenReply(details),
-        onPlaybackIdle: () => apply({ type: 'audio_idle' }),
+        onReady: () => {
+          if (!liveRunIs(run)) return
+          apply({ type: 'ready' })
+        },
+        onState: (state) => {
+          if (!liveRunIs(run)) return
+          apply({ type: 'state', state })
+        },
+        onTranscript: (role, text, final) => {
+          if (!liveRunIs(run)) return
+          showTurn(role, text, final)
+        },
+        onStored: (role, messageId, text) => {
+          if (!liveRunIs(run)) return
+          history.claimSpokenMessage(role, messageId, text)
+        },
+        onReply: (details) => {
+          if (!liveRunIs(run)) return
+          history.attachSpokenReply(details)
+        },
+        onPlaybackIdle: () => {
+          if (!liveRunIs(run)) return
+          apply({ type: 'audio_idle' })
+        },
         onInterrupted: () => {
+          if (!liveRunIs(run)) return
           outLevel.value = 0
           apply({ type: 'interrupted' })
         },
         onWrapUp: () => {
+          if (!liveRunIs(run)) return
           budgetWrap.value = true
           muted.value = true
           audio?.setMuted(true)
           apply({ type: 'wrap_up' })
         },
         onEnded: (next) => {
+          if (!liveRunIs(run)) return
           reason.value = liveEndReason(next)
           apply({ type: 'ended' })
           teardown()
+          publishSpokenIds()
         },
         onUsage: (left) => {
+          if (!liveRunIs(run)) return
           if (left !== null) secondsLeft.value = left
           void taximeter.loadSummary()
         },
         onWarn: (left) => {
+          if (!liveRunIs(run)) return
           budgetWarn.value = true
           secondsLeft.value = left
         },
         onLevel: (value) => {
+          if (!liveRunIs(run)) return
           level.value = value
         },
         onOutLevel: (value) => {
+          if (!liveRunIs(run)) return
           outLevel.value = value
         },
-        onAudioOut: () => apply({ type: 'audio' }),
+        onAudioOut: () => {
+          if (!liveRunIs(run)) return
+          apply({ type: 'audio' })
+        },
         onSocketClosed: () => {
-          if (ignoreClose || phase.value === 'ended' || phase.value === 'idle') return
+          if (!liveRunIs(run) || ignoreClose || phase.value === 'ended' || phase.value === 'idle')
+            return
           fail('network_lost')
         },
       }
       const wsUrl = liveVoiceSocketUrl(session.wsUrl, window.location)
-      audio =
+      const opened =
         session.transport === 'webrtc'
-          ? await openDirectVoice({ context, mic, wsUrl, handlers })
+          ? await openDirectVoice({ context, mic, wsUrl, handlers, signal: controller.signal })
           : await openLiveVoiceAudio({
               context,
               mic,
@@ -300,13 +390,22 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
               inRate,
               outRate,
               handlers,
+              signal: controller.signal,
             })
+      if (!liveRunIs(run)) {
+        opened.close()
+        return
+      }
+      audio = opened
       connectTimer = setTimeout(() => {
-        if (phase.value === 'connecting') fail('provider_error')
+        if (liveRunIs(run) && phase.value === 'connecting') fail('provider_error')
       }, CONNECT_MS)
     } catch (error) {
-      mic?.getTracks().forEach((track) => track.stop())
-      context.close().catch(() => undefined)
+      if (!liveRunIs(run)) return
+      stopStream(mic)
+      if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close().catch(() => undefined)
+      }
       if (
         error instanceof DOMException &&
         (error.name === 'NotAllowedError' || error.name === 'NotFoundError')
@@ -326,20 +425,31 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         void endLiveVoiceSession(sessionId, 'provider_error').catch(() => undefined)
       }
     } finally {
+      if (!liveRunIs(run)) {
+        if (sessionId === openedSessionId) sessionId = null
+        dropSession(openedSessionId)
+      }
       starting = false
     }
   }
 
+  function returnToComposer(): void {
+    phase.value = 'idle'
+    sessionId = null
+    sessionChatId = null
+    budgetWarn.value = false
+    budgetWrap.value = false
+  }
+
   async function end() {
-    if (phase.value === 'idle' || phase.value === 'ended') {
-      phase.value = 'idle'
-      return
-    }
+    liveRun += 1
     ignoreClose = true
-    apply({ type: 'wrap_up' })
     audio?.sendEnd()
     const id = sessionId
     teardown()
+    publishSpokenIds()
+    reason.value = 'user_end'
+    returnToComposer()
     if (id !== null) {
       try {
         await endLiveVoiceSession(id, 'user_end')
@@ -347,8 +457,6 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         // The socket close still ends the row on the server.
       }
     }
-    reason.value = 'user_end'
-    apply({ type: 'ended' })
   }
 
   function toggleMute() {
@@ -362,12 +470,15 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   }
 
   function dismiss() {
-    phase.value = 'idle'
-    sessionId = null
-    sessionChatId = null
-    budgetWarn.value = false
-    budgetWrap.value = false
+    liveRun += 1
+    teardown()
+    returnToComposer()
   }
+
+  watch(phase, (next, previous) => {
+    const cue = liveCueForTransition(previous, next, reason.value)
+    if (cue) playLiveCue(cue)
+  })
 
   watch(
     () => chats.activeChatId,
@@ -385,6 +496,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   )
 
   onUnmounted(() => {
+    liveRun += 1
     if (phase.value !== 'idle' && phase.value !== 'ended') void end()
     else teardown()
   })
