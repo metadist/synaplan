@@ -20,6 +20,7 @@ use App\Service\CostCalculationService;
 use App\Service\Infrastructure\RedisService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\Voice\VoiceLiveArtifact;
 use App\Service\Voice\VoiceLiveCompatibleEndpoint;
 use App\Service\Voice\VoiceLiveConcurrency;
 use App\Service\Voice\VoiceLiveDelegationService;
@@ -293,6 +294,93 @@ final class VoiceLiveGatewayTest extends TestCase
         $answer = $service->answer((new VoiceSession())->setUserId(4)->setStatus('live'), 'What time is it?');
 
         self::assertSame('It is four.', $answer['text']);
+    }
+
+    public function testAMadePictureIsAnnouncedAndCarriedInsteadOfTheMarker(): void
+    {
+        $processor = $this->createMock(MessageProcessor::class);
+        $processor->expects($this->once())->method('process')->with(
+            $this->isInstanceOf(Message::class),
+            self::callback(static fn (array $options): bool => true === ($options['record_media_usage'] ?? false)),
+        )->willReturn([
+            'success' => true,
+            'response' => [
+                'content' => '__IMAGE_GENERATED__',
+                'usage' => [],
+                'metadata' => ['model_id' => 8, 'file' => ['path' => '/api/v1/files/uploads/4/fox.png', 'type' => 'image']],
+            ],
+        ]);
+        $usage = $this->createMock(VoiceLiveUsageService::class);
+        $usage->method('isIncognito')->willReturn(false);
+        $usage->method('chargedAmount')->willReturn('0.000000');
+        $usage->expects($this->never())->method('savePendingReply');
+        $costs = $this->createStub(CostCalculationService::class);
+        $costs->method('calculateCost')->willReturn(new CostResult('0', '0', '0', '0', [], 0));
+        $users = $this->createStub(UserRepository::class);
+        $users->method('find')->willReturn((new User())->setMail('voice@synaplan.internal'));
+        $transcripts = $this->createStub(VoiceTranscriptWriter::class);
+        $transcripts->method('record')->willReturn(null);
+        $artifacts = $this->createMock(VoiceLiveArtifact::class);
+        $artifacts->expects($this->once())->method('capture')->willReturn([
+            'spoken' => 'The image is ready. You can see it in the chat now.',
+            'artifact' => ['type' => 'image', 'state' => 'completed', 'messageId' => 501],
+        ]);
+
+        $service = new VoiceLiveDelegationService(
+            $processor,
+            $usage,
+            $transcripts,
+            $costs,
+            $this->createStub(ModelConfigService::class),
+            $users,
+            new NullLogger(),
+            artifacts: $artifacts,
+        );
+        $answer = $service->answer((new VoiceSession())->setUserId(4)->setStatus('live'), 'Draw a fox');
+
+        self::assertSame('The image is ready. You can see it in the chat now.', $answer['text']);
+        self::assertSame(['type' => 'image', 'state' => 'completed', 'messageId' => 501], $answer['artifact']);
+    }
+
+    public function testAPlainDelegatedAnswerCarriesNoArtifact(): void
+    {
+        $processor = $this->createStub(MessageProcessor::class);
+        $processor->method('process')->willReturn([
+            'success' => true,
+            'response' => ['content' => 'It is four.', 'usage' => [], 'metadata' => ['model_id' => 5]],
+        ]);
+        $usage = $this->createStub(VoiceLiveUsageService::class);
+        $usage->method('isIncognito')->willReturn(true);
+        $costs = $this->createStub(CostCalculationService::class);
+        $costs->method('calculateCost')->willReturn(new CostResult('0', '0', '0', '0', [], 0));
+        $users = $this->createStub(UserRepository::class);
+        $users->method('find')->willReturn((new User())->setMail('voice@synaplan.internal'));
+        $artifacts = $this->createStub(VoiceLiveArtifact::class);
+        $artifacts->method('capture')->willReturn(null);
+
+        $service = new VoiceLiveDelegationService(
+            $processor,
+            $usage,
+            $this->createStub(VoiceTranscriptWriter::class),
+            $costs,
+            $this->createStub(ModelConfigService::class),
+            $users,
+            new NullLogger(),
+            artifacts: $artifacts,
+        );
+        $answer = $service->answer((new VoiceSession())->setUserId(4)->setStatus('live'), 'What time is it?');
+
+        self::assertSame('It is four.', $answer['text']);
+        self::assertNull($answer['artifact']);
+    }
+
+    public function testCreationRequestsGoToSynaplanAndAreNeverRefused(): void
+    {
+        $text = (new VoiceLiveInstructions())->build((new User())->setMail('ada@synaplan.internal'), '');
+
+        self::assertStringContainsString('a picture, a video, music, speech, or a document', $text);
+        self::assertStringContainsString('Never say that you cannot make it', $text);
+        self::assertStringContainsString('puts it in the chat', $text);
     }
 
     public function testInstructionsNameThePersonAndRefuseADirectAnswer(): void

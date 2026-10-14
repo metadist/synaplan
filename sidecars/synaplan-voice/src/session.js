@@ -55,6 +55,14 @@ export function storedFrame(role, json, text) {
   return { type: 'stored', role, messageId, text }
 }
 
+/** A picture, video, audio or document Synaplan made, so the chat can show it. */
+export function artifactFrame(json) {
+  const artifact = json?.artifact
+  if (!artifact || typeof artifact !== 'object' || Array.isArray(artifact)) return null
+  if (typeof artifact.type !== 'string' || typeof artifact.state !== 'string') return null
+  return { type: 'artifact', artifact }
+}
+
 /**
  * One client socket. Redeems the ticket, opens the provider, and relays PCM.
  * Logs carry ids and reasons only — never audio and never transcript text.
@@ -211,6 +219,8 @@ export function handleConnection(socket, request, deps) {
   const ask = async (question, reply) => {
     try {
       const result = await post(`/internal/voice/sessions/${sessionId}/delegate`, { question })
+      const frame = artifactFrame(result.json)
+      if (frame) send(frame)
       reply(String(result.json.text ?? ''))
     } catch {
       reply('')

@@ -345,6 +345,7 @@
     "voice": {
       "title": "Live-Gespräche",
       "intro": "Wähle die Stimme für Live-Gespräche. Deine Stimme geht an {company}, solange du sprichst, und die Kosten nutzen dasselbe monatliche Nutzungsbudget wie der Chat.",
+      "modelsHint": "Das Modell und seine Stimme stehen unter {page}.",
       "model": "Sprachmodell",
       "voice": "Stimme",
       "captions": "Untertitel während des Gesprächs zeigen",

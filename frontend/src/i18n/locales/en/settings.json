@@ -345,6 +345,7 @@
     "voice": {
       "title": "Live conversations",
       "intro": "Choose the voice for live conversations. Your voice goes to {company} while you talk, and the cost uses the same monthly usage budget as chat.",
+      "modelsHint": "The model and its voice are set under {page}.",
       "model": "Voice model",
       "voice": "Voice",
       "captions": "Show captions while you talk",

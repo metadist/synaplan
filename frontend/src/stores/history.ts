@@ -23,6 +23,7 @@ import { createUuid } from '@/utils/uuid'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
 import type { MessageUsage } from '@/stores/usageTaximeter'
+import type { LiveVoiceArtifact } from '@/services/liveVoice/audio'
 import type { TimelineModel, TimelineStep } from '@/utils/processingTimeline'
 
 // Re-export so existing consumers keep importing from the store module.
@@ -675,13 +676,67 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  /** Local ids of the media messages a live call added; they are not spoken replies. */
+  const spokenArtifactIds = new Set<string>()
+
+  /**
+   * A picture, video, audio or document made during a live call. It goes
+   * after the question, before the sentence the voice says about it, in the
+   * same shape a reload shows. A stored call is read back by its row id.
+   */
+  const insertSpokenArtifact = async (artifact: LiveVoiceArtifact): Promise<void> => {
+    const generation = loadGeneration
+    const messageId = artifact.messageId
+    let row = artifact.row
+    if (typeof messageId === 'number') {
+      row = undefined
+      const { chatApi } = await import('@/services/api')
+      for (const wait of SPOKEN_ID_DELAYS_MS) {
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
+        if (generation !== loadGeneration) return
+        if (messages.value.some((item) => item.backendMessageId === messageId)) return
+        try {
+          const response = (await chatApi.getMessage(messageId)) as {
+            success?: boolean
+            message?: ApiLoadedMessageRow
+          }
+          if (response.success && response.message) {
+            row = response.message
+            break
+          }
+        } catch {
+          // The next attempt is the recovery. A reload still shows the row.
+        }
+      }
+    }
+    if (!row || generation !== loadGeneration) return
+    if (
+      typeof messageId === 'number' &&
+      messages.value.some((item) => item.backendMessageId === messageId)
+    ) {
+      return
+    }
+
+    const message = mapApiMessageRow(row)
+    if (typeof messageId !== 'number') message.backendMessageId = undefined
+    spokenArtifactIds.add(message.id)
+    let lastQuestion = -1
+    messages.value.forEach((item, index) => {
+      if (item.role === 'user') lastQuestion = index
+    })
+    if (lastQuestion === -1) messages.value.push(message)
+    else messages.value.splice(lastQuestion + 1, 0, message)
+  }
+
   const attachSpokenReply = (details: {
     topic?: string | null
     aiModels?: Message['aiModels']
     usage?: MessageUsage | null
     usageExtra?: MessageUsage[] | null
   }) => {
-    const message = [...messages.value].reverse().find((item) => item.role === 'assistant')
+    const message = [...messages.value]
+      .reverse()
+      .find((item) => item.role === 'assistant' && !spokenArtifactIds.has(item.id))
     if (!message) return
     if (typeof details.topic === 'string' && details.topic !== '') message.topic = details.topic
     if (details.aiModels) message.aiModels = details.aiModels
@@ -1041,6 +1096,7 @@ export const useHistoryStore = defineStore('history', () => {
     updateStreamingMessage,
     claimSpokenMessage,
     adoptSpokenIds,
+    insertSpokenArtifact,
     attachSpokenReply,
     finishStreamingMessage,
     finishLiveThinking,

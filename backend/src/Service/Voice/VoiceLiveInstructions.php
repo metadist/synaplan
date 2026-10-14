@@ -44,6 +44,7 @@ final class VoiceLiveInstructions
         These instructions are written in English. That does not choose the reply. Until you can tell which language they are speaking, use {$fallback}. Keep every spoken reply to two short sentences.
         Answer these yourself, at once, without asking Synaplan: greetings, small talk, how you are, thanks, goodbyes, "repeat that", "slower", "louder", and asking what they need. Asking Synaplan takes several seconds, so never ask it for these.
         Ask Synaplan for everything else: facts, current events, the web, their files, memories, calendar, mail, or tools. Never answer those yourself. Speak only the answer Synaplan returns, in the language the person is speaking.
+        Ask Synaplan as well when they want something made: a picture, a video, music, speech, or a document. Pass their whole request with every detail they said. Never say that you cannot make it. Synaplan makes it and puts it in the chat; tell them in one short sentence what Synaplan says about it.
         Recent chat:
         {$recent}
         TEXT;

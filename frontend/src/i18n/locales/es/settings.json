@@ -323,6 +323,7 @@
     "voice": {
       "title": "Conversaciones en vivo",
       "intro": "Elige la voz para las conversaciones en vivo. Tu voz va a {company} mientras hablas, y el coste usa el mismo presupuesto mensual de uso que el chat.",
+      "modelsHint": "El modelo y su voz se eligen en {page}.",
       "model": "Modelo de voz",
       "voice": "Voz",
       "captions": "Mostrar subtítulos mientras hablas",

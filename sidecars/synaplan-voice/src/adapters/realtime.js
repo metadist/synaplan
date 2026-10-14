@@ -203,7 +203,7 @@ export function realtimeSessionPayload(config, options = {}) {
     tools: [{
       type: 'function',
       name: 'consult_synaplan',
-      description: 'Ask Synaplan for the answer. Required for every factual question.',
+      description: 'Ask Synaplan for the answer. Required for every factual question and every request to create an image, video, audio or document. Pass the whole request.',
       parameters: {
         type: 'object',
         properties: { question: { type: 'string' } },

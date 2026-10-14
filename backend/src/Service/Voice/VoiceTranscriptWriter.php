@@ -23,6 +23,8 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class VoiceTranscriptWriter
 {
+    private const TURN_LOOKBACK = 4;
+
     public function __construct(
         private EntityManagerInterface $em,
         private MessageRepository $messages,
@@ -110,7 +112,7 @@ final readonly class VoiceTranscriptWriter
     private function storeTurn(VoiceSession $session, Chat $chat, User $user, array $turn): Message
     {
         $direction = 'assistant' === $turn['role'] ? 'OUT' : 'IN';
-        $latest = $this->messages->findOneBy(['chatId' => $chat->getId()], ['id' => 'DESC']);
+        $latest = $this->latestTurn($chat);
         if ($latest instanceof Message && $latest->getDirection() === $direction) {
             if ($latest->getText() === $turn['text']) {
                 if ('OUT' === $direction) {
@@ -209,6 +211,23 @@ final readonly class VoiceTranscriptWriter
             return;
         }
         $this->stamp->apply($message, $pending);
+    }
+
+    /**
+     * The last spoken or typed turn of the chat. A picture made during the
+     * call sits between the question and its transcript, which can arrive
+     * after it; looking past that row keeps the question stored once.
+     */
+    private function latestTurn(Chat $chat): ?Message
+    {
+        $recent = $this->messages->findBy(['chatId' => $chat->getId()], ['id' => 'DESC'], self::TURN_LOOKBACK);
+        foreach ($recent as $candidate) {
+            if (null === $candidate->getMeta(VoiceLiveArtifact::META_SESSION)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function latestSpokenReply(VoiceSession $session): ?Message

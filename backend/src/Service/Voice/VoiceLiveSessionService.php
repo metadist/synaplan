@@ -362,7 +362,7 @@ final readonly class VoiceLiveSessionService
     }
 
     /**
-     * @return array{text: string, facts: list<string>}
+     * @return array{text: string, facts: list<string>, artifact: array<string, mixed>|null}
      */
     public function delegate(int $sessionId, string $question): array
     {

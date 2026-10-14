@@ -14,6 +14,7 @@ import {
 } from '@/services/api/liveVoiceApi'
 import {
   openLiveVoiceAudio,
+  type LiveVoiceArtifact,
   type LiveVoiceAudioSession,
   type LiveVoiceSocketHandlers,
 } from '@/services/liveVoice/audio'
@@ -38,6 +39,7 @@ import {
 import { useChatsStore } from '@/stores/chats'
 import { useHistoryStore } from '@/stores/history'
 import { useIncognitoStore } from '@/stores/incognito'
+import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useUsageTaximeterStore } from '@/stores/usageTaximeter'
 
 const CONNECT_MS = 15_000
@@ -47,6 +49,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   const chats = useChatsStore()
   const history = useHistoryStore()
   const incognito = useIncognitoStore()
+  const mediaJobs = useMediaJobsStore()
   const taximeter = useUsageTaximeterStore()
 
   const phase = ref<LivePhase>('idle')
@@ -147,6 +150,13 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     } else {
       liveTurns[role] = id
     }
+  }
+
+  /** A stored row belongs to the call's chat; another open chat must not show it. */
+  async function showArtifact(artifact: LiveVoiceArtifact): Promise<void> {
+    if (artifact.messageId !== undefined && chats.activeChatId !== sessionChatId) return
+    await history.insertSpokenArtifact(artifact)
+    if (artifact.state === 'running' && !incognito.active) void mediaJobs.loadActive()
   }
 
   function noteSavedTurn(role: 'user' | 'assistant', text: string) {
@@ -327,6 +337,10 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         onReply: (details) => {
           if (!liveRunIs(run)) return
           history.attachSpokenReply(details)
+        },
+        onArtifact: (artifact) => {
+          if (!liveRunIs(run)) return
+          void showArtifact(artifact)
         },
         onPlaybackIdle: () => {
           if (!liveRunIs(run)) return

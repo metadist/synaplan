@@ -678,6 +678,34 @@ class ChatHandlerTest extends TestCase
         $this->assertStringNotContainsString('spoken aloud', (string) json_encode($calls[1]['messages']));
     }
 
+    public function testASpokenDocumentRequestKeepsTheFullDocumentLength(): void
+    {
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $seen = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$seen): array {
+                $seen = ['messages' => $messages, 'options' => $options];
+
+                return ['content' => 'Fine.', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle(
+            $this->plainMessage('Schreib mir einen Bericht über Füchse.'),
+            [],
+            ['topic' => 'officemaker', 'language' => 'de'],
+            null,
+            ['source' => 'live_voice'],
+        );
+
+        $this->assertIsArray($seen);
+        $this->assertNotSame(600, $seen['options']['max_tokens'] ?? null);
+        $this->assertStringNotContainsString('spoken aloud', (string) json_encode($seen['messages']));
+    }
+
     public function testHandleStripsALeadingEchoedTimestamp(): void
     {
         $message = $this->plainMessage('Make an audio of that.');

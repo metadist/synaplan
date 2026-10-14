@@ -38,11 +38,14 @@ The server sends:
 | `{ "type": "usage", "seconds", "secondsLeft" }` | Cumulative time |
 | `{ "type": "warn", "secondsLeft" }` | About a minute of budget left |
 | `{ "type": "wrap_up" }` | One goodbye sentence, then the socket closes |
+| `{ "type": "artifact", "artifact": { "type", "state", "messageId" } }` | Synaplan made a picture, video, audio or document. `messageId` is the chat row to show; an incognito call sends `row` instead |
 | `{ "type": "ended", "reason" }` | The conversation is over. A dropped tab may close before this frame arrives |
 
 Closing the socket without `end` is a dropped tab. The sidecar closes the provider and posts `network_lost`. A CarPlay client is the exception: the sidecar keeps the provider session for 20 seconds and the app reconnects with a fresh ticket for the same session. After 20 seconds it posts `network_lost`. A web or phone tab still ends immediately. Reasons are `user_end`, `idle`, `max_duration`, `limit_budget`, `provider_error`, `network_lost`, `capacity`, `admin_disabled`.
 
 GPT-Live uses client delegation. Gemini Live uses the tool `consult_synaplan`. Both come back through `POST /internal/voice/sessions/{id}/delegate`. The answer is spoken. It is not a separate `MESSAGES` usage row. Its cost is added to the one `VOICE_LIVE` row.
+
+The delegated question runs through the same sorter as a typed one, so "draw a fox" reaches the media generator and "write a report" reaches the document writer. That result cannot be spoken. Synaplan stores it as the same assistant message the typed chat shows (file, background-job banner, prompt, models and cost) and returns a short English sentence instead of the storage marker, for example "I am creating the image now. It will appear in the chat in a moment." The voice model says it in the language being spoken. The delegate response carries `artifact` (`type`, `state`, `messageId`); the sidecar forwards it as the `artifact` frame and the browser inserts that row after the question. A background render is moved to that row, so its banner resolves and the jobs tray shows it. The render is billed like a typed one (`IMAGES`, `VIDEOS`, `AUDIOS`), not on the `VOICE_LIVE` row. An incognito call stores nothing and sends the row itself. With background jobs turned off, a render can outlast Gemini's 20-second tool timeout; the message still appears, only the spoken sentence may be generic.
 
 ## Direct connection
 

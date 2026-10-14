@@ -5,7 +5,7 @@ import { WebSocket } from 'ws'
 import { createMockAdapter } from '../src/adapters/mock.js'
 import { verify } from '../src/hmac.js'
 import { createServer } from '../src/server.js'
-import { shouldDropAudio, disconnectPlan, replyFrame, storedFrame, postUntilStored, CARPLAY_RECONNECT_MS } from '../src/session.js'
+import { shouldDropAudio, disconnectPlan, replyFrame, storedFrame, artifactFrame, postUntilStored, CARPLAY_RECONNECT_MS } from '../src/session.js'
 
 const SECRET = 'test-secret'
 
@@ -51,6 +51,15 @@ test('a stored turn tells the client which chat row it became', () => {
   })
   assert.equal(storedFrame('user', { ok: true }, 'Hello'), null)
   assert.equal(storedFrame('assistant', { messageId: 42 }, '  '), null)
+})
+
+test('a made picture is handed to the client so the chat can show it', () => {
+  const artifact = { type: 'image', state: 'running', messageId: 43 }
+  assert.deepEqual(artifactFrame({ text: 'I am creating the image now.', artifact }), { type: 'artifact', artifact })
+  assert.equal(artifactFrame({ text: 'It is four.', artifact: null }), null)
+  assert.equal(artifactFrame({ text: 'It is four.' }), null)
+  assert.equal(artifactFrame({ artifact: { type: 'image' } }), null)
+  assert.equal(artifactFrame({ artifact: [] }), null)
 })
 
 test('only a CarPlay client parks the provider after the socket drops', () => {

@@ -960,7 +960,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // The picture this turn edits (mediamaker only).
         $systemPrompt .= $this->buildMediaEditContext($topic, $options);
 
-        $liveVoice = self::SOURCE_LIVE_VOICE === ($options['source'] ?? null);
+        // A document is written into the file, not spoken, so it keeps its
+        // full length. The live voice only announces that it is in the chat.
+        $liveVoice = self::SOURCE_LIVE_VOICE === ($options['source'] ?? null) && 'officemaker' !== $topic;
         if ($liveVoice) {
             $systemPrompt .= self::LIVE_VOICE_REPLY_RULE;
         }

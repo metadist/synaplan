@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { applyControlMessage, pcm16Frame } from '@/services/liveVoice/audio'
+import {
+  applyControlMessage,
+  liveVoiceArtifact,
+  pcm16Frame,
+  type LiveVoiceArtifact,
+} from '@/services/liveVoice/audio'
 import { liveCueForTransition, liveCueSteps } from '@/services/liveVoice/cues'
 import { nextLivePhase } from '@/services/liveVoice/machine'
 import {
@@ -89,6 +94,7 @@ describe('live voice socket', () => {
       onUsage: () => undefined,
       onWarn: () => undefined,
       onReply: () => undefined,
+      onArtifact: () => undefined,
       onLevel: () => undefined,
       onOutLevel: () => undefined,
       onAudioOut: () => undefined,
@@ -99,6 +105,58 @@ describe('live voice socket', () => {
       handlers
     )
     expect(stored).toEqual([{ role: 'user', messageId: 41, text: 'Hello' }])
+  })
+
+  it('hands a made picture to the chat by its stored row or its incognito row', () => {
+    const made: LiveVoiceArtifact[] = []
+    const handlers = {
+      onReady: () => undefined,
+      onState: () => undefined,
+      onTranscript: () => undefined,
+      onStored: () => undefined,
+      onPlaybackIdle: () => undefined,
+      onInterrupted: () => undefined,
+      onWrapUp: () => undefined,
+      onEnded: () => undefined,
+      onUsage: () => undefined,
+      onWarn: () => undefined,
+      onReply: () => undefined,
+      onArtifact: (artifact: LiveVoiceArtifact) => {
+        made.push(artifact)
+      },
+      onLevel: () => undefined,
+      onOutLevel: () => undefined,
+      onAudioOut: () => undefined,
+      onSocketClosed: () => undefined,
+    }
+    const row = { id: 0, direction: 'OUT', text: '__IMAGE_GENERATED__', timestamp: 1 }
+    applyControlMessage(
+      JSON.stringify({
+        type: 'artifact',
+        artifact: { type: 'image', state: 'running', messageId: 55 },
+      }),
+      handlers
+    )
+    applyControlMessage(
+      JSON.stringify({ type: 'artifact', artifact: { type: 'image', state: 'completed', row } }),
+      handlers
+    )
+    applyControlMessage(
+      JSON.stringify({ type: 'artifact', artifact: { type: 'image', state: 'completed' } }),
+      handlers
+    )
+
+    expect(made).toEqual([
+      { type: 'image', state: 'running', messageId: 55 },
+      { type: 'image', state: 'completed', row },
+    ])
+  })
+
+  it('refuses an artifact frame without a type, a state or a row to show', () => {
+    expect(liveVoiceArtifact(null)).toBeNull()
+    expect(liveVoiceArtifact({ state: 'running', messageId: 3 })).toBeNull()
+    expect(liveVoiceArtifact({ type: 'image', state: 'running', messageId: 0 })).toBeNull()
+    expect(liveVoiceArtifact({ type: 'image', state: 'running', row: { id: 0 } })).toBeNull()
   })
 })
 

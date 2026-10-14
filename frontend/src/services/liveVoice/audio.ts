@@ -1,5 +1,19 @@
+import type { ApiLoadedMessageRow } from '@/utils/messageMapper'
+
+/**
+ * A picture, video, audio or document Synaplan made during the call. A
+ * stored call names the chat row; an incognito call carries the row itself.
+ */
+export interface LiveVoiceArtifact {
+  type: string
+  state: string
+  messageId?: number
+  row?: ApiLoadedMessageRow
+}
+
 export interface LiveVoiceSocketHandlers {
   onReady: () => void
+  onArtifact: (artifact: LiveVoiceArtifact) => void
   onState: (state: 'thinking' | 'listening' | 'speaking') => void
   onTranscript: (role: 'user' | 'assistant', text: string, final: boolean) => void
   onStored: (role: 'user' | 'assistant', messageId: number, text: string) => void
@@ -180,6 +194,29 @@ export function pcm16Frame(pcm: Int16Array): Uint8Array<ArrayBuffer> {
   return bytes
 }
 
+/** Only a frame that names a stored row or carries an incognito row can be shown. */
+export function liveVoiceArtifact(value: unknown): LiveVoiceArtifact | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const raw = value as Record<string, unknown>
+  if (typeof raw.type !== 'string' || typeof raw.state !== 'string') return null
+  const artifact: LiveVoiceArtifact = { type: raw.type, state: raw.state }
+  if (typeof raw.messageId === 'number' && Number.isInteger(raw.messageId) && raw.messageId > 0) {
+    artifact.messageId = raw.messageId
+    return artifact
+  }
+  const row = raw.row
+  if (
+    row &&
+    typeof row === 'object' &&
+    !Array.isArray(row) &&
+    typeof (row as Record<string, unknown>).timestamp === 'number'
+  ) {
+    artifact.row = row as ApiLoadedMessageRow
+    return artifact
+  }
+  return null
+}
+
 export function applyControlMessage(
   raw: string,
   handlers: LiveVoiceSocketHandlers,
@@ -194,6 +231,7 @@ export function applyControlMessage(
     secondsLeft?: number
     final?: boolean
     messageId?: number
+    artifact?: unknown
     details?: {
       topic?: string | null
       aiModels?: {
@@ -250,6 +288,10 @@ export function applyControlMessage(
     handlers.onStored(role, message.messageId, message.text)
   }
   if (message.type === 'reply' && message.details) handlers.onReply(message.details)
+  if (message.type === 'artifact') {
+    const artifact = liveVoiceArtifact(message.artifact)
+    if (artifact) handlers.onArtifact(artifact)
+  }
   if (message.type === 'interrupted') {
     onInterrupted?.()
     handlers.onInterrupted()

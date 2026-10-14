@@ -41,7 +41,7 @@ export function createGeminiAdapter({
       tools: [{
         functionDeclarations: [{
           name: 'consult_synaplan',
-          description: 'Ask Synaplan for the answer. Required for every factual question.',
+          description: 'Ask Synaplan for the answer. Required for every factual question and every request to create an image, video, audio or document. Pass the whole request.',
           parameters: {
             type: 'OBJECT',
             properties: { question: { type: 'STRING' } },

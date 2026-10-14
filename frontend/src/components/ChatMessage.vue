@@ -1939,7 +1939,12 @@ watch(infoPopoverOpen, (open) => {
 
 const hasMessageMetadata = computed(() => {
   if (props.topic) return true
-  if (props.aiModels?.chat || props.aiModels?.sorting || props.aiModels?.audio || props.aiModels?.voice)
+  if (
+    props.aiModels?.chat ||
+    props.aiModels?.sorting ||
+    props.aiModels?.audio ||
+    props.aiModels?.voice
+  )
     return true
   // Only count legacy model/provider as metadata when neither is a
   // channel-source token, otherwise we'd light up the info popover

@@ -129,7 +129,11 @@ function onKeydown(event: KeyboardEvent) {
     <p v-if="!connecting" class="mt-3 text-xs txt-secondary">
       {{ ownerLine }} {{ companyLine }} {{ touchesLine }}
       <span v-if="budgetLabel" class="min-[480px]:hidden">{{ budgetLabel }}.</span>
-      <RouterLink to="/settings/voice" class="underline" data-testid="link-live-voice-settings">
+      <RouterLink
+        to="/ai/models?highlight=VOICE_LIVE"
+        class="underline"
+        data-testid="link-live-voice-settings"
+      >
         {{ settingsLabel }}
       </RouterLink>
     </p>

@@ -16,13 +16,16 @@ use Psr\Log\LoggerInterface;
 
 /**
  * One spoken question goes through the user's normal chat pipeline.
- * The answer is added to the live-voice usage row. It is not a MESSAGES row:
- * the assistant speaks it, and the spoken transcript is the one reply the
- * chat keeps, so a delegated answer never shows up twice.
+ * The answer is added to the live-voice usage row. A spoken answer is not a
+ * MESSAGES row: the assistant speaks it, and the spoken transcript is the one
+ * reply the chat keeps, so a delegated answer never shows up twice.
+ * A picture, video, audio or document cannot be spoken, so that one becomes
+ * the same assistant message the typed chat shows ({@see VoiceLiveArtifact}).
  */
 final readonly class VoiceLiveDelegationService
 {
     private const SPOKEN_CHARS = 1500;
+    private const UNREACHABLE = 'I could not reach the answer. Please try again.';
 
     public function __construct(
         private MessageProcessor $processor,
@@ -33,22 +36,23 @@ final readonly class VoiceLiveDelegationService
         private UserRepository $users,
         private LoggerInterface $logger,
         private VoiceReplyStamp $replies = new VoiceReplyStamp(),
+        private ?VoiceLiveArtifact $artifacts = null,
     ) {
     }
 
     /**
-     * @return array{text: string, facts: list<string>}
+     * @return array{text: string, facts: list<string>, artifact: array<string, mixed>|null}
      */
     public function answer(VoiceSession $session, string $question): array
     {
         $question = trim($question);
         if ('' === $question || 'ended' === $session->getStatus()) {
-            return ['text' => '', 'facts' => []];
+            return $this->reply('');
         }
 
         $user = $this->users->find($session->getUserId());
         if (!$user instanceof User) {
-            return ['text' => 'I could not reach the answer. Please try again.', 'facts' => []];
+            return $this->reply(self::UNREACHABLE);
         }
 
         $incognito = $this->usage->isIncognito($session);
@@ -66,6 +70,9 @@ final readonly class VoiceLiveDelegationService
             $result = $this->processor->process($message, [
                 'incognito' => $incognito,
                 'source' => 'live_voice',
+                // A picture or video is billed the moment the provider bills
+                // it, exactly like the typed chat.
+                'record_media_usage' => true,
             ]);
         } catch (\Throwable $e) {
             $this->logger->error('Live voice delegation failed', [
@@ -73,29 +80,45 @@ final readonly class VoiceLiveDelegationService
                 'error' => $e::class,
             ]);
 
-            return ['text' => 'I could not reach the answer. Please try again.', 'facts' => []];
+            return $this->reply(self::UNREACHABLE);
         }
 
         if (true !== ($result['success'] ?? false)) {
-            return ['text' => 'I could not reach the answer. Please try again.', 'facts' => []];
+            return $this->reply(self::UNREACHABLE);
         }
 
         $response = is_array($result['response'] ?? null) ? $result['response'] : [];
         $text = trim((string) ($response['content'] ?? ''));
-        if ('' === $text) {
-            return ['text' => 'I could not reach the answer. Please try again.', 'facts' => []];
-        }
-
         $cost = $this->charge($session, $user, $response);
-        if (!$incognito) {
-            $this->usage->savePendingReply($session, $this->replies->fromProcess(
-                $result,
-                $this->usage->chargedAmount($session, $cost->totalCost),
-                false !== ($cost->priceSnapshot['price_known'] ?? true),
-            ));
+        $pending = $incognito ? [] : $this->replies->fromProcess(
+            $result,
+            $this->usage->chargedAmount($session, $cost->totalCost),
+            false !== ($cost->priceSnapshot['price_known'] ?? true),
+        );
+
+        $made = $this->artifacts?->capture($session, $message, $result, $pending, $incognito);
+        if (null !== $made) {
+            return $this->reply($made['spoken'], $made['artifact']);
         }
 
-        return ['text' => mb_substr($text, 0, self::SPOKEN_CHARS), 'facts' => []];
+        if ('' === $text) {
+            return $this->reply(self::UNREACHABLE);
+        }
+        if (!$incognito) {
+            $this->usage->savePendingReply($session, $pending);
+        }
+
+        return $this->reply($text);
+    }
+
+    /**
+     * @param array<string, mixed>|null $artifact
+     *
+     * @return array{text: string, facts: list<string>, artifact: array<string, mixed>|null}
+     */
+    private function reply(string $text, ?array $artifact = null): array
+    {
+        return ['text' => mb_substr($text, 0, self::SPOKEN_CHARS), 'facts' => [], 'artifact' => $artifact];
     }
 
     /**

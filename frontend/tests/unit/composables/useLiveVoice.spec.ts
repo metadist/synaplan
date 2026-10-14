@@ -16,6 +16,9 @@ const openDirectVoice = vi.hoisted(() => vi.fn())
 const addStreamingMessage = vi.hoisted(() => vi.fn(() => 'bubble'))
 const claimSpokenMessage = vi.hoisted(() => vi.fn())
 const adoptSpokenIds = vi.hoisted(() => vi.fn())
+const insertSpokenArtifact = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const loadActiveJobs = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+const activeChat = vi.hoisted(() => ({ id: 7 }))
 
 vi.mock('@/services/api/liveVoiceApi', () => ({
   startLiveVoiceSession,
@@ -36,7 +39,9 @@ vi.mock('@/services/liveVoice/webrtc', () => ({
 
 vi.mock('@/stores/chats', () => ({
   useChatsStore: () => ({
-    activeChatId: 7,
+    get activeChatId() {
+      return activeChat.id
+    },
     chats: [{ id: 7 }],
     loadChats: vi.fn(),
     setActiveChat: vi.fn(),
@@ -52,12 +57,17 @@ vi.mock('@/stores/history', () => ({
     addStreamingMessage,
     claimSpokenMessage,
     adoptSpokenIds,
+    insertSpokenArtifact,
     attachSpokenReply: vi.fn(),
   }),
 }))
 
 vi.mock('@/stores/incognito', () => ({
   useIncognitoStore: () => ({ active: false }),
+}))
+
+vi.mock('@/stores/mediaJobs', () => ({
+  useMediaJobsStore: () => ({ loadActive: loadActiveJobs }),
 }))
 
 vi.mock('@/stores/usageTaximeter', () => ({
@@ -108,6 +118,9 @@ beforeEach(() => {
   addStreamingMessage.mockImplementation(() => 'bubble')
   claimSpokenMessage.mockClear()
   adoptSpokenIds.mockClear()
+  insertSpokenArtifact.mockClear()
+  loadActiveJobs.mockClear()
+  activeChat.id = 7
   endLiveVoiceSession.mockResolvedValue({})
   fetchLiveVoiceOptions.mockResolvedValue({
     available: true,
@@ -280,5 +293,49 @@ describe('useLiveVoice hang-up', () => {
     await wrapper.vm.end()
     expect(adoptSpokenIds).toHaveBeenCalledWith(7, ['bubble-1', 'bubble-2'])
     expect(wrapper.vm.phase).toBe('idle')
+  })
+})
+
+describe('useLiveVoice made media', () => {
+  async function connect() {
+    const track = fakeTrack()
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [track] }) },
+    })
+    startLiveVoiceSession.mockResolvedValue(session)
+    let handlers: { onReady: () => void; onArtifact: (artifact: unknown) => void }
+    openLiveVoiceAudio.mockImplementation(async (input: { handlers: typeof handlers }) => {
+      handlers = input.handlers
+      return { close: vi.fn(), sendEnd: vi.fn(), setMuted: vi.fn() }
+    })
+    const wrapper = mount(Harness)
+    await wrapper.vm.press()
+    await flushPromises()
+    handlers!.onReady()
+    return { wrapper, handlers: handlers! }
+  }
+
+  it('shows a picture that is still rendering in the call chat and in the jobs tray', async () => {
+    const { wrapper, handlers } = await connect()
+    const artifact = { type: 'image', state: 'running', messageId: 55 }
+
+    handlers.onArtifact(artifact)
+    await flushPromises()
+
+    expect(insertSpokenArtifact).toHaveBeenCalledWith(artifact)
+    expect(loadActiveJobs).toHaveBeenCalledOnce()
+    await wrapper.vm.end()
+  })
+
+  it('keeps a stored picture out of another chat the person opened during the call', async () => {
+    const { wrapper, handlers } = await connect()
+    activeChat.id = 8
+
+    handlers.onArtifact({ type: 'image', state: 'completed', messageId: 55 })
+    await flushPromises()
+
+    expect(insertSpokenArtifact).not.toHaveBeenCalled()
+    await wrapper.vm.end()
   })
 })
