@@ -32,34 +32,37 @@ jobs:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           set -euo pipefail
-          # GitHub publishes refs/pull/<n>/head to the git backend a few seconds
-          # after the pull_request event fires. When the branch push and PR
-          # creation land back-to-back the workflow can start before the ref
-          # exists, and the fetch dies with "couldn't find remote ref". Retry
-          # with backoff to ride out that eventual-consistency window.
+          # Classify exactly the commit this event was raised for, fetched by
+          # its SHA. Fetching refs/pull/<n>/head instead loses two races:
+          # GitHub publishes that ref a few seconds after the event (the fetch
+          # fails with "couldn't find remote ref"), and a push right after the
+          # PR is opened moves the ref past HEAD_SHA before this job reads it,
+          # so the equality guard failed a run for a commit nobody tampered
+          # with — and did so without a word in the log. A commit fetched by
+          # SHA is by construction the one in the event; GitHub serves it even
+          # after a force-push has moved the branch on. The retry only covers
+          # replication delay between the push and the git backend.
           for attempt in 1 2 3 4 5 6; do
-            if git fetch --no-tags origin "pull/${PR_NUMBER}/head:refs/remotes/pull/head"; then
+            if git fetch --no-tags origin "$HEAD_SHA"; then
               break
             fi
-            echo "pull/${PR_NUMBER}/head not available yet (attempt ${attempt}), retrying in 5s..." >&2
+            echo "commit ${HEAD_SHA} not available yet (attempt ${attempt}), retrying in 5s..." >&2
             sleep 5
           done
-          # Fail closed if the ref never appeared, or if it does not match the
-          # SHA the event was raised for (PR-tampering guard).
-          git rev-parse refs/remotes/pull/head >/dev/null 2>&1 || {
-            echo "::error::refs/pull/${PR_NUMBER}/head never became available" >&2
+          # Fail closed, and say why, if the commit never arrived.
+          if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
+            echo "::error::commit ${HEAD_SHA} (head of pull request #${PR_NUMBER} when this run was triggered) never became available" >&2
             exit 1
-          }
-          test "$(git rev-parse refs/remotes/pull/head)" = "$HEAD_SHA"
+          fi
           # Bootstrap-only: the classifier tooling is checked out from the base
           # branch (fail-closed against PR tampering), but the PR that first
           # introduces the tooling has no copy on base yet. Materialize it from
-          # the PR head just for that case. Once merged to main this branch is
-          # dead code, because base always carries the files.
+          # the event's commit just for that case. Once merged to main this
+          # branch is dead code, because base always carries the files.
           if [ ! -f scripts/mobile-impact.mjs ]; then
             mkdir -p scripts .github
-            git show refs/remotes/pull/head:scripts/mobile-impact.mjs > scripts/mobile-impact.mjs
-            git show refs/remotes/pull/head:.github/mobile-impact-policy.json > .github/mobile-impact-policy.json
+            git show "${HEAD_SHA}:scripts/mobile-impact.mjs" > scripts/mobile-impact.mjs
+            git show "${HEAD_SHA}:.github/mobile-impact-policy.json" > .github/mobile-impact-policy.json
           fi
           mkdir -p mobile-impact
           args=(
