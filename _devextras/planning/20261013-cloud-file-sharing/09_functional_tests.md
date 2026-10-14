@@ -365,8 +365,8 @@ carries `cloud:watch` after the permission card.
 
 Watch API tests; ledger unique key (C6); loop guard three layers (C7);
 file targets (only new versions of that file; deletion and restore); watch
-index paging, `since` with tombstones, `304`, `410`; caps (50 per person,
-5 000 per instance); quiet period and windowing (`BWINDOWSEC`, `BMAXFILES`)
+index paging, `since` with tombstones, `304`, `410`; caps (20 per person,
+1 000 per instance); quiet period and windowing (`BWINDOWSEC`, `BMAXFILES`)
 with a fake clock;
 `file_event` trigger payload (`files`, `set`) and `SavedTaskRunner` attaching
 files (C15 fail-closed); presets → task templates; trial and `from-message`
@@ -380,7 +380,7 @@ render test (4–5 sentences, two links, plain-text part).
 | Script | Asserts |
 | ------ | ------- |
 | `cf5-watch.sh` (`CLOUD=…`) | Create a **Summarize and mail me** watch on `Reports` through `POST /api/v1/cloud/watches` (Ada's key with `cloud:watch`); the row is `active`; upload `report.pdf` version `v1` to `…/watches/{id}/files` → one `BCLOUDWATCHITEMS` row → run → MailHog has one mail "Summary: report.pdf" with a non-empty summary, **Open in …** and **See this run in Synaplan** links (TestProvider; the sentence count is L3 row 4); upload `v1` again → "already handled", no second run or mail (C6); `PATCH {state: paused}` → upload `v2` → no run; resume → the resume answer lists 1 waiting file → run; `DELETE` → the watch is `stopped` (row and item ledger kept), the preset task is disabled with "Its watch was stopped", the watch index returns a tombstone. **File block:** a Translate watch with `target_kind: file` on `Projects/Q3/price-list.docx` — a new version → one run and `price-list.en.docx`; a second new version → the output is replaced, not duplicated (copy-ledger remote id); another file in `Projects/Q3` → no run; trash the file → the watch reads `attention: target_gone`; restore → `active` |
-| `cf5-index.sh` | Seed 5 000 watches over 100 test identities on a fake instance (dev command); `GET platform-links/watches?limit=500` → 10 pages, each ≤ 500, no watch twice; change one watch → `since=<cursor>` returns exactly that one; stop one → a tombstone; nothing changed → **304**; an expired cursor → **410**; the 51st watch of one person and the 5 001st of the instance → **409** with the sentences of `04` §B.7 |
+| `cf5-index.sh` | Seed 1 000 watches over 50 test identities (20 each) on a fake instance (dev command); `GET platform-links/watches?limit=500` → 2 pages, each ≤ 500, no watch twice; change one watch → `since=<cursor>` returns exactly that one; stop one → a tombstone; nothing changed → **304**; an expired cursor → **410**; the 21st watch of one person and the 1 001st of the instance → **409** with the sentences of `04` §B.7 |
 | `cf5-quiet.sh` | Upload `v1`, `v2`, `v3` of the same file within 40 s → one run (for `v3`) after the 60 s quiet period; the server clock is read inside the container |
 | `cf5-loop.sh` | With the app's `dev_allow_self_write` switch (`08` §0.8): a **Translate** watch on `Incoming-DE` writing into `Incoming-DE` itself: one run produces `contract.en.docx`; the app's own-write guard and the copy-ledger lookup leave it unprocessed; no second run within 5 min (C7) |
 | `cf5-reconcile.sh` | Set the app's `dev_mute_events` switch; upload two files; `POST …/watches/{id}/reconcile` with the folder listing → the answer names the two ids to process → runs; a listing without a known id → the answer lists it under `forget` and its item ends `skipped` with reason `gone` |
@@ -410,7 +410,7 @@ render test (4–5 sentences, two links, plain-text part).
 | 14 | each cloud | J-CF-15 | Watch the single file `Projects/Q3/price-list.docx` → **Translate it**; the dialog asks "What should happen when this file changes?" and has no file-set block; the row shows the bird with eyes; a new version replaces `price-list.en.docx`; another file in `Projects/Q3` starts nothing; Tasks → Watched folders lists it as a file; Pause / Resume from the sidebar; delete → "Stopped — the file was deleted"; restore → watching; **Stop watching** → eyes gone, the translation stays |
 
 After the P1 exit: `cloud_files` on for new installs and the activation
-migration (row 46 once agreed; until then decision 22) — verified by a fresh install (`docker compose down -v`
+migration (row 46) — verified by a fresh install (`docker compose down -v`
 in a scratch checkout) showing the flag on.
 
 ---
@@ -450,7 +450,7 @@ in a scratch checkout) showing the flag on.
 5. The five spikes answered in STATUS; every core consequence merged.
 
 After the P1 exit (not part of it): the Synaplan release and the Nextcloud
-app release are published, the Nextcloud docs updated, and row 46 (or row 22)
+app release are published, the Nextcloud docs updated, and row 46
 applied to the flags (`00` §8).
 
 ### 8.2 P2 exit — OpenCloud

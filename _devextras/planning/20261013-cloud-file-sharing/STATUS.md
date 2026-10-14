@@ -17,7 +17,7 @@ not a chat message.
 | E-6 `env-check.sh`, fixtures, cloud helpers, `use-test-provider.sh` | `synaplan` | P0 | planned | `_devextras/testing/cloud-apps/` |
 | E-7 Developer docs | all | any | planned | after the stack it documents is green |
 | E-8 Refresh policy | STATUS | — | recurring | monthly or on `max-version` change |
-| E-9 Reference client `cloud-fixture` | `synaplan` | P1 (before CF2.1) | planned | `_devextras/testing/cloud-apps/fixture-app/`; profiles `keyed` and `sso` (row 45, proposed); extended by every core brief |
+| E-9 Reference client `cloud-fixture` | `synaplan` | P1 (before CF2.1) | planned | `_devextras/testing/cloud-apps/fixture-app/`; profiles `keyed` and `sso` (row 45); extended by every core brief |
 | CF-S1 OpenCloud web extension points | `synaplan-opencloud` | P1 (before CF3.1) | planned | timebox 2 days |
 | CF-S2 Nextcloud organisation login (`user_oidc`) | `synaplan-nextcloud` | P1 (start) | planned | decides CF2.6; records the `azp` Nextcloud would send |
 | CF-S3 OpenCloud unattended access | `synaplan-opencloud` | P1 (before CF3.1) | planned | Includes the watch index at the cap (row 41) |
@@ -64,7 +64,7 @@ not a chat message.
 | CF4.3 Nextcloud bird, sidebar | `synaplan-nextcloud` | P1 | planned |  |
 | CF4.4 ownCloud.online bird, sidebar | `synaplan-owncloud-online` | P3 | planned |  |
 | CF4.5 OpenCloud sidebar, upstream request | `synaplan-opencloud` | P2 | planned |  |
-| CF5.1 Watch model, ledger, `file_event` | `synaplan` | P1 | planned | Schema ask recorded; folder and file targets; paginated watch index and caps (row 41); `BEXPIRESAT` (D20) |
+| CF5.1 Watch model, ledger, `file_event` | `synaplan` | P1 | planned | Schema ask recorded; folder and file targets; paginated watch index and caps of 20 / 1 000 (row 41); `BEXPIRESAT` (D20) |
 | CF5.2 Presets | `synaplan` | P1 | planned |  |
 | CF5.3 Tasks → Watched folders | `synaplan` | P1 | planned |  |
 | CF5.4 Nextcloud watches | `synaplan-nextcloud` | P1 | planned |  |
@@ -75,7 +75,7 @@ not a chat message.
 | CF5.9-nc Dialog file sets and trial — Nextcloud | `synaplan-nextcloud` | P1 | planned |  |
 | CF5.9-oc Dialog file sets and trial — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF5.9-oco Dialog file sets and trial — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
-| CF5.10 Contract v1 freeze | `synaplan`, `synaplan-nextcloud` | P1 (last) | planned | row 44 (proposed); P1 exit |
+| CF5.10 Contract v1 freeze | `synaplan`, `synaplan-nextcloud` | P1 (last) | planned | row 44; P1 exit |
 | CF6.x Beyond the apps | various | after P3 | optional |  |
 
 ## Decisions
@@ -89,6 +89,7 @@ not a chat message.
 | 2026-10-14 | Product owner: the proposed defaults of §3 rows 1–36 stand. Rows 37–41 stay proposed — they were not in that confirmation. `10` §2.2 done: Nextcloud dev volume removed (container stays down until E-2), OpenCloud 6.0.0 config volume removed, signing-key tarballs moved to `synaplan-nextcloud/.local/` with a local README. |
 | 2026-10-14 | Product owner: **Nextcloud first, then OpenCloud, then ownCloud.online** — "one complete Nextcloud run first with tests and logic, so we know the Synaplan side is ready with a clean API". Recorded as §3 row 42 (agreed); rows 33–35 amended in place to the phases. The conditions that make the order safe are proposed as rows 43 (Synaplan offers a cloud only for features its app reports), 44 (contract v1 frozen at the P1 exit), 45 (reference client with `keyed` and `sso` profiles) and 46 (switch `cloud_files` on after P1) — **not ticked**. |
 | 2026-10-14 | CF0.3 changed from an opt-in upload option (`intake=direct`) to an automatic rule: a `nextcloud` / `opencloud` / `owncloud` upload that names a knowledge folder other than `DEFAULT` skips Incoming. Reason: no released app sends the option, so the CF0.7 walk could not pass; the apps already send the folder the person picked. C10 unchanged in meaning; Outlook unchanged. |
+| 2026-10-14 | Product owner, in a click-through of the open rows: rows 37 (signed notifications), 38 (deleting a person in one cloud), 39 (provisioned identities), 40 (files remember their cloud), 43 (apps report their features), 44 (contract v1 at the end of P1), 45 (reference client) and 46 (switch `cloud_files` on after P1) agreed as proposed; row 41 agreed with **lower caps — 20 active watches per person, 1 000 per instance** (instead of 50 / 5 000); the adjustments of rows 33–35 to the Nextcloud-first order confirmed. All 46 rows are agreed. Row 46 replaces row 22's timing; row 11's signing clause is in force. Caps updated in `04` §B.7 / §B.8, CF5.1, the spikes and `cf5-index.sh`. |
 
 ## Review log
 

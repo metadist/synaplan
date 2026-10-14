@@ -294,12 +294,12 @@ produce one run, not five.
   read".
 - Summarize-and-mail sends at most 20 mails per watch per hour; more files
   wait for the next hour (the row says so).
-- Active watches: at most **50 per person** and **5 000 per instance**
+- Active watches: at most **20 per person** and **1 000 per instance**
   (installation-wide `BCONFIG` `CLOUD_FILES.WATCHES_PER_PERSON` and
   `CLOUD_FILES.WATCHES_PER_INSTANCE`; a Synaplan admin may change them). The
-  dialog says so before **Start watching**: "You already watch 50 folders and
+  dialog says so before **Start watching**: "You already watch 20 folders and
   files with Synaplan, the most allowed. Stop one in Tasks → Watched folders
-  to start another." or "files.example.org already has 5 000 watched folders
+  to start another." or "files.example.org already has 1 000 watched folders
   and files, the most Synaplan allows. Ask your administrator." The caps also bound the app's watch index
   (B.8).
 
@@ -321,7 +321,7 @@ produce one run, not five.
   folder|file, target_id, owner_external_id, owner_name, sentence, state,
   reason, updated_at}], tombstones: [id, …], next_cursor: string|null}` with
   an `ETag`; a cursor stays valid 7 days.
-- The index is bounded by the caps of B.7 (5 000 watches per instance).
+- The index is bounded by the caps of B.7 (1 000 watches per instance).
   Nextcloud and ownCloud.online keep it in an app table keyed by target id,
   never in per-request memory; the OpenCloud Go service keeps it in memory
   and rebuilds it with the paginated walk when it starts. CF-S3, CF-S4 and

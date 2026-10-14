@@ -3,8 +3,8 @@
 **Status:** Plan, 2026-10-13, reviewed twice the same day (second review:
 agent briefs, functional tests, local environments), then updated for the
 six Copilot findings on [#2467](https://github.com/metadist/synaplan/pull/2467), and reviewed a third time on 2026-10-14 for the Nextcloud-first order.
-No product code. Master-plan §3 rows 1–36 and 42 agreed 2026-10-14; rows
-37–41 and 43–46 are proposed. Delivery order (row 42): **P1** Synaplan core +
+No product code. All 46 decision rows of master-plan §3 agreed 2026-10-14
+(row 41 with lower caps). Delivery order (row 42): **P1** Synaplan core +
 Nextcloud, ending with the core API frozen as contract v1; **P2** OpenCloud;
 **P3** ownCloud.online.
 **Plan of record:** [`00_master_plan.md`](./00_master_plan.md).
