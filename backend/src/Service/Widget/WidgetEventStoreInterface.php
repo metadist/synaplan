@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Widget;
 
 /**
  * Transport for real-time widget events (SSE backing store).

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Widget;
 
 use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
@@ -14,7 +14,11 @@ use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
 use App\Repository\PromptRepository;
+use App\Service\ModelConfigService;
 use App\Service\Prompt\LanguageDirectiveBuilder;
+use App\Service\PromptService;
+use App\Service\RateLimitService;
+use App\Service\UrlContentService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 

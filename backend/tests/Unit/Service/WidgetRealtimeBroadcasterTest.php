@@ -8,7 +8,7 @@ use App\Realtime\Channel\ChannelInterface;
 use App\Realtime\Channel\WidgetOperatorsChannel;
 use App\Realtime\Channel\WidgetSessionChannel;
 use App\Realtime\Publisher\RealtimePublisherInterface;
-use App\Service\WidgetRealtimeBroadcaster;
+use App\Service\Widget\WidgetRealtimeBroadcaster;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

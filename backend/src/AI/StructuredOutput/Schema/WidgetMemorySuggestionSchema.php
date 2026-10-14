@@ -7,7 +7,7 @@ namespace App\AI\StructuredOutput\Schema;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 
 /**
- * JSON schema for {@see \App\Service\WidgetSetupService::suggestMemoriesForWidget()}.
+ * JSON schema for {@see \App\Service\Widget\WidgetSetupService::suggestMemoriesForWidget()}.
  *
  * The natural output is a JSON ARRAY, wrapped under a `suggestions` property
  * because structured output requires an `object` root. No parsing change is

@@ -1,11 +1,12 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Widget;
 
 use App\Entity\User;
 use App\Entity\Widget;
 use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 

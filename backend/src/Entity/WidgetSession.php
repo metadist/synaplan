@@ -31,7 +31,7 @@ class WidgetSession
 
     /**
      * Total persisted messages on this session's chat (visitor IN, AI OUT, operator OUT,
-     * system OUT, welcome OUT). Maintained by {@see \App\Service\WidgetSessionService::incrementMessageCount()}
+     * system OUT, welcome OUT). Maintained by {@see \App\Service\Widget\WidgetSessionService::incrementMessageCount()}
      * at every successful persist site (widget public flow, human takeover, internal mode,
      * AI stream completion). The visitor-quota check is decoupled from this counter and
      * computed live from {@see \App\Repository\MessageRepository::countByChatId()}, so this

@@ -40,17 +40,6 @@ final class ServiceRootTest extends TestCase
      * that moves the file. Only shrinks; never add to it.
      */
     private const PENDING_MOVE = [
-        // C3 — Widget/
-        'DatabaseWidgetEventStore',
-        'HumanTakeoverService',
-        'WidgetEventStoreInterface',
-        'WidgetExportService',
-        'WidgetRealtimeBroadcaster',
-        'WidgetService',
-        'WidgetSessionService',
-        'WidgetSetupService',
-        'WidgetSummaryService',
-        'WordPressIntegrationService',
         // C4 — Email/, WhatsApp/, Notification/
         'DiscordNotificationService',
         'EmailChatService',

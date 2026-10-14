@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\Request;
  *
  * Deliberately NOT a gate: session expiry. {@see WidgetSession::isExpired()}
  * only reflects the 24h *quota* window — the chat endpoints
- * ({@see \App\Service\WidgetSessionService::getOrCreateSession()}) and
+ * ({@see \App\Service\Widget\WidgetSessionService::getOrCreateSession()}) and
  * history ({@see \App\Controller\WidgetPublicController::history()}) both
  * treat an expired-but-existing session as resumable, and the subscribe-side
  * {@see \App\Realtime\Authorizer\WidgetSessionAccessGuard} never checked

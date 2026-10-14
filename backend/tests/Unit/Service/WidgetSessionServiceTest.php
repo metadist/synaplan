@@ -8,7 +8,7 @@ use App\Entity\WidgetSession;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\Chat\ChatTitleService;
-use App\Service\WidgetSessionService;
+use App\Service\Widget\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

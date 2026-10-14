@@ -6,7 +6,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\WidgetRepository;
-use App\Service\WidgetExportService;
+use App\Service\Widget\WidgetExportService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
