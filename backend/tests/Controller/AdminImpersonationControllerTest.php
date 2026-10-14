@@ -10,7 +10,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
  * Edge-case coverage for {@see \App\Controller\AdminImpersonationController}
- * that the unit tests on {@see \App\Service\ImpersonationService} cannot reach,
+ * that the unit tests on {@see \App\Service\Auth\ImpersonationService} cannot reach,
  * because they exercise the controller's own input handling (route argument
  * resolution, repository lookup, role gate) instead of the service contract.
  *

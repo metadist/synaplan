@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Iam;
 
 use App\Entity\SavedTask;
 use App\Entity\User;
@@ -42,6 +42,7 @@ use App\Service\Iam\ResourceKind\SavedPromptKind;
 use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\Telegram\TelegramConnectionService;
+use App\Service\UserMemoryService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;

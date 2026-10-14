@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Auth;
 
 /**
  * Turns the configured OIDC scope list into the scope string sent at login.

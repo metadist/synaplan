@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Repository\ConfigRepository;
+use App\Service\Auth\RegistrationConfig;
 
 /**
  * Switch for the anonymous guest trial chat.

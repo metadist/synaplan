@@ -1,12 +1,9 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Auth;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Service\Auth\AuthCookieFactory;
-use App\Service\Auth\OidcAccessDeniedException;
-use App\Service\Auth\OidcAccessPolicy;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;

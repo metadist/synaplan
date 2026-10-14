@@ -349,7 +349,7 @@ Rotate `APP_SECRET`:
 ### Sessions survive restarts
 
 There is no JWT keypair to generate. Sign-in uses two HttpOnly cookies minted
-by `App\Service\TokenService`:
+by `App\Service\Auth\TokenService`:
 
 | Cookie | Lifetime | Where it lives | What a restart does |
 | ------ | -------- | -------------- | ------------------- |

@@ -10,7 +10,7 @@ use App\Repository\VerificationTokenRepository;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\MailerConfig;
 use App\Service\Iam\AuditLogWriter;
-use App\Service\UserLifecycleService;
+use App\Service\Iam\UserLifecycleService;
 
 /**
  * Accounts an administrator creates or unblocks from Users.

@@ -4,8 +4,8 @@ namespace App\Security;
 
 use App\Repository\UserRepository;
 use App\Service\Auth\OidcAccessDeniedException;
-use App\Service\OidcTokenService;
-use App\Service\TokenService;
+use App\Service\Auth\OidcTokenService;
+use App\Service\Auth\TokenService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;

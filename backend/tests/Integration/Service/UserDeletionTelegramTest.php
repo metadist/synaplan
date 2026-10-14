@@ -8,7 +8,7 @@ use App\Entity\TelegramBot;
 use App\Entity\User;
 use App\Repository\TelegramBotRepository;
 use App\Service\Credential\CredentialVaultInterface;
-use App\Service\UserDeletionService;
+use App\Service\Iam\UserDeletionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 

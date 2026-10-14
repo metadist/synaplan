@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Model;
 
 /**
  * The five languages the app, emails, and channel messages share.

@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit;
 
-use App\Service\RecaptchaService;
+use App\Service\Auth\RecaptchaService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 

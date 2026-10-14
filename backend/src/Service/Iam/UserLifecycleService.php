@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Iam;
 
 use App\Entity\User;
 use App\Service\Email\EmailChatService;
+use App\Service\GuestSessionService;
+use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;

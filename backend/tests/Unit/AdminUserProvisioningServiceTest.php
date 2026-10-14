@@ -10,7 +10,7 @@ use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\AdminUserProvisioningService;
-use App\Service\UserLifecycleService;
+use App\Service\Iam\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;

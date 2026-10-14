@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Admin;
 
 use App\Repository\UserRepository;
+use App\Service\Iam\UserLifecycleService;
 use App\Service\Setup\SetupStateService;
-use App\Service\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;

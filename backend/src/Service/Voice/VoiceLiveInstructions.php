@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Voice;
 
 use App\Entity\User;
-use App\Service\AccountLanguage;
+use App\Model\AccountLanguage;
 
 /**
  * What the voice model is told. Persona and the recent chat only.

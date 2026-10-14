@@ -982,7 +982,7 @@ services:
             $bearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
 
     # OIDC Token Service for Keycloak integration
-    App\Service\OidcTokenService:
+    App\Service\Auth\OidcTokenService:
         arguments:
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
@@ -1094,12 +1094,12 @@ services:
             $oidcProviderLabel: '%env(string:OIDC_PROVIDER_LABEL)%'
 
     # OAuth State Service (signed tokens for CSRF protection)
-    App\Service\OAuthStateService:
+    App\Service\OAuth\OAuthStateService:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
 
     # Native OAuth handoff token (signed, short-lived) for the mobile deep-link flow
-    App\Service\NativeAuthHandoffService:
+    App\Service\Auth\NativeAuthHandoffService:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
 
@@ -1110,7 +1110,7 @@ services:
             $appSecret: '%env(APP_SECRET)%'
 
     # OAuth login responder (web cookies vs native deep-link handoff)
-    App\Service\OAuthLoginResponder:
+    App\Service\Auth\OAuthLoginResponder:
         arguments:
             $frontendUrl: '%env(FRONTEND_URL)%'
             $nativeDeepLinkScheme: '%env(NATIVE_DEEPLINK_SCHEME)%'
@@ -1132,7 +1132,7 @@ services:
     # they need is autowired.
 
     # reCAPTCHA Service
-    App\Service\RecaptchaService:
+    App\Service\Auth\RecaptchaService:
         arguments:
             $secretKey: '%env(RECAPTCHA_SECRET_KEY)%'
             $enabled: '%env(string:default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'

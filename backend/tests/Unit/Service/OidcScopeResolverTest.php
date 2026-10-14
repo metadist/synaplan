@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
-use App\Service\OidcScopeResolver;
+use App\Service\Auth\OidcScopeResolver;
 use PHPUnit\Framework\TestCase;
 
 final class OidcScopeResolverTest extends TestCase

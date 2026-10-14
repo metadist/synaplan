@@ -3,7 +3,7 @@
 namespace App\Security;
 
 use App\Service\Auth\OidcAccessDeniedException;
-use App\Service\OidcTokenService;
+use App\Service\Auth\OidcTokenService;
 use App\Service\OidcUserService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
