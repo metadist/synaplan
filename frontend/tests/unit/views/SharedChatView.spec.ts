@@ -109,7 +109,11 @@ describe('SharedChatView knowledge sources', () => {
   it.each(['capacitor://localhost', 'https://localhost'])(
     'points canonical and og:url at the configured service from %s',
     async (origin) => {
-      vi.stubGlobal('location', { ...window.location, origin, href: `${origin}/shared/en/public-token` })
+      vi.stubGlobal('location', {
+        ...window.location,
+        origin,
+        href: `${origin}/shared/en/public-token`,
+      })
       vi.stubGlobal('__SYNAPLAN_API_BASE_URL__', 'https://chat.example.test')
 
       const router = createRouter({
