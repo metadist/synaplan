@@ -1,0 +1,44 @@
+# Architecture gate — code cleanup V1 (_devextras/planning/20261014-code-cleanup-V1).
+#
+# Five layers, top to bottom; a layer may only depend on the layers listed in
+# `ruleset`. Everything not listed is a violation. `deptrac.baseline.yaml`
+# freezes the violations that existed when the gate was introduced; it may
+# only shrink. A new violation is fixed, not baselined.
+#
+# Run:  make -C backend deptrac            (also part of make ci-local and CI)
+#       make -C backend deptrac-baseline   (regenerate the baseline — review the diff)
+imports:
+  - deptrac.baseline.yaml
+
+deptrac:
+  paths:
+    - ./src
+  exclude_files:
+    - '#src/Kernel\.php#'
+  analyser:
+    types: [class, class_superglobal, use, file, function]
+  ignore_uncovered_internal_classes: true
+
+  layers:
+    - name: Entrypoint
+      collectors:
+        - { type: classLike, value: '^App\\(Controller|Command)\\' }
+    - name: Application
+      collectors:
+        - { type: classLike, value: '^App\\(Service|AI|Mcp|Realtime|Plug|Prompt|Module|Runtime|Message|MessageHandler|EventSubscriber|EventListener|Security|Seed|Observability|Monolog|Doctrine|Bundle|DataFixtures|DependencyInjection)\\' }
+    - name: Repository
+      collectors:
+        - { type: classLike, value: '^App\\Repository\\' }
+    - name: Entity
+      collectors:
+        - { type: classLike, value: '^App\\Entity\\' }
+    - name: Shared
+      collectors:
+        - { type: classLike, value: '^App\\(DTO|Model|Attribute|Exception)\\' }
+
+  ruleset:
+    Entrypoint: [Application, Repository, Entity, Shared]
+    Application: [Application, Repository, Entity, Shared]
+    Repository: [Repository, Entity, Shared]
+    Entity: [Entity, Repository, Shared]
+    Shared: [Shared]

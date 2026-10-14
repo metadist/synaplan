@@ -23,9 +23,10 @@ test: ## Run all tests (backend + frontend unit tests)
 	$(MAKE) -C backend test
 	$(MAKE) -C frontend test
 
-ci-local: ## Unit/static CI mirror (lint, phpstan, tests, vue-tsc). Not E2E — run make test-e2e before push.
+ci-local: ## Unit/static CI mirror (lint, phpstan, deptrac, tests, vue-tsc). Not E2E — run make test-e2e before push.
 	$(MAKE) lint
 	$(MAKE) -C backend phpstan
+	$(MAKE) -C backend deptrac
 	$(MAKE) test
 	docker compose exec -T frontend npm run check:types
 
