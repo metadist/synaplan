@@ -200,7 +200,13 @@ docker compose exec -T backend php bin/console cache:clear
 
 ---
 
-## 8. V2 backlog (not scheduled)
+## 8. V2 backlog
+
+The god classes have their own track, queued behind this one:
+[`../20261014-code-cleanup-V2/00_master_plan.md`](../20261014-code-cleanup-V2/00_master_plan.md)
+(size ratchet, characterization snapshots, `ConfigController` →
+`ChatHandler` → `StreamController`, `docs/ARCHITECTURE.md`, `make metrics`).
+The rest below is unscheduled (V3 candidates).
 
 | Item | Why it waits |
 | ---- | ------------ |
@@ -208,9 +214,6 @@ docker compose exec -T backend php bin/console cache:clear
 | Split `AI` ↔ `Service` into two layers | 32 / 71 cross imports; needs a facade decision |
 | Domain-to-domain rules inside `Service/` (X reaches Y only through a named facade) | Needs sorted folders first |
 | `Plugin\Sdk` namespace + `class_alias` shims for the four SDK classes | Needs a deprecation window for four external repos |
-| Break `ChatHandler` (39 deps), `StreamController` (37), `ConfigController` (51); review rule "more than 10 ctor deps fails" | Each is its own sprint |
 | PHPStan 5 → 6 → 8 with baseline | One level per sprint |
 | Mirror `tests/` to `src/` | Mechanical, after the moves settle |
-| `docs/ARCHITECTURE.md` with the deptrac graph (`deptrac analyse --formatter=graphviz-image`) | Needs C1 |
-| `make metrics` (LOC, max class size, max ctor arity) | Cheap; schedule with ARCHITECTURE.md |
 | Move `Iam\Permission`, `Iam\SharedResourceIds`, `SmartSearch\Index\*` value objects to Shared so Repository → Service hits zero | Removes the last baseline entries |
