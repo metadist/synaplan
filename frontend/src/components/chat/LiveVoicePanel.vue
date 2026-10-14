@@ -39,7 +39,8 @@ const connecting = computed(() => props.phase === 'connecting')
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.preventDefault()
-    emit(ended.value ? 'dismiss' : 'end')
+    if (ended.value) emit('dismiss')
+    else emit('end')
     return
   }
   if (event.key === ' ' && event.target === event.currentTarget) {
