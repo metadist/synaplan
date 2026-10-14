@@ -11,6 +11,7 @@ use App\Service\Vision\VisionModelResolver;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpClientExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Synaplan's PIC2TEXT / vision models, exposed to the Messages gateway as a
@@ -219,8 +220,11 @@ final readonly class AnalyzeImageTool
             'max_redirects' => 0,
             'verify_peer' => true,
             'verify_host' => true,
+            'buffer' => false,
             'headers' => [
                 'User-Agent' => 'Synaplan-MessagesGateway/1.0',
+                // identity: the client must not inflate the body before the cap below.
+                'Accept-Encoding' => 'identity',
             ],
         ];
         // A hostname is connected to the public address the guard just accepted.
@@ -245,7 +249,7 @@ final readonly class AnalyzeImageTool
                 $response->cancel();
                 throw new \InvalidArgumentException('Downloaded image is too large.');
             }
-            $binary = $response->getContent();
+            $binary = $this->readCapped($response);
         } catch (\InvalidArgumentException $e) {
             throw $e;
         } catch (HttpClientExceptionInterface $e) {
@@ -259,10 +263,6 @@ final readonly class AnalyzeImageTool
         if ('' === $binary) {
             throw new \InvalidArgumentException('Failed to download image_url.');
         }
-        if (strlen($binary) > self::MAX_BASE64_CHARS) {
-            throw new \InvalidArgumentException('Downloaded image is too large.');
-        }
-
         $finfo = new \finfo(\FILEINFO_MIME_TYPE);
         $mime = strtolower((string) $finfo->buffer($binary));
         if (!isset(self::MEDIA_EXTENSIONS[$mime])) {
@@ -270,6 +270,31 @@ final readonly class AnalyzeImageTool
         }
 
         return $this->writeBytes($binary, self::MEDIA_EXTENSIONS[$mime]);
+    }
+
+    /**
+     * Reads the body in chunks and stops at the cap. getContent() would hold
+     * the whole decoded payload first, including a body whose Content-Length
+     * is missing or smaller than the decoded bytes.
+     */
+    private function readCapped(ResponseInterface $response): string
+    {
+        $binary = '';
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            if ($chunk->isTimeout()) {
+                continue;
+            }
+            if ($chunk->isLast()) {
+                break;
+            }
+            $binary .= $chunk->getContent();
+            if (strlen($binary) > self::MAX_BASE64_CHARS) {
+                $response->cancel();
+                throw new \InvalidArgumentException('Downloaded image is too large.');
+            }
+        }
+
+        return $binary;
     }
 
     private function writeBytes(string $binary, string $ext): string

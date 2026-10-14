@@ -195,6 +195,9 @@ final class AnalyzeImageToolTest extends TestCase
         self::assertSame(0, $seen[2]['max_redirects']);
         self::assertTrue($seen[2]['verify_peer']);
         self::assertTrue($seen[2]['verify_host']);
+        self::assertFalse($seen[2]['buffer']);
+        $headers = implode("\n", $seen[2]['headers']);
+        self::assertStringContainsString('identity', strtolower($headers));
         $this->removeUploadDir($uploadDir);
     }
 
@@ -270,6 +273,25 @@ final class AnalyzeImageToolTest extends TestCase
 
         self::assertTrue($result['isError']);
         self::assertStringContainsString('Failed to download', $result['text']);
+    }
+
+    public function testDownloadStopsWhenTheBodyExceedsTheCap(): void
+    {
+        $guard = $this->createMock(SsrfGuard::class);
+        $guard->method('isBlockedUrl')->willReturn(false);
+        $guard->method('pinnedIps')->willReturn(['203.0.113.10']);
+        $http = new MockHttpClient(static function (): MockResponse {
+            return new MockResponse(str_repeat('x', 6_000_001), ['http_code' => 200]);
+        });
+        $ai = $this->createMock(AiFacade::class);
+        $ai->expects(self::never())->method('analyzeImage');
+
+        $result = $this->tool(true, $guard, $http, $ai)->execute([
+            'image_url' => 'https://cdn.example/a.png',
+        ], 4);
+
+        self::assertTrue($result['isError']);
+        self::assertStringContainsString('too large', $result['text']);
     }
 
     public function testDownloadRejectsANonImageBody(): void
