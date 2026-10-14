@@ -106,19 +106,34 @@ class MessageRepository extends ServiceEntityRepository
      *
      * Used as fallback when chatId is not available (backward compatibility).
      * For new code with chatId, use findChatHistory() instead.
+     *
+     * Returns the NEWEST $limit messages of the thread, oldest first, so a
+     * long thread yields the turns the current question continues rather than
+     * its first ten messages. $excludeMessageId leaves the message being
+     * answered out, exactly like findChatHistory().
+     *
+     * @return list<Message>
      */
-    public function findConversationHistory(int $userId, string $trackingId, int $limit = 10): array
+    public function findConversationHistory(int $userId, string $trackingId, int $limit = 10, ?int $excludeMessageId = null): array
     {
-        return $this->createQueryBuilder('m')
+        $qb = $this->createQueryBuilder('m')
             ->where('m.userId = :userId')
             ->andWhere('m.trackingId = :trackingId')
             ->setParameter('userId', $userId)
             ->setParameter('trackingId', $trackingId)
-            ->orderBy('m.unixTimestamp', 'ASC')
-            ->addOrderBy('m.id', 'ASC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
+            ->setMaxResults($limit);
+
+        if (null !== $excludeMessageId) {
+            $qb->andWhere('m.id != :excludeId')
+                ->setParameter('excludeId', $excludeMessageId);
+        }
+
+        /** @var list<Message> $newestFirst */
+        $newestFirst = $qb->getQuery()->getResult();
+
+        return array_reverse($newestFirst);
     }
 
     /**
