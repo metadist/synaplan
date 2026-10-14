@@ -31,14 +31,9 @@ export function liveEndReason(value: string | null | undefined): LiveEndReason {
 export function liveTerminalAction(reason: LiveEndReason): LiveTerminalAction {
   if (reason === 'limit_budget') return 'top_up'
   if (reason === 'user_end') return 'close'
-  if (
-    reason === 'provider_error' ||
-    reason === 'capacity' ||
-    reason === 'mic_denied' ||
-    reason === 'admin_disabled'
-  ) {
-    return 'microphone'
-  }
+  // A blocked microphone or a switched-off feature cannot be retried from here.
+  if (reason === 'mic_denied' || reason === 'admin_disabled') return 'close'
+  if (reason === 'provider_error' || reason === 'capacity') return 'microphone'
   return 'talk_again'
 }
 

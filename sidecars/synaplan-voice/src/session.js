@@ -14,6 +14,14 @@ export function disconnectPlan(client) {
 
 const parkedSessions = new Map()
 
+/** One provider socket per session. A second ticket for a live session is refused. */
+const activeSessions = new Set()
+
+export const CALLBACK_TIMEOUT_MS = 10_000
+
+/** A delegated question can run a whole chat turn or start a render. */
+export const DELEGATE_TIMEOUT_MS = 90_000
+
 export function shouldDropAudio(bufferedAmount, limit = AUDIO_BUFFER_LIMIT) {
   return bufferedAmount > limit
 }
@@ -75,6 +83,10 @@ export function handleConnection(socket, request, deps) {
     socket.close(4403)
     return
   }
+  if (!looksLikeTicket(ticket)) {
+    socket.close(4401)
+    return
+  }
 
   let adapter = null
   let direct = false
@@ -110,7 +122,7 @@ export function handleConnection(socket, request, deps) {
     if (clientSocket && clientSocket.readyState === 1) clientSocket.send(JSON.stringify(payload))
   }
 
-  const post = async (path, payload) => {
+  const post = async (path, payload, timeoutMs = CALLBACK_TIMEOUT_MS) => {
     const body = JSON.stringify(payload)
     const { timestamp, signature } = sign(deps.secret, body)
     const response = await deps.fetch(`${deps.synaplanUrl}${path}`, {
@@ -121,6 +133,7 @@ export function handleConnection(socket, request, deps) {
         'x-voice-signature': signature,
       },
       body,
+      signal: AbortSignal.timeout(timeoutMs),
     })
     const text = await response.text()
     let json = {}
@@ -174,7 +187,10 @@ export function handleConnection(socket, request, deps) {
     for (const [role, text] of openTurn) void storeTurn(role, text)
     openTurn.clear()
     while (saving.size > 0) await Promise.all([...saving])
-    if (sessionId) parkedSessions.delete(sessionId)
+    if (sessionId) {
+      parkedSessions.delete(sessionId)
+      activeSessions.delete(sessionId)
+    }
     const latencyMs = Date.now() - startedAt
     try {
       adapter?.close()
@@ -182,7 +198,7 @@ export function handleConnection(socket, request, deps) {
       // The provider socket is already gone. The usage row still has to close.
     }
     try {
-      await post(`/internal/voice/sessions/${sessionId}/closed`, { reason, meter, latencyMs })
+      await post(`/internal/voice/sessions/${sessionId}/closed`, { reason, meter: usagePayload(), latencyMs })
     } catch {
       log({ event: 'close_callback_failed', reason })
     }
@@ -194,7 +210,7 @@ export function handleConnection(socket, request, deps) {
   const applyDecision = (decision) => {
     if (!decision || typeof decision !== 'object') return
     if (decision.action === 'warn') send({ type: 'warn', secondsLeft: decision.allowedSeconds })
-    if (decision.action === 'wrap_up') {
+    if (decision.action === 'wrap_up' && !wrapTimer) {
       dropping = true
       send({ type: 'wrap_up' })
       wrapTimer = setTimeout(() => { void finish(decision.reason || 'limit_budget') }, 8000)
@@ -207,6 +223,10 @@ export function handleConnection(socket, request, deps) {
     const payload = usagePayload()
     try {
       const result = await post(`/internal/voice/sessions/${sessionId}/usage`, { meter: payload })
+      if (result.status === 404) {
+        void finish('network_lost')
+        return
+      }
       send({ type: 'usage', seconds: payload.seconds, secondsLeft: result.json.allowedSeconds })
       const frame = replyFrame('assistant', result.json)
       if (frame) send(frame)
@@ -218,7 +238,7 @@ export function handleConnection(socket, request, deps) {
 
   const ask = async (question, reply) => {
     try {
-      const result = await post(`/internal/voice/sessions/${sessionId}/delegate`, { question })
+      const result = await post(`/internal/voice/sessions/${sessionId}/delegate`, { question }, DELEGATE_TIMEOUT_MS)
       const frame = artifactFrame(result.json)
       if (frame) send(frame)
       reply(String(result.json.text ?? ''))
@@ -249,7 +269,18 @@ export function handleConnection(socket, request, deps) {
     const waiting = parkedSessions.get(sessionId)
     if (waiting) {
       adopted = true
-      waiting.adopt(socket)
+      if (socket.readyState === 1) waiting.adopt(socket)
+      return
+    }
+    if (activeSessions.has(sessionId)) {
+      adopted = true
+      socket.close(4409)
+      log({ event: 'duplicate_socket_refused' })
+      return
+    }
+    activeSessions.add(sessionId)
+    if (socket.readyState !== 1) {
+      await finish('network_lost')
       return
     }
     startedAt = Date.now()
@@ -340,6 +371,12 @@ export function handleConnection(socket, request, deps) {
       await finish('provider_error')
       return
     }
+    // The person hung up, or the session was closed, while the provider was opening.
+    if (ended) return
+    if ((!clientSocket || clientSocket.readyState !== 1) && !parkedSessions.has(sessionId)) {
+      await finish('network_lost')
+      return
+    }
     send({
       type: 'ready',
       audio: config.audio,
@@ -412,6 +449,7 @@ export function handleConnection(socket, request, deps) {
         parkedSessions.delete(sessionId)
         clientSocket = next
         next.on('message', onMessage)
+        next.on('error', () => next.terminate?.())
         next.on('close', () => onClose(next))
         send({
           type: 'ready',
@@ -421,6 +459,9 @@ export function handleConnection(socket, request, deps) {
       },
     })
   }
+  // ws reports a malformed frame as 'error'. Without a listener Node throws
+  // and every conversation on this process dies. The close event follows.
+  socket.on('error', () => socket.terminate?.())
   socket.on('close', () => onClose(socket))
 }
 
@@ -429,6 +470,16 @@ function originAllowed(origin, allowed) {
   const list = String(allowed).split(',').map((item) => item.trim()).filter(Boolean)
   if (list.length === 0) return true
   return list.includes(origin)
+}
+
+const TICKET_MAX_LENGTH = 2048
+
+/** A compact JWT. Anything else is refused before it costs a backend call. */
+export function looksLikeTicket(ticket) {
+  return typeof ticket === 'string'
+    && ticket.length > 0
+    && ticket.length <= TICKET_MAX_LENGTH
+    && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(ticket)
 }
 
 function looksLikeJson(raw) {

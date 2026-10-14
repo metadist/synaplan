@@ -78,6 +78,16 @@ describe('live voice socket', () => {
     ).toBe('ws://localhost:5173/voice/ws?ticket=one')
   })
 
+  it('dials the API host when the app is not served from that host', () => {
+    expect(
+      liveVoiceSocketUrl(
+        'ws://backend/voice/ws?ticket=one',
+        { protocol: 'https:', host: 'localhost' },
+        'https://chat.example.com'
+      )
+    ).toBe('wss://chat.example.com/voice/ws?ticket=one')
+  })
+
   it('passes a stored turn id through to the chat', () => {
     const stored: { role: string; messageId: number; text: string }[] = []
     const handlers = {
@@ -263,7 +273,9 @@ describe('live voice terminal copy', () => {
     expect(liveTerminalMessageKey('network_lost')).toBe('chatInput.liveVoice.terminal.network_lost')
     expect(liveTerminalAction('limit_budget')).toBe('top_up')
     expect(liveTerminalAction('user_end')).toBe('close')
-    expect(liveTerminalAction('mic_denied')).toBe('microphone')
+    expect(liveTerminalAction('mic_denied')).toBe('close')
+    expect(liveTerminalAction('admin_disabled')).toBe('close')
+    expect(liveTerminalAction('provider_error')).toBe('microphone')
     expect(liveTerminalAction('idle')).toBe('talk_again')
     expect(liveTerminalActionKey('microphone')).toBe(
       'chatInput.liveVoice.terminal.actionMicrophone'

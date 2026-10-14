@@ -50,7 +50,7 @@ final class VoiceLiveController extends AbstractController
                         new OA\Property(property: 'defaultModelId', type: 'integer', nullable: true),
                         new OA\Property(property: 'estimatedSecondsLeft', type: 'integer', nullable: true),
                         new OA\Property(property: 'budgetExhausted', type: 'boolean'),
-                        new OA\Property(property: 'costBudget', nullable: true, properties: [
+                        new OA\Property(property: 'costBudget', required: ['limit', 'used', 'remaining', 'userLevel', 'phoneVerified', 'topupAvailable'], nullable: true, properties: [
                             new OA\Property(property: 'limit', type: 'string'),
                             new OA\Property(property: 'used', type: 'string'),
                             new OA\Property(property: 'remaining', type: 'string'),

@@ -47,6 +47,9 @@ export async function openDirectVoice(input: {
 
   for (const track of input.mic.getTracks()) peer.addTrack(track, input.mic)
   peer.createDataChannel('oai-events')
+  peer.onconnectionstatechange = () => {
+    if (peer.connectionState === 'failed') input.handlers.onSocketClosed()
+  }
   peer.ontrack = (event) => {
     const stream = event.streams[0] ?? new MediaStream([event.track])
     remote.srcObject = stream
@@ -88,11 +91,13 @@ export async function openDirectVoice(input: {
       return
     }
     if (message.type === 'offer_required') {
-      void sendOffer()
+      void sendOffer().catch(() => input.handlers.onSocketClosed())
       return
     }
     if (message.type === 'answer' && message.sdp) {
-      void peer.setRemoteDescription({ type: 'answer', sdp: message.sdp })
+      void peer
+        .setRemoteDescription({ type: 'answer', sdp: message.sdp })
+        .catch(() => input.handlers.onSocketClosed())
       return
     }
     applyControlMessage(event.data, input.handlers)

@@ -3,6 +3,8 @@ import { WebSocketServer } from 'ws'
 import { adapterFor } from './adapters/index.js'
 import { handleConnection } from './session.js'
 
+export const MAX_PAYLOAD_BYTES = 512 * 1024
+
 export function createServer(options = {}) {
   const deps = {
     synaplanUrl: options.synaplanUrl ?? process.env.SYNAPLAN_URL ?? 'http://backend',
@@ -33,7 +35,10 @@ export function createServer(options = {}) {
     res.end()
   })
 
-  const wss = new WebSocketServer({ server, path: '/voice/ws' })
+  // A PCM chunk is a few KB and an SDP offer stays well below this.
+  const wss = new WebSocketServer({ server, path: '/voice/ws', maxPayload: MAX_PAYLOAD_BYTES })
   wss.on('connection', (socket, request) => handleConnection(socket, request, deps))
+  wss.on('error', (error) => deps.log({ event: 'server_error', error: error?.code ?? 'unknown' }))
+  server.on('error', (error) => deps.log({ event: 'server_error', error: error?.code ?? 'unknown' }))
   return server
 }

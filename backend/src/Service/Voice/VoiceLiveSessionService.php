@@ -111,14 +111,17 @@ final readonly class VoiceLiveSessionService
         $this->concurrency->acquire($provider);
 
         $incognito = true === ($body['incognito'] ?? false);
-        $chat = $incognito ? null : $this->chatFor($user, $this->intOrNull($body['chatId'] ?? null));
         $client = $this->string($body['client'] ?? 'web');
-        $transport = VoiceLiveTransport::choose($provider, $model->getProviderId(), $this->webrtcOpenAi(), $client);
         try {
+            $chat = $incognito ? null : $this->chatFor($user, $this->intOrNull($body['chatId'] ?? null));
+            $transport = VoiceLiveTransport::choose($provider, $model->getProviderId(), $this->webrtcOpenAi(), $client);
             $session = $this->usage->open($user, $model, $chat?->getId(), '' !== $client ? $client : 'web', false, $transport);
         } catch (VoiceLiveBusyException) {
             $this->concurrency->release($provider);
             throw new VoiceLiveRejectedException(409, ['error' => 'A live conversation is already open.', 'code' => 'VOICE_BUSY']);
+        } catch (\Throwable $e) {
+            $this->concurrency->release($provider);
+            throw $e;
         }
 
         $extra = [];
@@ -325,9 +328,12 @@ final readonly class VoiceLiveSessionService
     public function resumeTicket(User $user, int $sessionId, Request $request): array
     {
         $session = $this->owned($user, $sessionId);
-        if ('ended' === $session->getStatus()) {
+        // Only CarPlay parks the provider across a drop. Any other client would
+        // open a second provider socket on the same session and slot.
+        if ('ended' === $session->getStatus() || 'carplay' !== $session->getClient()) {
             throw new VoiceLiveRejectedException(404, ['error' => 'Session not found']);
         }
+        $this->limitStarts($user);
 
         $ticket = $this->tickets->mint((int) $user->getId(), $sessionId);
 
@@ -348,7 +354,20 @@ final readonly class VoiceLiveSessionService
      */
     public function applyUsage(int $sessionId, array $body): array
     {
-        $session = $this->openSession($sessionId);
+        $session = $this->em->find(VoiceSession::class, $sessionId);
+        if (!$session instanceof VoiceSession) {
+            throw new VoiceLiveRejectedException(404, ['error' => 'Session not found']);
+        }
+        // An admin kill, a REST end or the reaper closed the row already.
+        // The gateway must hang up the provider socket on this answer.
+        if ('ended' === $session->getStatus()) {
+            return [
+                'action' => 'stop',
+                'allowedSeconds' => 0,
+                'reason' => $session->getEndReason() ?? 'user_end',
+                'details' => null,
+            ];
+        }
         $decision = $this->usage->tick($session, $this->meter($body), $this->intOrNull($body['latencyMs'] ?? null));
         $this->rememberProviderSession($session, $body);
         $updated = $this->transcripts->attributeVoice($session);

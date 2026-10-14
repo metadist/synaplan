@@ -1,5 +1,6 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useNotification } from '@/composables/useNotification'
 import { ApiError } from '@/services/api/httpClient'
 import {
   endLiveVoiceSession,
@@ -37,6 +38,7 @@ import {
   type LiveTerminalAction,
 } from '@/services/liveVoice/terminal'
 import { useChatsStore } from '@/stores/chats'
+import { useConfigStore } from '@/stores/config'
 import { useHistoryStore } from '@/stores/history'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
@@ -44,8 +46,12 @@ import { useUsageTaximeterStore } from '@/stores/usageTaximeter'
 
 const CONNECT_MS = 15_000
 
+/** The orb reads the level often. Faster than this only re-renders the chat. */
+const LEVEL_MS = 100
+
 export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
-  const { locale } = useI18n()
+  const { t, locale } = useI18n()
+  const { error: notifyError } = useNotification()
   const chats = useChatsStore()
   const history = useHistoryStore()
   const incognito = useIncognitoStore()
@@ -74,7 +80,9 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   let adoptingChat = false
   let connectTimer: ReturnType<typeof setTimeout> | undefined
   let starting = false
+  let consentSaving = false
   let ignoreClose = false
+  let lastLevelAt = 0
   let liveRun = 0
   const liveTurns: { user?: string; assistant?: string } = {}
   let spokenLocalIds = new Set<string>()
@@ -227,7 +235,16 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   }
 
   async function allowConsent(): Promise<void> {
-    await setLiveVoiceConsent(true)
+    if (consentSaving || starting) return
+    consentSaving = true
+    try {
+      await setLiveVoiceConsent(true)
+    } catch {
+      notifyError(t('chatInput.liveVoice.consentFailed'))
+      return
+    } finally {
+      consentSaving = false
+    }
     if (options.value) options.value = { ...options.value, consentGiven: true }
     consentOpen.value = false
     await begin()
@@ -240,7 +257,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   async function press(): Promise<void> {
     if (starting || phase.value !== 'idle') return
     try {
-      if (!options.value) await loadOptions()
+      await loadOptions()
     } catch {
       fail('provider_error')
       return
@@ -252,10 +269,9 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     }
     if (current.budgetExhausted) {
       const budget = liveCostBudget(current.costBudget)
-      if (budget) {
-        onBudget(budget)
-        return
-      }
+      if (budget) onBudget(budget)
+      else fail('limit_budget')
+      return
     }
     if (!current.consentGiven) {
       consentOpen.value = true
@@ -268,6 +284,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     if (starting) return
     starting = true
     ignoreClose = false
+    muted.value = false
     budgetWarn.value = false
     budgetWrap.value = false
     captionText.value = ''
@@ -290,6 +307,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
       })
     let openedSessionId: number | null = null
     apply({ type: 'start' })
+    armConnectTimer(run, () => openedSessionId)
     try {
       await resumed
       if (!liveRunIs(run)) return
@@ -320,6 +338,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
       const handlers: LiveVoiceSocketHandlers = {
         onReady: () => {
           if (!liveRunIs(run)) return
+          clearTimeout(connectTimer)
           apply({ type: 'ready' })
         },
         onState: (state) => {
@@ -376,11 +395,11 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
           secondsLeft.value = left
         },
         onLevel: (value) => {
-          if (!liveRunIs(run)) return
+          if (!liveRunIs(run) || !levelDue()) return
           level.value = value
         },
         onOutLevel: (value) => {
-          if (!liveRunIs(run)) return
+          if (!liveRunIs(run) || !levelDue()) return
           outLevel.value = value
         },
         onAudioOut: () => {
@@ -393,7 +412,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
           fail('network_lost')
         },
       }
-      const wsUrl = liveVoiceSocketUrl(session.wsUrl, window.location)
+      const wsUrl = liveVoiceSocketUrl(session.wsUrl, window.location, useConfigStore().apiBaseUrl)
       const opened =
         session.transport === 'webrtc'
           ? await openDirectVoice({ context, mic, wsUrl, handlers, signal: controller.signal })
@@ -411,11 +430,10 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         return
       }
       audio = opened
-      connectTimer = setTimeout(() => {
-        if (liveRunIs(run) && phase.value === 'connecting') fail('provider_error')
-      }, CONNECT_MS)
     } catch (error) {
       if (!liveRunIs(run)) return
+      const hangUp = sessionId ?? openedSessionId
+      sessionId = null
       stopStream(mic)
       if (audioContext && audioContext.state !== 'closed') {
         audioContext.close().catch(() => undefined)
@@ -430,13 +448,14 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         phase.value = 'idle'
         teardown()
         if (budget) onBudget(budget)
+        else fail('limit_budget')
       } else if (error instanceof ApiError && error.status === 503) {
         fail('capacity')
       } else {
         fail('provider_error')
       }
-      if (sessionId !== null && phase.value === 'ended') {
-        void endLiveVoiceSession(sessionId, 'provider_error').catch(() => undefined)
+      if (hangUp !== null && phase.value === 'ended') {
+        void endLiveVoiceSession(hangUp, 'provider_error').catch(() => undefined)
       }
     } finally {
       if (!liveRunIs(run)) {
@@ -445,6 +464,26 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
       }
       starting = false
     }
+  }
+
+  /** The whole handshake, including the microphone prompt, has a limit. */
+  function armConnectTimer(run: number, sessionOf: () => number | null): void {
+    clearTimeout(connectTimer)
+    connectTimer = setTimeout(() => {
+      if (!liveRunIs(run) || phase.value !== 'connecting') return
+      const id = sessionOf()
+      liveRun += 1
+      captureAbort?.abort()
+      fail('provider_error')
+      if (id !== null) void endLiveVoiceSession(id, 'provider_error').catch(() => undefined)
+    }, CONNECT_MS)
+  }
+
+  function levelDue(): boolean {
+    const now = performance.now()
+    if (now - lastLevelAt < LEVEL_MS) return false
+    lastLevelAt = now
+    return true
   }
 
   function returnToComposer(): void {

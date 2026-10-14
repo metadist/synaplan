@@ -129,7 +129,7 @@ test('a WebRTC sideband bills the same meter as the relay mapper and closes on s
   })
   await listen(gateway)
 
-  const client = new WebSocket(`ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=one-time`)
+  const client = new WebSocket(`ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=eyJhbGciOiJIUzI1NiJ9.eyJzaWQiOjd9.c2lnbmF0dXJl`)
   const frames = []
   client.on('message', (raw) => {
     const text = raw.toString()

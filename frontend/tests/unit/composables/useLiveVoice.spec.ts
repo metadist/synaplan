@@ -37,6 +37,10 @@ vi.mock('@/services/liveVoice/webrtc', () => ({
   openDirectVoice,
 }))
 
+vi.mock('@/stores/config', () => ({
+  useConfigStore: () => ({ apiBaseUrl: '' }),
+}))
+
 vi.mock('@/stores/chats', () => ({
   useChatsStore: () => ({
     get activeChatId() {

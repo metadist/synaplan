@@ -5,9 +5,18 @@ import { WebSocket } from 'ws'
 import { createMockAdapter } from '../src/adapters/mock.js'
 import { verify } from '../src/hmac.js'
 import { createServer } from '../src/server.js'
-import { shouldDropAudio, disconnectPlan, replyFrame, storedFrame, artifactFrame, postUntilStored, CARPLAY_RECONNECT_MS } from '../src/session.js'
+import { shouldDropAudio, disconnectPlan, replyFrame, storedFrame, artifactFrame, postUntilStored, looksLikeTicket, CARPLAY_RECONNECT_MS } from '../src/session.js'
 
 const SECRET = 'test-secret'
+const TICKET = 'eyJhbGciOiJIUzI1NiJ9.eyJzaWQiOjd9.c2lnbmF0dXJl'
+
+test('only a compact JWT is sent to the backend for redemption', () => {
+  assert.equal(looksLikeTicket(TICKET), true)
+  assert.equal(looksLikeTicket(''), false)
+  assert.equal(looksLikeTicket('one-time'), false)
+  assert.equal(looksLikeTicket('a.b.c<script>'), false)
+  assert.equal(looksLikeTicket(`${'a'.repeat(2048)}.b.c`), false)
+})
 
 test('audio is dropped once the client buffer is over a megabyte', () => {
   assert.equal(shouldDropAudio(1_000_000), false)
@@ -131,7 +140,7 @@ for (const dialect of ['mock-openai', 'mock-google']) {
     })
     await listen(gateway)
 
-    const client = new WebSocket(`ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=one-time`)
+    const client = new WebSocket(`ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=${TICKET}`)
     const frames = []
     client.on('message', (data, isBinary) => {
       frames.push(isBinary ? { binary: true, bytes: data.length } : JSON.parse(data.toString()))
@@ -198,7 +207,7 @@ test('a CarPlay drop keeps the provider until the reconnect window ends', async 
     },
   })
   await listen(gateway)
-  const url = `ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=one`
+  const url = `ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=${TICKET}`
 
   const first = new WebSocket(url)
   const firstFrames = []
@@ -292,7 +301,7 @@ test('an unfinished sentence is stored before the session is marked closed', asy
   })
   await listen(gateway)
 
-  const client = new WebSocket(`ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=one-time`)
+  const client = new WebSocket(`ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=${TICKET}`)
   const frames = []
   client.on('message', (data, isBinary) => {
     if (!isBinary) frames.push(JSON.parse(data.toString()))
@@ -311,6 +320,102 @@ test('an unfinished sentence is stored before the session is marked closed', asy
     'transcript-done',
     'closed',
   ])
+
+  client.terminate()
+  gateway.close()
+  backend.close()
+})
+
+function redeemingBackend(sessionId, usageReply, calls = []) {
+  return http.createServer((req, res) => {
+    req.resume()
+    req.on('end', () => {
+      calls.push(String(req.url))
+      res.writeHead(200, { 'content-type': 'application/json' })
+      if (req.url === '/internal/voice/tickets/redeem') {
+        res.end(JSON.stringify({
+          sessionId,
+          provider: 'mock-openai',
+          model: 'gpt-live-1',
+          voice: 'marin',
+          instructions: 'Ask Synaplan.',
+          allowedSeconds: 80,
+          transport: 'relay',
+          audio: { format: 'pcm16', inRate: 24000, outRate: 24000 },
+        }))
+        return
+      }
+      res.end(JSON.stringify(String(req.url).endsWith('/usage') ? usageReply : { ok: true }))
+    })
+  })
+}
+
+test('a second socket for a live session is refused and the first keeps its provider', async () => {
+  const backend = redeemingBackend(21, { action: 'continue', allowedSeconds: 80, reason: '' })
+  await listen(backend)
+  const adapters = []
+  const gateway = createServer({
+    synaplanUrl: `http://127.0.0.1:${backend.address().port}`,
+    secret: SECRET,
+    tickSeconds: 0,
+    idleSeconds: 0,
+    adapterFor: (provider) => {
+      const adapter = createMockAdapter(provider)
+      adapters.push(adapter)
+      return adapter
+    },
+  })
+  await listen(gateway)
+  const url = `ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=${TICKET}`
+
+  const first = new WebSocket(url)
+  const frames = []
+  first.on('message', (data, isBinary) => {
+    if (!isBinary) frames.push(JSON.parse(data.toString()))
+  })
+  await once(first, 'open')
+  await waitFor(() => frames.some((frame) => frame.type === 'ready'))
+
+  const second = new WebSocket(url)
+  const [code] = await once(second, 'close').then((...args) => args)
+  assert.equal(code, 4409)
+  assert.equal(adapters.length, 1)
+  assert.equal(adapters[0].closed, false)
+
+  first.close()
+  await waitFor(() => adapters[0].closed)
+  gateway.close()
+  backend.close()
+})
+
+test('a session ended by an admin stops the provider on the next usage tick', async () => {
+  const calls = []
+  const backend = redeemingBackend(22, { action: 'stop', allowedSeconds: 0, reason: 'admin_disabled' }, calls)
+  await listen(backend)
+  let adapter
+  const gateway = createServer({
+    synaplanUrl: `http://127.0.0.1:${backend.address().port}`,
+    secret: SECRET,
+    tickSeconds: 0.05,
+    idleSeconds: 0,
+    adapterFor: (provider) => {
+      adapter = createMockAdapter(provider)
+      return adapter
+    },
+  })
+  await listen(gateway)
+
+  const client = new WebSocket(`ws://127.0.0.1:${gateway.address().port}/voice/ws?ticket=${TICKET}`)
+  const frames = []
+  client.on('message', (data, isBinary) => {
+    if (!isBinary) frames.push(JSON.parse(data.toString()))
+  })
+  await once(client, 'open')
+  await waitFor(() => frames.some((frame) => frame.type === 'ended'))
+
+  assert.equal(adapter.closed, true)
+  assert.equal(frames.find((frame) => frame.type === 'ended').reason, 'admin_disabled')
+  assert.equal(calls.some((path) => path.endsWith('/closed')), true)
 
   client.terminate()
   gateway.close()

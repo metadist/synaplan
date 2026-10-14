@@ -14,7 +14,9 @@ The response carries `ticket`, `wsUrl`, `transport` (`relay` or `webrtc`), `audi
 
 A second open conversation for the same user is `409` with `code: VOICE_BUSY`. A used-up monthly budget is `429` with `code: COST_BUDGET_EXCEEDED`, the same payload as a typed message. Provider capacity is `503` with `code: VOICE_CAPACITY`. The live service being down is `503` with `code: VOICE_UNAVAILABLE`. Missing consent is `403` with `code: VOICE_CONSENT_REQUIRED`.
 
-`POST /api/v1/voice/live/sessions/{id}/ticket` mints a fresh ticket for a session that is still open. It does not open a second session. CarPlay uses it after a short network drop. The socket URL carries the new ticket.
+`POST /api/v1/voice/live/sessions/{id}/ticket` mints a fresh ticket for a CarPlay session that is still open. It does not open a second session. CarPlay uses it after a short network drop. The socket URL carries the new ticket. Any other client gets `404`, and it counts against the same start rate as a new conversation.
+
+The sidecar holds one provider socket per session. A second socket for a session that is still connected closes with `4409`; only a parked CarPlay session is taken over by the reconnect.
 
 ## Socket
 
@@ -80,7 +82,9 @@ LIVE_VOICE_GATEWAY_URL=http://voice:8096
 LIVE_VOICE_GATEWAY_SECRET=<shared secret>
 ```
 
-Caddy proxies `/voice/ws` to the sidecar and sends `/internal/voice` to PHP. A missing profile makes the socket path fail, which matches the feature being off.
+Both values go into `backend/.env`. The voice container reads the same file, so the secret, the provider keys and `LIVE_VOICE_ALLOWED_ORIGINS` (comma-separated; empty allows any origin) are set once. The sidecar refuses to start with a secret shorter than 32 characters.
+
+Caddy proxies `/voice/ws` to the sidecar and sends `/internal/voice` to PHP. A missing profile makes the socket path fail, which matches the feature being off. When an admin kill, a REST end or the reaper closes a session, the next usage tick answers `stop` and the sidecar hangs up the provider.
 
 Usage is ticked about every 15 seconds. A session with no tick for 45 seconds is closed by `app:voice:reap-sessions` on the scheduler tick (about once a minute) and billed up to the last tick. Idle silence of two minutes ends the conversation from the sidecar. The admin max length is `BCONFIG` `LIVE_VOICE` / `MAX_SESSION_SECONDS` (default 1800, floor 60).
 

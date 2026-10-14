@@ -22,6 +22,7 @@ const props = defineProps<{
   terminalMessage: string
   terminalActionLabel: string
   terminalAction: LiveTerminalAction
+  closeLabel: string
 }>()
 
 const emit = defineEmits<{
@@ -38,7 +39,7 @@ const connecting = computed(() => props.phase === 'connecting')
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.preventDefault()
-    emit('end')
+    emit(ended.value ? 'dismiss' : 'end')
     return
   }
   if (event.key === ' ' && event.target === event.currentTarget) {
@@ -116,14 +117,26 @@ function onKeydown(event: KeyboardEvent) {
 
     <div v-else data-testid="live-voice-terminal">
       <p class="text-sm txt-primary">{{ terminalMessage }}</p>
-      <button
-        type="button"
-        class="btn-primary mt-3 px-4 py-2.5 text-sm font-medium"
-        data-testid="btn-live-voice-terminal-action"
-        @click="emit('action')"
-      >
-        {{ terminalActionLabel }}
-      </button>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button
+          v-if="terminalAction !== 'close'"
+          type="button"
+          class="btn-primary px-4 py-2.5 text-sm font-medium"
+          data-testid="btn-live-voice-terminal-action"
+          @click="emit('action')"
+        >
+          {{ terminalActionLabel }}
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2.5 text-sm font-medium"
+          :class="terminalAction === 'close' ? 'btn-primary' : 'btn-secondary'"
+          data-testid="btn-live-voice-terminal-close"
+          @click="emit('dismiss')"
+        >
+          {{ closeLabel }}
+        </button>
+      </div>
     </div>
 
     <p v-if="!connecting" class="mt-3 text-xs txt-secondary">

@@ -514,7 +514,7 @@
           :status-hint="liveStatusHint"
           :muted="liveMuted"
           :company-line="$t('chatInput.liveVoice.companyLine', { company: liveCompany })"
-          :touches-line="$t('chatInput.liveVoice.touchesLine')"
+          :touches-line="$t(liveLine('chatInput.liveVoice.touchesLine'))"
           :owner-line="$t('chatInput.liveVoice.ownerLine')"
           :model-label="liveModelLabel"
           :budget-label="liveBudgetLabel"
@@ -533,9 +533,10 @@
               ? $t('chatInput.liveVoice.warnBanner', { seconds: liveSecondsLeft ?? 0 })
               : ''
           "
-          :terminal-message="$t(liveTerminalMessageKey)"
+          :terminal-message="$t(liveLine(liveTerminalMessageKey))"
           :terminal-action-label="$t(liveTerminalActionKey)"
           :terminal-action="liveTerminalAction"
+          :close-label="$t('chatInput.liveVoice.terminal.actionClose')"
           @mute="liveToggleMute"
           @captions="liveToggleCaptions"
           @end="liveEnd"
@@ -548,7 +549,7 @@
     <LiveVoiceConsentDialog
       v-if="liveConsentOpen"
       :title="$t('chatInput.liveVoice.consentTitle')"
-      :body="$t('chatInput.liveVoice.consentBody', { company: liveCompany })"
+      :body="$t(liveLine('chatInput.liveVoice.consentBody'), { company: liveCompany })"
       :allow-label="$t('chatInput.liveVoice.consentAllow')"
       :decline-label="$t('chatInput.liveVoice.consentDecline')"
       @allow="liveAllowConsent"
@@ -1037,7 +1038,7 @@ watch(
 onMounted(() => {
   void restoreDesktopJobs()
 })
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 watch([toolsSummaryText, selectedModelId, activeTool, isGuestMode], () => {
   void fitControlBar()
 })
@@ -2239,6 +2240,12 @@ const liveBudgetLabel = computed(() => {
   if (left < 90) return t('chatInput.liveVoice.budgetSeconds', { seconds: left })
   return t('chatInput.liveVoice.budgetMinutes', { minutes: Math.max(1, Math.round(left / 60)) })
 })
+
+/** A private conversation stores nothing, so its copy must not claim a saved transcript. */
+function liveLine(key: string): string {
+  const incognitoKey = `${key}Incognito`
+  return incognitoStore.active && te(incognitoKey) ? incognitoKey : key
+}
 
 function onLiveTerminalAction() {
   const action = liveTerminalAction.value

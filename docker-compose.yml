@@ -1298,6 +1298,9 @@ services:
   # Live voice. Off unless the profile is started and LIVE_VOICE_GATEWAY_URL
   # plus LIVE_VOICE_GATEWAY_SECRET are set. The browser connects through Caddy
   # on /voice/ws. Inside the network the backend listens on port 80.
+  # The secret, provider keys and LIVE_VOICE_* settings come from backend/.env,
+  # the same file the backend reads. Do not repeat them under `environment`
+  # with an empty default: that overrides env_file and blanks the secret.
   voice:
     profiles: [voice]
     pull_policy: build
@@ -1313,13 +1316,6 @@ services:
     environment:
       PORT: "8096"
       SYNAPLAN_URL: http://backend
-      LIVE_VOICE_GATEWAY_SECRET: ${LIVE_VOICE_GATEWAY_SECRET:-}
-      LIVE_VOICE_COMPATIBLE_WS_URL: ${LIVE_VOICE_COMPATIBLE_WS_URL:-}
-      LIVE_VOICE_COMPATIBLE_API_KEY: ${LIVE_VOICE_COMPATIBLE_API_KEY:-}
-      LIVE_VOICE_COMPATIBLE_AUTH: ${LIVE_VOICE_COMPATIBLE_AUTH:-bearer}
-      LIVE_VOICE_COMPATIBLE_MODEL: ${LIVE_VOICE_COMPATIBLE_MODEL:-}
-      OPENAI_LIVE_REGION: ${OPENAI_LIVE_REGION:-us}
-      LIVE_VOICE_ALLOWED_ORIGINS: ${LIVE_VOICE_ALLOWED_ORIGINS:-}
     depends_on:
       - backend
     networks:
