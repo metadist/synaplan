@@ -112,6 +112,7 @@ Do **not** push and wait for GitHub. The `CI` workflow is ~10–15 minutes; a mi
 | ---------- | ----------------- |
 | `make -C backend lint` | PHP Code Formatting |
 | `make -C backend phpstan` | Backend (PHP/Symfony) — PHPStan stage |
+| `make -C backend deptrac` | Backend (PHP/Symfony) — deptrac stage (layer rules, `backend/deptrac.yaml`) |
 | `make -C backend test` | Backend (PHP/Symfony) — PHPUnit stage |
 | `make -C frontend lint` | Frontend (Vue/TypeScript) — lint |
 | `docker compose exec -T frontend npm run check:types` | Frontend (Vue/TypeScript) — vue-tsc |
@@ -120,7 +121,7 @@ Do **not** push and wait for GitHub. The `CI` workflow is ~10–15 minutes; a mi
 ```bash
 make ci-local
 # same as:
-# make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
+# make lint && make -C backend phpstan && make -C backend deptrac && make test && docker compose exec -T frontend npm run check:types
 ```
 
 `make ci-local` is **not** full CI. Green here only means the unit/static jobs will pass. Playwright is a separate required job (below).
@@ -162,6 +163,7 @@ Real failure modes that have caused red CI more than once:
 
 - **`--filter` ≠ `make test`.** Characterization, integration, and feature tests live OUTSIDE the namespace you usually filter on. Always re-run unfiltered before committing.
 - **`phpstan analyse <path>` ≠ `make -C backend phpstan`.** CI analyses the WHOLE project including `tests/`. Example miss: a test closure typed `: ?string` that never returns null trips `Anonymous function never returns null` only in the full run.
+- **deptrac red = a new layer violation, not a baseline to extend.** `backend/deptrac.yaml` enforces Entrypoint → Application → Repository → Entity → Shared (`App\Entity\*` must not import `App\Service\*`, `App\Repository\*` must not import `App\AI\*`, …). `backend/deptrac.baseline.yaml` freezes only the violations that predate the gate and may only shrink: fix the import (move the value object to `App\Model\`, pass the value in instead of the service), never add an entry. `make -C backend deptrac-baseline` exists to drop entries that no longer fire, and its diff must contain removals only.
 - **Snapshot / characterization tests.** `backend/tests/Characterization/` locks the routing/classifier contract via JSON snapshots. Any change to `MessageClassifier`, `MessageSorter`, the fast-path heuristic, or the AI sorter response shape WILL drift them. Re-record and review every changed line — never silently re-record:
 
   ```bash

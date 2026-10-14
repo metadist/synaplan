@@ -402,6 +402,12 @@ jobs:
         working-directory: backend
         run: composer phpstan
 
+      - name: Run deptrac
+        working-directory: backend
+        # Layer rules in deptrac.yaml; deptrac.baseline.yaml freezes the
+        # violations that predate the gate and may only shrink.
+        run: composer deptrac
+
       - name: Setup database schema
         working-directory: backend
         # Migrations are the single source of truth. We deliberately do NOT run

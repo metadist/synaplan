@@ -118,6 +118,7 @@
         "lint": "php-cs-fixer check --diff",
         "lint:fix": "php-cs-fixer fix",
         "phpstan": "phpstan analyse",
+        "deptrac": "deptrac analyse --no-progress",
         "proto:generate": [
             "protoc --php_out=lib/grpc --proto_path=proto/triton proto/triton/grpc_service.proto proto/triton/model_config.proto"
         ]
@@ -137,6 +138,7 @@
     "require-dev": {
         "api-platform/test": "^5.0.1",
         "dama/doctrine-test-bundle": "^8.6",
+        "deptrac/deptrac": "^4.7",
         "dg/bypass-finals": "^1.9",
         "friendsofphp/php-cs-fixer": "^3.95.11",
         "phpstan/phpstan": "^2.1.53",

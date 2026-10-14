@@ -36,7 +36,7 @@ them; feature tracks resume when V2 meets its exit.
 
 | Path | What | State 2026-10-14 |
 | ---- | ---- | ---------------- |
-| [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | Backend ordering sprint: deptrac layer gate with baseline, `Service/` root guarded as plugin contract, 69 of the 73 loose services sorted into domain folders in six PRs | **cleanup window** — C1 on go |
+| [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | Backend ordering sprint: deptrac layer gate with baseline, `Service/` root guarded as plugin contract, 69 of the 73 loose services sorted into domain folders in six PRs | **cleanup window** — C1 in review |
 | [`20261014-code-cleanup-V2/`](./20261014-code-cleanup-V2/00_master_plan.md) | Break up the god classes: size ratchet, characterization snapshots, `ConfigController` → `ChatHandler` → `StreamController`, `docs/ARCHITECTURE.md` | **cleanup window** — after V1; closes the window |
 | [`20261009-ux-overhaul/`](./20261009-ux-overhaul/00_master_plan.md) | UX overhaul: rail Chats · Library · Assistants · Apps · Admin, every sub page explained, guided tours (UX00–UX14) | paused |
 | [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | Triage of the external 5.2.0 test round (F1–F49), six fixing waves, 50 issue drafts in `issues/` | paused — waves 1–3 shipped; bug-fix issues continue |
