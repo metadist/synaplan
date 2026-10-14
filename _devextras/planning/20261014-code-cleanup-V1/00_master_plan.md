@@ -26,7 +26,7 @@ Files in this track:
 
 | # | Decision | Default | Agree? |
 | - | -------- | ------- | ------ |
-| 1 | Architecture gate tool: **deptrac** (`deptrac/deptrac` ^4.7, PHP ^8.2, PHPStan ^2.0 — matches our PHPStan 2.3.1). New dev dependency + new CI step in the Backend job. Alternative with zero CI change: `phpat/phpat` (rules run inside the existing `composer phpstan`, violations land in `phpstan-baseline.neon`; no dependency graph). | deptrac | |
+| 1 | Architecture gate tool: **deptrac** (`deptrac/deptrac` ^4.7, PHP ^8.2, PHPStan ^2.0 — matches our PHPStan 2.3.1). New dev dependency + new CI step in the Backend job. Alternative with zero CI change: `phpat/phpat` (rules run inside the existing `composer phpstan`, violations land in `phpstan-baseline.neon`; no dependency graph). | deptrac | ✅ 2026-10-14 — deptrac. C1 starts after the next merge to `main`, on explicit go. |
 | 2 | Baseline policy: the first run writes `backend/deptrac.baseline.yaml`; CI fails only on **new** violations. The baseline can only shrink (same rule as `localeParityBaseline.json` and the dated allow-lists in `tests/Architecture/`). | Locked | |
 | 3 | V1 layer rules are the ones already (nearly) true today — see §3. Domain-to-domain rules inside `Service/` are V2, after the folders are sorted. | Locked | |
 | 4 | The four classes external plugins import (`PluginDataService`, `ModelConfigService`, `RateLimitService`, `OidcUserService`) **stay in `src/Service/` root** in V1. They are the de-facto plugin SDK; moving them breaks Synaform, synafastbill, Synamail and synaScriber. End state of the root: *only* plugin-facing classes, guarded by a test. | Locked | |
