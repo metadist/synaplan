@@ -243,3 +243,37 @@ describe('ConfigField — search deep link', () => {
     expect(mountField().find('[data-testid="config-field-highlighted"]').exists()).toBe(false)
   })
 })
+
+/**
+ * A page of secret settings must never read as a sign-in form to the browser:
+ * a password manager would otherwise fill the saved account password into the
+ * first secret field (and the account e-mail into the text field before it)
+ * on every load, and handleInput would offer that password for saving.
+ */
+describe('ConfigField — never a sign-in form for the password manager', () => {
+  const mountWithType = (type: ConfigFieldSchema['type'], fieldKey: string) =>
+    mount(ConfigField, {
+      props: {
+        fieldKey,
+        schema: { ...booleanSchema, type, default: '' },
+        value: { value: '', isSet: false, isMasked: false } as ConfigValue,
+      },
+    })
+
+  it('tells the browser a secret is a new credential, never a saved one', () => {
+    const input = mountWithType('password', 'WHATSAPP_ACCESS_TOKEN').get('input')
+
+    expect(input.attributes('type')).toBe('password')
+    expect(input.attributes('autocomplete')).toBe('new-password')
+    expect(input.attributes('data-1p-ignore')).toBeDefined()
+    expect(input.attributes('data-lpignore')).toBe('true')
+    expect(input.attributes('data-bwignore')).toBeDefined()
+  })
+
+  it('switches autofill off on text and e-mail settings', () => {
+    expect(mountWithType('text', 'M365_TENANT').get('input').attributes('autocomplete')).toBe('off')
+    expect(mountWithType('email', 'GMAIL_USERNAME').get('input').attributes('autocomplete')).toBe(
+      'off'
+    )
+  })
+})
