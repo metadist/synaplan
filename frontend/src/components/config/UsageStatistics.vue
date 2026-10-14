@@ -289,6 +289,8 @@
             <option value="EMBEDDINGS">{{ $t('config.usage.actions.embeddings') }}</option>
             <option value="RERANK">{{ $t('config.usage.actions.rerank') }}</option>
             <option value="MESSAGE_DIGEST">{{ $t('config.usage.actions.message_digest') }}</option>
+            <option value="VOICE_LIVE">{{ $t('config.usage.actions.voice_live') }}</option>
+            <option value="TRANSCRIPTION">{{ $t('config.usage.actions.transcription') }}</option>
           </select>
 
           <input
@@ -359,9 +361,27 @@
                   {{ getTimeAgo(entry.timestamp) }}
                 </td>
                 <td class="px-3 py-3">
-                  <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
-                    {{ getActionLabel(entry.action) }}
-                  </span>
+                  <RouterLink
+                    v-if="entry.chat_id"
+                    :to="{ name: 'chat', query: { chat: String(entry.chat_id) } }"
+                    class="inline-flex flex-col"
+                    :title="$t('config.usage.openChat')"
+                  >
+                    <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
+                      {{ getActionLabel(entry.action) }}
+                    </span>
+                    <span v-if="talkDuration(entry)" class="mt-1 text-xs txt-secondary">
+                      {{ talkDuration(entry) }}
+                    </span>
+                  </RouterLink>
+                  <template v-else>
+                    <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
+                      {{ getActionLabel(entry.action) }}
+                    </span>
+                    <p v-if="talkDuration(entry)" class="mt-1 text-xs txt-secondary">
+                      {{ talkDuration(entry) }}
+                    </p>
+                  </template>
                 </td>
                 <td class="px-3 py-3 whitespace-nowrap">
                   <span class="flex items-center gap-1.5 text-xs txt-secondary">
@@ -496,6 +516,7 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { RouterLink } from 'vue-router'
 import {
   getUsageStats,
   downloadUsageExport,
@@ -683,6 +704,16 @@ const getSubscriptionStatusClass = (status: SubscriptionStatus) => {
     default:
       return 'text-gray-600 dark:text-gray-400'
   }
+}
+
+function talkDuration(entry: ActivityEntry): string {
+  const seconds = entry.duration_seconds
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return ''
+  const total = Math.round(seconds)
+  const minutes = Math.floor(total / 60)
+  const rest = total % 60
+  if (minutes === 0) return t('config.usage.durationSeconds', { seconds: rest })
+  return t('config.usage.durationMinutes', { minutes, seconds: rest })
 }
 
 const getActionLabel = (action: string) => {

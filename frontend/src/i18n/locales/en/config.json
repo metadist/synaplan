@@ -1119,6 +1119,7 @@
       "channel": "Channel",
       "tokens": "Tokens",
       "latency": "Latency",
+      "duration": "Duration",
       "model": "Model",
       "promptTokens": "Prompt",
       "completionTokens": "Completion",
@@ -1126,6 +1127,9 @@
       "cost": "Cost",
       "estimatedTooltip": "Token count estimated (no exact measurement from provider)",
       "noRecentActivity": "No recent activity",
+      "durationMinutes": "{minutes} min {seconds} s",
+      "durationSeconds": "{seconds} s",
+      "openChat": "Open this chat",
       "activity": {
         "searchPlaceholder": "Search by model or provider...",
         "allActions": "All actions",
@@ -1157,7 +1161,9 @@
         "embeddings": "Embeddings",
         "api_chat": "API Chat",
         "rerank": "Rerank",
-        "message_digest": "Long-term memory"
+        "message_digest": "Long-term memory",
+        "voice_live": "Live conversation",
+        "transcription": "Transcription"
       },
       "sources": {
         "whatsapp": "WhatsApp",

@@ -18,12 +18,14 @@ use App\Module\Provider\HiggsfieldModule;
 use App\Module\Provider\TheHiveModule;
 use App\Module\Sidecar\ComputeModule;
 use App\Module\Sidecar\DoclingModule;
+use App\Module\Sidecar\LiveVoiceModule;
 use App\Module\Sidecar\LocalAiModule;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Module\Sidecar\OpendeskSttModule;
 use App\Module\Sidecar\PiperTtsModule;
 use App\Module\Sidecar\SearxngModule;
 use App\Module\Sidecar\TikaModule;
+use App\Repository\ModelRepository;
 use App\Service\BillingService;
 use App\Service\Chat\ChatArtifactsConfig;
 use App\Service\Compute\ComputeConfig;
@@ -75,6 +77,7 @@ trait BuildsAllModules
             new FederationModule('http://localhost:8000', false),
             new ComputeModule($probe, $this->createStub(ComputeConfig::class), '', ''),
             new OpendeskSttModule($probe, '', '', '', ''),
+            new LiveVoiceModule($probe, '', '', $this->createStub(ModelRepository::class), $keyStore),
             new ChatArtifactsModule($this->disabledArtifacts()),
         ];
 

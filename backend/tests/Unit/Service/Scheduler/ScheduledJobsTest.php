@@ -16,6 +16,7 @@ final class ScheduledJobsTest extends TestCase
                 'app:media:reap-jobs',
                 'app:chat:reap-stuck',
                 'app:desktop:reap-jobs',
+                'app:voice:reap-sessions',
                 'app:process-mail-handlers',
                 'app:process-emails',
             ],

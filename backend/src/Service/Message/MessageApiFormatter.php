@@ -117,6 +117,19 @@ final readonly class MessageApiFormatter
                 ];
             }
 
+            // Live voice model that spoke this reply. Present even when the
+            // live model answered itself and no chat model was involved.
+            $voiceModel = $m->getMeta('voice_model_name') ?: $m->getMeta('voice_model');
+            $voiceProvider = $m->getMeta('voice_provider');
+            $voiceModelId = $m->getMeta('voice_model_id');
+            if ($voiceProvider || $voiceModel) {
+                $aiModels['voice'] = [
+                    'provider' => $voiceProvider ?? '',
+                    'model' => $voiceModel ?? '',
+                    'model_id' => $voiceModelId ? (int) $voiceModelId : null,
+                ];
+            }
+
             // Usage taximeter: rebuild the per-message usage object from meta so
             // a page reload can reconstruct the session totals. Tokens live in
             // ai_chat_usage; the charged cost in ai_chat_cost (may be absent for

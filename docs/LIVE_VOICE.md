@@ -1,0 +1,99 @@
+# Live voice
+
+Full-duplex speech. The browser, the app, or CarPlay opens one WebSocket to Synaplan. A sidecar holds the provider socket. Synaplan's own chat model answers factual questions. The voice model only speaks that answer.
+
+The feature stays off until both `LIVE_VOICE_GATEWAY_URL` and `LIVE_VOICE_GATEWAY_SECRET` are set and at least one active `voice2voice` model has a provider key. The secret is at least 32 characters. Runtime config then reports `voiceLive.enabled: true`.
+
+## Start
+
+`POST /api/v1/voice/live/sessions` with a signed-in cookie or bearer token.
+
+The body may include `modelId`, `chatId`, `client` (`web`, `ios`, `android`, `carplay`) and `incognito`. Consent must already be stored with `PUT /api/v1/voice/live/consent` and `{ "given": true }`.
+
+The response carries `ticket`, `wsUrl`, `transport` (`relay` or `webrtc`), `audio` (`format`, `inRate`, `outRate`), `allowedSeconds` and `warnAtSeconds`. The ticket is a 30-second single-use JWT. It does not contain a provider key. `transport` is `relay` unless an admin has turned on the direct OpenAI connection and the chosen model is GPT-Live or GPT-Realtime. Google and xAI stay on `relay`. `client: carplay` is always `relay`: the car has no WebRTC stack.
+
+A second open conversation for the same user is `409` with `code: VOICE_BUSY`. A used-up monthly budget is `429` with `code: COST_BUDGET_EXCEEDED`, the same payload as a typed message. Provider capacity is `503` with `code: VOICE_CAPACITY`. The live service being down is `503` with `code: VOICE_UNAVAILABLE`. Missing consent is `403` with `code: VOICE_CONSENT_REQUIRED`.
+
+`POST /api/v1/voice/live/sessions/{id}/ticket` mints a fresh ticket for a CarPlay session that is still open. It does not open a second session. CarPlay uses it after a short network drop. The socket URL carries the new ticket. Any other client gets `404`, and it counts against the same start rate as a new conversation.
+
+The sidecar holds one provider socket per session. A second socket for a session that is still connected closes with `4409`; only a parked CarPlay session is taken over by the reconnect.
+
+## Socket
+
+Connect to `wsUrl`. Send PCM16 mono as binary frames at `audio.inRate`. Send text frames for control:
+
+| Client | Meaning |
+| --- | --- |
+| `{ "type": "mute" }` | Stop sending audio to the provider |
+| `{ "type": "unmute" }` | Send audio again |
+| `{ "type": "interrupt" }` | Barge in |
+| `{ "type": "end" }` | The person hung up |
+
+The server sends:
+
+| Server | Meaning |
+| --- | --- |
+| `{ "type": "ready", "audio", "allowedSeconds" }` | The provider session is up |
+| `{ "type": "transcript", "role", "text", "final" }` | A closed caption |
+| binary | PCM16 from the provider at `audio.outRate` |
+| `{ "type": "interrupted" }` | The model stopped speaking |
+| `{ "type": "usage", "seconds", "secondsLeft" }` | Cumulative time |
+| `{ "type": "warn", "secondsLeft" }` | About a minute of budget left |
+| `{ "type": "wrap_up" }` | One goodbye sentence, then the socket closes |
+| `{ "type": "artifact", "artifact": { "type", "state", "messageId" } }` | Synaplan made a picture, video, audio or document. `messageId` is the chat row to show; an incognito call sends `row` instead |
+| `{ "type": "ended", "reason" }` | The conversation is over. A dropped tab may close before this frame arrives |
+
+Closing the socket without `end` is a dropped tab. The sidecar closes the provider and posts `network_lost`. A CarPlay client is the exception: the sidecar keeps the provider session for 20 seconds and the app reconnects with a fresh ticket for the same session. After 20 seconds it posts `network_lost`. A web or phone tab still ends immediately. Reasons are `user_end`, `idle`, `max_duration`, `limit_budget`, `provider_error`, `network_lost`, `capacity`, `admin_disabled`.
+
+GPT-Live uses client delegation. Gemini Live uses the tool `consult_synaplan`. Both come back through `POST /internal/voice/sessions/{id}/delegate`. The answer is spoken. It is not a separate `MESSAGES` usage row. Its cost is added to the one `VOICE_LIVE` row.
+
+The delegated question runs through the same sorter as a typed one, so "draw a fox" reaches the media generator and "write a report" reaches the document writer. That result cannot be spoken. Synaplan stores it as the same assistant message the typed chat shows (file, background-job banner, prompt, models and cost) and returns a short English sentence instead of the storage marker, for example "I am creating the image now. It will appear in the chat in a moment." The voice model says it in the language being spoken. The delegate response carries `artifact` (`type`, `state`, `messageId`); the sidecar forwards it as the `artifact` frame and the browser inserts that row after the question. A background render is moved to that row, so its banner resolves and the jobs tray shows it. The render is billed like a typed one (`IMAGES`, `VIDEOS`, `AUDIOS`), not on the `VOICE_LIVE` row. An incognito call stores nothing and sends the row itself. With background jobs turned off, a render can outlast Gemini's 20-second tool timeout; the message still appears, only the spoken sentence may be generic.
+
+## Direct connection
+
+`BCONFIG` group `LIVE_VOICE`, setting `WEBRTC_OPENAI`, default `0`. An admin turns it on from the live-conversations section. The next OpenAI conversation then uses WebRTC. A conversation already running stays on the transport it started with. Turning the switch off does not move it.
+
+The browser still opens `wsUrl`. The sidecar asks for an SDP offer (`offer_required`). The browser creates the peer connection, sends `{ "type": "offer", "sdp" }`, and applies the `{ "type": "answer", "sdp" }` frame. Audio is Opus on that peer connection. PCM is not sent on the socket. Captions, mute, interrupt, end, usage, warn, wrap-up and ended stay on the socket.
+
+The sidecar exchanges the SDP with the provider key. GPT-Live is `POST /v1/live/sessions` with `allowed_client_events` set to an empty list, so the browser data channel cannot change instructions, tools or context. The sidecar then opens the Live sideband for delegation, usage and kill. GPT-Realtime is `POST /v1/realtime/calls`. That API has no client-event allow-list. The app does not send control events on the data channel; the sideband is `wss://api.openai.com/v1/realtime?call_id=…`. The provider key never goes to the browser.
+
+Billing uses the same usage mapping as the relay. A stop from the budget or an admin kill closes the sideband, and the browser closes the peer connection when `ended` arrives.
+
+## Gateway callbacks
+
+The sidecar signs every callback. Headers are `X-Voice-Timestamp` (unix seconds) and `X-Voice-Signature` (`hex(hmac_sha256(secret, timestamp + "\n" + rawBody))`). A timestamp older than a minute is rejected. The routes are:
+
+- `POST /internal/voice/tickets/redeem`
+- `POST /internal/voice/sessions/{id}/usage`
+- `POST /internal/voice/sessions/{id}/delegate`
+- `POST /internal/voice/sessions/{id}/transcript`
+- `POST /internal/voice/sessions/{id}/closed`
+
+They are not in the public OpenAPI document. Provider keys stay in the sidecar environment (`OPENAI_API_KEY`, `GOOGLE_GEMINI_API_KEY`). The gateway log line is the session id, the provider, and the end reason. It does not include audio or transcript text.
+
+`OPENAI_LIVE_REGION=eu` points GPT-Live at `eu.api.openai.com`. The measured EU socket returned HTTP 401, so `us` remains the default until residency is confirmed.
+
+## Operations
+
+Start the sidecar with the compose profile `voice` and set:
+
+```
+LIVE_VOICE_GATEWAY_URL=http://voice:8096
+LIVE_VOICE_GATEWAY_SECRET=<shared secret>
+```
+
+Both values go into `backend/.env`. The voice container reads the same file, so the secret, the provider keys and `LIVE_VOICE_ALLOWED_ORIGINS` (comma-separated; empty allows any origin) are set once. The sidecar refuses to start with a secret shorter than 32 characters.
+
+Caddy proxies `/voice/ws` to the sidecar and sends `/internal/voice` to PHP. A missing profile makes the socket path fail, which matches the feature being off. When an admin kill, a REST end or the reaper closes a session, the next usage tick answers `stop` and the sidecar hangs up the provider.
+
+Usage is ticked about every 15 seconds. A session with no tick for 45 seconds is closed by `app:voice:reap-sessions` on the scheduler tick (about once a minute) and billed up to the last tick. Idle silence of two minutes ends the conversation from the sidecar. The admin max length is `BCONFIG` `LIVE_VOICE` / `MAX_SESSION_SECONDS` (default 1800, floor 60).
+
+Per-provider caps default to OpenAI 50, Google 100, xAI 10, and 4 for a compatible endpoint. Override with `LIVE_VOICE` / `CONCURRENCY_OPENAI` (and `CONCURRENCY_GOOGLE`, `CONCURRENCY_XAI`, `CONCURRENCY_COMPATIBLE`). Redis down refuses a new conversation, because a ticket cannot be made single-use without it.
+
+Gemini sessions send `contextWindowCompression` and reconnect with the resumption handle on `GoAway`. That reconnect does not open a second usage row.
+
+## Your own realtime endpoint
+
+`LIVE_VOICE_COMPATIBLE_WS_URL` points the sidecar at one OpenAI-Realtime-compatible websocket. Empty hides the "Compatible realtime" model. The same variables belong on the backend and on the voice container. Details, including Azure, Qwen Cloud, vLLM-Omni, and the Unmute recipe, are in [LIVE_VOICE_SELF_HOSTED.md](LIVE_VOICE_SELF_HOSTED.md).
+
+That model always uses the relay. Synaplan records the talk time and does not add a per-minute price. A spoken reply in the normal chat stops when the person talks over it, if the microphone was already allowed.

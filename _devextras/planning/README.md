@@ -29,9 +29,10 @@ log. It is edited in place — no new dated roadmap files, no redirect stubs.
 
 ## Live tracks
 
-Same order as `ROADMAP.md` §1. **Cleanup first (decision 2026-10-14):**
-rows 1–2 form a window in which only bug fixes, security fixes and release
-blockers land beside them; feature tracks resume when V2 meets its exit.
+Same order as `ROADMAP.md` §1, plus the live-voice track that is already
+in review. **Cleanup first (decision 2026-10-14):** rows 1–2 form a window
+in which only bug fixes, security fixes and release blockers land beside
+them; feature tracks resume when V2 meets its exit.
 
 | Path | What | State 2026-10-14 |
 | ---- | ---- | ---------------- |
@@ -50,6 +51,7 @@ blockers land beside them; feature tracks resume when V2 meets its exit.
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/00_master_plan.md) | Collabora epics 0–4 | queued — partner |
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts: apps like SISmass create Synaplan accounts for their customers (AA1–AA8) | not started |
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/00_master_plan.md) | Config pyramid; §0 unticked | not started |
+| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat, model and voice under AI settings | in review — [#2477](https://github.com/metadist/synaplan/pull/2477), not on `main` yet |
 
 ## Archive
 

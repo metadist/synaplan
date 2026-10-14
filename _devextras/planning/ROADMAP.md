@@ -124,6 +124,7 @@ mirrors this table.
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/00_master_plan.md) | Collabora epics 0–4 | queued (row 13, partner) |
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts AA1–AA8 | not started (row 14) |
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/00_master_plan.md) | Config pyramid | not started (row 15) |
+| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat | in review — [#2477](https://github.com/metadist/synaplan/pull/2477), opened before the cleanup window, not on `main` yet |
 
 ---
 

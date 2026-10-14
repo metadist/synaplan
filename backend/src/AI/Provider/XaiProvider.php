@@ -40,10 +40,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * client. The same is true for voice: xAI serves `/v1/tts` and `/v1/stt`
  * instead of OpenAI's `/v1/audio/speech` and `/v1/audio/transcriptions`.
  *
- * The realtime Speech-to-Speech API (`wss://api.x.ai/v1/realtime`) is
- * deliberately not implemented — this application has no realtime-voice
- * capability to plug it into, and its per-minute session billing has no
- * counterpart in the usage model.
+ * The realtime Speech-to-Speech API (`wss://api.x.ai/v1/realtime`) is the
+ * live-voice sidecar (`XaiVoiceAdapter`), not this chat provider. Session
+ * minutes and text items are billed on the `VOICE_LIVE` usage row.
  *
  * @see https://docs.x.ai/developers/rest-api-reference/inference/chat
  * @see https://docs.x.ai/developers/model-capabilities/imagine

@@ -184,6 +184,9 @@ final readonly class CapabilityCatalog
             'VIDEO', 'TEXT2VID' => self::isImageToVideo($features) ? [] : ['TEXT2VID'],
             'AUDIO', 'SOUND2TEXT', 'TRANSCRIPTION' => ['SOUND2TEXT'],
             'TTS', 'TEXT2SOUND' => ['TEXT2SOUND'],
+            // Live speech-to-speech is not a desktop slot. An empty list keeps
+            // the row out of chat, dictation and TTS.
+            'VOICE2VOICE' => [],
             default => [],
         };
     }

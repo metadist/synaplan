@@ -152,6 +152,7 @@
 
           <!-- Usage Tab -->
           <div v-if="activeTab === 'usage'" data-testid="section-usage">
+            <AdminLiveVoicePanel v-if="config.voiceLive?.enabled" class="mb-6" />
             <!-- Period Selector -->
             <div class="surface-card rounded-lg p-4 mb-6">
               <div class="flex gap-2 flex-wrap">
@@ -451,6 +452,7 @@ const NativeServerControl = defineAsyncComponent(
   () => import('@/components/NativeServerControl.vue')
 )
 import { useConfigStore } from '@/stores/config'
+import AdminLiveVoicePanel from '@/components/admin/AdminLiveVoicePanel.vue'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { isNativeApp } from '@/services/api/nativeRuntime'

@@ -452,7 +452,7 @@ class MessageController extends AbstractController
                                         type: 'object'
                                     )
                                 ),
-                                new OA\Property(property: 'aiModels', type: 'object', nullable: true, description: 'AI model metadata (chat/sorting/audio)'),
+                                new OA\Property(property: 'aiModels', type: 'object', nullable: true, description: 'AI model metadata (chat/sorting/audio/voice)'),
                                 new OA\Property(property: 'webSearch', type: 'object', nullable: true),
                                 new OA\Property(property: 'searchResults', type: 'array', nullable: true, items: new OA\Items(type: 'object')),
                                 new OA\Property(property: 'multitask', type: 'boolean'),

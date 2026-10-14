@@ -74,6 +74,8 @@ final class ConfigControllerTest extends WebTestCase
         $this->assertFalse($data['features']['officeConvertEnabled']);
         $this->assertArrayHasKey('computeEnabled', $data['features']);
         $this->assertFalse($data['features']['computeEnabled']);
+        $this->assertArrayHasKey('voiceLive', $data);
+        $this->assertFalse($data['voiceLive']['enabled']);
         foreach (['documentToolsEnabled', 'platformLinksEnabled', 'agentsEnabled'] as $feature) {
             $this->assertArrayHasKey($feature, $data['features']);
             $this->assertIsBool($data['features'][$feature]);

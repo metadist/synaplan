@@ -23,7 +23,7 @@
     <!-- On mobile the horizontal padding matches the drawer toggle's left
          offset (left-3 = 12px) so the composer aligns with the menu button and
          uses the full width; md+ keeps the roomier px-4. -->
-    <div class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4">
+    <div v-show="!liveActive" class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4">
       <!-- File and Quote Display (above input) -->
       <div
         v-if="uploadedFiles.length > 0 || quote || pastedBlocks.length > 0"
@@ -464,6 +464,18 @@
               </button>
 
               <button
+                v-if="showLiveVoiceButton"
+                type="button"
+                class="icon-ghost !rounded-xl h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
+                :aria-label="$t('chatInput.liveVoice.button')"
+                :title="$t('chatInput.liveVoice.button')"
+                data-testid="btn-chat-live-voice"
+                @click="livePress"
+              >
+                <Icon icon="mdi:waveform" class="w-5 h-5" />
+              </button>
+
+              <button
                 type="button"
                 :disabled="!isStreaming && !canSend"
                 class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl flex-shrink-0 transition-all"
@@ -493,11 +505,70 @@
       @close="closePastedBlock"
       @save="savePastedBlock"
     />
+
+    <div v-if="liveActive" class="px-3 py-2 md:px-4 md:py-4">
+      <div class="mx-auto max-w-[70rem]">
+        <LiveVoicePanel
+          :phase="livePhase"
+          :status="liveStatus"
+          :status-hint="liveStatusHint"
+          :muted="liveMuted"
+          :company-line="$t('chatInput.liveVoice.companyLine', { company: liveCompany })"
+          :touches-line="$t(liveLine('chatInput.liveVoice.touchesLine'))"
+          :owner-line="$t('chatInput.liveVoice.ownerLine')"
+          :model-label="liveModelLabel"
+          :budget-label="liveBudgetLabel"
+          :mute-label="
+            liveMuted ? $t('chatInput.liveVoice.unmute') : $t('chatInput.liveVoice.mute')
+          "
+          :captions-label="
+            liveCaptions
+              ? $t('chatInput.liveVoice.captionsOn')
+              : $t('chatInput.liveVoice.captionsOff')
+          "
+          :end-label="$t('chatInput.liveVoice.end')"
+          :settings-label="$t('chatInput.liveVoice.settings')"
+          :warn-banner="
+            liveBudgetWarn && livePhase !== 'ended'
+              ? $t('chatInput.liveVoice.warnBanner', { seconds: liveSecondsLeft ?? 0 })
+              : ''
+          "
+          :terminal-message="$t(liveLine(liveTerminalMessageKey))"
+          :terminal-action-label="$t(liveTerminalActionKey)"
+          :terminal-action="liveTerminalAction"
+          :close-label="$t('chatInput.liveVoice.terminal.actionClose')"
+          @mute="liveToggleMute"
+          @captions="liveToggleCaptions"
+          @end="liveEnd"
+          @dismiss="liveDismiss"
+          @action="onLiveTerminalAction"
+        />
+      </div>
+    </div>
+
+    <LiveVoiceConsentDialog
+      v-if="liveConsentOpen"
+      :title="$t('chatInput.liveVoice.consentTitle')"
+      :body="$t(liveLine('chatInput.liveVoice.consentBody'), { company: liveCompany })"
+      :allow-label="$t('chatInput.liveVoice.consentAllow')"
+      :decline-label="$t('chatInput.liveVoice.consentDecline')"
+      @allow="liveAllowConsent"
+      @decline="liveDeclineConsent"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Ref } from 'vue'
+import {
+  ref,
+  computed,
+  watch,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  type ComputedRef,
+  type Ref,
+} from 'vue'
 import { storeToRefs } from 'pinia'
 import {
   ArrowUpIcon,
@@ -536,6 +607,13 @@ import { isNativeApp } from '@/services/api/nativeRuntime'
 import type { FileItem } from '@/services/filesService'
 import { deleteFile, getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
+import { useLiveVoice } from '@/composables/useLiveVoice'
+import { liveVoiceButtonVisible } from '@/services/liveVoice/visibility'
+import { liveCostBudget, type LiveVoiceCostBudget } from '@/services/api/liveVoiceApi'
+import type { LimitCheckResult } from '@/composables/useLimitCheck'
+import LiveVoicePanel from '@/components/chat/LiveVoicePanel.vue'
+import type { LiveVoiceStageState } from '@/services/liveVoice/orb'
+import LiveVoiceConsentDialog from '@/components/chat/LiveVoiceConsentDialog.vue'
 import { speechFailureMessageKey } from '@/utils/speechFailure'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
@@ -960,7 +1038,7 @@ watch(
 onMounted(() => {
   void restoreDesktopJobs()
 })
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 watch([toolsSummaryText, selectedModelId, activeTool, isGuestMode], () => {
   void fitControlBar()
 })
@@ -1184,6 +1262,7 @@ const emit = defineEmits<{
   stop: []
   guestFeatureGate: [featureKey: string]
   clearQuote: []
+  budgetBlocked: [result: LimitCheckResult]
 }>()
 
 const canSend = computed(() => {
@@ -2071,6 +2150,120 @@ const startWebSpeechRecording = async () => {
   }
 }
 
+function liveBudgetResult(budget: LiveVoiceCostBudget): LimitCheckResult {
+  return {
+    allowed: false,
+    limitType: 'monthly',
+    actionType: 'MESSAGES',
+    used: Number(budget.used),
+    limit: Number(budget.limit),
+    remaining: Number(budget.remaining),
+    userLevel: budget.userLevel,
+    phoneVerified: budget.phoneVerified,
+    topupAvailable: budget.topupAvailable,
+  }
+}
+
+const {
+  phase: livePhase,
+  active: liveActive,
+  consentOpen: liveConsentOpen,
+  muted: liveMuted,
+  captions: liveCaptions,
+  level: liveLevel,
+  outLevel: liveOutLevel,
+  secondsLeft: liveSecondsLeft,
+  captionText: liveCaptionText,
+  activeModel: liveModel,
+  budgetWarn: liveBudgetWarn,
+  budgetWrap: liveBudgetWrap,
+  company: liveCompany,
+  terminalAction: liveTerminalAction,
+  terminalMessageKey: liveTerminalMessageKey,
+  terminalActionKey: liveTerminalActionKey,
+  options: liveOptions,
+  press: livePress,
+  allowConsent: liveAllowConsent,
+  declineConsent: liveDeclineConsent,
+  end: liveEnd,
+  toggleMute: liveToggleMute,
+  toggleCaptions: liveToggleCaptions,
+  dismiss: liveDismiss,
+} = useLiveVoice((budget) => emit('budgetBlocked', liveBudgetResult(budget)))
+
+const showLiveVoiceButton = computed(() =>
+  liveVoiceButtonVisible({
+    enabled: configStore.voiceLive?.enabled === true,
+    guest: isGuestMode.value,
+    nativeApp: isNativeApp(),
+  })
+)
+
+const liveStatusHint = computed(() =>
+  livePhase.value === 'connecting' ? t('chatInput.liveVoice.connectingHint') : ''
+)
+
+const liveStatus = computed(() => {
+  const phase = livePhase.value
+  if (phase === 'thinking') return t('chatInput.liveVoice.thinking')
+  if (phase === 'speaking') return t('chatInput.liveVoice.speaking')
+  if (phase === 'ending') {
+    return liveBudgetWrap.value
+      ? t('chatInput.liveVoice.wrappingUp')
+      : t('chatInput.liveVoice.ending')
+  }
+  if (phase === 'connecting') return t('chatInput.liveVoice.connecting')
+  if (phase === 'ended') return t(liveTerminalMessageKey.value)
+  return t('chatInput.liveVoice.listening')
+})
+
+/** The orb, status and caption line the chat shows above the messages while a conversation runs. */
+const liveStage = computed<LiveVoiceStageState | null>(() => {
+  if (!liveActive.value || livePhase.value === 'ended') return null
+  return {
+    phase: livePhase.value,
+    status: liveStatus.value,
+    statusHint: liveStatusHint.value,
+    micLevel: liveLevel.value,
+    outLevel: liveOutLevel.value,
+    muted: liveMuted.value,
+    captionText: liveCaptionText.value,
+    showCaption: liveCaptions.value,
+  }
+})
+
+const liveModelLabel = computed(() => liveModel.value?.name ?? '')
+
+const liveBudgetLabel = computed(() => {
+  const left = liveSecondsLeft.value
+  if (left === null) return ''
+  if (left < 90) return t('chatInput.liveVoice.budgetSeconds', { seconds: left })
+  return t('chatInput.liveVoice.budgetMinutes', { minutes: Math.max(1, Math.round(left / 60)) })
+})
+
+/** A private conversation stores nothing, so its copy must not claim a saved transcript. */
+function liveLine(key: string): string {
+  const incognitoKey = `${key}Incognito`
+  return incognitoStore.active && te(incognitoKey) ? incognitoKey : key
+}
+
+function onLiveTerminalAction() {
+  const action = liveTerminalAction.value
+  const budget = liveCostBudget(liveOptions.value?.costBudget)
+  liveDismiss()
+  if (action === 'top_up' && budget) {
+    emit('budgetBlocked', liveBudgetResult(budget))
+    return
+  }
+  if (action === 'microphone') {
+    void toggleRecording()
+    return
+  }
+  if (action === 'talk_again') {
+    void livePress()
+  }
+}
+
 /**
  * Start audio recording for Whisper.cpp backend transcription.
  * Records audio blob, uploads to backend for processing.
@@ -2301,6 +2494,7 @@ defineExpose<{
   submitText: (text: string) => Promise<boolean>
   startDictation: () => Promise<boolean>
   armSummarize: () => void
+  liveStage: ComputedRef<LiveVoiceStageState | null>
 }>({
   textareaRef,
   uploadFiles,
@@ -2309,6 +2503,7 @@ defineExpose<{
   submitText,
   startDictation,
   armSummarize,
+  liveStage,
 })
 </script>
 

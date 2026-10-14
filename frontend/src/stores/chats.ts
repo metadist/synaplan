@@ -1311,6 +1311,20 @@ export const useChatsStore = defineStore('chats', () => {
     if (options.firstMessagePreview && !chat.firstMessagePreview) {
       chat.firstMessagePreview = options.firstMessagePreview
     }
+
+    const historyIndex = historyChats.value.findIndex((item) => item.id === chatId)
+    if (historyIndex >= 0) {
+      const row = historyChats.value[historyIndex]
+      row.updatedAt = chat.updatedAt
+      row.messageCount = chat.messageCount
+      if (chat.firstMessagePreview && !row.firstMessagePreview) {
+        row.firstMessagePreview = chat.firstMessagePreview
+      }
+      if (historyIndex > 0) {
+        historyChats.value.splice(historyIndex, 1)
+        historyChats.value.unshift(row)
+      }
+    }
   }
 
   /**

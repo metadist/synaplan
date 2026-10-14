@@ -1295,6 +1295,32 @@ services:
     networks:
       - synaplan-network
 
+  # Live voice. Off unless the profile is started and LIVE_VOICE_GATEWAY_URL
+  # plus LIVE_VOICE_GATEWAY_SECRET are set. The browser connects through Caddy
+  # on /voice/ws. Inside the network the backend listens on port 80.
+  # The secret, provider keys and LIVE_VOICE_* settings come from backend/.env,
+  # the same file the backend reads. Do not repeat them under `environment`
+  # with an empty default: that overrides env_file and blanks the secret.
+  voice:
+    profiles: [voice]
+    pull_policy: build
+    build:
+      context: ./sidecars/synaplan-voice
+    container_name: synaplan-voice
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SYNAPLAN_VOICE_PORT:-8096}:8096"
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      PORT: "8096"
+      SYNAPLAN_URL: http://backend
+    depends_on:
+      - backend
+    networks:
+      - synaplan-network
+
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
     image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad

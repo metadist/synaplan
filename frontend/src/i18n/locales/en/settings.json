@@ -342,6 +342,23 @@
     "cancel": "Cancel"
   },
   "settings": {
+    "voice": {
+      "title": "Live conversations",
+      "intro": "Choose the voice for live conversations. Your voice goes to {company} while you talk, and the cost uses the same monthly usage budget as chat.",
+      "modelsHint": "The model and its voice are set under {page}.",
+      "model": "Voice model",
+      "voice": "Voice",
+      "captions": "Show captions while you talk",
+      "save": "Save",
+      "saved": "Saved.",
+      "saveFailed": "Could not save voice settings.",
+      "loadFailed": "Could not load voice settings.",
+      "loading": "Loading…",
+      "noVoices": "This model uses its default voice.",
+      "withdraw": "Stop allowing live conversations",
+      "withdrawHint": "Chat will ask again before the next conversation. Conversations already saved stay in the chat.",
+      "withdrawn": "Live conversations will ask for permission again."
+    },
     "title": "Preferences",
     "subtitle": "Manage your preferences and configuration",
     "sections": {
@@ -349,6 +366,7 @@
       "profile": "Profile",
       "appearance": "Language & appearance",
       "chat": "Chat & AI",
+      "voice": "Live conversations",
       "data": "Data & privacy",
       "billing": "Billing",
       "security": "Security",

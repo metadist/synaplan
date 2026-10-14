@@ -871,7 +871,11 @@
       "channel": "Canal",
       "tokens": "Tokens",
       "latency": "Latencia",
+      "duration": "Duración",
       "noRecentActivity": "Sin actividad reciente",
+      "durationMinutes": "{minutes} min {seconds} s",
+      "durationSeconds": "{seconds} s",
+      "openChat": "Abrir este chat",
       "actions": {
         "messages": "Mensajes",
         "images": "Imágenes",
@@ -882,7 +886,9 @@
         "search_query": "Consulta de búsqueda",
         "api_chat": "Chat de API",
         "rerank": "Rerank",
-        "message_digest": "Memoria a largo plazo"
+        "message_digest": "Memoria a largo plazo",
+        "voice_live": "Conversación en vivo",
+        "transcription": "Transcripción"
       },
       "sources": {
         "whatsapp": "WhatsApp",

@@ -17,6 +17,7 @@ use App\Entity\User;
 use App\Model\ModelCatalog;
 use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
+use App\Module\Sidecar\LiveVoiceModule;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Repository\ConfigRepository;
 use App\Repository\GroupRepository;
@@ -78,7 +79,7 @@ class ConfigController extends AbstractController
     private const DEFAULTS_SCOPE_INSTANCE = 'instance';
 
     /** Capabilities the AI Models page binds a default model to. */
-    private const DEFAULT_MODEL_CAPABILITIES = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+    private const DEFAULT_MODEL_CAPABILITIES = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE', 'VOICE_LIVE'];
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -268,6 +269,15 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'showPoweredBy', type: 'boolean', example: true, description: 'Whether to show the "· powered by <label>" attribution'),
                         new OA\Property(property: 'poweredByLabel', type: 'string', example: 'Synaplan', description: 'Attribution label (the platform being credited)'),
                         new OA\Property(property: 'poweredByUrl', type: 'string', example: 'https://www.synaplan.com', description: 'Attribution link target'),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'voiceLive',
+                    type: 'object',
+                    required: ['enabled'],
+                    description: 'Live voice. enabled is true only when the gateway is configured and a speech-to-speech model has a provider key. Older clients ignore this key.',
+                    properties: [
+                        new OA\Property(property: 'enabled', type: 'boolean', example: false),
                     ]
                 ),
                 new OA\Property(
@@ -762,6 +772,9 @@ class ConfigController extends AbstractController
                     ?? $request->getBasePath().'/single_bird-light.svg',
             ],
             'features' => $features,
+            'voiceLive' => [
+                'enabled' => $this->modules->get(LiveVoiceModule::ID)->isConfigured(),
+            ],
             'speech' => $speech,
             'plugins' => $plugins,
             'googleTag' => $googleTagConfig,
@@ -1097,6 +1110,7 @@ class ConfigController extends AbstractController
             'SOUND2TEXT' => [],
             'TEXT2SOUND' => [],
             'ANALYZE' => [],
+            'VOICE_LIVE' => [],
         ];
 
         foreach ($modelList as $model) {
@@ -1159,6 +1173,11 @@ class ConfigController extends AbstractController
                 case 'TTS':
                 case 'TEXT2SOUND':
                     $grouped['TEXT2SOUND'][] = $model;
+                    break;
+                case 'VOICE2VOICE':
+                    // Live speech-to-speech. Its own picker only — the default
+                    // arm below would otherwise drop it into every dropdown.
+                    $grouped['VOICE_LIVE'][] = $model;
                     break;
                 default:
                     // If no specific tag, add to all capabilities (flexible)
@@ -1639,7 +1658,7 @@ class ConfigController extends AbstractController
         }
 
         $ownerId = $global ? 0 : $user->getId();
-        $validCapabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
+        $validCapabilities = self::DEFAULT_MODEL_CAPABILITIES;
 
         // Premium gate for VECTORIZE: switching the embedding model is
         // a paid feature even at the per-user scope, because every

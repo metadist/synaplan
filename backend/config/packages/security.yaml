@@ -60,6 +60,10 @@ security:
             user_checker: App\Security\AccountStatusChecker
 
     access_control:
+        # Voice sidecar callbacks. The controller checks an HMAC; the sidecar
+        # has no user cookie. Do not put these under the public API document.
+        - { path: ^/internal/voice, roles: PUBLIC_ACCESS }
+
         # OpenAI-compatible endpoints (require API key auth)
         - { path: ^/v1, roles: IS_AUTHENTICATED_FULLY }
 

@@ -44,6 +44,8 @@
         </div>
       </Transition>
 
+      <LiveVoiceStage v-if="liveStage && !needsProviderSetup" v-bind="liveStage" />
+
       <!-- First-run: no usable AI provider — replace the chat, do not let
            the user send messages that can only fail with HTTP 500. -->
       <div
@@ -159,7 +161,9 @@
           </div>
 
           <div
-            v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
+            v-else-if="
+              historyStore.messages.length === 0 && !historyStore.isLoadingMessages && !liveStage
+            "
             class="flex flex-col items-center justify-center px-6 py-8 gap-6"
             data-testid="state-empty"
           >
@@ -408,6 +412,7 @@
           Boolean(pinnedAgentId)
         "
         :quote="quoting.pendingQuote.value"
+        @budget-blocked="showLimitOrPaywall"
         @send="handleSendMessage"
         @stop="handleUserStop"
         @guest-feature-gate="handleGuestFeatureGate"
@@ -626,6 +631,7 @@ import MarketingNews from '@/components/MarketingNews.vue'
 import CompanionLinks from '@/components/CompanionLinks.vue'
 import AssistantStarterPrompts from '@/components/assistants/AssistantStarterPrompts.vue'
 import SelfAwareEmptyHint from '@/components/chat/SelfAwareEmptyHint.vue'
+import LiveVoiceStage from '@/components/chat/LiveVoiceStage.vue'
 import { parsePlatformDocs } from '@/components/chat/refs/DocRefPill'
 import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
@@ -725,6 +731,7 @@ import { claimOwnedChatForSend } from '@/utils/claimOwnedChatForSend'
 import { showStoreCards } from '@/composables/useChatWelcome'
 import GettingStartedChecklist from '@/components/chat/GettingStartedChecklist.vue'
 import { AudioStreamer } from '@/utils/AudioStreamer'
+import { startBargeInMonitor } from '@/services/voice/bargeIn'
 import { createSmoothStream } from '@/utils/smoothStream'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import {
@@ -1234,6 +1241,10 @@ const isEmptyLanding = computed(
     !historyStore.isLoadingMessages
 )
 
+// A running live conversation puts its orb above the messages, and the
+// welcome cards step aside until the first words arrive.
+const liveStage = computed(() => chatInputRef.value?.liveStage ?? null)
+
 // Runtime-config first-run signal: the default chat model has no usable
 // provider. Replace the composer with a tombstone so a fresh install cannot
 // produce the cryptic HTTP 500 the old banner still allowed.
@@ -1519,6 +1530,7 @@ let attachedRunId: string | null = null
 // Chat currently marked as "still answering" in the sidebar by this view.
 let generatingChatId: number | null = null
 let currentAudioStreamer: AudioStreamer | null = null
+let stopBargeIn: (() => void) | null = null
 const isAudioStreaming = ref(false)
 
 // Processing status for real-time feedback
@@ -3390,6 +3402,7 @@ function applyAssistantChatModelFooter(
   // through whenever the backend ships it so the voice-reply badge
   // appears live (no page reload required). See issue #583.
   const nestedAudio = data.aiModels?.audio
+  const nestedVoice = data.aiModels?.voice
 
   if (resolvedModel && resolvedProvider) {
     message.modelLabel = resolvedModel
@@ -3402,12 +3415,14 @@ function applyAssistantChatModelFooter(
       },
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
       ...(nestedAudio ? { audio: nestedAudio } : {}),
+      ...(nestedVoice ? { voice: nestedVoice } : {}),
     }
-  } else if (nestedChat || nestedSorting || nestedAudio) {
+  } else if (nestedChat || nestedSorting || nestedAudio || nestedVoice) {
     message.aiModels = {
       ...(nestedChat ? { chat: nestedChat } : {}),
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
       ...(nestedAudio ? { audio: nestedAudio } : {}),
+      ...(nestedVoice ? { voice: nestedVoice } : {}),
     }
   }
 }
@@ -4148,7 +4163,18 @@ const streamAIResponse = async (
       if (options?.voiceReply) {
         currentAudioStreamer = new AudioStreamer()
         isAudioStreaming.value = true
+        currentAudioStreamer.setOnPlaybackStart(() => {
+          stopBargeIn?.()
+          stopBargeIn = startBargeInMonitor(() => {
+            stopBargeIn?.()
+            stopBargeIn = null
+            currentAudioStreamer?.stop()
+            void chatInputRef.value?.startDictation()
+          })
+        })
         currentAudioStreamer.setOnFinished(() => {
+          stopBargeIn?.()
+          stopBargeIn = null
           isAudioStreaming.value = false
           currentAudioStreamer = null
         })

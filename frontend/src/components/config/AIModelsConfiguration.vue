@@ -318,6 +318,54 @@
             </div>
           </div>
         </div>
+
+        <div
+          v-if="showLiveVoiceChoice"
+          ref="liveCard"
+          class="space-y-2 transition-all duration-300"
+          :class="
+            liveHighlight
+              ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
+              : ''
+          "
+          data-testid="item-live-voice"
+        >
+          <label class="flex items-center gap-2 text-sm font-semibold txt-primary">
+            <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
+            <span class="flex-1 min-w-0">{{ t('settings.voice.title') }}</span>
+          </label>
+          <p class="text-sm txt-secondary">
+            {{ t('settings.voice.intro', { company: voiceCompany(liveSelected?.provider ?? '') }) }}
+          </p>
+          <label class="block text-sm txt-primary">
+            {{ t('settings.voice.model') }}
+            <select
+              v-model.number="liveModelId"
+              class="mt-1 w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="liveLocked || liveSaving"
+              data-testid="select-live-voice-model"
+              @change="onLiveModelChange"
+            >
+              <option v-for="model in liveOptions" :key="model.id ?? model.name" :value="model.id">
+                {{ model.name }} · {{ voiceCompany(model.provider ?? '') }}
+              </option>
+            </select>
+          </label>
+          <label class="block text-sm txt-primary">
+            {{ t('settings.voice.voice') }}
+            <select
+              v-if="liveVoices.length > 0"
+              v-model="liveVoice"
+              class="mt-1 w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="liveSaving"
+              data-testid="select-live-voice-voice"
+              @change="onLiveVoiceChange"
+            >
+              <option v-for="name in liveVoices" :key="name" :value="name">{{ name }}</option>
+            </select>
+            <p v-else class="mt-1 text-sm txt-secondary">{{ t('settings.voice.noVoices') }}</p>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -734,7 +782,11 @@ import {
 } from '@/services/api/configApi'
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { ApiError } from '@/services/api/httpClient'
+import { fetchLiveVoiceOptions, type LiveVoiceModel } from '@/services/api/liveVoiceApi'
+import { voiceCompany } from '@/services/liveVoice/company'
+import { preferredVoice, setPreferredVoice } from '@/services/liveVoice/preferences'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
 import {
   dedupeModelsByPurpose,
@@ -752,9 +804,88 @@ const isAdminScope = computed(() => props.scope === 'admin')
 const loadTopics = () => import('@/components/config/TaskPromptsConfiguration.vue')
 
 const authStore = useAuthStore()
+const configStore = useConfigStore()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
+
+const liveOptions = ref<LiveVoiceModel[]>([])
+const liveModelId = ref<number | null>(null)
+const liveVoice = ref('')
+const liveLocked = ref(false)
+const liveSaving = ref(false)
+const liveHighlight = ref(false)
+const liveCard = ref<HTMLElement | null>(null)
+const liveSelected = computed(
+  () => liveOptions.value.find((model) => model.id === liveModelId.value) ?? null
+)
+const liveVoices = computed(() => liveSelected.value?.voices ?? [])
+const showLiveVoiceChoice = computed(
+  () => configStore.voiceLive.enabled && liveOptions.value.length > 0
+)
+
+function syncLiveVoice() {
+  const next = liveSelected.value
+  if (!next) return
+  const stored = preferredVoice(next.provider ?? '')
+  const listed = next.voices ?? []
+  liveVoice.value = stored && listed.includes(stored) ? stored : (next.voice ?? listed[0] ?? '')
+}
+
+async function loadLiveOptions() {
+  if (!configStore.voiceLive.enabled) {
+    liveOptions.value = []
+    return
+  }
+  try {
+    const options = await fetchLiveVoiceOptions()
+    liveOptions.value = options.models ?? []
+    const known = liveOptions.value.some((model) => model.id === liveModelId.value)
+    if (!known) {
+      liveModelId.value = options.defaultModelId ?? liveOptions.value[0]?.id ?? null
+    }
+  } catch {
+    liveOptions.value = []
+  }
+}
+
+async function showLiveHighlight() {
+  activeTab.value = 'choice'
+  liveHighlight.value = true
+  await nextTick()
+  liveCard.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  setTimeout(() => {
+    liveHighlight.value = false
+  }, 4000)
+}
+
+async function onLiveModelChange() {
+  syncLiveVoice()
+  if (liveModelId.value === null || liveLocked.value || liveSaving.value) return
+  liveSaving.value = true
+  try {
+    const forEveryone = defaultsScope.value === 'instance'
+    const response = await saveDefaultModels({
+      defaults: { VOICE_LIVE: liveModelId.value },
+      ...(forEveryone ? { global: true } : {}),
+    })
+    if (response.success) {
+      success(
+        forEveryone ? t('config.aiModels.scope.savedInstance') : t('config.aiModels.saveSuccess')
+      )
+    }
+  } catch {
+    showError(t('settings.voice.saveFailed'))
+  } finally {
+    liveSaving.value = false
+  }
+}
+
+function onLiveVoiceChange() {
+  const provider = liveSelected.value?.provider ?? ''
+  if (provider === '') return
+  setPreferredVoice(provider, liveVoice.value)
+}
 
 const activeTab = ref<ModelsTabId>('choice')
 const adminPanelRef = ref<InstanceType<typeof AIModelsAdminPanel> | null>(null)
@@ -1032,7 +1163,8 @@ let catalogLoad: Promise<void> = Promise.resolve()
 let catalogRequest = 0
 
 onMounted(async () => {
-  await Promise.all([catalogLoad, loadEmbeddingGuard()])
+  await Promise.all([catalogLoad, loadEmbeddingGuard(), loadLiveOptions()])
+  syncLiveVoice()
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 
@@ -1041,6 +1173,10 @@ onMounted(async () => {
   // Check for highlight query parameter
   const highlightParam = route.query.highlight as string | undefined
   if (!highlightParam) return
+  if (highlightParam === 'VOICE_LIVE') {
+    await showLiveHighlight()
+    return
+  }
 
   const highlight = normalizeHighlight(highlightParam)
   if (!highlight) return
@@ -1086,6 +1222,11 @@ watch(
   () => route.query.highlight as string | string[] | undefined,
   async (newHighlightParam) => {
     if (!newHighlightParam || typeof newHighlightParam !== 'string') return
+
+    if (newHighlightParam === 'VOICE_LIVE') {
+      await showLiveHighlight()
+      return
+    }
 
     const newHighlight = normalizeHighlight(newHighlightParam)
     if (!newHighlight) return
@@ -1196,6 +1337,13 @@ const loadData = async (options?: { background?: boolean; replaceDefaults?: bool
         originalConfig.value = { ...mergedDefaults }
         defaultLocked.value = defaultsResult.value.locked ?? {}
         defaultSources.value = defaultsResult.value.sources ?? {}
+        const rawDefaults = defaultsResult.value.defaults as Record<string, number | null>
+        const rawLocked = (defaultsResult.value.locked ?? {}) as Record<string, boolean>
+        if (typeof rawDefaults.VOICE_LIVE === 'number') {
+          liveModelId.value = rawDefaults.VOICE_LIVE
+        }
+        liveLocked.value = rawLocked.VOICE_LIVE === true
+        syncLiveVoice()
       }
     } else if (defaultsResult.status === 'rejected') {
       console.error('Failed to load default models:', defaultsResult.reason)

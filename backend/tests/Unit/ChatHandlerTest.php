@@ -653,6 +653,59 @@ class ChatHandlerTest extends TestCase
         $this->assertStringContainsString('I created the document.', $encoded);
     }
 
+    public function testASpokenQuestionGetsAShortSpokenAnswer(): void
+    {
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $calls = [];
+        $this->aiFacade
+            ->expects($this->exactly(2))
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$calls): array {
+                $calls[] = ['messages' => $messages, 'options' => $options];
+
+                return ['content' => 'Fine.', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $classification = ['topic' => 'CHAT', 'language' => 'de'];
+        $this->handler->handle($this->plainMessage('Wie spät ist es?'), [], $classification, null, ['source' => 'live_voice']);
+        $this->handler->handle($this->plainMessage('Wie spät ist es?'), [], $classification);
+
+        $this->assertSame(600, $calls[0]['options']['max_tokens'] ?? null);
+        $this->assertStringContainsString('spoken aloud', (string) $calls[0]['messages'][0]['content']);
+        $this->assertArrayNotHasKey('max_tokens', $calls[1]['options']);
+        $this->assertStringNotContainsString('spoken aloud', (string) json_encode($calls[1]['messages']));
+    }
+
+    public function testASpokenDocumentRequestKeepsTheFullDocumentLength(): void
+    {
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $seen = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$seen): array {
+                $seen = ['messages' => $messages, 'options' => $options];
+
+                return ['content' => 'Fine.', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle(
+            $this->plainMessage('Schreib mir einen Bericht über Füchse.'),
+            [],
+            ['topic' => 'officemaker', 'language' => 'de'],
+            null,
+            ['source' => 'live_voice'],
+        );
+
+        $this->assertIsArray($seen);
+        $this->assertNotSame(600, $seen['options']['max_tokens'] ?? null);
+        $this->assertStringNotContainsString('spoken aloud', (string) json_encode($seen['messages']));
+    }
+
     public function testHandleStripsALeadingEchoedTimestamp(): void
     {
         $message = $this->plainMessage('Make an audio of that.');
@@ -2455,6 +2508,26 @@ class ChatHandlerTest extends TestCase
         }
 
         $this->assertSame(['prior answer'], $assistantContents);
+    }
+
+    public function testASpokenQuestionReachesTheModelAsPlainTextOnce(): void
+    {
+        $current = new Message();
+        $current->setDirection('IN');
+        $current->setText('Wie ist der Verkehr auf der A3?');
+        $current->setUnixTimestamp(time());
+        $current->setDateTime(date('YmdHis'));
+
+        $method = new \ReflectionMethod(ChatHandler::class, 'buildMessages');
+
+        /** @var list<array{role: string, content: mixed}> $voice */
+        $voice = $method->invoke($this->handler, 'system', [$current], $current, ['plain_user_turn' => true]);
+        $this->assertSame(['system', 'user'], array_column($voice, 'role'));
+        $this->assertSame('Wie ist der Verkehr auf der A3?', $voice[1]['content']);
+
+        /** @var list<array{role: string, content: mixed}> $channel */
+        $channel = $method->invoke($this->handler, 'system', [], $current, []);
+        $this->assertStringContainsString('"BTEXT"', (string) $channel[1]['content']);
     }
 
     /**

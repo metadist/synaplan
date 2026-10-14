@@ -65,6 +65,16 @@ const config = {
   },
 
   /**
+   * Full-duplex live voice. Off until the gateway and a provider key are set,
+   * so the chat button and the settings section stay absent.
+   */
+  voiceLive: {
+    get enabled(): boolean {
+      return getConfigSync().voiceLive?.enabled ?? false
+    },
+  },
+
+  /**
    * Authentication surface flags (loaded from backend at runtime).
    * `registrationEnabled` is false on SSO-/OIDC-only instances
    * (REGISTRATION_ENABLED=false); defaults to true so unconfigured/older

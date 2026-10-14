@@ -320,6 +320,23 @@
     "retryLater": "Reintentar"
   },
   "settings": {
+    "voice": {
+      "title": "Conversaciones en vivo",
+      "intro": "Elige la voz para las conversaciones en vivo. Tu voz va a {company} mientras hablas, y el coste usa el mismo presupuesto mensual de uso que el chat.",
+      "modelsHint": "El modelo y su voz se eligen en {page}.",
+      "model": "Modelo de voz",
+      "voice": "Voz",
+      "captions": "Mostrar subtítulos mientras hablas",
+      "save": "Guardar",
+      "saved": "Guardado.",
+      "saveFailed": "No se pudieron guardar los ajustes de voz.",
+      "loadFailed": "No se pudieron cargar los ajustes de voz.",
+      "loading": "Cargando…",
+      "noVoices": "Este modelo usa su voz predeterminada.",
+      "withdraw": "Dejar de permitir conversaciones en vivo",
+      "withdrawHint": "El chat volverá a preguntar antes de la siguiente conversación. Las conversaciones ya guardadas siguen en el chat.",
+      "withdrawn": "Las conversaciones en vivo volverán a pedir permiso."
+    },
     "title": "Preferencias",
     "subtitle": "Administra tus preferencias y configuración",
     "sections": {
@@ -327,6 +344,7 @@
       "profile": "Perfil",
       "appearance": "Idioma y apariencia",
       "chat": "Chat e IA",
+      "voice": "Conversaciones en vivo",
       "data": "Datos y privacidad",
       "billing": "Facturación",
       "security": "Seguridad",

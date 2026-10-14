@@ -166,6 +166,20 @@ export default defineConfig(({ mode }) => {
         // visitor widgets (which derive the URL from apiBaseUrl) keep
         // working. `ws: true` is what unlocks the WS upgrade; without it
         // Vite hijacks the request as plain HTTP and the upgrade 404s.
+        // Live voice. Caddy serves /voice/ws on the backend port. The dev
+        // page is on :5173, so the browser must not dial the internal host
+        // name from the start response.
+        '/voice': {
+          target: backendUrl,
+          changeOrigin: true,
+          ws: true,
+          configure: (proxy) => {
+            proxy.on('proxyReqWs', (proxyReq) => {
+              proxyReq.setHeader('Connection', 'Upgrade')
+              proxyReq.setHeader('Upgrade', 'websocket')
+            })
+          },
+        },
         '/connection': {
           target: backendUrl,
           changeOrigin: true,

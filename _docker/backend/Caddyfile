@@ -134,6 +134,14 @@
 		reverse_proxy {$REALTIME_UPSTREAM_ADDR:centrifugo:8000}
 	}
 
+	# Live voice gateway. The sidecar holds the provider socket. An install
+	# that has not started the `voice` profile gets a 502 on this path, which
+	# is the same as the feature being off. The upstream is overridable for
+	# the same shared-network DNS reason as Centrifugo above.
+	handle /voice/ws* {
+		reverse_proxy {$LIVE_VOICE_UPSTREAM_ADDR:voice:8096}
+	}
+
 	# Widgets first (to catch widget.js, chunks/*, etc.)
 	@widget_file {
 		file {
@@ -207,6 +215,7 @@
 		path('/widget.php') ||
 		path('/shared/*') ||
 		path('/v1/*') ||
+		path('/internal/voice/*') ||
 		path('/mcp') ||
 		path('/.well-known/oauth-protected-resource') ||
 		path('/.well-known/oauth-protected-resource/*') ||

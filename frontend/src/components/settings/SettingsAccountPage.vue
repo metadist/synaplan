@@ -47,6 +47,7 @@
 
       <SettingsAppearanceSection v-else-if="section === 'appearance'" />
       <SettingsChatSection v-else-if="section === 'chat'" />
+      <SettingsVoiceSection v-else-if="section === 'voice'" @keydown.enter.prevent />
       <SettingsDataSection v-else-if="section === 'data'" />
       <ProfileBillingSection v-else-if="section === 'billing'" />
       <fieldset
@@ -90,6 +91,7 @@ import NativeAppVersions from '@/components/NativeAppVersions.vue'
 import SettingsAppearanceSection from '@/components/settings/SettingsAppearanceSection.vue'
 import SettingsChatSection from '@/components/settings/SettingsChatSection.vue'
 import SettingsDataSection from '@/components/settings/SettingsDataSection.vue'
+import SettingsVoiceSection from '@/components/settings/SettingsVoiceSection.vue'
 import ProfilePersonalSection from '@/components/settings/ProfilePersonalSection.vue'
 import ProfileCompanySection from '@/components/settings/ProfileCompanySection.vue'
 import ProfileBillingSection from '@/components/settings/ProfileBillingSection.vue'

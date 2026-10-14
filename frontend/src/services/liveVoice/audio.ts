@@ -1,0 +1,307 @@
+import type { ApiLoadedMessageRow } from '@/utils/messageMapper'
+
+/**
+ * A picture, video, audio or document Synaplan made during the call. A
+ * stored call names the chat row; an incognito call carries the row itself.
+ */
+export interface LiveVoiceArtifact {
+  type: string
+  state: string
+  messageId?: number
+  row?: ApiLoadedMessageRow
+}
+
+export interface LiveVoiceSocketHandlers {
+  onReady: () => void
+  onArtifact: (artifact: LiveVoiceArtifact) => void
+  onState: (state: 'thinking' | 'listening' | 'speaking') => void
+  onTranscript: (role: 'user' | 'assistant', text: string, final: boolean) => void
+  onStored: (role: 'user' | 'assistant', messageId: number, text: string) => void
+  onPlaybackIdle: () => void
+  onInterrupted: () => void
+  onWrapUp: () => void
+  onEnded: (reason: string) => void
+  onUsage: (secondsLeft: number | null) => void
+  onWarn: (secondsLeft: number) => void
+  onReply: (details: {
+    topic?: string | null
+    aiModels?: {
+      chat?: { provider: string; model: string; model_id: number | null }
+      sorting?: { provider: string; model: string; model_id: number | null }
+      audio?: { provider: string; model: string; model_id: number | null }
+      voice?: { provider: string; model: string; model_id: number | null }
+    } | null
+    usage?: {
+      promptTokens: number
+      completionTokens: number
+      totalTokens: number
+      cost: string | null
+      modelKey: string
+      kind: string
+      priceKnown?: boolean
+    } | null
+    usageExtra?:
+      | {
+          promptTokens: number
+          completionTokens: number
+          totalTokens: number
+          cost: string
+          modelKey: string
+          kind: string
+          priceKnown?: boolean
+        }[]
+      | null
+  }) => void
+  onLevel: (level: number) => void
+  onOutLevel: (level: number) => void
+  onAudioOut: () => void
+  onSocketClosed: () => void
+}
+
+export interface LiveVoiceAudioSession {
+  setMuted: (muted: boolean) => void
+  sendEnd: () => void
+  close: () => void
+}
+
+/** Hang-up during connect must not leave the microphone or the socket open. */
+export function throwIfLiveVoiceAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+}
+
+/**
+ * Microphone to PCM16, and provider PCM16 back to the speakers.
+ * The AudioContext and getUserMedia call must be created in the click turn.
+ */
+export async function openLiveVoiceAudio(input: {
+  context: AudioContext
+  mic: MediaStream
+  wsUrl: string
+  inRate: number
+  outRate: number
+  handlers: LiveVoiceSocketHandlers
+  signal?: AbortSignal
+}): Promise<LiveVoiceAudioSession> {
+  throwIfLiveVoiceAborted(input.signal)
+  await input.context.audioWorklet.addModule(new URL('./pcm-capture.worklet.js', import.meta.url))
+  await input.context.audioWorklet.addModule(new URL('./pcm-playback.worklet.js', import.meta.url))
+  throwIfLiveVoiceAborted(input.signal)
+
+  const source = input.context.createMediaStreamSource(input.mic)
+  const capture = new AudioWorkletNode(input.context, 'pcm-capture')
+  capture.port.postMessage({ type: 'config', targetRate: input.inRate })
+  const silent = input.context.createGain()
+  silent.gain.value = 0
+  source.connect(capture)
+  capture.connect(silent)
+  silent.connect(input.context.destination)
+
+  const playback = new AudioWorkletNode(input.context, 'pcm-playback')
+  playback.port.postMessage({ type: 'config', sourceRate: input.outRate })
+  playback.port.onmessage = (event: MessageEvent<{ type?: string; level?: number }>) => {
+    if (event.data?.type === 'idle') input.handlers.onPlaybackIdle()
+    if (event.data?.type === 'level' && typeof event.data.level === 'number') {
+      input.handlers.onOutLevel(event.data.level)
+    }
+  }
+  playback.connect(input.context.destination)
+
+  const socket = new WebSocket(input.wsUrl)
+  socket.binaryType = 'arraybuffer'
+  let muted = false
+  let closed = false
+  let stopped = false
+
+  const stopTracks = () => {
+    if (stopped) return
+    stopped = true
+    closed = true
+    if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+      socket.close()
+    }
+    input.mic.getTracks().forEach((track) => track.stop())
+    capture.disconnect()
+    playback.disconnect()
+    source.disconnect()
+    void input.context.close().catch(() => undefined)
+  }
+
+  input.signal?.addEventListener('abort', stopTracks, { once: true })
+
+  capture.port.onmessage = (
+    event: MessageEvent<{ type: string; pcm?: Int16Array; level?: number }>
+  ) => {
+    if (event.data.type !== 'pcm' || !event.data.pcm) return
+    if (typeof event.data.level === 'number') input.handlers.onLevel(event.data.level)
+    if (muted || socket.readyState !== WebSocket.OPEN) return
+    socket.send(pcm16Frame(event.data.pcm))
+  }
+
+  socket.onmessage = (event) => {
+    if (typeof event.data !== 'string') {
+      if (input.context.state === 'suspended') void input.context.resume()
+      const pcm = new Int16Array(event.data as ArrayBuffer)
+      playback.port.postMessage({ type: 'pcm', pcm }, [pcm.buffer])
+      input.handlers.onAudioOut()
+      return
+    }
+    applyControlMessage(event.data, input.handlers, () => {
+      playback.port.postMessage({ type: 'flush' })
+    })
+  }
+
+  socket.onclose = () => {
+    if (!closed) input.handlers.onSocketClosed()
+  }
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      if (input.signal?.aborted) {
+        reject(new DOMException('The operation was aborted.', 'AbortError'))
+        return
+      }
+      socket.onopen = () => resolve()
+      socket.onerror = () => reject(new Error('socket'))
+    })
+    throwIfLiveVoiceAborted(input.signal)
+  } catch (error) {
+    input.signal?.removeEventListener('abort', stopTracks)
+    stopTracks()
+    throw error
+  }
+
+  return {
+    setMuted(next: boolean) {
+      muted = next
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: next ? 'mute' : 'unmute' }))
+      }
+    },
+    sendEnd() {
+      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'end' }))
+    },
+    close() {
+      input.signal?.removeEventListener('abort', stopTracks)
+      stopTracks()
+    },
+  }
+}
+
+/** Little-endian PCM16 bytes. A typed-array copy would keep only the low byte of each sample. */
+export function pcm16Frame(pcm: Int16Array): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(pcm.byteLength)
+  bytes.set(new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength))
+  return bytes
+}
+
+/** Only a frame that names a stored row or carries an incognito row can be shown. */
+export function liveVoiceArtifact(value: unknown): LiveVoiceArtifact | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const raw = value as Record<string, unknown>
+  if (typeof raw.type !== 'string' || typeof raw.state !== 'string') return null
+  const artifact: LiveVoiceArtifact = { type: raw.type, state: raw.state }
+  if (typeof raw.messageId === 'number' && Number.isInteger(raw.messageId) && raw.messageId > 0) {
+    artifact.messageId = raw.messageId
+    return artifact
+  }
+  const row = raw.row
+  if (
+    row &&
+    typeof row === 'object' &&
+    !Array.isArray(row) &&
+    typeof (row as Record<string, unknown>).timestamp === 'number'
+  ) {
+    artifact.row = row as ApiLoadedMessageRow
+    return artifact
+  }
+  return null
+}
+
+export function applyControlMessage(
+  raw: string,
+  handlers: LiveVoiceSocketHandlers,
+  onInterrupted?: () => void
+): void {
+  let message: {
+    type?: string
+    state?: string
+    role?: string
+    text?: string
+    reason?: string
+    secondsLeft?: number
+    final?: boolean
+    messageId?: number
+    artifact?: unknown
+    details?: {
+      topic?: string | null
+      aiModels?: {
+        chat?: { provider: string; model: string; model_id: number | null }
+        sorting?: { provider: string; model: string; model_id: number | null }
+        audio?: { provider: string; model: string; model_id: number | null }
+        voice?: { provider: string; model: string; model_id: number | null }
+      } | null
+      usage?: {
+        promptTokens: number
+        completionTokens: number
+        totalTokens: number
+        cost: string | null
+        modelKey: string
+        kind: string
+        priceKnown?: boolean
+      } | null
+      usageExtra?:
+        | {
+            promptTokens: number
+            completionTokens: number
+            totalTokens: number
+            cost: string
+            modelKey: string
+            kind: string
+            priceKnown?: boolean
+          }[]
+        | null
+    }
+  }
+  try {
+    message = JSON.parse(raw) as typeof message
+  } catch {
+    return
+  }
+  const state = message.state
+  const role = message.role
+  if (message.type === 'ready') handlers.onReady()
+  if (
+    message.type === 'state' &&
+    (state === 'thinking' || state === 'listening' || state === 'speaking')
+  ) {
+    handlers.onState(state)
+  }
+  if (message.type === 'transcript' && (role === 'user' || role === 'assistant') && message.text) {
+    handlers.onTranscript(role, message.text, message.final === true)
+  }
+  if (
+    message.type === 'stored' &&
+    (role === 'user' || role === 'assistant') &&
+    typeof message.messageId === 'number' &&
+    message.text
+  ) {
+    handlers.onStored(role, message.messageId, message.text)
+  }
+  if (message.type === 'reply' && message.details) handlers.onReply(message.details)
+  if (message.type === 'artifact') {
+    const artifact = liveVoiceArtifact(message.artifact)
+    if (artifact) handlers.onArtifact(artifact)
+  }
+  if (message.type === 'interrupted') {
+    onInterrupted?.()
+    handlers.onInterrupted()
+  }
+  if (message.type === 'wrap_up') handlers.onWrapUp()
+  if (message.type === 'ended') handlers.onEnded(message.reason ?? 'provider_error')
+  if (message.type === 'usage') {
+    handlers.onUsage(typeof message.secondsLeft === 'number' ? message.secondsLeft : null)
+  }
+  if (message.type === 'warn' && typeof message.secondsLeft === 'number') {
+    handlers.onWarn(message.secondsLeft)
+  }
+}

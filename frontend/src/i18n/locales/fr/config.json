@@ -1117,6 +1117,7 @@
       "channel": "Canal",
       "tokens": "Jetons",
       "latency": "Latence",
+      "duration": "Durée",
       "model": "Modèle",
       "promptTokens": "Instruction",
       "completionTokens": "Complétion",
@@ -1124,6 +1125,9 @@
       "cost": "Coût",
       "estimatedTooltip": "Nombre de jetons estimé (pas de mesure exacte du fournisseur)",
       "noRecentActivity": "Aucune activité récente",
+      "durationMinutes": "{minutes} min {seconds} s",
+      "durationSeconds": "{seconds} s",
+      "openChat": "Ouvrir ce chat",
       "activity": {
         "searchPlaceholder": "Rechercher par modèle ou fournisseur…",
         "allActions": "Toutes les actions",
@@ -1155,7 +1159,9 @@
         "embeddings": "Embeddings",
         "api_chat": "Chat API",
         "rerank": "Rerank",
-        "message_digest": "Mémoire à long terme"
+        "message_digest": "Mémoire à long terme",
+        "voice_live": "Conversation en direct",
+        "transcription": "Transcription"
       },
       "sources": {
         "whatsapp": "WhatsApp",

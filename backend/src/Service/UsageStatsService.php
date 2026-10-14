@@ -251,6 +251,48 @@ final readonly class UsageStatsService
     }
 
     /**
+     * Spoken length from BMETADATA.media_usage.duration_seconds.
+     * Null when the action did not record one.
+     */
+    private function durationSeconds(?string $metadataJson): ?float
+    {
+        if (null === $metadataJson || '' === $metadataJson) {
+            return null;
+        }
+
+        $decoded = json_decode($metadataJson, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        $media = $decoded['media_usage'] ?? null;
+        if (!is_array($media) || !isset($media['duration_seconds']) || !is_numeric($media['duration_seconds'])) {
+            return null;
+        }
+
+        return (float) $media['duration_seconds'];
+    }
+
+    /**
+     * Chat this row belongs to, when the action stored a positive chat_id.
+     */
+    private function chatIdFromMetadata(?string $metadataJson): ?int
+    {
+        if (null === $metadataJson || '' === $metadataJson) {
+            return null;
+        }
+
+        $decoded = json_decode($metadataJson, true);
+        if (!is_array($decoded) || !is_numeric($decoded['chat_id'] ?? null)) {
+            return null;
+        }
+
+        $chatId = (int) $decoded['chat_id'];
+
+        return $chatId > 0 ? $chatId : null;
+    }
+
+    /**
      * Get usage breakdown by time period (today, this week, this month).
      */
     private function getUsageByTimePeriod(int $userId): array
@@ -336,12 +378,14 @@ final readonly class UsageStatsService
         ]);
 
         return array_map(function ($row) {
+            $metadata = is_string($row['metadata'] ?? null) ? $row['metadata'] : null;
+
             return [
                 'timestamp' => (int) $row['timestamp'],
                 'datetime' => date('Y-m-d H:i:s', $row['timestamp']),
                 'action' => $row['action'],
                 'source' => $row['source'] ?: 'WEB',
-                'channel' => $this->channelFromMetadata($row['metadata'] ?? null),
+                'channel' => $this->channelFromMetadata($metadata),
                 'model' => $row['model'],
                 'tokens' => (int) $row['tokens'],
                 'prompt_tokens' => (int) ($row['prompt_tokens'] ?? 0),
@@ -352,6 +396,8 @@ final readonly class UsageStatsService
                 'cost' => (float) $row['cost'],
                 'latency' => (float) $row['latency'],
                 'status' => $row['status'],
+                'duration_seconds' => $this->durationSeconds($metadata),
+                'chat_id' => $this->chatIdFromMetadata($metadata),
             ];
         }, $results);
     }
@@ -819,7 +865,7 @@ final readonly class UsageStatsService
             'datetime' => date('Y-m-d H:i:s', (int) $row['timestamp']),
             'action' => $row['action'],
             'source' => $row['source'] ?: 'WEB',
-            'channel' => $this->channelFromMetadata($row['metadata'] ?? null),
+            'channel' => $this->channelFromMetadata(is_string($row['metadata'] ?? null) ? $row['metadata'] : null),
             'model' => $row['model'],
             'tokens' => (int) $row['tokens'],
             'prompt_tokens' => (int) ($row['prompt_tokens'] ?? 0),
@@ -830,6 +876,8 @@ final readonly class UsageStatsService
             'cost' => (float) $row['cost'],
             'latency' => (float) $row['latency'],
             'status' => $row['status'],
+            'duration_seconds' => $this->durationSeconds(is_string($row['metadata'] ?? null) ? $row['metadata'] : null),
+            'chat_id' => $this->chatIdFromMetadata(is_string($row['metadata'] ?? null) ? $row['metadata'] : null),
         ], $rows);
 
         return [
@@ -880,15 +928,17 @@ final readonly class UsageStatsService
 
         $results = $conn->fetchAllAssociative($sql, $params);
 
-        $csv = "Timestamp,Date,Action,Channel,Source,Model,Tokens,Prompt Tokens,Completion Tokens,Cached Tokens,Cache Creation Tokens,Estimated,Cost,Latency,Status\n";
+        $csv = "Timestamp,Date,Action,Channel,Source,Model,Tokens,Prompt Tokens,Completion Tokens,Cached Tokens,Cache Creation Tokens,Estimated,Cost,Latency,Status,Duration (s)\n";
 
         foreach ($results as $row) {
+            $metadata = is_string($row['metadata'] ?? null) ? $row['metadata'] : null;
+            $duration = $this->durationSeconds($metadata);
             $csv .= sprintf(
-                "%d,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%.6f,%.2f,%s\n",
+                "%d,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%s,%.6f,%.2f,%s,%s\n",
                 $row['timestamp'],
                 date('Y-m-d H:i:s', $row['timestamp']),
                 $row['action'],
-                $this->channelFromMetadata($row['metadata'] ?? null),
+                $this->channelFromMetadata($metadata),
                 $row['source'] ?: 'WEB',
                 $row['model'],
                 $row['tokens'],
@@ -899,7 +949,8 @@ final readonly class UsageStatsService
                 $row['estimated'] ? 'Yes' : 'No',
                 $row['cost'],
                 $row['latency'],
-                $row['status']
+                $row['status'],
+                null === $duration ? '' : sprintf('%.3f', $duration)
             );
         }
 

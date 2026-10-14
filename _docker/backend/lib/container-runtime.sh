@@ -662,6 +662,7 @@ run_scheduler_tick_lane() {
     run_scheduler_job 300 bin/console --env="$env" app:media:reap-jobs --no-interaction
     run_scheduler_job 300 bin/console --env="$env" app:chat:reap-stuck --no-interaction
     run_scheduler_job 300 bin/console --env="$env" app:desktop:reap-jobs --no-interaction
+    run_scheduler_job 300 bin/console --env="$env" app:voice:reap-sessions --no-interaction
     run_scheduler_job 300 bin/console --env="$env" app:process-mail-handlers --no-interaction
     if [ "$smart_mailbox" = "1" ]; then
         run_scheduler_job 300 bin/console --env="$env" app:process-emails --no-interaction

@@ -335,6 +335,31 @@
             "mobile_class": "ota-candidate"
         },
         {
+            "id": "live_voice",
+            "label_key": "modules.live_voice.label",
+            "state": "available",
+            "configured": true,
+            "healthy": true,
+            "message": "Live voice is running",
+            "details": {
+                "url": "http://voice:8096"
+            },
+            "configured_by": {
+                "env": [
+                    "LIVE_VOICE_GATEWAY_URL",
+                    "LIVE_VOICE_GATEWAY_SECRET",
+                    "LIVE_VOICE_PUBLIC_WS_PATH",
+                    "LIVE_VOICE_COMPATIBLE_WS_URL"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/live-voice",
+            "mobile_class": "backend-only"
+        },
+        {
             "id": "local_ai",
             "label_key": "modules.local_ai.label",
             "state": "absent",

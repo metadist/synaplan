@@ -36,6 +36,7 @@ final class ModuleDescriptorContractTest extends TestCase
         'federation',
         'compute',
         'opendesk_stt',
+        'live_voice',
         'chat_artifacts',
     ];
 

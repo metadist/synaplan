@@ -88,6 +88,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
      */
     private const ECHOED_HISTORY_STAMP = '/^\[\d{14}\]:\s*/';
 
+    /** Processing source of a question delegated from a live voice call. */
+    private const SOURCE_LIVE_VOICE = 'live_voice';
+
+    /**
+     * The live voice speaks this answer aloud while the person waits, so the
+     * whole reply has to be generated before a single word is heard.
+     */
+    private const LIVE_VOICE_MAX_TOKENS = 600;
+
+    private const LIVE_VOICE_REPLY_RULE = "\n\nThis answer is spoken aloud in a live voice conversation. "
+        .'Answer in at most three short spoken sentences. No markdown, lists, tables, links, or emoji. '
+        .'Reply in the language of the question.';
+
     /** Flat attachment cut used only when no context budget is available. */
     private const LEGACY_ATTACHMENT_CHARS = 10000;
 
@@ -947,6 +960,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // The picture this turn edits (mediamaker only).
         $systemPrompt .= $this->buildMediaEditContext($topic, $options);
 
+        // A document is written into the file, not spoken, so it keeps its
+        // full length. The live voice only announces that it is in the chat.
+        $liveVoice = self::SOURCE_LIVE_VOICE === ($options['source'] ?? null) && 'officemaker' !== $topic;
+        if ($liveVoice) {
+            $systemPrompt .= self::LIVE_VOICE_REPLY_RULE;
+        }
+
         $modelMaxTokens = null;
         $systemPromptFallback = null;
         $loadedModel = null;
@@ -1003,6 +1023,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'quoted_text' => $options['quoted_text'] ?? null,
             'quoted_message_id' => $options['quoted_message_id'] ?? null,
             'attachment_text' => $this->fitAttachmentText($message, $modelId, null),
+            'plain_user_turn' => $liveVoice,
         ]);
 
         if (null !== $systemPromptFallback) {
@@ -1036,7 +1057,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // we don't hit the repository twice per request.
         $planMaxTokens = null !== $user ? $this->rateLimitService->getMaxOutputTokens($user) : null;
         $tokenLimits = array_filter(
-            [$planMaxTokens, $modelMaxTokens],
+            [$planMaxTokens, $modelMaxTokens, $liveVoice ? self::LIVE_VOICE_MAX_TOKENS : null],
             static fn ($v) => is_int($v) && $v > 0,
         );
 
@@ -2645,6 +2666,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
     private function buildMessages(?string $systemPrompt, array $thread, Message $currentMessage, array $options = []): array
     {
+        // A spoken question is a chat turn, not a channel record: the model
+        // must read the words, not a BTEXT/BDATETIME envelope it then describes.
+        if (true === ($options['plain_user_turn'] ?? false)) {
+            return $this->buildStreamingMessages($systemPrompt, $thread, $currentMessage, $options);
+        }
+
         $messages = [];
         if (null !== $systemPrompt) {
             $messages[] = [

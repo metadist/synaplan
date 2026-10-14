@@ -18,8 +18,13 @@ export class AudioStreamer {
   private prefetchedBlobs: Map<number, string> = new Map() // index → blob URL
   private playIndex = 0
   private _allQueued = false
+  private onPlaybackStart?: () => void
   private onFinished?: () => void
   private onFailure?: (reason: ReadAloudFailureReason) => void
+
+  public setOnPlaybackStart(cb: () => void): void {
+    this.onPlaybackStart = cb
+  }
 
   /**
    * Register a callback invoked once when all queued audio has finished playing
@@ -170,14 +175,22 @@ export class AudioStreamer {
       this.failChunk('provider_error')
     })
 
-    audio.play().catch((e) => {
-      console.warn('AudioStreamer: Auto-play prevented', e)
-      this.isPlaying = false
-      this.currentAudio = null
-      this.playIndex++
-      this.tryPlayNext()
-      this.checkFinished()
-    })
+    audio
+      .play()
+      .then(() => {
+        if (this.stopped || this.failed) return
+        const started = this.onPlaybackStart
+        this.onPlaybackStart = undefined
+        started?.()
+      })
+      .catch((e) => {
+        console.warn('AudioStreamer: Auto-play prevented', e)
+        this.isPlaying = false
+        this.currentAudio = null
+        this.playIndex++
+        this.tryPlayNext()
+        this.checkFinished()
+      })
   }
 
   public stop(): void {

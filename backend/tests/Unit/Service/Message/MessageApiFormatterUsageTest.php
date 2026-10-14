@@ -163,6 +163,25 @@ final class MessageApiFormatterUsageTest extends TestCase
         self::assertSame('0.004200', $usageExtra[0]['cost']);
     }
 
+    public function testLiveVoiceModelIsListedBesideTheSynaplanModel(): void
+    {
+        $m = $this->makeOutMessage();
+        $m->setTopic('mediamaker');
+        $m->setMeta('voice_provider', 'OpenAI');
+        $m->setMeta('voice_model_name', 'GPT Live');
+        $m->setMeta('voice_model_id', '15');
+        $m->setMeta('ai_chat_provider', 'Anthropic');
+        $m->setMeta('ai_chat_model', 'Claude Sonnet');
+        $m->setMeta('ai_chat_model_id', '5');
+
+        $row = $this->formatter->format($m);
+
+        self::assertSame('mediamaker', $row['topic']);
+        self::assertSame('GPT Live', $row['aiModels']['voice']['model']);
+        self::assertSame(15, $row['aiModels']['voice']['model_id']);
+        self::assertSame('Claude Sonnet', $row['aiModels']['chat']['model']);
+    }
+
     public function testIncomingMessageHasNoUsage(): void
     {
         $m = $this->makeMessage('IN', 'question');

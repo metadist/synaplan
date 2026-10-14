@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Config;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
 use App\Entity\User;
@@ -12,6 +13,7 @@ use App\Module\Federation\FederationModule;
 use App\Module\ModuleRegistry;
 use App\Module\ModuleStatusPresenter;
 use App\Module\Sidecar\DoclingModule;
+use App\Module\Sidecar\LiveVoiceModule;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Module\Sidecar\TikaModule;
 use App\Plug\WebSearch\WebSearchGateway;
@@ -265,10 +267,11 @@ final class FeatureStatusReporterTest extends TestCase
                 'http://docling:5001/health' => true,
                 'http://collabora:9980/hosting/capabilities' => true,
                 'http://centrifugo:8000/health' => true,
+                'http://voice:8096/health' => true,
             ],
             bodies: ['http://tika:9998/version' => "Apache Tika 2.9.2\n"],
         );
-        $registry = $this->registry($probe, tikaUrl: 'http://tika:9998', doclingUrl: ' http://docling:5001/ ', officeUrl: ' http://collabora:9980 ', tikaUser: 'tika', tikaPass: 'secret', federationAppUrl: 'https://partners.example.com');
+        $registry = $this->registry($probe, tikaUrl: 'http://tika:9998', doclingUrl: ' http://docling:5001/ ', officeUrl: ' http://collabora:9980 ', tikaUser: 'tika', tikaPass: 'secret', federationAppUrl: 'https://partners.example.com', voiceUrl: 'http://voice:8096');
 
         return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry), $this->computeStatus(true));
     }
@@ -304,13 +307,26 @@ final class FeatureStatusReporterTest extends TestCase
      * All descriptors (unconfigured stubs), with the three sidecars the
      * page renders replaced by instances that see the scenario's URLs.
      */
-    private function registry(FakeSidecarHealthProbe $probe, string $tikaUrl, string $doclingUrl, string $officeUrl, ?string $tikaUser = null, ?string $tikaPass = null, string $federationAppUrl = 'http://localhost:8000'): ModuleRegistry
+    private function registry(FakeSidecarHealthProbe $probe, string $tikaUrl, string $doclingUrl, string $officeUrl, ?string $tikaUser = null, ?string $tikaPass = null, string $federationAppUrl = 'http://localhost:8000', string $voiceUrl = ''): ModuleRegistry
     {
         $modules = $this->allModules();
         $modules[TikaModule::ID] = new TikaModule($probe, $tikaUrl, $tikaUser, $tikaPass);
         $modules[DoclingModule::ID] = new DoclingModule($probe, $doclingUrl);
         $modules[OfficeConvertModule::ID] = new OfficeConvertModule($probe, $officeUrl);
         $modules[FederationModule::ID] = new FederationModule($federationAppUrl, false);
+        if ('' !== $voiceUrl) {
+            $voiceModels = $this->createStub(ModelRepository::class);
+            $voiceModels->method('findActiveByTag')->willReturn([(new Model())->setService('OpenAI')]);
+            $voiceKeys = $this->createStub(ProviderKeyStore::class);
+            $voiceKeys->method('getStatus')->willReturn([
+                'configured' => true,
+                'source' => 'env',
+                'origin' => null,
+                'maskedKey' => 'sk-secret',
+                'hasSecret' => false,
+            ]);
+            $modules[LiveVoiceModule::ID] = new LiveVoiceModule($probe, $voiceUrl, 'secret', $voiceModels, $voiceKeys);
+        }
 
         $factories = [];
         foreach ($modules as $id => $module) {

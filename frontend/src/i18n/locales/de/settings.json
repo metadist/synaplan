@@ -342,6 +342,23 @@
     }
   },
   "settings": {
+    "voice": {
+      "title": "Live-Gespräche",
+      "intro": "Wähle die Stimme für Live-Gespräche. Deine Stimme geht an {company}, solange du sprichst, und die Kosten nutzen dasselbe monatliche Nutzungsbudget wie der Chat.",
+      "modelsHint": "Das Modell und seine Stimme stehen unter {page}.",
+      "model": "Sprachmodell",
+      "voice": "Stimme",
+      "captions": "Untertitel während des Gesprächs zeigen",
+      "save": "Speichern",
+      "saved": "Gespeichert.",
+      "saveFailed": "Die Spracheinstellungen konnten nicht gespeichert werden.",
+      "loadFailed": "Die Spracheinstellungen konnten nicht geladen werden.",
+      "loading": "Wird geladen…",
+      "noVoices": "Dieses Modell nutzt seine Standardstimme.",
+      "withdraw": "Live-Gespräche nicht mehr erlauben",
+      "withdrawHint": "Der Chat fragt vor dem nächsten Gespräch wieder. Bereits gespeicherte Gespräche bleiben im Chat.",
+      "withdrawn": "Live-Gespräche fragen wieder nach der Erlaubnis."
+    },
     "title": "Einstellungen",
     "subtitle": "Verwalten Sie Ihre Präferenzen und Konfiguration",
     "sections": {
@@ -349,6 +366,7 @@
       "profile": "Profil",
       "appearance": "Sprache & Darstellung",
       "chat": "Chat & KI",
+      "voice": "Live-Gespräche",
       "data": "Daten & Datenschutz",
       "billing": "Abrechnung",
       "security": "Sicherheit",

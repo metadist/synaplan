@@ -9,6 +9,7 @@ use App\Entity\Model;
 use App\Model\ModelCatalog;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
+use App\Service\Voice\VoiceLiveMeter;
 use Psr\Log\LoggerInterface;
 
 final readonly class CostCalculationService
@@ -509,6 +510,89 @@ final readonly class CostCalculationService
             'per1' => $price,
             default => $price / 1_000_000,
         };
+    }
+
+    /**
+     * Cost of one live-voice session so far.
+     *
+     * `per_second` (GPT-Live, Grok Voice) bills the session length. Grok Voice
+     * also adds `text_item_price` for each text item. `per_audio_token`
+     * (Gemini Live, GPT Realtime) bills audio and text tokens separately. The
+     * chat model's answer cost is not included here; the caller adds it to
+     * the same usage row.
+     */
+    public function calculateVoiceLiveCost(?int $modelId, VoiceLiveMeter $meter, ?int $timestamp = null): CostResult
+    {
+        if (!$modelId) {
+            return $this->zeroCostResult();
+        }
+
+        $model = $this->modelRepository->find($modelId);
+        if (!$model) {
+            $this->logger->warning('CostCalculation: Model not found for live voice', ['model_id' => $modelId]);
+
+            return $this->zeroCostResult();
+        }
+
+        $mode = $model->getJson()['pricing_mode'] ?? 'per_token';
+        if ('per_second' === $mode) {
+            return $this->withTextItems($this->calculateMediaCost($modelId, $meter->seconds, 0.0, $timestamp), $model, $meter);
+        }
+
+        if ('per_audio_token' !== $mode) {
+            $this->logger->warning('CostCalculation: live voice model has no voice pricing mode', [
+                'model_id' => $modelId,
+                'pricing_mode' => $mode,
+            ]);
+
+            return $this->zeroCostResult();
+        }
+
+        /** @var array<string, mixed> $priceSnapshot */
+        $priceSnapshot = $this->getPriceSnapshot($model, $timestamp);
+        $json = $model->getJson();
+        $textIn = self::normaliseToPerUnit((float) $priceSnapshot['price_in'], (string) $priceSnapshot['in_unit']) * $meter->textInTokens;
+        $textOut = self::normaliseToPerUnit((float) $priceSnapshot['price_out'], (string) $priceSnapshot['out_unit']) * $meter->textOutTokens;
+        $audioIn = ((float) ($json['audio_price_in_per_1M'] ?? 0)) / 1_000_000 * $meter->audioInTokens;
+        $audioCache = ((float) ($json['audio_cache_in_per_1M'] ?? 0)) / 1_000_000 * $meter->audioCacheTokens;
+        $audioOut = ((float) ($json['audio_price_out_per_1M'] ?? 0)) / 1_000_000 * $meter->audioOutTokens;
+
+        $inputCost = $textIn + $audioIn + $audioCache;
+        $outputCost = $textOut + $audioOut;
+        $priceSnapshot['pricing_mode'] = 'per_audio_token';
+        $priceSnapshot['audio_price_in_per_1M'] = (string) ($json['audio_price_in_per_1M'] ?? '0');
+        $priceSnapshot['audio_price_out_per_1M'] = (string) ($json['audio_price_out_per_1M'] ?? '0');
+
+        return new CostResult(
+            totalCost: number_format($inputCost + $outputCost, 6, '.', ''),
+            inputCost: number_format($inputCost, 6, '.', ''),
+            outputCost: number_format($outputCost, 6, '.', ''),
+            cacheSavings: '0.000000',
+            priceSnapshot: $priceSnapshot,
+            billedInputTokens: $meter->textInTokens + $meter->audioInTokens,
+        );
+    }
+
+    private function withTextItems(CostResult $result, Model $model, VoiceLiveMeter $meter): CostResult
+    {
+        $itemPrice = (float) ($model->getJson()['text_item_price'] ?? 0);
+        if ($itemPrice <= 0.0 || $meter->textItems <= 0) {
+            return $result;
+        }
+
+        $extra = $itemPrice * $meter->textItems;
+        $snapshot = $result->priceSnapshot;
+        $snapshot['text_item_price'] = number_format($itemPrice, 6, '.', '');
+        $snapshot['text_items'] = $meter->textItems;
+
+        return new CostResult(
+            totalCost: number_format((float) $result->totalCost + $extra, 6, '.', ''),
+            inputCost: number_format((float) $result->inputCost + $extra, 6, '.', ''),
+            outputCost: $result->outputCost,
+            cacheSavings: $result->cacheSavings,
+            priceSnapshot: $snapshot,
+            billedInputTokens: $result->billedInputTokens,
+        );
     }
 
     private function zeroCostResult(): CostResult
