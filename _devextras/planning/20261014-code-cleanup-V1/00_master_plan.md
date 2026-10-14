@@ -70,8 +70,11 @@ Layer dependencies measured with `rg` on `use App\…` imports:
 | `DTO/` → `Service\` | 1 (`RegisterRequest` → `AccountLanguage`) | fixed by C5 |
 | `AI/` ↔ `Service/` | 32 / 71 | cycle; both in one *Application* layer in V1, split in V3 |
 
-Expected baseline after C1: **9 files** (4 + 1 + 2 + 1 + 1); C5 removes
-the two `AccountLanguage` entries, leaving 7.
+Expected baseline after C1: **9 files** (4 + 1 + 2 + 1 + 1). The first
+run measured 12 — three more than this `rg` count predicted
+(`DTO\Bundle\BundleDocument`, `DTO\Bundle\BundleImportRequest`,
+`Entity\InboundEmailHandler`; see [`STATUS.md`](./STATUS.md)) — so C5
+leaves 10, not 7.
 | `Controller/` → `Repository\` | 53 | allowed in V1 (reads through repositories are house style) |
 
 Blast radius of the 69 moves: 806 `use`/FQCN occurrences in 167 `src/`

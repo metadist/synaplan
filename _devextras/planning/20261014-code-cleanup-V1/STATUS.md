@@ -1,9 +1,12 @@
 # Code cleanup V1 — status
 
 Numbers to carry forward in every row: files in `src/Service/` root
-(start 73, target 4) and files in `deptrac.baseline.yaml` (expected 9
-after C1 — the edges listed in `00_master_plan.md` §1 — and 7 after C5
-removes the two `AccountLanguage` entries).
+(start 73, target 4) and files in `deptrac.baseline.yaml`. The first run
+measured **12 files / 59 edges**, not the 9 the `rg` count in
+`00_master_plan.md` §1 predicted: three more files
+(`DTO\Bundle\BundleDocument`, `DTO\Bundle\BundleImportRequest`,
+`Entity\InboundEmailHandler` — see the C1 row). C5 removes the two
+`AccountLanguage` entries, leaving **10**.
 
 | Date | Step | PR | Root files | Baseline entries | Note |
 | ---- | ---- | -- | ---------- | ---------------- | ---- |

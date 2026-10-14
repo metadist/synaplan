@@ -5,6 +5,12 @@
 # freezes the violations that existed when the gate was introduced; it may
 # only shrink. A new violation is fixed, not baselined.
 #
+# deptrac only sees classes a collector matches, and `--fail-on-uncovered`
+# cannot close that gap: it fails on every dependency into vendor code
+# (~18k here), so the gate would be permanently red. A new App namespace that
+# matches no layer is instead caught by tests/Architecture/LayerCoverageTest.php,
+# which reads the collectors below and fails when a src/ class matches none.
+#
 # Run:  make -C backend deptrac            (also part of make ci-local and CI)
 #       make -C backend deptrac-baseline   (regenerate the baseline — review the diff)
 imports:
