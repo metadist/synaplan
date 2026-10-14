@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\Repository\ConfigRepository;
-use App\Service\FeedbackConfigService;
-use App\Service\FeedbackConstants;
+use App\Service\Feedback\FeedbackConfigService;
+use App\Service\Feedback\FeedbackConstants;
 use PHPUnit\Framework\TestCase;
 
 class FeedbackConfigServiceTest extends TestCase

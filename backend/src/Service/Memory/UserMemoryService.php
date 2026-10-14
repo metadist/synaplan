@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Memory;
 
 use App\AI\Service\AiFacade;
 use App\DTO\UserMemoryDTO;
@@ -10,7 +10,8 @@ use App\Entity\User;
 use App\Entity\UserMemory;
 use App\Repository\UserMemoryRepository;
 use App\Service\Embedding\EmbeddingMetadataService;
-use App\Service\Memory\MemoryEmbeddingModelResolver;
+use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;

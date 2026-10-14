@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Memory;
 
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\JsonResponseDecoder;
@@ -12,6 +12,8 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\Message\GeneratedMediaTextRenderer;
+use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 

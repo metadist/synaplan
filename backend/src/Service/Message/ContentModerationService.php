@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Message;
 
 use App\Entity\ContentReport;
 use App\Entity\User;

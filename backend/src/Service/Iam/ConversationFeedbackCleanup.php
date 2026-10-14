@@ -12,7 +12,7 @@ use App\Repository\ShareRepository;
 use App\Repository\UserMemoryRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\ResourceKind\ConversationKind;
-use App\Service\UserMemoryService;
+use App\Service\Memory\UserMemoryService;
 use Psr\Log\LoggerInterface;
 
 /**

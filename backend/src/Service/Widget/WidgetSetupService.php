@@ -18,7 +18,7 @@ use App\Service\ModelConfigService;
 use App\Service\Prompt\LanguageDirectiveBuilder;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
-use App\Service\UrlContentService;
+use App\Service\Research\UrlContentService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 

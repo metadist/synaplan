@@ -6,8 +6,8 @@ namespace App\Service\Message;
 
 use App\Entity\User;
 use App\Service\Digest\MessageReferenceResolver;
+use App\Service\Memory\UserMemoryService;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
-use App\Service\UserMemoryService;
 
 /**
  * Resolves the reference tags an AI reply may carry before that reply leaves

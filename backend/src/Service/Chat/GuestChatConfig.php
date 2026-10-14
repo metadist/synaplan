@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Chat;
 
 use App\Repository\ConfigRepository;
 use App\Service\Auth\RegistrationConfig;

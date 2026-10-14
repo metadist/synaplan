@@ -18,7 +18,7 @@ use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\ModelRepository;
 use App\Service\Compute\ComputeFeatureStatusBuilder;
 use App\Service\Infrastructure\RedisService;
-use App\Service\UserMemoryService;
+use App\Service\Memory\UserMemoryService;
 use App\Service\WhisperService;
 use Doctrine\DBAL\Connection;
 

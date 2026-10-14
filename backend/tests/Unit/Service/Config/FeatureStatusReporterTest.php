@@ -25,7 +25,7 @@ use App\Service\Compute\ComputeFeatureStatusBuilder;
 use App\Service\Compute\Contract\ComputeHealth;
 use App\Service\Config\FeatureStatusReporter;
 use App\Service\Infrastructure\RedisService;
-use App\Service\UserMemoryService;
+use App\Service\Memory\UserMemoryService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use App\Service\WhisperService;
 use App\Tests\Unit\Module\Fixture\BuildsAllModules;

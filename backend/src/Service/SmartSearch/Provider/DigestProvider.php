@@ -6,11 +6,11 @@ namespace App\Service\SmartSearch\Provider;
 
 use App\Service\Digest\DigestSearchService;
 use App\Service\Digest\MessageDigestConfig;
+use App\Service\Memory\UserMemoryService;
 use App\Service\SmartSearch\Index\SearchIndexer;
 use App\Service\SmartSearch\SearchHit;
 use App\Service\SmartSearch\SearchProviderInterface;
 use App\Service\SmartSearch\SearchRequest;
-use App\Service\UserMemoryService;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**

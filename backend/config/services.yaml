@@ -1141,7 +1141,7 @@ services:
     App\Service\Message\AgainHandler: ~
 
     # Guest trial chat session service (per-IP cap configurable for E2E)
-    App\Service\GuestSessionService:
+    App\Service\Chat\GuestSessionService:
         arguments:
             $maxSessionsPerIp: '%env(int:GUEST_MAX_SESSIONS_PER_IP)%'
 

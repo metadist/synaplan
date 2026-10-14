@@ -20,9 +20,9 @@ use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\PerfTimer;
 use App\Service\PromptService;
+use App\Service\Research\UrlContentService;
 use App\Service\Research\WebResearchService;
 use App\Service\Runtime\RuntimeProfile;
-use App\Service\UrlContentService;
 use Psr\Log\LoggerInterface;
 
 /**

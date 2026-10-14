@@ -6,7 +6,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Message\ProcessMessageCommand;
 use App\Repository\MessageRepository;
-use App\Service\MessageEnqueueService;
+use App\Service\Message\MessageEnqueueService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Constraint\IsType;
 use PHPUnit\Framework\NativeType;

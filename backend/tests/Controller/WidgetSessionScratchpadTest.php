@@ -9,7 +9,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Entity\Widget;
 use App\Entity\WidgetSession;
-use App\Service\AiResponseSanitizer;
+use App\Service\Message\AiResponseSanitizer;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 

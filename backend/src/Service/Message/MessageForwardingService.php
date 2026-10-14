@@ -7,7 +7,6 @@ namespace App\Service\Message;
 use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\MessageRepository;
-use App\Service\AiResponseSanitizer;
 use App\Service\WhatsApp\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;

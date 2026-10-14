@@ -7,14 +7,14 @@ namespace App\AI\StructuredOutput\Schema;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 
 /**
- * JSON schema for {@see \App\Service\MemoryExtractionService}'s
+ * JSON schema for {@see \App\Service\Memory\MemoryExtractionService}'s
  * create/update/delete memory-action call.
  *
  * The model's natural output is a JSON ARRAY of actions, but OpenAI-dialect
  * structured output (and Anthropic tool-forcing, whose tool `input` is
  * always an object) both require an `object` root — a bare top-level array
  * is rejected. The array is therefore wrapped under a `memories` property,
- * which {@see \App\Service\MemoryExtractionService::parseMemoriesFromResponse()}
+ * which {@see \App\Service\Memory\MemoryExtractionService::parseMemoriesFromResponse()}
  * reads by key, falling back to a bare array for providers answering on the
  * prose-instruction path.
  *

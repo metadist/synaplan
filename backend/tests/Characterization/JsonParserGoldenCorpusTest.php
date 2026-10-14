@@ -6,7 +6,7 @@ namespace App\Tests\Characterization;
 
 use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\Controller\UserMemoryController;
-use App\Service\FeedbackContradictionService;
+use App\Service\Feedback\FeedbackContradictionService;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\MessageSorter;

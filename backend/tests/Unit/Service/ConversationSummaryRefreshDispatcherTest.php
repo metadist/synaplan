@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Service;
 
 use App\Message\DigestOtherChatsCommand;
 use App\Message\RefreshConversationSummaryCommand;
-use App\Service\ConversationSummaryRefreshDispatcher;
+use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

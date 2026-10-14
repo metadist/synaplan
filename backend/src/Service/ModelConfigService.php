@@ -15,6 +15,7 @@ use App\Repository\UserRepository;
 use App\Seed\DefaultModelConfigSeeder;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Iam\Policy\GroupPolicyService;
+use App\Service\Memory\MemoryExtractionService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 

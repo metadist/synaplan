@@ -11,7 +11,7 @@ use App\Controller\WebhookController;
 use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
-use App\Service\ConversationSummaryRefreshDispatcher;
+use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Email\EmailChatService;
 use App\Service\Email\EmailWebhookIdempotencyService;
 use App\Service\Email\InboundEmailAttachmentStore;

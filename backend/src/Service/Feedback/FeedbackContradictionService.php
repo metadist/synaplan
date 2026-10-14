@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Feedback;
 
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\JsonResponseDecoder;
@@ -10,6 +10,9 @@ use App\AI\StructuredOutput\Schema\FeedbackContradictionSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
 use App\Repository\PromptRepository;
+use App\Service\Memory\UserMemoryService;
+use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use Psr\Log\LoggerInterface;
 
 /**

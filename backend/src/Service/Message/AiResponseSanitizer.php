@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Message;
 
 /**
  * AI Response Sanitizer.
@@ -18,7 +18,7 @@ namespace App\Service;
  * regex pass at this layer, but regex sanitisation of model output is
  * fragile: every new model variant phrases the leak slightly differently
  * and the regex has to keep growing. Instead, the system prompt is built
- * via {@see Prompt\LanguageDirectiveBuilder}, which appends
+ * via {@see \App\Service\Prompt\LanguageDirectiveBuilder}, which appends
  * an explicit anti-echo clause that prevents the leak from being produced
  * in the first place. That is the right architectural layer for the fix.
  *

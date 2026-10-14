@@ -6,11 +6,11 @@ namespace App\Tests\Unit\Service\SmartSearch;
 
 use App\Entity\User;
 use App\Repository\SearchIndexRepository;
+use App\Service\Memory\UserMemoryService;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\SmartSearch\Index\SearchEmbeddingModel;
 use App\Service\SmartSearch\QueryVectors;
-use App\Service\UserMemoryService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

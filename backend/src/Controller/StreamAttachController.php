@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\Chat\GuestSessionService;
 use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunService;
-use App\Service\GuestSessionService;
 use App\Service\Widget\WidgetService;
 use App\Service\Widget\WidgetSessionService;
 use OpenApi\Attributes as OA;

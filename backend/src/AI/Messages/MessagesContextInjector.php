@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\AI\Messages;
 
 use App\Entity\User;
-use App\Service\FeedbackConfigService;
+use App\Service\Feedback\FeedbackConfigService;
 use App\Service\Knowledge\KnowledgeContextFormatter;
+use App\Service\Memory\UserMemoryService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RAG\VectorStorage\DTO\RagScope;
 use App\Service\Runtime\RuntimeProfile;
-use App\Service\UserMemoryService;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;

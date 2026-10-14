@@ -7,8 +7,8 @@ namespace App\Service\UrlWatch;
 use App\Entity\UrlWatch;
 use App\Repository\UrlWatchRepository;
 use App\Service\File\FileHelper;
+use App\Service\Research\UrlContentService;
 use App\Service\Security\SsrfGuard;
-use App\Service\UrlContentService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 

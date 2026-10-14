@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\Message\ExtractMemoriesCommand;
-use App\Service\MemoryExtractionDispatcher;
+use App\Service\Memory\MemoryExtractionDispatcher;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

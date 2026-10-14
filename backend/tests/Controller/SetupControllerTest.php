@@ -10,7 +10,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\TokenService;
-use App\Service\GuestChatConfig;
+use App\Service\Chat\GuestChatConfig;
 use App\Service\Setup\SetupConstants;
 use App\Service\Setup\SetupStateService;
 use Doctrine\DBAL\ArrayParameterType;

@@ -570,7 +570,7 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
      * so the schema-aware branch returns that envelope and fills in the
      * schema's nullable `memory_id`. Without a schema the stub keeps its
      * original bare-array shape — {@see
-     * \App\Service\MemoryExtractionService::parseMemoriesFromResponse()}
+     * \App\Service\Memory\MemoryExtractionService::parseMemoriesFromResponse()}
      * accepts both via regex, so neither shape is a compatibility risk.
      */
     private function mockMemoryExtraction(string $userContent, ?StructuredOutputSchema $schema): string
