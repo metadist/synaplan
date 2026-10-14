@@ -459,7 +459,8 @@ final readonly class MessageProcessor
                     $searchQuery = $this->searchQueryGenerator->generate(
                         $message->getText(),
                         $message->getUserId(),
-                        $attachmentContext ?? $this->linkedPageContext($classification)
+                        $attachmentContext ?? $this->linkedPageContext($classification),
+                        $this->threadContextForSearch($conversationHistory),
                     );
                     $perfTimer->stop('search_query');
 
@@ -961,7 +962,8 @@ final readonly class MessageProcessor
                     $searchQuery = $this->searchQueryGenerator->generate(
                         $message->getText(),
                         $message->getUserId(),
-                        $attachmentContext ?? $this->linkedPageContext($classification)
+                        $attachmentContext ?? $this->linkedPageContext($classification),
+                        $this->threadContextForSearch($conversationHistory),
                     );
 
                     $language = $this->resolveSearchLanguage($classification, $message);
@@ -1587,6 +1589,42 @@ final readonly class MessageProcessor
         $context = $classification['url_page_context'] ?? null;
 
         return is_string($context) && '' !== trim($context) ? $context : null;
+    }
+
+    /**
+     * The previous turns, so a follow-up that does not repeat the subject
+     * ("search for the text yourself") can be searched as that subject.
+     *
+     * @param array<int, Message|array{role?: string, content?: string, text?: string}> $conversationHistory
+     */
+    private function threadContextForSearch(array $conversationHistory): ?string
+    {
+        if ([] === $conversationHistory) {
+            return null;
+        }
+
+        $lines = [];
+        foreach (array_slice($conversationHistory, -4) as $entry) {
+            if ($entry instanceof Message) {
+                $role = 'IN' === $entry->getDirection() ? 'User' : 'Assistant';
+                $text = $entry->getText();
+            } else {
+                $role = 'assistant' === ($entry['role'] ?? '') ? 'Assistant' : 'User';
+                $text = $entry['content'] ?? $entry['text'] ?? '';
+            }
+
+            $text = preg_replace('/<think>.*?<\/think>/s', '', $text) ?? $text;
+            $text = trim(preg_replace('/\s+/u', ' ', $text) ?? '');
+            if ('' === $text) {
+                continue;
+            }
+            if (mb_strlen($text) > 500) {
+                $text = mb_substr($text, 0, 500).'…';
+            }
+            $lines[] = $role.': '.$text;
+        }
+
+        return [] === $lines ? null : implode("\n", $lines);
     }
 
     /**

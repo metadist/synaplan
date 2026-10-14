@@ -1741,6 +1741,7 @@ Your task is to analyze the user's question and generate a concise, effective se
 7. Keep the query concise (typically 3-8 words)
 8. Return ONLY the search query, no explanations or additional text
 9. If the input contains an "Attached file content" section, the question refers to THAT file (an uploaded image, document, audio or video). Resolve every reference ("this", "that", "it", "das", "esto") using the file content and build a self-contained query about the file's actual subject. NEVER search for the literal question words in that case.
+10. If the input contains a "Previous conversation" section, the question continues that conversation. Search for the subject already named there (the paper title, the product, the person). NEVER search for the instruction itself ("search for the text yourself", "den Text selber suchen").
 
 ## Examples:
 
@@ -1773,6 +1774,12 @@ Search Query: elbphilharmonie hamburg
 Question: "Is this still valid law?"
 Attached file content (the question refers to this): "GENERAL DATA PROTECTION REGULATION (EU) 2016/679 — Article 17, Right to erasure..."
 Search Query: gdpr article 17 current status
+
+Previous conversation (the question continues this — search for the subject already named here, never for the instruction itself):
+User: Summarize this paper: The Narrative AI Advantage? A Field Experiment on AI-Augmented Evaluations of Early-Stage Innovations
+Assistant: I can summarize the title and authors. I would need the full text for the results.
+Question: "I expect you to find the text yourself"
+Search Query: The Narrative AI Advantage field experiment full text
 
 Now generate the search query for the following user question:
 PROMPT;

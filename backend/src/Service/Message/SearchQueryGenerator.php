@@ -47,15 +47,26 @@ final readonly class SearchQueryGenerator
      *                                       ("what is that", "how much does this
      *                                       cost") resolve against the attachment
      *                                       instead of being searched literally.
+     * @param string|null $threadContext     Earlier turns of this chat, oldest
+     *                                       first. Used when the question points
+     *                                       at something already named there
+     *                                       ("search for the text yourself")
+     *                                       so the query is about that subject,
+     *                                       not about the instruction.
      *
      * @return string Optimized search query (or original if generation fails)
      */
-    public function generate(string $userQuestion, ?int $userId = null, ?string $attachmentContext = null): string
+    public function generate(string $userQuestion, ?int $userId = null, ?string $attachmentContext = null, ?string $threadContext = null): string
     {
+        $threadContext = self::blankToNull($threadContext);
+        $resolveThread = null !== $threadContext
+            && ($this->messageNeedsLlmRewrite($userQuestion) || self::resolvesAgainstThread($userQuestion));
+
         $this->logger->info('SearchQueryGenerator: Starting query generation', [
             'user_id' => $userId,
             'question_length' => strlen($userQuestion),
             'has_attachment_context' => null !== $attachmentContext,
+            'uses_thread_context' => $resolveThread,
         ]);
 
         // Phase 1c: skip the LLM round-trip when the user's message is already
@@ -69,7 +80,7 @@ final readonly class SearchQueryGenerator
         // With attachment context the short-circuit never applies: the whole
         // point is resolving the question's referent against the file content,
         // which only the model can do.
-        if (null === $attachmentContext && !$this->messageNeedsLlmRewrite($userQuestion)) {
+        if (null === $attachmentContext && !$resolveThread && !$this->messageNeedsLlmRewrite($userQuestion)) {
             $cleaned = $this->fallbackExtraction($userQuestion);
 
             $this->logger->info('SearchQueryGenerator: Skipped LLM rewrite (heuristic short-circuit)', [
@@ -86,7 +97,7 @@ final readonly class SearchQueryGenerator
         if (!$searchPrompt) {
             $this->logger->error('SearchQueryGenerator: Search prompt not found, using original question');
 
-            return $this->fallbackQuery($userQuestion, $attachmentContext);
+            return $this->fallbackQuery($userQuestion, $attachmentContext, $threadContext);
         }
 
         // Get sorting model (reuse sorting model for search query generation)
@@ -95,7 +106,7 @@ final readonly class SearchQueryGenerator
         if (!$modelId) {
             $this->logger->warning('SearchQueryGenerator: No sorting model configured, using fallback');
 
-            return $this->fallbackQuery($userQuestion, $attachmentContext);
+            return $this->fallbackQuery($userQuestion, $attachmentContext, $threadContext);
         }
 
         $provider = $this->modelConfigService->getProviderForModel($modelId);
@@ -104,11 +115,18 @@ final readonly class SearchQueryGenerator
         if (!$provider || !$modelName) {
             $this->logger->warning('SearchQueryGenerator: Model configuration invalid, using fallback');
 
-            return $this->fallbackQuery($userQuestion, $attachmentContext);
+            return $this->fallbackQuery($userQuestion, $attachmentContext, $threadContext);
         }
 
         // Build messages array for AI
         $userContent = $userQuestion;
+        if ($resolveThread) {
+            // The tools:search prompt has no conversation of its own. Without
+            // this block a follow-up like "search for the text yourself" is
+            // queried literally, and the search engine matches the instruction
+            // words instead of the subject named in the previous turn.
+            $userContent = "Previous conversation (the question continues this — search for the subject already named here, never for the instruction itself):\n{$threadContext}\n\nQuestion: {$userQuestion}";
+        }
         if (null !== $attachmentContext) {
             // Structured shape the tools:search prompt is trained on (see
             // PromptCatalog::searchQueryPrompt guideline 9): the model must
@@ -147,7 +165,7 @@ final readonly class SearchQueryGenerator
             if (strlen($searchQuery) > 200 || str_contains($searchQuery, "\n\n")) {
                 $this->logger->warning('SearchQueryGenerator: Generated query too long or malformed, using fallback');
 
-                return $this->fallbackQuery($userQuestion, $attachmentContext);
+                return $this->fallbackQuery($userQuestion, $attachmentContext, $threadContext);
             }
 
             // Remove any surrounding quotes
@@ -160,13 +178,13 @@ final readonly class SearchQueryGenerator
                 'provider' => $e->getProviderName(),
             ]);
 
-            return $this->fallbackQuery($userQuestion, $attachmentContext);
+            return $this->fallbackQuery($userQuestion, $attachmentContext, $threadContext);
         } catch (\Throwable $e) {
             $this->logger->error('SearchQueryGenerator: Query generation failed', [
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->fallbackQuery($userQuestion, $attachmentContext);
+            return $this->fallbackQuery($userQuestion, $attachmentContext, $threadContext);
         }
     }
 
@@ -199,6 +217,34 @@ final readonly class SearchQueryGenerator
                 'user_id' => $userId,
             ]);
         }
+    }
+
+    /**
+     * The question tells the assistant to go and get something already under
+     * discussion, without naming it again ("search for the text yourself").
+     * Searching those words is how a paper summary turned into song lyrics.
+     */
+    public static function resolvesAgainstThread(string $userQuestion): bool
+    {
+        $text = trim($userQuestion);
+        if ('' === $text) {
+            return false;
+        }
+
+        $asksToObtain = 1 === preg_match('/\b(?:such(?:e|en|st|t)?|suchen|fetch|find|look\s+up|hol(?:e|en|t)?|besorg\w*|recherchier\w*|read|get)\b/iu', $text);
+        $pointsAtUnnamedThing = 1 === preg_match('/\b(?:text|volltext|paper|artikel|article|pdf|document|it|that|selber|selbst|yourself)\b/iu', $text);
+
+        return $asksToObtain && $pointsAtUnnamedThing;
+    }
+
+    private static function blankToNull(?string $value): ?string
+    {
+        if (null === $value) {
+            return null;
+        }
+        $trimmed = trim($value);
+
+        return '' === $trimmed ? null : $trimmed;
     }
 
     /**
@@ -257,13 +303,21 @@ final readonly class SearchQueryGenerator
      * line of the file content (extracted text or vision identification)
      * names the subject and makes a far better keyword query.
      */
-    private function fallbackQuery(string $userQuestion, ?string $attachmentContext): string
+    private function fallbackQuery(string $userQuestion, ?string $attachmentContext, ?string $threadContext = null): string
     {
         if (null !== $attachmentContext && '' !== trim($attachmentContext)) {
             $firstLine = strtok(trim($attachmentContext), "\n") ?: trim($attachmentContext);
             $words = preg_split('/\s+/u', trim($firstLine)) ?: [];
 
             return implode(' ', array_slice($words, 0, 12));
+        }
+
+        if (null !== $threadContext && self::resolvesAgainstThread($userQuestion)
+            && 1 === preg_match('/^User:\s*(.+)$/m', $threadContext, $previousUser)
+        ) {
+            $words = preg_split('/\s+/u', trim($previousUser[1])) ?: [];
+
+            return implode(' ', array_slice($words, 0, 16));
         }
 
         return $this->fallbackExtraction($userQuestion);
