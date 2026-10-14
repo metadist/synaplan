@@ -36,11 +36,13 @@ function configuredServiceOrigin(): string {
 }
 
 /**
- * Public origin for links that leave the app (share URLs, absolute media).
+ * MOBILE-APP SEAM: public origin for links that leave the app (share URLs,
+ * absolute media, the shared-chat canonical address).
  *
- * Never use the WebView origin (`capacitor://localhost` / `https://localhost`):
- * a recipient cannot open it. Inside the shell the link uses the configured
- * service, even when the shell was not recognised via its User-Agent.
+ * The WebView origin (`capacitor://localhost` on iOS, `https://localhost` on
+ * Android) is not a link anyone else can open. Inside the shell these URLs
+ * use the server the user configured, even when the shell was not recognised
+ * via its User-Agent. On the plain web build this is the page origin.
  */
 export function publicAppOrigin(): string {
   const fromConfig = useConfigStore().appBaseUrl.replace(/\/$/, '')

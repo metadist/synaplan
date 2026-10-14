@@ -39,17 +39,20 @@ describe('buildChatShareUrl', () => {
     expect(buildChatShareUrl('tok')).toBe('https://web.synaplan.com/shared/tok')
   })
 
-  it('uses the configured service when the page is the Capacitor WebView', () => {
-    pageOrigin.value = 'capacitor://localhost'
-    appBaseUrl.value = 'capacitor://localhost'
-    vi.stubGlobal('__SYNAPLAN_API_BASE_URL__', 'https://chat.example.test')
-    expect(buildChatShareUrl('8ff39ffae77d4d9c0dfb7ccb')).toBe(
-      'https://chat.example.test/shared/8ff39ffae77d4d9c0dfb7ccb'
-    )
-    expect(publicAppOrigin()).not.toContain('capacitor://')
-    pageOrigin.value = 'http://localhost:5173'
-    vi.stubGlobal('__SYNAPLAN_API_BASE_URL__', undefined)
-  })
+  it.each(['capacitor://localhost', 'https://localhost'])(
+    'uses the configured service when the page origin is %s',
+    (origin) => {
+      pageOrigin.value = origin
+      appBaseUrl.value = origin
+      vi.stubGlobal('__SYNAPLAN_API_BASE_URL__', 'https://chat.example.test')
+      expect(buildChatShareUrl('8ff39ffae77d4d9c0dfb7ccb')).toBe(
+        'https://chat.example.test/shared/8ff39ffae77d4d9c0dfb7ccb'
+      )
+      expect(publicAppOrigin()).toBe('https://chat.example.test')
+      pageOrigin.value = 'http://localhost:5173'
+      vi.stubGlobal('__SYNAPLAN_API_BASE_URL__', undefined)
+    }
+  )
 
   it('keeps a normal site origin even when a native server URL is set', () => {
     pageOrigin.value = 'https://staging.synaplan.com'
