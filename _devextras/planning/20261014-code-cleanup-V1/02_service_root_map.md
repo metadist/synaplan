@@ -11,7 +11,8 @@ runner-up in the note; change them in review, not mid-PR.
 ## Stays — plugin SDK (4)
 
 Imported by external plugin repositories. Moving one is a breaking change
-for plugin authors; a `Plugin\Sdk` namespace with `class_alias` shims is V2.
+for plugin authors; a `Plugin\Sdk` namespace with `class_alias` shims is a
+V3 candidate (`00_master_plan.md` §8).
 
 | File | Imported by | src / tests / yaml |
 | ---- | ----------- | ------------------ |

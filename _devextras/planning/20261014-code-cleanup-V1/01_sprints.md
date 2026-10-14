@@ -78,11 +78,13 @@ the CI Backend job, and fails only on violations that are not in
    docker compose exec -T backend vendor/bin/deptrac analyse --formatter=baseline --output=deptrac.baseline.yaml --no-progress
    ```
 
-   Read the baseline before committing it. Expected content: the seven
-   edges from `00_master_plan.md` §1 (`Repository` → `Service\Iam\*`,
-   `Service\SmartSearch\Index\*`, `AI\*`; `Entity` → `Service\*`;
-   `DTO\RegisterRequest` → `Service\AccountLanguage`). Anything else is a
-   finding — note it in `STATUS.md`, do not silently freeze it.
+   Read the baseline before committing it. Expected content: the nine
+   files from `00_master_plan.md` §1 — `Repository` → `Service\Iam\*`,
+   `Service\SmartSearch\Index\*`, `AI\*` (5 files); `Entity\User` and
+   `Entity\McpServerConfig` → `Service\*`; `Entity\ModelHealth` →
+   `AI\Health\ModelHealthState`; `DTO\RegisterRequest` →
+   `Service\AccountLanguage`. Anything else is a finding — note it in
+   `STATUS.md`, do not silently freeze it.
 
 4. Wiring, mirroring the PHPStan entries exactly:
 
@@ -125,7 +127,7 @@ file that no longer exists (so the list cannot rot).
 - `PERMANENT = ['ModelConfigService', 'OidcUserService', 'PluginDataService', 'RateLimitService']`
   with the docblock: *imported by external plugins (Synaform, synafastbill,
   Synamail, synaScriber); moving one is a breaking change for plugin
-  authors and needs a `class_alias` window (V2).*
+  authors and needs a `class_alias` window (V3, master plan §8).*
 - `PENDING_MOVE = [...]` the other 69 names, grouped by the step that
   removes them (C3 … C8) as comments, taken from `02_service_root_map.md`.
 - Test 1: `glob('src/Service/*.php')` basenames ⊆ `PERMANENT ∪ PENDING_MOVE`.

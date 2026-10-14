@@ -66,7 +66,7 @@ Not god classes, excluded from the gate by path: `Model/ModelCatalog.php`
 
 | Target | Characterization test | Fixture |
 | ------ | --------------------- | ------- |
-| `StreamController` | **Golden SSE transcript.** For a fixed set of requests (plain chat, chat with file, guest, cancelled, error from provider) record the ordered event sequence `event: <name>` + the JSON shape (keys, not values) into `tests/Characterization/__snapshots__/sse/`. The vocabulary today: `data`, `status`, `complete`, `error`, `generating_file`, `file`, `thinking`, `reasoning`, `reasoning_complete`, `run_started`, `perf`, `message`, `links`, `audio`, `tts_generating`, `voice_reply_failed`, `guest_remaining`, `guest_limit_reached`. | Fake AI provider with scripted tokens (the `AiFacade` test double already used by the 17 existing tests) |
+| `StreamController` | **Golden SSE transcript.** For a fixed set of requests (plain chat, chat with file, chat that triggers RAG + memories + web search, guest, cancelled, error from provider) record the ordered event sequence `event: <name>` + the JSON shape (keys, not values) into `tests/Characterization/__snapshots__/sse/`. The vocabulary has **two halves**. *Fixed names* written by `StreamController` itself (18): `data`, `status`, `complete`, `error`, `generating_file`, `file`, `thinking`, `reasoning`, `reasoning_complete`, `run_started`, `perf`, `message`, `links`, `audio`, `tts_generating`, `voice_reply_failed`, `guest_remaining`, `guest_limit_reached`. *Pipeline status names* forwarded verbatim as event names through the status callback (`$this->sendSSE($statusUpdate['status'], …)`, ~27 today): `started`, `preprocessing`, `classifying`, `classified`, `analyzing`, `analyzing_prompt`, `searching`, `search_complete`, `search_failed`, `searching_files`, `fetching_urls`, `urls_fetched`, `pages_read`, `checking_memories`, `memories_loaded`, `docs_loaded`, `digests_loaded`, `feedback_loaded`, `generating`, `generated`, `editing`, `pause`, `resume`, `end`, `processing`, `complete`, `error`. The frontend keys on several of them (`docs_loaded`, `digests_loaded`, `pages_read`, `fetching_urls`, …). The fixtures must drive the RAG, memory, web-search and URL-fetch paths so these appear in the transcript; `SseWriter` keeps the fixed names as constants **and** passes any status name through unchanged. | Fake AI provider with scripted tokens (the `AiFacade` test double already used by the 17 existing tests); fake search / URL fetcher |
 | `ChatHandler` | **Prompt assembly snapshot.** For the same request set, snapshot the final message array handed to `AiFacade` (system prompt sections in order, user content blocks, tool definitions). This is the real contract of the class: what reaches the model. | Same fake provider; frozen clock via `TimeContextBuilder` |
 | `ConfigController::runtime()` | **Response snapshot** of `/api/v1/config/runtime` key set and types under three env profiles (minimal, full, OIDC-only). Plus: `make -C frontend generate-schemas` must be a **zero diff** — the Zod schema is the frontend's contract. | `.env.minimal`, dev `.env`, an OIDC profile |
 
@@ -82,26 +82,37 @@ is called out in the PR description.
 Derived from the method clusters in [`01_seams.md`](./01_seams.md). Names
 are proposals; the *boundaries* are the decision.
 
-### ConfigController (50 → ≤ 10)
+### ConfigController (50 → 7)
+
+Measured per route (`$this->…` members used inside each route body):
+`runtime()` touches **38** members, `GET /models` 8 services, the
+`/models/defaults` GET+POST+reset trio 10, the two `/routing/*` pairs 4,
+the three check routes 7, `/capabilities` and `/features` one each.
 
 ```
-ConfigController           routes + OpenAPI annotations only; delegates
-  ├─ RuntimeConfigAssembler        iterates tagged RuntimeConfigContributorInterface
-  │     ├─ AuthRuntimeConfig        registration, guest chat, mailer, recaptcha
-  │     ├─ BillingRuntimeConfig     billing, IAP, taximeter, premium gate
-  │     ├─ ModulesRuntimeConfig     ModuleRegistry → `modules`, gates, local AI
-  │     ├─ FeaturesRuntimeConfig    feature flags, IAM, saved tasks, desktop, agents
-  │     ├─ BrandingRuntimeConfig    branding, marketing news, platform links, disclosure
-  │     └─ SpeechRuntimeConfig      web speech, whisper, TTS
-  ├─ ModelDefaultsService          GET/POST/reset `/models/defaults` (already half in ModelConfigService)
-  ├─ RoutingModelsService          planner / summary model endpoints
-  └─ ModelCheckService             `/models/{id}/check`, `/memory-service/check`
+ConfigController           routes + OpenAPI annotations + isGranted() only; 7 deps
+  ├─ RuntimeConfigAssembler        iterates tagged RuntimeConfigContributorInterface (35 deps split 7 ways)
+  │     ├─ AuthRuntimeConfig        registration, guest chat, mailer, demo login, setup state, recaptcha
+  │     ├─ BillingRuntimeConfig     billing, taximeter, mobile version
+  │     ├─ ChatRuntimeConfig        chat action policy, readiness, welcome, progress narration, self-aware, search interpreter, document tools, tools, workflows
+  │     ├─ ModulesRuntimeConfig     ModuleRegistry → `modules`, gates, plugins, compute, bundle, provider registry
+  │     ├─ FeaturesRuntimeConfig    IAM, saved tasks, desktop agent, agents
+  │     ├─ BrandingRuntimeConfig    branding, marketing news, platform links, AI provider disclosure, client context
+  │     └─ SpeechRuntimeConfig      web speech, whisper
+  ├─ ModelListingService           GET `/models` (group limits, cost, locked defaults)
+  ├─ ModelDefaultsService          GET/POST/reset `/models/defaults`
+  │     └─ VectorizeModelChangePolicy   embedding change guard + metadata + capability inventory (the POST-only path)
+  ├─ RoutingModelsService          planner / summary model GET+POST
+  ├─ ModelCheckService             `/models/{id}/check`, `/memory-service/check`, `/local-ai/status`
+  ├─ CapabilityService             `/capabilities` (already a service; stays)
+  └─ FeatureStatusReporter         `/features` (already a service; stays)
 ```
 
-Each contributor owns its keys and its dependencies (3–6 each). The
-`modules` block already comes from `ModuleRegistry`; the contributor
-pattern generalises what AGENTS.md already demands ("let the registry drive
-feature status, runtime config, and the gate 404").
+Each contributor owns its keys and its dependencies (2–9 each, see
+`01_seams.md` §3 for the exact member → class table). The `modules` block
+already comes from `ModuleRegistry`; the contributor pattern generalises
+what AGENTS.md already demands ("let the registry drive feature status,
+runtime config, and the gate 404").
 
 ### ChatHandler (4,607 lines, 39 deps → pipeline)
 
@@ -125,7 +136,7 @@ ChatHandler (≤ 300 lines)   orchestrates stages, owns the sink
 
 ```
 StreamController (≤ 200 lines)   four routes, auth, delegates
-  ├─ SseWriter                       sendSSE, sanitizeUtf8, the event vocabulary as constants; the only place that writes to the response
+  ├─ SseWriter                       sendSSE, sanitizeUtf8; the 18 fixed names as constants, pipeline status names passed through; the only place that writes to the response
   ├─ StreamRequestResolver           resolveStreamParams, parseIncognitoHistory, resolveIntendedChatModel / EffectiveChatModelId, pinned agent, draft / owner checks
   ├─ ChatStreamOrchestrator          the 2,008-line body as named steps: run start → process → persist → usage → voice reply → complete
   ├─ StreamPersistence               persistRagSources / ClassificationSortingMeta / TaskPlanDefinition / OriginalMediaMeta / TaskPlanFiles / ChatErrorMeta, generated file storage (shared with ChatDocumentOutputHandler)

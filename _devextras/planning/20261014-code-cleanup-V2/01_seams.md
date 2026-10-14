@@ -59,7 +59,7 @@ stream body.
 
 | Target (folder) | Private methods today | Ctor deps that move |
 | --------------- | --------------------- | ------------------- |
-| `SseWriter` (`Realtime/` or `Message/`) | `sendSSE`, `sanitizeUtf8`; the 18 event names become `public const` | `LoggerInterface` |
+| `SseWriter` (`Realtime/` or `Message/`) | `sendSSE`, `sanitizeUtf8`; the 18 fixed event names become `public const`; `writeStatus(string $name, array $payload)` passes the ~27 pipeline status names through **unchanged** (the status callback at `StreamController.php:1444–1459` forwards `$statusUpdate['status']` as the event name — that behaviour is part of the contract) | `LoggerInterface` |
 | `StreamRequestResolver` (`Chat/`) | `resolveStreamParams`, `parseIncognitoHistory`, `isTruthyFlag`, `resolveRunOwnerKey`, `resolveIntendedChatModelForStream`, `resolveEffectiveChatModelId`, `normalizeModelId`, `resolvePinnedAgentId`, `denyAgentRuntime`, `denyDraftIfNotOwner`, `denyUnlessOwnsTrack`, `optionalChatId`, `resolveUiLanguage`, `isValidatedTestMode`, `suppressUnparseableOfficemakerEnvelope` | `GuestSessionService`, `GuestChatConfig`, `WidgetService`, `WidgetSessionService`, `ModelConfigService`, `AgentConfig`, `AgentService`, `AgentRuntimeResolver`, `RateLimitService`, `PremiumFeatureGate` |
 | `StreamPersistence` (`Chat/`) | `persistRagSources`, `persistClassificationSortingMeta`, `persistTaskPlanDefinition`, `persistOriginalMediaMeta`, `persistTaskPlanFiles`, `persistChatErrorMeta`, `stampAgentId`, `applyRagGroupKey`, `storeGeneratedDocumentInStream`, `storeGeneratedFileInStream`, `getMimeTypeForExtension`, `safeMessageFileType` | `EntityManagerInterface`, `DocumentGeneratorService`, `DocumentImageReferenceResolver`, `GeneratedFileRegistrar`, `UserUploadPathBuilder`, `$uploadDir`, `MediaJobService`, `MediaJobMessageSync`, `MediaCancellationStore` |
 | `StreamUsagePayloadBuilder` (`Usage/`) | `buildAiModelsPayload`, `buildChatUsagePayload`, `buildExtraUsageEntry`, `appendContextUsage` | `UsageStatsService`, `UsageTaximeterConfig` |
@@ -100,29 +100,58 @@ Tagged `app.runtime_config.contributor`; the assembler merges, asserts no
 two contributors claim the same key (a test), and returns the array the
 controller serialises. The OpenAPI annotation stays on `runtime()`.
 
-| Contributor (folder) | Keys (today's names) | Ctor deps that move |
-| -------------------- | -------------------- | ------------------- |
-| `AuthRuntimeConfig` (`Auth/`) | `auth.*`, `recaptcha.*`, `demoLogin`, `setup.*` | `RegistrationConfig`, `GuestChatConfig`, `MailerConfig`, `DemoLoginHint`, `SetupStateService`, recaptcha site key |
-| `BillingRuntimeConfig` (`Billing/`) | `billing.*`, `taximeter`, `premium`, `mobile.*` | `BillingService`, `UsageTaximeterConfig`, `MobileVersionService` |
-| `ModulesRuntimeConfig` (`Module/`) | `modules`, `officeConvertEnabled`, `localAi.*`, `plugins` | `ModuleRegistry`, `ModuleGateConfig`, `FeatureStatusReporter`, `LocalAiDownloadStatusService`, `PluginManager` |
-| `FeaturesRuntimeConfig` (`Feature/`) | `features.*`, `iam.*`, `savedTasks`, `desktop`, `agents`, `progressNarration`, `chatReadiness`, `capabilities` | `IamConfig`, `SavedTaskConfig`, `DesktopAgentConfig`, `AgentConfig`, `ProgressNarrationConfig`, `ChatReadinessService`, `CapabilityService` |
-| `BrandingRuntimeConfig` (`Branding/`) | `branding.*`, `marketingNews`, `platformLinks`, `aiProviderDisclosure`, `client.*` | `BrandingService`, `MarketingNewsConfig`, `PlatformLinksConfig`, `AiProviderDisclosure`, `ClientContextResolver` |
-| `SpeechRuntimeConfig` (`Stt/`) | `speech.*`, `whisper`, `tts` | `WebSpeechConfig`, `WhisperService` |
+`runtime()` uses **38 members** today (35 constructor dependencies plus the
+helpers `moduleStates()`, `getInternalIp()`, `json()`). Grouped by the
+concern they describe:
 
-Key names above are indicative — the G2 response snapshot is the exact list
-and the merge test enforces that the union of contributor keys equals it.
+| Contributor (folder) | Ctor members that move (as named in the constructor today) | Count |
+| -------------------- | ---------------------------------------------------------- | ----- |
+| `AuthRuntimeConfig` (`Auth/`) | `registrationConfig`, `guestChatConfig`, `mailerConfig`, `demoLoginHint`, `setupState`, `configRepository` (recaptcha + misc keys) | 6 |
+| `BillingRuntimeConfig` (`Billing/`) | `billingService`, `usageTaximeterConfig`, `mobileVersionService` | 3 |
+| `ChatRuntimeConfig` (`Chat/`) | `chatActionPolicy`, `chatReadiness`, `chatWelcomeConfig`, `progressNarrationConfig`, `selfAwareConfig`, `searchInterpreter`, `documentToolsConfig`, `toolsConfig`, `workflowsConfig` | 9 |
+| `ModulesRuntimeConfig` (`Module/`) | `modules` (ModuleRegistry), `moduleGate`, `pluginManager`, `computeConfig`, `bundleConfig`, `providerRegistry`, `getInternalIp()` | 6 |
+| `FeaturesRuntimeConfig` (`Feature/`) | `iamConfig`, `savedTaskConfig`, `desktopAgentConfig`, `agentConfig` | 4 |
+| `BrandingRuntimeConfig` (`Branding/`) | `brandingService`, `marketingNewsConfig`, `platformLinksConfig`, `aiProviderDisclosure`, `clientContextResolver` | 5 |
+| `SpeechRuntimeConfig` (`Stt/`) | `webSpeechConfig`, `whisperService` | 2 |
 
-### The other routes → three services (G4)
+The response-key → contributor assignment is fixed when the G2 snapshot
+exists: each contributor owns a disjoint key set, the merge test asserts
+the union equals the snapshot's 62 keys, and `configRepository` goes to
+whichever contributor reads a key from it (it may be injected into two).
 
-| Target (folder) | Routes | Ctor deps that move |
-| --------------- | ------ | ------------------- |
-| `ModelDefaultsService` (`Model/`) | `GET/POST /models/defaults`, `POST /models/defaults/reset`, `GET /models` | `ConfigRepository`, `ModelRepository`, `ProviderRegistry`, `ModelConfigService`, `EmbeddingModelChangeGuard`, `EmbeddingMetadataService`, `UserMemoryService`, `EntityManagerInterface` |
-| `RoutingModelsService` (`Model/`) | `/routing/planner-model`, `/routing/summary-model` | `ConfigRepository`, `ModelRepository`, `ModelConfigService` |
-| `ModelCheckService` (`ModelDiscovery/`) | `/models/{modelId}/check`, `/memory-service/check`, `/local-ai/status` | `ProviderRegistry`, `UserMemoryService`, `LocalAiDownloadStatusService` |
+### The other routes → five services (G4)
 
-`ConfigController` ends with the assembler, the three services and the
-`FeatureStatusReporter` for `/features` and `/capabilities`: five
-dependencies, routes and annotations only.
+Per-route member usage, measured:
+
+| Route | Members used (excluding `json()` / `isGranted()`) |
+| ----- | ------------------------------------------------- |
+| `GET /models` | `chatReadiness`, `costCalculationService`, `groupPolicyService`, `groupRepository`, `layeredConfigResolver`, `modelConfigService`, `modelRepository`, `providerRegistry` + helpers `groupLimitSummary()`, `withLockedDefaultVisible()` |
+| `GET /models/defaults` | `configRepository`, `iamConfig`, `layeredConfigResolver`, `modelConfigService`, `modelRepository` + `instanceDefaults()`, `reportedDefaults()` |
+| `POST /models/defaults` | `capabilityInventory`, `configRepository`, `em`, `embeddingChangeGuard`, `embeddingMetadata`, `groupPolicyService`, `iamConfig`, `layeredConfigResolver`, `modelRepository` + `replacedDefaults()`, `reportedDefaults()`, `resolveCurrentVectorizeModelId()` |
+| `POST /models/defaults/reset` | `modelConfigService` |
+| `/routing/planner-model`, `/routing/summary-model` (GET+POST) | `configRepository`, `em`, `modelConfigService`, `modelRepository` |
+| `GET /models/{modelId}/check` | `chatReadiness`, `configRepository`, `modelRepository`, `providerRegistry` + `envValue()`, `evaluateProviderRequiredConfiguration()`, `findProviderForModelService()` |
+| `GET /memory-service/check` | `memoryService`, `qdrantUrl` |
+| `GET /local-ai/status` | `localAiDownloadStatus` |
+| `GET /capabilities` | `capabilityService` |
+| `GET /features` | `featureStatusReporter` |
+
+| Target (folder) | Routes | Ctor deps | Count |
+| --------------- | ------ | --------- | ----- |
+| `ModelListingService` (`Model/`) | `GET /models` | `chatReadiness`, `costCalculationService`, `groupPolicyService`, `groupRepository`, `layeredConfigResolver`, `modelConfigService`, `modelRepository`, `providerRegistry` | 8 |
+| `ModelDefaultsService` (`Model/`) | `GET/POST /models/defaults`, `POST /models/defaults/reset` | `configRepository`, `iamConfig`, `layeredConfigResolver`, `modelConfigService`, `modelRepository`, `groupPolicyService`, `em`, `VectorizeModelChangePolicy` | 8 |
+| `VectorizeModelChangePolicy` (`Embedding/`) | the POST-only embedding-change path | `embeddingChangeGuard`, `embeddingMetadata`, `capabilityInventory` (+ `resolveCurrentVectorizeModelId()`) | 3 |
+| `RoutingModelsService` (`Model/`) | `/routing/planner-model`, `/routing/summary-model` | `configRepository`, `em`, `modelConfigService`, `modelRepository` | 4 |
+| `ModelCheckService` (`ModelDiscovery/`) | `/models/{modelId}/check`, `/memory-service/check`, `/local-ai/status` | `chatReadiness`, `configRepository`, `modelRepository`, `providerRegistry`, `memoryService`, `qdrantUrl`, `localAiDownloadStatus` (+ the three `evaluate*/find*/envValue` helpers) | 7 |
+
+`isGranted()` stays in the controller; the services receive the resolved
+`bool $isAdmin` as a method argument.
+
+`ConfigController` ends with **7 dependencies**: `RuntimeConfigAssembler`,
+`ModelListingService`, `ModelDefaultsService`, `RoutingModelsService`,
+`ModelCheckService`, `CapabilityService` (`/capabilities`, already a
+service) and `FeatureStatusReporter` (`/features`, already a service).
+Routes, OpenAPI annotations and `isGranted()` only.
 
 ---
 

@@ -7,9 +7,12 @@ CI keeps it that way. Two levers, both finishable in digestible PRs:
 `src/Service/` sorted into their domain folders.
 **Class:** `backend/**` is `backend-only`; `_devextras/**`, `.github/**`
 and `Makefile` are `no-app-impact`. Nothing here ships to the apps.
-**Out of scope here (V2):** domain-first folder layout, splitting the god
-classes, PHPStan level 6+, `docs/ARCHITECTURE.md`, `make metrics`. Listed
-in §8 so they are not forgotten.
+**Out of scope here:** splitting the god classes, `docs/ARCHITECTURE.md`
+and `make metrics` are **V2**
+([`../20261014-code-cleanup-V2/`](../20261014-code-cleanup-V2/00_master_plan.md));
+domain-first folder layout, the `AI` ↔ `Service` split, domain-to-domain
+rules, `Plugin\Sdk`, PHPStan 6+ and the test-tree mirror are **V3
+candidates** (§8). "V3" below always means that unscheduled list.
 
 Files in this track:
 
@@ -28,10 +31,10 @@ Files in this track:
 | - | -------- | ------- | ------ |
 | 1 | Architecture gate tool: **deptrac** (`deptrac/deptrac` ^4.7, PHP ^8.2, PHPStan ^2.0 — matches our PHPStan 2.3.1). New dev dependency + new CI step in the Backend job. Alternative with zero CI change: `phpat/phpat` (rules run inside the existing `composer phpstan`, violations land in `phpstan-baseline.neon`; no dependency graph). | deptrac | ✅ 2026-10-14 — deptrac. C1 starts after the next merge to `main`, on explicit go. |
 | 2 | Baseline policy: the first run writes `backend/deptrac.baseline.yaml`; CI fails only on **new** violations. The baseline can only shrink (same rule as `localeParityBaseline.json` and the dated allow-lists in `tests/Architecture/`). | Locked | |
-| 3 | V1 layer rules are the ones already (nearly) true today — see §3. Domain-to-domain rules inside `Service/` are V2, after the folders are sorted. | Locked | |
+| 3 | V1 layer rules are the ones already (nearly) true today — see §3. Domain-to-domain rules inside `Service/` are V3 (§8), after the folders are sorted. | Locked | |
 | 4 | The four classes external plugins import (`PluginDataService`, `ModelConfigService`, `RateLimitService`, `OidcUserService`) **stay in `src/Service/` root** in V1. They are the de-facto plugin SDK; moving them breaks Synaform, synafastbill, Synamail and synaScriber. End state of the root: *only* plugin-facing classes, guarded by a test. | Locked | |
 | 5 | Every move PR keeps the class name, only the namespace changes (`App\Service\X` → `App\Service\<Domain>\X`). No behaviour change, no method rename, no file split in the same PR. | Locked | |
-| 6 | Tests stay where they are (`tests/Unit/Service/`, `tests/Service/`, `tests/Unit/` do not mirror `src/` today); only their `use` lines change. Mirroring the test tree is V2. | Locked | |
+| 6 | Tests stay where they are (`tests/Unit/Service/`, `tests/Service/`, `tests/Unit/` do not mirror `src/` today); only their `use` lines change. Mirroring the test tree is V3 (§8). | Locked | |
 | 7 | `AccountLanguage` (used by `Entity\User` and `DTO\RegisterRequest`) moves to `App\Model\`, not to a Service subfolder, so the Entity and Shared layers stop depending on Service. | Approved | |
 | 8 | New Service folders created in V1: `Billing/`, `Feedback/`, `Notification/`. Nothing else new. | Approved | |
 
@@ -55,12 +58,16 @@ Layer dependencies measured with `rg` on `use App\…` imports:
 | ---- | ----- | ------- |
 | anything outside `Controller/` → `Controller\` | **0** | rule already true |
 | `Service/`, `AI/` → `Controller\` | 0 | rule already true |
-| `Repository/` → `Service\` | 4 (`Iam\Permission`, `Iam\SharedResourceIds`, `SmartSearch\Index\*`) | baseline; these are value objects that belong in a shared layer (V2) |
+| `Repository/` → `Service\` | 4 (`Iam\Permission`, `Iam\SharedResourceIds`, `SmartSearch\Index\*`) | baseline; these are value objects that belong in a shared layer (V3) |
 | `Repository/` → `AI\` | 1 (`ModelHealthRepository`) | baseline |
 | `Entity/` → `Service\` | 2 (`User` → `AccountLanguage`, `McpServerConfig` → `EncryptionService`, `Mcp\McpOAuthState`) | `AccountLanguage` fixed by C5; the other baselined |
+| `Entity/` → `AI\` | 1 (`ModelHealth` → `AI\Health\ModelHealthState`, an enum used as a column type) | baseline; moving the enum to `App\Model\` is a V3 candidate |
 | `Entity/` → `Repository\` | 58 | allowed — Doctrine `repositoryClass:` attribute |
 | `DTO/` → `Service\` | 1 (`RegisterRequest` → `AccountLanguage`) | fixed by C5 |
-| `AI/` ↔ `Service/` | 32 / 71 | cycle; both in one *Application* layer in V1, split in V2 |
+| `AI/` ↔ `Service/` | 32 / 71 | cycle; both in one *Application* layer in V1, split in V3 |
+
+Expected baseline after C1: **9 files** (4 + 1 + 2 + 1 + 1); C5 removes
+the two `AccountLanguage` entries, leaving 7.
 | `Controller/` → `Repository\` | 53 | allowed in V1 (reads through repositories are house style) |
 
 Blast radius of the 69 moves: 806 `use`/FQCN occurrences in 167 `src/`
@@ -77,7 +84,7 @@ string FQCNs, no persisted class names (Messenger messages live in
 2. The biggest classes carry 37–51 constructor dependencies.
 3. Nothing enforces the layering, so the order that exists is convention.
 
-V1 fixes 1 and 3. Item 2 is V2 (§8).
+V1 fixes 1 and 3. Item 2 is V2 (the god-class track, §8).
 
 ---
 
@@ -110,8 +117,9 @@ Rules (everything not listed is a violation):
 | Shared | Shared |
 
 Three facts make this cheap: Entrypoint is a leaf (0 violations today),
-Repository and Entity have 7 known violations (baselined, 2 of them removed
-by C5), and the `AI` ↔ `Service` cycle is hidden inside one layer until V2.
+Repository, Entity and DTO have 9 known violating files (baselined, 2 of
+them removed by C5), and the `AI` ↔ `Service` cycle is hidden inside one
+layer until V3.
 
 **Service root rule** (`tests/Architecture/ServiceRootTest.php`, step C2):
 a file directly in `src/Service/` is part of the plugin contract. The test
@@ -192,7 +200,7 @@ docker compose exec -T backend php bin/console cache:clear
 - No new top-level namespace. `App\Model\AccountLanguage` reuses an
   existing one.
 - No move of the four plugin-SDK classes. A `Plugin\Sdk` namespace with
-  `class_alias` shims and a deprecation note to plugin authors is V2.
+  `class_alias` shims and a deprecation note to plugin authors is V3 (§8).
 - No test-tree reorganisation.
 - No Go, no sidecar extraction. Candidates (stateless file conversion,
   STT, bulk ingestion) are already behind `Module/Sidecar` /
@@ -200,13 +208,15 @@ docker compose exec -T backend php bin/console cache:clear
 
 ---
 
-## 8. V2 backlog
+## 8. After V1
 
-The god classes have their own track, queued behind this one:
+**V2** — the god classes — has its own track, queued behind this one:
 [`../20261014-code-cleanup-V2/00_master_plan.md`](../20261014-code-cleanup-V2/00_master_plan.md)
 (size ratchet, characterization snapshots, `ConfigController` →
 `ChatHandler` → `StreamController`, `docs/ARCHITECTURE.md`, `make metrics`).
-The rest below is unscheduled (V3 candidates).
+
+**V3 candidates** — everything below is unscheduled and has no plan file.
+Every "V3" reference in this track and in the V2 plan points here.
 
 | Item | Why it waits |
 | ---- | ------------ |
@@ -216,4 +226,4 @@ The rest below is unscheduled (V3 candidates).
 | `Plugin\Sdk` namespace + `class_alias` shims for the four SDK classes | Needs a deprecation window for four external repos |
 | PHPStan 5 → 6 → 8 with baseline | One level per sprint |
 | Mirror `tests/` to `src/` | Mechanical, after the moves settle |
-| Move `Iam\Permission`, `Iam\SharedResourceIds`, `SmartSearch\Index\*` value objects to Shared so Repository → Service hits zero | Removes the last baseline entries |
+| Move `Iam\Permission`, `Iam\SharedResourceIds`, `SmartSearch\Index\*` value objects and the `AI\Health\ModelHealthState` enum to Shared so Repository → Service/AI and Entity → AI hit zero | Removes the last baseline entries |

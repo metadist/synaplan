@@ -1,9 +1,9 @@
 # Code cleanup V1 — status
 
 Numbers to carry forward in every row: files in `src/Service/` root
-(start 73, target 4) and entries in `deptrac.baseline.yaml` (set by C1,
-target: only the edges listed in `00_master_plan.md` §1 minus the two
-removed by C5).
+(start 73, target 4) and files in `deptrac.baseline.yaml` (expected 9
+after C1 — the edges listed in `00_master_plan.md` §1 — and 7 after C5
+removes the two `AccountLanguage` entries).
 
 | Date | Step | PR | Root files | Baseline entries | Note |
 | ---- | ---- | -- | ---------- | ---------------- | ---- |
