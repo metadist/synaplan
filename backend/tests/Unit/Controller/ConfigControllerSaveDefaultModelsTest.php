@@ -4,25 +4,22 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Controller;
 
-use App\AI\Credential\ChatReadinessService;
-use App\AI\Service\ProviderRegistry;
 use App\Controller\ConfigController;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
-use App\Service\Capability\CapabilityService;
-use App\Service\Config\FeatureStatusReporter;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\Embedding\VectorizeModelChangePolicy;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Policy\GroupPolicyService;
-use App\Service\LocalAi\LocalAiDownloadStatusService;
-use App\Service\Memory\UserMemoryService;
+use App\Service\Model\ModelDefaultsService;
 use App\Service\ModelConfigService;
+use App\Tests\Unit\Controller\Support\BuildsConfigController;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -41,6 +38,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class ConfigControllerSaveDefaultModelsTest extends TestCase
 {
+    use BuildsConfigController;
+
     private EntityManagerInterface&MockObject $em;
     private ConfigRepository&MockObject $configRepository;
     private ModelRepository&MockObject $modelRepository;
@@ -68,22 +67,8 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
         ]);
         $this->modelConfig->method('isConfiguredModelUsable')->willReturn(true);
 
-        $this->controller = new ConfigController(
-            $this->em,
-            $this->configRepository,
-            $this->modelRepository,
-            $this->createStub(ProviderRegistry::class),
-            $this->createStub(UserMemoryService::class),
-            $this->embeddingChangeGuard,
-            $this->embeddingMetadata,
-            $this->modelConfig,
-            $this->createStub(IamConfig::class),
-            $this->createStub(ChatReadinessService::class),
-            $this->createStub(LocalAiDownloadStatusService::class),
-            new CapabilityService(),
-            $this->createStub(FeatureStatusReporter::class),
-            $this->createStub(\App\Service\Config\Runtime\RuntimeConfigAssembler::class),
-            'http://qdrant.example',
+        $this->controller = $this->buildConfigController(
+            modelDefaults: $this->defaultsService($this->modelConfig, $this->createStub(IamConfig::class)),
         );
 
         // Bare container is enough for AbstractController::json() to
@@ -294,25 +279,8 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
         $policy = $this->createMock(GroupPolicyService::class);
         $policy->method('isModelAllowed')->willReturn(false);
 
-        $controller = new ConfigController(
-            $this->em,
-            $this->configRepository,
-            $this->modelRepository,
-            $this->createStub(ProviderRegistry::class),
-            $this->createStub(UserMemoryService::class),
-            $this->embeddingChangeGuard,
-            $this->embeddingMetadata,
-            $this->createStub(ModelConfigService::class),
-            $iam,
-            $this->createStub(ChatReadinessService::class),
-            $this->createStub(LocalAiDownloadStatusService::class),
-            new CapabilityService(),
-            $this->createStub(FeatureStatusReporter::class),
-            $this->createStub(\App\Service\Config\Runtime\RuntimeConfigAssembler::class),
-            'http://qdrant.example',
-            null,
-            $resolver,
-            $policy,
+        $controller = $this->buildConfigController(
+            modelDefaults: $this->defaultsService($this->createStub(ModelConfigService::class), $iam, $resolver, $policy),
         );
         $controller->setContainer(new Container());
 
@@ -457,29 +425,30 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
         $policy = $this->createStub(GroupPolicyService::class);
         $policy->method('isModelAllowed')->willReturn(true);
 
-        $controller = new ConfigController(
-            $this->em,
-            $this->configRepository,
-            $this->modelRepository,
-            $this->createStub(ProviderRegistry::class),
-            $this->createStub(UserMemoryService::class),
-            $this->embeddingChangeGuard,
-            $this->embeddingMetadata,
-            $modelConfig,
-            $iam,
-            $this->createStub(ChatReadinessService::class),
-            $this->createStub(LocalAiDownloadStatusService::class),
-            new CapabilityService(),
-            $this->createStub(FeatureStatusReporter::class),
-            $this->createStub(\App\Service\Config\Runtime\RuntimeConfigAssembler::class),
-            'http://qdrant.example',
-            null,
-            $resolver,
-            $policy,
+        $controller = $this->buildConfigController(
+            modelDefaults: $this->defaultsService($modelConfig, $iam, $resolver, $policy),
         );
         $controller->setContainer(new Container());
 
         return $controller;
+    }
+
+    private function defaultsService(
+        ModelConfigService $modelConfig,
+        IamConfig $iam,
+        ?LayeredConfigResolver $resolver = null,
+        ?GroupPolicyService $policy = null,
+    ): ModelDefaultsService {
+        return new ModelDefaultsService(
+            $this->em,
+            $this->configRepository,
+            $this->modelRepository,
+            $modelConfig,
+            $iam,
+            new VectorizeModelChangePolicy($this->configRepository, $this->embeddingChangeGuard, $this->embeddingMetadata),
+            $resolver,
+            $policy,
+        );
     }
 
     private function makeGroupPolicyController(ModelConfigService $modelConfig, LayeredConfigResolver $resolver): ConfigController

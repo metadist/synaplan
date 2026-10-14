@@ -14,7 +14,7 @@ use App\Service\ModelConfigService;
 /**
  * Capability-grouped selectable models for machine clients (Synaplan Desktop).
  *
- * Tag → group mapping matches {@see \App\Controller\ConfigController::getModels()}
+ * Tag → group mapping follows the web pickers ({@see PickerCapabilities::forTag()})
  * but only the eight project-companion groups. {@see id} is the catalog key
  * `service:providerId:tag`, not the database BID.
  */

@@ -44,7 +44,7 @@ use App\Service\Model\Exception\InvalidPromptModelException;
  */
 final readonly class PromptModelEligibilityValidator
 {
-    /** Tags that identify embedding-only models — kept in sync with ConfigController::getModels grouping. */
+    /** Tags that identify embedding-only models — kept in sync with {@see PickerCapabilities::forTag()}. */
     private const EMBEDDING_TAGS = ['VECTORIZE', 'EMBEDDING'];
 
     public function __construct(
