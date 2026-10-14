@@ -10,7 +10,7 @@ use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Service\Message\ExternalReplyReferences;
 use App\Service\Message\MessageForwardingService;
-use App\Service\WhatsAppService;
+use App\Service\WhatsApp\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\MockObject\MockObject;

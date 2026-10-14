@@ -14,7 +14,7 @@ use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
-use App\Service\DiscordNotificationService;
+use App\Service\Notification\DiscordNotificationService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;

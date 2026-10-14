@@ -12,7 +12,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Sends mail FROM the user's own connected Microsoft 365 mailbox (delegated
  * `Mail.Send`) — the message lands in their Outlook Sent items, unlike the
- * system-SMTP path of {@see \App\Service\InternalEmailService}.
+ * system-SMTP path of {@see \App\Service\Email\InternalEmailService}.
  *
  * Used as the preferred transport for `email_me` when the account owner has a
  * connected, send-capable M365 account; callers fall back to the internal

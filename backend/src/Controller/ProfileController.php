@@ -4,7 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Service\EmailChatService;
+use App\Service\Email\EmailChatService;
 use App\Service\GuestSessionService;
 use App\Service\Profile\ToursSeen;
 use App\Service\UserDeletionService;

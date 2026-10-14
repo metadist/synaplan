@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\WhatsApp;
 
 use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
@@ -12,6 +12,8 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Realtime\Notifier\ChatActivityNotifier;
 use App\Service\Agent\AgentConfig;
+use App\Service\ConversationSummaryRefreshDispatcher;
+use App\Service\Email\EmailChatService;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\OutboundChannelMedia;
@@ -20,9 +22,10 @@ use App\Service\Message\ExternalReplyReferences;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\Message\SpokenInput;
+use App\Service\Notification\DiscordNotificationService;
+use App\Service\RateLimitService;
 use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
-use App\Service\WhatsApp\WhatsAppAgentBinding;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;

@@ -19,7 +19,7 @@ use Symfony\Component\HttpKernel\KernelEvents;
  * move is what makes the setup window safe. It replaces a handful of per-feature
  * guards and shuts, in one go: registration, guest chat, the widget endpoints
  * and — the important one — the public webhooks.
- * {@see \App\Service\EmailChatService::findOrCreateUserFromEmail()} creates a
+ * {@see \App\Service\Email\EmailChatService::findOrCreateUserFromEmail()} creates a
  * BUSERLEVEL='ANONYMOUS' row, so without this a stranger could POST to the email
  * webhook, create a BUSER row and block the wizard permanently.
  *

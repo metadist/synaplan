@@ -274,7 +274,7 @@ parameters:
 			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Service/InboundEmailHandlerService.php
+			path: src/Service/Email/InboundEmailHandlerService.php
 
 		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'

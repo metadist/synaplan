@@ -6,7 +6,7 @@ namespace App\Service\Compute;
 
 use App\Repository\ComputeWorkspaceRepository;
 use App\Repository\UserRepository;
-use App\Service\InternalEmailService;
+use App\Service\Email\InternalEmailService;
 use Psr\Log\LoggerInterface;
 
 /**

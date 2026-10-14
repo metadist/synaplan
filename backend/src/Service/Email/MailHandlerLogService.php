@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Email;
 
 use App\Entity\UseLog;
 use App\Repository\MailHandlerLogRepository;

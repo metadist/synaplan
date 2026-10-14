@@ -2,7 +2,7 @@
 
 namespace App\Command;
 
-use App\Service\InboundEmailService;
+use App\Service\Email\InboundEmailService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

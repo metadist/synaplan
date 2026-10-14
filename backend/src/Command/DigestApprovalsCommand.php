@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Entity\Approval;
-use App\Service\InternalEmailService;
+use App\Service\Email\InternalEmailService;
 use App\Service\Tool\ApprovalExpiryService;
 use App\Service\Tool\ToolsConfig;
 use Symfony\Component\Console\Attribute\AsCommand;

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\AI\Service\ProviderModelListing;
-use App\Service\DiscordNotificationService;
 use App\Service\ModelDiscovery\ModelDiscoveryDigest;
 use App\Service\ModelDiscovery\ModelDiscoveryReport;
 use App\Service\ModelDiscovery\ModelDiscoveryService;
+use App\Service\Notification\DiscordNotificationService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

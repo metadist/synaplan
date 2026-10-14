@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
-use App\Service\MailerConfig;
+use App\Service\Email\MailerConfig;
 use PHPUnit\Framework\TestCase;
 
 final class MailerConfigTest extends TestCase

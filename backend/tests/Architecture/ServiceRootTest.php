@@ -40,17 +40,6 @@ final class ServiceRootTest extends TestCase
      * that moves the file. Only shrinks; never add to it.
      */
     private const PENDING_MOVE = [
-        // C4 — Email/, WhatsApp/, Notification/
-        'DiscordNotificationService',
-        'EmailChatService',
-        'EmailWebhookIdempotencyService',
-        'InboundEmailHandlerService',
-        'InboundEmailService',
-        'InternalEmailService',
-        'MailHandlerLogService',
-        'MailerConfig',
-        'SlackNotificationService',
-        'WhatsAppService',
         // C5 — Auth/, OAuth/, Iam/, App\Model\
         'AccountLanguage',
         'ImpersonationService',

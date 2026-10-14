@@ -7,7 +7,7 @@ namespace App\Command;
 use App\AI\Service\ModelAvailabilityChecker;
 use App\AI\Service\ProviderModelListing;
 use App\Model\ModelCatalog;
-use App\Service\DiscordNotificationService;
+use App\Service\Notification\DiscordNotificationService;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Clock\Clock;
 use Symfony\Component\Console\Attribute\AsCommand;

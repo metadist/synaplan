@@ -15,7 +15,7 @@ use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Repository\UserRepository;
-use App\Service\InternalEmailService;
+use App\Service\Email\InternalEmailService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Message\MessageProcessor;
 use App\Service\Multitask\TaskPlanExecutor;

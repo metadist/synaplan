@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Command;
 
 use App\Command\ProcessMailHandlersCommand;
-use App\Service\InboundEmailHandlerService;
+use App\Service\Email\InboundEmailHandlerService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
