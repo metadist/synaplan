@@ -19,6 +19,9 @@ phpstan-baseline: ## Regenerate PHPStan baseline
 deptrac: ## Check layer dependencies (deptrac.yaml); fails on violations not in deptrac.baseline.yaml
 	docker compose -f ../docker-compose.yml exec -T backend composer deptrac
 
+metrics: ## Size of src/ against the ratchet limits: files > 800 lines, constructors > 10 params, methods > 100 lines
+	docker compose -f ../docker-compose.yml exec -T backend php tests/Architecture/size-metrics.php
+
 deptrac-baseline: ## Regenerate deptrac baseline (review the diff — it may only shrink)
 	docker compose -f ../docker-compose.yml exec -T backend vendor/bin/deptrac analyse --formatter=baseline --output=deptrac.baseline.yaml --no-progress
 

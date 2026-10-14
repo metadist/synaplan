@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Architecture;
 
+use App\Tests\Architecture\Support\SizeOffenders;
 use App\Tests\Architecture\Support\SourceMetrics;
 use PHPUnit\Framework\TestCase;
 
@@ -22,21 +23,17 @@ use PHPUnit\Framework\TestCase;
  * with UPDATE_SIZE_RATCHET=1 and review the diff: removals and smaller
  * numbers only.
  *
+ * `make -C backend metrics` prints the same scan, with the largest offenders.
+ *
  * Plan: _devextras/planning/20261014-code-cleanup-V2/ (master plan §0 #1, §1).
  */
 final class SizeRatchetTest extends TestCase
 {
-    public const MAX_FILE_LINES = 800;
-    public const MAX_CONSTRUCTOR_PARAMS = 10;
-    public const MAX_METHOD_LINES = 100;
+    public const MAX_FILE_LINES = SizeOffenders::MAX_FILE_LINES;
+    public const MAX_CONSTRUCTOR_PARAMS = SizeOffenders::MAX_CONSTRUCTOR_PARAMS;
+    public const MAX_METHOD_LINES = SizeOffenders::MAX_METHOD_LINES;
 
     private const LEDGER = __DIR__.'/sizeRatchetBaseline.json';
-
-    /** Catalog data, not classes (master plan §1). */
-    private const EXCLUDED_PATHS = [
-        'src/Model/ModelCatalog.php',
-        'src/Prompt/PromptCatalog.php',
-    ];
 
     /** Guard against a vacuous pass if the scan breaks (1,640 files on 2026-10-14). */
     private const MIN_EXPECTED_FILES = 1000;
@@ -179,46 +176,10 @@ final class SizeRatchetTest extends TestCase
             return $cache;
         }
 
-        $root = dirname(__DIR__, 2);
-        $fileLines = [];
-        $constructorParams = [];
-        $methodLines = [];
-        $scanned = 0;
+        $measured = SizeOffenders::measure(dirname(__DIR__, 2));
+        $this->assertGreaterThanOrEqual(self::MIN_EXPECTED_FILES, $measured['scanned'], 'The src/ scan found suspiciously few files.');
 
-        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root.'/src', \FilesystemIterator::SKIP_DOTS));
-        foreach ($iterator as $file) {
-            if (!$file instanceof \SplFileInfo || !$file->isFile() || 'php' !== $file->getExtension()) {
-                continue;
-            }
-            $relative = substr($file->getPathname(), strlen($root) + 1);
-            if (in_array($relative, self::EXCLUDED_PATHS, true)) {
-                continue;
-            }
-            ++$scanned;
-
-            $metrics = SourceMetrics::ofFile($file->getPathname());
-            if ($metrics->lines > self::MAX_FILE_LINES) {
-                $fileLines[$relative] = $metrics->lines;
-            }
-            foreach ($metrics->constructorParams as $class => $params) {
-                if ($params > self::MAX_CONSTRUCTOR_PARAMS) {
-                    $constructorParams[$relative.'::'.$class] = $params;
-                }
-            }
-            foreach ($metrics->methodLines as $method => $lines) {
-                if ($lines > self::MAX_METHOD_LINES) {
-                    $methodLines[$relative.'::'.$method] = $lines;
-                }
-            }
-        }
-
-        $this->assertGreaterThanOrEqual(self::MIN_EXPECTED_FILES, $scanned, 'The src/ scan found suspiciously few files.');
-
-        ksort($fileLines);
-        ksort($constructorParams);
-        ksort($methodLines);
-
-        $cache = ['fileLines' => $fileLines, 'constructorParams' => $constructorParams, 'methodLines' => $methodLines];
+        $cache = ['fileLines' => $measured['fileLines'], 'constructorParams' => $measured['constructorParams'], 'methodLines' => $measured['methodLines']];
 
         if ('1' === getenv('UPDATE_SIZE_RATCHET')) {
             $this->writeLedger($cache);
