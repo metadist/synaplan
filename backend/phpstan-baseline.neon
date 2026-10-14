@@ -229,12 +229,6 @@ parameters:
 			path: src/Controller/OidcController.php
 
 		-
-			message: '#^Parameter \#1 \$enable of function ob_implicit_flush expects bool, int given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Controller/StreamController.php
-
-		-
 			message: '#^Property App\\Controller\\SubscriptionController\:\:\$userRepository is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1

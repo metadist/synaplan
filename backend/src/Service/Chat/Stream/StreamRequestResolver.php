@@ -107,7 +107,8 @@ final readonly class StreamRequestResolver
             message: (string) $message,
             fileIds: self::fileIds($fileIds),
             continueMessageId: $continueMessageId,
-            quote: null !== $quotedText ? new StreamQuote($quotedText, $quotedMessageId) : null,
+            // A falsy excerpt ("0") never counted as a quote.
+            quote: $quotedText ? new StreamQuote($quotedText, $quotedMessageId) : null,
         );
         self::assertSendable($input, $chatId, $incognito);
 

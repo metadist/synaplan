@@ -8,9 +8,9 @@
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 62,
-        "constructorParams": 76,
-        "methodLines": 165
+        "fileLines": 61,
+        "constructorParams": 75,
+        "methodLines": 160
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -40,7 +40,6 @@
         "src/Controller/MessagesGatewayController.php": 832,
         "src/Controller/OpenAICompatibleController.php": 862,
         "src/Controller/PromptController.php": 1885,
-        "src/Controller/StreamController.php": 3909,
         "src/Controller/SubscriptionController.php": 1198,
         "src/Controller/UserMemoryController.php": 1011,
         "src/Controller/WebhookController.php": 1085,
@@ -100,7 +99,6 @@
         "src/Controller/OpenAICompatibleController.php::OpenAICompatibleController": 11,
         "src/Controller/PromptController.php::PromptController": 18,
         "src/Controller/SetupController.php::SetupController": 11,
-        "src/Controller/StreamController.php::StreamController": 31,
         "src/Controller/SubscriptionController.php::SubscriptionController": 17,
         "src/Controller/WebhookController.php::WebhookController": 19,
         "src/Controller/WidgetController.php::WidgetController": 20,
@@ -206,11 +204,6 @@
         "src/Controller/PromptController.php::PromptController::summarizeFile": 123,
         "src/Controller/PromptController.php::PromptController::update": 147,
         "src/Controller/StaticUploadController.php::StaticUploadController::serve": 161,
-        "src/Controller/StreamController.php::StreamController::handleNonStreamingRequest": 431,
-        "src/Controller/StreamController.php::StreamController::processVoiceReply": 135,
-        "src/Controller/StreamController.php::StreamController::saveCancelled": 165,
-        "src/Controller/StreamController.php::StreamController::storeGeneratedFileInStream": 122,
-        "src/Controller/StreamController.php::StreamController::streamMessage": 1735,
         "src/Controller/SubscriptionController.php::SubscriptionController::createCheckoutSession": 169,
         "src/Controller/SubscriptionController.php::SubscriptionController::createTopupSession": 101,
         "src/Controller/SubscriptionController.php::SubscriptionController::syncFromStripe": 115,

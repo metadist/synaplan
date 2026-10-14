@@ -38,6 +38,19 @@ final class SseWriter
     {
     }
 
+    /**
+     * Prepares PHP for a long event stream: no output buffering (unless
+     * capturing), no time limit, and no abort when the client disconnects —
+     * a turn finishes in the background and stores its reply for the
+     * person's return (#1142, #1223, #1225). An explicit Stop still ends it.
+     */
+    public function open(): void
+    {
+        SseOutput::begin($this->captureMode);
+        set_time_limit(0);
+        ignore_user_abort(true);
+    }
+
     public function attachRun(?ChatRunRecorder $run): void
     {
         $this->run = $run;

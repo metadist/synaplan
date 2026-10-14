@@ -2,36 +2,21 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Controller;
+namespace App\Tests\Unit\Service\Chat\Stream;
 
 use App\AI\Service\AiFacade;
-use App\Controller\StreamController;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\FileRepository;
-use App\Service\Chat\ChatTitleService;
-use App\Service\Chat\ConversationSummaryRefreshDispatcher;
-use App\Service\Chat\GuestSessionService;
-use App\Service\Chat\Stream\StreamRequestResolver;
-use App\Service\File\DocumentGeneratorService;
-use App\Service\File\DocumentImageReferenceResolver;
-use App\Service\File\UserUploadPathBuilder;
+use App\Service\Chat\Stream\StreamCompleteEvent;
+use App\Service\Chat\Stream\StreamMessageMeta;
+use App\Service\Chat\Stream\StreamUsageRecorder;
+use App\Service\Chat\Stream\VoiceReplyStep;
 use App\Service\Media\GeneratedFileRegistrar;
-use App\Service\Media\MediaCancellationStore;
-use App\Service\Media\MediaJobMessageSync;
-use App\Service\Media\MediaJobService;
-use App\Service\Memory\MemoryExtractionDispatcher;
-use App\Service\Message\ChatErrorNotifier;
-use App\Service\Message\ChatErrorPresenter;
-use App\Service\Message\MessageForwardingService;
-use App\Service\Message\MessageProcessor;
-use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Realtime\SseWriter;
 use App\Service\Usage\UsageStatsService;
 use App\Service\Usage\UsageTaximeterConfig;
-use App\Service\Widget\WidgetSessionService;
-use App\Tests\Support\ChatRunServiceFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -40,12 +25,12 @@ use Psr\Log\NullLogger;
 /**
  * Voice-reply failure SSE + OUT-message meta contract (#2282).
  */
-final class StreamControllerVoiceReplyTest extends TestCase
+final class VoiceReplyStepTest extends TestCase
 {
     private AiFacade&MockObject $aiFacade;
     private RateLimitService&MockObject $rateLimitService;
     private EntityManagerInterface&MockObject $em;
-    private StreamController $controller;
+    private VoiceReplyStep $voiceReply;
 
     protected function setUp(): void
     {
@@ -53,34 +38,14 @@ final class StreamControllerVoiceReplyTest extends TestCase
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
 
-        $this->controller = new StreamController(
-            $this->createStub(StreamRequestResolver::class),
-            $this->em,
-            $this->aiFacade,
-            $this->createMock(MessageProcessor::class),
-            new NullLogger(),
-            $this->createMock(ModelConfigService::class),
-            $this->createMock(WidgetSessionService::class),
-            $this->createMock(GuestSessionService::class),
+        $this->voiceReply = new VoiceReplyStep(
             $this->rateLimitService,
-            '/tmp/upload',
-            $this->createMock(UserUploadPathBuilder::class),
-            $this->createMock(PromptService::class),
-            $this->createMock(MessageForwardingService::class),
-            $this->createMock(MemoryExtractionDispatcher::class),
-            $this->createMock(ConversationSummaryRefreshDispatcher::class),
-            $this->createStub(ChatTitleService::class),
-            $this->createMock(DocumentGeneratorService::class),
-            $this->createMock(DocumentImageReferenceResolver::class),
-            $this->createMock(MediaCancellationStore::class),
-            $this->createMock(MediaJobService::class),
-            $this->createMock(MediaJobMessageSync::class),
+            $this->aiFacade,
+            $this->em,
             new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
-            $this->createMock(UsageStatsService::class),
-            $this->createMock(UsageTaximeterConfig::class),
-            ChatRunServiceFactory::withoutRedis(),
-            $this->createMock(ChatErrorPresenter::class),
-            $this->createMock(ChatErrorNotifier::class),
+            new StreamMessageMeta(new NullLogger()),
+            new StreamUsageRecorder($this->rateLimitService, $this->createStub(UsageStatsService::class), $this->createStub(UsageTaximeterConfig::class), $this->em),
+            new NullLogger(),
         );
     }
 
@@ -191,24 +156,12 @@ final class StreamControllerVoiceReplyTest extends TestCase
      */
     private function invokeProcessVoiceReply(Message $message, User $user, string $responseText): array
     {
-        $completeData = [];
-        $usageExtra = [];
-
-        $capture = new \ReflectionProperty(StreamController::class, 'sseCaptureMode');
-        $capture->setValue($this->controller, true);
-
         ob_start();
-        $reflection = new \ReflectionMethod(StreamController::class, 'processVoiceReply');
-        $reflection->invokeArgs($this->controller, [
-            $message,
-            $user,
-            $responseText,
-            'en',
-            false,
-            &$completeData,
-            &$usageExtra,
-        ]);
-        $raw = (string) ob_get_clean();
+        try {
+            $this->voiceReply->run(new SseWriter(captureMode: true), new StreamCompleteEvent(), $message, $user, $responseText, 'en', false);
+        } finally {
+            $raw = (string) ob_get_clean();
+        }
 
         $events = [];
         foreach (preg_split("/\n\n+/", trim($raw)) ?: [] as $frame) {

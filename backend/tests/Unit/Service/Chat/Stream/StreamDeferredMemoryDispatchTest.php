@@ -2,42 +2,26 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Controller;
+namespace App\Tests\Unit\Service\Chat\Stream;
 
-use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
+use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
-use App\Repository\FileRepository;
 use App\Service\Chat\ChatTitleService;
 use App\Service\Chat\ConversationSummaryRefreshDispatcher;
-use App\Service\Chat\GuestSessionService;
-use App\Service\Chat\Stream\StreamRequestResolver;
-use App\Service\File\DocumentGeneratorService;
-use App\Service\File\DocumentImageReferenceResolver;
-use App\Service\File\UserUploadPathBuilder;
-use App\Service\Media\GeneratedFileRegistrar;
-use App\Service\Media\MediaCancellationStore;
-use App\Service\Media\MediaJobMessageSync;
-use App\Service\Media\MediaJobService;
+use App\Service\Chat\Stream\StreamCaller;
+use App\Service\Chat\Stream\StreamTurnFinisher;
+use App\Service\Chat\Stream\StreamTurnOptions;
+use App\Service\Chat\Stream\StreamTurnRequest;
+use App\Service\Chat\Stream\StreamUserInput;
 use App\Service\Memory\MemoryExtractionDispatcher;
-use App\Service\Message\ChatErrorNotifier;
-use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageForwardingService;
-use App\Service\Message\MessageProcessor;
-use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
-use App\Service\RateLimitService;
-use App\Service\Usage\UsageStatsService;
-use App\Service\Usage\UsageTaximeterConfig;
-use App\Service\Widget\WidgetSessionService;
-use App\Tests\Support\ChatRunServiceFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /**
- * Unit coverage for {@see StreamController::dispatchDeferredMemoryExtraction()}.
+ * Unit coverage for {@see StreamTurnFinisher::afterReply()}.
  *
  * Issue #881: ChatHandler now hands the prepared
  * {@see ExtractMemoriesCommand} back to the StreamController in
@@ -51,8 +35,9 @@ use Psr\Log\NullLogger;
  * The Copilot review of PR #939 flagged that the dispatch + log +
  * swallow contract used to be duplicated between this controller and
  * ChatHandler. Both now go through {@see MemoryExtractionDispatcher},
- * so this test only needs to pin the controller's contribution: pulling
- * the payload out of the metadata array and forwarding a typed command.
+ * so this test only needs to pin the stream's contribution: pulling
+ * the payload out of the metadata array and forwarding a typed command,
+ * after the reply is stored and never for an incognito turn.
  *
  * The behaviour pinned here:
  *   - Forwards the typed payload to the dispatcher exactly once.
@@ -63,43 +48,21 @@ use Psr\Log\NullLogger;
  * Bus-failure swallowing is covered by
  * {@see \App\Tests\Unit\Service\MemoryExtractionDispatcherTest}.
  */
-final class StreamControllerDeferredMemoryDispatchTest extends TestCase
+final class StreamDeferredMemoryDispatchTest extends TestCase
 {
     private MemoryExtractionDispatcher&MockObject $memoryExtractionDispatcher;
-    private StreamController $controller;
+    private StreamTurnFinisher $finisher;
 
     protected function setUp(): void
     {
         $this->memoryExtractionDispatcher = $this->createMock(MemoryExtractionDispatcher::class);
 
-        $this->controller = new StreamController(
-            $this->createStub(StreamRequestResolver::class),
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(AiFacade::class),
-            $this->createMock(MessageProcessor::class),
-            new NullLogger(),
-            $this->createMock(ModelConfigService::class),
-            $this->createMock(WidgetSessionService::class),
-            $this->createMock(GuestSessionService::class),
-            $this->createMock(RateLimitService::class),
-            '/tmp/upload',
-            $this->createMock(UserUploadPathBuilder::class),
-            $this->createMock(PromptService::class),
-            $this->createMock(MessageForwardingService::class),
+        $this->finisher = new StreamTurnFinisher(
+            $this->createStub(EntityManagerInterface::class),
             $this->memoryExtractionDispatcher,
-            $this->createMock(ConversationSummaryRefreshDispatcher::class),
+            $this->createStub(ConversationSummaryRefreshDispatcher::class),
+            $this->createStub(MessageForwardingService::class),
             $this->createStub(ChatTitleService::class),
-            $this->createMock(DocumentGeneratorService::class),
-            $this->createMock(DocumentImageReferenceResolver::class),
-            $this->createMock(MediaCancellationStore::class),
-            $this->createMock(MediaJobService::class),
-            $this->createMock(MediaJobMessageSync::class),
-            new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
-            $this->createMock(UsageStatsService::class),
-            $this->createMock(UsageTaximeterConfig::class),
-            ChatRunServiceFactory::withoutRedis(),
-            $this->createMock(ChatErrorPresenter::class),
-            $this->createMock(ChatErrorNotifier::class),
         );
     }
 
@@ -144,12 +107,37 @@ final class StreamControllerDeferredMemoryDispatchTest extends TestCase
         $this->invokeDispatch(['extraction_payload' => ['fake' => 'payload']]);
     }
 
+    public function testIncognitoNeverDispatches(): void
+    {
+        $command = new ExtractMemoriesCommand(
+            messageId: 99,
+            userId: 7,
+            aiResponse: 'reply text',
+            threadSnapshot: [],
+            relevantMemories: [],
+        );
+        $this->memoryExtractionDispatcher->expects($this->never())->method('dispatch');
+
+        $this->finisher->afterReply($this->turn(true), null, ['extraction_payload' => $command], 'reply text');
+    }
+
+    private function turn(bool $incognito): StreamTurnRequest
+    {
+        return new StreamTurnRequest(
+            caller: new StreamCaller(new User(), 'en'),
+            chatId: $incognito ? null : '7',
+            trackId: '4242',
+            input: new StreamUserInput('Hello'),
+            options: new StreamTurnOptions(),
+            incognito: $incognito,
+        );
+    }
+
     /**
      * @param array<string, mixed> $metadata
      */
     private function invokeDispatch(array $metadata): void
     {
-        $reflection = new \ReflectionMethod(StreamController::class, 'dispatchDeferredMemoryExtraction');
-        $reflection->invoke($this->controller, $metadata);
+        $this->finisher->afterReply($this->turn(false), null, $metadata, 'reply text');
     }
 }
