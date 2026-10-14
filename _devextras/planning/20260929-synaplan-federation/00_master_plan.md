@@ -15,7 +15,7 @@
 | **Branch** | `feat/synaplan-network` |
 | **Type** | Vibe-coding sprint plan (F0–F13), backend-first, UI behind a default-off module. |
 | **Scope v1.0** | **Pure opt-in.** Pairwise *Federation Links* between operators. Two goods: **Knowledge exchange** (RAG) and **Token exchange** (brokered inference). |
-| **Supersedes** | The federation half of [`../discord_ai_buddy.md`](../discord_ai_buddy.md). That file's Discord bot becomes a *consumer* of this network, planned separately later. |
+| **Supersedes** | The federation half of [`../../discord_ai_buddy.md`](../../discord_ai_buddy.md). That file's Discord bot becomes a *consumer* of this network, planned separately later. |
 | **Binding contracts** | UX rules U1–U12 in [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) and AGENTS.md "Perfect UX & Stability". |
 | **Owners of the surfaces** | `App\Module\Federation\FederationModule` + `App\Service\Federation\*` (backend); `Manage → Federation` + chat composer (frontend). |
 
@@ -576,7 +576,7 @@ are user-visible ⇒ `make test-e2e` before push.
 - **Reputation-weighted routing** — price × health × user feedback.
 - **Escrow** for postpaid trading between operators without a prior credit line.
 - **Discordyai** and other channels as consumers of the federated network
-  (folds the [`../discord_ai_buddy.md`](../discord_ai_buddy.md) bot back in).
+  (folds the [`../../discord_ai_buddy.md`](../../discord_ai_buddy.md) bot back in).
 - **Direct discovery** of an unlinked domain via its well-known, behind an admin
   setting.
 

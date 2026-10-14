@@ -1,7 +1,7 @@
 # Archived — Roadmap update 2026-09-10
 
 Frozen Wave 4 / Intermezzo / Wave 5 overview. **Live plan:**
-[`../../20260925_roadmap.md`](../../20260925_roadmap.md).
+[`../../ROADMAP.md`](../../ROADMAP.md).
 
 Relative links below were rewritten for this archive folder.
 
@@ -10,7 +10,7 @@ Relative links below were rewritten for this archive folder.
 # Roadmap update 2026-09-10 — Wave 4, Intermezzo, Wave 5
 
 **Status:** Live plan as of 2026-09-13. Replaces
-[`20260903_roadmap.md`](../../20260903_roadmap.md) as the overview; the 2026-09-03
+[`20260903_roadmap.md`](../20260903_roadmap/20260903_roadmap.md) as the overview; the 2026-09-03
 text is frozen at
 [`2026-archive/20260903_roadmap/20260903_roadmap.md`](../20260903_roadmap/20260903_roadmap.md).
 Track directories, sprint files,
@@ -32,7 +32,7 @@ product flags and the Steps editor started on `main` before that exit
 recorded in §10 #10, not re-litigated.
 
 The 2026-09-10 wave-state that Wave 4 wrote onto
-[`20260903_roadmap.md`](../../20260903_roadmap.md) (W3 closed in #1769; W4
+[`20260903_roadmap.md`](../20260903_roadmap/20260903_roadmap.md) (W3 closed in #1769; W4
 tools/approvals S1–S4 + compute A0–A2 in progress) is superseded here: W4 is
 closed in this repo. Flags as of 4.8: `TOOLS.REGISTRY_ENABLED` on as
 kill-switch; `TOOLS.APPROVALS_ENABLED`, `TOOLS.CUSTOM_HTTP_ENABLED` and
@@ -393,5 +393,5 @@ This file is the wave overview. It does not replace track STATUS.
 | [`20260913-use-case-research/`](../../20260913-use-case-research/README.md) | Ten jobs + Perfect-UX bar; feeds Wave 5 ticks |
 | [`2026-archive/20260910-wave5-architecture-research/`](../20260910-wave5-architecture-research/README.md) | Compute vs Desktop; conditional modules; partner review (`03_…`) |
 | [`2026-archive/20260910-feature-modules/`](../20260910-feature-modules/00_master_plan.md) | Intermezzo plan of record (S1–S4 done) |
-| [`20260914-navigation-consolidation/`](../../20260914-navigation-consolidation/00_master_plan.md) | Nav duplicates, reachability, wording, Operate stacked UI (NV01–NV23); awaits D1–D7 |
+| [`20260914-navigation-consolidation/`](../20260914-navigation-consolidation/00_master_plan.md) | Nav duplicates, reachability, wording, Operate stacked UI (NV01–NV23); awaits D1–D7 |
 | Track 4 / 5 `STATUS.md` on `main` | Tools S1–S5 (S5 open) and compute A0–A2 as implemented |

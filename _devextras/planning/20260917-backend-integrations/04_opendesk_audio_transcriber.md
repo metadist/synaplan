@@ -8,7 +8,7 @@ described below. This file stays as the September sketch.
 
 **Status:** Draft 2026-09-17. Flagship of Wave 6. No media-path code
 until §0 here is ticked **and** in-app transcription
-([`../20260927-early-intake/01_sprint_e1_transcription_and_easy.md`](../20260927-early-intake/01_sprint_e1_transcription_and_easy.md),
+([`../20260927-early-intake/01_sprint_e1_transcription_and_easy.md`](../2026-archive/20260927-early-intake/01_sprint_e1_transcription_and_easy.md),
 J-STT-1) has been walked. The Integrations-page checklist in
 [`00_master_plan.md`](./00_master_plan.md) §0 does **not** gate this
 track anymore (decision 2026-09-27).

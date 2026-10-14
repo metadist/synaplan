@@ -1,7 +1,7 @@
 # Secure Compute — a sandboxed workspace for the AI — master plan
 
 **Status:** Decisions ticked 2026-09-03 (log in [`STATUS.md`](./STATUS.md)).
-Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
+Track 5 of [`../20260903_roadmap.md`](../2026-archive/20260903_roadmap/20260903_roadmap.md).
 The sidecar (Phase A) can start as a spike at any time; the Synaplan
 integration (Phase B) depends on track 4's approval policy and track 2's tool
 allow-list.
@@ -14,7 +14,7 @@ Operate → System config holds limits.
 `COMPUTE_URL` (unset = feature absent).
 **Related:**
 
-- [`../20260829-desktop-agent-client/00_master_plan.md`](../20260829-desktop-agent-client/00_master_plan.md)
+- [`../20260829-desktop-agent-client/00_master_plan.md`](../2026-archive/20260829-desktop-agent-client/00_master_plan.md)
   — the *client-side* answer to "let the AI run code"; §12 explicitly leaves
   server-side execution out. This track is the server-side counterpart with
   a container boundary instead of a user's trust step

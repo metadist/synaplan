@@ -2,7 +2,7 @@
 
 **Status:** Draft 2026-09-27. Tick §0 before the first product PR of
 each sprint.
-**Order:** [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 rows 1b–1d.
+**Order:** [`../20260925_roadmap.md`](../20260925_roadmap/20260925_roadmap.md) §1 rows 1b–1d.
 **Class:** E1 transcription and #2204 are `ota-candidate` where the UI
 changes; #2205 and #2206 are compose and docs (`no-app-impact` /
 backend deploy, not a store binary). E2 is `ota-candidate` for the
@@ -49,4 +49,4 @@ channel screen plus `backend-only` for the webhook.
 | Catalog row | `service: Whisper`, tag `sound2text` |
 | WhatsApp channel shape | `WhatsappModule`, `WhatsAppService`, Incoming chats |
 | Two-file self-host | `deploy/compose.yaml`, `deploy/selfhost.env.example` |
-| Telegram pilot notes | [`2026-archive/20260822-open-plugin-platform/README.md`](../2026-archive/20260822-open-plugin-platform/README.md) |
+| Telegram pilot notes | [`2026-archive/20260822-open-plugin-platform/README.md`](../20260822-open-plugin-platform/README.md) |

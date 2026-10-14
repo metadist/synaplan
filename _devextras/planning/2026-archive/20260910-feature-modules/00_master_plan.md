@@ -4,7 +4,7 @@
 on 2026-09-10 (all 15 rows at their proposed defaults; log in
 [`STATUS.md`](./STATUS.md)); S1–S4 closed 2026-09-13 (S5 optional). This is
 the **Intermezzo** release in
-[`../../20260917_roadmap.md`](../../20260917_roadmap.md) (written against the
+[`../../20260917_roadmap.md`](../20260917_roadmap/20260917_roadmap.md) (written against the
 frozen [`../20260910_roadmap/20260910_roadmap_update.md`](../20260910_roadmap/20260910_roadmap_update.md)) — after the
 two production bugfixes and Wave 4, before Wave 5. Cross-cutting refactor,
 not a seventh track. Wave 5 adds optional services (compute client, more
@@ -30,7 +30,7 @@ kill-switch is needed because the registry itself changes no behaviour.
 - [`../20260903_ai_plugs/06_sprint_6_plugin_adapters.md`](../20260903_ai_plugs/06_sprint_6_plugin_adapters.md)
   — `PlugDeclarationCheckPass`: the "declare it or boot fails" pattern reused
   for optional services
-- [`../20260902-platform-self-awareness/`](../20260902-platform-self-awareness/)
+- [`../20260902-platform-self-awareness/`](../20260902-platform-self-awareness)
   — `PlatformCapabilityInventory` / `CapabilityState` become consumers of the
   registry instead of a second hand-written list
 - [`../20260903_secure_compute/05_phase_b1_client_and_capability.md`](../20260903_secure_compute/05_phase_b1_client_and_capability.md)

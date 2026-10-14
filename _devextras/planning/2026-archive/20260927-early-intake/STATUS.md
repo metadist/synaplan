@@ -1,7 +1,21 @@
 # Status — Early intake (2026-09-27)
 
+> **Archived 2026-10-14.** All three sprints shipped: E1 in-app
+> transcription (dictation and voice notes in the composer, local
+> whisper.cpp fallback — [#2213](https://github.com/metadist/synaplan/pull/2213),
+> [#2290](https://github.com/metadist/synaplan/pull/2290)–[#2292](https://github.com/metadist/synaplan/pull/2292),
+> [#2303](https://github.com/metadist/synaplan/pull/2303),
+> [#2323](https://github.com/metadist/synaplan/pull/2323)), the three easy
+> issues (2026-09-28, rows below), E2 Telegram
+> ([#2256](https://github.com/metadist/synaplan/pull/2256),
+> [#2270](https://github.com/metadist/synaplan/pull/2270)). The J-STT-1…3
+> walk entries were never written into this file; if a walk is still
+> wanted it belongs to the UX overhaul close-out
+> ([`../../20261009-ux-overhaul/06_sprint_tours_closeout.md`](../../20261009-ux-overhaul/06_sprint_tours_closeout.md)),
+> not to this folder.
+
 Plan of record: [`00_master_plan.md`](./00_master_plan.md).
-Live order: [`../20260925_roadmap.md`](../20260925_roadmap.md) §1 rows 1b–1d
+Live order: [`../20260925_roadmap.md`](../20260925_roadmap/20260925_roadmap.md) §1 rows 1b–1d
 (combined with [#2211](https://github.com/metadist/synaplan/pull/2211)).
 
 ## Steps

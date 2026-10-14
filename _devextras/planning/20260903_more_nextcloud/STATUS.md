@@ -1,6 +1,6 @@
 # Status — More Nextcloud
 
-Track 6 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
+Track 6 of [`../20260903_roadmap.md`](../2026-archive/20260903_roadmap/20260903_roadmap.md). Plan of record:
 [`00_master_plan.md`](./00_master_plan.md).
 
 ## Steps

@@ -1,7 +1,7 @@
 # E2 — Telegram channel
 
 **Sprint:** E2 of [`00_master_plan.md`](./00_master_plan.md).
-**Starts:** row 1d of [`../20260925_roadmap.md`](../20260925_roadmap.md).
+**Starts:** row 1d of [`../20260925_roadmap.md`](../20260925_roadmap/20260925_roadmap.md).
 After E1 coding has started. Do not wait for the UX walk list or the
 Integrations catalog.
 **Issue:** [#2202](https://github.com/metadist/synaplan/issues/2202).
