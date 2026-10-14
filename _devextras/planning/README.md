@@ -11,6 +11,7 @@ paths were renamed on 2026-09-17.
 | Path | Why it stays here |
 | ---- | ----------------- |
 | [`20260925_roadmap.md`](./20260925_roadmap.md) | Current roadmap (UX close-out, in-app transcription, Telegram, openDesk meeting notes, Wave 6) |
+| [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | Backend ordering sprint: deptrac layer gate with baseline (C1), `Service/` root guarded as plugin contract (C2), the 73 loose services sorted into domain folders in six PRs (C3–C8). V2 backlog (god classes, domain-first layout, PHPStan 6+) listed, not scheduled |
 | [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | Triage of the external 5.2.0 test round (F1–F49 vs Open WebUI 0.11.4): six fixing waves, finding → issue map, 50 ready-to-create issue drafts in `issues/` + `create-issues.sh` |
 | [`20260927-early-intake/`](./20260927-early-intake/README.md) | Sprint files for transcription, the easy issues, and Telegram |
 | [`20260917-backend-integrations/`](./20260917-backend-integrations/README.md) | Wave 6: catalog, Connect UI, editor / office clients. Jitsi meeting notes moved to the synaScriber repository |
