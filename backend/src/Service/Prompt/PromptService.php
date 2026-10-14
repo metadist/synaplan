@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Prompt;
 
 use App\Entity\Prompt;
 use App\Repository\PromptMetaRepository;

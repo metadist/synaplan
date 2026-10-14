@@ -6,9 +6,9 @@ namespace App\Service\Dropbox;
 
 use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
 use App\Service\OAuth\OAuthProviderConfig;
 use App\Service\OAuth\OAuthProviderSource;
+use App\Service\Security\EncryptionService;
 
 /**
  * Dropbox app registration (BCONFIG group DROPBOX, ownerId=0) — connector

@@ -11,9 +11,9 @@ use App\Entity\User;
 use App\Model\ModelCatalog;
 use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
-use App\Service\MediaGenerationServiceInterface;
+use App\Service\Media\MediaGenerationServiceInterface;
+use App\Service\Media\TtsTextSanitizer;
 use App\Service\RateLimitService;
-use App\Service\TtsTextSanitizer;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**

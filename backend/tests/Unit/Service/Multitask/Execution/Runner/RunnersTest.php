@@ -44,7 +44,7 @@ use App\Service\Multitask\Execution\Runner\WebSearchRunner;
 use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\Search\BraveSearchService;
 use App\Tests\Support\WebSearchGatewayFactory;
@@ -610,7 +610,7 @@ final class RunnersTest extends TestCase
         $result = $runner->run($node, $this->context($this->message()));
 
         self::assertTrue($result->isSuccessful());
-        self::assertLessThanOrEqual(\App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS, mb_strlen((string) $result->files[0]['source_text']));
+        self::assertLessThanOrEqual(\App\Service\Media\TtsTextSanitizer::MAX_SYNTHESIS_CHARS, mb_strlen((string) $result->files[0]['source_text']));
     }
 
     public function testText2SoundPassesClassificationLanguage(): void

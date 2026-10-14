@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Federation;
 
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 
 /**
  * The key pair lives encrypted in BCONFIG, same at-rest pattern as provider keys.

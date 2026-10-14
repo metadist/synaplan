@@ -7,7 +7,7 @@ namespace App\Tests\Integration\Plug;
 use App\Plug\PlugKeyStore;
 use App\Plug\WebSearch\WebSearchQuery;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Plugin\SerperSearch\Plug\SerperSearchAdapter;
 use Plugin\SerperSearch\Plug\SerperSearchResultMapper;

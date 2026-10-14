@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;

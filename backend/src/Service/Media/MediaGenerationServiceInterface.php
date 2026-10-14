@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Media;
 
 use App\AI\Exception\ProviderException;
 use App\Entity\User;

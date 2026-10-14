@@ -22,7 +22,7 @@ namespace App\AI\Exception;
  *     runs that loop.
  *   - {@see \App\AI\Health\FailureClassifier} files it as a request-caused
  *     failure so a burst of them cannot switch a model off, and
- *     {@see \App\Service\CircuitBreaker} does not count it as an outage.
+ *     {@see \App\Service\Infrastructure\CircuitBreaker} does not count it as an outage.
  *   - Call sites with a safe default ({@see \App\Service\Message\MessageSorter})
  *     fall back instead of failing the whole turn.
  */

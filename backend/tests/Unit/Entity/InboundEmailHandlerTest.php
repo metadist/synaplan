@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Entity;
 
 use App\Entity\InboundEmailHandler;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

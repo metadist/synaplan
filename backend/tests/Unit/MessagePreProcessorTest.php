@@ -12,7 +12,7 @@ use App\Service\File\TikaClient;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\SpokenInput;
 use App\Service\RateLimitService;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

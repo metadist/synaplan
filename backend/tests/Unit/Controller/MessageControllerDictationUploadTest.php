@@ -20,7 +20,7 @@ use App\Service\Message\AgainHandler;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Message\MessageEnqueueService;
 use App\Service\ModelConfigService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use Doctrine\ORM\EntityManagerInterface;

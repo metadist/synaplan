@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Monolog;
 
 use Monolog\Formatter\FormatterInterface;
 use Monolog\Formatter\JsonFormatter;

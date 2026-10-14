@@ -8,7 +8,7 @@ use App\Entity\Credential;
 use App\Repository\CredentialRepository;
 use App\Service\Credential\AesCredentialVault;
 use App\Service\Credential\CredentialNotFoundException;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;

@@ -11,7 +11,7 @@ use App\Entity\Model;
 use App\Entity\Prompt;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

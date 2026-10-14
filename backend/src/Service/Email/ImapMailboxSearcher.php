@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Email;
 
 use App\Entity\InboundEmailHandler;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 
 /**
  * IMAP implementation of {@see MailboxSearcher}.

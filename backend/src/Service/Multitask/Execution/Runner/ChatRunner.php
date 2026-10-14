@@ -19,7 +19,7 @@ use App\Service\Multitask\Execution\UpstreamHandover;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\Docs\PlatformDocsRetriever;

@@ -14,7 +14,7 @@ use App\Service\Multitask\Execution\Runner\ChatRunner;
 use App\Service\Multitask\Execution\UpstreamHandover;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RAG\VectorSearchService;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;

@@ -23,7 +23,7 @@ use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
 use App\Service\Notification\DiscordNotificationService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\Usage\RecordedUsage;

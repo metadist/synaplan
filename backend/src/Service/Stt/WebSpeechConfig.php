@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Stt;
 
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Chat\GuestChatConfig;

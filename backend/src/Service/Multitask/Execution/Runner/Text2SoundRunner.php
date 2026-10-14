@@ -6,13 +6,13 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
+use App\Service\Media\TtsTextSanitizer;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
-use App\Service\TtsTextSanitizer;
 use Psr\Log\LoggerInterface;
 
 /**

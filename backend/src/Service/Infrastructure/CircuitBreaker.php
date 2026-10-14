@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Infrastructure;
 
 use App\AI\Exception\NoImageException;
 use App\AI\Exception\StructuredOutputViolationException;

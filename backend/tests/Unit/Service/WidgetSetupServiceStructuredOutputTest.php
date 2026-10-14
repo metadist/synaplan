@@ -12,7 +12,7 @@ use App\Entity\User;
 use App\Entity\Widget;
 use App\Repository\PromptRepository;
 use App\Service\ModelConfigService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\Research\UrlContentService;
 use App\Service\Widget\WidgetService;

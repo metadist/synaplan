@@ -8,7 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\User;
 use App\Service\Desktop\DesktopGeneratedMediaService;
-use App\Service\MediaGenerationServiceInterface;
+use App\Service\Media\MediaGenerationServiceInterface;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;

@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Service\Dropbox;
 
 use App\Repository\ConfigRepository;
 use App\Service\Dropbox\DropboxOAuthConfig;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

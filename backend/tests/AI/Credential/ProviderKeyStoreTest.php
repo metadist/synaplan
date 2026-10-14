@@ -8,7 +8,7 @@ use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
