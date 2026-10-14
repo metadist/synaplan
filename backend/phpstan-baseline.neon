@@ -331,10 +331,10 @@ parameters:
 			path: src/Service/ModelConfigService.php
 
 		-
-			message: '#^Property App\\Service\\OidcTokenService\:\:\$em is never read, only written\.$#'
+			message: '#^Property App\\Service\\Auth\\OidcTokenService\:\:\$em is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Service/OidcTokenService.php
+			path: src/Service/Auth/OidcTokenService.php
 
 		-
 			message: '#^Property App\\Service\\PromptService\:\:\$logger is never read, only written\.$#'

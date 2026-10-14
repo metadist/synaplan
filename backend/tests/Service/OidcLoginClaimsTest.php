@@ -6,11 +6,11 @@ namespace App\Tests\Service;
 
 use App\Repository\UserRepository;
 use App\Service\Auth\AuthCookieFactory;
+use App\Service\Auth\JwtValidator;
 use App\Service\Auth\OidcAccessDenialReason;
 use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcAccessPolicy;
-use App\Service\JwtValidator;
-use App\Service\OidcTokenService;
+use App\Service\Auth\OidcTokenService;
 use App\Tests\Support\OidcAccessPolicyFixture;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;

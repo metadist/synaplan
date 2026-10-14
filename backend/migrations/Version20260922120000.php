@@ -27,7 +27,7 @@ use Doctrine\Migrations\AbstractMigration;
  * instead; step 2 restores their provenance so plugin assistants keep reaching
  * every account after the switch, on every policy value.
  *
- * Registration precedence matches {@see \App\Service\RegistrationConfig}:
+ * Registration precedence matches {@see \App\Service\Auth\RegistrationConfig}:
  * an explicit REGISTRATION_ENABLED env value wins, then ACCESS.REGISTRATION_ENABLED,
  * then the built-in default (open).
  *

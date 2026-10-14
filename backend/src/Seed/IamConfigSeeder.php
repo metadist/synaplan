@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Seed;
 
+use App\Service\Auth\RegistrationConfig;
 use App\Service\Iam\IamConfig;
-use App\Service\RegistrationConfig;
 use Doctrine\DBAL\Connection;
 
 /**

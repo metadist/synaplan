@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Service\Stt;
 
 use App\Entity\User;
+use App\Model\AccountLanguage;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
-use App\Service\AccountLanguage;
 
 /**
  * Languages a transcription may treat as expected for one user.

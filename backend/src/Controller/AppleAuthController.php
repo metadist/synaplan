@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
-use App\Service\AccountLanguage;
 use App\Service\Auth\AppleClientSecretGenerator;
 use App\Service\Auth\AppleIdentityTokenVerifier;
+use App\Service\Auth\OAuthLoginResponder;
+use App\Service\Auth\TokenService;
 use App\Service\ModelConfigService;
-use App\Service\OAuthLoginResponder;
-use App\Service\OAuthStateService;
-use App\Service\TokenService;
+use App\Service\OAuth\OAuthStateService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
-use App\Service\JwtValidator;
+use App\Service\Auth\JwtValidator;
 use PHPUnit\Framework\Constraint\IsType;
 use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;

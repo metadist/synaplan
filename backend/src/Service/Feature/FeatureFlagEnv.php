@@ -22,7 +22,7 @@ namespace App\Service\Feature;
  * `FEATURE_MODULES_GATE_TIKA`. The same name is the field key in the admin UI,
  * which then shows the toggle as locked and names the variable to remove.
  *
- * Precedence mirrors {@see \App\Service\RegistrationConfig}: an explicit
+ * Precedence mirrors {@see \App\Service\Auth\RegistrationConfig}: an explicit
  * environment value wins over per-user, group and global BCONFIG rows. An
  * unrecognised value (anything `filter_var` cannot read as a boolean) is
  * ignored rather than guessed, so a typo never silently disables a feature.

@@ -2,16 +2,16 @@
 
 namespace App\Controller;
 
-use App\Service\AccountLanguage;
+use App\Model\AccountLanguage;
+use App\Service\Auth\ImpersonationService;
+use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcAuthorizeParams;
-use App\Service\ImpersonationService;
-use App\Service\OAuthLoginResponder;
-use App\Service\OAuthStateService;
-use App\Service\OidcScopeResolver;
-use App\Service\OidcTokenService;
+use App\Service\Auth\OidcScopeResolver;
+use App\Service\Auth\OidcTokenService;
+use App\Service\Auth\TokenService;
+use App\Service\OAuth\OAuthStateService;
 use App\Service\OidcUserService;
-use App\Service\TokenService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

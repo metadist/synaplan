@@ -9,7 +9,7 @@ use App\Entity\User;
 use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\AuthCookieFactory;
-use App\Service\TokenService;
+use App\Service\Auth\TokenService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

@@ -9,7 +9,7 @@ use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
-use App\Service\UserLifecycleService;
+use App\Service\Iam\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 

@@ -40,20 +40,6 @@ final class ServiceRootTest extends TestCase
      * that moves the file. Only shrinks; never add to it.
      */
     private const PENDING_MOVE = [
-        // C5 — Auth/, OAuth/, Iam/, App\Model\
-        'AccountLanguage',
-        'ImpersonationService',
-        'JwtValidator',
-        'NativeAuthHandoffService',
-        'OAuthLoginResponder',
-        'OAuthStateService',
-        'OidcScopeResolver',
-        'OidcTokenService',
-        'RecaptchaService',
-        'RegistrationConfig',
-        'TokenService',
-        'UserDeletionService',
-        'UserLifecycleService',
         // C6 — Usage/, Billing/, Iap/
         'BillingService',
         'CachePriceResolver',

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Service\Auth\RegistrationConfig;
+
 /**
  * Deployment-level switch for the browser's Web Speech API as the speech-to-
  * text path of the chat input.

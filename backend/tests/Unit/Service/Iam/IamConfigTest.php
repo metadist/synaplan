@@ -6,8 +6,8 @@ namespace App\Tests\Unit\Service\Iam;
 
 use App\Entity\Share;
 use App\Repository\ConfigRepository;
+use App\Service\Auth\RegistrationConfig;
 use App\Service\Iam\IamConfig;
-use App\Service\RegistrationConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 

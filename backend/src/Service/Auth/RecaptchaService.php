@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Auth;
 
 use Psr\Log\LoggerInterface;
 use ReCaptcha\ReCaptcha;

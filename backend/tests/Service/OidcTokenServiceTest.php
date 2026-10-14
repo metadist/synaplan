@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Service\Auth\AuthCookieFactory;
-use App\Service\JwtValidator;
-use App\Service\OidcTokenService;
+use App\Service\Auth\JwtValidator;
+use App\Service\Auth\OidcTokenService;
 use App\Tests\Support\OidcAccessPolicyFixture;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;

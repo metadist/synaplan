@@ -10,7 +10,7 @@ use App\Service\EncryptionService;
 use App\Service\OAuth\OAuthClient;
 use App\Service\OAuth\OAuthException;
 use App\Service\OAuth\OAuthProviderConfig;
-use App\Service\OAuthStateService;
+use App\Service\OAuth\OAuthStateService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 

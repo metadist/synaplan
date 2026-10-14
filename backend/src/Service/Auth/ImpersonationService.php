@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Service\Auth;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Service\Auth\AuthCookieFactory;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\IamConfig;
 use Psr\Log\LoggerInterface;

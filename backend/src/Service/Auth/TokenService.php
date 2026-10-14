@@ -1,12 +1,11 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Auth;
 
 use App\Entity\Token;
 use App\Entity\User;
 use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
-use App\Service\Auth\AuthCookieFactory;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Cookie;

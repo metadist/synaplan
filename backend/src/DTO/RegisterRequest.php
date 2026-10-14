@@ -2,7 +2,7 @@
 
 namespace App\DTO;
 
-use App\Service\AccountLanguage;
+use App\Model\AccountLanguage;
 use Symfony\Component\Validator\Constraints as Assert;
 
 class RegisterRequest

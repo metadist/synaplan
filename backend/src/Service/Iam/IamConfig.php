@@ -7,8 +7,8 @@ namespace App\Service\Iam;
 use App\Entity\Share;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Service\Auth\RegistrationConfig;
 use App\Service\Feature\FeatureFlagEnv;
-use App\Service\RegistrationConfig;
 
 /**
  * Feature-flag resolver for IAM (groups, sharing, directory sync, policies).

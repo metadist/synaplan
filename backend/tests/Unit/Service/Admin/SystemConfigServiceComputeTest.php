@@ -7,11 +7,11 @@ namespace App\Tests\Unit\Service\Admin;
 use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
+use App\Service\Auth\RegistrationConfig;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\Contract\ComputeHealth;
 use App\Service\EncryptionService;
 use App\Service\GuestChatConfig;
-use App\Service\RegistrationConfig;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

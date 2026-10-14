@@ -16,7 +16,7 @@ use App\Service\Mcp\McpOAuthException;
 use App\Service\Mcp\McpOAuthRegistration;
 use App\Service\Mcp\McpOAuthState;
 use App\Service\OAuth\OAuthClient;
-use App\Service\OAuthStateService;
+use App\Service\OAuth\OAuthStateService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;

@@ -6,7 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\Token;
 use App\Entity\User;
-use App\Service\TokenService;
+use App\Service\Auth\TokenService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
