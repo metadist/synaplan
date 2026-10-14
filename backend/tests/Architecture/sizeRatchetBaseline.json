@@ -10,7 +10,7 @@
     "counts": {
         "fileLines": 62,
         "constructorParams": 76,
-        "methodLines": 166
+        "methodLines": 165
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -32,7 +32,7 @@
         "src/Controller/AgentController.php": 921,
         "src/Controller/AuthController.php": 1257,
         "src/Controller/ChatController.php": 1186,
-        "src/Controller/ConfigController.php": 2591,
+        "src/Controller/ConfigController.php": 2240,
         "src/Controller/FeedbackController.php": 837,
         "src/Controller/FileController.php": 1930,
         "src/Controller/InboundEmailHandlerController.php": 824,
@@ -40,7 +40,7 @@
         "src/Controller/MessagesGatewayController.php": 832,
         "src/Controller/OpenAICompatibleController.php": 862,
         "src/Controller/PromptController.php": 1885,
-        "src/Controller/StreamController.php": 4430,
+        "src/Controller/StreamController.php": 4427,
         "src/Controller/SubscriptionController.php": 1198,
         "src/Controller/UserMemoryController.php": 1011,
         "src/Controller/WebhookController.php": 1085,
@@ -90,7 +90,7 @@
         "src/Controller/AppleAuthController.php::AppleAuthController": 12,
         "src/Controller/AuthController.php::AuthController": 17,
         "src/Controller/ChatController.php::ChatController": 18,
-        "src/Controller/ConfigController.php::ConfigController": 50,
+        "src/Controller/ConfigController.php::ConfigController": 20,
         "src/Controller/FileController.php::FileController": 25,
         "src/Controller/GuestChatController.php::GuestChatController": 12,
         "src/Controller/KeycloakAuthController.php::KeycloakAuthController": 16,
@@ -189,7 +189,6 @@
         "src/Controller/AuthController.php::AuthController::refresh": 102,
         "src/Controller/AuthController.php::AuthController::refreshOidcTokens": 105,
         "src/Controller/ConfigController.php::ConfigController::getModels": 200,
-        "src/Controller/ConfigController.php::ConfigController::getRuntimeConfig": 246,
         "src/Controller/ConfigController.php::ConfigController::saveDefaultModels": 170,
         "src/Controller/FileServeController.php::FileServeController::serve": 146,
         "src/Controller/GitHubAuthController.php::GitHubAuthController::callback": 108,
@@ -211,7 +210,7 @@
         "src/Controller/StreamController.php::StreamController::processVoiceReply": 135,
         "src/Controller/StreamController.php::StreamController::saveCancelled": 165,
         "src/Controller/StreamController.php::StreamController::storeGeneratedFileInStream": 122,
-        "src/Controller/StreamController.php::StreamController::streamMessage": 2000,
+        "src/Controller/StreamController.php::StreamController::streamMessage": 1996,
         "src/Controller/SubscriptionController.php::SubscriptionController::createCheckoutSession": 169,
         "src/Controller/SubscriptionController.php::SubscriptionController::createTopupSession": 101,
         "src/Controller/SubscriptionController.php::SubscriptionController::syncFromStripe": 115,
