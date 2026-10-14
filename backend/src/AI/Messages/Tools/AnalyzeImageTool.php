@@ -9,6 +9,8 @@ use App\Service\Message\ChatErrorPresenter;
 use App\Service\Security\SsrfGuard;
 use App\Service\Vision\VisionModelResolver;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpClientExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Synaplan's PIC2TEXT / vision models, exposed to the Messages gateway as a
@@ -36,6 +38,7 @@ final readonly class AnalyzeImageTool
         private AiFacade $aiFacade,
         private VisionModelResolver $visionModelResolver,
         private SsrfGuard $ssrfGuard,
+        private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
         private string $uploadDir,
         private ?ChatErrorPresenter $errorPresenter = null,
@@ -205,20 +208,55 @@ final readonly class AnalyzeImageTool
             throw new \InvalidArgumentException('image_url points at a blocked host.');
         }
 
-        $ctx = stream_context_create([
-            'http' => [
-                'timeout' => 20,
-                'follow_location' => 0,
-                'user_agent' => 'Synaplan-MessagesGateway/1.0',
-            ],
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-            ],
-        ]);
+        $host = trim((string) parse_url($url, \PHP_URL_HOST), '[]');
+        if ('' === $host) {
+            throw new \InvalidArgumentException('image_url points at a blocked host.');
+        }
 
-        $binary = @file_get_contents($url, false, $ctx);
-        if (false === $binary || '' === $binary) {
+        $options = [
+            'timeout' => 20,
+            'max_duration' => 20,
+            'max_redirects' => 0,
+            'verify_peer' => true,
+            'verify_host' => true,
+            'headers' => [
+                'User-Agent' => 'Synaplan-MessagesGateway/1.0',
+            ],
+        ];
+        // A hostname is connected to the public address the guard just accepted.
+        // Leaving the name to be resolved again would let it point somewhere else.
+        if (false === filter_var($host, \FILTER_VALIDATE_IP)) {
+            $pinned = $this->ssrfGuard->pinnedIps($host);
+            if ([] === $pinned) {
+                throw new \InvalidArgumentException('image_url points at a blocked host.');
+            }
+            $options['resolve'] = [$host => $pinned[0]];
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', $url, $options);
+            $status = $response->getStatusCode();
+            if ($status < 200 || $status >= 300) {
+                $response->cancel();
+                throw new \InvalidArgumentException('Failed to download image_url.');
+            }
+            $declared = (int) ($response->getHeaders(false)['content-length'][0] ?? 0);
+            if ($declared > self::MAX_BASE64_CHARS) {
+                $response->cancel();
+                throw new \InvalidArgumentException('Downloaded image is too large.');
+            }
+            $binary = $response->getContent();
+        } catch (\InvalidArgumentException $e) {
+            throw $e;
+        } catch (HttpClientExceptionInterface $e) {
+            $this->logger->warning('AnalyzeImageTool: image download failed', [
+                'host' => $host,
+                'error' => $e->getMessage(),
+            ]);
+            throw new \InvalidArgumentException('Failed to download image_url.', 0, $e);
+        }
+
+        if ('' === $binary) {
             throw new \InvalidArgumentException('Failed to download image_url.');
         }
         if (strlen($binary) > self::MAX_BASE64_CHARS) {
