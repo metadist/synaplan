@@ -19,6 +19,8 @@ use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Memory\MemoryExtractionDispatcher;
+use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\MediaPromptExtractor;
@@ -132,8 +134,11 @@ final class MediaGenerationHandlerRetiredModelTest extends TestCase
             $this->createMock(ThumbnailService::class),
             $rateLimitService,
             new MediaErrorMessageBuilder(),
-            $messageBus,
-            $this->createMock(PerfPipelineFlag::class),
+            new PendingMemoryExtraction(
+                new MemoryExtractionDispatcher($messageBus, new NullLogger()),
+                $this->createMock(PerfPipelineFlag::class),
+                new NullLogger(),
+            ),
             $this->createMock(MediaCancellationStore::class),
             $mediaJobConfig,
             $this->createMock(MediaJobService::class),

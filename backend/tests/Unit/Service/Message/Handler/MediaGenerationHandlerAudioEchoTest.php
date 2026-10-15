@@ -19,6 +19,8 @@ use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Memory\MemoryExtractionDispatcher;
+use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
@@ -225,8 +227,11 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
             $this->createMock(ThumbnailService::class),
             $this->rateLimitService,
             new MediaErrorMessageBuilder(),
-            $this->messageBus,
-            $this->perfPipelineFlag,
+            new PendingMemoryExtraction(
+                new MemoryExtractionDispatcher($this->messageBus, new NullLogger()),
+                $this->perfPipelineFlag,
+                new NullLogger(),
+            ),
             $this->createMock(MediaCancellationStore::class),
             $mediaJobConfig,
             $this->createMock(MediaJobService::class),

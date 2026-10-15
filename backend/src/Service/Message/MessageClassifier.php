@@ -241,7 +241,7 @@ final readonly class MessageClassifier
         if ($modelOverride && !$promptOverride) {
             // "Again" with model but no prompt override
             // Detect model type from model tag and set topic accordingly
-            $modelTag = $this->getModelTag($modelOverride);
+            $modelTag = $this->modelConfigService->getModelTag($modelOverride) ?? 'chat';
             $topic = $this->mapModelTagToTopic($modelTag, $message->getTopic());
             $intent = $this->mapTopicToIntent($topic);
 
@@ -1100,19 +1100,6 @@ final readonly class MessageClassifier
         ];
 
         return $aliasToIntent[$topic] ?? Capability::Chat->value;
-    }
-
-    /**
-     * Get model tag (capability) from model ID.
-     */
-    private function getModelTag(int $modelId): string
-    {
-        $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
-        if ($model) {
-            return $model->getTag();
-        }
-
-        return 'chat'; // fallback
     }
 
     /**

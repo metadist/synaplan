@@ -7,6 +7,7 @@ use App\AI\Exception\ChatFailureReason;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Model\AccountLanguage;
 use App\Service\Context\ContextCondenser;
 use App\Service\Context\ModelContextWindow;
 use App\Service\File\ConversationFile;
@@ -48,10 +49,6 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
     /** Upper bound for the requested completion budget (reasoning tokens count against it). */
     private const MAX_ANSWER_OUTPUT_TOKENS = 16000;
-
-    /** Locales shipped in `translations/ai_errors.*.yaml`. */
-    private const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'tr'];
-
     private const AUDIO_PENDING_FALLBACK = 'The recording is still being prepared. Please wait a moment and send your question again.';
 
     private const AUDIO_FAILED_FALLBACK = 'This recording could not be transcribed. Speech-to-text is not set up on this server, or the audio could not be understood. Connect a speech-to-text service under Settings, or try a different file.';
@@ -1871,7 +1868,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     {
         $normalized = strtolower(substr(trim($lang), 0, 2));
 
-        return in_array($normalized, self::SUPPORTED_LOCALES, true) ? $normalized : 'en';
+        return in_array($normalized, AccountLanguage::SUPPORTED, true) ? $normalized : 'en';
     }
 
     private function trans(string $key, string $fallback, string $locale): string

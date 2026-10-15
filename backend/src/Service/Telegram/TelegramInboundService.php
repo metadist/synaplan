@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\TelegramBot;
 use App\Entity\User;
 use App\Message\ProcessTelegramAlbumCommand;
+use App\Model\AccountLanguage;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,8 +27,6 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 final readonly class TelegramInboundService
 {
     public const META_UPDATE = TelegramMessageStore::META_UPDATE;
-
-    private const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'tr'];
     private const LOCK_SECONDS = 300.0;
     private const BUSY_RETRY_MS = 30_000;
     /** Telegram sends the parts of an album within about a second. */
@@ -508,7 +507,7 @@ final readonly class TelegramInboundService
 
         $language = strtolower(substr($code, 0, 2));
 
-        return in_array($language, self::SUPPORTED_LOCALES, true) ? $language : null;
+        return in_array($language, AccountLanguage::SUPPORTED, true) ? $language : null;
     }
 
     private function scalarId(mixed $value): ?string
