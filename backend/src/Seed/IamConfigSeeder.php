@@ -7,6 +7,7 @@ namespace App\Seed;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Iam\IamConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the global IAM flags (BCONFIG, ownerId=0).
@@ -21,12 +22,23 @@ use Doctrine\DBAL\Connection;
  * when registration is invite-only or SSO-only (#2096). Existing rows are
  * never overwritten; the upgrade migration applies the public-instance default.
  */
-final readonly class IamConfigSeeder
+#[AsTaggedItem(priority: 160)]
+final readonly class IamConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
         private RegistrationConfig $registration,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'iam';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=IAM, ownerId=0 — feature flags default ON';
     }
 
     public function seed(): SeedResult

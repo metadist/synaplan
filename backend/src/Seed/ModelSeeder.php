@@ -7,6 +7,7 @@ namespace App\Seed;
 use App\Model\CatalogPriceOwnership;
 use App\Model\ModelCatalog;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the AI model catalog (BMODELS).
@@ -46,7 +47,8 @@ use Doctrine\DBAL\Connection;
  * also flips test models to selectable/showWhenFree so the admin UI exposes them
  * in the E2E stack.
  */
-final readonly class ModelSeeder
+#[AsTaggedItem(priority: 350)]
+final readonly class ModelSeeder implements SeederInterface
 {
     /**
      * Mock models for E2E/CI stacks. Negative IDs cannot collide with auto-increment.
@@ -74,6 +76,16 @@ final readonly class ModelSeeder
         private Connection $connection,
         private string $environment,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'models';
+    }
+
+    public function description(): string
+    {
+        return 'BMODELS';
     }
 
     public function seed(): SeedResult

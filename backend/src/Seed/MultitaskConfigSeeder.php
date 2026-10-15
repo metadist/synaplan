@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Multitask\MultitaskRoutingConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the global multi-task routing flags (BCONFIG, ownerId=0).
@@ -18,11 +19,22 @@ use Doctrine\DBAL\Connection;
  * routing. Existing users on the live platform are grandfathered to OFF by the
  * dedicated data migration, NOT by this seeder.
  */
-final readonly class MultitaskConfigSeeder
+#[AsTaggedItem(priority: 290)]
+final readonly class MultitaskConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'multitask';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=MULTITASK';
     }
 
     public function seed(): SeedResult

@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Agent\AgentConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the global Agent Builder flag (BCONFIG, ownerId=0).
@@ -14,11 +15,22 @@ use Doctrine\DBAL\Connection;
  * (`1`) since 4.8; System configuration → Features or `FEATURE_AGENTS_*=false`
  * turns it off.
  */
-final readonly class AgentConfigSeeder
+#[AsTaggedItem(priority: 150)]
+final readonly class AgentConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'agents';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=AGENTS, ownerId=0 — default ON';
     }
 
     public function seed(): SeedResult

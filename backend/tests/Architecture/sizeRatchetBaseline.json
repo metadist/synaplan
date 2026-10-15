@@ -9,7 +9,7 @@
     },
     "counts": {
         "fileLines": 57,
-        "constructorParams": 71,
+        "constructorParams": 70,
         "methodLines": 147
     },
     "fileLines": {
@@ -79,7 +79,6 @@
         "src/AI/OpenAI/OpenAiGatewayToolLoop.php::OpenAiGatewayToolLoop": 13,
         "src/AI/Service/AiFacade.php::AiFacade": 16,
         "src/AI/Service/ProviderRegistry.php::ProviderRegistry": 12,
-        "src/Command/SeedAllCommand.php::SeedAllCommand": 36,
         "src/Controller/AdminController.php::AdminController": 12,
         "src/Controller/AgentController.php::AgentController": 14,
         "src/Controller/AppleAuthController.php::AppleAuthController": 12,

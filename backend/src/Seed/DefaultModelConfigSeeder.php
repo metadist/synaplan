@@ -7,6 +7,7 @@ namespace App\Seed;
 use App\Model\ModelCatalog;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for global default-model configuration in BCONFIG (ownerId=0).
@@ -20,7 +21,8 @@ use Doctrine\DBAL\ParameterType;
  *
  * NEVER overwrites operator-tuned values, even if they differ from the seed defaults.
  */
-final readonly class DefaultModelConfigSeeder
+#[AsTaggedItem(priority: 320)]
+final readonly class DefaultModelConfigSeeder implements SeederInterface
 {
     /**
      * Production defaults: every capability points at a stable catalog key. The
@@ -118,6 +120,16 @@ final readonly class DefaultModelConfigSeeder
         private Connection $connection,
         private string $environment,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'defaults';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=DEFAULTMODEL/ai';
     }
 
     public function seed(): SeedResult

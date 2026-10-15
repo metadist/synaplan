@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Client\MobileVersionService;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the mobile forced-update gate config (BCONFIG, ownerId=0).
@@ -15,11 +16,22 @@ use Doctrine\DBAL\Connection;
  * overrides are never touched. Defaults leave the gate OFF (empty min-version),
  * so seeding never blocks an existing install.
  */
-final readonly class MobileConfigSeeder
+#[AsTaggedItem(priority: 250)]
+final readonly class MobileConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'mobile';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=MOBILE, ownerId=0';
     }
 
     public function seed(): SeedResult
