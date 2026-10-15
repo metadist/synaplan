@@ -464,18 +464,18 @@
               </button>
 
               <button
-                v-if="showLiveVoiceButton"
+                v-if="showLiveInSendSlot"
                 type="button"
-                class="icon-ghost !rounded-xl h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
+                class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl flex-shrink-0 transition-all"
                 :aria-label="$t('chatInput.liveVoice.button')"
                 :title="$t('chatInput.liveVoice.button')"
                 data-testid="btn-chat-live-voice"
-                @click="livePress"
+                @click="onLivePress"
               >
                 <Icon icon="mdi:waveform" class="w-5 h-5" />
               </button>
-
               <button
+                v-else
                 type="button"
                 :disabled="!isStreaming && !canSend"
                 class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl flex-shrink-0 transition-all"
@@ -608,7 +608,7 @@ import type { FileItem } from '@/services/filesService'
 import { deleteFile, getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 import { useLiveVoice } from '@/composables/useLiveVoice'
-import { liveVoiceButtonVisible } from '@/services/liveVoice/visibility'
+import { liveVoiceButtonVisible, liveVoiceReplacesSend } from '@/services/liveVoice/visibility'
 import { liveCostBudget, type LiveVoiceCostBudget } from '@/services/api/liveVoiceApi'
 import type { LimitCheckResult } from '@/composables/useLimitCheck'
 import LiveVoicePanel from '@/components/chat/LiveVoicePanel.vue'
@@ -2199,6 +2199,20 @@ const showLiveVoiceButton = computed(() =>
   })
 )
 
+const showLiveInSendSlot = computed(() =>
+  liveVoiceReplacesSend({
+    available: showLiveVoiceButton.value,
+    streaming: isStreaming.value,
+    hasText: message.value.trim().length > 0,
+    hasAttachment: uploadedFiles.value.length > 0 || pastedBlocks.value.length > 0,
+  })
+)
+
+function onLivePress() {
+  if (!showLiveInSendSlot.value) return
+  void livePress()
+}
+
 const liveStatusHint = computed(() =>
   livePhase.value === 'connecting' ? t('chatInput.liveVoice.connectingHint') : ''
 )
@@ -2260,7 +2274,7 @@ function onLiveTerminalAction() {
     return
   }
   if (action === 'talk_again') {
-    void livePress()
+    onLivePress()
   }
 }
 

@@ -54,21 +54,6 @@
       "8": "Dites-moi où ça coince.",
       "9": "Un fichier, une question, une ébauche.",
       "10": "Surprenez-moi. Ou la tâche ennuyeuse."
-    },
-    "opensInNewTab": "S’ouvre dans un nouvel onglet",
-    "choice": {
-      "title": "Votre modèle et votre assistant",
-      "blurb": "Vous pouvez changer l’un ou l’autre dans cette conversation."
-    },
-    "mobile": {
-      "title": "iPhone et Android",
-      "blurb": "L’app Synaplan sur votre téléphone.",
-      "appStore": "App Store",
-      "playStore": "Google Play"
-    },
-    "source": {
-      "title": "Code source",
-      "blurb": "Lisez-le sur GitHub et faites tourner Synaplan vous-même."
     }
   },
   "chats": {

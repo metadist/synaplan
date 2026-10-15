@@ -73,6 +73,33 @@ final class ConfigControllerInstanceDefaultsTest extends WebTestCase
         self::assertSame($instanceModelId, $body['defaults']['CHAT']);
         self::assertSame('admin', $body['sources']['CHAT']);
         self::assertFalse($body['locked']['CHAT']);
+        self::assertSame($instanceModelId, $body['stored']['CHAT']);
+    }
+
+    public function testStoredKeepsTheSavedModelWhenAnotherOneAnswers(): void
+    {
+        $admin = $this->createUser('instance-defaults-admin@synaplan.internal', 'ADMIN');
+        $model = $this->createChatModel('instance-defaults-retired');
+        $modelId = (int) $model->getId();
+        $this->authenticateClient($this->client, $admin);
+
+        $this->client->request('POST', '/api/v1/config/models/defaults', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+        ], json_encode([
+            'defaults' => ['CHAT' => $modelId],
+            'global' => true,
+        ], \JSON_THROW_ON_ERROR));
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $model->setActive(0);
+        $this->em->flush();
+
+        $this->client->request('GET', '/api/v1/config/models/defaults?scope=instance');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertNotSame($modelId, $body['defaults']['CHAT']);
+        self::assertSame($modelId, $body['stored']['CHAT']);
     }
 
     private function createChatModel(string $providerId): Model

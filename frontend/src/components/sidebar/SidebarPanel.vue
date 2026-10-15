@@ -49,6 +49,12 @@
     </header>
 
     <!--
+      Outside the scroller, with no fill of its own. A bar inside the list
+      painted a second layer and read as black against the panel.
+    -->
+    <SidebarChatsActions v-if="!onSettings && activeKey === 'chats'" />
+
+    <!--
       The list is the only part that scrolls. Search and the profile stay in
       the footer, so a long history cannot push them off the menu.
     -->
@@ -77,6 +83,7 @@ import { isAccountPanelPath, useNavSections } from '@/composables/useNavSections
 import { focusSidebarToggle, useSidebarLayout } from '@/composables/useSidebarLayout'
 import { useAuthStore } from '@/stores/auth'
 import SidebarPanelChats from './SidebarPanelChats.vue'
+import SidebarChatsActions from './SidebarChatsActions.vue'
 import SidebarPanelSettings from './SidebarPanelSettings.vue'
 import SidebarPanelLibrary from './SidebarPanelLibrary.vue'
 import SidebarPanelLinks from './SidebarPanelLinks.vue'

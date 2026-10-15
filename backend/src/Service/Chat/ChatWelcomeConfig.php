@@ -9,9 +9,10 @@ use App\Repository\ConfigRepository;
 /**
  * What the empty chat may promote.
  *
- * A missing row keeps today's screen: store cards and the website-widget
- * promotion stay visible. An admin turns them off per installation. Seeder
- * defaults do not rewrite existing installs, so "off" is an explicit row.
+ * A missing row keeps the website-widget promotion visible. An admin turns
+ * it off per installation. Seeder defaults do not rewrite existing installs,
+ * so "off" is an explicit row. SHOW_STORE_CARDS stays on the runtime payload
+ * for older clients; the web empty chat no longer renders those cards.
  */
 final readonly class ChatWelcomeConfig
 {

@@ -49,23 +49,31 @@ final readonly class ModelDefaultsService
      * guest chat uses. With group policies on, a group default still wins for
      * that group's members; this is the layer beneath it.
      *
-     * @return array{defaults: array<string, ?int>, locked: array<string, bool>, sources: array<string, ?string>}
+     * `stored` is the saved row itself, before that fallback, so a caller can
+     * put back exactly what was configured.
+     *
+     * @return array{defaults: array<string, ?int>, locked: array<string, bool>, sources: array<string, ?string>, stored: array<string, ?int>}
      */
     public function instanceDefaults(): array
     {
         $defaults = [];
         $locked = [];
         $sources = [];
+        $stored = [];
         foreach (PickerCapabilities::ALL as $capability) {
+            $row = $this->storedRow(0, $capability);
             $defaults[$capability] = $this->modelConfigService->getDefaultModel($capability);
             $locked[$capability] = false;
-            $sources[$capability] = null !== $this->storedRow(0, $capability) ? 'admin' : null;
+            $sources[$capability] = null !== $row ? 'admin' : null;
+            $value = trim((string) $row?->getValue());
+            $stored[$capability] = is_numeric($value) ? (int) $value : null;
         }
 
         return [
             'defaults' => $defaults,
             'locked' => $locked,
             'sources' => $sources,
+            'stored' => $stored,
         ];
     }
 

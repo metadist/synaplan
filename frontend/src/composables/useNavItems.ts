@@ -230,6 +230,13 @@ export function useNavItems() {
       const grouped = (groupKey: string, group: string) => ({ groupKey, group })
 
       const manageChildren: NavChild[] = [
+        {
+          key: 'ai-models',
+          path: '/ai/models',
+          label: t('nav.configAiModels'),
+          icon: CpuChipIcon,
+          ...grouped('assistants', assistants),
+        },
         ...(isAgentsEnabled()
           ? [
               {
@@ -246,13 +253,6 @@ export function useNavItems() {
           path: '/prompts',
           label: t('nav.prompts'),
           icon: BookOpenIcon,
-          ...grouped('assistants', assistants),
-        },
-        {
-          key: 'ai-models',
-          path: '/ai/models',
-          label: t('nav.configAiModels'),
-          icon: CpuChipIcon,
           ...grouped('assistants', assistants),
         },
         ...(isSavedTasksEnabled()

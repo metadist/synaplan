@@ -178,11 +178,8 @@ export const selectors = {
     aiAnswerBubble: '[data-testid="assistant-message-bubble"]',
     /** Empty-state for a new/empty chat (shown while messages.length === 0 && !isLoadingMessages). Use to assert that a fresh chat is fully committed before counting bubbles. */
     stateEmpty: '[data-testid="state-empty"]',
+    /** Gone from the empty chat; the landing test asserts it stays absent. */
     companionLinks: '[data-testid="comp-companion-links"]',
-    companionChoice: '[data-testid="card-companion-choice"]',
-    companionAppStore: '[data-testid="link-companion-app-store"]',
-    companionPlayStore: '[data-testid="link-companion-play-store"]',
-    companionSource: '[data-testid="link-companion-source"]',
     selfAwareEmptyHint: '[data-testid="self-aware-empty-hint"]',
     selfAwareEmptyHintBtn: '[data-testid="btn-self-aware-empty-hint"]',
     userMessageBubble: '[data-testid="user-message-bubble"]',

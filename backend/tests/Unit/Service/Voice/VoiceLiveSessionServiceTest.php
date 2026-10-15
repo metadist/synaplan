@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Voice;
 
 use App\AI\Credential\ProviderKeyStore;
+use App\Entity\Model;
 use App\Entity\User;
 use App\Entity\VoiceSession;
 use App\Exception\VoiceLiveRejectedException;
@@ -81,6 +82,48 @@ final class VoiceLiveSessionServiceTest extends TestCase
         self::assertStringEndsWith('?ticket=a.b.c', $result['wsUrl']);
     }
 
+    public function testTheOptionsDefaultFollowsTheModelIdSavedOnTheModelsPage(): void
+    {
+        $config = $this->createStub(ConfigRepository::class);
+        $config->method('getValue')->willReturnMap([
+            [3, 'DEFAULTMODEL', 'VOICE_LIVE', '390'],
+            [0, 'DEFAULTMODEL', 'VOICE_LIVE', '389'],
+        ]);
+
+        $options = $this->service(null, models: $this->voiceModels(), config: $config)->options($this->user());
+
+        self::assertSame(390, $options['defaultModelId']);
+        self::assertArrayHasKey('priceIn', $options['models'][0]);
+        self::assertArrayHasKey('priceKnown', $options['models'][0]);
+    }
+
+    public function testTheOptionsDefaultFallsBackToTheInstanceModel(): void
+    {
+        $config = $this->createStub(ConfigRepository::class);
+        $config->method('getValue')->willReturnMap([
+            [3, 'DEFAULTMODEL', 'VOICE_LIVE', null],
+            [0, 'DEFAULTMODEL', 'VOICE_LIVE', '390'],
+        ]);
+
+        $options = $this->service(null, models: $this->voiceModels(), config: $config)->options($this->user());
+
+        self::assertSame(390, $options['defaultModelId']);
+    }
+
+    private function voiceModels(): ModelRepository
+    {
+        $rows = [];
+        foreach ([389 => 'OpenAI', 390 => 'Google'] as $id => $service) {
+            $model = (new Model())->setService($service)->setName('Live '.$id)->setTag('voice2voice')->setActive(1);
+            (new \ReflectionProperty(Model::class, 'id'))->setValue($model, $id);
+            $rows[] = $model;
+        }
+        $models = $this->createStub(ModelRepository::class);
+        $models->method('findActiveByTag')->willReturn($rows);
+
+        return $models;
+    }
+
     private function session(string $client): VoiceSession
     {
         $session = (new VoiceSession())
@@ -107,9 +150,13 @@ final class VoiceLiveSessionServiceTest extends TestCase
         ?VoiceLiveUsageService $usage = null,
         ?VoiceLiveTicketService $tickets = null,
         ?RedisService $redis = null,
+        ?ModelRepository $models = null,
+        ?ConfigRepository $config = null,
     ): VoiceLiveSessionService {
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('find')->willReturn($session);
+        $keys = $this->createStub(ProviderKeyStore::class);
+        $keys->method('getStatus')->willReturn(['configured' => true, 'source' => 'env', 'origin' => null, 'maskedKey' => '', 'hasSecret' => false]);
 
         return new VoiceLiveSessionService(
             $this->createStub(LiveVoiceModule::class),
@@ -119,9 +166,9 @@ final class VoiceLiveSessionServiceTest extends TestCase
             $this->createStub(VoiceLiveDelegationService::class),
             $this->createStub(VoiceTranscriptWriter::class),
             new VoiceLiveInstructions(),
-            $this->createStub(ModelRepository::class),
-            $this->createStub(ProviderKeyStore::class),
-            $this->createStub(ConfigRepository::class),
+            $models ?? $this->createStub(ModelRepository::class),
+            $keys,
+            $config ?? $this->createStub(ConfigRepository::class),
             $this->createStub(MessageRepository::class),
             $this->createStub(VoiceSessionRepository::class),
             $this->createStub(UserRepository::class),

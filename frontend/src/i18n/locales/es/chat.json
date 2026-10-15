@@ -54,21 +54,6 @@
       "8": "Cuéntame dónde te atascas.",
       "9": "Un archivo, una pregunta, una idea a medias.",
       "10": "Sorpréndeme. O la tarea aburrida."
-    },
-    "opensInNewTab": "Se abre en una pestaña nueva",
-    "choice": {
-      "title": "Tu modelo y tu asistente",
-      "blurb": "Puedes cambiar cualquiera de los dos en este chat."
-    },
-    "mobile": {
-      "title": "iPhone y Android",
-      "blurb": "La app de Synaplan en tu teléfono.",
-      "appStore": "App Store",
-      "playStore": "Google Play"
-    },
-    "source": {
-      "title": "Código fuente",
-      "blurb": "Léelo en GitHub y ejecuta Synaplan tú mismo."
     }
   },
   "chats": {

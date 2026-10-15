@@ -47,7 +47,7 @@
       v-show="activeTab === 'choice'"
       v-if="!isAdminScope"
       class="surface-card p-6 relative"
-      :class="openDropdown ? 'z-20' : 'z-0'"
+      :class="openDropdown || liveMenuOpen ? 'z-20' : 'z-0'"
       data-testid="section-default-config"
     >
       <h3
@@ -114,206 +114,212 @@
         </button>
       </div>
 
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
-        <div
-          v-for="capability in Object.keys(purposeLabels)"
-          :key="capability"
-          :ref="
-            (el: any) => {
-              if (el) capabilityRefs[capability as Capability] = el as HTMLElement
-            }
-          "
-          class="space-y-2 transition-all duration-300 relative"
-          :class="[
-            highlightedCapability === capability || highlightedCapability === 'ALL'
-              ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
-              : '',
-            openDropdown === capability ? 'z-10' : 'z-0',
-          ]"
-          data-testid="item-capability"
-        >
-          <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
-            <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
-            <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
-            <span
-              v-if="capability === 'VECTORIZE' && isVectorizeAdminOnly"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--status-warning-muted)] text-[var(--status-warning-text)] border border-amber-500/30"
-              :title="$t('config.embeddingSwitch.adminOnly.lockTooltip')"
-              data-testid="badge-embedding-admin-only"
-            >
-              <LockClosedIcon class="w-3 h-3" />
-              {{ $t('config.embeddingSwitch.adminOnly.badge') }}
-            </span>
-            <span
-              v-else-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-              :title="$t('config.embeddingSwitch.premium.lockTooltip')"
-              data-testid="badge-embedding-premium"
-            >
-              <LockClosedIcon class="w-3 h-3" />
-              {{ $t('config.embeddingSwitch.premium.badge') }}
-            </span>
-            <span
-              v-if="isCapabilityLocked(capability as Capability)"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30"
-              data-testid="badge-set-by-admin"
-            >
-              {{ $t('config.setByAdmin') }}
-            </span>
-            <span
-              v-else-if="defaultSources[capability as Capability] === 'group'"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium txt-secondary"
-              data-testid="badge-from-group"
-            >
-              {{ $t('config.fromGroup') }}
-            </span>
-            <span
-              v-if="restrictedCapabilities.includes(capability)"
-              class="basis-full text-xs font-normal txt-secondary"
-              data-testid="hint-group-model-limit"
-            >
-              {{ groupLimitText }}
-            </span>
-          </label>
-          <div class="relative">
-            <button
-              type="button"
-              :class="[
-                'w-full px-4 py-3 pl-10 pr-10 rounded-xl surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
-                'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
-                openDropdown === capability && 'ring-2 ring-[var(--brand)]',
-                ((capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
-                  isCapabilityLocked(capability as Capability)) &&
-                  'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
-              ]"
-              :disabled="
-                (capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
-                isCapabilityLocked(capability as Capability)
-              "
-              :title="
-                isCapabilityLocked(capability as Capability)
-                  ? $t('config.setByAdmin')
-                  : capability === 'VECTORIZE' && isVectorizeAdminOnly
-                    ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
-                    : undefined
-              "
-              data-testid="btn-model-dropdown"
-              @click="toggleDropdown(capability as Capability)"
-            >
-              <span class="flex items-center gap-2 truncate">
-                <span
-                  class="truncate"
-                  :class="{
-                    'txt-model-placeholder': !getSelectedModelObj(capability as Capability),
-                  }"
-                  >{{ getSelectedModelLabel(capability as Capability) }}</span
-                >
-                <ModelCostBadge
-                  v-if="getSelectedModelObj(capability as Capability)"
-                  :model="getSelectedModelObj(capability as Capability)!"
-                  :peers="getModelsByPurpose(capability as Capability)"
-                  :capability="capability"
-                />
-              </span>
-            </button>
-            <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              <ServiceIcon
-                :service="getSelectedModelService(capability as Capability)"
-                :size="16"
-              />
-            </div>
-            <ChevronDownIcon
-              :class="[
-                'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none transition-transform',
-                openDropdown === capability && 'rotate-180',
-              ]"
-            />
-
-            <!-- Custom Dropdown -->
-            <div
-              v-if="openDropdown === capability"
-              class="absolute z-50 mt-2 flex w-full max-h-[60vh] flex-col dropdown-panel"
-            >
-              <div
-                v-if="showDropdownFilter(capability as Capability)"
-                class="shrink-0 border-b border-light-border/30 p-2 dark:border-dark-border/20"
-                data-testid="section-model-choice-filter"
+      <div v-else>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
+          <div
+            v-for="capability in Object.keys(purposeLabels)"
+            :key="capability"
+            :ref="
+              (el: any) => {
+                if (el) capabilityRefs[capability as Capability] = el as HTMLElement
+              }
+            "
+            class="space-y-2 transition-all duration-300 relative"
+            :class="[
+              highlightedCapability === capability || highlightedCapability === 'ALL'
+                ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
+                : '',
+              openDropdown === capability ? 'z-10' : 'z-0',
+            ]"
+            data-testid="item-capability"
+          >
+            <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
+              <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
+              <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
+              <span
+                v-if="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--status-warning-muted)] text-[var(--status-warning-text)] border border-amber-500/30"
+                :title="$t('config.embeddingSwitch.adminOnly.lockTooltip')"
+                data-testid="badge-embedding-admin-only"
               >
-                <label class="sr-only" :for="`model-choice-filter-${capability}`">
-                  {{ $t('config.aiModels.dropdownFilterLabel') }}
-                </label>
-                <div class="relative">
-                  <MagnifyingGlassIcon
-                    class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 txt-secondary"
-                    aria-hidden="true"
-                  />
-                  <input
-                    :id="`model-choice-filter-${capability}`"
-                    v-model="dropdownFilter"
-                    type="text"
-                    autocomplete="off"
-                    spellcheck="false"
-                    enterkeyhint="go"
-                    class="w-full rounded-xl surface-card border border-light-border/30 py-1.5 pl-9 pr-9 text-sm txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] dark:border-dark-border/20"
-                    :placeholder="$t('config.aiModels.dropdownFilterPlaceholder')"
-                    data-testid="input-model-choice-filter"
-                    @keydown.enter="onDropdownFilterEnter($event, capability as Capability)"
-                    @keydown.escape.stop.prevent="onDropdownFilterEscape"
-                  />
-                  <button
-                    v-if="dropdownFilter"
-                    type="button"
-                    class="icon-ghost absolute right-1.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md"
-                    :aria-label="$t('config.aiModels.dropdownClearFilter')"
-                    data-testid="btn-model-choice-filter-clear"
-                    @click="clearDropdownFilter"
+                <LockClosedIcon class="w-3 h-3" />
+                {{ $t('config.embeddingSwitch.adminOnly.badge') }}
+              </span>
+              <span
+                v-else-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                :title="$t('config.embeddingSwitch.premium.lockTooltip')"
+                data-testid="badge-embedding-premium"
+              >
+                <LockClosedIcon class="w-3 h-3" />
+                {{ $t('config.embeddingSwitch.premium.badge') }}
+              </span>
+              <span
+                v-if="isCapabilityLocked(capability as Capability)"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30"
+                data-testid="badge-set-by-admin"
+              >
+                {{ $t('config.setByAdmin') }}
+              </span>
+              <span
+                v-else-if="defaultSources[capability as Capability] === 'group'"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium txt-secondary"
+                data-testid="badge-from-group"
+              >
+                {{ $t('config.fromGroup') }}
+              </span>
+              <span
+                v-if="restrictedCapabilities.includes(capability)"
+                class="basis-full text-xs font-normal txt-secondary"
+                data-testid="hint-group-model-limit"
+              >
+                {{ groupLimitText }}
+              </span>
+            </label>
+            <div class="relative">
+              <button
+                type="button"
+                :class="[
+                  'w-full px-4 py-3 pl-10 pr-10 rounded-xl surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
+                  'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
+                  openDropdown === capability && 'ring-2 ring-[var(--brand)]',
+                  ((capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
+                    isCapabilityLocked(capability as Capability)) &&
+                    'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
+                ]"
+                :disabled="
+                  (capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
+                  isCapabilityLocked(capability as Capability)
+                "
+                :title="
+                  isCapabilityLocked(capability as Capability)
+                    ? $t('config.setByAdmin')
+                    : capability === 'VECTORIZE' && isVectorizeAdminOnly
+                      ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
+                      : undefined
+                "
+                data-testid="btn-model-dropdown"
+                @click="toggleDropdown(capability as Capability)"
+              >
+                <span class="flex items-center gap-2 truncate">
+                  <span
+                    class="truncate"
+                    :class="{
+                      'txt-model-placeholder': !getSelectedModelObj(capability as Capability),
+                    }"
+                    >{{ getSelectedModelLabel(capability as Capability) }}</span
                   >
-                    <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </div>
+                  <ModelCostBadge
+                    v-if="getSelectedModelObj(capability as Capability)"
+                    :model="getSelectedModelObj(capability as Capability)!"
+                    :peers="getModelsByPurpose(capability as Capability)"
+                    :capability="capability"
+                  />
+                </span>
+              </button>
+              <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ServiceIcon
+                  :service="getSelectedModelService(capability as Capability)"
+                  :size="16"
+                />
               </div>
-              <div class="min-h-0 overflow-y-auto">
-                <button
-                  type="button"
-                  class="dropdown-item w-full"
-                  data-testid="btn-model-option"
-                  @click="selectModel(capability as Capability, null)"
+              <ChevronDownIcon
+                :class="[
+                  'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none transition-transform',
+                  openDropdown === capability && 'rotate-180',
+                ]"
+              />
+
+              <!-- Custom Dropdown -->
+              <div
+                v-if="openDropdown === capability"
+                class="absolute z-50 mt-2 flex w-full max-h-[60vh] flex-col dropdown-panel"
+              >
+                <div
+                  v-if="showDropdownFilter(capability as Capability)"
+                  class="shrink-0 border-b border-light-border/30 p-2 dark:border-dark-border/20"
+                  data-testid="section-model-choice-filter"
                 >
-                  <span class="txt-model-placeholder">{{ $t('config.aiModels.selectModel') }}</span>
-                </button>
-                <button
-                  v-for="model in visibleModelsFor(capability as Capability)"
-                  :key="model.id"
-                  type="button"
-                  :class="[
-                    'dropdown-item w-full',
-                    defaultConfig[capability as Capability] === model.id && 'dropdown-item--active',
-                  ]"
-                  data-testid="btn-model-option"
-                  @click="selectModel(capability as Capability, model.id)"
-                >
-                  <ServiceIcon :service="model.service" :size="20" />
-                  <div class="flex-1 min-w-0 text-left">
-                    <div class="flex items-center gap-2">
-                      <span class="font-medium truncate">{{ model.name }}</span>
-                      <ModelCostBadge
-                        :model="model"
-                        :peers="getModelsByPurpose(capability as Capability)"
-                        :capability="capability"
-                      />
-                    </div>
-                    <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
+                  <label class="sr-only" :for="`model-choice-filter-${capability}`">
+                    {{ $t('config.aiModels.dropdownFilterLabel') }}
+                  </label>
+                  <div class="relative">
+                    <MagnifyingGlassIcon
+                      class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 txt-secondary"
+                      aria-hidden="true"
+                    />
+                    <input
+                      :id="`model-choice-filter-${capability}`"
+                      v-model="dropdownFilter"
+                      type="text"
+                      autocomplete="off"
+                      spellcheck="false"
+                      enterkeyhint="go"
+                      class="w-full rounded-xl surface-card border border-light-border/30 py-1.5 pl-9 pr-9 text-sm txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] dark:border-dark-border/20"
+                      :placeholder="$t('config.aiModels.dropdownFilterPlaceholder')"
+                      data-testid="input-model-choice-filter"
+                      @keydown.enter="onDropdownFilterEnter($event, capability as Capability)"
+                      @keydown.escape.stop.prevent="onDropdownFilterEscape"
+                    />
+                    <button
+                      v-if="dropdownFilter"
+                      type="button"
+                      class="icon-ghost absolute right-1.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md"
+                      :aria-label="$t('config.aiModels.dropdownClearFilter')"
+                      data-testid="btn-model-choice-filter-clear"
+                      @click="clearDropdownFilter"
+                    >
+                      <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
                   </div>
-                </button>
-                <p
-                  v-if="
-                    dropdownFilter.trim() && visibleModelsFor(capability as Capability).length === 0
-                  "
-                  class="px-3 py-2 text-sm txt-secondary"
-                  data-testid="text-model-choice-filter-empty"
-                >
-                  {{ $t('config.aiModels.dropdownNoMatch', { query: dropdownFilter.trim() }) }}
-                </p>
+                </div>
+                <div class="min-h-0 overflow-y-auto">
+                  <button
+                    type="button"
+                    class="dropdown-item w-full"
+                    data-testid="btn-model-option"
+                    @click="selectModel(capability as Capability, null)"
+                  >
+                    <span class="txt-model-placeholder">{{
+                      $t('config.aiModels.selectModel')
+                    }}</span>
+                  </button>
+                  <button
+                    v-for="model in visibleModelsFor(capability as Capability)"
+                    :key="model.id"
+                    type="button"
+                    :class="[
+                      'dropdown-item w-full',
+                      defaultConfig[capability as Capability] === model.id &&
+                        'dropdown-item--active',
+                    ]"
+                    data-testid="btn-model-option"
+                    @click="selectModel(capability as Capability, model.id)"
+                  >
+                    <ServiceIcon :service="model.service" :size="20" />
+                    <div class="flex-1 min-w-0 text-left">
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium truncate">{{ model.name }}</span>
+                        <ModelCostBadge
+                          :model="model"
+                          :peers="getModelsByPurpose(capability as Capability)"
+                          :capability="capability"
+                        />
+                      </div>
+                      <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
+                    </div>
+                  </button>
+                  <p
+                    v-if="
+                      dropdownFilter.trim() &&
+                      visibleModelsFor(capability as Capability).length === 0
+                    "
+                    class="px-3 py-2 text-sm txt-secondary"
+                    data-testid="text-model-choice-filter-empty"
+                  >
+                    {{ $t('config.aiModels.dropdownNoMatch', { query: dropdownFilter.trim() }) }}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -321,50 +327,39 @@
 
         <div
           v-if="showLiveVoiceChoice"
-          ref="liveCard"
-          class="space-y-2 transition-all duration-300"
-          :class="
-            liveHighlight
-              ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
-              : ''
-          "
+          class="mt-6 border-t border-light-border/30 pt-6 dark:border-dark-border/20"
           data-testid="item-live-voice"
         >
-          <label class="flex items-center gap-2 text-sm font-semibold txt-primary">
-            <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
-            <span class="flex-1 min-w-0">{{ t('settings.voice.title') }}</span>
-          </label>
-          <p class="text-sm txt-secondary">
-            {{ t('settings.voice.intro', { company: voiceCompany(liveSelected?.provider ?? '') }) }}
-          </p>
-          <label class="block text-sm txt-primary">
-            {{ t('settings.voice.model') }}
-            <select
-              v-model.number="liveModelId"
-              class="mt-1 w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="liveLocked || liveSaving"
-              data-testid="select-live-voice-model"
-              @change="onLiveModelChange"
-            >
-              <option v-for="model in liveOptions" :key="model.id ?? model.name" :value="model.id">
-                {{ model.name }} · {{ voiceCompany(model.provider ?? '') }}
-              </option>
-            </select>
-          </label>
-          <label class="block text-sm txt-primary">
-            {{ t('settings.voice.voice') }}
-            <select
-              v-if="liveVoices.length > 0"
-              v-model="liveVoice"
-              class="mt-1 w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="liveSaving"
-              data-testid="select-live-voice-voice"
-              @change="onLiveVoiceChange"
-            >
-              <option v-for="name in liveVoices" :key="name" :value="name">{{ name }}</option>
-            </select>
-            <p v-else class="mt-1 text-sm txt-secondary">{{ t('settings.voice.noVoices') }}</p>
-          </label>
+          <div
+            ref="liveCard"
+            class="transition-all duration-300"
+            :class="
+              liveHighlight
+                ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
+                : ''
+            "
+          >
+            <h4 class="text-base font-semibold txt-primary">{{ t('settings.voice.title') }}</h4>
+            <p class="mt-2 text-sm txt-secondary">
+              {{
+                t('settings.voice.intro', { company: voiceCompany(liveSelected?.provider ?? '') })
+              }}
+            </p>
+            <LiveVoiceDefaults
+              class="mt-5"
+              :models="liveOptions"
+              :model-id="liveModelId"
+              :voice="liveVoice"
+              :locked="liveLocked"
+              :saving="liveSaving"
+              :dismiss="liveMenuDismiss"
+              @update:model-id="liveModelId = $event"
+              @update:voice="liveVoice = $event"
+              @menu="liveMenuOpen = $event"
+              @model-commit="onLiveModelChange"
+              @voice-commit="onLiveVoiceChange"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -762,6 +757,7 @@ import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatible
 import PageHeader from '@/components/PageHeader.vue'
 import AppPanelHost from '@/components/apps/AppPanelHost.vue'
 import PlannerModelCard from '@/components/config/PlannerModelCard.vue'
+import LiveVoiceDefaults from '@/components/config/LiveVoiceDefaults.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
@@ -816,10 +812,11 @@ const liveLocked = ref(false)
 const liveSaving = ref(false)
 const liveHighlight = ref(false)
 const liveCard = ref<HTMLElement | null>(null)
+const liveMenuOpen = ref(false)
+const liveMenuDismiss = ref(0)
 const liveSelected = computed(
   () => liveOptions.value.find((model) => model.id === liveModelId.value) ?? null
 )
-const liveVoices = computed(() => liveSelected.value?.voices ?? [])
 const showLiveVoiceChoice = computed(
   () => configStore.voiceLive.enabled && liveOptions.value.length > 0
 )
@@ -1500,6 +1497,7 @@ const toggleDropdown = (capability: Capability) => {
     return
   }
   openDropdown.value = openDropdown.value === capability ? null : capability
+  if (openDropdown.value) liveMenuDismiss.value += 1
   dropdownFilter.value = ''
   const opened = openDropdown.value
   if (opened && showDropdownFilter(opened)) {

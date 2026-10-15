@@ -54,21 +54,6 @@
       "8": "Sag mir, wo es hakt.",
       "9": "Eine Datei, eine Frage, eine halbe Idee.",
       "10": "Überrasch mich. Oder die lästige Aufgabe."
-    },
-    "opensInNewTab": "Öffnet in einem neuen Tab",
-    "choice": {
-      "title": "Dein Modell und dein Assistent",
-      "blurb": "Du kannst beides in diesem Chat jederzeit wechseln."
-    },
-    "mobile": {
-      "title": "iPhone und Android",
-      "blurb": "Die Synaplan-App auf deinem Handy.",
-      "appStore": "App Store",
-      "playStore": "Google Play"
-    },
-    "source": {
-      "title": "Quellcode",
-      "blurb": "Lies ihn auf GitHub und betreibe Synaplan selbst."
     }
   },
   "chats": {

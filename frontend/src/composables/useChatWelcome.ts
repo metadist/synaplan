@@ -1,10 +1,6 @@
 import { getConfigSync } from '@/services/api/httpClient'
 
-/** Missing configuration keeps today's empty chat. */
-export function showStoreCards(): boolean {
-  return getConfigSync().chatWelcome?.showStoreCards !== false
-}
-
+/** Missing configuration keeps today's widget promotion. */
 export function showWidgetPromo(): boolean {
   return getConfigSync().chatWelcome?.showWidgetPromo !== false
 }

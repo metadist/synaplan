@@ -3,8 +3,9 @@
  *
  * Fails the run when the generated API schemas are stale, then sets system-wide
  * default models (ownerId=0) to TestProvider so E2E tests use deterministic AI
- * without API keys. If the backend is unavailable (e.g. UI mode without
- * services), we skip and do not throw so the UI still opens.
+ * without API keys. Locally the previous defaults are snapshotted first and put
+ * back by global-teardown.ts. If the backend is unavailable (e.g. UI mode
+ * without services), we skip and do not throw so the UI still opens.
  */
 
 import { createHash } from 'node:crypto'
@@ -13,9 +14,8 @@ import { fileURLToPath } from 'node:url'
 import { request as playwrightRequest } from '@playwright/test'
 import { getApiUrl, URLS } from './config/config'
 import { getAuthHeaders } from './helpers/auth'
+import { DEFAULTS_PATH, snapshotInstanceDefaults } from './helpers/model-defaults'
 import { CREDENTIALS } from './config/credentials'
-
-const DEFAULTS_PATH = '/api/v1/config/models/defaults'
 
 const TEST_PROVIDER_DEFAULTS: Record<string, number> = {
   CHAT: -1,
@@ -71,6 +71,13 @@ export default async function globalSetup(): Promise<void> {
   const ctx = await playwrightRequest.newContext({ baseURL: URLS.BASE_URL })
   try {
     const authHeaders = await getAuthHeaders(ctx, CREDENTIALS.getAdminCredentials())
+    await snapshotInstanceDefaults(ctx, authHeaders, Object.keys(TEST_PROVIDER_DEFAULTS)).catch(
+      (err: unknown) =>
+        console.warn(
+          '[globalSetup] Instance defaults were not snapshotted and will not be restored:',
+          err instanceof Error ? err.message : String(err)
+        )
+    )
     const res = await ctx.post(`${getApiUrl()}${DEFAULTS_PATH}`, {
       headers: authHeaders,
       data: { defaults: TEST_PROVIDER_DEFAULTS, global: true },

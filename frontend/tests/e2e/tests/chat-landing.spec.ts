@@ -1,6 +1,7 @@
 /**
- * Empty chat landing: companion cards plus the self-aware question.
- * Stops after the user bubble appears — no provider wait.
+ * Empty chat landing: the self-aware question for a new account.
+ * The worker user is created at the start of the run, so it is inside
+ * the first week. Stops after the user bubble appears — no provider wait.
  */
 import { test, expect } from '../test-setup'
 import { openApp } from '../helpers/auth'
@@ -11,26 +12,14 @@ import { TIMEOUTS } from '../config/config'
 const CHAT = selectors.chat
 
 test.describe('@ci Chat empty landing', () => {
-  test('shows companion apps and submits the self-aware question', async ({ page }) => {
+  test('hides the welcome cards and submits the self-aware question', async ({ page }) => {
     const chat = new ChatHelper(page)
 
     await openApp(page)
     await chat.startNewChat()
 
-    await expect(page.locator(CHAT.companionLinks)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expect(page.locator(CHAT.companionChoice)).toBeVisible()
-    await expect(page.locator(CHAT.companionAppStore)).toHaveAttribute(
-      'href',
-      'https://apps.apple.com/app/id6784278288?ct=app-welcome'
-    )
-    await expect(page.locator(CHAT.companionPlayStore)).toHaveAttribute(
-      'href',
-      'https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dapp-welcome'
-    )
-    await expect(page.locator(CHAT.companionSource)).toHaveAttribute(
-      'href',
-      'https://github.com/metadist/synaplan'
-    )
+    await expect(page.locator(CHAT.companionLinks)).toHaveCount(0)
+    await expect(page.locator(CHAT.stateEmpty)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 
     const ask = page.locator(CHAT.selfAwareEmptyHintBtn)
     await expect(ask).toBeVisible({ timeout: TIMEOUTS.STANDARD })

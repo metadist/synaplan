@@ -23,7 +23,11 @@ import {
   liveTerminalMessageKey,
 } from '@/services/liveVoice/terminal'
 import { liveVoiceSocketUrl } from '@/services/liveVoice/socket-url'
-import { liveVoiceButtonVisible, hasNativeLiveVoice } from '@/services/liveVoice/visibility'
+import {
+  liveVoiceButtonVisible,
+  liveVoiceReplacesSend,
+  hasNativeLiveVoice,
+} from '@/services/liveVoice/visibility'
 
 describe('live voice button', () => {
   it('shows the button only when the module is on for a signed-in web user', () => {
@@ -65,6 +69,15 @@ describe('live voice button', () => {
 
   it('keeps the button when the monthly budget is already used up', () => {
     expect(liveVoiceButtonVisible({ enabled: true, guest: false, nativeApp: false })).toBe(true)
+  })
+
+  it('takes the send button only while the composer is empty', () => {
+    const empty = { available: true, streaming: false, hasText: false, hasAttachment: false }
+    expect(liveVoiceReplacesSend(empty)).toBe(true)
+    expect(liveVoiceReplacesSend({ ...empty, hasText: true })).toBe(false)
+    expect(liveVoiceReplacesSend({ ...empty, hasAttachment: true })).toBe(false)
+    expect(liveVoiceReplacesSend({ ...empty, streaming: true })).toBe(false)
+    expect(liveVoiceReplacesSend({ ...empty, available: false })).toBe(false)
   })
 })
 
