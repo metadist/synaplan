@@ -54,21 +54,6 @@
       "8": "Nerede tıkandığını söyle.",
       "9": "Bir dosya, bir soru, yarım bir fikir.",
       "10": "Şaşırt beni. Ya da sıkıcı işi ver."
-    },
-    "opensInNewTab": "Yeni sekmede açılır",
-    "choice": {
-      "title": "Modelin ve asistanın",
-      "blurb": "İkisini de bu sohbette istediğin zaman değiştirebilirsin."
-    },
-    "mobile": {
-      "title": "iPhone ve Android",
-      "blurb": "Synaplan uygulaması telefonunda.",
-      "appStore": "App Store",
-      "playStore": "Google Play"
-    },
-    "source": {
-      "title": "Kaynak kodu",
-      "blurb": "GitHub’da oku ve Synaplan’ı kendin çalıştır."
     }
   },
   "chats": {

@@ -54,21 +54,6 @@
       "8": "Tell me where you're stuck.",
       "9": "A file, a question, a half idea.",
       "10": "Surprise me, or the boring task."
-    },
-    "opensInNewTab": "Opens in a new tab",
-    "choice": {
-      "title": "Your model and assistant",
-      "blurb": "You can switch either one in this chat."
-    },
-    "mobile": {
-      "title": "iPhone and Android",
-      "blurb": "The Synaplan app on your phone.",
-      "appStore": "App Store",
-      "playStore": "Google Play"
-    },
-    "source": {
-      "title": "Source code",
-      "blurb": "Read it on GitHub and run Synaplan yourself."
     }
   },
   "chats": {

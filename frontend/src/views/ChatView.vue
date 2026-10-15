@@ -199,7 +199,6 @@
               :prompts="pinnedStarterPrompts"
               @pick="handleExamplePick"
             />
-            <CompanionLinks v-else-if="showCompanionLinks" />
             <GettingStartedChecklist
               v-if="authStore.isAuthenticated && !incognitoStore.active && !pinnedAgentId"
             />
@@ -628,7 +627,6 @@ import ChatInput from '@/components/ChatInput.vue'
 import ChatAccessErrorBanner from '@/components/ChatAccessErrorBanner.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
-import CompanionLinks from '@/components/CompanionLinks.vue'
 import AssistantStarterPrompts from '@/components/assistants/AssistantStarterPrompts.vue'
 import SelfAwareEmptyHint from '@/components/chat/SelfAwareEmptyHint.vue'
 import LiveVoiceStage from '@/components/chat/LiveVoiceStage.vue'
@@ -725,10 +723,9 @@ import { isChannelSource } from '@/utils/channelSource'
 import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
-import { shouldShowCompanionLinks, shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
+import { shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
 import { pickEmptyGreetingKey } from '@/utils/emptyGreeting'
 import { claimOwnedChatForSend } from '@/utils/claimOwnedChatForSend'
-import { showStoreCards } from '@/composables/useChatWelcome'
 import GettingStartedChecklist from '@/components/chat/GettingStartedChecklist.vue'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { startBargeInMonitor } from '@/services/voice/bargeIn'
@@ -1252,19 +1249,19 @@ const needsProviderSetup = computed(
   () => authStore.isAuthenticated && configStore.setup.chatReady === false
 )
 
-// Empty start page: companion cards on the unpinned landing; the self-aware
-// CTA also covers a pinned assistant that has no starters of its own, and
-// only when the composer can actually submit the question.
+// Empty start page: the self-aware question is the one suggested action in
+// the first week after the account was created. A pinned assistant with its
+// own starters replaces it. It only shows when the composer can submit.
 const emptyLandingActions = computed(() => ({
   incognito: incognitoStore.active,
   hasPinnedAssistant: Boolean(pinnedAgentId.value),
   starterPromptCount: pinnedStarterPrompts.value.length,
   canCompose: canComposeSharedChat.value,
   needsProviderSetup: needsProviderSetup.value,
+  hasAccount: authStore.isAuthenticated,
+  accountCreatedAt: authStore.user?.created ?? null,
+  nowMs: Date.now(),
 }))
-const showCompanionLinks = computed(() =>
-  shouldShowCompanionLinks(emptyLandingActions.value, showStoreCards())
-)
 const showSelfAwareEmptyHint = computed(() =>
   shouldShowSelfAwareEmptyHint(emptyLandingActions.value)
 )
