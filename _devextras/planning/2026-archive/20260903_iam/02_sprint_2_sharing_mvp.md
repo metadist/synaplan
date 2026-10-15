@@ -14,7 +14,7 @@ off; RAG queries stay byte-identical; no Share action, chip or badge is rendered
 capability. The professional user-flow (one-row Share, Incoming
 chats, five-question banner) landed afterwards (#1717) and is
 completed by **IAM-UX** in
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §7.
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §7.
 Do not treat the S2 dialog ASCII as the template for later kinds.
 
 ---

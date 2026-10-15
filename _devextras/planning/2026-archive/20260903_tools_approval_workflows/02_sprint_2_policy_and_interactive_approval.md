@@ -13,7 +13,7 @@ without them. Master plan §0 rows 3, 4; §4.2; §12 rows 2, 3, 4, 5.
 **Repos:** `synaplan/` only.
 **Flag:** `TOOLS.APPROVALS_ENABLED` (default off). Off ⇒ `decide()` is not consulted and every loop
 behaves as after S1. On ⇒ policy enforced, `/api/v1/approvals` routes live, inbox visible.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-TL-1, J-TL-2. Wireframe:
 [`../20260907_ux_user_flows/approval-and-inbox.md`](../20260907_ux_user_flows/approval-and-inbox.md).
 `TL14` / `TL16` are not done until the card *and* the closed-tab

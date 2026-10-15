@@ -14,7 +14,7 @@ Relative links below were rewritten for this archive folder.
 text is frozen at
 [`2026-archive/20260903_roadmap/20260903_roadmap.md`](../20260903_roadmap/20260903_roadmap.md).
 Track directories, sprint files,
-[`20260907_ux_user_flows.md`](../../20260907_ux_user_flows.md) and
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) and
 [`20260913-use-case-research/`](../../20260913-use-case-research/README.md) stay
 where they are.
 **Owner:** product owner. **§1 rows 1–3 are closed.** Next coding work is
@@ -342,7 +342,7 @@ adapters, sidecars, default-off, regression as a deliverable, growth
 plans, explainable UX, security posture, mobile classification).
 
 The UX contract
-([`20260907_ux_user_flows.md`](../../20260907_ux_user_flows.md), U1–U12) still
+([`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md), U1–U12) still
 binds every `ota-candidate` step. The ten-job list
 ([`20260913-use-case-research/`](../../20260913-use-case-research/README.md))
 applies those rules; a listed screen is not a user-flow.
@@ -389,7 +389,7 @@ This file is the wave overview. It does not replace track STATUS.
 | Document | Use |
 | -------- | --- |
 | [`2026-archive/20260903_roadmap/20260903_roadmap.md`](../20260903_roadmap/20260903_roadmap.md) | Frozen original (tracks, inventory, 2026-09-03 decisions) |
-| [`20260907_ux_user_flows.md`](../../20260907_ux_user_flows.md) | Binding UX |
+| [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) | Binding UX |
 | [`20260913-use-case-research/`](../../20260913-use-case-research/README.md) | Ten jobs + Perfect-UX bar; feeds Wave 5 ticks |
 | [`2026-archive/20260910-wave5-architecture-research/`](../20260910-wave5-architecture-research/README.md) | Compute vs Desktop; conditional modules; partner review (`03_…`) |
 | [`2026-archive/20260910-feature-modules/`](../20260910-feature-modules/00_master_plan.md) | Intermezzo plan of record (S1–S4 done) |

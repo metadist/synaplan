@@ -7,7 +7,7 @@
 **Unlocks:** S3 (publish button and version list plug into this form), S4/S5 (further form sections), S6 (Export & import lives beside this UI).
 **Repos:** `synaplan/` only. **Class:** `ota-candidate` (Vue, i18n, generated schemas) + `backend-only` for `AB9`, `AB10`, `AB14a`.
 **Flag:** `AGENTS.ENABLED` off ⇒ nav shows `Instructions` as today, `/ai/assistants` is not registered, no redirect is installed. The label rename in `AB17` is **not** flag-gated (decision 2 is a plain copy fix).
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-AB-1. Wireframe:
 [`../20260907_ux_user_flows/assistant-publish.md`](../20260907_ux_user_flows/assistant-publish.md)
 (gallery + test panel). First Vue deliverable is the empty-state

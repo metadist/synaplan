@@ -29,7 +29,7 @@ is metered and its cost lands in the user's **one** monthly usage budget,
 next to chat, images, video and everything else — no separate voice quota,
 no separate bill. A budget that runs out mid-sentence ends the conversation
 politely instead of cutting it off.
-**Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**Binding UX:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)
 (U1–U12) and the Perfect-UX bar in `AGENTS.md`.
 **Class:** LV1, LV2, LV5, LV9 `backend-only` (plus a new sidecar,
 `no-app-impact`); LV3, LV4, LV6 `ota-candidate`; LV7, LV8

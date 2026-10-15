@@ -1,7 +1,7 @@
 # Journeys, wireframes and copy
 
 Plan of record: [`00_master_plan.md`](./00_master_plan.md). Binding:
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) — U1 (journey
+[`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) — U1 (journey
 before Vue), U10 (walk before merge), §6 (sprint-file contract).
 
 Each journey is an acceptance demo, walked in a browser against the local

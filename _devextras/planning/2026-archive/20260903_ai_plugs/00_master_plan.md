@@ -20,7 +20,7 @@ renamed and extended). No new nav item.
   — manifest v2; plugins contribute plug adapters
 - [`../20260902-platform-self-awareness/05_eval_question_set.md`](../20260902-platform-self-awareness/05_eval_question_set.md)
   — the eval discipline reused for the rerank go/no-go
-- [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) — binding
+- [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) — binding
   user-flow contract for the admin page (J-PL-1…3). Operators are
   users too: health, Test, and a human result — not a form of keys.
 
@@ -202,7 +202,7 @@ Infraestructura de IA / Infrastructure IA / AI altyapısı.
 This is Operate, not everyday work — still a user-flow. An admin who
 cannot tell whether Docling is actually reading files will not enable
 it. Journeys J-PL-1…3:
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §5.3.
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §5.3.
 Each tab leads with **what this does** in one sentence, a health pill,
 and **Test** that shows a human result ("Docling read this PDF — table
 kept", "12 models will be added"). Missing sidecar = "unavailable —

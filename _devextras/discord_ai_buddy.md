@@ -7,7 +7,7 @@
 | **Parts** | A — Synaplan Network (federation + replicated directory) · B — Network knowledge in chat · C — Discordyai plugin |
 | **Order** | A → B → C. Discordyai is one way into the network, not the core. |
 | **First scope** | Parked. Build [`planning/20260929-synaplan-federation/`](./planning/20260929-synaplan-federation/01_review.md) first (pairwise knowledge link). |
-| **Contract** | UX rules U1–U12 in [`planning/20260907_ux_user_flows.md`](./planning/20260907_ux_user_flows.md); every `ota-candidate` sprint below carries the five exit bullets from its §6. |
+| **Contract** | UX rules U1–U12 in [`docs/UX_CONTRACT.md`](../docs/UX_CONTRACT.md); every `ota-candidate` sprint below carries the five exit bullets from its §6. |
 
 ---
 

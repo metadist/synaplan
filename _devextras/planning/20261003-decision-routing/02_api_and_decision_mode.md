@@ -1,7 +1,7 @@
 # Decision models as a product — API + decision mode in chat
 
 Part of [`00_master_plan.md`](00_master_plan.md) (steps P1–P6).
-Binding UX: [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md).
+Binding UX: [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md).
 
 ---
 

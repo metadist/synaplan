@@ -11,7 +11,7 @@ become a portable bundle section.
 **Unlocks:** hosters with vLLM / LiteLLM / TGI endpoints stop typing models by hand (hosting-partner CORE-1 P3 closes).
 **Repos:** `synaplan/` only.
 **Flag:** none — import is an admin action; the probe is an opt-in checkbox per preview (decision §12.8).
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-PL-3. Preview table: name, editable tags, already-there badge.
 Apply adds only new rows. Re-import: "Nothing new." Probe checkbox
 off by default, labelled "Check what each model can do (uses a

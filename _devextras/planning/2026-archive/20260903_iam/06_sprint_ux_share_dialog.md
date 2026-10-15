@@ -14,7 +14,7 @@ share reuse `ShareDialog.vue`.
 templates.
 **Repos:** `synaplan/` only. **Class:** `ota-candidate`.
 **Flag:** none new — `IAM.SHARING_ENABLED` as today.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-IAM-4 and §7. Wireframe:
 [`../20260907_ux_user_flows/share-dialog-v2.md`](../20260907_ux_user_flows/share-dialog-v2.md).
 
@@ -36,7 +36,7 @@ miss at a larger scale.
 | `frontend/src/components/iam/ShareDialog.vue`, `SubjectPicker.vue`, `PermissionSelect.vue` | The stacked form to replace, not fork |
 | `frontend/src/views/IncomingChatsView.vue` | Findability pattern and copy to name in the consequence sentence |
 | `frontend/src/i18n/en.json` `iam.dialog.*`, `iam.permission.*` | Keys to extend with kind-specific consequence lines |
-| [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §4.1 table | Binding copy per kind |
+| [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §4.1 table | Binding copy per kind |
 
 ---
 
