@@ -1,0 +1,1567 @@
+{
+    "again_model": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "The user sent you a voice message. The transcript of what they actually said is provided below.\n\nRespond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\nIMPORTANT — do NOT:\n- describe, summarize, or analyze the audio file itself\n- mention the file format (OGG, MP3, WAV, etc.) or that it is a recording\n- say things like \"the audio file contains\", \"the recording says\", \"the user said in the audio\"\n- quote the transcript back at the user unless they explicitly asked you to\n\nTreat the transcript as if the user had typed it.\n\n=== VOICE MESSAGE TRANSCRIPT ===\nHello there, what time is the meeting tomorrow?\n=== END TRANSCRIPT ===",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Hi",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-55",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "voice_message_reply",
+                    "analyzed_file": "note.ogg",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 55,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Replying to voice message...",
+                "complete: Reply complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "The user sent you a voice message. The transcript of what they actually said is provided below.\n\nRespond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\nIMPORTANT — do NOT:\n- describe, summarize, or analyze the audio file itself\n- mention the file format (OGG, MP3, WAV, etc.) or that it is a recording\n- say things like \"the audio file contains\", \"the recording says\", \"the user said in the audio\"\n- quote the transcript back at the user unless they explicitly asked you to\n\nTreat the transcript as if the user had typed it.\n\n=== VOICE MESSAGE TRANSCRIPT ===\nHello there, what time is the meeting tomorrow?\n=== END TRANSCRIPT ===",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Hi",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-55",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "voice_message_reply",
+                    "analyzed_file": "note.ogg",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 55,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Replying to voice message...",
+                "complete: Reply complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "audio_failed": {
+        "buffered": {
+            "ai_calls": [],
+            "result": {
+                "content": "This recording could not be transcribed. Speech-to-text is not set up on this server, or the audio could not be understood. Connect a speech-to-text service under Settings, or try a different file.",
+                "metadata": {
+                    "error": "audio_transcription_failed"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [],
+            "result": {
+                "metadata": {
+                    "error": "audio_transcription_failed"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": [
+                "This recording could not be transcribed. Speech-to-text is not set up on this server, or the audio could not be understood. Connect a speech-to-text service under Settings, or try a different file."
+            ]
+        }
+    },
+    "audio_pending": {
+        "buffered": {
+            "ai_calls": [],
+            "result": {
+                "content": "The recording is still being prepared. Please wait a moment and send your question again.",
+                "metadata": {
+                    "error": "audio_transcription_in_progress"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [],
+            "result": {
+                "metadata": {
+                    "error": "audio_transcription_in_progress"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": [
+                "The recording is still being prepared. Please wait a moment and send your question again."
+            ]
+        }
+    },
+    "document_failed": {
+        "buffered": {
+            "ai_calls": [],
+            "result": {
+                "content": "I couldn't read any text from this document. It may be empty, scanned without OCR, password-protected, or in an unsupported format. Try a different file or paste the text directly.",
+                "metadata": {
+                    "error": "document_extraction_failed",
+                    "file_status": "processed"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [],
+            "result": {
+                "metadata": {
+                    "error": "document_extraction_failed",
+                    "file_status": "processed"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": [
+                "I couldn't read any text from this document. It may be empty, scanned without OCR, password-protected, or in an unsupported format. Try a different file or paste the text directly."
+            ]
+        }
+    },
+    "document_pending": {
+        "buffered": {
+            "ai_calls": [],
+            "result": {
+                "content": "The document is still being prepared. Please wait a moment and send your question again — extraction is usually fast, but very large documents can take a few extra seconds.",
+                "metadata": {
+                    "error": "document_extraction_in_progress",
+                    "file_status": "extracting"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [],
+            "result": {
+                "metadata": {
+                    "error": "document_extraction_in_progress",
+                    "file_status": "extracting"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": [
+                "The document is still being prepared. Please wait a moment and send your question again — extraction is usually fast, but very large documents can take a few extra seconds."
+            ]
+        }
+    },
+    "document_plus_voice": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing 2 documents. The user has uploaded multiple files and wants to know about their contents. Treat the documents as a related set — cross-reference them when the user's question spans more than one file, and clearly attribute any quotes or facts to the originating filename.\n\n=== FILE 1 OF 2 INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== FILE 1 EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF FILE 1 CONTENT ===\n\n=== FILE 2 OF 2 INFORMATION ===\nFilename: note.ogg (voice transcript)\nType: ogg transcript\n\n=== FILE 2 EXTRACTED CONTENT ===\nVoice message transcript:\nHello there, what time is the meeting tomorrow?\n=== END OF FILE 2 CONTENT ===\n\nAnswer the user's question using information from any of the files above. When summarizing, list the key points per file so the user can tell which document each statement came from.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "What do both say?",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf, note.ogg (voice transcript)",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document contents...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing 2 documents. The user has uploaded multiple files and wants to know about their contents. Treat the documents as a related set — cross-reference them when the user's question spans more than one file, and clearly attribute any quotes or facts to the originating filename.\n\n=== FILE 1 OF 2 INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== FILE 1 EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF FILE 1 CONTENT ===\n\n=== FILE 2 OF 2 INFORMATION ===\nFilename: note.ogg (voice transcript)\nType: ogg transcript\n\n=== FILE 2 EXTRACTED CONTENT ===\nVoice message transcript:\nHello there, what time is the meeting tomorrow?\n=== END OF FILE 2 CONTENT ===\n\nAnswer the user's question using information from any of the files above. When summarizing, list the key points per file so the user can tell which document each statement came from.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "What do both say?",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf, note.ogg (voice transcript)",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document contents...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "document_without_prompt": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: memo.docx\nType: docx\n\n=== EXTRACTED CONTENT ===\nOffice closes at 5.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "What is in this document? Please summarize the content.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "memo.docx",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: memo.docx\nType: docx\n\n=== EXTRACTED CONTENT ===\nOffice closes at 5.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "What is in this document? Please summarize the content.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "memo.docx",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "follow_up_from_thread": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Check the whole contract.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "analyzing: Using report.pdf from earlier in this chat...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Check the whole contract.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "analyzing: Using report.pdf from earlier in this chat...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "german_conversation": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like German; prefer German unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Fasse zusammen.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like German; prefer German unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Fasse zusammen.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "image_text_in_bundle": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing 2 documents. The user has uploaded multiple files and wants to know about their contents. Treat the documents as a related set — cross-reference them when the user's question spans more than one file, and clearly attribute any quotes or facts to the originating filename.\n\n=== FILE 1 OF 2 INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== FILE 1 EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF FILE 1 CONTENT ===\n\n=== FILE 2 OF 2 INFORMATION ===\nFilename: photo.png (image text)\nType: png image\n\n=== FILE 2 EXTRACTED CONTENT ===\nText extracted from image:\nInvoice 42, total 99 EUR\n=== END OF FILE 2 CONTENT ===\n\nAnswer the user's question using information from any of the files above. When summarizing, list the key points per file so the user can tell which document each statement came from.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Match the invoice.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf, photo.png (image text)",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document contents...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing 2 documents. The user has uploaded multiple files and wants to know about their contents. Treat the documents as a related set — cross-reference them when the user's question spans more than one file, and clearly attribute any quotes or facts to the originating filename.\n\n=== FILE 1 OF 2 INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== FILE 1 EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF FILE 1 CONTENT ===\n\n=== FILE 2 OF 2 INFORMATION ===\nFilename: photo.png (image text)\nType: png image\n\n=== FILE 2 EXTRACTED CONTENT ===\nText extracted from image:\nInvoice 42, total 99 EUR\n=== END OF FILE 2 CONTENT ===\n\nAnswer the user's question using information from any of the files above. When summarizing, list the key points per file so the user can tell which document each statement came from.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Match the invoice.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf, photo.png (image text)",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document contents...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "images_and_voice": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "method": "analyzeImage",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-13",
+                        "provider": "openai"
+                    },
+                    "path": "13/000/photo.png",
+                    "prompt": "Please describe this image in detail.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user."
+                }
+            ],
+            "result": {
+                "content": "A picture of photo.png.",
+                "metadata": {
+                    "analysis_type": "vision",
+                    "analyzed_file": "photo.png",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4o",
+                    "model_id": 13,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "analyzing: Analyzing image...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "method": "analyzeImage",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-13",
+                        "provider": "openai"
+                    },
+                    "path": "13/000/photo.png",
+                    "prompt": "Please describe this image in detail.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user."
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "vision",
+                    "analyzed_file": "photo.png",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4o",
+                    "model_id": 13,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "analyzing: Analyzing image...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "A picture of photo.png."
+            ]
+        }
+    },
+    "images_one_missing": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "method": "analyzeImage",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-13",
+                        "provider": "openai"
+                    },
+                    "path": "13/000/photo.png",
+                    "prompt": "Please describe this image in detail. The user uploaded several images in the same message — describe each one independently.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user."
+                }
+            ],
+            "result": {
+                "content": "### Image 1: photo.png\n\nA picture of photo.png.\n\n---\n\n### Image 2: gone.jpg\n\nreason.unknown\n\nhint.retry_other_model",
+                "metadata": {
+                    "analysis_type": "vision",
+                    "analyzed_file": "photo.png, gone.jpg",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4o",
+                    "model_id": 13,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "analyzing: Analyzing image 1 of 2...",
+                "analyzing: Analyzing image 2 of 2...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "method": "analyzeImage",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-13",
+                        "provider": "openai"
+                    },
+                    "path": "13/000/photo.png",
+                    "prompt": "Please describe this image in detail. The user uploaded several images in the same message — describe each one independently.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user."
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "vision",
+                    "analyzed_file": "photo.png, gone.jpg",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4o",
+                    "model_id": 13,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "analyzing: Analyzing image 1 of 2...",
+                "analyzing: Analyzing image 2 of 2...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "### Image 1: photo.png\n\nA picture of photo.png.\n\n---\n\n### Image 2: gone.jpg\n\nreason.unknown\n\nhint.retry_other_model"
+            ]
+        }
+    },
+    "no_file": {
+        "buffered": {
+            "ai_calls": [],
+            "result": {
+                "content": "No file was provided for analysis. Please upload a file and try again.",
+                "metadata": {
+                    "error": "no_file"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [],
+            "result": {
+                "metadata": {
+                    "error": "no_file"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": [
+                "No file was provided for analysis. Please upload a file and try again."
+            ]
+        }
+    },
+    "one_document": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Summarize.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Summarize.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "provider_error": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Summarize.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "exception": "RuntimeException",
+                "message": "Provider unavailable"
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content..."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Summarize.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "exception": "RuntimeException",
+                "message": "Provider unavailable"
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content..."
+            ],
+            "stream_chunks": []
+        }
+    },
+    "single_image": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "method": "analyzeImage",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-13",
+                        "provider": "openai"
+                    },
+                    "path": "13/000/photo.png",
+                    "prompt": "What is on it?\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user."
+                }
+            ],
+            "result": {
+                "content": "A picture of photo.png.",
+                "metadata": {
+                    "analysis_type": "vision",
+                    "analyzed_file": "photo.png",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4o",
+                    "model_id": 13,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "analyzing: Analyzing image...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "method": "analyzeImage",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-13",
+                        "provider": "openai"
+                    },
+                    "path": "13/000/photo.png",
+                    "prompt": "What is on it?\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user."
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "vision",
+                    "analyzed_file": "photo.png",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4o",
+                    "model_id": 13,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "analyzing: Analyzing image...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "A picture of photo.png."
+            ]
+        }
+    },
+    "task_prompt_model": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Summarize.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-99",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 99,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: report.pdf\nType: pdf\n\n=== EXTRACTED CONTENT ===\nQuarterly revenue rose by 12 percent.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Summarize.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-99",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "report.pdf",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 99,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "two_documents": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing 2 documents. The user has uploaded multiple files and wants to know about their contents. Treat the documents as a related set — cross-reference them when the user's question spans more than one file, and clearly attribute any quotes or facts to the originating filename.\n\n=== FILE 1 OF 2 INFORMATION ===\nFilename: rules.md\nType: md\n\n=== FILE 1 EXTRACTED CONTENT ===\nRule 1: ship small PRs.\n=== END OF FILE 1 CONTENT ===\n\n=== FILE 2 OF 2 INFORMATION ===\nFilename: plan.md\nType: md\n\n=== FILE 2 EXTRACTED CONTENT ===\nStep A: write tests.\n=== END OF FILE 2 CONTENT ===\n\nAnswer the user's question using information from any of the files above. When summarizing, list the key points per file so the user can tell which document each statement came from.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Compare them.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "rules.md, plan.md",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document contents...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing 2 documents. The user has uploaded multiple files and wants to know about their contents. Treat the documents as a related set — cross-reference them when the user's question spans more than one file, and clearly attribute any quotes or facts to the originating filename.\n\n=== FILE 1 OF 2 INFORMATION ===\nFilename: rules.md\nType: md\n\n=== FILE 1 EXTRACTED CONTENT ===\nRule 1: ship small PRs.\n=== END OF FILE 1 CONTENT ===\n\n=== FILE 2 OF 2 INFORMATION ===\nFilename: plan.md\nType: md\n\n=== FILE 2 EXTRACTED CONTENT ===\nStep A: write tests.\n=== END OF FILE 2 CONTENT ===\n\nAnswer the user's question using information from any of the files above. When summarizing, list the key points per file so the user can tell which document each statement came from.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Compare them.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "rules.md, plan.md",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document contents...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "two_voice_messages": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "The user sent you 2 voice messages. The transcripts of what they actually said are provided below in order.\n\nRespond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\nIMPORTANT — do NOT:\n- describe, summarize, or analyze the audio file itself\n- mention the file format (OGG, MP3, WAV, etc.) or that it is a recording\n- say things like \"the audio file contains\", \"the recording says\", \"the user said in the audio\"\n- quote the transcript back at the user unless they explicitly asked you to\n\nTreat the transcript as if the user had typed it.\n\n=== VOICE MESSAGE TRANSCRIPT ===\n--- Voice message 1 (note.ogg) ---\nHello there, what time is the meeting tomorrow?\n\n--- Voice message 2 (second.ogg) ---\nAnd please bring the slides.\n=== END TRANSCRIPT ===\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "--- Voice message 1 (note.ogg) ---\nHello there, what time is the meeting tomorrow?\n\n--- Voice message 2 (second.ogg) ---\nAnd please bring the slides.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-12",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "voice_message_reply",
+                    "analyzed_file": "note.ogg, second.ogg",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4",
+                    "model_id": 12,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Replying to voice message...",
+                "complete: Reply complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "The user sent you 2 voice messages. The transcripts of what they actually said are provided below in order.\n\nRespond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\nIMPORTANT — do NOT:\n- describe, summarize, or analyze the audio file itself\n- mention the file format (OGG, MP3, WAV, etc.) or that it is a recording\n- say things like \"the audio file contains\", \"the recording says\", \"the user said in the audio\"\n- quote the transcript back at the user unless they explicitly asked you to\n\nTreat the transcript as if the user had typed it.\n\n=== VOICE MESSAGE TRANSCRIPT ===\n--- Voice message 1 (note.ogg) ---\nHello there, what time is the meeting tomorrow?\n\n--- Voice message 2 (second.ogg) ---\nAnd please bring the slides.\n=== END TRANSCRIPT ===\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "--- Voice message 1 (note.ogg) ---\nHello there, what time is the meeting tomorrow?\n\n--- Voice message 2 (second.ogg) ---\nAnd please bring the slides.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-12",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "voice_message_reply",
+                    "analyzed_file": "note.ogg, second.ogg",
+                    "analyzed_file_count": 2,
+                    "model": "gpt-4",
+                    "model_id": 12,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Replying to voice message...",
+                "complete: Reply complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "unsupported_only": {
+        "buffered": {
+            "ai_calls": [],
+            "result": {
+                "content": "This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), audio files (such as MP3, OGG, WAV), and videos (such as MP4, MOV).",
+                "metadata": {
+                    "error": "unsupported_file_type"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [],
+            "result": {
+                "metadata": {
+                    "error": "unsupported_file_type"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": [
+                "This file type cannot be analyzed. Supported types include documents (such as PDF, Word, Excel), images (such as JPG, PNG, GIF), audio files (such as MP3, OGG, WAV), and videos (such as MP4, MOV)."
+            ]
+        }
+    },
+    "video_failed": {
+        "buffered": {
+            "ai_calls": [],
+            "result": {
+                "content": "I couldn't get any speech from this video. It may have no spoken audio, be silent, or be in a format I can't transcribe. Try a different file or describe what you need.",
+                "metadata": {
+                    "error": "video_transcription_failed"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [],
+            "result": {
+                "metadata": {
+                    "error": "video_transcription_failed"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": [
+                "I couldn't get any speech from this video. It may have no spoken audio, be silent, or be in a format I can't transcribe. Try a different file or describe what you need."
+            ]
+        }
+    },
+    "video_pending": {
+        "buffered": {
+            "ai_calls": [],
+            "result": {
+                "content": "The video is still being processed — its audio is being transcribed. Please wait a moment and send your question again. Longer videos can take a little while.",
+                "metadata": {
+                    "error": "video_transcription_in_progress"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [],
+            "result": {
+                "metadata": {
+                    "error": "video_transcription_in_progress"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file..."
+            ],
+            "stream_chunks": [
+                "The video is still being processed — its audio is being transcribed. Please wait a moment and send your question again. Longer videos can take a little while."
+            ]
+        }
+    },
+    "video_with_transcript": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: clip.mp4 (video transcript)\nType: mp4 transcript\n\n=== EXTRACTED CONTENT ===\nVideo transcript:\nThe speaker welcomes everyone to the launch.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "What happens in the video?",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "clip.mp4 (video transcript)",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "You are analyzing a document. The user has uploaded a file and wants to know about its contents.\n\n=== FILE INFORMATION ===\nFilename: clip.mp4 (video transcript)\nType: mp4 transcript\n\n=== EXTRACTED CONTENT ===\nVideo transcript:\nThe speaker welcomes everyone to the launch.\n=== END OF CONTENT ===\n\nAnswer the user's question about this document. If they ask what's in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "What happens in the video?",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-11",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "chat_with_extracted_text",
+                    "analyzed_file": "clip.mp4 (video transcript)",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 11,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Analyzing document content...",
+                "complete: Analysis complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "voice_message": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "The user sent you a voice message. The transcript of what they actually said is provided below.\n\nRespond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\nIMPORTANT — do NOT:\n- describe, summarize, or analyze the audio file itself\n- mention the file format (OGG, MP3, WAV, etc.) or that it is a recording\n- say things like \"the audio file contains\", \"the recording says\", \"the user said in the audio\"\n- quote the transcript back at the user unless they explicitly asked you to\n\nTreat the transcript as if the user had typed it.\n\n=== VOICE MESSAGE TRANSCRIPT ===\nHello there, what time is the meeting tomorrow?\n=== END TRANSCRIPT ===\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Hello there, what time is the meeting tomorrow?",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-12",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "voice_message_reply",
+                    "analyzed_file": "note.ogg",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 12,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Replying to voice message...",
+                "complete: Reply complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "The user sent you a voice message. The transcript of what they actually said is provided below.\n\nRespond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\nIMPORTANT — do NOT:\n- describe, summarize, or analyze the audio file itself\n- mention the file format (OGG, MP3, WAV, etc.) or that it is a recording\n- say things like \"the audio file contains\", \"the recording says\", \"the user said in the audio\"\n- quote the transcript back at the user unless they explicitly asked you to\n\nTreat the transcript as if the user had typed it.\n\n=== VOICE MESSAGE TRANSCRIPT ===\nHello there, what time is the meeting tomorrow?\n=== END TRANSCRIPT ===\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Hello there, what time is the meeting tomorrow?",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-12",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "voice_message_reply",
+                    "analyzed_file": "note.ogg",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 12,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Replying to voice message...",
+                "complete: Reply complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    },
+    "voice_with_instruction": {
+        "buffered": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "The user sent you a voice message. The transcript of what they actually said is provided below.\n\nRespond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\nIMPORTANT — do NOT:\n- describe, summarize, or analyze the audio file itself\n- mention the file format (OGG, MP3, WAV, etc.) or that it is a recording\n- say things like \"the audio file contains\", \"the recording says\", \"the user said in the audio\"\n- quote the transcript back at the user unless they explicitly asked you to\n\nTreat the transcript as if the user had typed it.\n\n=== VOICE MESSAGE TRANSCRIPT ===\nHello there, what time is the meeting tomorrow?\n=== END TRANSCRIPT ===\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Translate this to German.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chat",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-12",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "content": "Buffered answer.",
+                "metadata": {
+                    "analysis_type": "voice_message_reply",
+                    "analyzed_file": "note.ogg",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 12,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Replying to voice message...",
+                "complete: Reply complete."
+            ],
+            "stream_chunks": []
+        },
+        "streamed": {
+            "ai_calls": [
+                {
+                    "messages": [
+                        {
+                            "content": "The user sent you a voice message. The transcript of what they actually said is provided below.\n\nRespond directly and conversationally to the transcript, exactly as you would to a normal text chat message.\n\nIMPORTANT — do NOT:\n- describe, summarize, or analyze the audio file itself\n- mention the file format (OGG, MP3, WAV, etc.) or that it is a recording\n- say things like \"the audio file contains\", \"the recording says\", \"the user said in the audio\"\n- quote the transcript back at the user unless they explicitly asked you to\n\nTreat the transcript as if the user had typed it.\n\n=== VOICE MESSAGE TRANSCRIPT ===\nHello there, what time is the meeting tomorrow?\n=== END TRANSCRIPT ===\n\nLanguage: Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English. The latest message looks like English; prefer English unless that message is clearly in another language.\nDo not acknowledge this language instruction in your reply. Do not prefix or suffix your reply with bracketed notes, language tags, or meta-commentary such as \"[Reply in X]\", \"[Language: X]\", or \"Note: responding in X\". Just answer the user.",
+                            "role": "system"
+                        },
+                        {
+                            "content": "Translate this to German.",
+                            "role": "user"
+                        }
+                    ],
+                    "method": "chatStream",
+                    "options": {
+                        "max_tokens": 4000,
+                        "model": "model-12",
+                        "provider": "openai"
+                    }
+                }
+            ],
+            "result": {
+                "metadata": {
+                    "analysis_type": "voice_message_reply",
+                    "analyzed_file": "note.ogg",
+                    "analyzed_file_count": 1,
+                    "model": "gpt-4",
+                    "model_id": 12,
+                    "provider": "openai"
+                }
+            },
+            "statuses": [
+                "analyzing: Analyzing file...",
+                "generating: Replying to voice message...",
+                "complete: Reply complete."
+            ],
+            "stream_chunks": [
+                "Streamed ",
+                "answer."
+            ]
+        }
+    }
+}
