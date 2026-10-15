@@ -11,7 +11,7 @@
 > [#2270](https://github.com/metadist/synaplan/pull/2270)). The J-STT-1…3
 > walk entries were never written into this file; if a walk is still
 > wanted it belongs to the UX overhaul close-out
-> ([`../../20261009-ux-overhaul/06_sprint_tours_closeout.md`](../../20261009-ux-overhaul/06_sprint_tours_closeout.md)),
+> ([`../20261009-ux-overhaul/06_sprint_tours_closeout.md`](../20261009-ux-overhaul/06_sprint_tours_closeout.md)),
 > not to this folder.
 
 Plan of record: [`00_master_plan.md`](./00_master_plan.md).

@@ -13,7 +13,7 @@ track 5 (unattended `code_run`).
 **Repos:** `synaplan/` only.
 **Flag:** `TOOLS.APPROVALS_ENABLED` (same flag as S2). Off ⇒ `DagExecutor` never emits `waiting_approval`;
 `SavedTaskService` keeps refusing to schedule mutating tasks without `allow_unattended`. On ⇒ such tasks pause instead.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-TL-3. The waiting step is labelled **Waiting for you** on the run
 and in the inbox, never as a failed node. Expiry is "Nobody approved
 in time", not a timeout code. Email uses the preview sentence only.

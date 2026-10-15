@@ -1,4 +1,4 @@
-# Architecture gate — code cleanup V1 (_devextras/planning/20261014-code-cleanup-V1).
+# Architecture gate — code cleanup V1 (_devextras/planning/2026-archive/20261014-code-cleanup-V1).
 #
 # Five layers, top to bottom; a layer may only depend on the layers listed in
 # `ruleset`. Everything not listed is a violation. `deptrac.baseline.yaml`

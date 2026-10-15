@@ -25,7 +25,7 @@ use PHPUnit\Framework\TestCase;
  *
  * `make -C backend metrics` prints the same scan, with the largest offenders.
  *
- * Plan: _devextras/planning/20261014-code-cleanup-V2/ (master plan §0 #1, §1).
+ * Plan: _devextras/planning/2026-archive/20261014-code-cleanup-V2/ (master plan §0 #1, §1).
  */
 final class SizeRatchetTest extends TestCase
 {

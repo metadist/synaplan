@@ -7,7 +7,7 @@
 **Unlocks:** S4 (shared folders need the published/`use` path), S5 (widgets bind to a published assistant), S6 (export of published definitions).
 **Repos:** `synaplan/` only. **Class:** `backend-only` + `ota-candidate`.
 **Flag:** `AGENTS.ENABLED`; group targets additionally require track 1's `IAM.GROUPS_ENABLED` (user / everyone targets work without it).
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-AB-2, J-AB-3, J-AB-4. Wireframe:
 [`../20260907_ux_user_flows/assistant-publish.md`](../20260907_ux_user_flows/assistant-publish.md).
 **Share opens the IAM-UX dialog** (`20260907_ux_user_flows.md` §7) — do

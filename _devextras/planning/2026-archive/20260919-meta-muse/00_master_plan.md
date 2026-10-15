@@ -6,7 +6,7 @@ checklist in §0 is ticked. No product code in this change.**
 provider, and let users set the **thinking effort** of a reasoning model
 to the levels that model supports — configured dynamically per model on
 the model management page.
-**Binding contracts:** [`../20260907_ux_user_flows.md`](../../20260907_ux_user_flows.md)
+**Binding contracts:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 (U1–U12) and AGENTS.md "Perfect UX & Stability".
 **Owner of the surfaces:** `App\AI\Provider\*` + `ModelCatalog`/`BMODELS`
 seeders (backend); `AIModelsConfiguration.vue` + chat input (frontend).

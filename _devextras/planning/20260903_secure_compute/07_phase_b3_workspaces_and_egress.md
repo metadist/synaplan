@@ -12,7 +12,7 @@ feature is documented for users, hosters and the platform team.
 **Unlocks:** B4. **Repos:** `synaplan/`; a page in `synaplan-docs`; a pointer in `synaplan-platform` (private).
 **Flag:** `COMPUTE.WORKSPACES_ENABLED` (default `0`), `COMPUTE.EGRESS_ENABLED` (default `0`). Both sit
 under `COMPUTE.ENABLED`; off means B1/B2 behaviour.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)
 **J-CP-2 — Open what it left behind.** After a file-work run, **Open workspace**
 is a chip on the chat card (only when `COMPUTE.WORKSPACES_ENABLED` is on). It
 opens Files → Workspace. Empty: "Files the AI creates for you will show up here."

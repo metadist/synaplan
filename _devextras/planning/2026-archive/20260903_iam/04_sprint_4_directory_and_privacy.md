@@ -10,7 +10,7 @@ an audit row an admin can read on People → **Audit**; admins manage everything
 **Flag:** `IAM.DIRECTORY_SYNC_ENABLED` (seeded `0`) gates the claim sync. Audit writes and admin metadata-only enforcement
 follow `IAM.GROUPS_ENABLED`. Settings: `IAM.DIRECTORY_GROUPS_CLAIM = groups`, `IAM.ADMIN_IMPERSONATION = audited`,
 `IAM.AUDIT_RETENTION_DAYS = 365`.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-IAM-1 (directory group is obviously read-only) and J-IAM-2 (Audit
 never opens content). `IAM36` / `IAM37` are not done until those
 journeys walk (U10) and empty/error/flag-off states exist (U5, U8, U11).

@@ -43,7 +43,7 @@ questionnaire; open questions converted into the master plan's decisions table;
 sprint files written. Next: technical plan review (roadmap §7 step 3).
 
 **2026-09-07 (UX contract):** Operate is still a user-flow. See
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §5.3.
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §5.3.
 
 **2026-09-07 (S1 implementation):** Wave 3 starts here. Ports live under
 `backend/src/Plug/`. Seeded `PLUGS` defaults match sprint §2.3. Golden corpus

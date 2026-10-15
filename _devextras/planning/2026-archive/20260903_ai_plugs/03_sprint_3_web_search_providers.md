@@ -8,7 +8,7 @@ plus an optional fallback; the next chat search uses it without a restart. Perpl
 **Unlocks:** S6 reference plugin adapter (a search adapter is the smallest a plugin can ship); S5 `model_preferences` exports the per-user override.
 **Repos:** `synaplan/` (backend, frontend, `docker-compose.yml`), `synaplan-platform/` (SearXNG service block, private).
 **Flag:** `PLUGS.WEB_SEARCH.PROVIDER` (default `brave`), `PLUGS.WEB_SEARCH.FALLBACK` (default empty), `PLUGS.WEB_SEARCH.USER_OVERRIDE_ALLOWED` (default `0`).
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-PL-2. **Test query** shows titles. Next chat uses the new provider
 with no restart. Per-user override is "Use my own search" in
 Settings, not a hidden flag.
