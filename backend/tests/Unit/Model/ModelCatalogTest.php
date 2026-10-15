@@ -1169,6 +1169,29 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * xAI Grok Voice 3.0 — speech-to-speech, same BID as the previous pin.
+     * Price verified 2026-10-15: $0.08/min plus $0.004 per text item, identical
+     * to Grok Voice 2.0. The versioned id is pinned; grok-voice-latest moves.
+     */
+    public function testGrokVoice3KeepsThePublishedPerMinutePrice(): void
+    {
+        $model = ModelCatalog::find('xai:grok-voice-3.0:voice2voice')[0] ?? null;
+
+        $this->assertNotNull($model);
+        $this->assertSame(394, $model['id']);
+        $this->assertSame('Grok Voice 3', $model['name']);
+        $this->assertSame('grok-voice-3.0', $model['providerId']);
+        $this->assertSame('grok-voice-3.0', $model['json']['params']['model'] ?? null);
+        $this->assertSame('per_second', $model['json']['pricing_mode'] ?? null);
+        $this->assertEqualsWithDelta(0.08, (float) $model['priceIn'], 1e-9);
+        $this->assertSame('permin', $model['inUnit']);
+        $this->assertEqualsWithDelta(0.0, (float) $model['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.004, (float) ($model['json']['text_item_price'] ?? 0.0), 1e-9);
+        $this->assertSame('eve', $model['json']['voices'][0] ?? null);
+        $this->assertNull(ModelCatalog::findBidByKey('xai:grok-voice-think-fast-2.0:voice2voice'));
+    }
+
+    /**
      * Meta Muse Spark 1.3 — standard tier only (BIDs 369–370). The contributor
      * id is cheaper and is used to improve Meta's products, so it stays out.
      */

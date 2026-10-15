@@ -6164,22 +6164,26 @@ class ModelCatalog
         [
             'id' => 394,
             'service' => 'xAI',
-            'name' => 'Grok Voice',
+            'name' => 'Grok Voice 3',
             'tag' => 'voice2voice',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'grok-voice-think-fast-2.0',
+            // Pin the version. grok-voice-latest currently aliases this id and
+            // moves when xAI ships the next one. Verified 2026-10-15:
+            // https://docs.x.ai/developers/model-capabilities/audio/speech-to-speech
+            'providerId' => 'grok-voice-3.0',
             'priceIn' => 0.08,
             'inUnit' => 'permin',
             'priceOut' => 0,
             'outUnit' => '-',
-            'quality' => 8,
+            'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'xAI Grok Voice. Turn-based speech-to-speech. Billed per second of the session ($0.08/min) plus $0.004 per text item. Function outputs are free. Answers still come from the user\'s chat model. EU data handling for this model is not confirmed.',
+                'description' => 'xAI Grok Voice 3.0. Speech-to-speech, same API and price as Grok Voice 2.0: $0.08/min plus $0.004 per text item. Function outputs are free. Answers still come from the user\'s chat model. EU data handling for this model is not confirmed.',
                 'pricing_mode' => 'per_second',
                 'text_item_price' => 0.004,
-                'params' => ['model' => 'grok-voice-think-fast-2.0'],
+                'params' => ['model' => 'grok-voice-3.0'],
+                'voices' => ['eve', 'ara', 'rex', 'sal', 'leo'],
                 'features' => ['live_voice'],
             ],
         ],

@@ -134,7 +134,7 @@ test('adapter kind follows the model, not only the provider', () => {
   assert.equal(adapterKind('openai', 'gpt-realtime-2.1'), 'openai-realtime')
   assert.equal(adapterKind('openai', 'gpt-realtime-2.1-mini'), 'openai-realtime')
   assert.equal(adapterKind('google', 'gemini-3.8-live-extended-thinking'), 'gemini')
-  assert.equal(adapterKind('xai', 'grok-voice-think-fast-2.0'), 'xai')
+  assert.equal(adapterKind('xai', 'grok-voice-3.0'), 'xai')
   assert.equal(adapterKind('compatible', 'qwen3-omni'), 'compatible')
 })
 
@@ -254,7 +254,7 @@ test('xAI counts text items and does not invent token usage', async () => {
   adapter.on('transcript', (turn) => {
     if (turn.final) finals += 1
   })
-  await adapter.open({ model: 'grok-voice-think-fast-2.0', instructions: 'Ask Synaplan.', audio: { inRate: 24000 } })
+  await adapter.open({ model: 'grok-voice-3.0', instructions: 'Ask Synaplan.', audio: { inRate: 24000 } })
   socket.send(JSON.stringify({ type: 'conversation.item.added', item: { id: 'msg-1', type: 'message' } }))
   socket.send(JSON.stringify({ type: 'conversation.item.added', item: { id: 'msg-1', type: 'message' } }))
   socket.send(JSON.stringify({ type: 'conversation.item.added', item: { id: 'out-1', type: 'function_call_output' } }))
