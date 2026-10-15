@@ -1,16 +1,16 @@
 {
     "_comment": "Size ratchet ledger (tests/Architecture/SizeRatchetTest.php). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_SIZE_RATCHET=1 and review the diff.",
     "recorded": "2026-10-14",
-    "updated": "2026-10-14",
+    "updated": "2026-10-15",
     "limits": {
         "fileLines": 800,
         "constructorParams": 10,
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 61,
-        "constructorParams": 75,
-        "methodLines": 158
+        "fileLines": 60,
+        "constructorParams": 74,
+        "methodLines": 156
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -32,7 +32,6 @@
         "src/Controller/AgentController.php": 921,
         "src/Controller/AuthController.php": 1257,
         "src/Controller/ChatController.php": 1186,
-        "src/Controller/ConfigController.php": 2240,
         "src/Controller/FeedbackController.php": 837,
         "src/Controller/FileController.php": 1930,
         "src/Controller/InboundEmailHandlerController.php": 824,
@@ -89,7 +88,6 @@
         "src/Controller/AppleAuthController.php::AppleAuthController": 12,
         "src/Controller/AuthController.php::AuthController": 17,
         "src/Controller/ChatController.php::ChatController": 18,
-        "src/Controller/ConfigController.php::ConfigController": 20,
         "src/Controller/FileController.php::FileController": 25,
         "src/Controller/GuestChatController.php::GuestChatController": 12,
         "src/Controller/KeycloakAuthController.php::KeycloakAuthController": 16,
@@ -186,8 +184,6 @@
         "src/Command/SyncModelPricesCommand.php::SyncModelPricesCommand::extractPricing": 124,
         "src/Controller/AuthController.php::AuthController::refresh": 102,
         "src/Controller/AuthController.php::AuthController::refreshOidcTokens": 105,
-        "src/Controller/ConfigController.php::ConfigController::getModels": 200,
-        "src/Controller/ConfigController.php::ConfigController::saveDefaultModels": 170,
         "src/Controller/FileServeController.php::FileServeController::serve": 146,
         "src/Controller/GitHubAuthController.php::GitHubAuthController::callback": 108,
         "src/Controller/GitHubAuthController.php::GitHubAuthController::findOrCreateUser": 109,

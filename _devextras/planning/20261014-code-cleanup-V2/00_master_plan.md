@@ -118,6 +118,25 @@ already comes from `ModuleRegistry`; the contributor pattern generalises
 what AGENTS.md already demands ("let the registry drive feature status,
 runtime config, and the gate 404").
 
+**As delivered (G3 + G4).** Nine dependencies, not seven: the memory-store
+probe (`Memory/MemoryServiceStatus`) and `LocalAiDownloadStatusService` stay
+separate instead of being folded into the model check, which they do not
+belong to. `ModelCheckService` became `Model/ModelAvailabilityCheck`, and
+the tag → picker rules moved out of `GET /models` into
+`Model/PickerCapabilities`. Lock and allow-list refusals are a domain
+exception (`DefaultModelRejectedException`) that the controller maps to
+409 / 422.
+
+Every route stays in this one controller. Nelmio orders the OpenAPI
+`paths` by route registration, and the generated frontend schema file
+pins a SHA-256 of that document: moving a route to another controller
+would change the hash and turn a backend-only refactor into an OTA
+frontend change. The six large 200-response schemas live in
+`App\Attribute\OpenApi\Config\*` instead — subclasses of `OA\Response`,
+which swagger-php reads by `instanceof`, so the document stays byte-identical
+(verified against `/api/doc.json`). The controller ends at ~740 lines and
+leaves the size ledger.
+
 ### ChatHandler (4,607 lines, 39 deps → pipeline)
 
 ```
@@ -213,6 +232,14 @@ early.
 G3–G4 (config) and G5–G7 (chat) are independent tracks; G8 can start with
 them; G9 needs both chat and stream extractions. Each step is one PR and
 leaves `main` releasable.
+
+**Delivery (decided 2026-10-14).** One branch and one pull request per god
+class, each into `main`, in this order: `configcontroller` (G3 + G4),
+`chathandler` (G5–G7), `streamcontroller` (G8–G9, plus G10). Steps stay
+separate commits inside each pull request so a reviewer can follow them.
+CI only runs for pull requests into `main`, so the branches are not
+stacked; the later ones take the earlier ones' ledger and `STATUS.md`
+changes in a merge from `main`.
 
 Sizing: G1–G2 one day together; G3–G4 one day; G5–G7 three to four days;
 G8–G9 three days; G10 half a day. About two weeks of focused work, spread

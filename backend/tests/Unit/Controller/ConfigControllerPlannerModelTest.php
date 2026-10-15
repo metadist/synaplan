@@ -4,21 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Controller;
 
-use App\AI\Credential\ChatReadinessService;
-use App\AI\Service\ProviderRegistry;
 use App\Controller\ConfigController;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
-use App\Service\Capability\CapabilityService;
-use App\Service\Config\FeatureStatusReporter;
-use App\Service\Embedding\EmbeddingMetadataService;
-use App\Service\Embedding\EmbeddingModelChangeGuard;
-use App\Service\LocalAi\LocalAiDownloadStatusService;
-use App\Service\Memory\UserMemoryService;
+use App\Service\Model\RoutingModelsService;
 use App\Service\ModelConfigService;
+use App\Tests\Unit\Controller\Support\BuildsConfigController;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -32,6 +26,8 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class ConfigControllerPlannerModelTest extends TestCase
 {
+    use BuildsConfigController;
+
     private EntityManagerInterface&MockObject $em;
     private ConfigRepository&MockObject $configRepository;
     private ModelRepository&MockObject $modelRepository;
@@ -45,22 +41,8 @@ final class ConfigControllerPlannerModelTest extends TestCase
         $this->modelRepository = $this->createMock(ModelRepository::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
 
-        $this->controller = new ConfigController(
-            $this->em,
-            $this->configRepository,
-            $this->modelRepository,
-            $this->createStub(ProviderRegistry::class),
-            $this->createStub(UserMemoryService::class),
-            $this->createStub(EmbeddingModelChangeGuard::class),
-            $this->createStub(EmbeddingMetadataService::class),
-            $this->modelConfigService,
-            $this->createStub(\App\Service\Iam\IamConfig::class),
-            $this->createStub(ChatReadinessService::class),
-            $this->createStub(LocalAiDownloadStatusService::class),
-            new CapabilityService(),
-            $this->createStub(FeatureStatusReporter::class),
-            $this->createStub(\App\Service\Config\Runtime\RuntimeConfigAssembler::class),
-            'http://qdrant.example',
+        $this->controller = $this->buildConfigController(
+            routingModels: new RoutingModelsService($this->em, $this->configRepository, $this->modelRepository, $this->modelConfigService),
         );
 
         $this->controller->setContainer(new Container());
