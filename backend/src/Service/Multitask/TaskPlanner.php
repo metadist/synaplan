@@ -464,7 +464,7 @@ final readonly class TaskPlanner
     /**
      * Resolve the two timezone signals the {@see TimeContextBuilder} needs: the
      * user's stored IANA timezone (profile, authoritative) and the approximate
-     * Cloudflare country. Mirrors {@see \App\Service\Message\Handler\ChatHandler::buildTimeContext()}.
+     * Cloudflare country. Mirrors {@see \App\Service\Prompt\ChatSystemPromptBuilder::timeContext()}.
      *
      * @param array<string, mixed> $options
      *

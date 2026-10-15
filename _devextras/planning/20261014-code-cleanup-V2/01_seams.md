@@ -16,6 +16,11 @@ lines), `humanizeFileMarkersForModel()`, `dispatchPendingMemoryExtraction()`.
 shared** — the two methods are one pipeline written twice (buffered vs.
 streamed). Decision §0 #3: collapse into `run(ChatRequest, ChatSink)`.
 
+> Delivered differently in G5–G7: seven stage classes with a buffered and a
+> streamed entry each, and two short orchestrators. The class names below are
+> the proposal; the real names and the reason for keeping two entry points
+> are in `00_master_plan.md` §3, "As delivered (G5–G7)".
+
 ### Clusters → target classes
 
 | Target (folder) | Private methods today | Ctor deps that move with it |

@@ -775,9 +775,6 @@ services:
 
     # Message Handlers
     App\Service\Message\Handler\ChatHandler:
-        arguments:
-            $uploadDir: '%kernel.project_dir%/var/uploads'
-            $pluginContextProviders: !tagged_iterator app.plugin.context_provider
         tags:
             - { name: 'app.message.handler' }
 

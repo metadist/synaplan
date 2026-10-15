@@ -118,6 +118,25 @@ already comes from `ModuleRegistry`; the contributor pattern generalises
 what AGENTS.md already demands ("let the registry drive feature status,
 runtime config, and the gate 404").
 
+**As delivered (G3 + G4).** Nine dependencies, not seven: the memory-store
+probe (`Memory/MemoryServiceStatus`) and `LocalAiDownloadStatusService` stay
+separate instead of being folded into the model check, which they do not
+belong to. `ModelCheckService` became `Model/ModelAvailabilityCheck`, and
+the tag → picker rules moved out of `GET /models` into
+`Model/PickerCapabilities`. Lock and allow-list refusals are a domain
+exception (`DefaultModelRejectedException`) that the controller maps to
+409 / 422.
+
+Every route stays in this one controller. Nelmio orders the OpenAPI
+`paths` by route registration, and the generated frontend schema file
+pins a SHA-256 of that document: moving a route to another controller
+would change the hash and turn a backend-only refactor into an OTA
+frontend change. The six large 200-response schemas live in
+`App\Attribute\OpenApi\Config\*` instead — subclasses of `OA\Response`,
+which swagger-php reads by `instanceof`, so the document stays byte-identical
+(verified against `/api/doc.json`). The controller ends at ~740 lines and
+leaves the size ledger.
+
 ### ChatHandler (4,607 lines, 39 deps → pipeline)
 
 ```
@@ -135,6 +154,38 @@ ChatHandler (≤ 300 lines)   orchestrates stages, owns the sink
 
 `handle()` and `handleStream()` collapse into one `run(ChatRequest, ChatSink)`;
 `BufferedChatSink` and `StreamingChatSink` are the only difference.
+
+**As delivered (G5–G7).** `ChatHandler` is 229 lines with 9 dependencies and
+orchestrates seven stages in `App\Service\Message\Chat\`:
+
+```
+ChatHandler                    handle() buffered, handleStream() streamed
+  1 ChatTurnContextLoader      runtime profile, topic prompt, knowledge base, memories → ChatTurn
+  2 ChatModelSelector          Again > widget > assistant > prompt > default, retired-model swap, vision fallback → ChatModelChoice
+  3 ChatSystemPromptAssembler  section order per channel → ChatSystemPrompt (system role or user-turn fallback)
+  4 ChatMessageAssembler       thread + current turn; OpenAI previous_response_id on the stream
+  5 ChatRequestOptions         document schema, routing tools, token ceiling, assistant sampling, reasoning level
+  6 ChatReplyGenerator         document tool loop or chat call; cut-off and empty-answer checks → ChatReply
+  7 PendingMemoryExtraction    memory job, dispatched now or handed back to StreamController (#881)
+```
+
+The stages lean on the G5/G6 collaborators: `ChatKnowledgeContextLoader`,
+`ChatMemoryContextLoader`, `ChatSystemPromptBuilder` (sections that read
+state), `ChatPromptBlocks` (pure sections), `VisionAttachmentEncoder`,
+`ChatDocumentOutput` (office hints, tool edits, buffered file delivery),
+`GeneratedFileWriter` and `RoutingHandoffResolver`.
+
+The single `run(ChatRequest, ChatSink)` was not built. The two paths differ in
+more than the sink, and the snapshots pin those differences: the streamed
+turn checks a deferred routing decision after the system prompt, the buffered
+one before it; only the stream carries widget API data and the continuation
+and voice-mode rules; only a live-voice question gets the spoken-answer rule;
+a vision swap names the model by provider id (buffered) or through
+`ModelConfigService` (streamed); only the buffered path delivers generated
+files itself. Each stage therefore has a `forBufferedTurn()` and a
+`forStreamedTurn()` that share their private sections, so every remaining
+difference is named in the stage that owns it. Aligning them is behaviour
+work, one difference per PR with its snapshot diff — a V3 candidate (§7).
 
 ### StreamController (4,430 lines, 36 deps → transport + orchestration)
 
@@ -214,6 +265,14 @@ G3–G4 (config) and G5–G7 (chat) are independent tracks; G8 can start with
 them; G9 needs both chat and stream extractions. Each step is one PR and
 leaves `main` releasable.
 
+**Delivery (decided 2026-10-14).** One branch and one pull request per god
+class, each into `main`, in this order: `configcontroller` (G3 + G4),
+`chathandler` (G5–G7), `streamcontroller` (G8–G9, plus G10). Steps stay
+separate commits inside each pull request so a reviewer can follow them.
+CI only runs for pull requests into `main`, so the branches are not
+stacked; the later ones take the earlier ones' ledger and `STATUS.md`
+changes in a merge from `main`.
+
 Sizing: G1–G2 one day together; G3–G4 one day; G5–G7 three to four days;
 G8–G9 three days; G10 half a day. About two weeks of focused work, spread
 over sprints as capacity allows — the ratchet makes "not finished yet"
@@ -259,3 +318,7 @@ Domain-first layout (`src/Widget/{Controller,Service,Repository}`), the
 `AI` ↔ `Service` layer split, domain-to-domain deptrac rules, the
 `Plugin\Sdk` namespace with `class_alias` shims, PHPStan 5 → 8, mirroring
 `tests/` to `src/`. None of these needs to be decided before V2 ends.
+
+From G7: align the buffered and streamed chat turn (§3, "As delivered
+(G5–G7)") one difference at a time, each PR with its prompt-snapshot diff,
+until a single `run()` with two sinks is a mechanical step.

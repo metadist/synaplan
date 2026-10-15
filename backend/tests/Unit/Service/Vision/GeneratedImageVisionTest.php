@@ -2,43 +2,19 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Service\Message\Handler;
+namespace App\Tests\Unit\Service\Vision;
 
-use App\AI\Service\AiFacade;
-use App\AI\StructuredOutput\StructuredOutputConfig;
-use App\AI\ToolCalling\ToolCallingCapability;
-use App\AI\ToolCalling\ToolCallingTranslator;
-use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
-use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
 use App\Repository\ModelRepository;
-use App\Repository\PromptRepository;
-use App\Service\Digest\DigestSearchService;
-use App\Service\Digest\MessageDigestConfig;
-use App\Service\Feedback\FeedbackConfigService;
 use App\Service\File\ConversationFileCatalog;
-use App\Service\File\DocumentGeneratorService;
-use App\Service\File\DocumentImageCatalog;
-use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\GeneratedImageVisionFlag;
-use App\Service\File\UserUploadPathBuilder;
-use App\Service\Knowledge\KnowledgeContextFormatter;
-use App\Service\Memory\MemoryExtractionDispatcher;
-use App\Service\Memory\UserMemoryService;
-use App\Service\Message\Capability\SystemCapabilityRegistry;
-use App\Service\Message\Handler\ChatHandler;
-use App\Service\Message\PerfPipelineFlag;
-use App\Service\Message\Routing\RoutingToolset;
-use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
-use App\Service\Prompt\TimeContextBuilder;
-use App\Service\RAG\VectorSearchService;
-use App\Service\RateLimitService;
+use App\Service\Message\Chat\ChatMessageAssembler;
+use App\Service\Message\Chat\ConversationHistoryRenderer;
+use App\Service\Vision\VisionAttachmentEncoder;
 use App\Service\Vision\VisionModelResolver;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -51,7 +27,7 @@ use Psr\Log\NullLogger;
  * behaviour and the unchanged default: with the flag off the request must look
  * exactly as it did before.
  */
-final class ChatHandlerGeneratedImageVisionTest extends TestCase
+final class GeneratedImageVisionTest extends TestCase
 {
     /** 1x1 transparent PNG. */
     private const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
@@ -74,9 +50,9 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
 
     public function testGeneratedImageIsAttachedToTheFollowUpUserTurn(): void
     {
-        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+        $messages = $this->assembler([$this->imageFile(1, 'cat.png', 500)]);
 
-        $messages = $this->buildStreamingMessages($handler, ['include_generated_images' => true]);
+        $messages = $this->buildStreamingMessages($messages, ['include_generated_images' => true]);
 
         $this->assertIsString($this->firstAssistantMessage($messages)['content'], 'Anthropic rejects image blocks on assistant turns');
         $user = $this->lastUserMessage($messages);
@@ -92,9 +68,9 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
      */
     public function testGeneratedMediaIsReferencedInTextWhileTheFlagIsOff(): void
     {
-        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+        $messages = $this->assembler([$this->imageFile(1, 'cat.png', 500)]);
 
-        $content = $this->firstAssistantMessage($this->buildStreamingMessages($handler, []))['content'];
+        $content = $this->firstAssistantMessage($this->buildStreamingMessages($messages, []))['content'];
 
         $this->assertIsString($content, 'No image bytes may be sent while the flag is off');
         $this->assertStringContainsString('cat.png', $content);
@@ -109,15 +85,14 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
      */
     public function testGeneratedMediaTurnWithClearedTextSurvivesAsAReference(): void
     {
-        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+        $messages = $this->assembler([$this->imageFile(1, 'cat.png', 500)]);
 
         $assistantTurn = $this->message(500, 'OUT', ''); // text cleared by async sync
         $current = $this->message(501, 'IN', 'What breed is it?');
 
-        $method = new \ReflectionMethod(ChatHandler::class, 'buildStreamingMessages');
-        $messages = $method->invoke($handler, null, [$assistantTurn, $current], $current, []);
+        $built = $messages->streaming(null, [$assistantTurn, $current], $current, []);
 
-        $content = $this->firstAssistantMessage($messages)['content'];
+        $content = $this->firstAssistantMessage($built)['content'];
         $this->assertIsString($content);
         $this->assertStringContainsString('cat.png', $content);
     }
@@ -128,9 +103,9 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
      */
     public function testGeneratedImageCarriesBothPixelsAndTextReferenceWithFlagOn(): void
     {
-        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+        $messages = $this->assembler([$this->imageFile(1, 'cat.png', 500)]);
 
-        $messages = $this->buildStreamingMessages($handler, ['include_generated_images' => true]);
+        $messages = $this->buildStreamingMessages($messages, ['include_generated_images' => true]);
 
         $assistant = $this->firstAssistantMessage($messages)['content'];
         $this->assertIsString($assistant);
@@ -148,9 +123,9 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
             $files[] = $this->imageFile($i, 'cat'.$i.'.png', 500);
         }
 
-        $handler = $this->handler($files);
+        $messages = $this->assembler($files);
 
-        $messages = $this->buildStreamingMessages($handler, ['include_generated_images' => true]);
+        $messages = $this->buildStreamingMessages($messages, ['include_generated_images' => true]);
 
         $content = $this->lastUserMessage($messages)['content'];
         $this->assertIsArray($content);
@@ -167,9 +142,9 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
      */
     public function testGeneratedDocumentsAreNotSentAsImages(): void
     {
-        $handler = $this->handler([$this->file(1, 'report.docx', 500)]);
+        $messages = $this->assembler([$this->file(1, 'report.docx', 500)]);
 
-        $messages = $this->buildStreamingMessages($handler, ['include_generated_images' => true]);
+        $messages = $this->buildStreamingMessages($messages, ['include_generated_images' => true]);
 
         $this->assertIsString($this->firstAssistantMessage($messages)['content']);
     }
@@ -180,9 +155,9 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
      */
     public function testUploadedImagesAreLeftToTheUserTurnPath(): void
     {
-        $handler = $this->handler([$this->imageFile(1, 'photo.png', 500, source: 'web_upload')]);
+        $messages = $this->assembler([$this->imageFile(1, 'photo.png', 500, source: 'web_upload')]);
 
-        $messages = $this->buildStreamingMessages($handler, ['include_generated_images' => true]);
+        $messages = $this->buildStreamingMessages($messages, ['include_generated_images' => true]);
 
         $this->assertIsString($this->firstAssistantMessage($messages)['content']);
     }
@@ -194,10 +169,10 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
      */
     public function testTheUserTurnSaysWhereTheGeneratedImageCameFrom(): void
     {
-        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+        $messages = $this->assembler([$this->imageFile(1, 'cat.png', 500)]);
 
         $content = $this->lastUserMessage(
-            $this->buildStreamingMessages($handler, ['include_generated_images' => true]),
+            $this->buildStreamingMessages($messages, ['include_generated_images' => true]),
         )['content'];
 
         $this->assertIsArray($content);
@@ -217,10 +192,10 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
     public function testAFreshUploadDisplacesTheHistoricGeneratedImage(): void
     {
         $upload = $this->imageFile(2, 'photo.png', 501, source: 'web_upload');
-        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+        $messages = $this->assembler([$this->imageFile(1, 'cat.png', 500)]);
 
         $content = $this->lastUserMessage($this->buildStreamingMessages(
-            $handler,
+            $messages,
             ['include_generated_images' => true, 'include_images' => true],
             currentAttachments: [$upload],
         ))['content'];
@@ -237,14 +212,14 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
     /**
      * A stored display URL (`/api/v1/files/uploads/<rel>`) must resolve to the
      * file under the upload dir — StreamController persists that prefix on the
-     * OUT message, and ChatHandler used to prefix $uploadDir on top of it.
+     * OUT message, and the encoder used to prefix $uploadDir on top of it.
      */
     public function testDisplayUrlPathIsResolvedForGeneratedVision(): void
     {
-        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500, filePath: '/api/v1/files/uploads/cat.png')]);
+        $messages = $this->assembler([$this->imageFile(1, 'cat.png', 500, filePath: '/api/v1/files/uploads/cat.png')]);
 
         $content = $this->lastUserMessage(
-            $this->buildStreamingMessages($handler, ['include_generated_images' => true]),
+            $this->buildStreamingMessages($messages, ['include_generated_images' => true]),
         )['content'];
 
         $this->assertIsArray($content);
@@ -253,11 +228,10 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
 
     public function testImageToBase64DataUrlStripsTheServePrefix(): void
     {
-        $handler = $this->handler([]);
+        $encoder = $this->encoder($this->catalog([]));
         file_put_contents($this->uploadDir.'/cat.png', base64_decode(self::PNG));
 
-        $method = new \ReflectionMethod(ChatHandler::class, 'imageToBase64DataUrl');
-        $dataUrl = $method->invoke($handler, '/api/v1/files/uploads/cat.png');
+        $dataUrl = $encoder->toBase64DataUrl('/api/v1/files/uploads/cat.png');
 
         $this->assertIsString($dataUrl);
         $this->assertStringStartsWith('data:image/png;base64,', $dataUrl);
@@ -270,62 +244,50 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
             'flag on, blind model' => [true, false, false],
             'flag on, vision model' => [true, true, true],
         ] as $case => [$flagEnabled, $modelSeesImages, $expected]) {
-            $handler = $this->handler([], flagEnabled: $flagEnabled, modelSeesImages: $modelSeesImages);
+            $encoder = $this->encoder($this->catalog([]), flagEnabled: $flagEnabled, modelSeesImages: $modelSeesImages);
 
-            $method = new \ReflectionMethod(ChatHandler::class, 'shouldIncludeGeneratedImages');
-            $this->assertSame($expected, $method->invoke($handler, 42, 7), $case);
+            $this->assertSame($expected, $encoder->shouldIncludeGeneratedImages(42, 7), $case);
         }
     }
 
     /**
      * @param list<File> $threadFiles
      */
-    private function handler(array $threadFiles, bool $flagEnabled = true, bool $modelSeesImages = true): ChatHandler
+    private function catalog(array $threadFiles): ConversationFileCatalog
     {
-        $fileRepository = $this->createMock(FileRepository::class);
+        $fileRepository = $this->createStub(FileRepository::class);
         $fileRepository->method('findFilesByMessageIds')->willReturn($threadFiles);
         $fileRepository->method('findOneBy')->willReturn(null);
 
-        $model = $this->createMock(Model::class);
+        return new ConversationFileCatalog($fileRepository, $this->uploadDir);
+    }
+
+    private function encoder(ConversationFileCatalog $catalog, bool $flagEnabled = true, bool $modelSeesImages = true): VisionAttachmentEncoder
+    {
+        $model = $this->createStub(Model::class);
         $model->method('hasFeature')->willReturnCallback(
             static fn (string $feature): bool => 'vision' === $feature && $modelSeesImages,
         );
-        $modelRepository = $this->createMock(ModelRepository::class);
+        $modelRepository = $this->createStub(ModelRepository::class);
         $modelRepository->method('find')->willReturn($model);
 
-        $flag = $this->createMock(GeneratedImageVisionFlag::class);
+        $flag = $this->createStub(GeneratedImageVisionFlag::class);
         $flag->method('isEnabled')->willReturn($flagEnabled);
 
-        return new ChatHandler(
-            $this->createMock(AiFacade::class),
-            $this->createMock(PromptRepository::class),
-            $this->createMock(PromptService::class),
-            $this->createMock(ModelConfigService::class),
-            $modelRepository,
+        return new VisionAttachmentEncoder($this->uploadDir, $catalog, $flag, $modelRepository, $this->createStub(VisionModelResolver::class), new NullLogger());
+    }
+
+    /**
+     * @param list<File> $threadFiles
+     */
+    private function assembler(array $threadFiles, bool $flagEnabled = true, bool $modelSeesImages = true): ChatMessageAssembler
+    {
+        $catalog = $this->catalog($threadFiles);
+
+        return new ChatMessageAssembler(
+            $this->encoder($catalog, $flagEnabled, $modelSeesImages),
+            new ConversationHistoryRenderer($catalog),
             new NullLogger(),
-            $this->createMock(VectorSearchService::class),
-            $this->createMock(EntityManagerInterface::class),
-            $this->uploadDir,
-            new UserUploadPathBuilder(),
-            $this->createMock(UserMemoryService::class),
-            new FeedbackConfigService($this->createStub(ConfigRepository::class)),
-            $this->createMock(RateLimitService::class),
-            $this->createMock(MemoryExtractionDispatcher::class),
-            $this->createMock(PerfPipelineFlag::class),
-            $this->createMock(DocumentGeneratorService::class),
-            $this->createMock(DocumentImageReferenceResolver::class),
-            $this->createMock(DocumentImageCatalog::class),
-            new TimeContextBuilder(),
-            new KnowledgeContextFormatter(),
-            $this->createMock(VisionModelResolver::class),
-            $this->createMock(DigestSearchService::class),
-            $this->createMock(MessageDigestConfig::class),
-            new ConversationFileCatalog($fileRepository, $this->uploadDir),
-            $flag,
-            $this->createMock(StructuredOutputConfig::class),
-            new ToolCallingTranslator(new ToolCallingCapability()),
-            new ToolCallParser(),
-            new RoutingToolset(new SystemCapabilityRegistry()),
         );
     }
 
@@ -335,7 +297,7 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
      *
      * @return array<int, array{role: string, content: string|array<int, array<string, mixed>>}>
      */
-    private function buildStreamingMessages(ChatHandler $handler, array $options, array $currentAttachments = []): array
+    private function buildStreamingMessages(ChatMessageAssembler $messages, array $options, array $currentAttachments = []): array
     {
         $assistantTurn = $this->message(500, 'OUT', 'Here is your cat.');
         $current = $this->message(501, 'IN', 'What breed is it?');
@@ -343,9 +305,7 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
             $current->addFile($attachment);
         }
 
-        $method = new \ReflectionMethod(ChatHandler::class, 'buildStreamingMessages');
-
-        return $method->invoke($handler, null, [$assistantTurn, $current], $current, $options);
+        return $messages->streaming(null, [$assistantTurn, $current], $current, $options);
     }
 
     /**

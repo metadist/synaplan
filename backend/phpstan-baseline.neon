@@ -139,18 +139,6 @@ parameters:
 			path: src/Controller/ChatController.php
 
 		-
-			message: '#^Result of && is always false\.$#'
-			identifier: booleanAnd.alwaysFalse
-			count: 1
-			path: src/Controller/ConfigController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between ''dev'' and ''dev'' will always evaluate to false\.$#'
-			identifier: notIdentical.alwaysFalse
-			count: 1
-			path: src/Controller/ConfigController.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 2
@@ -274,13 +262,7 @@ parameters:
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1
-			path: src/Service/Message/Handler/ChatHandler.php
-
-		-
-			message: '#^Method App\\Service\\Message\\Handler\\ChatHandler\:\:getSystemPrompt\(\) is unused\.$#'
-			identifier: method.unused
-			count: 1
-			path: src/Service/Message/Handler/ChatHandler.php
+			path: src/Service/Message/Chat/ChatMessageAssembler.php
 
 		-
 			message: '#^Offset ''prompt'' on array\{prompt\: string, media_type\: string\|null, raw\: string\} on left side of \?\? always exists and is not nullable\.$#'
