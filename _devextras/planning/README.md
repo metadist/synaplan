@@ -29,15 +29,16 @@ log. It is edited in place — no new dated roadmap files, no redirect stubs.
 
 ## Live tracks
 
-Same order as `ROADMAP.md` §1, plus the live-voice track that is already
-in review. **Cleanup first (decision 2026-10-14):** rows 1–2 form a window
-in which only bug fixes, security fixes and release blockers land beside
-them; feature tracks resume when V2 meets its exit.
+Same order as `ROADMAP.md` §1, plus the live-voice track. **Cleanup first
+(decision 2026-10-14, extended 2026-10-15):** rows 1–2b form a window in
+which only bug fixes, security fixes and release blockers land beside them;
+feature tracks resume when V3 meets its exit.
 
-| Path | What | State 2026-10-14 |
+| Path | What | State 2026-10-15 |
 | ---- | ---- | ---------------- |
-| [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | Backend ordering sprint: deptrac layer gate with baseline, `Service/` root guarded as plugin contract, 69 of the 73 loose services sorted into domain folders in six PRs | **cleanup window** — C1–C9 in review as a stacked series ([#2478](https://github.com/metadist/synaplan/pull/2478) → #2486), merge in order |
-| [`20261014-code-cleanup-V2/`](./20261014-code-cleanup-V2/00_master_plan.md) | Break up the god classes: size ratchet, characterization snapshots, `ConfigController` → `ChatHandler` → `StreamController`, `docs/ARCHITECTURE.md` | **cleanup window** — after V1; closes the window |
+| [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | Backend ordering sprint: deptrac layer gate with baseline, `Service/` root guarded as plugin contract, 69 of the 73 loose services sorted into domain folders in six PRs | shipped ([#2478](https://github.com/metadist/synaplan/pull/2478) → #2486); archived together with V3 |
+| [`20261014-code-cleanup-V2/`](./20261014-code-cleanup-V2/00_master_plan.md) | Break up the god classes: size ratchet, characterization snapshots, `ConfigController` → `ChatHandler` → `StreamController`, `docs/ARCHITECTURE.md` | shipped ([#2492](https://github.com/metadist/synaplan/pull/2492), #2496–#2500); archived together with V3 |
+| [`20261015-code-cleanup-V3/`](./20261015-code-cleanup-V3/00_master_plan.md) | Three bad ideas, three fixes: copied helpers in the four chat-path god classes, buffered / streamed twins in `MessageProcessor` and `FileAnalysisHandler`, 36-dependency lists in `SeedAllCommand` and `UserDeletionService`; V4 order in §7 | **cleanup window** — closes the window |
 | [`20261009-ux-overhaul/`](./20261009-ux-overhaul/00_master_plan.md) | UX overhaul: rail Chats · Library · Assistants · Apps · Admin, every sub page explained, guided tours (UX00–UX14) | paused |
 | [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | Triage of the external 5.2.0 test round (F1–F49), six fixing waves, 50 issue drafts in `issues/` | paused — waves 1–3 shipped; bug-fix issues continue |
 | [`20260903_secure_compute/`](./20260903_secure_compute/00_master_plan.md) | Secure Compute; B4 remainder (egress, gVisor node, run images, docs, staging) | paused |
@@ -51,7 +52,7 @@ them; feature tracks resume when V2 meets its exit.
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/00_master_plan.md) | Collabora epics 0–4 | queued — partner |
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts: apps like SISmass create Synaplan accounts for their customers (AA1–AA8) | not started |
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/00_master_plan.md) | Config pyramid; §0 unticked | not started |
-| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat, model and voice under AI settings | in review — [#2477](https://github.com/metadist/synaplan/pull/2477), not on `main` yet |
+| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat, model and voice under AI settings | on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), [#2507](https://github.com/metadist/synaplan/pull/2507)); GPU walk open in its STATUS |
 
 ## Archive
 

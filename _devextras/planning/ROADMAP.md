@@ -23,8 +23,8 @@ STATUS.
 
 ### Now — the cleanup window (decision 2026-10-14)
 
-**The two cleanup tracks run first. Feature work resumes when row 2 has
-met its exit.** During the window the only non-cleanup PRs are bug fixes,
+**The cleanup tracks run first. Feature work resumes when row 2b has
+met its exit** (extended from row 2 on 2026-10-15, §6). During the window the only non-cleanup PRs are bug fixes,
 security fixes and release blockers (the community-test fixes in row 4
 count as bug fixes). No new feature track opens, and the paused tracks
 below finish their current PR and stop. Reason: rows 1–2 move `Service/`
@@ -36,8 +36,9 @@ class.
 
 | # | Track | Plan | State | Exit |
 | - | ----- | ---- | ----- | ---- |
-| 1 | **Code cleanup V1** — deptrac layer gate with baseline, `Service/` root as plugin contract, 69 loose services into domain folders | [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | Plan merged; §0 decided (deptrac). C1 starts on the product owner's go. | Root files = 4, deptrac green on `main`, baseline 7 files. |
-| 2 | **Code cleanup V2** — break up the god classes | [`20261014-code-cleanup-V2/`](./20261014-code-cleanup-V2/00_master_plan.md) | Queued behind row 1. Size ratchet and characterization snapshots first, then `ConfigController` → `ChatHandler` → `StreamController`. | No chat-path class over 800 lines or 10 constructor deps; `docs/ARCHITECTURE.md` + `make metrics` on `main`. **Opens the feature window.** |
+| 1 | **Code cleanup V1** — deptrac layer gate with baseline, `Service/` root as plugin contract, 69 loose services into domain folders | [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | **Shipped** ([#2478](https://github.com/metadist/synaplan/pull/2478)–[#2486](https://github.com/metadist/synaplan/pull/2486)): root 73 → 4, deptrac green, baseline 10 files / 54 edges. Archived with V3 (V3 §0 #8). | Root files = 4, deptrac green on `main`, baseline 7 files. |
+| 2 | **Code cleanup V2** — break up the god classes | [`20261014-code-cleanup-V2/`](./20261014-code-cleanup-V2/00_master_plan.md) | **Shipped** ([#2492](https://github.com/metadist/synaplan/pull/2492), [#2496](https://github.com/metadist/synaplan/pull/2496)–[#2500](https://github.com/metadist/synaplan/pull/2500)): `ConfigController`, `ChatHandler`, `StreamController` left every ledger; `docs/ARCHITECTURE.md` + `make -C backend metrics` on `main`. The exit holds for those three classes, not for the whole chat path — `MessageProcessor` and the handlers below the orchestrator are still over the limits (row 2b). | No chat-path class over 800 lines or 10 constructor deps; `docs/ARCHITECTURE.md` + `make metrics` on `main`. |
+| 2b | **Code cleanup V3** — three bad ideas, three fixes: copied helpers in the four chat-path god classes, buffered / streamed twins in `MessageProcessor` and `FileAnalysisHandler`, 36-dependency lists in `SeedAllCommand` and `UserDeletionService` | [`20261015-code-cleanup-V3/`](./20261015-code-cleanup-V3/00_master_plan.md) | Plan 2026-10-15 (K0); K1–K9 on branch `refactor/code-cleanup-v3`. Ten further audit findings ordered as V4 in its §7 — the frontend size ratchet and `ChatView.vue` first. | `MessageProcessor` and `FileAnalysisHandler` out of the file and constructor ledgers, `SeedAllCommand` and `UserDeletionService` out of the constructor ledger, no private `notify()` copy in `Service/Message/`. **Opens the feature window.** |
 
 ### Paused — resume after the cleanup window, in this order
 
@@ -109,8 +110,9 @@ mirrors this table.
 | [`ROADMAP.md`](./ROADMAP.md) | This file | live |
 | [`20260907_ux_user_flows.md`](./20260907_ux_user_flows.md) + [`20260907_ux_user_flows/`](./20260907_ux_user_flows/) | Binding UX contract (U1–U12) and journey notes | binding |
 | [`20260913-use-case-research/`](./20260913-use-case-research/README.md) | Ten jobs, Perfect-UX bar, Q-list | binding; Q2–Q9 open |
-| [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | Layers enforced, Service root sorted | **cleanup window (row 1)** |
-| [`20261014-code-cleanup-V2/`](./20261014-code-cleanup-V2/00_master_plan.md) | God classes | **cleanup window (row 2)** |
+| [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | Layers enforced, Service root sorted | shipped (row 1); archived with V3 |
+| [`20261014-code-cleanup-V2/`](./20261014-code-cleanup-V2/00_master_plan.md) | God classes | shipped (row 2); archived with V3 |
+| [`20261015-code-cleanup-V3/`](./20261015-code-cleanup-V3/00_master_plan.md) | Three bad ideas, three fixes; V4 order in §7 | **cleanup window (row 2b)** |
 | [`20261009-ux-overhaul/`](./20261009-ux-overhaul/00_master_plan.md) | UX overhaul UX00–UX14 | paused (row 3) |
 | [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | 5.2.0 external test triage, 50 issue drafts | paused; bug fixes continue (row 4) |
 | [`20260903_secure_compute/`](./20260903_secure_compute/00_master_plan.md) | Secure Compute; B4 remainder | paused (row 5) |
@@ -124,7 +126,7 @@ mirrors this table.
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/00_master_plan.md) | Collabora epics 0–4 | queued (row 13, partner) |
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts AA1–AA8 | not started (row 14) |
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/00_master_plan.md) | Config pyramid | not started (row 15) |
-| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat | in review — [#2477](https://github.com/metadist/synaplan/pull/2477), opened before the cleanup window, not on `main` yet |
+| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat | on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), [#2507](https://github.com/metadist/synaplan/pull/2507)); its STATUS records the GPU walk as not done |
 
 ---
 
@@ -179,3 +181,5 @@ This file is the overview. It does not replace track STATUS files.
 | 2026-10-14 | **Cleanup first.** Code cleanup V1 and V2 are rows 1–2 and form a window in which no feature work lands: only bug fixes, security fixes and release blockers. Paused tracks finish their current PR and stop; scheduler P3 (ops, no code here) and the community-test bug fixes continue. The window closes when V2 meets its exit. |
 | 2026-10-14 | **Cloud file sharing registered** (row 9) after [#2467](https://github.com/metadist/synaplan/pull/2467) merged during this housekeeping; it absorbs Nextcloud S3 and the Q-list folder watch. Its place among the queued rows is the owner's call. |
 | 2026-10-14 | **Prompting flow requested** (row 8): work on files the way an IDE assistant does. Queued as the first feature after the window because it reshapes the chat pipeline V2 extracts. Plan folder `20261014-prompting-flow/` reserved, not yet written. Building blocks already on `main` that the plan reuses rather than rebuilds: `@`-mentions in the composer (`FileMentionPalette`), the conversation file catalog (`ConversationFileCatalog`), 30+ document tools for docx / xlsx / pptx behind `DocumentEditCoordinator` + `ChatToolLoop`, per-file revisions (`DocumentRevision`, `FileRevisionsPanel`), the task planner with ~20 runners incl. `CodeRunRunner` (compute sandbox), `AskUserRunner` and `SaveToFolderRunner`, the approval and ask-the-user cards, SSE status events, the `AgainHandler`, desktop jobs for files on the user's computer. What is missing is listed in the owner's brief of 2026-10-14 and goes into the plan's §0. |
+| 2026-10-15 | **V1 and V2 shipped; the window is extended by Code cleanup V3** (row 2b). An audit of `main` after V2 found its broader goal unmet: the chat path continues below `ChatStreamOrchestrator` into `MessageProcessor` (2,111 lines, 21 deps) and three handlers of ~2,000 lines, with the buffered / streamed twins and copied helpers V2 removed one layer up. V3 fixes three bad ideas only — copied helpers, twin pipelines, hand-wired 36-dependency lists — and orders the other ten findings as V4 (V3 §7; frontend size ratchet and `ChatView.vue` first). The window closes when V3 meets its exit. V1–V3 move to the archive together when V3 closes. |
+| 2026-10-15 | Live voice ([`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md)) is on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), [#2507](https://github.com/metadist/synaplan/pull/2507)); the §3 row said "not on `main` yet". It stays live until its STATUS closes the GPU walk. |
