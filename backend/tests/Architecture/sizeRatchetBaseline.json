@@ -9,7 +9,7 @@
     },
     "counts": {
         "fileLines": 57,
-        "constructorParams": 70,
+        "constructorParams": 69,
         "methodLines": 147
     },
     "fileLines": {
@@ -114,7 +114,6 @@
         "src/Service/Email/InboundEmailHandlerService.php::InboundEmailHandlerService": 12,
         "src/Service/File/FileProcessor.php::FileProcessor": 17,
         "src/Service/File/FileUploadService.php::FileUploadService": 12,
-        "src/Service/Iam/UserDeletionService.php::UserDeletionService": 36,
         "src/Service/Mcp/McpOAuthState.php::McpOAuthState": 11,
         "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler": 22,
         "src/Service/Message/MessageClassifier.php::MessageClassifier": 21,
