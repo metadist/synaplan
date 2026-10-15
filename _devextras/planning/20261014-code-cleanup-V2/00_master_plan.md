@@ -202,6 +202,38 @@ StreamController (≤ 200 lines)   four routes, auth, delegates
 `handleNonStreamingRequest()` (~450 lines) reuses the orchestrator with a
 buffered sink — the same move as in ChatHandler.
 
+**As delivered (G8–G10).** `StreamController` is 417 lines with 3
+dependencies — its four routes keep their OpenAPI attributes in place, which
+is most of the file, so `/api/doc.json` stays byte-identical. Everything else
+lives in `App\Service\Chat\Stream\`:
+
+```
+StreamController                 routes, rejection → JSON or guest-limit event
+  StreamRequestResolver          → StreamTurnRequest (StreamCaller, StreamUserInput, StreamTurnOptions)
+    StreamCallerResolver         signed-in / widget visitor / guest, UI language, country
+    StreamAgentPinResolver       pinned assistant, draft 403, unreachable 404, archived 410
+  ChatStreamOrchestrator         rate limit → run → prepare → route → relay → failure | reply + complete
+    StreamTurnPreparer           chat, continuation, quote source, incoming message, files, processing options
+    StreamModelRouting           expected model, streaming support
+    StreamRelayFactory           StreamChunkRelay (reasoning, JSON envelope, document progress, Stop), StreamStatusRelay
+    StreamFailureReporter        failed result, exceptions, buffered twin; cancellation is not a failure
+    StreamReplyPersister         reply text, files, model / media / plan / search metas
+    StreamCompletion             StreamTurnFinisher, StreamUsageRecorder, VoiceReplyStep, counters, `complete`
+    NonStreamingTurn             models that cannot stream
+  CancelledTurns                 save-cancelled, stop, cancel-node
+SseWriter (App\Service\Realtime) one frame per event, recorded into the resumable run
+```
+
+`StreamTurnState` is the working set the steps share; a step that fails
+halfway leaves what it created, so the error path still stores the error
+reply. Deviations from the target: the buffered twin is its own step
+(`NonStreamingTurn`) that reuses the stream's collaborators rather than a
+sink of the orchestrator — its payload shape and order differ from the
+streamed one and the transcript pins them; and the voice reply works on a
+`StreamCompleteEvent` instead of by-reference arrays. G10 added
+`docs/ARCHITECTURE.md` and `make -C backend metrics`, which prints the scan of
+the size ratchet (`tests/Architecture/Support/SizeOffenders.php`).
+
 ### Next tier
 
 `MessageProcessor`, `MediaGenerationHandler`, `WhatsAppService`,

@@ -60,6 +60,11 @@ lines**), `/save-cancelled`, `/stop-stream`, `/cancel-node`.
 `handleNonStreamingRequest()` (~450 lines) is the buffered twin of the
 stream body.
 
+> Delivered in G8–G9 with more, smaller collaborators than the table below
+> proposes (the orchestrator would otherwise exceed ten dependencies). The
+> real class map is in `00_master_plan.md` §3, "As delivered (G8–G10)", and
+> in `docs/ARCHITECTURE.md`.
+
 ### Clusters → target classes
 
 | Target (folder) | Private methods today | Ctor deps that move |

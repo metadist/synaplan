@@ -477,6 +477,7 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 
 ## Detailed Documentation
 
+- `docs/ARCHITECTURE.md` — backend layers, size limits (`make -C backend metrics`), the chat and stream request paths
 - `docs/PHP_CONVENTIONS.md` — PHP code style, examples, patterns
 - `docs/FRONTEND_CONVENTIONS.md` — TypeScript, Vue, styling tokens, i18n
 - `docs/API_PATTERNS.md` — Zod schemas, OpenAPI, httpClient usage

@@ -2,44 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Controller;
+namespace App\Tests\Unit\Service\Chat\Stream;
 
-use App\AI\Service\AiFacade;
-use App\Controller\StreamController;
 use App\Entity\Message;
-use App\Repository\FileRepository;
-use App\Service\Billing\BillingService;
-use App\Service\Billing\PremiumFeatureGate;
-use App\Service\Chat\ChatTitleService;
-use App\Service\Chat\ConversationSummaryRefreshDispatcher;
-use App\Service\Chat\GuestChatConfig;
-use App\Service\Chat\GuestSessionService;
-use App\Service\File\DocumentGeneratorService;
-use App\Service\File\DocumentImageReferenceResolver;
-use App\Service\File\UserUploadPathBuilder;
-use App\Service\Media\GeneratedFileRegistrar;
-use App\Service\Media\MediaCancellationStore;
-use App\Service\Media\MediaJobMessageSync;
-use App\Service\Media\MediaJobService;
-use App\Service\Memory\MemoryExtractionDispatcher;
-use App\Service\Message\ChatErrorNotifier;
-use App\Service\Message\ChatErrorPresenter;
-use App\Service\Message\MessageForwardingService;
-use App\Service\Message\MessageProcessor;
-use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
-use App\Service\RateLimitService;
-use App\Service\Usage\UsageStatsService;
-use App\Service\Usage\UsageTaximeterConfig;
-use App\Service\Widget\WidgetService;
-use App\Service\Widget\WidgetSessionService;
-use App\Tests\Support\ChatRunServiceFactory;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\Chat\Stream\StreamMessageMeta;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
- * Unit coverage for {@see StreamController::persistOriginalMediaMeta()}.
+ * Unit coverage for {@see StreamMessageMeta::persistOriginalMediaMeta()}.
  *
  * Issue #624: MEDIAMAKER audio responses used to leave the message
  * without `original_topic` / `original_media_type` meta, so the chat
@@ -48,46 +19,13 @@ use Psr\Log\NullLogger;
  * classification routes through `mediamaker`, regardless of streaming
  * vs non-streaming code path.
  */
-class StreamControllerOriginalMediaMetaTest extends TestCase
+class StreamOriginalMediaMetaTest extends TestCase
 {
-    private StreamController $controller;
+    private StreamMessageMeta $meta;
 
     protected function setUp(): void
     {
-        $this->controller = new StreamController(
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(AiFacade::class),
-            $this->createMock(MessageProcessor::class),
-            new NullLogger(),
-            $this->createMock(ModelConfigService::class),
-            $this->createMock(WidgetService::class),
-            $this->createMock(WidgetSessionService::class),
-            $this->createMock(GuestSessionService::class),
-            $this->createStub(GuestChatConfig::class),
-            $this->createMock(RateLimitService::class),
-            '/tmp/upload',
-            $this->createMock(UserUploadPathBuilder::class),
-            $this->createMock(PromptService::class),
-            $this->createMock(MessageForwardingService::class),
-            $this->createMock(MemoryExtractionDispatcher::class),
-            $this->createMock(ConversationSummaryRefreshDispatcher::class),
-            $this->createStub(ChatTitleService::class),
-            $this->createMock(DocumentGeneratorService::class),
-            $this->createMock(DocumentImageReferenceResolver::class),
-            $this->createMock(MediaCancellationStore::class),
-            $this->createMock(MediaJobService::class),
-            $this->createMock(MediaJobMessageSync::class),
-            new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
-            $this->createMock(UsageStatsService::class),
-            $this->createMock(UsageTaximeterConfig::class),
-            new PremiumFeatureGate(new BillingService('', '')),
-            ChatRunServiceFactory::withoutRedis(),
-            $this->createMock(ChatErrorPresenter::class),
-            $this->createMock(ChatErrorNotifier::class),
-            $this->createMock(\App\Service\Agent\AgentConfig::class),
-            $this->createMock(\App\Service\Agent\AgentService::class),
-            $this->createMock(\App\Service\Agent\AgentRuntimeResolver::class),
-        );
+        $this->meta = new StreamMessageMeta(new NullLogger());
     }
 
     public function testPersistsOriginalMetaForMediamakerAudio(): void
@@ -201,7 +139,6 @@ class StreamControllerOriginalMediaMetaTest extends TestCase
      */
     private function invokeHelper(Message $message, array $classification, array $metadata): void
     {
-        $reflection = new \ReflectionMethod(StreamController::class, 'persistOriginalMediaMeta');
-        $reflection->invoke($this->controller, $message, $classification, $metadata);
+        $this->meta->persistOriginalMediaMeta($message, $classification, $metadata);
     }
 }

@@ -92,6 +92,14 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
             $client->loginUser($user);
         }
 
+        // The doubles replace container services before the controller is
+        // built, so the transcript runs through the real stream wiring.
+        if ('guest' === $scenario['kind']) {
+            $this->installGuestLimit();
+        } else {
+            static::getContainer()->set(MessageProcessor::class, $this->scriptedProcessor($scenario));
+        }
+
         /** @var StreamController $controller */
         $controller = $client->getContainer()->get(StreamController::class);
         $flag = new \ReflectionProperty(StreamController::class, 'sseCaptureMode');
@@ -100,7 +108,6 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
         $chatId = null;
         try {
             if ('guest' === $scenario['kind']) {
-                $this->installGuestLimit($controller);
                 $request = Request::create('/api/v1/messages/stream', 'GET', [
                     'guestSession' => 'guest-limit',
                     'message' => 'Hello',
@@ -110,8 +117,6 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
                 if ('persisted' === $scenario['kind']) {
                     $chatId = $this->openChat($client, $user);
                 }
-                $processor = new \ReflectionProperty(StreamController::class, 'messageProcessor');
-                $processor->setValue($controller, $this->scriptedProcessor($scenario));
                 $body = [
                     'message' => 'Hello, how are you today?',
                     'trackId' => 4242,
@@ -181,7 +186,7 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
         return $processor;
     }
 
-    private function installGuestLimit(StreamController $controller): void
+    private function installGuestLimit(): void
     {
         $config = $this->createMock(GuestChatConfig::class);
         $config->method('isEnabled')->willReturn(true);
@@ -191,8 +196,8 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
         $sessions->method('getSession')->willReturn($session);
         $sessions->method('checkLimit')->willReturn(false);
 
-        (new \ReflectionProperty(StreamController::class, 'guestChatConfig'))->setValue($controller, $config);
-        (new \ReflectionProperty(StreamController::class, 'guestSessionService'))->setValue($controller, $sessions);
+        static::getContainer()->set(GuestChatConfig::class, $config);
+        static::getContainer()->set(GuestSessionService::class, $sessions);
     }
 
     /**

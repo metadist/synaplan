@@ -2,44 +2,18 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Controller;
+namespace App\Tests\Unit\Service\Chat\Stream;
 
-use App\AI\Service\AiFacade;
-use App\Controller\StreamController;
 use App\Entity\File;
 use App\Repository\FileRepository;
-use App\Service\Billing\BillingService;
-use App\Service\Billing\PremiumFeatureGate;
-use App\Service\Chat\ChatTitleService;
-use App\Service\Chat\ConversationSummaryRefreshDispatcher;
-use App\Service\Chat\GuestChatConfig;
-use App\Service\Chat\GuestSessionService;
-use App\Service\File\DocumentGeneratorService;
-use App\Service\File\DocumentImageReferenceResolver;
-use App\Service\File\UserUploadPathBuilder;
+use App\Service\Chat\Stream\StreamGeneratedFiles;
+use App\Service\File\GeneratedFileWriter;
 use App\Service\Media\GeneratedFileRegistrar;
-use App\Service\Media\MediaCancellationStore;
-use App\Service\Media\MediaJobMessageSync;
-use App\Service\Media\MediaJobService;
-use App\Service\Memory\MemoryExtractionDispatcher;
-use App\Service\Message\ChatErrorNotifier;
-use App\Service\Message\ChatErrorPresenter;
-use App\Service\Message\MessageForwardingService;
-use App\Service\Message\MessageProcessor;
-use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
-use App\Service\RateLimitService;
-use App\Service\Usage\UsageStatsService;
-use App\Service\Usage\UsageTaximeterConfig;
-use App\Service\Widget\WidgetService;
-use App\Service\Widget\WidgetSessionService;
-use App\Tests\Support\ChatRunServiceFactory;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
- * Unit coverage for {@see StreamController::persistTaskPlanFiles()}.
+ * Unit coverage for {@see StreamGeneratedFiles::persistTaskPlanFiles()}.
  *
  * Issue #1055: in multi-node task plans the FIRST output file was only
  * persisted via the legacy BFILE/BFILEPATH columns — never as a File
@@ -52,45 +26,16 @@ use Psr\Log\NullLogger;
  * TTS source_text) via GeneratedFileRegistrar, but is not returned for
  * Message::addFile().
  */
-class StreamControllerTaskPlanFilesTest extends TestCase
+class StreamTaskPlanFilesTest extends TestCase
 {
-    private StreamController $controller;
+    private StreamGeneratedFiles $files;
 
     protected function setUp(): void
     {
-        $this->controller = new StreamController(
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(AiFacade::class),
-            $this->createMock(MessageProcessor::class),
+        $this->files = new StreamGeneratedFiles(
+            $this->createStub(GeneratedFileWriter::class),
+            new GeneratedFileRegistrar($this->createStub(FileRepository::class), new NullLogger(), '/tmp/upload'),
             new NullLogger(),
-            $this->createMock(ModelConfigService::class),
-            $this->createMock(WidgetService::class),
-            $this->createMock(WidgetSessionService::class),
-            $this->createMock(GuestSessionService::class),
-            $this->createStub(GuestChatConfig::class),
-            $this->createMock(RateLimitService::class),
-            '/tmp/upload',
-            $this->createMock(UserUploadPathBuilder::class),
-            $this->createMock(PromptService::class),
-            $this->createMock(MessageForwardingService::class),
-            $this->createMock(MemoryExtractionDispatcher::class),
-            $this->createMock(ConversationSummaryRefreshDispatcher::class),
-            $this->createStub(ChatTitleService::class),
-            $this->createMock(DocumentGeneratorService::class),
-            $this->createMock(DocumentImageReferenceResolver::class),
-            $this->createMock(MediaCancellationStore::class),
-            $this->createMock(MediaJobService::class),
-            $this->createMock(MediaJobMessageSync::class),
-            new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
-            $this->createMock(UsageStatsService::class),
-            $this->createMock(UsageTaximeterConfig::class),
-            new PremiumFeatureGate(new BillingService('', '')),
-            ChatRunServiceFactory::withoutRedis(),
-            $this->createMock(ChatErrorPresenter::class),
-            $this->createMock(ChatErrorNotifier::class),
-            $this->createMock(\App\Service\Agent\AgentConfig::class),
-            $this->createMock(\App\Service\Agent\AgentService::class),
-            $this->createMock(\App\Service\Agent\AgentRuntimeResolver::class),
         );
     }
 
@@ -179,11 +124,6 @@ class StreamControllerTaskPlanFilesTest extends TestCase
      */
     private function invokeHelper(array $taskFiles): array
     {
-        $reflection = new \ReflectionMethod(StreamController::class, 'persistTaskPlanFiles');
-
-        /** @var list<File> $result */
-        $result = $reflection->invoke($this->controller, $taskFiles, 7);
-
-        return $result;
+        return $this->files->persistTaskPlanFiles($taskFiles, 7);
     }
 }
