@@ -172,6 +172,31 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
         self::assertArrayNotHasKey(MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY, $result['metadata']);
     }
 
+    /**
+     * Live voice can hand over a message that was never stored (the transcript
+     * row failed) without being incognito. The memory job cannot reference it;
+     * that must cost the memory, never the generated audio.
+     */
+    public function testAMessageThatWasNeverStoredStillGetsItsAudio(): void
+    {
+        $handler = $this->handler($this->chatHandler);
+        $message = $this->messageStub('Lies mir bitte folgenden Text als Sprachnachricht vor: Guten Morgen zusammen.', null);
+
+        $this->promptExtractor->method('extract')->willReturn([
+            'prompt' => 'Guten Morgen zusammen.',
+            'media_type' => 'audio',
+        ]);
+        $this->aiFacade->expects(self::once())
+            ->method('synthesize')
+            ->willReturn(['relativePath' => '7/tts.mp3', 'provider' => 'openai', 'model' => 'tts-1', 'text_length' => 22]);
+        $this->messageBus->expects(self::never())->method('dispatch');
+
+        $result = $handler->handle($message, [], ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'audio']);
+
+        self::assertSame('__AUDIO_GENERATED__', $result['content']);
+        self::assertSame('audio', $result['metadata']['media_type'] ?? null);
+    }
+
     public function testSlashTtsCommandSpeaksExactlyWhatWasTyped(): void
     {
         $handler = $this->handler($this->chatHandler);
@@ -270,13 +295,13 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
         ]);
     }
 
-    private function messageStub(string $text): Message&MockObject
+    private function messageStub(string $text, ?int $id = 1001): Message&MockObject
     {
         $message = $this->createMock(Message::class);
         $message->method('getUserId')->willReturn(7);
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn('de');
-        $message->method('getId')->willReturn(1001);
+        $message->method('getId')->willReturn($id);
         $message->method('getChat')->willReturn(null);
         $message->method('getFile')->willReturn(0);
         $message->method('getFilePath')->willReturn('');

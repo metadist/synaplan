@@ -109,6 +109,17 @@ final readonly class PendingMemoryExtraction
             return null;
         }
 
+        if (null === $message->getId()) {
+            // The job references the stored message. Live voice hands over a
+            // message that was never stored when its transcript row could not
+            // be written; the turn is answered, its memories are not mined.
+            $this->logger->info('Memory extraction skipped: the message was never stored', [
+                'user_id' => $message->getUserId(),
+            ]);
+
+            return null;
+        }
+
         if ($disabledByRequest) {
             $this->logger->info('ChatHandler: Memory extraction disabled by request, skipping', array_merge([
                 'user_id' => $message->getUserId(),
