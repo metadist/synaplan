@@ -42,10 +42,10 @@ final readonly class UserDeletionService
             'email' => $email,
         ]);
 
-        $erasure = new UserErasure($userId, $email);
         $this->em->getConnection()->beginTransaction();
 
         try {
+            $erasure = new UserErasure($userId, $email);
             foreach ($this->erasers as $eraser) {
                 $eraser->erase($erasure);
             }
