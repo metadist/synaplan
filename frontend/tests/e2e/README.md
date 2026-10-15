@@ -65,7 +65,7 @@ Widget E2E tests use the page at `/widget-test.html`. Tests use `page.route()` t
 
 The TestProvider is available in **dev and test** environments (not in prod). Fixtures seed test models (negative IDs -1…-7, one per capability tag) in both stacks. Negative IDs never collide with auto-increment. `selectable=0` keeps them out of user-facing dropdowns. ANALYZE uses the chat model (ID -1) since `CAPABILITY_TAGS` maps ANALYZE to the `chat` tag.
 
-**Global defaults are set automatically** by `global-setup.ts` (Playwright `globalSetup`). Before any test runs, the setup logs in as admin and sets the system-wide default models (ownerId=0) to TestProvider via `POST /api/v1/config/models/defaults` with `global: true`. This covers all channels — chat, widget, email, and WhatsApp — without per-test setup.
+**Global defaults are set automatically** by `global-setup.ts` (Playwright `globalSetup`). Before any test runs, the setup logs in as admin and sets the system-wide default models (ownerId=0) to TestProvider via `POST /api/v1/config/models/defaults` with `global: true`. This covers all channels — chat, widget, email, and WhatsApp — without per-test setup. Outside CI the previous instance defaults are first saved to `tests/e2e/.model-defaults-snapshot.json`, and `global-teardown.ts` writes them back after the run, so the dev stack does not keep answering with stubs. A run that dies before its teardown leaves the file behind; the next run keeps it and restores those values.
 
 Individual tests do **not** need to call any TestProvider helper. The global defaults apply to every user and every channel fallback automatically.
 

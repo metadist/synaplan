@@ -53,6 +53,12 @@ final class DefaultModelsResponse extends OA\Response
                         description: 'Where each default comes from: admin, group, or user',
                         additionalProperties: new OA\AdditionalProperties(type: 'string', enum: ['admin', 'group', 'user'])
                     ),
+                    new OA\Property(
+                        property: 'stored',
+                        type: 'object',
+                        description: 'Only with `scope=instance`: the saved system-wide model ID per capability, before the fallback that replaces a model whose provider has no key (null when nothing is saved). `defaults` is what answers; `stored` is what an admin configured.',
+                        additionalProperties: new OA\AdditionalProperties(type: 'integer', nullable: true)
+                    ),
                 ]
             ),
         );

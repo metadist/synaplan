@@ -29,6 +29,7 @@ frontend/tests/e2e/
 ├── tests/                 # All *.spec.ts files
 ├── playwright.config.ts   # Global Playwright config
 ├── global-setup.ts        # Runs once before all tests (admin login, TestProvider defaults)
+├── global-teardown.ts     # Runs once after all tests (restores the previous defaults locally)
 └── test-setup.ts          # Worker fixtures: per-worker user + pre-authenticated storageState
 ```
 

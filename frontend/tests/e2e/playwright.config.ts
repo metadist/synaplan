@@ -18,6 +18,7 @@ const headed = ['1', 'true', 'yes'].includes((process.env.HEADED ?? '').toLowerC
 
 export default defineConfig({
   globalSetup: './global-setup.ts',
+  globalTeardown: './global-teardown.ts',
   testDir: 'tests',
   testMatch: '**/*.spec.ts',
   retries: process.env.CI ? 1 : 0,
