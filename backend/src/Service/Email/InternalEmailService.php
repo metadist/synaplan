@@ -562,6 +562,7 @@ final readonly class InternalEmailService
      */
     public function sendModelHealthAlert(ModelHealthAlert $alert, bool $resolved = false): void
     {
+        $paragraph = static fn (string $text): string => '' === $text ? '' : '<p>'.htmlspecialchars($text, ENT_QUOTES).'</p>';
         $adminEmail = $this->operatorInbox();
         if (null === $adminEmail) {
             $this->logger->debug('No admin email configured, skipping model health alert');
@@ -581,14 +582,17 @@ final readonly class InternalEmailService
         if ($resolved) {
             $banner = '#2e7d32';
             $title = '✅ RESOLVED — AI models available again';
-            $lead = "<p><strong>{$count}</strong> model(s) from <strong>{$provider}</strong> are working again. No action needed.</p>";
-            $action = '';
+            $lead = $count > 0
+                ? "<p><strong>{$count}</strong> model(s) from <strong>{$provider}</strong> are working again. No action needed.</p>"
+                : "<p>The reported models from <strong>{$provider}</strong> are working again. No action needed.</p>";
+            $action = $paragraph($alert->relapseNotice());
             $subject = '[RESOLVED][Synaplan] '.$alert->name().' models available again';
         } else {
             $banner = '#c62828';
             $title = '🚨 INCIDENT — AI models unavailable';
             $lead = "<p><strong>{$count}</strong> model(s) from <strong>{$provider}</strong> are currently not usable.</p>";
-            $action = '<p><strong>Action required:</strong> '.htmlspecialchars($alert->actionRequired(), ENT_QUOTES).'</p>';
+            $action = '<p><strong>Action required:</strong> '.htmlspecialchars($alert->actionRequired(), ENT_QUOTES).'</p>'
+                .$paragraph($alert->quietPeriodNotice());
             $subject = '[INCIDENT][Synaplan] '.$alert->headline();
         }
 

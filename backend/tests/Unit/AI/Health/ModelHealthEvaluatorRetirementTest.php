@@ -116,8 +116,12 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
             new NullLogger(),
         );
 
+        $health = $this->createStub(ModelHealthRepository::class);
+        $health->method('findIndexedByModelId')->willReturn([]);
+
         $alerter = new ModelHealthAlerter(
             new ArrayAdapter(),
+            $health,
             $config,
             $this->createMock(InternalEmailService::class),
             $this->createMock(DiscordNotificationService::class),

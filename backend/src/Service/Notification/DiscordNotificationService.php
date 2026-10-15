@@ -952,11 +952,10 @@ final readonly class DiscordNotificationService
      * this one is an incident about models failing right now — including the
      * account-specific failures a catalog comparison cannot see.
      *
-     * One message per provider rather than per model — see
-     * {@see ModelHealthAlert}. `@everyone` is reserved for the
-     * credential case: a rejected key or an empty balance takes out every model
-     * behind that provider and only an operator can fix it, whereas a provider
-     * retiring a single model can wait for office hours.
+     * One message per provider per check, not per model ({@see ModelHealthAlert}).
+     * `@everyone` is only for the credential case: a rejected key or an empty
+     * balance takes out every model behind that provider and only an operator
+     * can fix it, whereas a retired model can wait for office hours.
      */
     public function notifyModelHealth(ModelHealthAlert $alert, bool $resolved = false): void
     {
@@ -987,10 +986,11 @@ final readonly class DiscordNotificationService
             ],
         ];
 
-        if (!$resolved) {
+        $next = $resolved ? $alert->relapseNotice() : trim($alert->actionRequired()."\n".$alert->quietPeriodNotice());
+        if ('' !== $next) {
             $fields[] = [
-                'name' => 'Action required',
-                'value' => $alert->actionRequired(),
+                'name' => $resolved ? 'If it fails again' : 'Action required',
+                'value' => $next,
                 'inline' => false,
             ];
         }
@@ -1001,7 +1001,7 @@ final readonly class DiscordNotificationService
                 : '🚨 [INCIDENT] '.$alert->headline(),
             color: $resolved ? self::COLOR_SUCCESS : self::COLOR_ERROR,
             fields: $fields,
-            footer: 'Synaplan Model Health · one alert per provider',
+            footer: 'Synaplan Model Health · each model at most once per '.$alert->quietPeriod(),
             mentionEveryone: !$resolved && ModelHealthAlert::KIND_CREDENTIAL === $alert->kind,
         );
     }

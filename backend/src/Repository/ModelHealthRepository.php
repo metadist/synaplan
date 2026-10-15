@@ -56,6 +56,16 @@ class ModelHealthRepository extends ServiceEntityRepository
      */
     public function findOrCreate(int $modelId): ModelHealth
     {
+        // The health check creates the row and then stamps BLASTALERTED in
+        // the same request, before flush. findOneBy only sees committed rows,
+        // so a second call would persist a duplicate and the unique key would
+        // reject the flush — and the stamp would never land.
+        foreach ($this->getEntityManager()->getUnitOfWork()->getScheduledEntityInsertions() as $entity) {
+            if ($entity instanceof ModelHealth && $entity->getModelId() === $modelId) {
+                return $entity;
+            }
+        }
+
         $health = $this->findByModelId($modelId);
         if (null !== $health) {
             return $health;
@@ -65,6 +75,26 @@ class ModelHealthRepository extends ServiceEntityRepository
         $this->getEntityManager()->persist($health);
 
         return $health;
+    }
+
+    /**
+     * Record that an incident message named these models, and write it now.
+     *
+     * The message is already out. Waiting for the end of the health run would
+     * lose the stamp when a later provider aborts the run or the scheduler's
+     * timeout kills it, and the next run would send the same message again.
+     *
+     * @param list<int> $modelIds
+     */
+    public function stampAlerted(array $modelIds, string $kind, int $at): void
+    {
+        foreach ($modelIds as $modelId) {
+            $this->findOrCreate($modelId)
+                ->setLastAlerted($at)
+                ->setLastAlertedKind($kind);
+        }
+
+        $this->getEntityManager()->flush();
     }
 
     /**
