@@ -70,6 +70,61 @@ export function throwIfLiveVoiceAborted(signal?: AbortSignal): void {
 }
 
 /**
+ * AudioWorklet scripts are classic scripts. The playback worklet is a module
+ * so tests can import it; the exports have to go before addModule.
+ */
+export function classicWorkletSource(source: string): string {
+  return source.replace(/^export /gm, '')
+}
+
+/**
+ * PCM16 frames are two bytes per sample. A frame can end on the odd byte;
+ * that byte belongs to the next frame instead of being dropped.
+ */
+export class PcmFrameAssembler {
+  private pending: number | null = null
+
+  reset(): void {
+    this.pending = null
+  }
+
+  push(frame: ArrayBuffer): Int16Array | null {
+    const incoming = new Uint8Array(frame)
+    const total = incoming.length + (this.pending === null ? 0 : 1)
+    const even = total - (total % 2)
+    if (even === 0) {
+      if (incoming.length === 1) this.pending = incoming[0] ?? null
+      return null
+    }
+    const bytes = new Uint8Array(even)
+    let offset = 0
+    if (this.pending !== null) {
+      bytes[0] = this.pending
+      offset = 1
+    }
+    const take = even - offset
+    bytes.set(incoming.subarray(0, take), offset)
+    this.pending = total % 2 === 1 ? (incoming[incoming.length - 1] ?? null) : null
+    return new Int16Array(bytes.buffer)
+  }
+}
+
+async function addPlaybackWorklet(context: AudioContext): Promise<void> {
+  const url = new URL('./pcm-playback.worklet.js', import.meta.url)
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('worklet')
+  const blob = new Blob([classicWorkletSource(await response.text())], {
+    type: 'application/javascript',
+  })
+  const blobUrl = URL.createObjectURL(blob)
+  try {
+    await context.audioWorklet.addModule(blobUrl)
+  } finally {
+    URL.revokeObjectURL(blobUrl)
+  }
+}
+
+/**
  * Microphone to PCM16, and provider PCM16 back to the speakers.
  * The AudioContext and getUserMedia call must be created in the click turn.
  */
@@ -84,7 +139,7 @@ export async function openLiveVoiceAudio(input: {
 }): Promise<LiveVoiceAudioSession> {
   throwIfLiveVoiceAborted(input.signal)
   await input.context.audioWorklet.addModule(new URL('./pcm-capture.worklet.js', import.meta.url))
-  await input.context.audioWorklet.addModule(new URL('./pcm-playback.worklet.js', import.meta.url))
+  await addPlaybackWorklet(input.context)
   throwIfLiveVoiceAborted(input.signal)
 
   const source = input.context.createMediaStreamSource(input.mic)
@@ -108,6 +163,7 @@ export async function openLiveVoiceAudio(input: {
 
   const socket = new WebSocket(input.wsUrl)
   socket.binaryType = 'arraybuffer'
+  const frames = new PcmFrameAssembler()
   let muted = false
   let closed = false
   let stopped = false
@@ -140,12 +196,14 @@ export async function openLiveVoiceAudio(input: {
   socket.onmessage = (event) => {
     if (typeof event.data !== 'string') {
       if (input.context.state === 'suspended') void input.context.resume()
-      const pcm = new Int16Array(event.data as ArrayBuffer)
+      const pcm = frames.push(event.data as ArrayBuffer)
+      if (!pcm) return
       playback.port.postMessage({ type: 'pcm', pcm }, [pcm.buffer])
       input.handlers.onAudioOut()
       return
     }
     applyControlMessage(event.data, input.handlers, () => {
+      frames.reset()
       playback.port.postMessage({ type: 'flush' })
     })
   }
