@@ -88,6 +88,14 @@ class ModelHealth
     #[ORM\Column(name: 'BUPDATED', type: 'bigint', options: ['default' => 0])]
     private int $updated = 0;
 
+    /**
+     * Unix time of the last incident message that named this model.
+     * Zero means it has never been reported. Recovery does not clear it:
+     * the same model stays quiet for the configured period either way.
+     */
+    #[ORM\Column(name: 'BLASTALERTED', type: 'bigint', options: ['default' => 0])]
+    private int $lastAlerted = 0;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -249,6 +257,18 @@ class ModelHealth
     public function setUpdated(int $updated): self
     {
         $this->updated = $updated;
+
+        return $this;
+    }
+
+    public function getLastAlerted(): int
+    {
+        return $this->lastAlerted;
+    }
+
+    public function setLastAlerted(int $lastAlerted): self
+    {
+        $this->lastAlerted = max(0, $lastAlerted);
 
         return $this;
     }

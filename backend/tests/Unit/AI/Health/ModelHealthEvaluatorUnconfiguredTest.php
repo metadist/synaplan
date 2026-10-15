@@ -143,8 +143,12 @@ final class ModelHealthEvaluatorUnconfiguredTest extends TestCase
         $configRepository->method('getValue')->willReturn(null);
         $config = new ModelHealthConfig($configRepository);
 
+        $health = $this->createStub(ModelHealthRepository::class);
+        $health->method('findIndexedByModelId')->willReturn([]);
+
         $alerter = new ModelHealthAlerter(
             new ArrayAdapter(),
+            $health,
             $config,
             $this->createStub(InternalEmailService::class),
             $this->createStub(DiscordNotificationService::class),

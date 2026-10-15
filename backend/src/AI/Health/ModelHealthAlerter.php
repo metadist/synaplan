@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Health;
 
+use App\Repository\ModelHealthRepository;
 use App\Service\Email\InternalEmailService;
 use App\Service\Notification\DiscordNotificationService;
 use Psr\Cache\CacheItemPoolInterface;
@@ -12,27 +13,28 @@ use Psr\Log\LoggerInterface;
 /**
  * Decides whether an operator hears about a health event, and on which channel.
  *
- * Two pieces of state per (provider, kind), both in the shared Redis pool so
- * three web nodes do not send three copies of the same alert:
+ * Two different facts:
  *
- *   - a THROTTLE key that suppresses repeats of an alert already sent,
- *   - an OPEN key that remembers an incident is running.
- *
- * The second one is what makes the all-clear trustworthy. Without it, a restart
- * or an expired throttle would produce "resolved" for an incident nobody was
- * ever told about — and an all-clear for an alert you never saw is worse than
- * no all-clear at all.
+ *   - Which models were already named in an incident. That lives on the health
+ *     row (BLASTALERTED), not in Redis. A cache miss used to fail open and
+ *     send the same incident again on every check, and an all-clear used to
+ *     wipe the silence window so the next flicker paged immediately. Recovery
+ *     does not clear it: the same model stays quiet for the configured period.
+ *   - Whether an incident is open, so the all-clear is only sent for something
+ *     the operator was told about. That key is per provider and kind. It is
+ *     not the quiet period — a different model of the same provider still
+ *     pages the same day.
  */
 final readonly class ModelHealthAlerter
 {
-    private const THROTTLE_PREFIX = 'model_health.alert.';
     private const OPEN_PREFIX = 'model_health.open.';
 
-    /** An incident stays open far longer than the throttle window. */
+    /** An incident stays open far longer than one quiet period. */
     private const OPEN_TTL_SECONDS = 604800;
 
     public function __construct(
         private CacheItemPoolInterface $cache,
+        private ModelHealthRepository $health,
         private ModelHealthConfig $config,
         private InternalEmailService $email,
         private DiscordNotificationService $discord,
@@ -41,34 +43,65 @@ final readonly class ModelHealthAlerter
     }
 
     /**
-     * Raise an alert unless an identical one went out recently.
+     * Ids that are allowed to be named in an incident right now.
+     *
+     * @param list<int> $modelIds
+     *
+     * @return list<int>
+     */
+    public function dueModelIds(array $modelIds, ?int $now = null): array
+    {
+        $modelIds = array_values(array_unique(array_map(static fn (mixed $id): int => (int) $id, $modelIds)));
+        if ([] === $modelIds) {
+            return [];
+        }
+
+        $now ??= time();
+        $quietFor = $this->config->alertThrottleSeconds();
+        $rows = $this->health->findIndexedByModelId($modelIds);
+        $due = [];
+        foreach ($modelIds as $id) {
+            $last = isset($rows[$id]) ? $rows[$id]->getLastAlerted() : 0;
+            if ($last <= 0 || ($now - $last) >= $quietFor) {
+                $due[] = $id;
+            }
+        }
+
+        return $due;
+    }
+
+    /**
+     * Raise an alert for the models that are not already inside their quiet period.
+     *
+     * Models named here that were reported recently are dropped from the
+     * message rather than holding the new ones back.
      *
      * @return bool true when something was actually sent
      */
     public function raise(ModelHealthAlert $alert): bool
     {
-        $key = $this->key($alert);
-
-        if ($this->has(self::THROTTLE_PREFIX.$key)) {
-            $this->logger->debug('Model health alert throttled', [
+        $now = time();
+        $deliver = $this->onlyDue($alert, $now);
+        if (null === $deliver) {
+            $this->logger->debug('Model health alert still inside the quiet period', [
                 'provider' => $alert->provider,
                 'kind' => $alert->kind,
+                'models' => $alert->modelIds,
             ]);
 
             return false;
         }
 
-        $this->email->sendModelHealthAlert($alert);
-        $this->discord->notifyModelHealth($alert);
-
-        $this->remember(self::THROTTLE_PREFIX.$key, $this->config->alertThrottleSeconds());
-        $this->remember(self::OPEN_PREFIX.$key, self::OPEN_TTL_SECONDS);
+        $this->email->sendModelHealthAlert($deliver);
+        $this->discord->notifyModelHealth($deliver);
+        $this->markAlerted($deliver->modelIds, $now);
+        $this->remember(self::OPEN_PREFIX.$this->key($alert), self::OPEN_TTL_SECONDS);
 
         $this->logger->warning('Model health alert raised', [
-            'provider' => $alert->provider,
-            'kind' => $alert->kind,
-            'models' => $alert->modelCount(),
-            'reason' => $alert->reason,
+            'provider' => $deliver->provider,
+            'kind' => $deliver->kind,
+            'models' => $deliver->modelCount(),
+            'reason' => $deliver->reason,
         ]);
 
         return true;
@@ -76,6 +109,9 @@ final readonly class ModelHealthAlerter
 
     /**
      * Send the all-clear — but only for an incident the operator was told about.
+     *
+     * Does not end the per-model quiet period. A model that fails again the
+     * same day stays silent until that period has passed.
      *
      * @return bool true when an all-clear was actually sent
      */
@@ -91,9 +127,6 @@ final readonly class ModelHealthAlerter
         $this->discord->notifyModelHealth($alert, resolved: true);
 
         $this->forget(self::OPEN_PREFIX.$key);
-        // Drop the throttle too: the next incident on this provider deserves an
-        // immediate alert instead of inheriting the old one's silence window.
-        $this->forget(self::THROTTLE_PREFIX.$key);
 
         $this->logger->info('Model health alert resolved', [
             'provider' => $alert->provider,
@@ -124,13 +157,67 @@ final readonly class ModelHealthAlerter
         return preg_replace('/[^a-z0-9_]/', '_', mb_strtolower($provider)) ?? 'unknown';
     }
 
+    /**
+     * @return ModelHealthAlert|null the alert to send, or null when every model is still quiet
+     */
+    private function onlyDue(ModelHealthAlert $alert, int $now): ?ModelHealthAlert
+    {
+        if ([] === $alert->modelIds) {
+            $this->logger->warning('Model health alert has no model ids and was not sent', [
+                'provider' => $alert->provider,
+                'kind' => $alert->kind,
+            ]);
+
+            return null;
+        }
+
+        $due = array_flip($this->dueModelIds($alert->modelIds, $now));
+        $ids = [];
+        $names = [];
+        foreach ($alert->modelIds as $index => $id) {
+            if (!isset($due[$id])) {
+                continue;
+            }
+            $ids[] = $id;
+            $names[] = $alert->modelNames[$index] ?? ('model '.$id);
+        }
+
+        if ([] === $ids) {
+            return null;
+        }
+
+        if ($ids === $alert->modelIds) {
+            return $alert;
+        }
+
+        return new ModelHealthAlert(
+            $alert->kind,
+            $alert->provider,
+            $names,
+            $alert->reason,
+            $alert->displayName,
+            $ids,
+        );
+    }
+
+    /**
+     * @param list<int> $modelIds
+     */
+    private function markAlerted(array $modelIds, int $now): void
+    {
+        foreach ($modelIds as $modelId) {
+            $this->health->findOrCreate($modelId)->setLastAlerted($now);
+        }
+    }
+
     private function has(string $key): bool
     {
         try {
             return $this->cache->getItem($key)->isHit();
         } catch (\Throwable $e) {
-            // A cache outage must not silence alerting. Reporting "not sent
-            // yet" errs towards a duplicate alert, which beats silence.
+            // A cache outage must not invent an all-clear. Missing the
+            // open-incident flag skips a recovery message, which beats
+            // announcing a recovery nobody was told about.
             $this->logger->debug('Model health alert state read failed', ['error' => $e->getMessage()]);
 
             return false;

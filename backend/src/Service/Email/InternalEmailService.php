@@ -588,7 +588,8 @@ final readonly class InternalEmailService
             $banner = '#c62828';
             $title = '🚨 INCIDENT — AI models unavailable';
             $lead = "<p><strong>{$count}</strong> model(s) from <strong>{$provider}</strong> are currently not usable.</p>";
-            $action = '<p><strong>Action required:</strong> '.htmlspecialchars($alert->actionRequired(), ENT_QUOTES).'</p>';
+            $action = '<p><strong>Action required:</strong> '.htmlspecialchars($alert->actionRequired(), ENT_QUOTES).'</p>'
+                .'<p>'.htmlspecialchars($alert->quietPeriodNotice(), ENT_QUOTES).'</p>';
             $subject = '[INCIDENT][Synaplan] '.$alert->headline();
         }
 

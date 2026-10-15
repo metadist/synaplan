@@ -116,7 +116,7 @@ final readonly class ModelHealthEvaluator
             foreach ($catalogModels as $providerId => $rows) {
                 // A recorded retirement is a closed decision, not news. Probing
                 // those rows again only reconfirms what BRETIREDON already says
-                // and turns the hourly incident mail into a reminder about work
+                // and turns the incident mail into a reminder about work
                 // that is already done. Operator-disabled rows (BACTIVE=0, no
                 // retirement date) stay in the check: those can come back.
                 // Their verdict is marked, so it is shown but never alerted.
@@ -394,13 +394,18 @@ final readonly class ModelHealthEvaluator
         ];
 
         foreach ($buckets as $kind => $affected) {
-            if ([] !== $affected) {
+            // Quiet models stay in $affected so a still-broken model cannot
+            // look like a recovery. Only models outside the quiet period are
+            // named, which is what lets a new model page the same day.
+            $fresh = $this->freshVerdicts($affected);
+            if ([] !== $fresh) {
                 $alert = new ModelHealthAlert(
                     $kind,
                     $service,
-                    array_map(static fn (ModelHealthVerdict $v): string => $v->modelName, $affected),
-                    $affected[0]->message,
+                    array_map(static fn (ModelHealthVerdict $v): string => $v->modelName, $fresh),
+                    $fresh[0]->message,
                     $this->displayNames->forService($service),
+                    array_map(static fn (ModelHealthVerdict $v): int => $v->modelId, $fresh),
                 );
 
                 if ($dryRun || $this->alerter->raise($alert)) {
@@ -409,7 +414,7 @@ final readonly class ModelHealthEvaluator
                 continue;
             }
 
-            if ($this->alerter->isOpen($service, $kind)) {
+            if ([] === $affected && $this->alerter->isOpen($service, $kind)) {
                 $alert = new ModelHealthAlert($kind, $service, [], 'All models are answering again.', $this->displayNames->forService($service));
                 if ($dryRun || $this->alerter->resolve($alert)) {
                     $resolved[] = $alert;
@@ -418,6 +423,30 @@ final readonly class ModelHealthEvaluator
         }
 
         return ['raised' => $raised, 'resolved' => $resolved];
+    }
+
+    /**
+     * Models that may be named in an incident on this run.
+     *
+     * @param list<ModelHealthVerdict> $verdicts
+     *
+     * @return list<ModelHealthVerdict>
+     */
+    private function freshVerdicts(array $verdicts): array
+    {
+        if ([] === $verdicts) {
+            return [];
+        }
+
+        $due = array_flip($this->alerter->dueModelIds(array_map(
+            static fn (ModelHealthVerdict $verdict): int => $verdict->modelId,
+            $verdicts,
+        )));
+
+        return array_values(array_filter(
+            $verdicts,
+            static fn (ModelHealthVerdict $verdict): bool => isset($due[$verdict->modelId]),
+        ));
     }
 
     /**

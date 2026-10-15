@@ -7,9 +7,10 @@ namespace App\AI\Health;
 /**
  * One thing worth waking an operator for, already aggregated per provider.
  *
- * Aggregation is the point: a revoked OpenAI key breaks every OpenAI model at
+ * Aggregation is the point: a revoked key breaks every model behind it at
  * once, and forty separate emails about the same key would train the operator
- * to ignore the alert channel.
+ * to ignore the alert channel. The quiet period is still per model, so a
+ * different model that fails later the same day is its own message.
  */
 final readonly class ModelHealthAlert
 {
@@ -18,9 +19,11 @@ final readonly class ModelHealthAlert
     public const KIND_CREDENTIAL = 'credential';
 
     /**
-     * @param string       $provider    internal service key; also the throttle key, so it
+     * @param string       $provider    internal service key; the open-incident key, so it
      *                                  must stay stable and must not be a display string
-     * @param list<string> $modelNames  names of the affected models, for the alert body
+     * @param list<string> $modelNames  names of the affected models, same order as $modelIds
+     * @param list<int>    $modelIds    catalog row ids. The quiet period is per id, so the
+     *                                  same model is not reported again until it has elapsed
      * @param string|null  $displayName the provider's branded name, for the alert text
      */
     public function __construct(
@@ -29,6 +32,7 @@ final readonly class ModelHealthAlert
         public array $modelNames,
         public string $reason,
         public ?string $displayName = null,
+        public array $modelIds = [],
     ) {
     }
 
@@ -65,6 +69,15 @@ final readonly class ModelHealthAlert
                 $this->name()
             ),
         };
+    }
+
+    /**
+     * Told with every incident so a repeat of the same model is not expected
+     * the same day, and a different model is not assumed to be covered.
+     */
+    public function quietPeriodNotice(): string
+    {
+        return 'No further message about these models for 24 hours. A different model is still reported the same day.';
     }
 
     /** What the operator is expected to do about it. */

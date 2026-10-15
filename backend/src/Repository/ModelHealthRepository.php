@@ -56,6 +56,16 @@ class ModelHealthRepository extends ServiceEntityRepository
      */
     public function findOrCreate(int $modelId): ModelHealth
     {
+        // The health check creates the row and then stamps BLASTALERTED in
+        // the same request, before flush. findOneBy only sees committed rows,
+        // so a second call would persist a duplicate and the unique key would
+        // reject the flush — and the stamp would never land.
+        foreach ($this->getEntityManager()->getUnitOfWork()->getScheduledEntityInsertions() as $entity) {
+            if ($entity instanceof ModelHealth && $entity->getModelId() === $modelId) {
+                return $entity;
+            }
+        }
+
         $health = $this->findByModelId($modelId);
         if (null !== $health) {
             return $health;

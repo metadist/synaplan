@@ -26,7 +26,10 @@ final class ModelHealthConfig
         'MIN_SAMPLE_SIZE' => '5',
         'WINDOW_MINUTES' => '30',
         'PROBE_INTERVAL_MINUTES' => '15',
-        'ALERT_THROTTLE_MINUTES' => '60',
+        // Quiet period before the same model is reported again. A different
+        // model is not held back. The incident text says "24 hours", so this
+        // stays a day unless an operator changes both together.
+        'ALERT_THROTTLE_MINUTES' => '1440',
         'AUTO_DISABLE_ENABLED' => '0',
         'SUPPRESSION_DAYS' => '7',
     ];
@@ -74,6 +77,7 @@ final class ModelHealthConfig
         return max(60, (int) $this->get('PROBE_INTERVAL_MINUTES') * 60);
     }
 
+    /** How long the same model stays quiet after an incident message. */
     public function alertThrottleSeconds(): int
     {
         return max(60, (int) $this->get('ALERT_THROTTLE_MINUTES') * 60);
