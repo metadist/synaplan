@@ -211,8 +211,8 @@ describe('useNavItems rail', () => {
       groupKey?: string
     }>
     expect(children.map((child) => child.key)).toEqual([
-      'saved-prompts',
       'ai-models',
+      'saved-prompts',
       'saved-tasks',
       'apps',
       'chat-widget',
@@ -251,13 +251,14 @@ describe('useNavItems rail', () => {
     expect(child?.groupKey).toBe('automations')
   })
 
-  it('leads with Assistants when the flag is on', () => {
+  it('lists AI settings first and Assistants when the flag is on', () => {
     runtimeFeatures.agentsEnabled = true
     const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
     const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
-    const first = (manage?.children ?? [])[0] as { key: string; path: string } | undefined
-    expect(first?.key).toBe('assistants')
-    expect(first?.path).toBe('/ai/assistants')
+    const children = (manage?.children ?? []) as Array<{ key: string; path: string }>
+    expect(children[0]?.key).toBe('ai-models')
+    expect(children[0]?.path).toBe('/ai/models')
+    expect(children.find((child) => child.key === 'assistants')?.path).toBe('/ai/assistants')
   })
 
   it('keeps All apps highlighted on the connected filter and on an app page', () => {
