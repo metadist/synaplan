@@ -18,3 +18,17 @@ export function liveVoiceButtonVisible(input: {
   if (input.nativeApp && !(input.nativeLiveVoice ?? hasNativeLiveVoice())) return false
   return true
 }
+
+/**
+ * Live speech takes the send button's place only while the composer has
+ * nothing to send. Typed text, an attached file or a pasted block brings
+ * the send button back, and a running reply keeps its stop button.
+ */
+export function liveVoiceReplacesSend(input: {
+  available: boolean
+  streaming: boolean
+  hasText: boolean
+  hasAttachment: boolean
+}): boolean {
+  return input.available && !input.streaming && !input.hasText && !input.hasAttachment
+}

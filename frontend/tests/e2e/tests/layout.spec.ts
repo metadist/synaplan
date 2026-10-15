@@ -20,6 +20,12 @@ import { TIMEOUTS } from '../config/config'
 
 const NAV = selectors.nav
 const CHAT = selectors.chat
+/**
+ * An empty composer puts live voice in the send slot. Typed text brings the
+ * send button back. Either control is the primary action the layout guard
+ * has to keep on screen.
+ */
+const composerAction = `${CHAT.sendBtn}, [data-testid="btn-chat-live-voice"]`
 
 /**
  * Touch-target floor in px — §4.3 #1/#2: interactive nav targets are 44 px
@@ -180,7 +186,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await expectNoHorizontalOverflow(page, 'chat')
 
     await expectInsideViewport(page, CHAT.textInput, 'chat input')
-    await expectInsideViewport(page, CHAT.sendBtn, 'send button')
+    await expectInsideViewport(page, composerAction, 'composer action')
   })
 
   test('primary nav controls carry visible labels and meet target size', async ({ page }) => {
@@ -360,7 +366,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await page.setViewportSize({ width: 320, height: 800 })
     await openApp(page)
     await expectNoHorizontalOverflow(page, 'chat @320px')
-    await expectInsideViewport(page, CHAT.sendBtn, 'send button @320px')
+    await expectInsideViewport(page, composerAction, 'composer action @320px')
     await expectInsideViewport(
       page,
       '[data-testid="section-chat-controls"]',
@@ -422,7 +428,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
       )
       const box = await toggle.boundingBox()
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(MIN_TARGET_PX)
-      for (const selector of [CHAT.plusToggle, CHAT.sendBtn]) {
+      for (const selector of [CHAT.plusToggle, composerAction]) {
         const target = await page.locator(selector).boundingBox()
         expect(target?.height ?? 0, selector).toBeGreaterThanOrEqual(MIN_TARGET_PX)
         expect(target?.width ?? 0, selector).toBeGreaterThanOrEqual(MIN_TARGET_PX)
