@@ -54,6 +54,12 @@ final readonly class VoiceMessageReply
                 $context->message->getUserId(),
                 $model->options(self::MAX_TOKENS),
             );
+            $context->notify('complete', 'Reply complete.');
+
+            return $context->reply->fromModel(
+                $response,
+                $model->metadata($response['provider'] ?? null, $response['model'] ?? null, $audioFiles, 'voice_message_reply'),
+            );
         } catch (\Exception $e) {
             $this->logger->error('FileAnalysisHandler: Voice message reply failed', [
                 'files' => AnalysisFileResolver::describe($audioFiles),
@@ -62,13 +68,6 @@ final readonly class VoiceMessageReply
 
             throw $e;
         }
-
-        $context->notify('complete', 'Reply complete.');
-
-        return $context->reply->fromModel(
-            $response,
-            $model->metadata($response['provider'] ?? null, $response['model'] ?? null, $audioFiles, 'voice_message_reply'),
-        );
     }
 
     /**

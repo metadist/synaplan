@@ -56,6 +56,12 @@ final readonly class DocumentAnalysis
 
         try {
             $response = $this->chatWithOverflowRetry($context, $fitted, $finalPrompt, $model->options($outputTokens));
+            $context->notify('complete', 'Analysis complete.');
+
+            return $context->reply->fromModel(
+                $response,
+                $model->metadata($response['provider'] ?? null, $response['model'] ?? null, $documents, 'chat_with_extracted_text'),
+            );
         } catch (\Exception $e) {
             $this->logger->error('FileAnalysisHandler: Chat analysis failed', [
                 'files' => AnalysisFileResolver::describe($documents),
@@ -64,13 +70,6 @@ final readonly class DocumentAnalysis
 
             throw $e;
         }
-
-        $context->notify('complete', 'Analysis complete.');
-
-        return $context->reply->fromModel(
-            $response,
-            $model->metadata($response['provider'] ?? null, $response['model'] ?? null, $documents, 'chat_with_extracted_text'),
-        );
     }
 
     /**
