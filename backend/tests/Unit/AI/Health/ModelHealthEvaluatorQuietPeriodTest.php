@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Health;
 
 use App\AI\Health\FailureClassifier;
+use App\AI\Health\FailureKind;
 use App\AI\Health\ModelAutoDisabler;
+use App\AI\Health\ModelHealthAlert;
 use App\AI\Health\ModelHealthAlerter;
 use App\AI\Health\ModelHealthConfig;
 use App\AI\Health\ModelHealthEvaluator;
@@ -90,7 +92,10 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
 
     public function testADifferentModelIsReportedWhileAnEarlierOneStaysQuiet(): void
     {
-        $this->healthRows[1] = (new ModelHealth())->setModelId(1)->setLastAlerted(time());
+        $this->healthRows[1] = (new ModelHealth())
+            ->setModelId(1)
+            ->setLastAlerted(time())
+            ->setLastAlertedKind(ModelHealthAlert::KIND_OFFLINE);
 
         $this->email->expects(self::once())->method('sendModelHealthAlert');
         $this->discord->expects(self::once())->method('notifyModelHealth');
@@ -160,6 +165,58 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
     }
 
     /**
+     * A flaky provider that then rejects the key: the credential incident
+     * (the one that pings everyone) goes out although the same models were
+     * reported an hour ago, and the flaky incident is not declared over —
+     * those models are worse, not recovered.
+     */
+    public function testARejectedKeyAfterAFlakyHourIsReportedWithoutAFalseAllClear(): void
+    {
+        $sent = [];
+        $this->email->method('sendModelHealthAlert')->willReturnCallback(
+            static function (ModelHealthAlert $alert, bool $resolved = false) use (&$sent): void {
+                $sent[] = [$alert->kind, $resolved];
+            }
+        );
+
+        $voice = self::model(1, 'xAI', 'grok-voice-3.0', 'Grok Voice 3');
+        $probe = new class implements ModelListProbeInterface {
+            public ProbeResult $next;
+
+            public function supports(string $service): bool
+            {
+                return true;
+            }
+
+            public function probe(string $service): ProbeResult
+            {
+                return $this->next;
+            }
+
+            public function confirm(string $service, string $providerModelId): ModelProbeResult
+            {
+                return ModelProbeResult::Inconclusive;
+            }
+        };
+        $evaluator = $this->evaluatorFor(['xAI' => ['grok-voice-3.0' => [$voice]]], [], $probe);
+
+        $probe->next = ProbeResult::failed(FailureKind::Transient, 'xAI answered 503.');
+        $flaky = $evaluator->run();
+        self::assertSame(ModelHealthAlert::KIND_DEGRADED, $flaky->alertsRaised[0]->kind);
+
+        $probe->next = ProbeResult::failed(FailureKind::Credential, 'xAI rejected the API key.');
+        $rejected = $evaluator->run();
+        self::assertCount(1, $rejected->alertsRaised);
+        self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $rejected->alertsRaised[0]->kind);
+        self::assertSame([], $rejected->alertsResolved, 'A model that got worse has not recovered');
+
+        self::assertSame([
+            [ModelHealthAlert::KIND_DEGRADED, false],
+            [ModelHealthAlert::KIND_CREDENTIAL, false],
+        ], $sent);
+    }
+
+    /**
      * @param array<string, array<string, list<Model>>> $catalog service => provider id => rows
      * @param list<string>                              $listed
      */
@@ -215,6 +272,12 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
         });
         $health->method('findOrCreate')->willReturnCallback(function (int $id): ModelHealth {
             return $this->healthRows[$id] ??= (new ModelHealth())->setModelId($id);
+        });
+        $health->method('stampAlerted')->willReturnCallback(function (array $ids, string $kind, int $at): void {
+            foreach ($ids as $id) {
+                $this->healthRows[$id] ??= (new ModelHealth())->setModelId($id);
+                $this->healthRows[$id]->setLastAlerted($at)->setLastAlertedKind($kind);
+            }
         });
 
         $alerter = new ModelHealthAlerter(

@@ -96,6 +96,14 @@ class ModelHealth
     #[ORM\Column(name: 'BLASTALERTED', type: 'bigint', options: ['default' => 0])]
     private int $lastAlerted = 0;
 
+    /**
+     * {@see \App\AI\Health\ModelHealthAlert} kind of that last message. A more
+     * severe kind (a rejected key after a flaky hour) is reported inside the
+     * quiet period; the same or a milder one is not.
+     */
+    #[ORM\Column(name: 'BLASTALERTEDKIND', length: 16, nullable: true)]
+    private ?string $lastAlertedKind = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -269,6 +277,18 @@ class ModelHealth
     public function setLastAlerted(int $lastAlerted): self
     {
         $this->lastAlerted = max(0, $lastAlerted);
+
+        return $this;
+    }
+
+    public function getLastAlertedKind(): ?string
+    {
+        return $this->lastAlertedKind;
+    }
+
+    public function setLastAlertedKind(?string $lastAlertedKind): self
+    {
+        $this->lastAlertedKind = $lastAlertedKind;
 
         return $this;
     }

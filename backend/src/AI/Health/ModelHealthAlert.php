@@ -19,12 +19,13 @@ final readonly class ModelHealthAlert
     public const KIND_CREDENTIAL = 'credential';
 
     /**
-     * @param string       $provider    internal service key; the open-incident key, so it
-     *                                  must stay stable and must not be a display string
-     * @param list<string> $modelNames  names of the affected models, same order as $modelIds
-     * @param list<int>    $modelIds    catalog row ids. The quiet period is per id, so the
-     *                                  same model is not reported again until it has elapsed
-     * @param string|null  $displayName the provider's branded name, for the alert text
+     * @param string       $provider        internal service key; the open-incident key, so it
+     *                                      must stay stable and must not be a display string
+     * @param list<string> $modelNames      names of the affected models, same order as $modelIds
+     * @param list<int>    $modelIds        catalog row ids. The quiet period is per id, so the
+     *                                      same model is not reported again until it has elapsed
+     * @param string|null  $displayName     the provider's branded name, for the alert text
+     * @param int          $quietForSeconds the quiet period the message promises; 0 says nothing
      */
     public function __construct(
         public string $kind,
@@ -33,7 +34,41 @@ final readonly class ModelHealthAlert
         public string $reason,
         public ?string $displayName = null,
         public array $modelIds = [],
+        public int $quietForSeconds = 0,
     ) {
+    }
+
+    /**
+     * Same incident, narrowed to the models that are actually being sent.
+     *
+     * @param list<string> $modelNames
+     * @param list<int>    $modelIds
+     */
+    public function with(array $modelNames, array $modelIds, int $quietForSeconds): self
+    {
+        return new self(
+            $this->kind,
+            $this->provider,
+            $modelNames,
+            $this->reason,
+            $this->displayName,
+            $modelIds,
+            $quietForSeconds,
+        );
+    }
+
+    /**
+     * Rank of a kind. Inside the quiet period a model is only reported again
+     * when its problem got worse, never for the same or a milder one.
+     */
+    public static function severity(?string $kind): int
+    {
+        return match ($kind) {
+            self::KIND_CREDENTIAL => 3,
+            self::KIND_OFFLINE => 2,
+            self::KIND_DEGRADED => 1,
+            default => 0,
+        };
     }
 
     /** The provider as it should appear in the alert, never the raw service key. */
@@ -72,12 +107,48 @@ final readonly class ModelHealthAlert
     }
 
     /**
-     * Told with every incident so a repeat of the same model is not expected
-     * the same day, and a different model is not assumed to be covered.
+     * Told with every incident so a repeat of the same model is not expected,
+     * and a different model is not assumed to be covered.
      */
     public function quietPeriodNotice(): string
     {
-        return 'No further message about these models for 24 hours. A different model is still reported the same day.';
+        if ($this->quietForSeconds <= 0) {
+            return '';
+        }
+
+        return sprintf(
+            'These models are not reported again for %s unless the problem gets worse. A different model is still reported right away.',
+            $this->quietPeriod(),
+        );
+    }
+
+    /**
+     * Told with the all-clear, because a relapse inside the quiet period is
+     * shown on the status page but not sent.
+     */
+    public function relapseNotice(): string
+    {
+        if ($this->quietForSeconds <= 0) {
+            return '';
+        }
+
+        return sprintf(
+            'If one of them fails again within %s of its incident message, it shows under Model health but no new message is sent.',
+            $this->quietPeriod(),
+        );
+    }
+
+    /** "24 hours", "1 hour", "90 minutes" — the quiet period as an operator reads it. */
+    public function quietPeriod(): string
+    {
+        $minutes = intdiv(max(0, $this->quietForSeconds), 60);
+        if ($minutes > 0 && 0 === $minutes % 60) {
+            $hours = intdiv($minutes, 60);
+
+            return 1 === $hours ? '1 hour' : $hours.' hours';
+        }
+
+        return 1 === $minutes ? '1 minute' : $minutes.' minutes';
     }
 
     /** What the operator is expected to do about it. */

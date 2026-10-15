@@ -393,11 +393,18 @@ final readonly class ModelHealthEvaluator
             ModelHealthAlert::KIND_DEGRADED => $degraded,
         ];
 
+        $stillFailing = [];
+        foreach ($verdicts as $verdict) {
+            if ($verdict->needsAttention()) {
+                $stillFailing[$verdict->modelId] = true;
+            }
+        }
+
         foreach ($buckets as $kind => $affected) {
             // Quiet models stay in $affected so a still-broken model cannot
             // look like a recovery. Only models outside the quiet period are
             // named, which is what lets a new model page the same day.
-            $fresh = $this->freshVerdicts($affected);
+            $fresh = $this->freshVerdicts($affected, $kind);
             if ([] !== $fresh) {
                 $alert = new ModelHealthAlert(
                     $kind,
@@ -414,7 +421,11 @@ final readonly class ModelHealthEvaluator
                 continue;
             }
 
-            if ([] === $affected && $this->alerter->isOpen($service, $kind)) {
+            // A model that moved to a worse kind (flaky, then a rejected key)
+            // left this bucket without recovering. Its old incident is not
+            // over, so no all-clear for it.
+            $open = [] === $affected ? $this->alerter->openIncident($service, $kind) : null;
+            if (null !== $open && [] === array_intersect_key($open, $stillFailing)) {
                 $alert = new ModelHealthAlert($kind, $service, [], 'All models are answering again.', $this->displayNames->forService($service));
                 if ($dryRun || $this->alerter->resolve($alert)) {
                     $resolved[] = $alert;
@@ -432,7 +443,7 @@ final readonly class ModelHealthEvaluator
      *
      * @return list<ModelHealthVerdict>
      */
-    private function freshVerdicts(array $verdicts): array
+    private function freshVerdicts(array $verdicts, string $kind): array
     {
         if ([] === $verdicts) {
             return [];
@@ -441,7 +452,7 @@ final readonly class ModelHealthEvaluator
         $due = array_flip($this->alerter->dueModelIds(array_map(
             static fn (ModelHealthVerdict $verdict): int => $verdict->modelId,
             $verdicts,
-        )));
+        ), $kind));
 
         return array_values(array_filter(
             $verdicts,

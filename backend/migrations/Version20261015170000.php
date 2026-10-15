@@ -13,8 +13,10 @@ use Doctrine\Migrations\AbstractMigration;
  * stayed offline (or flickered) paged Discord and email on every health check.
  *
  * BLASTALERTED survives a cache flush and is not cleared when the model
- * recovers. Existing installs keep a custom throttle; only the shipped 60
- * minutes becomes a day. The incident text says "24 hours".
+ * recovers. BLASTALERTEDKIND lets a worse problem of the same model (a
+ * rejected key after a flaky hour) still be reported inside that period.
+ * Existing installs keep a custom quiet period; only the shipped 60 minutes
+ * becomes a day.
  *
  * Galera-safe: raw addSql only, ADD COLUMN IF NOT EXISTS, no Schema API.
  */
@@ -28,6 +30,7 @@ final class Version20261015170000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         $this->addSql('ALTER TABLE BMODELHEALTH ADD COLUMN IF NOT EXISTS BLASTALERTED BIGINT NOT NULL DEFAULT 0');
+        $this->addSql('ALTER TABLE BMODELHEALTH ADD COLUMN IF NOT EXISTS BLASTALERTEDKIND VARCHAR(16) DEFAULT NULL');
         $this->addSql(<<<'SQL'
             UPDATE BCONFIG SET BVALUE = '1440'
              WHERE BOWNERID = 0
@@ -46,6 +49,7 @@ final class Version20261015170000 extends AbstractMigration
                AND BSETTING = 'ALERT_THROTTLE_MINUTES'
                AND BVALUE = '1440'
             SQL);
+        $this->addSql('ALTER TABLE BMODELHEALTH DROP COLUMN IF EXISTS BLASTALERTEDKIND');
         $this->addSql('ALTER TABLE BMODELHEALTH DROP COLUMN IF EXISTS BLASTALERTED');
     }
 }

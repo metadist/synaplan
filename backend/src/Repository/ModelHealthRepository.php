@@ -78,6 +78,26 @@ class ModelHealthRepository extends ServiceEntityRepository
     }
 
     /**
+     * Record that an incident message named these models, and write it now.
+     *
+     * The message is already out. Waiting for the end of the health run would
+     * lose the stamp when a later provider aborts the run or the scheduler's
+     * timeout kills it, and the next run would send the same message again.
+     *
+     * @param list<int> $modelIds
+     */
+    public function stampAlerted(array $modelIds, string $kind, int $at): void
+    {
+        foreach ($modelIds as $modelId) {
+            $this->findOrCreate($modelId)
+                ->setLastAlerted($at)
+                ->setLastAlertedKind($kind);
+        }
+
+        $this->getEntityManager()->flush();
+    }
+
+    /**
      * Ids of models the monitor currently considers dead.
      *
      * Restricted to a permanent verdict on purpose: a degraded model is flaky,

@@ -26,9 +26,8 @@ final class ModelHealthConfig
         'MIN_SAMPLE_SIZE' => '5',
         'WINDOW_MINUTES' => '30',
         'PROBE_INTERVAL_MINUTES' => '15',
-        // Quiet period before the same model is reported again. A different
-        // model is not held back. The incident text says "24 hours", so this
-        // stays a day unless an operator changes both together.
+        // Quiet period before the same model is reported again for the same
+        // or a milder problem. A different model is not held back.
         'ALERT_THROTTLE_MINUTES' => '1440',
         'AUTO_DISABLE_ENABLED' => '0',
         'SUPPRESSION_DAYS' => '7',

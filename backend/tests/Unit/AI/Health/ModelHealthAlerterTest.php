@@ -31,10 +31,14 @@ final class ModelHealthAlerterTest extends TestCase
     /** @var array<int, ModelHealth> */
     private array $healthRows = [];
 
+    /** @var array<string, string> */
+    private array $settings = [];
+
     protected function setUp(): void
     {
         $this->cache = new ArrayAdapter();
         $this->healthRows = [];
+        $this->settings = [];
         $this->email = $this->createMock(InternalEmailService::class);
         $this->discord = $this->createMock(DiscordNotificationService::class);
 
@@ -54,12 +58,17 @@ final class ModelHealthAlerterTest extends TestCase
 
             return $found;
         });
-        $health->method('findOrCreate')->willReturnCallback(function (int $id): ModelHealth {
-            return $this->healthRows[$id] ??= (new ModelHealth())->setModelId($id);
+        $health->method('stampAlerted')->willReturnCallback(function (array $ids, string $kind, int $at): void {
+            foreach ($ids as $id) {
+                $this->healthRows[$id] ??= (new ModelHealth())->setModelId($id);
+                $this->healthRows[$id]->setLastAlerted($at)->setLastAlertedKind($kind);
+            }
         });
 
         $configRepository = $this->createStub(ConfigRepository::class);
-        $configRepository->method('getValue')->willReturn(null);
+        $configRepository->method('getValue')->willReturnCallback(
+            fn (int $owner, string $group, string $setting): ?string => $this->setting($setting),
+        );
 
         $this->alerter = new ModelHealthAlerter(
             $this->cache,
@@ -69,6 +78,11 @@ final class ModelHealthAlerterTest extends TestCase
             $this->discord,
             new NullLogger(),
         );
+    }
+
+    private function setting(string $name): ?string
+    {
+        return $this->settings[$name] ?? null;
     }
 
     /**
@@ -182,7 +196,8 @@ final class ModelHealthAlerterTest extends TestCase
     {
         $this->healthRows[1] = (new ModelHealth())
             ->setModelId(1)
-            ->setLastAlerted(time() - (1440 * 60) - 5);
+            ->setLastAlerted(time() - (1440 * 60) - 5)
+            ->setLastAlertedKind(ModelHealthAlert::KIND_OFFLINE);
 
         $this->email->expects(self::once())->method('sendModelHealthAlert');
         $this->discord->expects(self::once())->method('notifyModelHealth');
@@ -193,18 +208,76 @@ final class ModelHealthAlerterTest extends TestCase
     }
 
     /**
-     * Offline this morning and a credential failure of the same model at noon
-     * are still the same model. A different model under the other kind is not.
+     * A flaky hour this morning must not hide a rejected key at noon: that is
+     * the one alert that pings everyone. The same or a milder problem of the
+     * same model stays quiet.
      */
     #[AllowMockObjectsWithoutExpectations]
-    public function testTheQuietPeriodIsPerModelNotPerKind(): void
+    public function testOnlyAWorseProblemOfTheSameModelBreaksTheQuietPeriod(): void
     {
-        $this->email->expects(self::exactly(2))->method('sendModelHealthAlert');
-        $this->discord->expects(self::exactly(2))->method('notifyModelHealth');
+        $this->email->expects(self::exactly(3))->method('sendModelHealthAlert');
+        $this->discord->expects(self::exactly(3))->method('notifyModelHealth');
 
+        self::assertTrue($this->alerter->raise(self::alert(ModelHealthAlert::KIND_DEGRADED, [1], ['Grok Voice 3'])));
         self::assertTrue($this->alerter->raise(self::alert(ModelHealthAlert::KIND_OFFLINE, [1], ['Grok Voice 3'])));
-        self::assertFalse($this->alerter->raise(self::alert(ModelHealthAlert::KIND_CREDENTIAL, [1], ['Grok Voice 3'])));
-        self::assertTrue($this->alerter->raise(self::alert(ModelHealthAlert::KIND_CREDENTIAL, [2], ['Gemini 2.5 Pro'])));
+        self::assertTrue($this->alerter->raise(self::alert(ModelHealthAlert::KIND_CREDENTIAL, [1], ['Grok Voice 3'])));
+        self::assertFalse($this->alerter->raise(self::alert(ModelHealthAlert::KIND_OFFLINE, [1], ['Grok Voice 3'])));
+        self::assertFalse($this->alerter->raise(self::alert(ModelHealthAlert::KIND_DEGRADED, [1], ['Grok Voice 3'])));
+        self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $this->healthRows[1]->getLastAlertedKind());
+    }
+
+    /** The message must promise the quiet period the install actually uses. */
+    #[AllowMockObjectsWithoutExpectations]
+    public function testTheNoticeFollowsTheConfiguredQuietPeriod(): void
+    {
+        $this->settings['ALERT_THROTTLE_MINUTES'] = '120';
+        $sent = [];
+        $this->email->method('sendModelHealthAlert')->willReturnCallback(
+            static function (ModelHealthAlert $alert) use (&$sent): void {
+                $sent[] = $alert;
+            }
+        );
+
+        self::assertTrue($this->alerter->raise(self::alert()));
+
+        self::assertSame(7200, $sent[0]->quietForSeconds);
+        self::assertStringContainsString('for 2 hours', $sent[0]->quietPeriodNotice());
+        self::assertStringNotContainsString('24 hours', $sent[0]->quietPeriodNotice());
+    }
+
+    /** "0 model(s) are working again" told the operator nothing. */
+    #[AllowMockObjectsWithoutExpectations]
+    public function testTheAllClearNamesTheModelsOfTheIncident(): void
+    {
+        $resolved = [];
+        $this->email->method('sendModelHealthAlert')->willReturnCallback(
+            static function (ModelHealthAlert $alert, bool $isResolved = false) use (&$resolved): void {
+                if ($isResolved) {
+                    $resolved[] = $alert;
+                }
+            }
+        );
+
+        $this->alerter->raise(self::alert(modelIds: [1], names: ['GPT-5']));
+        $this->alerter->raise(self::alert(modelIds: [1, 2], names: ['GPT-5', 'GPT-5 Vision']));
+        self::assertSame([1 => 'GPT-5', 2 => 'GPT-5 Vision'], $this->alerter->openIncident('OpenAI', ModelHealthAlert::KIND_OFFLINE));
+
+        self::assertTrue($this->alerter->resolve(new ModelHealthAlert(ModelHealthAlert::KIND_OFFLINE, 'OpenAI', [], 'All models are answering again.')));
+
+        self::assertSame(['GPT-5', 'GPT-5 Vision'], $resolved[0]->modelNames);
+        self::assertStringContainsString('24 hours', $resolved[0]->relapseNotice());
+    }
+
+    /** An incident opened before this change holds a bare timestamp. */
+    #[AllowMockObjectsWithoutExpectations]
+    public function testAnIncidentOpenedByTheOldFormatStillResolves(): void
+    {
+        $item = $this->cache->getItem('model_health.open.openai.offline');
+        $item->set(time());
+        $this->cache->save($item);
+
+        self::assertSame([], $this->alerter->openIncident('OpenAI', ModelHealthAlert::KIND_OFFLINE));
+        self::assertTrue($this->alerter->resolve(self::alert()));
     }
 
     /**

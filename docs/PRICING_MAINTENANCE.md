@@ -192,7 +192,7 @@ TrustedTokens dropped the remaining DeepSeek V4 ids (`deepseek-ai/DeepSeek-V4-Fl
 | 336 | DeepSeek V4 Flash 0731 | `deepseek-ai/DeepSeek-V4-Flash-0731` | `trustedtokens:zai-org/GLM-5.3-Flash:chat` (BID 332) |
 | 337 | DeepSeek V4 Pro | `deepseek-ai/DeepSeek-V4-Pro-0813` | `trustedtokens:zai-org/GLM-5.3:chat` (BID 331) |
 
-Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 336 or 337, so nothing is orphaned. Neither BID is a `ProviderDefaultsService` recommendation. The health monitor skips rows that carry `BRETIREDON`, so this also stops the hourly incident mail for these ids.
+Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 336 or 337, so nothing is orphaned. Neither BID is a `ProviderDefaultsService` recommendation. The health monitor skips rows that carry `BRETIREDON`, so this also stops the incident mail for these ids.
 
 ### OpenAI deprecation notice (2026-10-02, shutdown 2027-04-01)
 
@@ -601,7 +601,9 @@ replacement.
 
 **What the seeder does**, idempotently and on every container start, for each entry whose row exists and still matches `providerId`: stamps `BRETIREDON` and `BSUCCESSORID`, and forces `BACTIVE = BSELECTABLE = BISDEFAULT = 0`. A re-run writes nothing. A BID an operator repurposed is skipped with a warning. Rows are never deleted — `BMESSAGES` has FKs into `BMODELS` and **BIDs must never be reused**.
 
-The health monitor (`app:model:health-check`) skips every row that carries `BRETIREDON`. A recorded retirement is expected to be missing, so it is not probed and it must not raise the hourly incident mail. Operator-disabled rows without a date stay in the check so a recovery shows, but they never raise an alert and the status page counts them as "Switched off", not in the "need attention" count. A row the monitor switched off itself (auto-disable) still counts.
+The health monitor (`app:model:health-check`) skips every row that carries `BRETIREDON`. A recorded retirement is expected to be missing, so it is not probed and it must not raise the incident mail. Operator-disabled rows without a date stay in the check so a recovery shows, but they never raise an alert and the status page counts them as "Switched off", not in the "need attention" count. A row the monitor switched off itself (auto-disable) still counts.
+
+The incident mail and the Discord message name each model at most once per quiet period (`MODELHEALTH.ALERT_THROTTLE_MINUTES`, default 1440 = 24 hours; the message states the configured value). The time is kept on the health row (`BLASTALERTED`, `BLASTALERTEDKIND`), so a cache flush or an all-clear does not reset it. Inside that period a different model is still reported right away, and the same model is reported again only when its problem gets worse (degraded, then offline, then rejected credentials). The all-clear names the models of the incident and is held back while any of them still fails under another kind.
 
 Because nothing checks a retired row any more, its last `BMODELHEALTH` verdict would be frozen at whatever held before the retirement. Each health run therefore deletes the health rows of retired models (`ModelHealthRepository::pruneRetired()`), and the status page (`ModelHealthOverview`) lists retired models in their own collapsed "Retired models" section — with the retirement date and the successor — never inside a provider section and never in the "need attention" count or the Operate badge.
 
