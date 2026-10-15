@@ -10,6 +10,11 @@ use App\Service\Context\ContextCondenser;
 use App\Service\Context\ModelContextWindow;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\FileAnalysis\AnalysisFileResolver;
+use App\Service\Message\FileAnalysis\DocumentAnalysis;
+use App\Service\Message\FileAnalysis\FileAnalysisFailureCopy;
+use App\Service\Message\FileAnalysis\ImageAnalysis;
+use App\Service\Message\FileAnalysis\VoiceMessageReply;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\ModelConfigService;
 use App\Service\Stt\WhisperService;
@@ -35,18 +40,15 @@ final class FileAnalysisHandlerFactory
         ?ConversationFileCatalog $conversationFileCatalog = null,
         ?WhisperService $whisperService = null,
     ): FileAnalysisHandler {
+        $failures = new FileAnalysisFailureCopy($aiFacade, $logger, $chatErrorPresenter, $translator, $whisperService);
+
         return new FileAnalysisHandler(
-            $aiFacade,
-            $modelConfigService,
+            new AnalysisFileResolver($conversationFileCatalog),
+            new DocumentAnalysis($aiFacade, $modelConfigService, $logger, $failureClassifier, $contextCondenser, $modelContextWindow),
+            new VoiceMessageReply($aiFacade, $modelConfigService, $logger),
+            new ImageAnalysis($aiFacade, $modelConfigService, $failures, $logger, $uploadDir),
+            $failures,
             $logger,
-            $uploadDir,
-            $contextCondenser,
-            $modelContextWindow,
-            $failureClassifier,
-            $chatErrorPresenter,
-            $translator,
-            $conversationFileCatalog,
-            $whisperService,
         );
     }
 }

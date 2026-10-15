@@ -13,6 +13,7 @@ use App\Service\File\ConversationFileCatalog;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\ModelConfigService;
+use App\Tests\Support\FileAnalysisHandlerFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -38,7 +39,7 @@ class FileAnalysisHandlerFollowUpTest extends TestCase
         $this->uploadDir = sys_get_temp_dir().'/synaplan-file-followup-'.bin2hex(random_bytes(8));
         mkdir($this->uploadDir, 0o775, true);
 
-        $this->handler = new FileAnalysisHandler(
+        $this->handler = FileAnalysisHandlerFactory::create(
             $this->aiFacade,
             $this->modelConfigService,
             $this->createMock(LoggerInterface::class),
@@ -159,7 +160,7 @@ class FileAnalysisHandlerFollowUpTest extends TestCase
         $repository->method('findFilesByChatId')->willReturn([$pdf]);
         $repository->method('findOneBy')->willReturn(null);
 
-        $handler = new FileAnalysisHandler(
+        $handler = FileAnalysisHandlerFactory::create(
             $this->aiFacade,
             $this->modelConfigService,
             $this->createMock(LoggerInterface::class),

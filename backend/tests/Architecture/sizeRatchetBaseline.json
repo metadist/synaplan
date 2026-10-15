@@ -8,9 +8,9 @@
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 59,
-        "constructorParams": 73,
-        "methodLines": 151
+        "fileLines": 58,
+        "constructorParams": 72,
+        "methodLines": 149
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -55,10 +55,9 @@
         "src/Service/Iam/ShareService.php": 853,
         "src/Service/Media/MediaGenerationService.php": 846,
         "src/Service/Memory/UserMemoryService.php": 1022,
-        "src/Service/Message/Handler/FileAnalysisHandler.php": 2046,
-        "src/Service/Message/Handler/MediaGenerationHandler.php": 2351,
-        "src/Service/Message/MessageClassifier.php": 2082,
-        "src/Service/Message/MessageProcessor.php": 2111,
+        "src/Service/Message/Handler/MediaGenerationHandler.php": 2245,
+        "src/Service/Message/MessageClassifier.php": 2025,
+        "src/Service/Message/MessageProcessor.php": 2109,
         "src/Service/Message/MessageSorter.php": 921,
         "src/Service/ModelConfigService.php": 1327,
         "src/Service/Multitask/Execution/DagExecutor.php": 805,
@@ -119,8 +118,7 @@
         "src/Service/File/FileUploadService.php::FileUploadService": 12,
         "src/Service/Iam/UserDeletionService.php::UserDeletionService": 36,
         "src/Service/Mcp/McpOAuthState.php::McpOAuthState": 11,
-        "src/Service/Message/Handler/FileAnalysisHandler.php::FileAnalysisHandler": 11,
-        "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler": 23,
+        "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler": 22,
         "src/Service/Message/MessageClassifier.php::MessageClassifier": 21,
         "src/Service/Message/MessageProcessor.php::MessageProcessor": 21,
         "src/Service/Message/MessageSorter.php::MessageSorter": 18,
@@ -248,8 +246,6 @@
         "src/Service/Memory/MemoryExtractionService.php::MemoryExtractionService::extractMemoriesViaAi": 185,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::searchRelevantMemories": 142,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::storeInQdrant": 101,
-        "src/Service/Message/Handler/FileAnalysisHandler.php::FileAnalysisHandler::handleStream": 104,
-        "src/Service/Message/Handler/FileAnalysisHandler.php::FileAnalysisHandler::routeFiles": 205,
         "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler::detachMediaToAsyncJob": 166,
         "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler::handleStream": 1010,
         "src/Service/Message/MediaPromptExtractor.php::MediaPromptExtractor::extract": 107,
