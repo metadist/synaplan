@@ -4,7 +4,7 @@
 **Goal:** One place to find and operate everything in Synaplan — pages,
 commands, settings, chats, files (including RAG content), memories,
 widgets, assistants — by *meaning*, not by exact string.
-**Binding UX:** [`../20260907_ux_user_flows.md`](../../20260907_ux_user_flows.md) (U1–U12).
+**Binding UX:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) (U1–U12).
 **Class:** palette and admin card are `ota-candidate`; index, providers,
 interpret and model slots are `backend-only`.
 

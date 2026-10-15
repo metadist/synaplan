@@ -6,7 +6,7 @@
 | **Branch** | `feat/synaplan-network` (same branch; separate PRs per step) |
 | **Type** | Backend-first, UI behind existing surfaces + `FederationModule` gate. |
 | **Scope** | **Share a copy** (prompt / widget + its knowledge) with a peer over a federation link, and **migrate a client** (all prompts, widgets, knowledge data) from instance A to instance B. File download + re-upload already works; this plan makes *the whole working setup* move. |
-| **Binding contracts** | UX rules U1–U12 ([`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)); AGENTS.md "Perfect UX & Stability"; bundle rules in `BundleEnvelopeValidator` (5 MB JSON cap, 200 items/section). |
+| **Binding contracts** | UX rules U1–U12 ([`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)); AGENTS.md "Perfect UX & Stability"; bundle rules in `BundleEnvelopeValidator` (5 MB JSON cap, 200 items/section). |
 
 Files in this folder: start with [`05_partners.md`](./05_partners.md) (binding
 plan). This file stays binding for the portable format (§1–§4) and client

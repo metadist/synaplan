@@ -16,7 +16,7 @@ track anymore (decision 2026-09-27).
 in docs. Never “Jigasi”, “MatrixRTC”, or “whisper” on the button.
 **Class:** new repo + a small Synaplan FeatureModule (`opendesk_stt`,
 default off). `backend-only` from `synaplan/`.
-**Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md).
+**Binding UX:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md).
 
 This is the plan for turning Synaplan into the speech-to-text brain of
 an [openDesk](https://www.opendesk.eu/en/product) deployment.

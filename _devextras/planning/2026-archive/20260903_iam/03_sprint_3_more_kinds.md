@@ -13,7 +13,7 @@ manifest v2. An admin publishes a system-like assistant to **one** group only; n
 **Shipped — UX lesson (2026-09-07):** kinds reuse `ShareDialog` and a
 "Shared with me" chip. That is not enough findability — see Incoming
 chats (#1717) and **IAM-UX** in
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §4.1 / §7
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §4.1 / §7
 before track 2 publish or track 4 tool/template share treat this as
 the finished UI.
 

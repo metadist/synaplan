@@ -9,7 +9,7 @@ group-level config layer sits between the user row and the global row for a smal
 **Repos:** `synaplan/` only.
 **Flag:** `IAM.GROUP_POLICIES_ENABLED` (seeded `0`). **New flag** beyond the three in master plan §0 — record it as a
 decision entry in [`STATUS.md`](./STATUS.md) when S5 starts. Off ⇒ every resolver returns exactly `[user, global]` as today.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-IAM-3. Policies is an operator surface: one group at a time, plain
 "Users cannot change this", and the member sees "Set by your
 administrator" — never a raw 409. `IAM44` / `IAM45` walk the journey

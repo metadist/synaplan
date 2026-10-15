@@ -3,7 +3,7 @@
 **Status:** Queued 2026-10-14. Starts when
 [`../20261014-code-cleanup-V1/STATUS.md`](../20261014-code-cleanup-V1/STATUS.md)
 shows root files = 4 and deptrac green on `main`. Tick §0 before G1.
-**Priority:** Row 2 of [`../ROADMAP.md`](../ROADMAP.md); its exit
+**Priority:** Row 2 of [`../../ROADMAP.md`](../../ROADMAP.md); its exit
 **closes the cleanup window** and reopens feature work (first in line:
 the prompting flow, row 8, which builds on the chat pipeline G5–G9
 extract).

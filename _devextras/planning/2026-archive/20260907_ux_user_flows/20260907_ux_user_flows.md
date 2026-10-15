@@ -1,13 +1,24 @@
 # UX user-flows — 2026-09 roadmap
 
+> **Archived 2026-10-15.** The rules are no longer here: U1–U12 (§3), the
+> shared patterns (§4), the sprint-file contract (§6) and the success
+> criteria (§8) live on in [`docs/UX_CONTRACT.md`](../../../../docs/UX_CONTRACT.md)
+> with the same section numbers, the rail names updated to the UX overhaul
+> and U9 aligned with the AGENTS.md button rule. What stays here is
+> history and reference: the verdict on the 2026-09 plans (§0–§1), the
+> journeys of the 2026-09 tracks (§5 — J-CP-1/2 are still open in Secure
+> Compute, J-NC-1…3 are walked by cloud file sharing CF0.7), IAM-UX (§7,
+> shipped in [#1726](https://github.com/metadist/synaplan/pull/1726)) and
+> the wireframes next to this file.
+
 **Status:** Binding from 2026-09-07. Copy and journeys are reviewed **before**
 the Vue is built, not after. This is the UX contract for every remaining
-sprint in the live plan [`ROADMAP.md`](./ROADMAP.md) (frozen earlier
+sprint in the live plan [`ROADMAP.md`](../../ROADMAP.md) (frozen earlier
 overviews:
-[`2026-archive/20260925_roadmap/20260925_roadmap.md`](./2026-archive/20260925_roadmap/20260925_roadmap.md),
-[`2026-archive/20260917_roadmap/20260917_roadmap.md`](./2026-archive/20260917_roadmap/20260917_roadmap.md),
-[`2026-archive/20260910_roadmap/20260910_roadmap_update.md`](./2026-archive/20260910_roadmap/20260910_roadmap_update.md),
-[`2026-archive/20260903_roadmap/20260903_roadmap.md`](./2026-archive/20260903_roadmap/20260903_roadmap.md)).
+[`2026-archive/20260925_roadmap/20260925_roadmap.md`](../20260925_roadmap/20260925_roadmap.md),
+[`2026-archive/20260917_roadmap/20260917_roadmap.md`](../20260917_roadmap/20260917_roadmap.md),
+[`2026-archive/20260910_roadmap/20260910_roadmap_update.md`](../20260910_roadmap/20260910_roadmap_update.md),
+[`2026-archive/20260903_roadmap/20260903_roadmap.md`](../20260903_roadmap/20260903_roadmap.md)).
 **Lesson:** IAM sharing (S2/S3) shipped as APIs plus a dialog. Recipients
 could not find a chat shared with their group. A follow-up
 ([#1717](https://github.com/metadist/synaplan/pull/1717)) had to invent the
@@ -15,7 +26,7 @@ real user-flow after the fact. That must not happen again.
 **Owner:** product owner + the track that owns the surface. A UI PR that
 cannot walk its named journey is not done.
 
-Companion wireframes: [`20260907_ux_user_flows/`](./20260907_ux_user_flows).
+Companion wireframes: [`README.md`](./README.md) in this folder.
 
 ---
 
@@ -79,7 +90,7 @@ shipped, even if the API is green.
 
 Synaplan is a **user-centric, easy application**. Power lives behind a
 clean UI. The interface-streamlining contract still holds
-([`2026-archive/20260828-interface-streamlining-sprint/README.md`](./2026-archive/20260828-interface-streamlining-sprint/README.md)):
+([`2026-archive/20260828-interface-streamlining-sprint/README.md`](../20260828-interface-streamlining-sprint/README.md)):
 
 1. Everyday work stays tiny: **Chat, History, Sources**.
 2. Creation and publishing live in **Manage**.
@@ -123,7 +134,7 @@ user") and do not replace it. **U1–U12 are the merge gate for every
 ### 4.1 Share (professionalize, then reuse)
 
 Target interaction — see
-[`share-dialog-v2.md`](./20260907_ux_user_flows/share-dialog-v2.md):
+[`share-dialog-v2.md`](./share-dialog-v2.md):
 
 ```text
 Share "Q3 playbook"                         [×]
@@ -217,7 +228,7 @@ or a **schedule** (a point in time). Every trigger row is one generated
 sentence (what arrives / when, what it does, **who it runs as**), one
 visible on/off, a last-run status. The word list and the row pattern
 live in
-[`20260907_ux_user_flows/assistant-triggers.md`](./20260907_ux_user_flows/assistant-triggers.md);
+[`./assistant-triggers.md`](./assistant-triggers.md);
 a Saved Task card and an assistant's trigger row must be
 indistinguishable in wording. `cron`, `binding`, `channel`, `topic`
 never appear in primary copy.
@@ -304,7 +315,7 @@ the reply is pinned to the assistant; the run shows under
 Automations → Saved tasks *and* in the row ("Last: today 09:12 · ok").
 A non-matching mail is untouched. Turning the row off stops it
 immediately. Wireframe:
-[`20260907_ux_user_flows/assistant-triggers.md`](./20260907_ux_user_flows/assistant-triggers.md).
+[`./assistant-triggers.md`](./assistant-triggers.md).
 
 **J-AB-6 — Move work to another instance** (S6)
 Settings → **Export & import**: one file, one sentence of what is in
@@ -369,7 +380,7 @@ Saved Task card stays the default. **Steps** opens a numbered list:
 pick a step, fill inputs or "from step 2", optional "Ask me before
 this step." Save. Plain-language summary on the card still answers
 the five Saved-Task questions
-([`2026-archive/20260816-saved-task-workflows/08_ux_and_i18n.md`](./2026-archive/20260816-saved-task-workflows/08_ux_and_i18n.md)).
+([`2026-archive/20260816-saved-task-workflows/08_ux_and_i18n.md`](../20260816-saved-task-workflows/08_ux_and_i18n.md)).
 **Save as template** is a share, not a second object. Webhook URL
 sits behind "Let another system start this" with a reveal + copy,
 never as the first control.
@@ -438,7 +449,7 @@ they grow a UI step.
 **Not a new product feature.** The sharing *capability* shipped in S2/S3;
 the professional flow (one-row add, kind-specific consequence, find path)
 landed in [#1726](https://github.com/metadist/synaplan/pull/1726). Sprint file:
-[`2026-archive/20260903_iam/06_sprint_ux_share_dialog.md`](./2026-archive/20260903_iam/06_sprint_ux_share_dialog.md).
+[`2026-archive/20260903_iam/06_sprint_ux_share_dialog.md`](../20260903_iam/06_sprint_ux_share_dialog.md).
 
 | Step | Content | Class |
 | ---- | ------- | ----- |
@@ -451,7 +462,7 @@ Depends on: S2/S3 on `main`. Unlocks: track 2 S3 Publish, track 4 S4
 tool share, track 4 S5 templates. Cut anything else before cutting
 this — a confusing share UI on assistants is worse than no publish.
 
-Wireframe: [`share-dialog-v2.md`](./20260907_ux_user_flows/share-dialog-v2.md).
+Wireframe: [`share-dialog-v2.md`](./share-dialog-v2.md).
 
 ---
 

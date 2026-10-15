@@ -33,8 +33,8 @@ Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, e
 Without usability and stability the software is bad, whatever the API does.
 Every plan, sprint file and PR that touches anything a person sees or waits
 for is measured against this bar. It is the merge gate, not a polish pass.
-The binding contract is `_devextras/planning/20260907_ux_user_flows.md`
-(rules **U1–U12**); the use-case list that applies it is
+The binding contract is `docs/UX_CONTRACT.md` (rules **U1–U12**); the
+use-case list that applies it is
 `_devextras/planning/20260913-use-case-research/README.md` §1.
 
 A user-visible change is **done** only when all seven hold:
@@ -65,8 +65,9 @@ A user-visible change is **done** only when all seven hold:
    AA, all five locales in the same PR (U9).
 
 Planning rule (sprint files opened after 2026-09-13): a sprint file with
-an `ota-candidate` step names its journey (§5 of the UX contract) and
-lists the five exit bullets from its §6 before implementation starts.
+an `ota-candidate` step names its journey (in its own plan, UX contract §5)
+and lists the five exit bullets from the contract's §6 before
+implementation starts.
 Existing files add those bullets when next edited; they are not a
 retroactive merge block. "A listed screen is not a user-flow."
 
@@ -480,6 +481,7 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 - `docs/ARCHITECTURE.md` — backend layers, size limits (`make -C backend metrics`), the chat and stream request paths
 - `docs/PHP_CONVENTIONS.md` — PHP code style, examples, patterns
 - `docs/FRONTEND_CONVENTIONS.md` — TypeScript, Vue, styling tokens, i18n
+- `docs/UX_CONTRACT.md` — UX rules U1–U12, shared patterns (share, inbox, gallery, triggers), sprint-file contract
 - `docs/API_PATTERNS.md` — Zod schemas, OpenAPI, httpClient usage
 - `docs/MIGRATIONS.md` — Doctrine migrations + idempotent seed workflow
 - `docs/E2E_TESTING.md` — Playwright E2E test guidelines

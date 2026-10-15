@@ -11,12 +11,12 @@ log. It is edited in place — no new dated roadmap files, no redirect stubs.
 ## Conventions
 
 - Folder and file names are `YYYYMMDD-topic` (a day, not only a month).
-  The two binding documents keep their historical `YYYYMMDD_` names.
 - A track is a folder with `00_master_plan.md` (decisions, journeys, step
   table, gates), optional sprint files, and `STATUS.md` as the step log.
   A walk is a STATUS entry, not a chat message.
 - A step file that touches a user-visible surface names its journey and
-  the five exit bullets from the UX contract §6 before implementation.
+  the five exit bullets from the UX contract (`docs/UX_CONTRACT.md` §6)
+  before implementation.
 - Release class per step: `no-app-impact`, `backend-only`,
   `ota-candidate`, `store-required` (`.github/mobile-impact-policy.json`).
 
@@ -24,25 +24,23 @@ log. It is edited in place — no new dated roadmap files, no redirect stubs.
 
 | Path | Role |
 | ---- | ---- |
-| [`20260907_ux_user_flows.md`](./20260907_ux_user_flows.md) + [`20260907_ux_user_flows/`](./20260907_ux_user_flows/) | UX contract U1–U12 and journey notes; referenced by AGENTS.md |
+| [`docs/UX_CONTRACT.md`](../../docs/UX_CONTRACT.md) | UX contract U1–U12, shared patterns, sprint-file contract; referenced by AGENTS.md. Moved out of this directory on 2026-10-15; the 2026-09 journeys and wireframes are in [`2026-archive/20260907_ux_user_flows/`](./2026-archive/20260907_ux_user_flows/README.md) |
 | [`20260913-use-case-research/`](./20260913-use-case-research/README.md) | Ten jobs, Perfect-UX bar, Q-list; referenced by AGENTS.md |
 
 ## Live tracks
 
-Same order as `ROADMAP.md` §1, plus the live-voice track. **Cleanup first
-(decision 2026-10-14, extended 2026-10-15):** rows 1–2b form a window in
-which only bug fixes, security fixes and release blockers land beside them;
-feature tracks resume when V3 meets its exit.
+Same order as `ROADMAP.md` §1. **The cleanup window closed on
+2026-10-15:** code cleanup V1 and V2 met their exits and moved to the
+archive with the UX overhaul; feature tracks resume with the prompting flow. Code cleanup V3
+finishes the chat path first and is in review.
 
 | Path | What | State 2026-10-15 |
 | ---- | ---- | ---------------- |
-| [`20261014-code-cleanup-V1/`](./20261014-code-cleanup-V1/00_master_plan.md) | Backend ordering sprint: deptrac layer gate with baseline, `Service/` root guarded as plugin contract, 69 of the 73 loose services sorted into domain folders in six PRs | shipped ([#2478](https://github.com/metadist/synaplan/pull/2478) → #2486); archived together with V3 |
-| [`20261014-code-cleanup-V2/`](./20261014-code-cleanup-V2/00_master_plan.md) | Break up the god classes: size ratchet, characterization snapshots, `ConfigController` → `ChatHandler` → `StreamController`, `docs/ARCHITECTURE.md` | shipped ([#2492](https://github.com/metadist/synaplan/pull/2492), #2496–#2500); archived together with V3 |
-| [`20261015-code-cleanup-V3/`](./20261015-code-cleanup-V3/00_master_plan.md) | Three bad ideas, three fixes: copied helpers in the four chat-path god classes, buffered / streamed twins in `MessageProcessor` and `FileAnalysisHandler`, 36-dependency lists in `SeedAllCommand` and `UserDeletionService`; V4 order in §7 | **cleanup window** — closes the window |
-| [`20261009-ux-overhaul/`](./20261009-ux-overhaul/00_master_plan.md) | UX overhaul: rail Chats · Library · Assistants · Apps · Admin, every sub page explained, guided tours (UX00–UX14) | paused |
-| [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | Triage of the external 5.2.0 test round (F1–F49), six fixing waves, 50 issue drafts in `issues/` | paused — waves 1–3 shipped; bug-fix issues continue |
+| [`20261015-code-cleanup-V3/`](./20261015-code-cleanup-V3/00_master_plan.md) | Three bad ideas, three fixes: copied helpers in the four chat-path god classes, buffered / streamed twins in `MessageProcessor` and `FileAnalysisHandler`, 36-dependency lists in `SeedAllCommand` and `UserDeletionService`; V4 order in §7 | in review — [#2512](https://github.com/metadist/synaplan/pull/2512) → [#2513](https://github.com/metadist/synaplan/pull/2513) → [#2514](https://github.com/metadist/synaplan/pull/2514), merge in order |
+| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat, model and voice under AI settings | finishing — web, backend and sidecar on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), [#2507](https://github.com/metadist/synaplan/pull/2507)); LV7–LV8 on `synaplan-apps` branch `feat/live-voice`, no PR yet |
+| [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | Triage of the external 5.2.0 test round (F1–F49), six fixing waves, 50 issue drafts in `issues/` | paused — waves 1–3 shipped; waves 4–6 open, drafts not filed on GitHub |
 | [`20260903_secure_compute/`](./20260903_secure_compute/00_master_plan.md) | Secure Compute; B4 remainder (egress, gVisor node, run images, docs, staging) | paused |
-| [`20261001-single-scheduler/`](./20261001-single-scheduler/00_master_plan.md) | One scheduler; P1/P2/P4 shipped, P3 production rollout open (`synaplan-platform`) | ops, may proceed |
+| [`20261001-single-scheduler/`](./20261001-single-scheduler/00_master_plan.md) | One scheduler; P1/P2/P4 shipped, P3 production rollout open (`synaplan-platform`) | ops |
 | [`20260929-synaplan-federation/`](./20260929-synaplan-federation/00_master_plan.md) | Federation v1.0; first slice shipped, opt-in knowledge link next ([`01_review.md`](./20260929-synaplan-federation/01_review.md)) | paused |
 | `20261014-prompting-flow/` (reserved) | Prompting flow — work on files the way an IDE assistant does: working set, proposed changes as a diff with accept / reject, docked result pane, restore, verify step | queued — plan not yet written |
 | [`20261013-cloud-file-sharing/`](./20261013-cloud-file-sharing/00_master_plan.md) | Nextcloud, ownCloud.online and OpenCloud on one level: copy Synaplan files into the cloud, one identity model (organisation login), the bird indicator, watched folders and automations that run on files picked up from the cloud. Nextcloud first (P1, core API frozen as contract v1), then OpenCloud (P2), then ownCloud.online (P3); all 46 §3 decision rows agreed. Absorbs More-Nextcloud S3 and the folder watch | queued — plan merged 2026-10-14, no code yet |
@@ -52,13 +50,13 @@ feature tracks resume when V3 meets its exit.
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/00_master_plan.md) | Collabora epics 0–4 | queued — partner |
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts: apps like SISmass create Synaplan accounts for their customers (AA1–AA8) | not started |
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/00_master_plan.md) | Config pyramid; §0 unticked | not started |
-| [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat, model and voice under AI settings | on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), [#2507](https://github.com/metadist/synaplan/pull/2507)); GPU walk open in its STATUS |
 
 ## Archive
 
 Everything else — the frozen roadmaps (2026-09-03, 09-10, 09-17, 09-25),
-the completed August/September tracks (IAM, tools, plugs, agent builder,
+the completed August–October tracks (IAM, tools, plugs, agent builder,
 feature modules, navigation consolidation, smart search, early intake,
-desktop Phase A, …), and the April/May topical dump
-(`2026-archive/2026-04-05-topic-docs/`) — lives under `2026-archive/` with
-its dated name. The 2026-10-14 housekeeping is listed in `ROADMAP.md` §4.
+desktop Phase A, code cleanup V1 and V2, UX overhaul, …), and the April/May
+topical dump (`2026-archive/2026-04-05-topic-docs/`) — lives under
+`2026-archive/` with its dated name. The 2026-10-14 and 2026-10-15
+housekeeping is listed in `ROADMAP.md` §4.

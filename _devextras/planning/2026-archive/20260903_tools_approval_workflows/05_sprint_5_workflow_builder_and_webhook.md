@@ -13,7 +13,7 @@ section. Master plan §0 rows 9, 10, 11; §4.5; §12 rows 7, 9.
 **Repos:** `synaplan/` only. Cut line (master plan §8): webhook trigger (`TL42`–`TL43`) ships before the editor if capacity is short.
 **Flag:** `WORKFLOWS.BUILDER_ENABLED` (default off) gates the editor, the new node kinds in the validator and
 the webhook route; the outbound webhook hardening (`TL43`) is unconditional because it only tightens.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-TL-5. The Saved Task card stays the default path (five questions
 from the saved-tasks UX doc). **Steps** is a numbered list. Webhook
 URL lives behind "Let another system start this". **Save as

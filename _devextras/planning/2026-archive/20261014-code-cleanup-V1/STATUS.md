@@ -1,5 +1,15 @@
 # Code cleanup V1 — status
 
+> **Archived 2026-10-15.** C1–C9 merged on `main` on 2026-10-14
+> ([#2478](https://github.com/metadist/synaplan/pull/2478) →
+> [#2486](https://github.com/metadist/synaplan/pull/2486)). Exit met: the
+> `src/Service/` root holds the four plugin-SDK classes (guarded by
+> `ServiceRootTest`), deptrac runs in `make ci-local` and CI, and the
+> baseline is 10 files / 54 edges — not the 7 files the plan predicted,
+> because C1 found three more violating files (row C1). What is left in the
+> baseline is the unscheduled V3 list of master plan §8. Code comments that
+> cite `_devextras/planning/20261014-code-cleanup-V1/` mean this folder.
+
 Numbers to carry forward in every row: files in `src/Service/` root
 (start 73, target 4) and files in `deptrac.baseline.yaml`. The first run
 measured **12 files / 59 edges**, not the 9 the `rg` count in
