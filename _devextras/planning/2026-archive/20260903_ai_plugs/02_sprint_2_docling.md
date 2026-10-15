@@ -8,7 +8,7 @@ are chunked heading-aware, and the table row is retrievable. Sidecar down or not
 **Unlocks:** the Extraction tab is the first tab of the renamed AI infrastructure page; S3 and S4 add theirs beside it.
 **Repos:** `synaplan/` (backend, frontend, `docker-compose.yml`), `synaplan-docs/` (one pointer), `synaplan-platform/` (service block, private).
 **Flag:** `PLUGS.EXTRACTION.CHAIN.document` — Docling runs only when an admin adds `docling` to the chain; fresh installs keep the S1 default.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-PL-1. Extraction tab leads with one sentence + health + **Test
 with a file** that shows a human result. Down sidecar = "Docling
 unavailable — Tika used instead", never a failed upload.

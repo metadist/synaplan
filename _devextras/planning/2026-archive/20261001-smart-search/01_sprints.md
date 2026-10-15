@@ -3,7 +3,7 @@
 Roadmap: [`00_master_plan.md`](00_master_plan.md) §4.
 
 Every `ota-candidate` step below carries the five exit bullets from
-[`../20260907_ux_user_flows.md`](../../20260907_ux_user_flows.md) §6.
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §6.
 
 ---
 

@@ -10,9 +10,9 @@ landing in `BFILES` with `source = compute`, and quotas in the existing rate-lim
 **Unlocks:** B2 (tools and policy), B3 (workspaces, egress). **Repos:** `synaplan/` only.
 **Flag:** `COMPUTE.ENABLED` (`BCONFIG` group `COMPUTE`, setting `ENABLED`, default `0` in code and seeder) **and** env
 `COMPUTE_URL` + `COMPUTE_TOKEN`. Both must be set; either missing means the feature is absent.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)
 J-CP-1. Wireframe:
-[`../20260907_ux_user_flows/compute-run-card.md`](../20260907_ux_user_flows/compute-run-card.md).
+[`../2026-archive/20260907_ux_user_flows/compute-run-card.md`](../2026-archive/20260907_ux_user_flows/compute-run-card.md).
 `CS6` is not done until the card is walked in the chat: progress →
 result chip → existing preview; quota is a sentence; flag off offers
 nothing (U11). Never "sandbox" / "stdout" in primary copy.

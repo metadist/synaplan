@@ -7,7 +7,7 @@ pointing it at `00_master_plan.md`. The exit criteria are the definition of
 done; the agent reports each one with the command it ran.
 
 The `ota-candidate` steps (D7, P4, P5) carry the five exit bullets from
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §6.
+[`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) §6.
 
 ---
 

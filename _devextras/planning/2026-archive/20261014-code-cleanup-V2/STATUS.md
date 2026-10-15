@@ -1,5 +1,17 @@
 # Code cleanup V2 — status
 
+> **Archived 2026-10-15.** G1–G10 merged on `main`
+> ([#2492](https://github.com/metadist/synaplan/pull/2492),
+> [#2496](https://github.com/metadist/synaplan/pull/2496)–[#2500](https://github.com/metadist/synaplan/pull/2500)).
+> The three god classes left every size ledger: `ConfigController` 745 lines
+> / 9 deps, `ChatHandler` 229 / 9, `StreamController` 417 / 3.
+> `docs/ARCHITECTURE.md` and `make -C backend metrics` are on `main`; the
+> ratchet stands at 59 / 73 / 151. `MessageProcessor` (chat path, ~2,100
+> lines) and the rest of the next tier stay frozen in the ratchet by design
+> (master plan §3) and split when a feature PR opens them; the V3 candidates
+> (§7) are unscheduled. This closed the cleanup window. Code comments that
+> cite `_devextras/planning/20261014-code-cleanup-V2/` mean this folder.
+
 Three numbers in every row (from the ratchet, G1): files > 800 lines,
 constructors > 10 params, methods > 100 lines. Plus the lines / params of
 the class the PR works on. Start values measured 2026-10-14: 64 / 98 / —.

@@ -32,7 +32,7 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 
 **2026-09-07 (UX contract):** keep the handshake as a flow, not a
 settings form. See
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §5.6.
+[`../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md`](../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md) §5.6.
 
 **2026-09-07 (S1 implementation):** Wave 2 S1 landed on
 `feat/more-nextcloud-s1-handshake` — `BPLATFORMINSTANCES`, instance

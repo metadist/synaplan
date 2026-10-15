@@ -20,7 +20,7 @@ resource cards (everyone). No new top-level nav item.
   — manifest v2 `provides.*` (plugins contribute shareable resource kinds)
 - Track 2 (assistants are the second shareable kind), track 6 (external
   identities table is introduced here and reused there)
-- [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) — binding
+- [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) — binding
   user-flow contract (U1–U12). S2/S3 shipped the capability; **IAM-UX**
   professionalizes `ShareDialog` before later tracks reuse it.
 
@@ -196,7 +196,7 @@ talk to it".
 Contract: the current navigation is lean (Work / Manage / Operate) and this
 track must not undo that. **A listed screen is not a user-flow.** Remaining
 UI (S4 Audit / directory, S5 Policies, IAM-UX) follows
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) journeys
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) journeys
 J-IAM-1…4. S2 specified a dialog and a filter chip; members could not
 find incoming chats until #1717. Do not ship another surface that only
 exists as a component name.
@@ -309,7 +309,7 @@ Named tests live in the sprint files; the list is binding.
 | **S3 — More kinds** ([file](./03_sprint_3_more_kinds.md)) | `assistant` (BPROMPTS — coordinates with track 2 S3), `saved_task` (read/use = run a copy), `widget` (read/edit for co-editing); plugin-declared kinds via manifest v2 | Admin publishes a system-like assistant to one group only |
 | **S4 — Directory & privacy** ([file](./04_sprint_4_directory_and_privacy.md)) | OIDC groups claim sync; audit log + Audit tab; admin metadata-only enforcement; impersonation audit + `disabled` option; regression check that OpenCloud token-exchanged users (RFC 8693 bearer, same Keycloak realm) resolve to the same `BUSER` and therefore see their groups and shares | A user logging in via Keycloak lands in the right groups; admin sees who shared what, not the content |
 | **S5 — Group policies** ([file](./05_sprint_5_group_policies.md)) | `BGROUPCONFIG`, `BCONFIG.BLOCKED`, resolution user → groups → global for allow-listed settings; Policies tab | "Support may only use these two models" holds; a locked default cannot be overridden (journey J-IAM-3) |
-| **IAM-UX — Share dialog professionalization** ([`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §7) | One-row add, kind-specific consequence, open-resource five-question check on every S3 kind, after-share toast names the recipient path | J-IAM-4 walked; required **before** track 2 S3 Publish and track 4 tool/template share reuse the dialog |
+| **IAM-UX — Share dialog professionalization** ([`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §7) | One-row add, kind-specific consequence, open-resource five-question check on every S3 kind, after-share toast names the recipient path | J-IAM-4 walked; required **before** track 2 S3 Publish and track 4 tool/template share reuse the dialog |
 | **v2 candidates** | SCIM 2.0; nested groups; ownership transfer; support access (time-boxed read grant to an admin); per-group budgets | Decided per hoster demand |
 
 Cut line: if scope slips, cut **S5** first, then **S4 audit tab** (keep the
@@ -363,7 +363,7 @@ than no sharing, and later tracks must not inherit the S2 dialog as-is.
 6. The People page replaces the old Users tab; total nav item count in
    Operate grows by exactly one.
 7. Remaining UI (S4, S5, IAM-UX) walks J-IAM-1…4 in
-   [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md): a
+   [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md): a
    directory group is obviously read-only, Audit never opens content,
    a locked model default is a sentence not a status code, and Share
    tells both sides where the other person will look.

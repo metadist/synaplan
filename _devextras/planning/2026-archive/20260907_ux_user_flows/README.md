@@ -1,7 +1,8 @@
 # Wireframes — 2026-09 user-flows
 
-Binding companions to [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md).
-Copy is reviewed against these before the first Vue for the surface.
+Companions to [`20260907_ux_user_flows.md`](./20260907_ux_user_flows.md),
+archived with it on 2026-10-15. The binding rules are in
+[`docs/UX_CONTRACT.md`](../../../../docs/UX_CONTRACT.md); these wireframes stay as reference.
 
 | File | Journey | Track |
 | ---- | ------- | ----- |
