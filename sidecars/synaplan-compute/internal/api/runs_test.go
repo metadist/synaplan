@@ -81,6 +81,19 @@ func waitFor(t *testing.T, ts *httptest.Server, id string, pred func(contract.Ru
 	return st
 }
 
+// waitUntil polls cond until it holds; after ten seconds the test fails
+// naming what it waited for.
+func waitUntil(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func readFixture(t *testing.T, name string) []byte {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -472,6 +485,9 @@ func TestDeleteQueuedRunNeverCreatesContainer(t *testing.T) {
 	_, ts := newTestServer(t, testOpts{runner: fr, cfg: func(c *config.Config) { c.MaxConcurrent = 1 }})
 	first := submitJSON(t, ts, validRun())
 	waitFor(t, ts, first, func(st contract.RunStatus) bool { return st.Status == contract.StatusRunning })
+	// A run reports "running" while it still prepares its scratch dir; a
+	// DELETE in that gap ends it before it has a container to count.
+	waitUntil(t, "the first run's container", func() bool { return fr.created.Load() == 1 })
 	second := submitJSON(t, ts, validRun())
 	if st, _ := getStatus(t, ts, second); st.Status != contract.StatusQueued {
 		t.Fatalf("%+v", st)
