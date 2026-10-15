@@ -2021,14 +2021,7 @@ final readonly class MessageProcessor
 
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
     {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'metadata' => $metadata,
-                'timestamp' => microtime(true),
-            ]);
-        }
+        ProgressCallback::notify($callback, $status, $message, $metadata);
 
         $this->logger->info('MessageProcessor status', [
             'status' => $status,

@@ -28,6 +28,7 @@ use App\Service\Media\RenderedImageSize;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\PerfPipelineFlag;
+use App\Service\Message\ProgressCallback;
 use App\Service\Message\TtsScriptGuard;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -150,7 +151,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         array $options = [],
     ): array {
         // Send initial status based on detected media type (will be refined later)
-        $this->notify($progressCallback, 'analyzing', 'Understanding your request...');
+        ProgressCallback::notify($progressCallback, 'analyzing', 'Understanding your request...');
 
         // Background memory extraction on the user's prompt is dispatched
         // further down, once the turn is confirmed to stay on the media path
@@ -240,7 +241,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
         if (null !== $editSource) {
             $attachedImagePaths[] = $editSource->absolutePath;
-            $this->notify($progressCallback, 'editing', 'Editing '.$editSource->displayName.'…', [
+            ProgressCallback::notify($progressCallback, 'editing', 'Editing '.$editSource->displayName.'…', [
                 'edit_source_file_id' => $editSource->fileId,
                 'edit_source_name' => $editSource->displayName,
             ]);
@@ -554,7 +555,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $statusMessage = "AI is crafting your $mediaTypeLabel with $providerName $modelName";
         // Structured fields let the client narrate this in the user's language
         // ("Generating your image with …") instead of echoing the English text.
-        $this->notify($progressCallback, 'generating', $statusMessage, [
+        ProgressCallback::notify($progressCallback, 'generating', $statusMessage, [
             'provider' => $provider,
             'model_name' => $modelName,
             'media_type' => $mediaTypeLabel,
@@ -668,7 +669,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     // render a live progress bar tagged to its node.
                     'progress_callback' => function (array $progress) use ($progressCallback): void {
                         $elapsed = $progress['elapsed_seconds'] ?? 0;
-                        $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)", [
+                        ProgressCallback::notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)", [
                             'provider_status' => $progress['status'] ?? 'processing',
                             'elapsed_seconds' => $elapsed,
                             'percent' => $progress['percent'] ?? null,
@@ -721,7 +722,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 if ([] !== $referenceImageUrls) {
                     $videoOptions['image_url'] = $referenceImageUrls[0];
                     $videoOptions['images'] = $referenceImageUrls;
-                    $this->notify($progressCallback, 'generating', 'Preparing your image for animation...');
+                    ProgressCallback::notify($progressCallback, 'generating', 'Preparing your image for animation...');
                     $this->logger->info('MediaGenerationHandler: Image-to-video source(s) prepared', [
                         'provider' => $provider,
                         'model' => $modelName,
@@ -832,7 +833,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $responseText = '__AUDIO_GENERATED__';
                 $streamCallback($responseText);
 
-                $this->notify($progressCallback, 'generating', 'Audio generated successfully.');
+                ProgressCallback::notify($progressCallback, 'generating', 'Audio generated successfully.');
 
                 $audioMediaUsage = [
                     'characters' => $result['text_length'] ?? mb_strlen($prompt),
@@ -946,7 +947,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 throw new \Exception("Generated {$mediaType} has no URL. Check provider response format.");
             }
 
-            $this->notify($progressCallback, 'generating', 'Saving '.$mediaTypeLabel.'...');
+            ProgressCallback::notify($progressCallback, 'generating', 'Saving '.$mediaTypeLabel.'...');
 
             $localPath = null;
 
@@ -995,7 +996,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // Generate thumbnail for video files
             $thumbnailPath = null;
             if ('video' === $mediaType) {
-                $this->notify($progressCallback, 'generating', 'Creating video thumbnail...');
+                ProgressCallback::notify($progressCallback, 'generating', 'Creating video thumbnail...');
                 $thumbnailPath = $this->thumbnailService->generateThumbnail($localPath);
                 if ($thumbnailPath) {
                     $this->logger->info('MediaGenerationHandler: Video thumbnail generated', [
@@ -1025,7 +1026,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // Stream the response
             $streamCallback($responseText);
 
-            $this->notify($progressCallback, 'generating', ucfirst($mediaType).' generated successfully.');
+            ProgressCallback::notify($progressCallback, 'generating', ucfirst($mediaType).' generated successfully.');
 
             $mediaUsage = [];
             if ('image' === $mediaType) {
@@ -1541,7 +1542,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $chatOptions = $options;
         unset($chatOptions['resolved_prompt_data']);
 
-        $this->notify($progressCallback, 'analyzing', 'Answering your request…');
+        ProgressCallback::notify($progressCallback, 'analyzing', 'Answering your request…');
 
         $result = $this->chatHandler->handleStream($message, $thread, $chatClassification, $streamCallback, $progressCallback, $chatOptions);
         $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];
@@ -1921,7 +1922,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         if ($this->mediaJobService->countActiveForUser($effectiveUserId) >= $maxActive) {
             $limitMessage = $this->errorMessageBuilder->buildTooManyJobsMessage($lang);
             $streamCallback($limitMessage);
-            $this->notify($progressCallback, 'error', $limitMessage);
+            ProgressCallback::notify($progressCallback, 'error', $limitMessage);
             $this->logger->info('MediaGenerationHandler: media job rejected — per-user concurrency limit reached', [
                 'user_id' => $effectiveUserId,
                 'limit' => $maxActive,
@@ -1990,7 +1991,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $this->mediaJobMessageSync->syncTerminalState($job);
 
             $streamCallback($errorMessage);
-            $this->notify($progressCallback, 'error', $errorMessage, [
+            ProgressCallback::notify($progressCallback, 'error', $errorMessage, [
                 'media_job' => [
                     'job_id' => $job->getJobKey(),
                     'type' => $type,
@@ -2036,7 +2037,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // banner (MediaJobStatus) and persists this marker so reloads are not empty.
         $streamCallback($this->generatingTokenFor($type));
 
-        $this->notify($progressCallback, 'generating', 'Media generation started in the background.', [
+        ProgressCallback::notify($progressCallback, 'generating', 'Media generation started in the background.', [
             'media_job' => $mediaJob,
         ]);
 
@@ -2277,18 +2278,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
         // Image providers bill per generated image.
         return ['images' => 1];
-    }
-
-    private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
-    {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'metadata' => $metadata,
-                'timestamp' => time(),
-            ]);
-        }
     }
 
     /**

@@ -14,6 +14,7 @@ use App\Service\File\ConversationFileCatalog;
 use App\Service\File\FileTypeResolver;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessagePreProcessor;
+use App\Service\Message\ProgressCallback;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\LanguageDirectiveBuilder;
 use App\Service\Stt\SpeechFailure;
@@ -97,7 +98,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $this->notify($progressCallback, 'analyzing', 'Analyzing file...');
+        ProgressCallback::notify($progressCallback, 'analyzing', 'Analyzing file...');
 
         $userPrompt = $message->getText();
 
@@ -117,7 +118,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         }
 
         if ($fromConversation) {
-            $this->notify($progressCallback, 'analyzing', $this->conversationProgressMessage($filesInfo));
+            ProgressCallback::notify($progressCallback, 'analyzing', $this->conversationProgressMessage($filesInfo));
         }
 
         $this->logFilesInfo($message, $filesInfo, streaming: false, fromConversation: $fromConversation);
@@ -194,7 +195,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
-        $this->notify($progressCallback, 'analyzing', 'Analyzing file...');
+        ProgressCallback::notify($progressCallback, 'analyzing', 'Analyzing file...');
 
         $userPrompt = $message->getText();
 
@@ -215,7 +216,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         }
 
         if ($fromConversation) {
-            $this->notify($progressCallback, 'analyzing', $this->conversationProgressMessage($filesInfo));
+            ProgressCallback::notify($progressCallback, 'analyzing', $this->conversationProgressMessage($filesInfo));
         }
 
         $this->logFilesInfo($message, $filesInfo, streaming: true, fromConversation: $fromConversation);
@@ -435,7 +436,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         array $classification,
         ?callable $progressCallback,
     ): array {
-        $this->notify($progressCallback, 'generating', 'Replying to voice message...');
+        ProgressCallback::notify($progressCallback, 'generating', 'Replying to voice message...');
 
         $prompts = $this->buildAudioConversationalPrompt($audioFiles, $userPrompt);
         $prompts['system'] .= $this->buildLanguageDirective($classification);
@@ -483,7 +484,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ]
             );
 
-            $this->notify($progressCallback, 'complete', 'Reply complete.');
+            ProgressCallback::notify($progressCallback, 'complete', 'Reply complete.');
 
             return [
                 'content' => $result['content'],
@@ -517,7 +518,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         ?callable $progressCallback,
         array $options,
     ): array {
-        $this->notify($progressCallback, 'generating', 'Replying to voice message...');
+        ProgressCallback::notify($progressCallback, 'generating', 'Replying to voice message...');
 
         $prompts = $this->buildAudioConversationalPrompt($audioFiles, $userPrompt);
         $prompts['system'] .= $this->buildLanguageDirective($classification);
@@ -561,7 +562,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 ]
             );
 
-            $this->notify($progressCallback, 'complete', 'Reply complete.');
+            ProgressCallback::notify($progressCallback, 'complete', 'Reply complete.');
 
             return [
                 'metadata' => [
@@ -595,7 +596,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         array $classification,
         ?callable $progressCallback,
     ): array {
-        $this->notify(
+        ProgressCallback::notify(
             $progressCallback,
             'generating',
             count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
@@ -639,7 +640,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 null,
             );
 
-            $this->notify($progressCallback, 'complete', 'Analysis complete.');
+            ProgressCallback::notify($progressCallback, 'complete', 'Analysis complete.');
 
             return [
                 'content' => $result['content'],
@@ -673,7 +674,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         ?callable $progressCallback,
         array $options,
     ): array {
-        $this->notify(
+        ProgressCallback::notify(
             $progressCallback,
             'generating',
             count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
@@ -717,7 +718,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 $streamCallback,
             );
 
-            $this->notify($progressCallback, 'complete', 'Analysis complete.');
+            ProgressCallback::notify($progressCallback, 'complete', 'Analysis complete.');
 
             return [
                 'metadata' => [
@@ -780,7 +781,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             return $documents;
         }
 
-        $this->notify($progressCallback, 'generating', count($documents) > 1
+        ProgressCallback::notify($progressCallback, 'generating', count($documents) > 1
             ? 'Documents are large — condensing them for the model...'
             : 'Document is large — condensing it for the model...');
 
@@ -791,7 +792,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $docBudget = max(1000, (int) floor($totalBudget * ($docChars / $totalChars)));
 
             $result = $this->contextCondenser->fit($text, $question, $docBudget, $userId, function (array $progress) use ($progressCallback, $doc): void {
-                $this->notify($progressCallback, 'generating', sprintf(
+                ProgressCallback::notify($progressCallback, 'generating', sprintf(
                     'Condensing %s — part %d of %d%s...',
                     (string) ($doc['name'] ?? 'document'),
                     $progress['chunk'],
@@ -964,7 +965,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $this->throwIfImageBatchFullyFailed($perImage);
         $content = $this->combineImageAnalyses($perImage, $images);
 
-        $this->notify($progressCallback, 'complete', 'Analysis complete.');
+        ProgressCallback::notify($progressCallback, 'complete', 'Analysis complete.');
 
         $firstSuccess = null;
         foreach ($perImage as $entry) {
@@ -1055,7 +1056,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $progressMessage = count($images) > 1
                 ? sprintf('Analyzing image %d of %d...', $index + 1, count($images))
                 : 'Analyzing image...';
-            $this->notify($progressCallback, 'analyzing', $progressMessage);
+            ProgressCallback::notify($progressCallback, 'analyzing', $progressMessage);
 
             $fullPath = $this->uploadDir.'/'.$image['path'];
             if (!file_exists($fullPath)) {
@@ -2028,19 +2029,5 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $aiModel = $promptMetadata['aiModel'] ?? null;
 
         return (null !== $aiModel && (int) $aiModel > 0) ? (int) $aiModel : null;
-    }
-
-    /**
-     * Notify progress callback.
-     */
-    private function notify(?callable $callback, string $status, string $message): void
-    {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'timestamp' => time(),
-            ]);
-        }
     }
 }
