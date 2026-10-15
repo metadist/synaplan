@@ -19,23 +19,31 @@ use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\Feedback\FeedbackConfigService;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
+use App\Service\File\GeneratedImageVisionFlag;
 use App\Service\File\UnreadSourceGuard;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Memory\MemoryExtractionDispatcher;
+use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Memory\UserMemoryService;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Chat\ChatMessageAssembler;
+use App\Service\Message\Chat\ConversationHistoryRenderer;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\PerfPipelineFlag;
 use App\Service\Message\Routing\RoutingDirective;
 use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
+use App\Service\Prompt\ChatPromptBlocks;
 use App\Service\Prompt\PromptService;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
+use App\Service\Vision\VisionAttachmentEncoder;
+use App\Tests\Support\ChatHandlerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -89,7 +97,7 @@ class ChatHandlerTest extends TestCase
             ->method('resolveUsableModelId')
             ->willReturnCallback(static fn (?int $modelId): ?int => $modelId);
 
-        $this->handler = new ChatHandler(
+        $this->handler = ChatHandlerFactory::create(
             $this->aiFacade,
             $this->promptRepository,
             $this->promptService,
@@ -113,8 +121,8 @@ class ChatHandlerTest extends TestCase
             $this->visionModelResolver,
             $this->digestSearchService,
             $this->digestConfig,
-            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
-            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(ConversationFileCatalog::class),
+            $this->createMock(GeneratedImageVisionFlag::class),
             $this->alwaysOnStructuredOutputConfig(),
             new ToolCallingTranslator(new ToolCallingCapability()),
             new ToolCallParser(),
@@ -311,7 +319,7 @@ class ChatHandlerTest extends TestCase
 
     public function testHumanizeFileMarkersReplacesGeneratedMarker(): void
     {
-        $result = $this->handler->humanizeFileMarkersForModel('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
+        $result = $this->history()->humanizeFileMarkers('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
 
         $this->assertStringNotContainsString('__FILE_GENERATED__', $result);
         $this->assertStringNotContainsString('FILE_GENERATED', $result);
@@ -320,7 +328,7 @@ class ChatHandlerTest extends TestCase
 
     public function testHumanizeFileMarkersReplacesFailedMarker(): void
     {
-        $result = $this->handler->humanizeFileMarkersForModel('__FILE_GENERATION_FAILED__');
+        $result = $this->history()->humanizeFileMarkers('__FILE_GENERATION_FAILED__');
 
         $this->assertStringNotContainsString('__FILE_GENERATION_FAILED__', $result);
         $this->assertStringContainsString('could not be generated', $result);
@@ -329,7 +337,7 @@ class ChatHandlerTest extends TestCase
     public function testHumanizeFileMarkersReplacesImageVideoAndAudioMarkers(): void
     {
         foreach (['__IMAGE_GENERATED__', '__VIDEO_GENERATED__', '__AUDIO_GENERATED__'] as $marker) {
-            $result = $this->handler->humanizeFileMarkersForModel($marker);
+            $result = $this->history()->humanizeFileMarkers($marker);
             $this->assertStringNotContainsString('__', $result, $marker);
             $this->assertStringNotContainsString('Generated ', $result, $marker);
             $this->assertNotSame('', trim($result), $marker);
@@ -340,12 +348,12 @@ class ChatHandlerTest extends TestCase
     {
         $text = 'Here is a normal assistant reply with no markers.';
 
-        $this->assertSame($text, $this->handler->humanizeFileMarkersForModel($text));
+        $this->assertSame($text, $this->history()->humanizeFileMarkers($text));
     }
 
     public function testHumanizeFileMarkersHandlesNull(): void
     {
-        $this->assertSame('', $this->handler->humanizeFileMarkersForModel(null));
+        $this->assertSame('', $this->history()->humanizeFileMarkers(null));
     }
 
     public function testHandleUsesUserSelectedModel(): void
@@ -1872,7 +1880,7 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
-     * The public {@see ChatHandler::dispatchPendingMemoryExtraction()} is
+     * The public {@see PendingMemoryExtraction::dispatch()} is
      * now a thin proxy onto {@see MemoryExtractionDispatcher::dispatch()}
      * (Copilot review of PR #939: keep the dispatch + log + swallow
      * contract in one service so this path and the
@@ -1881,7 +1889,7 @@ class ChatHandlerTest extends TestCase
      * {@see Service\MemoryExtractionDispatcherTest} —
      * and this test only pins that the wrapper forwards a null payload
      * unchanged so callers can blindly hand the result of
-     * `buildPendingMemoryExtraction()` over without conditionals.
+     * `PendingMemoryExtraction::build()` over without conditionals.
      */
     public function testDispatchPendingMemoryExtractionForwardsNullToDispatcher(): void
     {
@@ -1890,7 +1898,7 @@ class ChatHandlerTest extends TestCase
             ->method('dispatch')
             ->with($this->isNull());
 
-        $this->handler->dispatchPendingMemoryExtraction(null);
+        $this->pendingMemory()->dispatch(null);
     }
 
     /**
@@ -1913,7 +1921,7 @@ class ChatHandlerTest extends TestCase
             ->method('dispatch')
             ->with($this->identicalTo($command));
 
-        $this->handler->dispatchPendingMemoryExtraction($command);
+        $this->pendingMemory()->dispatch($command);
     }
 
     public function testHandleSuppressesMalformedOfficemakerEnvelope(): void
@@ -2046,7 +2054,7 @@ class ChatHandlerTest extends TestCase
         $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
         $structuredOutputConfig->method('isEnabled')->willReturn(false);
 
-        $handler = new ChatHandler(
+        $handler = ChatHandlerFactory::create(
             $this->aiFacade,
             $this->promptRepository,
             $this->promptService,
@@ -2070,8 +2078,8 @@ class ChatHandlerTest extends TestCase
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
             $this->digestSearchService,
             $this->digestConfig,
-            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
-            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(ConversationFileCatalog::class),
+            $this->createMock(GeneratedImageVisionFlag::class),
             $structuredOutputConfig,
             new ToolCallingTranslator(new ToolCallingCapability()),
             new ToolCallParser(),
@@ -2122,7 +2130,7 @@ class ChatHandlerTest extends TestCase
         $guard = $this->createMock(UnreadSourceGuard::class);
         $guard->method('refusalFor')->willReturn('REFUSAL');
 
-        $handler = new ChatHandler(
+        $handler = ChatHandlerFactory::create(
             $this->aiFacade,
             $this->promptRepository,
             $this->promptService,
@@ -2146,8 +2154,8 @@ class ChatHandlerTest extends TestCase
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
             $this->digestSearchService,
             $this->digestConfig,
-            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
-            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(ConversationFileCatalog::class),
+            $this->createMock(GeneratedImageVisionFlag::class),
             $this->alwaysOnStructuredOutputConfig(),
             new ToolCallingTranslator(new ToolCallingCapability()),
             new ToolCallParser(),
@@ -2488,12 +2496,8 @@ class ChatHandlerTest extends TestCase
         $goodAssistant->setUnixTimestamp(time() - 5);
         $goodAssistant->setDateTime(date('YmdHis', time() - 5));
 
-        $method = new \ReflectionMethod(ChatHandler::class, 'buildStreamingMessages');
-        $method->setAccessible(true);
-
         /** @var list<array{role: string, content: mixed}> $messages */
-        $messages = $method->invoke(
-            $this->handler,
+        $messages = $this->messageAssembler()->streaming(
             null,
             [$priorUser, $emptyAssistant, $goodAssistant],
             $current,
@@ -2518,15 +2522,13 @@ class ChatHandlerTest extends TestCase
         $current->setUnixTimestamp(time());
         $current->setDateTime(date('YmdHis'));
 
-        $method = new \ReflectionMethod(ChatHandler::class, 'buildMessages');
-
         /** @var list<array{role: string, content: mixed}> $voice */
-        $voice = $method->invoke($this->handler, 'system', [$current], $current, ['plain_user_turn' => true]);
+        $voice = $this->messageAssembler()->buffered('system', [$current], $current, ['plain_user_turn' => true]);
         $this->assertSame(['system', 'user'], array_column($voice, 'role'));
         $this->assertSame('Wie ist der Verkehr auf der A3?', $voice[1]['content']);
 
         /** @var list<array{role: string, content: mixed}> $channel */
-        $channel = $method->invoke($this->handler, 'system', [], $current, []);
+        $channel = $this->messageAssembler()->buffered('system', [], $current, []);
         $this->assertStringContainsString('"BTEXT"', (string) $channel[1]['content']);
     }
 
@@ -2535,12 +2537,27 @@ class ChatHandlerTest extends TestCase
      */
     private function invokeFormatQuotedReference(array $options): string
     {
-        $method = new \ReflectionMethod(ChatHandler::class, 'formatQuotedReferenceForPrompt');
-        $method->setAccessible(true);
+        return ChatPromptBlocks::quotedReference($options);
+    }
 
-        /** @var string $result */
-        $result = $method->invoke($this->handler, $options);
+    private function history(): ConversationHistoryRenderer
+    {
+        return new ConversationHistoryRenderer($this->createStub(ConversationFileCatalog::class));
+    }
 
-        return $result;
+    private function pendingMemory(): PendingMemoryExtraction
+    {
+        return new PendingMemoryExtraction($this->memoryExtractionDispatcher, $this->perfPipelineFlag, $this->logger);
+    }
+
+    private function messageAssembler(): ChatMessageAssembler
+    {
+        $catalog = $this->createStub(ConversationFileCatalog::class);
+
+        return new ChatMessageAssembler(
+            new VisionAttachmentEncoder('/tmp/uploads', $catalog, $this->createStub(GeneratedImageVisionFlag::class), $this->modelRepository, $this->visionModelResolver, $this->logger),
+            new ConversationHistoryRenderer($catalog),
+            $this->logger,
+        );
     }
 }

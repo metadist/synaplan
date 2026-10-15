@@ -1815,7 +1815,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
      *
      * Doctrine entities cannot survive the queue boundary; the extractor
      * only needs `role`+`content` so we reduce to that. Mirrors the
-     * implementation in ChatHandler::normalizeThreadForQueue() — kept in
+     * implementation in PendingMemoryExtraction::normalizeThreadForQueue() — kept in
      * sync but duplicated to avoid leaking a private helper across
      * handler classes.
      *

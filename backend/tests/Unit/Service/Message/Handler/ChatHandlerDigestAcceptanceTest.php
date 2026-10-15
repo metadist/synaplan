@@ -37,6 +37,7 @@ use App\Service\Prompt\TimeContextBuilder;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\VectorSearch\QdrantClientInterface;
+use App\Tests\Support\ChatHandlerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -370,7 +371,7 @@ class ChatHandlerDigestAcceptanceTest extends TestCase
         $modelConfigService->method('resolveUsableModelId')
             ->willReturnCallback(static fn (?int $modelId): ?int => $modelId);
 
-        return new ChatHandler(
+        return ChatHandlerFactory::create(
             $aiFacade,
             $this->createMock(PromptRepository::class),
             $this->createMock(PromptService::class),

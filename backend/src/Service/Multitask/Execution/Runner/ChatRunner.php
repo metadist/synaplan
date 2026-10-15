@@ -323,7 +323,7 @@ final readonly class ChatRunner implements TaskRunner
         $minScore = $context->options['rag_min_score'] ?? null;
 
         // A pinned assistant carries its scope in the RuntimeProfile, never
-        // as scalar copies (see ChatHandler::ragSettings).
+        // as scalar copies (see ChatKnowledgeContextLoader::settings).
         $profile = $context->options['runtime_profile'] ?? null;
         if ($profile instanceof RuntimeProfile) {
             $groupKey ??= $profile->primaryRagGroupKey();

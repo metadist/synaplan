@@ -1,16 +1,16 @@
 {
     "_comment": "Size ratchet ledger (tests/Architecture/SizeRatchetTest.php). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_SIZE_RATCHET=1 and review the diff.",
     "recorded": "2026-10-14",
-    "updated": "2026-10-14",
+    "updated": "2026-10-15",
     "limits": {
         "fileLines": 800,
         "constructorParams": 10,
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 61,
-        "constructorParams": 75,
-        "methodLines": 163
+        "fileLines": 60,
+        "constructorParams": 74,
+        "methodLines": 156
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -56,7 +56,6 @@
         "src/Service/Iam/ShareService.php": 853,
         "src/Service/Media/MediaGenerationService.php": 846,
         "src/Service/Memory/UserMemoryService.php": 1022,
-        "src/Service/Message/Handler/ChatHandler.php": 4634,
         "src/Service/Message/Handler/FileAnalysisHandler.php": 2046,
         "src/Service/Message/Handler/MediaGenerationHandler.php": 2351,
         "src/Service/Message/MessageClassifier.php": 2082,
@@ -122,7 +121,6 @@
         "src/Service/File/FileUploadService.php::FileUploadService": 12,
         "src/Service/Iam/UserDeletionService.php::UserDeletionService": 36,
         "src/Service/Mcp/McpOAuthState.php::McpOAuthState": 11,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler": 39,
         "src/Service/Message/Handler/FileAnalysisHandler.php::FileAnalysisHandler": 11,
         "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler": 23,
         "src/Service/Message/MessageClassifier.php::MessageClassifier": 21,
@@ -257,13 +255,6 @@
         "src/Service/Memory/MemoryExtractionService.php::MemoryExtractionService::extractMemoriesViaAi": 185,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::searchRelevantMemories": 142,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::storeInQdrant": 101,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler::buildMessages": 121,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler::handle": 677,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler::handleStream": 792,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler::loadDigestContext": 106,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler::loadFeedbackContext": 106,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler::loadMemoriesContext": 120,
-        "src/Service/Message/Handler/ChatHandler.php::ChatHandler::storeGeneratedFile": 108,
         "src/Service/Message/Handler/FileAnalysisHandler.php::FileAnalysisHandler::handleStream": 104,
         "src/Service/Message/Handler/FileAnalysisHandler.php::FileAnalysisHandler::routeFiles": 205,
         "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler::detachMediaToAsyncJob": 166,
