@@ -29,3 +29,10 @@ since September: `20260914-navigation-consolidation/`, `20261001-smart-search/`,
 `20260927_openai_compatible_image_generation.md`, `20260927-early-intake/`,
 `20260829-desktop-agent-client/` (Phase B continues in `synaplan-desktop`),
 `20260919-meta-muse/`. Each carries a dated note at the top saying why.
+
+2026-10-15 housekeeping: the cleanup window closed. `20261014-code-cleanup-V1/`
+and `20261014-code-cleanup-V2/` met their exits; `20261009-ux-overhaul/`
+shipped in #2431. The UX contract (`20260907_ux_user_flows.md` and its
+wireframes) is in `20260907_ux_user_flows/`; its rules U1–U12 moved to
+`docs/UX_CONTRACT.md`. Code comments that cite the old
+`_devextras/planning/<folder>/` paths mean the folder of the same name here.

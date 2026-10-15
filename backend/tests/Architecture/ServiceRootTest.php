@@ -16,7 +16,7 @@ use PHPUnit\Framework\TestCase;
  * every move PR deletes its names here, and a name whose file no longer
  * exists fails the second test so the list cannot rot.
  *
- * Plan: _devextras/planning/20261014-code-cleanup-V1/ (master plan §3,
+ * Plan: _devextras/planning/2026-archive/20261014-code-cleanup-V1/ (master plan §3,
  * sprints C2–C8, 02_service_root_map.md for the destination of each file).
  */
 final class ServiceRootTest extends TestCase

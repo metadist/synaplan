@@ -5,7 +5,7 @@
 | **Status** | Plan, 2026-09-29. **Binding entry point** for this folder. Product decisions recorded in §12 the same day. Supersedes [`03_verdict_and_orders.md`](./03_verdict_and_orders.md) where they differ (listed in §11). Keeps every safety rule from `03` §3 and the portable format from [`04_portable_sharing_migration.md`](./04_portable_sharing_migration.md). No product code yet. |
 | **Branch** | `feat/synaplan-network` (one PR per step) |
 | **User-facing name** | **Partners.** Code keeps `Federation` (`App\Module\Federation\FederationModule`, `App\Service\Federation\*`). The words *federation, peer, node, link, gossip, realm, mount, RAG, vector, protocol* never appear in primary UI copy. |
-| **Binding contracts** | UX rules U1–U12 ([`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)), AGENTS.md "Perfect UX & Stability", `03` §3 safety findings, `04` §1 "what never travels". |
+| **Binding contracts** | UX rules U1–U12 ([`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)), AGENTS.md "Perfect UX & Stability", `03` §3 safety findings, `04` §1 "what never travels". |
 
 ---
 

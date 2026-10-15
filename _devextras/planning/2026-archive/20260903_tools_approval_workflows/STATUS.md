@@ -41,7 +41,7 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 
 **2026-09-07 (UX contract):** an approval the owner cannot find after
 closing the tab is not governance. See
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §5.4.
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §5.4.
 
 **2026-09-10 (Wave 4 implementation):** S1–S4 on `cursor/wave4-tools-approval-compute-469d`,
 merged to `main` as #1774. S5 stays Wave 5.

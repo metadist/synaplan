@@ -5,11 +5,12 @@ goes. Two checks keep the shape: deptrac enforces the layers, and the size
 ratchet keeps classes and methods small. Both run in `make ci-local` and CI.
 
 The request paths below were "god classes" until the code cleanup V2 and V3
-sprints (`_devextras/planning/20261014-code-cleanup-V2/`,
+sprints (`_devextras/planning/2026-archive/20261014-code-cleanup-V2/`,
 `_devextras/planning/20261015-code-cleanup-V3/`). The runtime config and the
 chat turn sections describe the code of [#2498](https://github.com/metadist/synaplan/pull/2498)
 and [#2499](https://github.com/metadist/synaplan/pull/2499); the message turn,
-file analysis and tagged-list sections the V3 branch `refactor/code-cleanup-v3`.
+file analysis and tagged-list sections the V3 pull requests
+[#2512](https://github.com/metadist/synaplan/pull/2512)–[#2514](https://github.com/metadist/synaplan/pull/2514).
 
 ## Layers
 

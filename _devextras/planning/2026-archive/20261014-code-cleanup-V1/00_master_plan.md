@@ -3,7 +3,7 @@
 **Status:** In review 2026-10-14 — C1–C9 implemented as a stacked PR series
 ([#2478](https://github.com/metadist/synaplan/pull/2478) → #2486, merge in
 order); per-step log and findings in [`STATUS.md`](./STATUS.md).
-**Priority:** Row 1 of [`../ROADMAP.md`](../ROADMAP.md). Per the
+**Priority:** Row 1 of [`../../ROADMAP.md`](../../ROADMAP.md). Per the
 2026-10-14 decision, V1 and V2 form a **cleanup window**: feature work
 pauses until V2 meets its exit; only bug fixes, security fixes and release
 blockers land beside them.

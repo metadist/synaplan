@@ -73,7 +73,7 @@ questionnaire; open questions converted into the master plan's decisions table;
 sprint files written. Next: technical plan review (roadmap §7 step 3).
 
 **2026-09-07 (UX contract):** results stay in the thread. See
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §5.5.
+[`../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md`](../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md) §5.5.
 
 **2026-09-10 (Wave 4 implementation):** sidecar A0–A2 implemented and merged
 to `main` as #1774. Phase B waits on the approval policy (this wave) being

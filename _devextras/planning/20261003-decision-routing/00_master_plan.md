@@ -10,7 +10,7 @@ single extra misroute.
 Ollama-compatible `/v1/systemone`, a Synaplan-native `/api/v1/decisions`
 with thresholds and escalation, and a **decision mode** in chat that builds,
 runs, visualizes and explains decision requests.
-**Binding UX:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) (U1–U12) — surfaces in D7, P4, P5.
+**Binding UX:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) (U1–U12) — surfaces in D7, P4, P5.
 **Class:** D1–D6, P1–P3 `backend-only`; D7, P4, P5 `ota-candidate`; P6 tests + docs.
 
 Files in this track:

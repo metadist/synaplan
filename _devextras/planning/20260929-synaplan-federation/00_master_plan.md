@@ -16,7 +16,7 @@
 | **Type** | Vibe-coding sprint plan (F0–F13), backend-first, UI behind a default-off module. |
 | **Scope v1.0** | **Pure opt-in.** Pairwise *Federation Links* between operators. Two goods: **Knowledge exchange** (RAG) and **Token exchange** (brokered inference). |
 | **Supersedes** | The federation half of [`../../discord_ai_buddy.md`](../../discord_ai_buddy.md). That file's Discord bot becomes a *consumer* of this network, planned separately later. |
-| **Binding contracts** | UX rules U1–U12 in [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) and AGENTS.md "Perfect UX & Stability". |
+| **Binding contracts** | UX rules U1–U12 in [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) and AGENTS.md "Perfect UX & Stability". |
 | **Owners of the surfaces** | `App\Module\Federation\FederationModule` + `App\Service\Federation\*` (backend); `Manage → Federation` + chat composer (frontend). |
 
 Files in this folder:

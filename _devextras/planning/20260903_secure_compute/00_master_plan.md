@@ -24,9 +24,9 @@ Operate → System config holds limits.
 - [`../2026-archive/20260903_tools_approval_workflows/00_master_plan.md`](../2026-archive/20260903_tools_approval_workflows/00_master_plan.md)
   — `code_run` is a `write`-class tool
 - `/wwwroot/synaplan-opencloud/backend` — Go sidecar precedent in the family
-- [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) — binding
+- [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) — binding
   user-flow contract. No new page: J-CP-1/2 are chat-native. Wireframe:
-  [`../20260907_ux_user_flows/compute-run-card.md`](../20260907_ux_user_flows/compute-run-card.md).
+  [`../2026-archive/20260907_ux_user_flows/compute-run-card.md`](../2026-archive/20260907_ux_user_flows/compute-run-card.md).
 
 ---
 
@@ -181,7 +181,7 @@ the compute repo and must be green on T1.
 No new page. Power stays behind a card in the thread the user already
 has open — the same instinct as Incoming chats (do not hide results on
 a page nobody opens). Journeys J-CP-1/2:
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §5.5.
+[`../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md`](../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md) §5.5.
 
 In the chat: run card ("Working with your file…" → result chips →
 existing preview). Logs collapsed as **Details**. Quota / refusal is a

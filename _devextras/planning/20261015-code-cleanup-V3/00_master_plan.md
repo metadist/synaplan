@@ -1,12 +1,12 @@
 # Code cleanup V3 — three bad ideas, three fixes
 
-**Status:** Implemented 2026-10-15 on branch `refactor/code-cleanup-v3`
-(K0–K10, see `STATUS.md`); exit met, pending review and merge. Drafted the
-same day from a measurement of `main` at `eef29b5ac`; §0 agreed in chat
-("fix 3 things in V3, not perfection in one go").
-**Priority:** Row 2b of [`../ROADMAP.md`](../ROADMAP.md) — the last track of
-the cleanup window. Its exit reopens feature work (row 8, the prompting
-flow, is first).
+**Status:** Implemented 2026-10-15 (K0–K10, see `STATUS.md`); exit met, in
+review as one pull request per fix, merged in order: [#2512](https://github.com/metadist/synaplan/pull/2512) → [#2513](https://github.com/metadist/synaplan/pull/2513) → [#2514](https://github.com/metadist/synaplan/pull/2514).
+Drafted the same day from a measurement of `main` at `eef29b5ac`; §0 agreed
+in chat ("fix 3 things in V3, not perfection in one go").
+**Priority:** Row 17 of [`../ROADMAP.md`](../ROADMAP.md): the cleanup follow-up
+that lands before row 8, the prompting flow. V1 and V2 closed the cleanup
+window and were archived in #2510; V3 does not reopen it.
 **Goal:** Remove three ideas that keep producing bloat, each where it hurts
 most today, and stop there:
 
@@ -48,7 +48,7 @@ lines) and the handlers. Row 8 lands on exactly these files.
 | 5 | `MessageProcessor` follows the **G7 recipe**: shared stages that both `process()` and `processStream()` call; where the two paths differ, the stage has a buffered and a streamed entry and the difference is named there. Aligning the differences is behaviour work and goes to V4 (§3 lists them). | 2026-10-15 |
 | 6 | Lists become **tagged collections** (the V2 runtime-config pattern): `app:seed` iterates tagged seeders in today's order, account deletion iterates tagged erasers in today's order. A test pins each order; a coverage test makes a forgotten user-owned table fail CI. | 2026-10-15 |
 | 7 | V2's extraction rule applies: one reason to change, ≤ 10 constructor params, domain folder, `final readonly`, no "Helper" / "Util" / "Manager" names. | Locked |
-| 8 | V1, V2 and V3 move to `2026-archive/` together when V3 closes (K10), with the path references in `backend/deptrac.yaml`, `SizeRatchetTest`, `ServiceRootTest` and `docs/ARCHITECTURE.md`. Until then V2's `STATUS.md` stays the ratchet's log of record. | 2026-10-15 |
+| 8 | V1 and V2 were archived by #2510 on 2026-10-15. V3 moves to `2026-archive/` when its pull requests merge; the plan paths in `backend/deptrac.yaml`, `SizeRatchetTest` and `ServiceRootTest` point at the archived V1 / V2 folders. | 2026-10-15 |
 
 ---
 
@@ -195,9 +195,10 @@ deletion path cannot silently leave data behind.
   after-commit cleanups run in eraser order; each already contains its own
   failures. The coverage test found **12 user-owned tables that are not
   erased** — the first item of V4 (§7 #0).
-- Delivered on one branch in commit order K0–K5, K8, K9, K6, K7, K10
-  (`STATUS.md`); the fixes are independent and can be split into one pull
-  request each.
+- Built on one branch in commit order K0–K5, K8, K9, K6, K7, K10
+  (`STATUS.md`), then split by fix into #2512 → #2513 → #2514. `main`
+  gained #2510 (V1 / V2 archived, cleanup window closed) meanwhile; V3 is
+  row 17 of the roadmap and lands before the prompting flow.
 
 ---
 
@@ -217,10 +218,11 @@ deletion path cannot silently leave data behind.
 | K9 | `refactor(iam): erase user data through tagged erasers` | 3 | K0 |
 | K10 | `docs(planning): close V3 and the cleanup window` | — | K1–K9 |
 
-Delivery: one branch, `refactor/code-cleanup-v3`, one commit per step, each
-commit green on the gate below. The three fixes are independent; the branch
-can be split into one pull request per fix before review if that is easier
-to read (each fix touches its own ledger entries).
+Delivery: one commit per step, each commit green on the gate below, built on
+one branch and split by fix for review: [#2512](https://github.com/metadist/synaplan/pull/2512) (K0–K3),
+[#2513](https://github.com/metadist/synaplan/pull/2513) (K4–K7), [#2514](https://github.com/metadist/synaplan/pull/2514) (K8–K10). Fix 2 builds on Fix 1's
+consolidated helpers, so the three merge in order; the size ledger is
+regenerated on each branch.
 
 Commit types: every step is `refactor:`, `test:` or `docs:` — none raises
 the minor version. A step that turns out to change behaviour is split and

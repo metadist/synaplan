@@ -4,7 +4,7 @@ Three numbers in every row (from the V2 size ratchet): files > 800 lines,
 constructors > 10 params, methods > 100 lines. Plus the lines / params of
 the class the step works on. Start values measured 2026-10-15: 59 / 73 / 151.
 
-Branch `refactor/code-cleanup-v3`, one commit per step, each green on
+Built on one branch and split by fix into [#2512](https://github.com/metadist/synaplan/pull/2512) → [#2513](https://github.com/metadist/synaplan/pull/2513) → [#2514](https://github.com/metadist/synaplan/pull/2514); one commit per step, each green on
 `make -C backend lint phpstan deptrac test` (8,727 → 8,733 tests). Rows are in
 commit order: Fix 3 was done before the processor half of Fix 2 so the two
 cheaper fixes could not be blocked by the largest one.

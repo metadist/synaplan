@@ -24,9 +24,9 @@ Sprint files: [`01_sprint_1_core_handshake.md`](./01_sprint_1_core_handshake.md)
 - [`../20260902-collabora-integration/05_epic_4_partner_platforms.md`](../20260902-collabora-integration/05_epic_4_partner_platforms.md)
   — assumes the platform app already holds a Synaplan key; this track
   produces that key per user
-- [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) — binding
+- [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) — binding
   user-flow contract (J-NC-1…3). Wireframe:
-  [`../20260907_ux_user_flows/connect-platform.md`](../20260907_ux_user_flows/connect-platform.md).
+  [`../2026-archive/20260907_ux_user_flows/connect-platform.md`](../2026-archive/20260907_ux_user_flows/connect-platform.md).
   Synamail `docs/AUTH_FLOW.md` remains the Outlook acceptance list.
 
 ---
@@ -167,7 +167,7 @@ redirect policy; `/addin/connect` becomes a redirect to the generic route
 
 This handshake is already closer to a real flow than sharing was — keep
 it that way. Journeys J-NC-1…3:
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §5.6.
+[`../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md`](../2026-archive/20260907_ux_user_flows/20260907_ux_user_flows.md) §5.6.
 The user never types or sees a key. Empty Linked-platforms explains
 *where to start* (Nextcloud settings), not Synaplan jargon.
 

@@ -5,7 +5,7 @@
 | **Status** | Plan, 2026-10-04. No product code yet. First consumer: **SISmass** (care documentation for German home-care services, `metadist/SISmass-web`, plan of record `docs/planning/v1.0-plan.md` M4). |
 | **Branch** | `feat/app-accounts` (one PR per step, AA1 … AA8) |
 | **User-facing name** | **Apps** (Operate → Apps) and **Signed up via** (People list). Code: `App\Module\Commerce\AppAccountsModule`, `App\Service\AppAccounts\*`. The word **Partner** is taken by Federation (`20260929-synaplan-federation/05_partners.md`) and must not appear here. |
-| **Binding contracts** | UX rules U1–U12 ([`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)), AGENTS.md "Perfect UX & Stability", Galera migration rules, API-key scope enforcement ([`backend/src/Security/ApiKeyScope.php`](../../../backend/src/Security/ApiKeyScope.php)). |
+| **Binding contracts** | UX rules U1–U12 ([`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)), AGENTS.md "Perfect UX & Stability", Galera migration rules, API-key scope enforcement ([`backend/src/Security/ApiKeyScope.php`](../../../backend/src/Security/ApiKeyScope.php)). |
 | **Feature flag** | `APP_ACCOUNTS_ENABLED` (env, default off). Flag off ⇒ routes 404, no nav child, no column (U11). |
 
 ---
