@@ -1,9 +1,5 @@
 <template>
-  <div
-    v-if="visible"
-    class="flex justify-center w-full"
-    data-testid="self-aware-empty-hint"
-  >
+  <div v-if="visible" class="flex justify-center w-full" data-testid="self-aware-empty-hint">
     <button
       type="button"
       class="btn-secondary max-w-full whitespace-normal text-center px-4 py-2.5 rounded-xl text-sm font-medium leading-snug"
