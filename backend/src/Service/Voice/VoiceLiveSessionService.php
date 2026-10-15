@@ -621,12 +621,12 @@ final readonly class VoiceLiveSessionService
      */
     private function defaultModel(User $user, array $models): ?Model
     {
-        $key = $this->config->getValue((int) $user->getId(), 'DEFAULTMODEL', 'VOICE_LIVE')
-            ?? $this->config->getValue(0, 'DEFAULTMODEL', 'VOICE_LIVE');
-        $bid = is_string($key) ? ModelCatalog::findBidByKey($key) : null;
-        if (null !== $bid) {
+        foreach ([(int) $user->getId(), 0] as $ownerId) {
+            $raw = trim((string) $this->config->getValue($ownerId, 'DEFAULTMODEL', 'VOICE_LIVE'));
+            // The AI Models page stores the BID; older seeds stored a catalog key.
+            $bid = ctype_digit($raw) ? (int) $raw : ('' !== $raw ? ModelCatalog::findBidByKey($raw) : null);
             foreach ($models as $model) {
-                if ($model->getId() === $bid) {
+                if (null !== $bid && $model->getId() === $bid) {
                     return $model;
                 }
             }
@@ -651,7 +651,7 @@ final readonly class VoiceLiveSessionService
     }
 
     /**
-     * @return array{id: int|null, name: string, provider: string, voice: string, voices: list<string>}
+     * @return array{id: int|null, name: string, provider: string, voice: string, voices: list<string>, priceIn: float, priceOut: float, priceKnown: bool}
      */
     private function modelCard(Model $model): array
     {
@@ -663,6 +663,10 @@ final readonly class VoiceLiveSessionService
             'provider' => strtolower($model->getService()),
             'voice' => $voices[0] ?? '',
             'voices' => $voices,
+            // priceOut stays 0 so the shared badge averages this per-minute cost.
+            'priceIn' => LiveVoiceMenuPrice::perMinute($model),
+            'priceOut' => 0.0,
+            'priceKnown' => $model->isPriceKnown(),
         ];
     }
 
