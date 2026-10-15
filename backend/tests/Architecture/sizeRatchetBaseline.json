@@ -8,9 +8,9 @@
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 58,
-        "constructorParams": 72,
-        "methodLines": 149
+        "fileLines": 57,
+        "constructorParams": 71,
+        "methodLines": 147
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -57,7 +57,6 @@
         "src/Service/Memory/UserMemoryService.php": 1022,
         "src/Service/Message/Handler/MediaGenerationHandler.php": 2245,
         "src/Service/Message/MessageClassifier.php": 2025,
-        "src/Service/Message/MessageProcessor.php": 2109,
         "src/Service/Message/MessageSorter.php": 921,
         "src/Service/ModelConfigService.php": 1327,
         "src/Service/Multitask/Execution/DagExecutor.php": 805,
@@ -120,7 +119,6 @@
         "src/Service/Mcp/McpOAuthState.php::McpOAuthState": 11,
         "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler": 22,
         "src/Service/Message/MessageClassifier.php::MessageClassifier": 21,
-        "src/Service/Message/MessageProcessor.php::MessageProcessor": 21,
         "src/Service/Message/MessageSorter.php::MessageSorter": 18,
         "src/Service/Multitask/Execution/Runner/CodeRunRunner.php::CodeRunRunner": 13,
         "src/Service/Multitask/Execution/Runner/McpActionRunner.php::McpActionRunner": 11,
@@ -254,8 +252,6 @@
         "src/Service/Message/MessageClassifier.php::MessageClassifier::classify": 575,
         "src/Service/Message/MessagePreProcessor.php::MessagePreProcessor::processFile": 156,
         "src/Service/Message/MessagePreProcessor.php::MessagePreProcessor::processMessageFile": 199,
-        "src/Service/Message/MessageProcessor.php::MessageProcessor::process": 468,
-        "src/Service/Message/MessageProcessor.php::MessageProcessor::processStream": 578,
         "src/Service/Message/MessageSorter.php::MessageSorter::classify": 356,
         "src/Service/Message/MessageSorter.php::MessageSorter::parseResponse": 109,
         "src/Service/Message/SearchQueryGenerator.php::SearchQueryGenerator::generate": 140,

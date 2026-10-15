@@ -16,6 +16,11 @@ use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
+use App\Service\Message\Processing\LinkedContentReader;
+use App\Service\Message\Processing\TurnClassificationResolver;
+use App\Service\Message\Processing\TurnDispatcher;
+use App\Service\Message\Processing\TurnHistoryLoader;
+use App\Service\Message\Processing\TurnWebSearch;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -57,27 +62,20 @@ final class MessageProcessorFactory
         ?JiraLinkedIssueReader $jiraIssues = null,
     ): MessageProcessor {
         return new MessageProcessor(
-            $messageRepository,
-            $searchResultRepository,
             $preProcessor,
-            $classifier,
-            $router,
-            $modelConfigService,
-            $promptService,
-            $webSearch,
-            $searchQueryGenerator,
-            $attachmentContextResolver,
-            $urlContentService,
+            new TurnClassificationResolver($classifier, $modelConfigService, $agentConfig, $promptService, $logger),
+            new TurnHistoryLoader($messageRepository, $conversationSummaryService, $logger),
+            new TurnWebSearch(
+                $webSearch,
+                $searchQueryGenerator,
+                $attachmentContextResolver,
+                new LinkedContentReader($urlContentService, $logger, $webResearch, $confluencePages, $jiraIssues),
+                $logger,
+                $searchResultRepository,
+                $webResearch,
+            ),
+            new TurnDispatcher($router, $taskPlanExecutor, $taskPlanner, $taskPlanStore, $multitaskConfig, $modelConfigService, $logger),
             $logger,
-            $multitaskConfig,
-            $taskPlanner,
-            $taskPlanStore,
-            $taskPlanExecutor,
-            $conversationSummaryService,
-            $agentConfig,
-            $webResearch,
-            $confluencePages,
-            $jiraIssues,
         );
     }
 }

@@ -271,28 +271,10 @@ parameters:
 			path: src/Service/Message/Handler/MediaGenerationHandler.php
 
 		-
-			message: '#^Property App\\Service\\Message\\MessageClassifier\:\:\$modelConfigService is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Service/Message/MessageClassifier.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1
 			path: src/Service/Message/MessagePreProcessor.php
-
-		-
-			message: '#^Parameter \#2 \$trackingId of method App\\Repository\\MessageRepository\:\:findConversationHistory\(\) expects string, int given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Service/Message/MessageProcessor.php
-
-		-
-			message: '#^Variable \$classification might not be defined\.$#'
-			identifier: variable.undefined
-			count: 2
-			path: src/Service/Message/MessageProcessor.php
 
 		-
 			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
