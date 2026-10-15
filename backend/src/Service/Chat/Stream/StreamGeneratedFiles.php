@@ -6,35 +6,27 @@ namespace App\Service\Chat\Stream;
 
 use App\Entity\File;
 use App\Entity\Message;
-use App\Service\File\DocumentGeneratorService;
-use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\GeneratedDocumentBundle;
 use App\Service\File\GeneratedDocumentStore;
-use App\Service\File\Office\DocumentThumbnailDispatcher;
-use App\Service\File\Presentation\PptxRequestDirectiveResolver;
-use App\Service\File\UserUploadPathBuilder;
+use App\Service\File\GeneratedFileWriter;
 use App\Service\Media\GeneratedFileRegistrar;
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * The files a streamed turn produces: the document a model wrote as a
  * {"BFILEPATH", "BFILETEXT"} envelope, and the output files of a multi-task
  * plan. Incognito turns store them ephemeral, so the session cleanup
  * removes them.
+ *
+ * Without {@see GeneratedDocumentStore} a document is written by the same
+ * {@see GeneratedFileWriter} the buffered chat uses.
  */
 final readonly class StreamGeneratedFiles
 {
     public function __construct(
-        private EntityManagerInterface $em,
-        private DocumentGeneratorService $documentGenerator,
-        private DocumentImageReferenceResolver $documentImageReferenceResolver,
-        private UserUploadPathBuilder $userUploadPathBuilder,
+        private GeneratedFileWriter $fileWriter,
         private GeneratedFileRegistrar $generatedFileRegistrar,
         private LoggerInterface $logger,
-        #[Autowire(param: 'app.upload_dir')] private string $uploadDir,
-        private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
     ) {
     }
@@ -48,7 +40,18 @@ final readonly class StreamGeneratedFiles
             return $this->generatedDocumentStore->store($fileData, $message, $ephemeral);
         }
 
-        $file = $this->storeFile($fileData, $message, $ephemeral);
+        // #1196: whitespace-only content would leave a DB row and a blank
+        // file with no usable body. The caller surfaces a real failure.
+        if ('' === trim((string) $fileData['content'])) {
+            $this->logger->warning('StreamController: refusing to store generated file with empty content', [
+                'filename' => $fileData['filename'],
+                'extension' => $fileData['extension'],
+            ]);
+
+            return null;
+        }
+
+        $file = $this->fileWriter->store($fileData, $message, $ephemeral);
 
         return null !== $file ? new GeneratedDocumentBundle($file) : null;
     }
@@ -149,159 +152,6 @@ final readonly class StreamGeneratedFiles
             str_starts_with($type, 'video/') => 'video',
             str_starts_with($type, 'audio/') => 'audio',
             default => 'document',
-        };
-    }
-
-    /**
-     * Same steps as {@see \App\Service\File\GeneratedFileWriter}, which the
-     * buffered chat uses.
-     *
-     * @param array{filename: string, content: string, extension: string, export?: string} $fileData
-     */
-    private function storeFile(array $fileData, Message $message, bool $ephemeral): ?File
-    {
-        $filename = $fileData['filename'];
-        $extension = $fileData['extension'];
-
-        // #1196: whitespace-only content would leave a DB row and a blank
-        // file with no usable body. The caller surfaces a real failure.
-        if ('' === trim((string) $fileData['content'])) {
-            $this->logger->warning('StreamController: refusing to store generated file with empty content', [
-                'filename' => $filename,
-                'extension' => $extension,
-            ]);
-
-            return null;
-        }
-
-        try {
-            $written = $this->writeFile($fileData, $message);
-            if (null === $written) {
-                return null;
-            }
-
-            $file = $this->fileEntity($message->getUserId(), $filename, $extension, $written, $ephemeral);
-
-            $this->em->persist($file);
-            $this->em->flush();
-            $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
-
-            $this->logger->info('StreamController: File generated and stored successfully', [
-                'file_id' => $file->getId(),
-                'filename' => $filename,
-                'path' => $written['relativePath'],
-                'size' => $file->getFileSize(),
-            ]);
-
-            return $file;
-        } catch (\Throwable $e) {
-            $this->logger->error('StreamController: Failed to store generated file', [
-                'filename' => $filename,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return null;
-        }
-    }
-
-    /**
-     * Writes the document under the person's upload folder: real OOXML for
-     * docx/xlsx/pptx, text otherwise.
-     *
-     * @param array{filename: string, content: string, extension: string, export?: string} $fileData
-     *
-     * @return array{relativePath: string, size: int, content: string}|null
-     */
-    private function writeFile(array $fileData, Message $message): ?array
-    {
-        $content = $fileData['content'];
-        $extension = $fileData['extension'];
-        if ('pptx' === strtolower($extension)) {
-            $content = PptxRequestDirectiveResolver::apply($content, (string) $message->getText());
-        }
-
-        $resolvedDocument = $this->documentImageReferenceResolver->resolve($content, $message);
-        $content = $resolvedDocument['content'];
-
-        // A timestamp keeps names from colliding.
-        $sanitized = preg_replace('/[^a-zA-Z0-9._-]/', '_', $fileData['filename']);
-        $sanitized = preg_replace('/_+/', '_', (string) $sanitized);
-        $finalFilename = pathinfo((string) $sanitized, PATHINFO_FILENAME).'_'.time().'.'.$extension;
-
-        $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($message->getUserId());
-        $relativePath = $userBase.'/'.date('Y').'/'.date('m').'/'.$finalFilename;
-        $absolutePath = $this->uploadDir.'/'.$relativePath;
-
-        $dir = dirname($absolutePath);
-        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
-            $this->logger->error('StreamController: Failed to create directory', ['dir' => $dir]);
-
-            return null;
-        }
-
-        try {
-            $this->documentGenerator->write($content, $extension, $absolutePath, $resolvedDocument['images']);
-        } catch (\Throwable $e) {
-            $this->logger->error('StreamController: Failed to write file', [
-                'path' => $absolutePath,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
-        }
-
-        $fileSize = filesize($absolutePath);
-        if (false === $fileSize) {
-            $this->logger->error('StreamController: Failed to read generated file size', ['path' => $absolutePath]);
-
-            return null;
-        }
-
-        return ['relativePath' => $relativePath, 'size' => $fileSize, 'content' => $content];
-    }
-
-    /**
-     * @param array{relativePath: string, size: int, content: string} $written
-     */
-    private function fileEntity(int $userId, string $filename, string $extension, array $written, bool $ephemeral): File
-    {
-        $file = new File();
-        $file->setUserId($userId);
-        $file->setFilePath($written['relativePath']);
-        $file->setFileType($extension);
-        $file->setFileName($filename);
-        $file->setFileSize($written['size']);
-        $file->setFileMime(self::mimeTypeFor($extension));
-        // The source (Markdown/CSV/text) the document was built from, even
-        // for binary office formats: it is the text for search, and a later
-        // edit transforms exactly this instead of re-deriving it.
-        $file->setFileText($written['content']);
-        $file->setStatus('generated');
-        // #1190: provenance tells generated files from uploads and lets a
-        // missing binary be regenerated from BFILETEXT on download.
-        $file->setSource('generated');
-        // Powers the Generated gallery's type filter (BORIGINKIND).
-        $file->setOriginKind('document');
-        $file->setEphemeral($ephemeral);
-
-        return $file;
-    }
-
-    private static function mimeTypeFor(string $extension): string
-    {
-        return match (strtolower($extension)) {
-            'csv' => 'text/csv',
-            'txt' => 'text/plain',
-            'md' => 'text/markdown',
-            'html' => 'text/html',
-            'json' => 'application/json',
-            'xml' => 'application/xml',
-            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'pdf' => 'application/pdf',
-            default => 'application/octet-stream',
         };
     }
 }

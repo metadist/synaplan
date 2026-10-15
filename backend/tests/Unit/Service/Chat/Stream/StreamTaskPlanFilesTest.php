@@ -7,11 +7,8 @@ namespace App\Tests\Unit\Service\Chat\Stream;
 use App\Entity\File;
 use App\Repository\FileRepository;
 use App\Service\Chat\Stream\StreamGeneratedFiles;
-use App\Service\File\DocumentGeneratorService;
-use App\Service\File\DocumentImageReferenceResolver;
-use App\Service\File\UserUploadPathBuilder;
+use App\Service\File\GeneratedFileWriter;
 use App\Service\Media\GeneratedFileRegistrar;
-use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -36,13 +33,9 @@ class StreamTaskPlanFilesTest extends TestCase
     protected function setUp(): void
     {
         $this->files = new StreamGeneratedFiles(
-            $this->createStub(EntityManagerInterface::class),
-            $this->createStub(DocumentGeneratorService::class),
-            $this->createStub(DocumentImageReferenceResolver::class),
-            new UserUploadPathBuilder(),
-            new GeneratedFileRegistrar($this->createMock(FileRepository::class), new NullLogger(), '/tmp/upload'),
+            $this->createStub(GeneratedFileWriter::class),
+            new GeneratedFileRegistrar($this->createStub(FileRepository::class), new NullLogger(), '/tmp/upload'),
             new NullLogger(),
-            '/tmp/upload',
         );
     }
 
