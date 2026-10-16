@@ -7,9 +7,16 @@ namespace App\Service\Agent;
 use App\Entity\Agent;
 use App\Entity\AgentVersion;
 use App\Entity\User;
+use App\Service\Agent\Definition\AgentDefinitionValidator;
+use App\Service\Agent\Exception\AgentDefinitionException;
 
 final class AgentSerializer
 {
+    public function __construct(
+        private readonly AgentDefinitionValidator $definitions,
+    ) {
+    }
+
     /**
      * List row — never includes the draft JSON.
      *
@@ -91,7 +98,7 @@ final class AgentSerializer
             'source' => $agent->getSource(),
             'routable' => $agent->isRoutable(),
             'publishedVersionId' => $agent->getPublishedVersionId(),
-            'draft' => $agent->getDraft(),
+            'draft' => $this->completeDefinition($agent->getDraft()),
             'createdAt' => $agent->getCreated(),
             'updatedAt' => $agent->getUpdated(),
         ];
@@ -174,7 +181,7 @@ final class AgentSerializer
     public function versionDetail(AgentVersion $version, string $publisherName): array
     {
         return $this->versionCard($version, $publisherName) + [
-            'definition' => $version->getDefinition(),
+            'definition' => $this->completeDefinition($version->getDefinition()),
             'promptText' => $version->getPromptText(),
         ];
     }
@@ -190,6 +197,24 @@ final class AgentSerializer
         }
 
         return (string) $user->getMail();
+    }
+
+    /**
+     * Stored documents predate keys the current contract requires.
+     * Fill those from defaults so the client can open the assistant.
+     * A document that no longer validates is returned unchanged.
+     *
+     * @param array<string, mixed> $definition
+     *
+     * @return array<string, mixed>
+     */
+    private function completeDefinition(array $definition): array
+    {
+        try {
+            return $this->definitions->validate($definition)->toArray();
+        } catch (AgentDefinitionException) {
+            return $definition;
+        }
     }
 
     /**
