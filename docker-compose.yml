@@ -982,7 +982,7 @@ services:
   # No mem_limit in dev (cgroup limits break some sandboxes; see frontend-widgets).
   # Ask-first Docker change: recorded in _devextras/planning/202609_ai_plugs/02_sprint_2_docling.md
   docling:
-    image: ghcr.io/docling-project/docling-serve-cpu:v1.36.0@sha256:225c8586e20d5d0fc6811a9e0e044fa602bcc4393f00389009bad42d6787b58f
+    image: ghcr.io/docling-project/docling-serve-cpu:v1.37.0@sha256:6eda9c524992147c1b0b06a1a9be4894bd68b1f43c86d92c32f996c4c60d18a3
     container_name: synaplan-docling
     profiles: [docling]
     restart: unless-stopped
