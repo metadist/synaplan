@@ -34,9 +34,10 @@ Same order as `ROADMAP.md` §1. **The cleanup window closed on
 archive with the UX overhaul; feature tracks resume with the prompting flow. Code cleanup V3
 finishes the chat path first and is in review.
 
-| Path | What | State 2026-10-15 |
+| Path | What | State 2026-10-16 |
 | ---- | ---- | ---------------- |
 | [`20261015-code-cleanup-V3/`](./20261015-code-cleanup-V3/00_master_plan.md) | Three bad ideas, three fixes: copied helpers in the four chat-path god classes, buffered / streamed twins in `MessageProcessor` and `FileAnalysisHandler`, 36-dependency lists in `SeedAllCommand` and `UserDeletionService`; V4 order in §7 | in review — [#2512](https://github.com/metadist/synaplan/pull/2512) → [#2513](https://github.com/metadist/synaplan/pull/2513) → [#2514](https://github.com/metadist/synaplan/pull/2514), merge in order |
+| [`20261016_6-issues/`](./20261016_6-issues/00_master_plan.md) | Six newest product issues. Confirm #2459, #2460, #2461. Then a stacked fix: widget sources (#2519), visitor-chrome Playwright (#2504), owner-only transcript on a reply (#2515). | plan only (row 18) — no product code yet |
 | [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat, model and voice under AI settings | finishing — web, backend and sidecar on `main` ([#2477](https://github.com/metadist/synaplan/pull/2477), [#2507](https://github.com/metadist/synaplan/pull/2507)); LV7–LV8 on `synaplan-apps` branch `feat/live-voice`, no PR yet |
 | [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | Triage of the external 5.2.0 test round (F1–F49), six fixing waves, 50 issue drafts in `issues/` | paused — waves 1–3 shipped; waves 4–6 open, drafts not filed on GitHub |
 | [`20260903_secure_compute/`](./20260903_secure_compute/00_master_plan.md) | Secure Compute; B4 remainder (egress, gVisor node, run images, docs, staging) | paused |
