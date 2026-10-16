@@ -143,6 +143,26 @@ frontend/src/
 - **Services**: API call logic only
 - **Stores**: Pinia state management
 
+### Size ratchet
+
+A file under `src/` has at most 800 lines and a function at most 100,
+measured by `tests/unit/architecture/sizeRatchet.spec.ts` (part of
+`make -C frontend test`, so of CI). The offenders that existed when the gate
+came in are frozen in `sizeRatchetBaseline.json`: an entry may shrink or
+disappear, never grow, and a new offender fails. When the test goes red, move
+the new code into a composable, a component or a pure function of its own
+instead of growing the file that is already too big. After shrinking one,
+regenerate the ledger and review the diff (removals and smaller numbers only):
+
+```bash
+docker compose exec -T -e UPDATE_SIZE_RATCHET=1 frontend npx vitest run tests/unit/architecture/sizeRatchet.spec.ts
+```
+
+A function is keyed `path::outer.inner`. An anonymous callback is named after
+the property it is assigned to (`streamAIResponse.onUpdate`), the variable a
+call initialises (`useChatsStore`), or else the function it is passed to
+(`onMounted`); a repeat gets `#2`, `#3` in source order.
+
 ## UI Patterns
 
 **Dialogs**: Use `useDialog()` composable
