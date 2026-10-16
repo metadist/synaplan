@@ -28,6 +28,7 @@
           iconColor: params.get('iconColor') || '#ffffff',
           defaultTheme: params.get('defaultTheme') || 'light',
           lazy: params.get('lazy') !== 'false',
+          allowFullscreen: params.get('allowFullscreen') === 'true',
           apiUrl,
         })
       } catch (err) {

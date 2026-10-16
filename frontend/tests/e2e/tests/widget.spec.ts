@@ -11,6 +11,7 @@ import {
   getApiUrl,
   updateWidgetSettings,
   setWidgetTaskPrompt,
+  deleteWidgetViaApi,
 } from '../helpers/widget'
 import { selectors } from '../helpers/selectors'
 import { URLS, TIMEOUTS, INTERVALS } from '../config/config'
@@ -210,6 +211,217 @@ test.describe('@ci @smoke Widget', () => {
 
     await test.step('Assert: stream ended (message-done) and assistant reply non-empty', async () => {
       expect(aiText.length).toBeGreaterThan(0)
+    })
+  })
+})
+
+test.describe('@ci Widget visitor chrome', () => {
+  const created: string[] = []
+
+  test.afterEach(async ({ request, credentials }) => {
+    while (created.length > 0) {
+      const widgetId = created.pop()
+      if (widgetId) await deleteWidgetViaApi(request, credentials, widgetId)
+    }
+  })
+
+  test('@crossbrowser close and reopen keeps the earlier messages', async ({
+    page,
+    request,
+    credentials,
+  }) => {
+    const widgetName = WIDGET_NAMES.unique('Widget Close Reopen')
+    const widgetInfo = await createWidgetViaApi(request, credentials, widgetName, {
+      websiteUrl: URLS.TEST_PAGE_URL,
+    })
+    created.push(widgetInfo.widgetId)
+    const apiUrl = getApiUrl()
+    const widgetHost = page.locator(selectors.widget.host)
+
+    await test.step('Arrange: a finished reply is on screen', async () => {
+      await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+      const previousCount = await countWidgetMessages(page)
+      await widgetHost.locator(selectors.widget.input).fill(PROMPTS.SMOKE_TEST)
+      await widgetHost.locator(selectors.widget.sendButton).click()
+      await waitForWidgetAnswer(page, previousCount)
+    })
+
+    await test.step('Act: close the chat, then open it from the launcher', async () => {
+      await widgetHost.locator(selectors.widget.closeButton).click()
+      await expect(widgetHost.locator(selectors.widget.chatWindow)).toBeHidden()
+      await page.locator(selectors.widget.button).click()
+      await expect(widgetHost.locator(selectors.widget.chatWindow)).toBeVisible()
+    })
+
+    await test.step('Assert: the earlier reply is still in the thread', async () => {
+      await expect(widgetHost.locator(selectors.widget.messageAiText).last()).toBeVisible()
+      await expect(widgetHost.locator(selectors.widget.messageUserText).last()).toContainText(
+        'smoke test'
+      )
+    })
+  })
+
+  test('theme toggle changes the widget and leaves the host page alone', async ({
+    page,
+    request,
+    credentials,
+  }) => {
+    const widgetName = WIDGET_NAMES.unique('Widget Theme')
+    const widgetInfo = await createWidgetViaApi(request, credentials, widgetName, {
+      websiteUrl: URLS.TEST_PAGE_URL,
+    })
+    created.push(widgetInfo.widgetId)
+    const apiUrl = getApiUrl()
+
+    await test.step('Arrange: the widget is open on a light host page', async () => {
+      await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+    })
+
+    const hostBackground = () =>
+      page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+    const widgetRoot = page.locator(selectors.widget.host).locator(selectors.widget.root)
+    const before = await hostBackground()
+
+    await test.step('Act: switch the widget theme twice', async () => {
+      const theme = page.locator(selectors.widget.host).locator(selectors.widget.themeButton)
+      await theme.click()
+      await expect(widgetRoot).toHaveClass(/dark/)
+      await theme.click()
+      await expect(widgetRoot).not.toHaveClass(/\bdark\b/)
+    })
+
+    await test.step('Assert: the host page background did not change', async () => {
+      expect(await hostBackground()).toBe(before)
+    })
+  })
+
+  test('fullscreen covers the page and then gives it back', async ({
+    page,
+    request,
+    credentials,
+  }) => {
+    const widgetName = WIDGET_NAMES.unique('Widget Fullscreen')
+    const widgetInfo = await createWidgetViaApi(request, credentials, widgetName, {
+      websiteUrl: URLS.TEST_PAGE_URL,
+    })
+    created.push(widgetInfo.widgetId)
+    const apiUrl = getApiUrl()
+    const widgetHost = page.locator(selectors.widget.host)
+
+    await test.step('Arrange: open a widget that can go fullscreen', async () => {
+      await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl, { allowFullscreen: 'true' })
+    })
+
+    await test.step('Act: enter fullscreen, then leave it', async () => {
+      const fullscreen = widgetHost.locator(selectors.widget.fullscreenButton)
+      await fullscreen.click()
+      await expect(widgetHost.locator(selectors.widget.fullscreenBackdrop)).toBeVisible()
+      await fullscreen.click()
+      await expect(widgetHost.locator(selectors.widget.fullscreenBackdrop)).toBeHidden()
+    })
+
+    await test.step('Assert: the host page is visible around the widget', async () => {
+      await expect(page.getByRole('heading', { name: 'Widget Test Page' })).toBeVisible()
+      const hostSurface = await widgetHost.evaluate((element) => {
+        const style = getComputedStyle(element)
+        return { color: style.backgroundColor, image: style.backgroundImage }
+      })
+      expect(hostSurface.color).toBe('rgba(0, 0, 0, 0)')
+      expect(hostSurface.image).toBe('none')
+    })
+  })
+
+  test('message limit warns at four of five and then stops sending', async ({
+    page,
+    request,
+    credentials,
+  }) => {
+    await openApp(page)
+    const widgetName = WIDGET_NAMES.unique('Widget Message Limit')
+    const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
+    created.push(widgetInfo.widgetId)
+    await updateWidgetSettings(page, widgetName, { messageLimit: 5 })
+    await updateWidgetViaApi(request, credentials, widgetInfo.widgetId, {
+      config: { messageLimit: 5 },
+    })
+
+    const apiUrl = getApiUrl()
+    const configResponse = await request.get(
+      `${apiUrl}/api/v1/widget/${widgetInfo.widgetId}/config`,
+      {
+        headers: { 'X-Widget-Host': 'localhost:5173' },
+      }
+    )
+    const configRaw = await configResponse.text()
+    expect(configResponse.ok(), `${configResponse.status()} ${configRaw}`).toBeTruthy()
+    const configBody = JSON.parse(configRaw) as { config?: { messageLimit?: number } }
+    expect(configBody.config?.messageLimit).toBe(5)
+    const widgetHost = page.locator(selectors.widget.host)
+
+    await test.step('Arrange: open the widget and let its session load', async () => {
+      const history = page.waitForResponse(
+        (response) => response.url().includes('/history') && response.ok(),
+        { timeout: TIMEOUTS.STANDARD }
+      )
+      await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+      await history
+    })
+
+    await test.step('Act: send until four replies have finished', async () => {
+      for (let sent = 0; sent < 4; sent += 1) {
+        const previousCount = await countWidgetMessages(page)
+        await widgetHost.locator(selectors.widget.input).fill(`limit check ${sent + 1}`)
+        await widgetHost.locator(selectors.widget.sendButton).click()
+        await waitForWidgetAnswer(page, previousCount)
+      }
+    })
+
+    await test.step('Assert: the warning names 4 of 5', async () => {
+      const warning = widgetHost.locator(selectors.widget.warningMessageLimit)
+      await expect(warning).toBeVisible()
+      await expect(warning).toContainText('4 of 5')
+    })
+
+    await test.step('Act: send the fifth message', async () => {
+      const previousCount = await countWidgetMessages(page)
+      await widgetHost.locator(selectors.widget.input).fill('limit check 5')
+      await widgetHost.locator(selectors.widget.sendButton).click()
+      await waitForWidgetAnswer(page, previousCount)
+    })
+
+    await test.step('Assert: the composer cannot send another message', async () => {
+      await expect(widgetHost.locator(selectors.widget.errorMessageLimitReached)).toBeVisible()
+      await expect(widgetHost.locator(selectors.widget.input)).toBeDisabled()
+    })
+  })
+
+  test('removing a staged file leaves the composer usable', async ({ page }) => {
+    await openApp(page)
+    const widgetName = WIDGET_NAMES.unique('Widget Remove File')
+    const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
+    created.push(widgetInfo.widgetId)
+    await updateWidgetSettings(page, widgetName, { allowFileUpload: true })
+
+    const apiUrl = getApiUrl()
+    const widgetHost = page.locator(selectors.widget.host)
+
+    await test.step('Arrange: a file is staged and not sent', async () => {
+      await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
+      const filePath = path.join(__dirname, '../test_data/most_important_thing.txt')
+      await widgetHost.locator(selectors.widget.fileInput).setInputFiles(filePath)
+      await expect(widgetHost.locator('text=most_important_thing.txt')).toBeVisible()
+    })
+
+    await test.step('Act: remove the file', async () => {
+      await widgetHost.locator(selectors.widget.removeFileButton(0)).click()
+    })
+
+    await test.step('Assert: the file is gone and the composer can still be typed in', async () => {
+      await expect(widgetHost.locator('text=most_important_thing.txt')).toHaveCount(0)
+      const input = widgetHost.locator(selectors.widget.input)
+      await expect(input).toBeEnabled()
+      await input.fill('still here')
+      await expect(input).toHaveValue('still here')
     })
   })
 })
