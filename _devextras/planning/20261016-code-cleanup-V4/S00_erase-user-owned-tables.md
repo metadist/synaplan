@@ -172,3 +172,8 @@ Seven new erasers instead of six; the rest follows the plan.
   written only when the row was. Carried: the other post-turn workers
   (memory extraction, digests, the Smart Search index) can still write a
   row for an account deleted while they run.
+- **Review round 2 (Copilot, one finding).** A workspace created while the
+  account was being deleted could outlive it: `ComputeEraser` now reads
+  with a write lock, so a creation for that user waits until the deletion
+  ends, and `ComputeWorkspaceService` stores a new workspace only while its
+  owner exists, discarding the new folder otherwise.

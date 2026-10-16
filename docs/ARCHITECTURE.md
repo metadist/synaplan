@@ -228,7 +228,8 @@ cleanup is the only reference left once the workspace row is gone, so it
 travels on `async_index`, which retries it five times and then parks it in
 `failed` for an operator. A summary refresh still running when the account
 goes writes nothing back: its upsert checks the chat's owner in the same
-statement.
+statement. A file-work workspace created meanwhile is either seen by
+`ComputeEraser`'s locking read or refused because its owner is gone.
 
 ## Where new code goes
 
