@@ -13,14 +13,17 @@ A walk is a row here, not a chat message (planning README).
 | Date | Step | > 800 lines | ctor > 10 | method > 100 | Frontend | Class worked on | Note |
 | ---- | ---- | ----------- | --------- | ------------ | -------- | --------------- | ---- |
 | 2026-10-16 | Plan | 57 | 69 | 147 | — | — | Plan written from the V3 §7 order, re-measured on `main`; twelve sprints S0–S11 with chores C0–C11, S1 and S4 as lettered pull requests; V3 archived; D1–D3 proposed, not ticked |
+| 2026-10-16 | S0 start | 57 | 69 | 147 | — | `Service/Iam/Erasure/` | Branch `fix/cleanup-v4-s0-erasure` from `origin/main` (`6c8517fa5`); `make -C backend metrics` unchanged since the plan |
+| 2026-10-16 | S0 (C0) | 57 | 69 | 147 | — | `Service/Iam/Erasure/`: 15 → 22 erasers | `ConnectionEraser`, `DesktopEraser`, `ApprovalEraser`, `UrlWatchEraser`, `VoiceSessionEraser`, `ComputeEraser`, `CredentialEraser` new; `ConversationEraser` and `FileEraser` extended; `UserDeletionService` guards each after-commit cleanup; `DeleteComputeWorkspaceCommand` on `async_index`. `NOT_ERASED_YET` deleted. Largest new class 61 lines; no ledger entry touched |
 
 ## Owner decisions
 
 | # | For | State |
 | - | --- | ----- |
-| D1 | S2 — which buffered / streamed differences align | proposed |
-| D2 | S3 — one topic / intent rule | proposed |
-| D3 | S8 — one MIME-to-extension map | proposed |
+| D1 | S2 — which buffered / streamed differences align | ticked 2026-10-16, as proposed |
+| D2 | S3 — one topic / intent rule | ticked 2026-10-16, as proposed |
+| D3 | S8 — one MIME-to-extension map | ticked 2026-10-16, as proposed |
+| #2 | The branch chain | amended 2026-10-16: no WIP limit, no intermediate merges. Each pull request opens on its parent (Copilot reviews the sprint alone), is retargeted to `main` once answered (CI runs on the chain), and the last one carries every sprint |
 
 ## Sprint tests
 
@@ -30,6 +33,7 @@ failure matched to the known-local list, walks).
 
 | Date | Pull request | Proof | Regression | Journey |
 | ---- | ------------ | ----- | ---------- | ------- |
+| 2026-10-16 | S0 | `UserErasureLeavesNoRowTest` seeds one row in each of the 37 user-owned tables. On the parent the deleted account left rows in exactly the 12 known tables (`Approval`, `ChatSummary`, `ComputeRun`, `ComputeWorkspace`, `Connection`, `Credential`, `CustomTool`, `DesktopDevice`, `DesktopJob`, `DocumentRevision`, `UrlWatch`, `VoiceSession`); now in none, with no exception list. `UserDeletionServiceTest::testACleanupThatFailsAfterTheCommitIsLoggedAndTheDeletionStillCompletes` red on the parent: "Expectation for LoggerInterface::error() failed … 'Failed to delete user'" (the committed deletion was rolled back and rethrown). A unit test per new or extended eraser; `UserErasureVaultFailureTest`; `DeleteComputeWorkspaceCommandHandlerTest` (busy → thrown for the retry, next delivery deletes; not found → acknowledged); `ComputeWorkspaceCleanupRoutingTest` (`async_index`, retryable at redelivery 4, not at 5). Mutation: `UrlWatchEraser` detached from the interface → the order, coverage and no-row tests all fail | `ORDER` changes only by the seven new erasers. Backend 8,794 tests green, lint, PHPStan, deptrac, `lint:container`; frontend lint, vue-tsc, Vitest green (no frontend change); `generate-schemas` zero diff; `mobile-impact` → backend-only | `make test-e2e`: 146 passed, 1 skipped, 12 failed, 10 did not run, every failure on the known-local list: `registration`, `guest-registration`, `account-language`, `email` (MailHog port; 6/6 green with `MAILHOG_URL=http://localhost:8025`), `subscription*` ×5 (Stripe secrets), `telegram`, `whatsapp` (stubs), `workspace-tab` "flag off" (compute on); the ten that did not run sit behind them in serial blocks. Every E2E worker account was deleted through the admin API and `UserDeletionService`; the backend log shows no deletion error |
 
 ## Review log
 

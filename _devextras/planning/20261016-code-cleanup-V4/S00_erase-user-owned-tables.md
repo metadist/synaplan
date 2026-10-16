@@ -121,3 +121,43 @@ never the synchronous bus.
 Data export (GDPR access requests). Organisation-owned rows; they belong
 to the organisation, not the person. Backups (an operator concern,
 `synaplan-platform`).
+
+## 8. As delivered (2026-10-16)
+
+Seven new erasers instead of six; the rest follows the plan.
+
+- **Credentials are swept last.** `ConnectionEraser` (195) forgets each
+  connection's secret through the vault, as planned. Forgetting *every*
+  credential at 195 would have broken the Telegram webhook drop:
+  `IdentityEraser` (60) reads the bot token from the vault before it can
+  drop the webhook after the commit. A seventh eraser, `CredentialEraser`
+  (50, the last), forgets whatever secret the account still owns, an
+  orphaned credential included. Both run inside the transaction. A
+  dangling credential reference on a connection counts as already
+  forgotten instead of blocking the deletion.
+- **One guard for every after-commit cleanup.** A cleanup that threw after
+  the commit made `UserDeletionService` roll back a committed transaction
+  and report the deletion as failed (regression test red on the parent,
+  quoted in STATUS). Each cleanup now runs under its own guard and is
+  logged, so the per-eraser "throwing double" tests are one test in
+  `UserDeletionServiceTest`, covering the older erasers' cleanups too.
+- **The no-row test seeds from the mapping.** `UserErasureLeavesNoRowTest`
+  writes one row into every user-owned table straight from its Doctrine
+  mapping (foreign keys off while seeding), so a table added later is
+  covered without editing the test. `UserOwnedTables` is the scan both
+  tests share.
+- **Bulk deletes for row-only tables.** Approvals, URL watches, desktop
+  jobs and devices, compute runs, custom tools, revisions, summaries and
+  voice sessions go with one `DELETE` each; rows are loaded only where the
+  eraser needs a value from them (connection secrets, workspace ids, an
+  open voice session's provider).
+- **Priorities** put each eraser next to its domain: Desktop 185, Approval
+  145, UrlWatch 135, VoiceSession 125, Compute 115, Credential 50. No
+  foreign key forces an order among the twelve tables.
+- **Compute cleanup** rides `async_index` (five retries, then `failed`).
+  A run can hold a workspace for up to `MAX_TIMEOUT_SEC` (300 s by
+  default), longer than the retry window, so a long run parks the message
+  in `failed` for an operator to replay. A new transport would need a
+  worker change (AGENTS.md, ask first).
+- **Journey.** `account-deletion.spec.ts` only covers the public info
+  page; the walk on the dev stack is recorded in STATUS.
