@@ -842,14 +842,12 @@
                   </div>
                 </div>
               </Transition>
-              <Teleport to="body">
-                <WhatWasSentDialog
-                  v-if="whatWasSentOpen"
-                  :messages="providerMessages ?? null"
-                  :truncated="providerMessagesTruncated === true"
-                  @close="whatWasSentOpen = false"
-                />
-              </Teleport>
+              <WhatWasSentDialog
+                v-if="whatWasSentOpen"
+                :messages="providerMessages ?? null"
+                :truncated="providerMessagesTruncated === true"
+                @close="closeWhatWasSent"
+              />
             </div>
 
             <!-- Usage taximeter: per-reply token/cost badge. Hover-revealed on
@@ -1148,7 +1146,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { TOOL_RESULT_MARKER } from '@/utils/apiToolTurn'
 import { useI18n } from 'vue-i18n'
@@ -1356,7 +1354,7 @@ interface Props {
     ownerName?: string
   }> | null // Web search results
   ragSources?: RagSourceRef[] | null
-  providerMessages?: Array<{ role: string; text: string }> | null
+  providerMessages?: Array<{ role: string; text: string; request?: number }> | null
   providerMessagesTruncated?: boolean
   aiModels?: {
     chat?: {
@@ -1992,6 +1990,15 @@ const closeInfoPopover = () => {
 const openWhatWasSent = () => {
   closeInfoPopover()
   whatWasSentOpen.value = true
+}
+
+// The control that opened this dialog lives in the info popover, which
+// openWhatWasSent() already closed. Return to the button that is still on the message.
+const closeWhatWasSent = () => {
+  whatWasSentOpen.value = false
+  void nextTick(() => {
+    infoButtonRef.value?.focus()
+  })
 }
 
 const handleInfoModelClick = (modelType: 'chat' | 'sorting' | 'audio' | 'voice') => {

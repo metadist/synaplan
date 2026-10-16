@@ -13,7 +13,7 @@ use Symfony\Contracts\Service\ResetInterface;
  */
 final class ProviderTranscriptCapture implements ResetInterface
 {
-    /** @var list<array{role: string, text: string}> */
+    /** @var list<array{role: string, text: string, request: int}> */
     private array $messages = [];
 
     private int $used = 0;
@@ -26,6 +26,9 @@ final class ProviderTranscriptCapture implements ResetInterface
 
     private ?int $lastStart = null;
 
+    /** Index of the provider call currently being recorded. */
+    private int $request = 0;
+
     public function reset(): void
     {
         $this->messages = [];
@@ -34,6 +37,7 @@ final class ProviderTranscriptCapture implements ResetInterface
         $this->enabled = false;
         $this->sealed = false;
         $this->lastStart = null;
+        $this->request = 0;
     }
 
     public function enable(): void
@@ -59,6 +63,9 @@ final class ProviderTranscriptCapture implements ResetInterface
     {
         if (!$this->enabled || $this->sealed) {
             return;
+        }
+        if (null !== $this->lastStart) {
+            ++$this->request;
         }
         $this->lastStart = count($this->messages);
         $this->append($messages);
@@ -162,7 +169,7 @@ final class ProviderTranscriptCapture implements ResetInterface
     }
 
     /**
-     * @return array{messages: list<array{role: string, text: string}>, truncated: bool}|null
+     * @return array{messages: list<array{role: string, text: string, request: int}>, truncated: bool}|null
      */
     public function payload(): ?array
     {
@@ -189,7 +196,11 @@ final class ProviderTranscriptCapture implements ResetInterface
         }
         $transcript = ProviderTranscript::fromMessages($messages)->redact()->cap($remaining);
         foreach ($transcript->toArray() as $row) {
-            $this->messages[] = $row;
+            $this->messages[] = [
+                'role' => $row['role'],
+                'text' => $row['text'],
+                'request' => $this->request,
+            ];
             $this->used += mb_strlen($row['text']);
         }
         if ($transcript->isTruncated()) {

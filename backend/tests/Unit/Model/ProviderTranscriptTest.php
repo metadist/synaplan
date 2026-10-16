@@ -60,8 +60,8 @@ final class ProviderTranscriptTest extends TestCase
         ]);
 
         self::assertSame([
-            ['role' => 'instructions', 'text' => 'Be concise.'],
-            ['role' => 'you', 'text' => 'Latest question'],
+            ['role' => 'instructions', 'text' => 'Be concise.', 'request' => 0],
+            ['role' => 'you', 'text' => 'Latest question', 'request' => 0],
         ], $capture->payload()['messages'] ?? null);
 
         // When previous_response_id fails, the fallback resends the full history and replaces the reduced attempt.
@@ -75,10 +75,10 @@ final class ProviderTranscriptTest extends TestCase
         ]);
 
         self::assertSame([
-            ['role' => 'instructions', 'text' => 'Be concise.'],
-            ['role' => 'you', 'text' => 'Earlier question'],
-            ['role' => 'assistant', 'text' => 'Earlier answer'],
-            ['role' => 'you', 'text' => 'Latest question'],
+            ['role' => 'instructions', 'text' => 'Be concise.', 'request' => 0],
+            ['role' => 'you', 'text' => 'Earlier question', 'request' => 0],
+            ['role' => 'assistant', 'text' => 'Earlier answer', 'request' => 0],
+            ['role' => 'you', 'text' => 'Latest question', 'request' => 0],
         ], $capture->payload()['messages'] ?? null);
     }
 
@@ -99,8 +99,8 @@ final class ProviderTranscriptTest extends TestCase
         ]);
 
         self::assertSame([
-            ['role' => 'instructions', 'text' => 'Follow rules.'],
-            ['role' => 'you', 'text' => "First part\n\nSecond part"],
+            ['role' => 'instructions', 'text' => 'Follow rules.', 'request' => 0],
+            ['role' => 'you', 'text' => "First part\n\nSecond part", 'request' => 0],
         ], $capture->payload()['messages'] ?? null);
     }
 
@@ -121,7 +121,31 @@ final class ProviderTranscriptTest extends TestCase
 
         $messages = $capture->payload()['messages'] ?? [];
         self::assertCount(5, $messages);
-        self::assertSame(['role' => 'assistant', 'text' => 'Updated A10'], $messages[4]);
+        self::assertSame(0, $messages[0]['request']);
+        self::assertSame(0, $messages[1]['request']);
+        self::assertSame(1, $messages[2]['request']);
+        self::assertSame(['role' => 'assistant', 'text' => 'Updated A10', 'request' => 1], $messages[4]);
+    }
+
+    public function testConsecutiveCallsWithoutInstructionRowsKeepSeparateRequests(): void
+    {
+        $capture = new ProviderTranscriptCapture();
+        $capture->enable();
+
+        $prompt = "Edit the sheet.\n\n---\n\nAdd a total row.";
+        $capture->record([
+            ['role' => 'user', 'content' => $prompt],
+        ]);
+        $capture->record([
+            ['role' => 'user', 'content' => $prompt],
+            ['role' => 'tool', 'content' => 'Updated A10'],
+        ]);
+
+        self::assertSame([
+            ['role' => 'you', 'text' => $prompt, 'request' => 0],
+            ['role' => 'you', 'text' => $prompt, 'request' => 1],
+            ['role' => 'assistant', 'text' => 'Updated A10', 'request' => 1],
+        ], $capture->payload()['messages'] ?? null);
     }
 
     public function testSealPreventsFollowUpProviderCallsFromOverwritingTranscript(): void
@@ -147,8 +171,8 @@ final class ProviderTranscriptTest extends TestCase
         ]);
 
         self::assertSame([
-            ['role' => 'instructions', 'text' => 'Answer the user.'],
-            ['role' => 'you', 'text' => 'Hello there'],
+            ['role' => 'instructions', 'text' => 'Answer the user.', 'request' => 0],
+            ['role' => 'you', 'text' => 'Hello there', 'request' => 0],
         ], $capture->payload()['messages'] ?? null);
     }
 
@@ -166,9 +190,9 @@ final class ProviderTranscriptTest extends TestCase
         ]);
 
         self::assertSame([
-            ['role' => 'instructions', 'text' => 'Edit the document.'],
-            ['role' => 'you', 'text' => 'Update cell A1'],
-            ['role' => 'assistant', 'text' => 'Cell A1 updated'],
+            ['role' => 'instructions', 'text' => 'Edit the document.', 'request' => 0],
+            ['role' => 'you', 'text' => 'Update cell A1', 'request' => 0],
+            ['role' => 'assistant', 'text' => 'Cell A1 updated', 'request' => 0],
         ], $capture->payload()['messages'] ?? null);
 
         $capture->recordAnthropicRequest('Edit the document.', [
@@ -177,9 +201,9 @@ final class ProviderTranscriptTest extends TestCase
         ]);
 
         self::assertSame([
-            ['role' => 'instructions', 'text' => 'Edit the document.'],
-            ['role' => 'you', 'text' => 'Update cell A1'],
-            ['role' => 'assistant', 'text' => 'Cell A1 updated'],
+            ['role' => 'instructions', 'text' => 'Edit the document.', 'request' => 0],
+            ['role' => 'you', 'text' => 'Update cell A1', 'request' => 0],
+            ['role' => 'assistant', 'text' => 'Cell A1 updated', 'request' => 0],
         ], $capture->payload()['messages'] ?? null);
     }
 }
