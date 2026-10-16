@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Service\Iam;
 
 use App\Entity\Approval;
-use App\Entity\DocumentRevision;
 use App\Entity\UrlWatch;
 use App\Entity\VoiceSession;
 use App\Service\Iam\Erasure\UserDataEraserInterface;
@@ -37,7 +36,6 @@ final class UserErasureCoverageTest extends KernelTestCase
      */
     public const NOT_ERASED_YET = [
         Approval::class,
-        DocumentRevision::class,
         UrlWatch::class,
         VoiceSession::class,
     ];

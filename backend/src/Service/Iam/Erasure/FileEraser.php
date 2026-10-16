@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\Iam\Erasure;
 
+use App\Entity\DocumentRevision;
 use App\Entity\File;
+use App\Repository\DocumentRevisionRepository;
 use App\Repository\FileRepository;
 use App\Service\File\FileStorageService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -12,8 +14,9 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
- * The user's files: each stored file first, then its row. Once the rows are
- * committed away, the user's now-empty upload directories go too.
+ * The user's files and their document revisions: the revisions, then each
+ * stored file, then its row. Once the rows are committed away, the user's
+ * now-empty upload directories go too.
  */
 #[AsTaggedItem(priority: 120)]
 final readonly class FileEraser implements UserDataEraserInterface
@@ -21,6 +24,7 @@ final readonly class FileEraser implements UserDataEraserInterface
     public function __construct(
         private EntityManagerInterface $em,
         private FileRepository $files,
+        private DocumentRevisionRepository $revisions,
         private FileStorageService $fileStorage,
         private LoggerInterface $logger,
     ) {
@@ -29,6 +33,7 @@ final readonly class FileEraser implements UserDataEraserInterface
     public function erase(UserErasure $erasure): void
     {
         $userId = $erasure->userId;
+        $this->revisions->deleteForUser($userId);
         $files = $this->files->findBy(['userId' => $userId]);
         $deletedCount = 0;
         $failedCount = 0;
@@ -68,7 +73,7 @@ final readonly class FileEraser implements UserDataEraserInterface
 
     public static function covers(): array
     {
-        return [File::class];
+        return [File::class, DocumentRevision::class];
     }
 
     /**
