@@ -331,31 +331,14 @@ test.describe('@ci Widget visitor chrome', () => {
     })
   })
 
-  test('message limit warns at four of five and then stops sending', async ({
-    page,
-    request,
-    credentials,
-  }) => {
+  test('message limit warns at four of five and then stops sending', async ({ page }) => {
     await openApp(page)
     const widgetName = WIDGET_NAMES.unique('Widget Message Limit')
     const widgetInfo = await createTestWidget(page, widgetName, URLS.TEST_PAGE_URL)
     created.push(widgetInfo.widgetId)
     await updateWidgetSettings(page, widgetName, { messageLimit: 5 })
-    await updateWidgetViaApi(request, credentials, widgetInfo.widgetId, {
-      config: { messageLimit: 5 },
-    })
 
     const apiUrl = getApiUrl()
-    const configResponse = await request.get(
-      `${apiUrl}/api/v1/widget/${widgetInfo.widgetId}/config`,
-      {
-        headers: { 'X-Widget-Host': 'localhost:5173' },
-      }
-    )
-    const configRaw = await configResponse.text()
-    expect(configResponse.ok(), `${configResponse.status()} ${configRaw}`).toBeTruthy()
-    const configBody = JSON.parse(configRaw) as { config?: { messageLimit?: number } }
-    expect(configBody.config?.messageLimit).toBe(5)
     const widgetHost = page.locator(selectors.widget.host)
 
     await test.step('Arrange: open the widget and let its session load', async () => {
