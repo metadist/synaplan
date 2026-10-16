@@ -8,7 +8,7 @@
   },
   "counts": {
     "fileLines": 29,
-    "functionLines": 84
+    "functionLines": 81
   },
   "fileLines": {
     "src/components/ChatBrowser.vue": 999,
@@ -33,7 +33,7 @@
     "src/stores/chats.ts": 1513,
     "src/stores/history.ts": 1121,
     "src/utils/messageMapper.ts": 869,
-    "src/views/ChatView.vue": 6537,
+    "src/views/ChatView.vue": 4726,
     "src/views/FilesView.vue": 2998,
     "src/views/LoginView.vue": 812,
     "src/views/NeuroExplorerView.vue": 1434,
@@ -117,9 +117,6 @@
     "src/views/ChatView.vue::handleUserStop": 162,
     "src/views/ChatView.vue::onMounted#2": 204,
     "src/views/ChatView.vue::renderStreamingContent": 122,
-    "src/views/ChatView.vue::streamAIResponse": 1889,
-    "src/views/ChatView.vue::streamAIResponse.onUpdate": 481,
-    "src/views/ChatView.vue::streamAIResponse.onUpdate#2": 1135,
     "src/views/NeuroExplorerView.vue::animate": 230,
     "src/views/NeuroExplorerView.vue::createPlayer": 115,
     "src/views/WidgetSessionsView.vue::handleSessionEvent": 156,
