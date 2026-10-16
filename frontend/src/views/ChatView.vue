@@ -462,10 +462,7 @@
                 — {{ $t('incognito.bannerText') }}
               </p>
             </div>
-            <label
-              v-if="!incognitoHasMessages"
-              class="mt-2 flex cursor-pointer items-start gap-2"
-            >
+            <label v-if="!incognitoHasMessages" class="mt-2 flex cursor-pointer items-start gap-2">
               <input
                 type="checkbox"
                 class="mt-0.5 h-4 w-4 shrink-0"
