@@ -8,9 +8,6 @@ use App\Entity\Approval;
 use App\Entity\ChatSummary;
 use App\Entity\ComputeRun;
 use App\Entity\ComputeWorkspace;
-use App\Entity\Connection;
-use App\Entity\Credential;
-use App\Entity\CustomTool;
 use App\Entity\DesktopDevice;
 use App\Entity\DesktopJob;
 use App\Entity\DocumentRevision;
@@ -30,10 +27,10 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 final class UserErasureCoverageTest extends KernelTestCase
 {
     private const ORDER = [
-        'AccessCredentialsEraser', 'KnowledgeEraser', 'UsageLogEraser', 'WidgetEraser',
+        'AccessCredentialsEraser', 'ConnectionEraser', 'KnowledgeEraser', 'UsageLogEraser', 'WidgetEraser',
         'ShareEraser', 'AgentEraser', 'SavedTaskEraser', 'ConversationEraser', 'FileEraser',
         'InboxEraser', 'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'MemoryEraser',
-        'IdentityEraser',
+        'IdentityEraser', 'CredentialEraser',
     ];
 
     /**
@@ -48,9 +45,6 @@ final class UserErasureCoverageTest extends KernelTestCase
         ChatSummary::class,
         ComputeRun::class,
         ComputeWorkspace::class,
-        Connection::class,
-        Credential::class,
-        CustomTool::class,
         DesktopDevice::class,
         DesktopJob::class,
         DocumentRevision::class,
