@@ -33,13 +33,19 @@ route the same tag differently.
 | tag `chat`, `vectorize`, unknown | **the topic it is given** (empty or `unknown` counts as none), else `general`. The policy: a chat model keeps a custom prompt. |
 | topic → intent | the capability registry, then the aliases; unknown → chat |
 
-What moves: an Again on a `/pic` message regenerates the image instead of
-chatting; an Again on `docsummary` (and every other registry topic) uses
-the registry's intent; a classifier override with a document model now
-reaches the document handler; an unknown tag on Again falls back to
-`general` instead of `chat`. The classifier's `chat` tag already passes the
-message topic, which a new message does not have yet. The S3.1 snapshot
-confirms that nothing moves for it.
+What moves:
+
+- **Again:** a `/pic` message regenerates the image instead of chatting;
+  `docsummary` and every other registry topic use the registry's intent;
+  an unknown tag falls back to `general` instead of `chat`.
+- **Classifier, document models:** an override with a document model
+  reaches the document handler.
+- **Classifier, `chat` / `vectorize` models:** today the classifier maps
+  both straight to `general` and drops a topic the message already
+  carries, a custom prompt or a media topic (`mapModelTagToTopic()`,
+  lines 1,108–1,112). Under the rule that topic is kept. This is a real
+  routing change for messages that carry a topic, so it gets its own
+  `fix:` commit with a reviewed routing diff (S3.5).
 
 Alternative the owner may pick instead: the Again semantics win. That
 keeps the document route but sends `tools:pic` retries to chat. It is not
@@ -50,10 +56,12 @@ bug this sprint exists to close.
 
 | Step | Commit | What |
 | ---- | ------ | ---- |
-| S3.1 | `test(message): pin both topic and intent rules side by side` | Table test over every tag and topic above, against both private copies, on the parent. Add routing cases for a model override per tag to `RoutingCharacterizationTest`, and turn cases for Again per tag to `MessageTurnCharacterizationTest`. |
-| S3.2 | `refactor(message): one owner for the topic and intent tables` | `App\Service\Message\Capability\TopicIntentRule` (`topicForModelTag(string $tag, ?string $given): string`, `intentForTopic(string $topic): string`), built on `SystemCapabilityRegistry`. The classifier calls it; its private copies are deleted. No snapshot moves. |
-| S3.3 | `fix(message): Again routes by the same topic and intent rule` | `TurnClassificationResolver` calls the rule; `topicForModelTag()` / `intentForAgainTopic()` are deleted. `message_turn.json` diff: the Again cases only. |
-| S3.4 | `fix(message): a document model override reaches the document handler` | The rule's document row now applies to the classifier. `routing_classification.json` diff: the override cases only. |
+| S3.1 | `test(message): pin both topic and intent rules side by side` | Table test over every tag and topic above, against both private copies, on the parent. Add routing cases for a model override per tag to `RoutingCharacterizationTest`, **each with and without a topic already on the message** (a custom prompt topic, `mediamaker`). Add turn cases for Again per tag to `MessageTurnCharacterizationTest`. |
+| S3.2 | `refactor(message): one owner for the topic and intent tables` | `App\Service\Message\Capability\TopicIntentRule`, built on `SystemCapabilityRegistry`. It moves both copies **unchanged**: today's two policies sit side by side as named methods (`forModelOverride()`, `forAgain()`), so no snapshot moves. The private copies in both callers are deleted. |
+| S3.3 | `fix(message): Again routes by the same topic and intent rule` | Again switches to the D2 rule. `message_turn.json` diff: the Again cases only. |
+| S3.4 | `fix(message): a document model override reaches the document handler` | The classifier gets the document row. `routing_classification.json` diff: the document-override cases only. |
+| S3.5 | `fix(message): a chat model override keeps the message's topic` | The classifier's `chat` / `vectorize` row keeps a given topic. Routing diff: exactly the S3.1 cases that carry a topic. |
+| S3.6 | `refactor(message): one topic and intent rule` | `forModelOverride()` / `forAgain()` collapse into the one rule; no snapshot moves. |
 | C3 | `chore(planning): close V4 S3 — sprint test, status, ledgers` | Loop §7 |
 
 ## 4. Sprint test
@@ -61,10 +69,12 @@ bug this sprint exists to close.
 - **Proof:** `TopicIntentRuleTest`, one row per line of the D2 table.
   Regression tests red on S2's head: an Again of a `tools:pic` message
   routes to image generation; a document-model override routes to the
-  document handler. Mutation check: drop the document row and see two
-  tests fail.
-- **Regression:** the routing diff limited to the override cases and the
-  turn diff limited to the Again cases, both quoted in the pull request
+  document handler; a chat-model override on a message with a custom
+  prompt topic keeps that topic. Mutation check: drop the document row and
+  see two tests fail.
+- **Regression:** S3.2 and S3.6 move no snapshot. The routing diff of
+  S3.4 / S3.5 and the turn diff of S3.3 are limited to their cases and
+  quoted in the pull request
   (`UPDATE_ROUTING_SNAPSHOTS=1` / `UPDATE_CLEANUP_V2_SNAPSHOTS=1`). Every
   other snapshot unchanged. Unfiltered gates.
 - **Journey:** `chat-again.spec.ts`, `chat.spec.ts`, `operate-topics.spec.ts`,

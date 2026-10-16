@@ -46,7 +46,7 @@ against rows 8–11 is the owner's call.
 
 | # | Track | Plan | State | Exit |
 | - | ----- | ---- | ----- | ---- |
-| 19 | **Code cleanup V4** — the twelve findings V3 left (V3 §7), one sprint each: erase every user-owned table with the account; a frontend size ratchet and one stream handler for the chat view; align the buffered and streamed turn; one topic / intent rule; channel turns, media turn, classifier and system-settings schema as stages; one MIME map; a thin-controller gate; Google / OpenAI providers per capability; strict types on the message turn | [`20261016-code-cleanup-V4/`](./20261016-code-cleanup-V4/00_master_plan.md) | Plan written 2026-10-16 from a re-measurement of `main` (`9ca56ccb1`); no code yet. One branch chain, merged in order; every sprint closes with a sprint test and its chore (Copilot answered, CI green). Owner decisions D1–D4 proposed. | All twelve sprints merged; `NOT_ERASED_YET` deleted; plan archived. |
+| 19 | **Code cleanup V4** — the twelve findings V3 left (V3 §7), one sprint each: erase every user-owned table with the account; a frontend size ratchet and one stream handler for the chat view; align the buffered and streamed turn; one topic / intent rule; channel turns, media turn, classifier and system-settings schema as stages; one MIME map; a thin-controller gate; Google / OpenAI providers per capability; strict types on the message turn | [`20261016-code-cleanup-V4/`](./20261016-code-cleanup-V4/00_master_plan.md) | Plan written 2026-10-16 from a re-measurement of `main` (`9ca56ccb1`); no code yet. One branch chain, merged in order; every sprint closes with a sprint test and its chore (Copilot answered, CI green). Owner decisions D1–D3 proposed. | All twelve sprints merged; `NOT_ERASED_YET` deleted; plan archived. |
 
 Still finishing from before the window:
 
@@ -125,7 +125,7 @@ mirrors this table.
 | [`ROADMAP.md`](./ROADMAP.md) | This file | live |
 | [`20260913-use-case-research/`](./20260913-use-case-research/README.md) | Ten jobs, Perfect-UX bar, Q-list | binding; Q2–Q9 open |
 | [`20261008-live-voice/`](./20261008-live-voice/00_master_plan.md) | Live voice conversations: speech-to-speech sidecar, delegation into chat, created media shown in the chat | finishing (row 16) — web and backend on `main`, LV7–LV8 unmerged in `synaplan-apps` |
-| [`20261016-code-cleanup-V4/`](./20261016-code-cleanup-V4/00_master_plan.md) | Twelve sprints S0–S11 from V3 §7, one branch chain; sprint test and chore per sprint | plan (row 19) — no code yet; D1–D4 proposed |
+| [`20261016-code-cleanup-V4/`](./20261016-code-cleanup-V4/00_master_plan.md) | Twelve sprints S0–S11 from V3 §7, one branch chain; sprint test and chore per sprint | plan (row 19) — no code yet; D1–D3 proposed |
 | [`20261007-community-test-findings-5.2.0/`](./20261007-community-test-findings-5.2.0/README.md) | 5.2.0 external test triage, 50 issue drafts | paused (row 4); waves 4–6 open |
 | [`20260903_secure_compute/`](./20260903_secure_compute/00_master_plan.md) | Secure Compute; B4 remainder | paused (row 5) |
 | [`20261001-single-scheduler/`](./20261001-single-scheduler/00_master_plan.md) | One scheduler; P3 production rollout | ops (row 6) |

@@ -43,7 +43,9 @@ AI/Provider/GoogleProvider   the registered façade: the same class, interfaces 
 
 OpenAI follows the same shape (`OpenAIApiClient`, `OpenAIChat` with the
 Responses API, `OpenAIEmbedding`, `OpenAIImageGeneration`,
-`OpenAISpeech`).
+`OpenAISpeech`). `OpenAIApiClient` holds both of OpenAI's transports: the
+injected Symfony client and the SDK client, built through the factory
+seam of S10.1.
 
 **Why a façade:** the class name, its interfaces and its tags are what the
 registry, five other classes and the module system know. Keeping them
@@ -55,17 +57,21 @@ directly is a later step, when no class names the façade any more (V5).
 
 | Step | Commit | What |
 | ---- | ------ | ---- |
-| S10.1 | `test(ai): request snapshots for the Google and OpenAI providers` | `ProviderRequestCharacterizationTest` with `MockHttpClient`: for each capability method, the request sent (method, URL, headers without the key, JSON body) and the parsed result, from fixed inputs, streamed and buffered. Snapshots `provider_requests_google.json`, `provider_requests_openai.json`, recorded on the parent. |
-| S10.2 | `refactor(ai): one API client per vendor` | `GoogleApiClient`, `OpenAIApiClient`. |
-| S10.3 | `refactor(ai): Google capabilities in their own classes` | Chat, images, video, speech; the façade delegates. |
-| S10.4 | `refactor(ai): OpenAI capabilities in their own classes` | The same for OpenAI. |
+| S10.1 | `refactor(ai): an injectable OpenAI SDK factory, recorded offline in tests` | Google's requests go through the injected Symfony client. OpenAI's Responses, embedding and image requests do not: `OpenAIProvider::client()` builds its own SDK client with `\OpenAI::client($key)` (line 88). The provider gets a seam: an optional constructor parameter for the SDK factory, whose default is that same call, byte for byte. `services.yaml` stays untouched. Tests build the SDK with `\OpenAI::factory()->withApiKey(…)->withHttpClient($guzzle)`, where `$guzzle` is a Guzzle client (already installed) on a `MockHandler` with history middleware. The commit carries a test that fails if any request leaves the process. |
+| S10.2 | `test(ai): request snapshots for the Google and OpenAI providers` | `ProviderRequestCharacterizationTest`. For each capability method, from fixed inputs, streamed and buffered: the request sent (method, URL, headers without the key, body) and the parsed result. Captured from `MockHttpClient` for the Symfony transport and from the Guzzle history for the SDK transport, so every OpenAI capability is in the snapshot whichever client it uses. Snapshots `provider_requests_google.json` and `provider_requests_openai.json`, recorded before any split (S10.1 changes no request). |
+| S10.3 | `refactor(ai): one API client per vendor` | `GoogleApiClient`; `OpenAIApiClient` owns both OpenAI transports (the Symfony client and the SDK factory). |
+| S10.4 | `refactor(ai): Google capabilities in their own classes` | Chat, images, video, speech; the façade delegates. |
+| S10.5 | `refactor(ai): OpenAI capabilities in their own classes` | The same for OpenAI. |
 | C10 | `chore(planning): close V4 S10 — sprint test, status, ledgers` | Loop §7 |
 
 ## 5. Sprint test
 
-- **Proof:** both request snapshots recorded on S9's head, unchanged after
-  every step. A unit test per capability class against its client double.
-  Mutation check: change one header in a client and see the snapshot fail.
+- **Proof:** both request snapshots, recorded after the S10.1 seam and
+  before any split, unchanged after every later step. The no-network test from
+  S10.1. A unit test per capability class against its client double.
+  Mutation check: change one header in a client and see the snapshot
+  fail; route one OpenAI capability back to the default SDK client and see
+  the no-network test fail.
 - **Regression:** the 11 existing provider test classes green with
   unchanged assertions; `lint:container`; no `services.yaml` diff;
   unfiltered gates.

@@ -20,7 +20,7 @@ commit types, red flags), [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md
 | ---- | ---- | ----- |
 | **Agent** | Reads the plan, writes the tests first, implements in small commits, runs every gate, writes the pull request, answers every review thread, keeps CI green, writes STATUS | Merges; uses `--admin`; pushes to `main`; re-records a snapshot without reading the diff; resolves a thread without an answer; adds AI attribution |
 | **Copilot** | First review, automatically when a non-draft pull request opens (ruleset `ReviewCodeSyn`); a re-review on request | — |
-| **Owner** | Ticks the §0 decisions D1–D4; answers stop-rule questions (§12); approves and merges in order; walks S1b's journeys with the agent's walk record | — |
+| **Owner** | Ticks the §0 decisions D1–D3; answers stop-rule questions (§12); approves and merges in order; walks S1b's journeys with the agent's walk record | — |
 
 ---
 

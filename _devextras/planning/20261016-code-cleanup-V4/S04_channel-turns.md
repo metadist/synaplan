@@ -60,6 +60,13 @@ Service/Widget/Turn/                         Service/Email/Turn/                
 | S4.6 | S4c | `refactor(whatsapp): intake, conversation and reply stages` | `handleIncomingMessage()` ≤ 60 lines. |
 | C4 | each | `chore(planning): close V4 S4<a/b/c> — sprint test, status, ledgers` | Loop §7, per pull request |
 
+Each snapshot captures every way the turn's output leaves, not only the
+convenient one. The widget's frames are echoed by its own `sendSse()`, so
+they are read from the output buffer. Email replies come from the
+mailer's test transport, WhatsApp replies from a double of its HTTP
+client, realtime events from the broadcaster double. Each test also
+asserts that no request left the process.
+
 ## 5. Sprint test (per pull request)
 
 - **Proof:** the channel's reply snapshot, recorded on the parent and

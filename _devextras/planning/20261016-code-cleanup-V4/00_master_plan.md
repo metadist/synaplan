@@ -41,13 +41,12 @@ twelve.
 | 6 | **Size budget:** a pull request carries at most ~1,500 lines of new or changed logic. Snapshots, ledgers, generated files and code moved verbatim (`git diff --color-moved`) do not count. Above that it splits into lettered pull requests on the same chain (S1a, S1b, …), each with its own sprint test. S1 and S4 are planned that way. | 2026-10-16 |
 | 7 | **Safety net before a change** (V2/V3 rule, locked): characterization first. A `refactor:` commit with a snapshot diff is wrong. A `fix:` commit's snapshot diff is reviewed line by line and quoted in the pull request. | Locked |
 | 8 | **Extraction rules** (V2, locked): one reason to change, ≤ 10 constructor parameters, domain folder, `final readonly`, `declare(strict_types=1)` in every new file, no "Helper" / "Util" / "Manager" names. Each new class opens with a docblock that says what it owns in one or two sentences. Comments only for constraints the code cannot show. | Locked |
-| 9 | **Erasure lives in code, not in foreign keys.** S0 closes the 12 gaps with erasers. It does not add `ON DELETE CASCADE`: several gaps carry external state (stored secrets, sidecar sessions, files on disk) that a cascade cannot revoke, and FK migrations on the production Galera cluster are the riskiest kind (AGENTS.md, "Production Platform Specifics"). | 2026-10-16 |
+| 9 | **Erasure lives in code, not in foreign keys.** S0 closes the 12 gaps with erasers. It does not add `ON DELETE CASCADE`: several gaps carry state outside their row that a cascade cannot reach (sidecar workspaces, Redis copies, open live sessions), secrets must go through the credential vault, and FK migrations on the production Galera cluster are the riskiest kind (AGENTS.md, "Production Platform Specifics"). | 2026-10-16 |
 | 10 | **The owner merges.** The agent brings a pull request to merge-ready (loop §10). It never merges with `--admin`, never bypasses a red check, never resolves a review thread without an answer. | 2026-10-16 |
 | 11 | V3 moves to `2026-archive/` in this plan's pull request (V3 decision #8); `docs/ARCHITECTURE.md` points at the archived path. | 2026-10-16 |
 | D1 | **S2 — which processor differences align.** Proposed: align #1–#6 and the double classification; keep #7–#9 and name the reason in the stage (S02 §2). | *proposed* |
 | D2 | **S3 — one topic / intent rule.** Proposed: the classifier's semantics win, with one policy: a `chat` tag keeps the topic it is given (S03 §2). | *proposed* |
 | D3 | **S8 — one MIME-to-extension map.** Proposed: the union of both maps in `FileHelper`, parameters stripped, the caller keeps its fallback (S08 §2). | *proposed* |
-| D4 | **S0 — a revision the deleted user made on someone else's file.** Proposed: keep the revision for the owner's restore chain, anonymise its author (S00 §2). | *proposed* |
 
 ---
 
@@ -86,7 +85,7 @@ branch is pushed (loop §10).
 | Sprint | Chore | Branch | Base when opened | Pull-request title (= commit on `main`) | Class | Owner decision |
 | ------ | ----- | ------ | ---------------- | ---------------------------------------- | ----- | -------------- |
 | — | — | `docs/cleanup-v4-plan` | `main` | `docs(planning): code cleanup V4 — twelve sprints, one branch chain` | no-app-impact | — |
-| [S0](./S00_erase-user-owned-tables.md) | C0 | `fix/cleanup-v4-s0-erasure` | plan branch or `main` | `fix(iam): erase every user-owned table with the account` | backend-only | D4 |
+| [S0](./S00_erase-user-owned-tables.md) | C0 | `fix/cleanup-v4-s0-erasure` | plan branch or `main` | `fix(iam): erase every user-owned table with the account` | backend-only | — |
 | [S1a](./S01_frontend-ratchet-chat-stream.md) | C1 | `test/cleanup-v4-s1a-frontend-ratchet` | S0 or `main` | `test(frontend): size ratchet for the frontend` | no-app-impact | — |
 | [S1b](./S01_frontend-ratchet-chat-stream.md) | C1 | `refactor/cleanup-v4-s1b-chat-stream` | S1a or `main` | `refactor(frontend): one stream handler for the chat view` | ota-candidate | — |
 | [S2](./S02_align-buffered-streamed-turn.md) | C2 | `fix/cleanup-v4-s2-turn-alignment` | S1b or `main` | `fix(message): one buffered and streamed turn, widget turns classified once` | backend-only | D1 |
