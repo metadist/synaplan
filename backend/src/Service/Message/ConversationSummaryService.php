@@ -192,6 +192,18 @@ final readonly class ConversationSummaryService
     }
 
     /**
+     * Drops the Redis copies of these chats' summaries; the durable rows are
+     * the caller's to delete. A copy written under an earlier config
+     * fingerprint expires with its TTL.
+     *
+     * @param list<int> $chatIds
+     */
+    public function evictCached(array $chatIds): void
+    {
+        $this->cache->deleteItems(array_map(fn (int $chatId): string => $this->storeKey($chatId), $chatIds));
+    }
+
+    /**
      * @param Message[] $recentWindow
      */
     private function resolveOlderLastId(array $recentWindow, int $tailCount, ?int $userId, int $chatId): ?int

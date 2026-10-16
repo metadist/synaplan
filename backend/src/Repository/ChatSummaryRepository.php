@@ -72,4 +72,13 @@ class ChatSummaryRepository extends ServiceEntityRepository
         $stmt->bindValue('chatId', $chatId);
         $stmt->executeStatement();
     }
+
+    public function deleteByUser(int $userId): void
+    {
+        $stmt = $this->getEntityManager()->getConnection()->prepare(
+            'DELETE FROM BCHATSUMMARIES WHERE BUSERID = :userId',
+        );
+        $stmt->bindValue('userId', $userId);
+        $stmt->executeStatement();
+    }
 }
