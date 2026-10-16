@@ -1,0 +1,140 @@
+{
+  "measuredAt": "2026-10-12T09:43:19.533Z",
+  "phrase": "What is the capital of France?",
+  "pipeline": {
+    "ok": true,
+    "ms": 2827,
+    "firstTokenMs": 2471,
+    "status": 200,
+    "chars": 88,
+    "preview": "The capital of France is Paris.  \nIt is the country’s largest city and political center.",
+    "modelId": 232,
+    "providerModel": "gpt-5.4-mini",
+    "error": null
+  },
+  "brainSource": "message-processor",
+  "openaiUs": {
+    "provider": "openai",
+    "label": "us",
+    "host": "api.openai.com",
+    "model": "gpt-live-1",
+    "transport": "websocket",
+    "storeRequested": false,
+    "connectedMs": 550,
+    "startedMs": 1348,
+    "sessionIdPrefix": "live_u2_",
+    "resolvedDelegation": "client",
+    "firstAudioMs": 2204,
+    "audioBytes": 297600,
+    "heard": "What is the capital of France",
+    "delegationMs": 3942,
+    "speechEndedMs": 3180,
+    "audioSentMs": 4698,
+    "commentarySentMs": 4752,
+    "audioAfterCommentaryMs": 5395,
+    "endReason": "measured",
+    "finalUsage": {
+      "seconds": 7
+    },
+    "closed": true,
+    "wallMs": 10167,
+    "eventTypes": [
+      "session.started",
+      "session.output_audio.delta",
+      "session.input_transcript.delta",
+      "session.delegation.created",
+      "session.output_transcript.delta",
+      "session.thinking.appended",
+      "session.commentary.appended",
+      "session.closed"
+    ],
+    "storeAccepted": true
+  },
+  "openaiEu": {
+    "provider": "openai",
+    "label": "eu",
+    "host": "eu.api.openai.com",
+    "model": "gpt-live-1",
+    "transport": "websocket",
+    "store": true,
+    "error": "Unexpected server response: 401"
+  },
+  "gemini": {
+    "provider": "google",
+    "label": "gemini",
+    "model": "gemini-3.8-live",
+    "transport": "websocket",
+    "connectedMs": 94,
+    "startedMs": 424,
+    "delegationMs": 3330,
+    "toolNames": [
+      "consult_synaplan"
+    ],
+    "toolResponseSentMs": 3331,
+    "usage": {
+      "promptTokenCount": 686,
+      "responseTokenCount": 19,
+      "totalTokenCount": 705,
+      "promptTokensDetails": [
+        {
+          "modality": "TEXT",
+          "tokenCount": 363
+        },
+        {
+          "modality": "AUDIO",
+          "tokenCount": 272
+        }
+      ],
+      "thoughtsTokenCount": 79
+    },
+    "speechEndedMs": 2264,
+    "audioSentMs": 3784,
+    "audioAfterToolMs": 3913,
+    "audioBytes": 21600,
+    "wallMs": 3936,
+    "eventTypes": [
+      "setupComplete",
+      "sessionResumptionUpdate",
+      "voiceActivity",
+      "empty",
+      "serverContent",
+      "toolCall"
+    ]
+  },
+  "listPriceUsdPerMin": {
+    "gptLive": 0.05,
+    "geminiAudioIn": 0.005,
+    "geminiAudioOut": 0.018
+  },
+  "openaiReportedSeconds": 7,
+  "budgetAtListPrice": {
+    "gptLive": {
+      "PRO": {
+        "budget": 10,
+        "voiceOnlyMinutesNoMarkup": 200
+      },
+      "TEAM": {
+        "budget": 30,
+        "voiceOnlyMinutesNoMarkup": 600
+      },
+      "BUSINESS": {
+        "budget": 60,
+        "voiceOnlyMinutesNoMarkup": 1200
+      }
+    },
+    "geminiBothDirections": {
+      "PRO": {
+        "budget": 10,
+        "voiceOnlyMinutesNoMarkup": 434
+      },
+      "TEAM": {
+        "budget": 30,
+        "voiceOnlyMinutesNoMarkup": 1304
+      },
+      "BUSINESS": {
+        "budget": 60,
+        "voiceOnlyMinutesNoMarkup": 2608
+      }
+    }
+  }
+}

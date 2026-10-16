@@ -1,8 +1,24 @@
+# Published image. Copy this file and deploy/selfhost.env.example (as .env)
+# into an empty directory. Set SYNAPLAN_VERSION to a release tag, never latest.
+# Then: docker compose up -d
+# Open http://127.0.0.1:8000 unless you changed SYNAPLAN_HTTP_BIND or
+# SYNAPLAN_HTTP_PORT. This file does not build from source and does not need
+# the git checkout. Leave the eight secrets unset to generate them into
+# ./data/secrets.env on the first start. Back that file up with the database.
+# Just want it running, or deploying from a Docker GUI? quickstart/compose.yaml
+# starts from that one file alone, with no .env and no host directories.
 name: "${COMPOSE_PROJECT_NAME:-synaplan}"
 
 x-app-image: &app-image "${SYNAPLAN_IMAGE:-ghcr.io/metadist/synaplan}:${SYNAPLAN_VERSION:?Set SYNAPLAN_VERSION to a published compatible immutable SemVer release}"
 x-app-command: &app-command
   - |
+    set -a
+    . /run/synaplan-secrets/secrets.env
+    set +a
+    # The application reads DB_PASSWORD. The secrets file stores MARIADB_PASSWORD.
+    # Compose leaves DB_PASSWORD empty when the value is generated inside this
+    # stack, so map it after the file is loaded.
+    export DB_PASSWORD="$$MARIADB_PASSWORD"
     # COMPOSE_PROFILES is a comma-separated list, so the profile is matched as a
     # list ELEMENT. An equality test against the whole value made
     # "local-ai,anything" start Ollama — Compose does read the list — while
@@ -25,6 +41,13 @@ x-app-command: &app-command
         export OFFICE_CONVERT_URL=http://collabora:9980
         ;;
     esac
+    case ",$${COMPOSE_PROFILES:-}," in
+      *,compute,*)
+        export COMPUTE_URL=http://compute:8080
+        export FEATURE_COMPUTE_ENABLED=true
+        export FEATURE_COMPUTE_WORKSPACES_ENABLED=true
+        ;;
+    esac
     exec /usr/local/bin/docker-entrypoint.sh
 x-app-environment: &app-environment
   APP_ENV: prod
@@ -40,8 +63,8 @@ x-app-environment: &app-environment
   APP_VERSION: "${SYNAPLAN_VERSION}"
   APP_URL: "${APP_URL:?Set APP_URL to the public HTTPS URL}"
   FRONTEND_URL: "${FRONTEND_URL:?Set FRONTEND_URL to the public HTTPS URL}"
-  APP_SECRET: "${APP_SECRET:?Set a stable APP_SECRET}"
-  TOKEN_SECRET: "${TOKEN_SECRET:?Set a stable TOKEN_SECRET}"
+  APP_SECRET: "${APP_SECRET:-}"
+  TOKEN_SECRET: "${TOKEN_SECRET:-}"
   # Empty means the Secure flag follows the APP_URL scheme, which is what every
   # deployment following selfhost.env.example wants. Only a deployment whose TLS
   # terminates where APP_URL cannot show it needs an explicit value.
@@ -60,8 +83,11 @@ x-app-environment: &app-environment
   # keeps it that way. "false" pins the feature off for this deployment and
   # locks the admin toggle. Module gates (FEATURE_MODULES_GATE_<ID>) are per
   # module and go into a compose override when a deployment needs one.
+  # Exception: FEATURE_IAM_USER_SEARCH_ENABLED is OFF by default (#2060); a
+  # company deployment pins it "true" to let the share picker find accounts.
   FEATURE_IAM_GROUPS_ENABLED: "${FEATURE_IAM_GROUPS_ENABLED:-}"
   FEATURE_IAM_SHARING_ENABLED: "${FEATURE_IAM_SHARING_ENABLED:-}"
+  FEATURE_IAM_USER_SEARCH_ENABLED: "${FEATURE_IAM_USER_SEARCH_ENABLED:-}"
   FEATURE_IAM_GROUP_POLICIES_ENABLED: "${FEATURE_IAM_GROUP_POLICIES_ENABLED:-}"
   FEATURE_IAM_DIRECTORY_SYNC_ENABLED: "${FEATURE_IAM_DIRECTORY_SYNC_ENABLED:-}"
   FEATURE_AGENTS_ENABLED: "${FEATURE_AGENTS_ENABLED:-}"
@@ -86,14 +112,14 @@ x-app-environment: &app-environment
   DB_PORT: "3306"
   DB_NAME: "${MARIADB_DATABASE:-synaplan}"
   DB_USER: "${MARIADB_USER:-synaplan}"
-  DB_PASSWORD: "${MARIADB_PASSWORD:?Set a stable MariaDB application password}"
+  DB_PASSWORD: "${MARIADB_PASSWORD:-}"
   DB_SERVER_VERSION: mariadb-12.3.2
   REDIS_DSN: redis://redis:6379
   LOCK_DSN: redis://redis:6379
   REALTIME_ENABLED: "true"
   REALTIME_API_URL: http://centrifugo:8000/api
-  REALTIME_API_KEY: "${REALTIME_API_KEY:?Set a stable Centrifugo API key}"
-  REALTIME_TOKEN_SECRET: "${REALTIME_TOKEN_SECRET:?Set a stable Centrifugo token secret}"
+  REALTIME_API_KEY: "${REALTIME_API_KEY:-}"
+  REALTIME_TOKEN_SECRET: "${REALTIME_TOKEN_SECRET:-}"
   REALTIME_PUBLIC_WS_URL: ""
   REALTIME_ALLOWED_ORIGINS: "${REALTIME_ALLOWED_ORIGINS:-${APP_URL}}"
   QDRANT_URL: http://qdrant:6333
@@ -101,6 +127,9 @@ x-app-environment: &app-environment
   # Empty until the `office` profile sets it in x-app-command.
   OFFICE_CONVERT_URL: "${OFFICE_CONVERT_URL:-}"
   OFFICE_CONVERT_TIMEOUT_MS: "${OFFICE_CONVERT_TIMEOUT_MS:-60000}"
+  SYNAPLAN_TTS_URL: "${SYNAPLAN_TTS_URL:-http://tts:10200}"
+  COMPUTE_URL: "${COMPUTE_URL:-}"
+  COMPUTE_TOKEN: "${COMPUTE_TOKEN:-}"
   COMPOSE_PROFILES: "${COMPOSE_PROFILES:-}"
   OLLAMA_BASE_URL: ""
   AUTO_DOWNLOAD_MODELS: "false"
@@ -122,6 +151,7 @@ x-app-environment: &app-environment
   GOOGLE_GEMINI_API_KEY: "${GOOGLE_GEMINI_API_KEY:-}"
   MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
   XAI_API_KEY: "${XAI_API_KEY:-}"
+  META_API_KEY: "${META_API_KEY:-}"
   # Operator billing. Empty keys mean open-source mode: no plans, no quotas, no
   # upgrade prompts, and every tier gate open (see docs/BILLING_SELFHOST.md).
   # Setting them turns this install into a paid product run by YOU, billed
@@ -148,8 +178,254 @@ x-app-volumes: &app-volumes
   # writable gave the internet-facing PHP container the ability to read, alter
   # or destroy the entire backup history for no functional gain.
   - ./data/backups:/var/www/backup:ro
+  # Application secrets only. The database root password and the realtime
+  # admin password live in other volumes this container does not mount.
+  - synaplan-secrets-app:/run/synaplan-secrets:ro
 
 services:
+  secrets-init:
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    restart: "no"
+    environment:
+      APP_SECRET: "${APP_SECRET:-}"
+      TOKEN_SECRET: "${TOKEN_SECRET:-}"
+      MARIADB_PASSWORD: "${MARIADB_PASSWORD:-}"
+      MARIADB_ROOT_PASSWORD: "${MARIADB_ROOT_PASSWORD:-}"
+      REALTIME_API_KEY: "${REALTIME_API_KEY:-}"
+      REALTIME_TOKEN_SECRET: "${REALTIME_TOKEN_SECRET:-}"
+      REALTIME_ADMIN_PASSWORD: "${REALTIME_ADMIN_PASSWORD:-}"
+      REALTIME_ADMIN_SECRET: "${REALTIME_ADMIN_SECRET:-}"
+    volumes:
+      - ./data:/data
+      - synaplan-secrets-app:/out/app
+      - synaplan-secrets-db:/out/db
+      - synaplan-secrets-realtime:/out/realtime
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        # SECRETS_INIT_SCRIPT_START
+        # Resolve the eight deployment secrets once, then publish a separate file for
+        # each consumer. data/secrets.env is the backup copy and is never rewritten.
+        # A replace-with-* example value is refused. Nothing is written in that case.
+        # A file that already exists but is missing a key is refused too: a value that
+        # lives only in .env would not be in the backup.
+        #
+        # The published files are sourced by the other containers, so each value is
+        # written as a single-quoted shell literal. The backup file stays raw
+        # KEY=value lines, which is what a restore reads back.
+        #
+        # The same script is inlined in deploy/compose.yaml and
+        # deploy/quickstart/compose.yaml (every "$$" doubled) so neither install needs
+        # this path. deploy/scripts/tests/test-secrets-init.sh fails when a copy differs.
+        set -eu
+        DATA="$${SECRETS_INIT_DATA:-/data}"
+        SECRETS="$$DATA/secrets.env"
+        # The quickstart keeps the database in its own volume, not under $$DATA.
+        DB_DIR="$${SECRETS_INIT_DB_DIR:-$$DATA/mariadb}"
+        # Where the person reading an error finds the backup copy.
+        SECRETS_NAME="$${SECRETS_INIT_FILE_LABEL:-data/secrets.env}"
+        # Each consumer mounts only its own directory. The web container never sees
+        # the database root password or the realtime admin credentials.
+        APP_OUT="$${SECRETS_INIT_APP_OUT:-/out/app/secrets.env}"
+        DB_OUT="$${SECRETS_INIT_DB_OUT:-/out/db/secrets.env}"
+        REALTIME_OUT="$${SECRETS_INIT_REALTIME_OUT:-/out/realtime/secrets.env}"
+        KEYS="APP_SECRET TOKEN_SECRET MARIADB_PASSWORD MARIADB_ROOT_PASSWORD REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET"
+        APP_KEYS="APP_SECRET TOKEN_SECRET MARIADB_PASSWORD REALTIME_API_KEY REALTIME_TOKEN_SECRET"
+        DB_KEYS="MARIADB_PASSWORD MARIADB_ROOT_PASSWORD"
+        REALTIME_KEYS="REALTIME_API_KEY REALTIME_TOKEN_SECRET REALTIME_ADMIN_PASSWORD REALTIME_ADMIN_SECRET"
+
+        read_key() {
+            file=$$1
+            key=$$2
+            val=""
+            while IFS= read -r line || [ -n "$$line" ]; do
+                case "$$line" in
+                    ''|\#*) continue ;;
+                esac
+                case "$$line" in
+                    "$$key"=*) val=$${line#*=} ;;
+                esac
+            done < "$$file"
+            printf '%s' "$$val"
+        }
+
+        # One character at a time, so a secret containing *, ? or [ is not treated as a
+        # pattern. A single quote becomes the four-character sequence '\'' .
+        shell_quote() {
+            input=$$1
+            quoted="'"
+            while [ -n "$$input" ]; do
+                case "$$input" in
+                    \'*)
+                        quoted="$${quoted}'\\''"
+                        ;;
+                    *)
+                        quoted="$${quoted}$${input%"$${input#?}"}"
+                        ;;
+                esac
+                input=$${input#?}
+            done
+            printf '%s' "$${quoted}'"
+        }
+
+        stack_initialised() {
+            [ -d "$$DB_DIR" ] || return 1
+            find "$$DB_DIR" -mindepth 1 -print -quit 2>/dev/null | grep -q .
+        }
+
+        is_placeholder() {
+            case "$$1" in
+                replace-with-*) return 0 ;;
+            esac
+            return 1
+        }
+
+        is_adoptable() {
+            case "$$1" in
+                *'$$'*|*' #'*) return 1 ;;
+                \"*\"|\'*\') return 1 ;;
+                [[:space:]]*|*[[:space:]]) return 1 ;;
+            esac
+            return 0
+        }
+
+        generate_secret() {
+            val=$$(hexdump -vn 32 -e '/1 "%02x"' /dev/urandom)
+            case "$$val" in
+                *[!0-9a-f]*) val="" ;;
+            esac
+            if [ "$${#val}" -ne 64 ]; then
+                echo "Synaplan did not start and created nothing: a random secret could not be generated." >&2
+                exit 1
+            fi
+            printf '%s' "$$val"
+        }
+
+        refuse() {
+            echo "Synaplan did not start and created nothing: $$1" >&2
+            exit 1
+        }
+
+        list_keys() {
+            printf '%s' "$$1" | sed 's/^ //; s/ /, /g'
+        }
+
+        publish_quoted() {
+            dest=$$1
+            key_list=$$2
+            dest_dir=$$(dirname "$$dest")
+            mkdir -p "$$dest_dir"
+            chmod 755 "$$dest_dir"
+            umask 022
+            tmp="$$dest_dir/.secrets.env.$$$$"
+            {
+                printf '%s\n' '# Copy for this start. Do not edit.'
+                for key in $$key_list; do
+                    printf '%s=%s\n' "$$key" "$$(shell_quote "$$(read_key "$$SECRETS" "$$key")")"
+                done
+            } > "$$tmp"
+            mv "$$tmp" "$$dest"
+            chmod 644 "$$dest"
+        }
+
+        file_existed=false
+        if [ -f "$$SECRETS" ]; then
+            file_existed=true
+        fi
+        initialised=false
+        if stack_initialised; then
+            initialised=true
+        fi
+
+        placeholders=""
+        file_placeholders=""
+        unadoptable=""
+        unresolved=""
+        assignments=""
+
+        for key in $$KEYS; do
+            val=""
+            if [ "$$file_existed" = true ]; then
+                val=$$(read_key "$$SECRETS" "$$key")
+                if [ -z "$$val" ]; then
+                    unresolved="$$unresolved $$key"
+                    continue
+                fi
+                if is_placeholder "$$val"; then
+                    file_placeholders="$$file_placeholders $$key"
+                    continue
+                fi
+            else
+                envval=$$(printenv "$$key" || true)
+                if [ -n "$$envval" ]; then
+                    if is_placeholder "$$envval"; then
+                        placeholders="$$placeholders $$key"
+                        continue
+                    fi
+                    if ! is_adoptable "$$envval"; then
+                        unadoptable="$$unadoptable $$key"
+                        continue
+                    fi
+                    val=$$envval
+                fi
+                if [ -z "$$val" ]; then
+                    if [ "$$initialised" = true ]; then
+                        unresolved="$$unresolved $$key"
+                        continue
+                    fi
+                    val=$$(generate_secret)
+                fi
+            fi
+            assignments="$${assignments}$${key}=$${val}
+        "
+        done
+
+        if [ -n "$$placeholders" ]; then
+            refuse "$$(list_keys "$$placeholders") still has the example value. Delete that line so Synaplan generates one, or set it to the output of \"openssl rand -hex 32\"."
+        fi
+
+        if [ -n "$$file_placeholders" ]; then
+            refuse "$$(list_keys "$$file_placeholders") in $$SECRETS_NAME still has the example value. Replace it with the output of \"openssl rand -hex 32\". The file was not rewritten."
+        fi
+
+        if [ -n "$$unadoptable" ]; then
+            refuse "$$(list_keys "$$unadoptable") cannot be read unchanged. Use only letters, digits, '-' and '_', or delete the line so Synaplan generates one."
+        fi
+
+        if [ -n "$$unresolved" ]; then
+            if [ "$$file_existed" = true ]; then
+                refuse "$$(list_keys "$$unresolved") has no value in $$SECRETS_NAME. That file was not changed. Add the original value there, or restore the file from a backup. A value that exists only in .env is not used once this file exists."
+            fi
+            refuse "$$(list_keys "$$unresolved") has no value, and this install already has a database. Restore $$SECRETS_NAME from the backup of this install, or put the original values back. A new password would not open the existing database."
+        fi
+
+        if [ "$$file_existed" = false ]; then
+            mkdir -p "$$DATA"
+            chmod 0700 "$$DATA"
+            umask 077
+            tmp="$$DATA/.secrets.env.$$$$"
+            {
+                printf '%s\n' '# Synaplan deployment secrets. Generated once. Back this file up with the database. Do not commit it.'
+                printf '%s' "$$assignments"
+            } > "$$tmp"
+            for key in $$KEYS; do
+                got=$$(read_key "$$tmp" "$$key")
+                if ! printf '%s\n' "$$assignments" | grep -Fxq "$${key}=$${got}"; then
+                    rm -f "$$tmp"
+                    refuse "the generated secrets file could not be read back. Nothing was kept."
+                fi
+            done
+            mv "$$tmp" "$$SECRETS"
+            chmod 600 "$$SECRETS"
+        fi
+
+        umask 077
+        publish_quoted "$$APP_OUT" "$$APP_KEYS"
+        publish_quoted "$$DB_OUT" "$$DB_KEYS"
+        publish_quoted "$$REALTIME_OUT" "$$REALTIME_KEYS"
+        # SECRETS_INIT_SCRIPT_END
+    networks: [internal]
+
   backend:
     image: *app-image
     pull_policy: "${SYNAPLAN_PULL_POLICY:-always}"
@@ -162,6 +438,8 @@ services:
     ports:
       - "${SYNAPLAN_HTTP_BIND:-127.0.0.1}:${SYNAPLAN_HTTP_PORT:-8000}:80"
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
@@ -181,6 +459,33 @@ services:
     restart: unless-stopped
     networks: [internal]
 
+  # Local network, off by default. Run deploy/scripts/local-tls.sh <address>
+  # first: it writes deploy/data/tls and adds the local-tls profile. The
+  # application port stays on 127.0.0.1. This proxy is the only listener on
+  # the network. It runs as root so it can read the mode-0600 key; it does
+  # not run the application.
+  tls-proxy:
+    image: caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    profiles: [local-tls]
+    user: "0:0"
+    ports:
+      - "${SYNAPLAN_TLS_BIND:-0.0.0.0}:443:443"
+      - "${SYNAPLAN_TLS_BIND:-0.0.0.0}:80:80"
+    volumes:
+      - ./local-network/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/tls:/etc/caddy/selfsigned:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "--no-check-certificate", "https://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks: [internal]
+
   worker:
     image: *app-image
     pull_policy: "${SYNAPLAN_PULL_POLICY:-always}"
@@ -191,6 +496,8 @@ services:
       SYNAPLAN_ROLE: worker
     volumes: *app-volumes
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       backend:
         condition: service_healthy
       redis:
@@ -214,6 +521,8 @@ services:
       SYNAPLAN_ROLE: scheduler
     volumes: *app-volumes
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       backend:
         condition: service_healthy
       redis:
@@ -228,21 +537,34 @@ services:
     networks: [internal]
 
   db:
-    image: mariadb:12.3.3@sha256:ab1c3dd381940233af12512b97d47b508fd3a0f17fbe3ba388739b7bc17cbc0b
-    command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
+    image: mariadb:13.0.2@sha256:f1bba652ba57bea3099ca2fe1af692af537c27d96e0bcde39dce29e2ba1ec4f3
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        set -a
+        . /run/synaplan-secrets/secrets.env
+        set +a
+        export MARIADB_PASSWORD="$$MARIADB_PASSWORD"
+        export MARIADB_ROOT_PASSWORD="$$MARIADB_ROOT_PASSWORD"
+        exec docker-entrypoint.sh --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
       MARIADB_DATABASE: "${MARIADB_DATABASE:-synaplan}"
       MARIADB_USER: "${MARIADB_USER:-synaplan}"
-      MARIADB_PASSWORD: "${MARIADB_PASSWORD:?Set a stable MariaDB application password}"
-      MARIADB_ROOT_PASSWORD: "${MARIADB_ROOT_PASSWORD:?Set a stable MariaDB root password}"
+      MARIADB_PASSWORD: "${MARIADB_PASSWORD:-}"
+      MARIADB_ROOT_PASSWORD: "${MARIADB_ROOT_PASSWORD:-}"
     volumes:
       - ./data/mariadb:/var/lib/mysql
+      - synaplan-secrets-db:/run/synaplan-secrets:ro
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
     healthcheck:
       # The password is expanded by the container's shell, so it MUST stay
       # quoted: an unquoted expansion splits a password containing whitespace
       # into several arguments, mariadb-admin never authenticates, db never turns
-      # healthy, and backend, worker and scheduler wait on it forever.
-      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\"$$MARIADB_ROOT_PASSWORD\" --silent"]
+      # healthy, and backend, worker and scheduler wait on it forever. The
+      # healthcheck is a new process, so it sources the secrets file itself.
+      test: ["CMD-SHELL", "set -a; . /run/synaplan-secrets/secrets.env; set +a; mariadb-admin ping -h 127.0.0.1 -uroot -p\"$$MARIADB_ROOT_PASSWORD\" --silent"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -251,7 +573,7 @@ services:
     networks: [internal]
 
   redis:
-    image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - ./data/redis:/data
@@ -265,22 +587,45 @@ services:
     networks: [internal]
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.5@sha256:99730b3f481c7ee639dbd2147716e3c12bd3ad191df5e8427e050414806609a3
-    command: ["centrifugo", "-c", "/centrifugo/config.json"]
+    image: centrifugo/centrifugo:v6.9.7@sha256:d014d3e99e0e9e58c45e656a7ea4ab97c3f79f96c82a3614ea0f810b4dd0e461
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        set -a
+        . /run/synaplan-secrets/secrets.env
+        set +a
+        export CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY="$$REALTIME_TOKEN_SECRET"
+        export CENTRIFUGO_HTTP_API_KEY="$$REALTIME_API_KEY"
+        export CENTRIFUGO_ADMIN_PASSWORD="$$REALTIME_ADMIN_PASSWORD"
+        export CENTRIFUGO_ADMIN_SECRET="$$REALTIME_ADMIN_SECRET"
+        exec centrifugo
     environment:
-      CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: "${REALTIME_TOKEN_SECRET:?Set a stable Centrifugo token secret}"
-      CENTRIFUGO_HTTP_API_KEY: "${REALTIME_API_KEY:?Set a stable Centrifugo API key}"
-      CENTRIFUGO_ADMIN_PASSWORD: "${REALTIME_ADMIN_PASSWORD:?Set a stable Centrifugo admin password}"
-      CENTRIFUGO_ADMIN_SECRET: "${REALTIME_ADMIN_SECRET:?Set a stable Centrifugo admin secret}"
-      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: "${REALTIME_ALLOWED_ORIGINS:-${APP_URL}}"
+      # Same settings as _docker/centrifugo/config.json, expressed as env so
+      # this file does not mount a third file. Allowed origins stay the
+      # deployment override. Namespace JSON is checked by
+      # deploy/scripts/tests/test-centrifugo-env.sh.
+      CENTRIFUGO_HTTP_SERVER_ADDRESS: "0.0.0.0"
+      CENTRIFUGO_HTTP_SERVER_PORT: "8000"
+      CENTRIFUGO_LOG_LEVEL: info
+      CENTRIFUGO_ENGINE_TYPE: redis
       CENTRIFUGO_ENGINE_REDIS_ADDRESS: redis://redis:6379/3
+      CENTRIFUGO_CLIENT_USER_CONNECTION_LIMIT: "16"
+      CENTRIFUGO_CLIENT_PING_INTERVAL: 25s
+      CENTRIFUGO_CLIENT_STALE_CLOSE_DELAY: 60s
+      CENTRIFUGO_ADMIN_ENABLED: "true"
+      CENTRIFUGO_PROMETHEUS_ENABLED: "true"
+      CENTRIFUGO_HEALTH_ENABLED: "true"
+      CENTRIFUGO_CHANNEL_NAMESPACES: '[{"name":"widget","presence":false,"history_size":100,"history_ttl":"10m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"widgettyping","presence":false,"history_size":0,"history_ttl":"0s","force_recovery":false,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":true,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"user","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"admin","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"system","presence":false,"history_size":10,"history_ttl":"1m","force_recovery":false,"allow_subscribe_for_anonymous":true,"allow_subscribe_for_client":true,"allow_publish_for_subscriber":false}]'
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: "${REALTIME_ALLOWED_ORIGINS:-${APP_URL}}"
     volumes:
-      - ../_docker/centrifugo/config.json:/centrifugo/config.json:ro
+      - synaplan-secrets-realtime:/run/synaplan-secrets:ro
     depends_on:
+      secrets-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "centrifugo", "checkconfig", "-c", "/centrifugo/config.json"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -301,7 +646,7 @@ services:
     networks: [internal]
 
   qdrant:
-    image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
+    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
     volumes:
       - ./data/qdrant:/qdrant/storage
     healthcheck:
@@ -317,7 +662,7 @@ services:
   # official 8 GB self-host floor stays valid. Enable with COMPOSE_PROFILES=office
   # (or `--profile office`). No published port.
   collabora:
-    image: collabora/code:26.04.3.2.1@sha256:379b8f1fc955dd6d01ba24adf61d1b177048ddaae179ae8c1e6a6342daccb282
+    image: collabora/code:26.04.5.1.1@sha256:bb8f3c9c5c9016045f25fccb5f0649be94469ebc7c7cc379f3576e470cccf33d
     profiles: [office]
     environment:
       extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
@@ -336,7 +681,7 @@ services:
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:0c0a83210471fb50226bcdc2d6611d20ab13ae87e024cc304c94a6a5765c5e65
+    image: ollama/ollama:latest@sha256:5d3a2f25f9825628daba94dc0b1d421c7d57d6c03ae5faa9ba050e058bab8241
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0
@@ -352,7 +697,7 @@ services:
     networks: [internal]
 
   whisper-models:
-    image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     profiles: [local-ai]
     # The model name is passed as an environment variable and expanded by the
     # container's shell inside quotes, instead of being interpolated by Compose
@@ -376,6 +721,71 @@ services:
       - ./data/whisper:/models
     restart: "no"
     networks: [internal]
+
+  # Spoken answers. Published image, no host port. Stop the container to hide TTS.
+  tts:
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:efa9f2188abca5603aa9c15dec59963cdf7070eb5a9e2564793a7ceba6c3642a
+    restart: unless-stopped
+    environment:
+      VOICES_DIR: /voices
+      EXTRA_VOICES_DIR: /voices-extra
+      DEFAULT_VOICE: en_US-lessac-medium
+    networks: [internal]
+
+  # File work (T1). Off by default — needs the host Docker socket.
+  # Enable with COMPOSE_PROFILES=compute. prepare.sh writes COMPUTE_TOKEN.
+  compute-python:
+    image: synaplan-compute-python:local
+    pull_policy: build
+    profiles: [compute]
+    build:
+      context: ../sidecars/synaplan-compute/images/python
+    command: ["python", "--version"]
+    network_mode: none
+    restart: "no"
+
+  compute-node:
+    image: synaplan-compute-node:local
+    pull_policy: build
+    profiles: [compute]
+    build:
+      context: ../sidecars/synaplan-compute/images/node
+    command: ["node", "--version"]
+    network_mode: none
+    restart: "no"
+
+  compute:
+    pull_policy: build
+    profiles: [compute]
+    build:
+      context: ../sidecars/synaplan-compute
+    user: "0:0"
+    restart: unless-stopped
+    depends_on:
+      compute-python:
+        condition: service_completed_successfully
+      compute-node:
+        condition: service_completed_successfully
+    environment:
+      COMPUTE_AUTH_TOKEN: "${COMPUTE_TOKEN:-}"
+      COMPUTE_LISTEN: :8080
+      COMPUTE_EGRESS_ENABLED: "${COMPUTE_EGRESS_ENABLED:-false}"
+      COMPUTE_SCRATCH_DIR: /scratch
+      COMPUTE_WORKSPACES_DIR: /workspaces
+      COMPUTE_MAX_CONCURRENT: "${COMPUTE_MAX_CONCURRENT:-2}"
+      COMPUTE_ALLOW_LOCAL_IMAGES: "1"
+      COMPUTE_IMAGE_PYTHON: synaplan-compute-python:local
+      COMPUTE_IMAGE_NODE: synaplan-compute-node:local
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data/compute/scratch:/scratch
+      - ./data/compute/workspaces:/workspaces
+    networks: [internal]
+
+volumes:
+  synaplan-secrets-app:
+  synaplan-secrets-db:
+  synaplan-secrets-realtime:
 
 networks:
   internal:

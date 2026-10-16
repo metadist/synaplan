@@ -2,24 +2,28 @@
 
 namespace App\Controller;
 
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
-use App\Service\ConversationSummaryRefreshDispatcher;
-use App\Service\DiscordNotificationService;
+use App\Service\Chat\ConversationSummaryRefreshDispatcher;
+use App\Service\Email\EmailChatService;
+use App\Service\Email\EmailWebhookIdempotencyService;
+use App\Service\Email\InboundEmailAttachmentStore;
+use App\Service\Email\InternalEmailService;
 use App\Service\Email\RawMimeEmailParser;
-use App\Service\EmailChatService;
-use App\Service\EmailWebhookIdempotencyService;
-use App\Service\InternalEmailService;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ExternalReplyReferences;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
-use App\Service\TtsTextSanitizer;
+use App\Service\SelfAware\Docs\PlatformDocReferenceResolver;
 use App\Service\Usage\RecordedUsage;
-use App\Service\WhatsAppService;
+use App\Service\WhatsApp\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -49,8 +53,11 @@ class WebhookController extends AbstractController
         private ModelConfigService $modelConfigService,
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private RawMimeEmailParser $rawMimeEmailParser,
+        private InboundEmailAttachmentStore $inboundEmailAttachmentStore,
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private ChatErrorPresenter $chatErrorPresenter,
+        private ExternalReplyReferences $externalReplyReferences,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -75,12 +82,13 @@ class WebhookController extends AbstractController
                 new OA\Property(
                     property: 'attachments',
                     type: 'array',
+                    description: 'Optional. Each item\'s url is fetched by the server (http/https only; private addresses are refused, DNS is pinned) and stored as a File on the receiving user, linked to the inbound message. At most 10 attachments and 128 MB total are fetched; unknown types, oversize, quota misses and the rest of an over-budget list are skipped. The email is still accepted. Automatic vectorization is not started.',
                     items: new OA\Items(
                         properties: [
-                            new OA\Property(property: 'filename', type: 'string'),
-                            new OA\Property(property: 'content_type', type: 'string'),
-                            new OA\Property(property: 'size', type: 'integer'),
-                            new OA\Property(property: 'url', type: 'string'),
+                            new OA\Property(property: 'filename', type: 'string', example: 'invoice.pdf'),
+                            new OA\Property(property: 'content_type', type: 'string', example: 'application/pdf'),
+                            new OA\Property(property: 'size', type: 'integer', example: 1024),
+                            new OA\Property(property: 'url', type: 'string', example: 'https://relay.example.com/files/invoice.pdf', description: 'Public http(s) URL the server fetches. Query strings are allowed; the bytes are stored, not the URL.'),
                         ]
                     )
                 ),
@@ -358,13 +366,14 @@ class WebhookController extends AbstractController
                 $message->setMeta('external_id', $normalizedMessageId);
                 // Note: Email threading is handled via Chat titles (Email: keyword or Email Conversation)
             }
-            if (!empty($data['attachments'])) {
+            if (!empty($data['attachments']) && is_array($data['attachments'])) {
                 $message->setMeta('has_attachments', 'true');
+                $this->inboundEmailAttachmentStore->attach($message, $user, $data['attachments']);
 
                 // Check for audio attachments to enable voice reply
                 foreach ($data['attachments'] as $attachment) {
-                    $mime = $attachment['content_type'] ?? '';
-                    if (str_starts_with($mime, 'audio/')) {
+                    $mime = is_array($attachment) ? ($attachment['content_type'] ?? '') : '';
+                    if (is_string($mime) && str_starts_with($mime, 'audio/')) {
                         $message->setMeta('voice_reply', '1');
                         break;
                     }
@@ -470,12 +479,24 @@ class WebhookController extends AbstractController
             // Generate TTS if voice_reply is set and no media attachment already exists.
             if (null === $attachmentPath && '1' === $message->getMeta('voice_reply')) {
                 try {
-                    $ttsText = TtsTextSanitizer::sanitize($responseText);
-                    if (!empty(trim($ttsText))) {
+                    // Classification language is available after process() (#2283).
+                    $ttsLanguage = is_string($result['classification']['language'] ?? null)
+                        ? (string) $result['classification']['language']
+                        : ($message->getLanguage() ?: 'en');
+
+                    $speakable = null !== $this->mediaTextRenderer
+                        ? $this->mediaTextRenderer->forUser(
+                            $responseText,
+                            $message->getLanguage(),
+                            $user->getLocale(),
+                        )
+                        : GeneratedMediaTextRenderer::renderModel($responseText);
+                    if (!empty(trim($speakable))) {
                         $ttsModelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $user->getId());
                         $ttsProvider = $ttsModelId ? $this->modelConfigService->getProviderForModel($ttsModelId) : null;
 
-                        $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [
+                        // The facade sanitizes; markers are already a readable sentence here.
+                        $ttsResult = $this->aiFacade->synthesize($speakable, $ttsLanguage, $user->getId(), [
                             'format' => 'mp3',
                             'provider' => $ttsProvider ? strtolower($ttsProvider) : null,
                         ]);
@@ -488,10 +509,13 @@ class WebhookController extends AbstractController
                             'model_id' => $ttsResult['model_id'] ?? null,
                             'source' => 'EMAIL',
                             'media_usage' => [
-                                'characters' => $ttsResult['text_length'] ?? mb_strlen($ttsText),
+                                'characters' => $ttsResult['text_length'] ?? mb_strlen($speakable),
                             ],
                         ]);
                     }
+                } catch (NoSpeakableTextException) {
+                    // Code-only or think-only answer: send the text email without audio.
+                    $this->logger->info('Email voice reply skipped: no speakable text');
                 } catch (\Exception $e) {
                     $this->logger->error('Failed to generate TTS for email', ['error' => $e->getMessage()]);
                     if ($debugDiscord) {
@@ -546,21 +570,21 @@ class WebhookController extends AbstractController
             if (!empty($metadata['model_id'])) {
                 $outgoingMessage->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
             }
-            $outgoingMessage->setMeta('ai_chat_cost', $recordedChatUsage->chargedCost);
+            $recordedChatUsage->attachChatCost($outgoingMessage);
+            if (is_array($metadata)) {
+                $docsMeta = PlatformDocReferenceResolver::encodeDocsMeta($metadata);
+                if (null !== $docsMeta) {
+                    $outgoingMessage->setMeta('docs', $docsMeta);
+                }
+            }
 
             $usageExtra = [];
             if (is_array($classification['sorting_usage'] ?? null)) {
-                $usageExtra[] = [
-                    'promptTokens' => (int) ($classification['sorting_usage']['prompt_tokens'] ?? 0),
-                    'completionTokens' => (int) ($classification['sorting_usage']['completion_tokens'] ?? 0),
-                    'totalTokens' => (int) ($classification['sorting_usage']['tokens'] ?? 0),
-                    'cost' => (string) ($classification['sorting_usage']['cost'] ?? '0'),
-                    'modelKey' => RecordedUsage::modelKey(
-                        $classification['sorting_provider'] ?? null,
-                        $classification['sorting_model_name'] ?? null,
-                    ),
-                    'kind' => 'SORT',
-                ];
+                $usageExtra[] = RecordedUsage::fromSortingUsage(
+                    $classification['sorting_usage'],
+                    isset($classification['sorting_provider']) ? (string) $classification['sorting_provider'] : null,
+                    isset($classification['sorting_model_name']) ? (string) $classification['sorting_model_name'] : null,
+                );
             }
             if (is_array($metadata['planning_usage'] ?? null)) {
                 $usageExtra[] = $metadata['planning_usage'];
@@ -591,7 +615,16 @@ class WebhookController extends AbstractController
                 $this->internalEmailService->sendAiResponseEmail(
                     $fromEmail,
                     $subject,
-                    $responseText,
+                    $this->externalReplyReferences->resolve(
+                        null !== $this->mediaTextRenderer
+                            ? $this->mediaTextRenderer->forUser(
+                                $responseText,
+                                $message->getLanguage(),
+                                $user->getLocale(),
+                            )
+                            : GeneratedMediaTextRenderer::renderModel($responseText),
+                        $user,
+                    ),
                     $messageId,
                     $provider,
                     $model,
@@ -599,7 +632,8 @@ class WebhookController extends AbstractController
                     $attachmentPath,
                     $toEmail,
                     $responseMediaType,
-                    $this->resolveAdditionalAttachmentPathsFromAiMetadata($metadata)
+                    $this->resolveAdditionalAttachmentPathsFromAiMetadata($metadata),
+                    $message->getLanguage() ?: $user->getLocale(),
                 );
 
                 $this->logger->info('Email response sent', [

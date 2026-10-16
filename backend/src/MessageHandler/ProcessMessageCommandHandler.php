@@ -4,7 +4,7 @@ namespace App\MessageHandler;
 
 use App\Entity\Message;
 use App\Message\ProcessMessageCommand;
-use App\Service\ConversationSummaryRefreshDispatcher;
+use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Message\MessageProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;

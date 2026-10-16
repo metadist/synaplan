@@ -1,6 +1,6 @@
 <template>
-  <div class="surface-card p-6" data-testid="add-model-form">
-    <h2 class="text-xl font-semibold txt-primary mb-1">
+  <div :class="embedded ? '' : 'surface-card p-6'" data-testid="add-model-form">
+    <h2 v-if="!embedded" class="text-xl font-semibold txt-primary mb-1">
       {{ t('config.aiModels.admin.addForm.title') }}
     </h2>
     <p class="text-sm txt-secondary mb-5">
@@ -15,7 +15,7 @@
         </label>
         <select
           v-model="selectedEndpoint"
-          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="add-model-endpoint"
         >
           <option :value="null">{{ t('config.aiModels.admin.addForm.endpointBuiltin') }}</option>
@@ -41,7 +41,7 @@
         </label>
         <input
           v-model="service"
-          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :placeholder="t('config.aiModels.admin.addForm.serviceHint')"
           data-testid="add-model-service"
         />
@@ -54,7 +54,7 @@
         </label>
         <select
           v-model="capability"
-          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="add-model-capability"
         >
           <option v-for="tag in availableTags" :key="tag" :value="tag">
@@ -70,7 +70,7 @@
         </label>
         <input
           v-model="providerId"
-          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           placeholder="llama3"
           data-testid="add-model-provider-id"
         />
@@ -86,7 +86,7 @@
         </label>
         <input
           v-model="name"
-          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           placeholder="Llama 3 (self-hosted)"
           data-testid="add-model-name"
         />
@@ -116,7 +116,7 @@
 
       <button
         type="button"
-        class="btn-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+        class="btn-primary px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50"
         :disabled="submitting"
         data-testid="add-model-submit"
         @click="submit"
@@ -141,6 +141,8 @@ import {
   type OpenAiEndpoint,
 } from '@/services/api/adminOpenAiEndpointsApi'
 
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
 const emit = defineEmits<{ created: [] }>()
 
 const { t } = useI18n()
@@ -150,8 +152,9 @@ const { success, error: showError } = useNotification()
 const OPENAI_COMPATIBLE_SERVICE = 'OpenAICompatible'
 
 // Full set of BTAG capabilities used across the model catalog. When an
-// endpoint is selected we restrict to what that endpoint advertises, since
-// the OpenAI-compatible provider only implements chat/vectorize/pic2text.
+// endpoint is selected we restrict to what that endpoint advertises.
+// text2pic is included: the OpenAI-compatible provider calls
+// POST /images/generations on that endpoint.
 const ALL_TAGS = [
   'sort',
   'chat',

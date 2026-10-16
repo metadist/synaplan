@@ -1,0 +1,85 @@
+# Compute nightly load (CS26): T1 on GitHub-hosted runners, T2 behind a flag.
+#
+# T1 builds the sidecar and the :local run images from source, then starts
+# the sidecar the same way a developer `docker compose up` does: the fixed
+# demo token, COMPUTE_ALLOW_LOCAL_IMAGES=1, and host-path scratch. It does
+# not mint a new token and it does not rewrite the published digest pins in
+# map.go. Those two moving parts are what made this job fail after an
+# unrelated pin or tag change. Production still uses its own COMPUTE_TOKEN
+# (deploy/ prepare.sh) and the digest pins; see the root README.
+#
+# T2 needs a self-hosted gVisor runner that does not exist yet: the job only
+# runs when the repo variable COMPUTE_T2_NIGHTLY_ENABLED is 'true'.
+name: Compute nightly load
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  load-t1:
+    name: Load mix on T1 (docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: sidecars/synaplan-compute
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: sidecars/synaplan-compute/go.mod
+          cache-dependency-path: sidecars/synaplan-compute/go.sum
+
+      - name: Build run images
+        run: make images
+
+      - name: Build and start sidecar
+        run: ./scripts/nightly-up.sh
+
+      - name: Run load mix (N=32, concurrency 4)
+        run: go run ./cmd/compute-load -url http://127.0.0.1:8080 -n 32 -concurrency 4
+
+      - name: Show sidecar logs on failure
+        if: failure()
+        run: docker logs synaplan-compute-nightly 2>&1 | tail -40
+
+  load-t2:
+    name: Load mix on T2 (gVisor)
+    if: vars.COMPUTE_T2_NIGHTLY_ENABLED == 'true'
+    runs-on: [self-hosted, gvisor]
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: sidecars/synaplan-compute
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: sidecars/synaplan-compute/go.mod
+          cache-dependency-path: sidecars/synaplan-compute/go.sum
+
+      - name: Build run images
+        run: make images
+
+      - name: Build and start sidecar (gVisor tier)
+        env:
+          COMPUTE_TIER: gvisor
+        run: ./scripts/nightly-up.sh
+
+      - name: Run load mix (N=32, concurrency 4)
+        run: go run ./cmd/compute-load -url http://127.0.0.1:8080 -n 32 -concurrency 4
+
+      - name: Show sidecar logs on failure
+        if: failure()
+        run: docker logs synaplan-compute-nightly 2>&1 | tail -40

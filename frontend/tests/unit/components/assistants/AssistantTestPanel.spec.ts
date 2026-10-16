@@ -7,7 +7,9 @@ import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api/chatApi'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 vi.mock('@/services/api/chatApi', () => ({
   chatApi: {
@@ -52,7 +54,7 @@ function mountPanel(attach = false) {
   }
   const auth = useAuthStore()
   auth.user = { id: 1, email: 'ada@test.com', level: 'PRO', isAdmin: false } as never
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   return mount(AssistantTestPanel, {
     attachTo: attach ? document.body : undefined,
     global: {
@@ -86,5 +88,31 @@ describe('AssistantTestPanel', () => {
 
     expect(document.activeElement).toBe(input.element)
     wrapper.unmount()
+  })
+
+  it('shows the reply while it streams and keeps it once complete', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    type Update = { status: string; chunk?: string }
+    let onUpdate: ((data: Update) => void) | undefined
+    vi.mocked(chatApi.streamMessage).mockImplementationOnce((options) => {
+      onUpdate = options.onUpdate as (data: Update) => void
+      return () => undefined
+    })
+
+    const wrapper = mountPanel()
+    await wrapper.get('[data-testid="input-test-message"]').setValue('hello draft')
+    await wrapper.get('form').trigger('submit')
+
+    onUpdate?.({ status: 'data', chunk: 'Hello, ' })
+    onUpdate?.({ status: 'data', chunk: 'world.' })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('[data-testid="text-test-live"]').text()).toBe('Hello, world.')
+
+    onUpdate?.({ status: 'complete' })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="text-test-live"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="list-test-messages"]').text()).toContain('Hello, world.')
+
+    vi.unstubAllGlobals()
   })
 })

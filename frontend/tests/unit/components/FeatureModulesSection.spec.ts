@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
 import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
 import type { FeatureModule } from '@/services/featuresService'
 
-const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+const en = loadAllMessages('en')
+
+const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
 
 const module = (
   overrides: Partial<FeatureModule> & Pick<FeatureModule, 'id' | 'state'>
@@ -99,7 +101,60 @@ describe('FeatureModulesSection', () => {
       module({ id: 'future', state: 'absent', label_key: 'modules.future.label' }),
     ])
 
-    expect(wrapper.get('[data-testid="item-module"] h3').text()).toBe('future')
+    const header = wrapper.get('[data-testid="btn-module-future"]')
+    expect(header.text()).toContain('future')
+    expect(header.text()).not.toContain('modules.future.label')
+    expect(wrapper.get('[data-testid="item-module"]').attributes('data-open')).toBe('false')
     expect(wrapper.get('[data-testid="badge-module-state"]').text()).toBe('Not installed')
+  })
+
+  it('translates the compute module line from sidecar state, not the backend sentence', () => {
+    const running = mountSection([
+      module({
+        id: 'compute',
+        state: 'available',
+        message: 'Compute sidecar is running.',
+        details: { enabled: true },
+      }),
+    ])
+    expect(running.get('[data-testid="item-module"]').text()).toContain('File work is running.')
+    expect(running.get('[data-testid="item-module"]').text()).not.toContain(
+      'Compute sidecar is running.'
+    )
+
+    const off = mountSection([
+      module({
+        id: 'compute',
+        state: 'available',
+        message: 'Compute sidecar is running.',
+        details: { enabled: false },
+      }),
+    ])
+    expect(off.get('[data-testid="item-module"]').text()).toContain(
+      'The sidecar is running; file work is turned off under System configuration › Tools & automation.'
+    )
+
+    const down = mountSection([
+      module({
+        id: 'compute',
+        state: 'needs_setup',
+        healthy: false,
+        message: 'Compute sidecar is not reachable.',
+      }),
+    ])
+    expect(down.get('[data-testid="item-module"]').text()).toContain(
+      'The file-work sidecar is not reachable.'
+    )
+
+    const unset = mountSection([
+      module({
+        id: 'compute',
+        state: 'absent',
+        message: 'COMPUTE_URL or COMPUTE_TOKEN is not set.',
+      }),
+    ])
+    expect(unset.get('[data-testid="item-module"]').text()).toContain(
+      'COMPUTE_URL or COMPUTE_TOKEN is not set.'
+    )
   })
 })

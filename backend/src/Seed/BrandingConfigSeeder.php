@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Branding\BrandingService;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the white-label branding defaults (BCONFIG, ownerId=0).
@@ -17,11 +18,22 @@ use Doctrine\DBAL\Connection;
  * Defaults reproduce the historical "Synaplan" look, so seeding a fresh install
  * leaves the product visually unchanged.
  */
-final readonly class BrandingConfigSeeder
+#[AsTaggedItem(priority: 260)]
+final readonly class BrandingConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'branding';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=BRANDING, ownerId=0';
     }
 
     public function seed(): SeedResult

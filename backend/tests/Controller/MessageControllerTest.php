@@ -7,7 +7,7 @@ namespace App\Tests\Controller;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
-use App\Service\TokenService;
+use App\Service\Auth\TokenService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;

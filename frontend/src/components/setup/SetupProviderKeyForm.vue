@@ -45,7 +45,7 @@
         type="password"
         :aria-label="$t('setup.provider.keyLabel', { provider: provider.displayName })"
         :placeholder="$t('adminSetup.keyPlaceholder')"
-        class="flex-1 min-w-0 px-3 py-2.5 rounded-lg surface-card txt-primary text-sm font-mono"
+        class="flex-1 min-w-0 px-3 py-2.5 rounded-xl surface-card txt-primary text-sm font-mono"
         :data-testid="`setup-provider-key-input-${provider.name}`"
         autocomplete="off"
         spellcheck="false"
@@ -53,7 +53,7 @@
       />
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap"
         :disabled="saving || '' === keyInput.trim()"
         data-testid="setup-provider-save"
         @click="save"

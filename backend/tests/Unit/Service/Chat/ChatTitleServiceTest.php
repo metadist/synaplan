@@ -244,6 +244,9 @@ final class ChatTitleServiceTest extends TestCase
         yield 'double quotes' => ['"Invoice import"', 'Invoice import'];
         yield 'single quotes' => ["'Invoice import'", 'Invoice import'];
         yield 'markdown bold' => ['**Invoice import**', 'Invoice import'];
+        yield 'inner markdown bold' => ["**You're in demo mode** — canned reply", "You're in demo mode — canned reply"];
+        yield 'inline code' => ['Fix `app:seed` import', 'Fix app:seed import'];
+        yield 'snake case is kept' => ['Telegram @synaplan_test_bot', 'Telegram @synaplan_test_bot'];
         yield 'trailing period' => ['Invoice import.', 'Invoice import'];
         yield 'label prefix' => ['Title: Invoice import', 'Invoice import'];
         yield 'german label prefix' => ['Titel: Rechnungsimport', 'Rechnungsimport'];

@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import {
+  useAccountTimezone,
+  ensureAccountTimezone,
+  type AccountTimezoneSource,
+} from '@/composables/useAccountTimezone'
 import { useNotification } from '@/composables/useNotification'
+import { isValidIanaTimezone } from '@/utils/zonedDay'
 import { useDialog } from '@/composables/useDialog'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { isWorkflowsBuilderEnabled } from '@/composables/useWorkflowsFeature'
@@ -49,26 +55,59 @@ const showRuns = ref(false)
 const runs = ref<SavedTaskRun[]>([])
 const scheduleKind = ref('off')
 const scheduleAt = ref('07:00')
-const scheduleTz = ref(Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin')
+const scheduleTz = ref('')
+const zoneSource = ref<AccountTimezoneSource | null>(null)
+const { timezone: accountTimezone, state: accountTimezoneState } = useAccountTimezone()
 
-watch(
-  () => props.task,
-  (task) => {
-    if (task.triggerType === 'schedule' && task.triggerConfig) {
-      const kind = task.triggerConfig.kind
-      scheduleKind.value = typeof kind === 'string' ? kind : 'off'
-      const at = task.triggerConfig.at
-      if (typeof at === 'string') scheduleAt.value = at
-      const tz = task.triggerConfig.tz
-      if (typeof tz === 'string') scheduleTz.value = tz
-    } else if (task.triggerType === 'webhook') {
-      scheduleKind.value = 'webhook'
-    } else {
-      scheduleKind.value = 'off'
-    }
-  },
-  { immediate: true }
+const wallClockSchedule = computed(
+  () => scheduleKind.value === 'daily' || scheduleKind.value === 'weekly'
 )
+const profileZone = computed(() => {
+  const name = accountTimezone.value.trim()
+  return accountTimezoneState.value === 'ready' && isValidIanaTimezone(name) ? name : ''
+})
+const timezoneLabel = computed(() =>
+  wallClockSchedule.value && scheduleTz.value
+    ? t('config.savedTasks.timezoneLabel', { tz: scheduleTz.value })
+    : ''
+)
+const timezoneDeviceHint = computed(() =>
+  wallClockSchedule.value && zoneSource.value === 'device-unsaved' && scheduleTz.value
+    ? t('config.savedTasks.timezoneDeviceUnsaved', { tz: scheduleTz.value })
+    : ''
+)
+const timezoneSwitchHint = computed(() => {
+  if (!wallClockSchedule.value || !scheduleTz.value || !profileZone.value) return ''
+  if (scheduleTz.value === profileZone.value) return ''
+  return t('config.savedTasks.timezoneSwitchHint', {
+    tz: profileZone.value,
+    current: scheduleTz.value,
+  })
+})
+
+function applyScheduleFromTask(task: SavedTask): void {
+  if (task.triggerType === 'schedule' && task.triggerConfig) {
+    const kind = task.triggerConfig.kind
+    scheduleKind.value = typeof kind === 'string' ? kind : 'off'
+    const at = task.triggerConfig.at
+    if (typeof at === 'string') scheduleAt.value = at
+    const tz = task.triggerConfig.tz
+    scheduleTz.value = typeof tz === 'string' ? tz : ''
+    return
+  }
+  scheduleTz.value = ''
+  scheduleKind.value = task.triggerType === 'webhook' ? 'webhook' : 'off'
+}
+
+watch(() => props.task, applyScheduleFromTask, { immediate: true })
+
+onMounted(() => {
+  if (!props.sharedView) {
+    void ensureAccountTimezone().then((ensured) => {
+      if (ensured) zoneSource.value = ensured.source
+    })
+  }
+})
 
 /**
  * Translates one summary part code (e.g. when=daily → "every day at 07:00").
@@ -243,14 +282,25 @@ const onSchedule = async () => {
       success(t('config.savedTasks.scheduleSaved'))
       return
     }
+    const wallClock = scheduleKind.value === 'daily' || scheduleKind.value === 'weekly'
+    if (wallClock) {
+      const ensured = await ensureAccountTimezone()
+      if (!ensured) {
+        applyScheduleFromTask(props.task)
+        showError(t('config.savedTasks.timezoneNotSavedLoad'))
+        return
+      }
+      scheduleTz.value = ensured.tz
+      zoneSource.value = ensured.source
+    }
     const triggerConfig: Record<string, unknown> = {
       kind: scheduleKind.value,
-      tz: scheduleTz.value,
     }
     if (scheduleKind.value === 'interval') {
       triggerConfig.every_minutes = 60
     } else {
       triggerConfig.at = scheduleAt.value
+      triggerConfig.tz = scheduleTz.value
       if (scheduleKind.value === 'weekly') {
         triggerConfig.days = [1, 2, 3, 4, 5]
       }
@@ -265,6 +315,7 @@ const onSchedule = async () => {
     )
     success(t('config.savedTasks.scheduleSaved'))
   } catch {
+    applyScheduleFromTask(props.task)
     showError(t('config.savedTasks.updateFailed'))
   }
 }
@@ -348,9 +399,15 @@ const onRunCopy = async () => {
     }
   } catch (err) {
     const message = err instanceof ApiError ? err.message : ''
+    const assistant =
+      err instanceof ApiError && typeof err.details?.assistant === 'string'
+        ? err.details.assistant
+        : ''
     showError(
       message === 'iam.assistantNotShared'
-        ? t('iam.assistantNotShared')
+        ? assistant !== ''
+          ? t('iam.assistantNotSharedNamed', { name: assistant })
+          : t('iam.assistantNotShared')
         : t('config.savedTasks.runFailed')
     )
   } finally {
@@ -404,7 +461,7 @@ const onRunCopy = async () => {
       type="button"
       class="pill text-sm font-medium"
       data-testid="saved-task-waiting-approval"
-      @click="router.push({ path: '/channels/approvals', query: { task: String(task.id) } })"
+      @click="router.push({ path: '/approvals', query: { task: String(task.id) } })"
     >
       {{ $t('config.savedTasks.waitingApproval') }}
       <span class="txt-secondary">{{ task.waitingApprovalCount }}</span>
@@ -419,7 +476,7 @@ const onRunCopy = async () => {
       </p>
       <button
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium mt-2"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium mt-2"
         @click="onResume"
       >
         {{ $t('config.savedTasks.resume') }}
@@ -430,7 +487,7 @@ const onRunCopy = async () => {
       <button
         v-if="sharedView"
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="copying"
         data-testid="btn-run-copy"
         @click="onRunCopy"
@@ -440,7 +497,7 @@ const onRunCopy = async () => {
       <button
         v-else
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="running"
         data-testid="btn-run-now"
         @click="onRunNow"
@@ -450,7 +507,7 @@ const onRunCopy = async () => {
       <button
         v-if="iamSharingEnabled && !sharedView"
         type="button"
-        class="btn-secondary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-share-saved-task"
         @click="iamShareOpen = true"
       >
@@ -459,7 +516,7 @@ const onRunCopy = async () => {
       <button
         v-if="!sharedView"
         type="button"
-        class="btn-danger inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-danger inline-flex items-center px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-delete-saved-task"
         @click="onDelete"
       >
@@ -468,7 +525,7 @@ const onRunCopy = async () => {
       <select
         v-if="!sharedView"
         v-model="scheduleKind"
-        class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+        class="px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid="saved-task-schedule"
         :disabled="!task.enabled"
         @change="onSchedule"
@@ -485,11 +542,23 @@ const onRunCopy = async () => {
         v-if="!sharedView && (scheduleKind === 'daily' || scheduleKind === 'weekly')"
         v-model="scheduleAt"
         type="time"
-        class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         @change="onSchedule"
       />
-      <span class="text-xs txt-secondary">{{ scheduleTz }}</span>
+      <span v-if="timezoneLabel" class="text-xs txt-secondary" data-testid="saved-task-timezone">
+        {{ timezoneLabel }}
+      </span>
     </div>
+    <p
+      v-if="timezoneDeviceHint"
+      class="text-sm txt-secondary"
+      data-testid="saved-task-timezone-device"
+    >
+      {{ timezoneDeviceHint }}
+    </p>
+    <p class="text-sm txt-secondary" data-testid="saved-task-timezone-switch">
+      {{ timezoneSwitchHint }}
+    </p>
 
     <div
       v-if="!sharedView"
@@ -498,7 +567,7 @@ const onRunCopy = async () => {
       <button
         v-if="task.chatId"
         type="button"
-        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-medium"
         data-testid="btn-show-results"
         @click="openResults"
       >
@@ -506,7 +575,7 @@ const onRunCopy = async () => {
       </button>
       <button
         type="button"
-        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-medium"
         data-testid="btn-view-runs"
         @click="loadRuns"
       >
@@ -515,7 +584,7 @@ const onRunCopy = async () => {
       <button
         v-if="workflowsEnabled && !sharedView"
         type="button"
-        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-medium"
         data-testid="btn-saved-task-steps"
         @click="stepsOpen = true"
       >
@@ -552,7 +621,7 @@ const onRunCopy = async () => {
       <p class="text-sm font-medium txt-primary">{{ $t('workflows.webhookCardTitle') }}</p>
       <p class="text-xs txt-secondary">{{ $t('workflows.webhookCardHint') }}</p>
       <input
-        class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :value="webhookUrl"
         :aria-label="$t('workflows.webhookCardTitle')"
         readonly
@@ -561,7 +630,7 @@ const onRunCopy = async () => {
       <div class="flex flex-wrap gap-2">
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-copy-webhook-url"
           @click="copyWebhookUrl"
         >
@@ -569,7 +638,7 @@ const onRunCopy = async () => {
         </button>
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-regenerate-webhook"
           @click="regenerateWebhook"
         >
@@ -600,7 +669,7 @@ const onRunCopy = async () => {
         <p class="alert-warning-text">{{ $t('workflows.secretRevealTitle') }}</p>
         <p class="alert-warning-text font-normal">{{ $t('workflows.secretRevealHint') }}</p>
         <input
-          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :value="revealedSecret"
           :aria-label="$t('workflows.secretRevealTitle')"
           readonly
@@ -608,7 +677,7 @@ const onRunCopy = async () => {
         />
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-copy-webhook-secret"
           @click="copyWebhookSecret"
         >

@@ -15,7 +15,8 @@ Living playbook for keeping Synaplan's model prices correct **and** billed the w
 
 | What | File |
 | ---- | ---- |
-| Source of truth (prices, units, `pricing_mode`, `resolution_prices`) | `backend/src/Model/ModelCatalog.php` |
+| Authored baseline (structure, units, `pricing_mode`, `resolution_prices`, and the price a release ships) | `backend/src/Model/ModelCatalog.php` |
+| Live per-token price after `app:sync-model-prices` | `BMODELS`, owned by LiteLLM until the catalog price changes or the row is `pricePinned` — see §"Who owns a per-token price" |
 | Cost calc (per_token / per_character / per_image / per_second, cache discount) | `backend/src/Service/CostCalculationService.php` |
 | Charge = raw × (1+markup) | `backend/src/Service/RateLimitService.php` |
 | Auto price pull from LiteLLM | `backend/src/Command/SyncModelPricesCommand.php` (`app:sync-model-prices`, `--dry-run`) |
@@ -24,7 +25,7 @@ Living playbook for keeping Synaplan's model prices correct **and** billed the w
 | Embedding pre-flight estimate | `backend/src/Service/Embedding/EmbeddingCostEstimator.php` |
 | DB sync from catalog | `app:model:seed` |
 
-Units (`inUnit`/`outUnit` in the catalog): the tokens `CostCalculationService::normaliseToPerUnit()` understands are — `per1m`/`per1mchars`/`per1mtokens` (÷1e6), `per1k`/`per1000`/`per1000chars` (÷1e3), `permin` (÷60), `perhour` (÷3600), `per1`/`perchar`/`perpic`/`perimage`/`persec`/`persecond` (as-is), and `-`/``/`free` (→ 0). Time-based media bills on **seconds**, so `permin`/`perhour` are converted down to per-second (fixed in #1314). Anything else falls through unchanged (per-1), so never author a unit that isn't in this list. `pricing_mode` is one of `per_token` (default), `per_image`, `per_character`, `per_second`.
+Units (`inUnit`/`outUnit` in the catalog): the tokens `CostCalculationService::normaliseToPerUnit()` understands are — `per1m`/`per1mchars`/`per1mtokens` (÷1e6), `per1k`/`per1000`/`per1000chars` (÷1e3), `permin` (÷60), `perhour` (÷3600), `per1`/`perchar`/`perpic`/`perimage`/`persec`/`persecond` (as-is), and `-`/``/`free` (→ 0). Time-based media bills on **seconds**, so `permin`/`perhour` are converted down to per-second (fixed in #1314). Anything else falls through unchanged (per-1), so never author a unit that isn't in this list. `pricing_mode` is one of `per_token` (default), `per_image`, `per_character`, `per_second`, `per_audio_token`. `per_audio_token` is live voice only: text uses `priceIn`/`priceOut`, audio uses `audio_price_in_per_1M` / `audio_price_out_per_1M` / `audio_cache_in_per_1M` in the row JSON. A `per_second` live-voice row may also set `text_item_price` (Grok Voice). The price sync does not write either mode.
 
 ## Verification playbook (do this for EVERY model)
 
@@ -128,6 +129,28 @@ Reporting rules that keep it trustworthy:
 
 Exit codes match `app:sync-model-prices`: `0` clean, `1` the command broke, `2` confirmed findings (only with `--fail-on-drift`). The scheduler role runs it daily with `--notify`, which posts to Discord when `DISCORD_WEBHOOK_URL` is set. Installs without cloud keys make no outbound request at all.
 
+## New model detection — `app:models:discover`
+
+Finds newly listed upstream models early, with a human in the loop. Uses each provider's **own** model list (same `ProviderModelInventory` as the availability check) and the API keys this install already has — no third-party list, no keys in GitHub.
+
+```bash
+docker compose exec -T -e MODEL_DISCOVERY_ENABLED=1 backend php bin/console app:models:discover
+```
+
+**Opt-in.** `MODEL_DISCOVERY_ENABLED` defaults to `false`. Self-hosted installs must leave it off; when disabled the command prints one note and exits 0 with no outbound request. Not a FeatureModule — ops check only. The production scheduler calls it every hour, in the same slot as the ephemeral-file reaper; the command itself enforces the flag.
+
+**Baseline.** The first successful listing of a provider (including a key added months later) records every current id in `BCONFIG` (`MODEL_DISCOVERY`) and reports none of them as pending — so enable it only after every model you already mean to add is in `BMODELS`, or that model is baselined and never reported. Exception: an id the provider dates within the last 14 days (`ModelDiscoveryService::BASELINE_FRESH_DAYS`) stays out of the baseline and is reported in that same run, so a model released just before the first run is not swallowed. The date comes from the listing itself — `created` (OpenAI, xAI, Groq) or `created_at` (Anthropic). Google lists no date, and Mistral (request time on every row) and Meta (`0`) list placeholders; `ProviderModelListing::releasedSince()` rejects a listing whose dates span less than a day, so those providers baseline everything. New ids after that baseline are **pending** until this install has a matching `BMODELS` row (including inactive/retired), an exact `ModelDiscoveryIgnoreList` entry, or a matching class rule. If the provider stops listing a pending id, it is dropped silently (and cleared from the announced map). Matching lowercases and strips Google's `models/` prefix; date snapshots are asymmetric — an undated catalog id covers later dated listings (e.g. `gpt-4o` covers `gpt-4o-2024-11-20`), and an undated upstream id covers a date-pinned catalog row, but a new dated snapshot of a date-pinned catalog row stays pending.
+
+**Cadence.** The check runs hourly, so a new id reaches Discord within about an hour of the provider listing it. New pending ids are Discord-posted **once** (`announced` map in `BCONFIG`). Open ids stay in the console every run and appear on Discord as one "Still open" summary line next to the next new id; on the first run of each **Monday** the digest lists them in full (grouped variants) as a weekly reminder (`REMINDER_SENT` holds the day it went out). Provider listing failures (`failingSince`) are posted once, then only in the Monday reminder until the next OK listing clears them. At most one discovery post per hour across all nodes (atomic `NOTIFY_CLAIM`, value `Y-m-d H`); a crash of the command itself is posted at most once a day (`FAILURE_CLAIM`). A failed post releases the claim and marks nothing, so the next hourly run retries; `--notify` with Discord disabled still marks announced so console-only installs do not repeat forever.
+
+**Family labels.** `ModelFamilyClassifier` tags each pending id (`New family` / `New generation` / `New line` / `New version`) from tokenised comparison against known BMODELS ids — **label only**, never a filter. Discord groups variants under a shorter root id (`gpt-6-sol` + dated/mini snapshots → one line).
+
+**Class rules.** `ModelDiscoveryIgnoreList::CLASS_RULES` silence classes we never sell (e.g. OpenAI `ft:` fine-tunes and moderation). They are not pending and never announced; the console shows the per-provider count. A guard test asserts no `ModelCatalog` row matches a class rule — remove the rule before we start selling that class. Live speech-to-speech (`gpt-live-1`, `gemini-3.8-live`) is a catalog row, so the old OpenAI `realtime` class rule is gone and other realtime ids can show up as pending.
+
+**Resolve a pending id:** add it to `ModelCatalog` via the normal playbook above (then seed), **or** add an exact `provider:id` entry to `ModelDiscoveryIgnoreList` with `reason` + `decidedOn`. Obsolete exact ignore entries (gone upstream, or now in `BMODELS`) are printed to the console only. Class rules are not obsolete-scanned.
+
+**Discord** (`--notify` + `DISCORD_WEBHOOK_URL`): posts on new pending, new failures, unannounced baselines, or the Monday reminder. A "could not check" line means the key is present but the listing request failed — not the same as no key / no listing endpoint (those stay silent).
+
 ### First run against live APIs (2026-08-19)
 
 Six confirmed retirements, each re-verified by hand: Groq dropped `llama-3.3-70b-versatile` (BID 9), `llama-3.1-8b-instant` (236), `qwen/qwen3-32b` (53) and `meta-llama/llama-4-scout-17b-16e-instruct` (17 — the Groq `PIC2TEXT` default), xAI dropped `grok-stt` (321 — the xAI `SOUND2TEXT` default) and `grok-tts` (320). Groq's current list is 13 models; `whisper-large-v3` and `openai/gpt-oss-*` are unaffected.
@@ -142,21 +165,57 @@ Google deprecated all three Imagen 4 IDs on 2026-06-15 and **hard-shut them down
 
 | BID | Model | `providerId` | Successor |
 | --- | ----- | ------------ | --------- |
-| 115 | Imagen 4.0 | `imagen-4.0-generate-001` | `google:gemini-3.1-flash-image-preview:text2pic` (Nano Banana 2, BID 190) |
+| 115 | Imagen 4.0 | `imagen-4.0-generate-001` | `google:gemini-3.1-flash-image:text2pic` (Nano Banana 2, BID 371) |
 | 230 | Imagen 4.0 Fast | `imagen-4.0-fast-generate-001` | same |
 | 231 | Imagen 4.0 Ultra | `imagen-4.0-ultra-generate-001` | same |
+| 190 | Nano Banana 2 preview | `gemini-3.1-flash-image-preview` | `google:gemini-3.1-flash-image:text2pic` (BID 371) |
+| 228 | Nano Banana Pro preview | `nano-banana-pro-preview` | `google:gemini-3-pro-image:text2pic` (BID 372) |
 
-Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the three catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. Nano Banana 2 (`gemini-3.1-flash-image-preview`, BID 190) is already the seeded `DEFAULTMODEL.TEXT2PIC`/`PIC2PIC`, so no default binding is orphaned; all three tiers point at it because we do not carry the flat `gemini-3.1-flash-image` / `gemini-3-pro-image` variants Google's migration table names per tier. Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) is the authority for the shutdown date.
+Imagen 4 was retired via the registry. The preview image ids were shut down on 2026-06-25; `Version20260923190000` inserts the stable rows as active, deactivates BIDs 190 and 228, and repoints image bindings. Stable prices (1K): Nano Banana 2 $0.067/image, Nano Banana Pro $0.134/image. Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) is the authority for the shutdown date.
 
 ### TrustedTokens DeepSeek V4 Flash shutdown (2026-09-08)
 
-TrustedTokens dropped the undated `deepseek-ai/DeepSeek-V4-Flash` id. The hourly health check confirmed the model is gone against `https://trustedtokens.eu/api/billing/models` on 2026-09-08; the dated Flash-0731 snapshot and V4 Pro remain in that catalog.
+TrustedTokens dropped the undated `deepseek-ai/DeepSeek-V4-Flash` id. The hourly health check confirmed the model is gone against `https://trustedtokens.eu/api/billing/models` on 2026-09-08. The dated Flash-0731 snapshot was recorded as the same-family successor; that id was itself dropped on 2026-09-17 (see below), so BID 335 now points at GLM-5.3-Flash.
 
 | BID | Model | `providerId` | Successor |
 | --- | ----- | ------------ | --------- |
-| 335 | DeepSeek V4 Flash | `deepseek-ai/DeepSeek-V4-Flash` | `trustedtokens:deepseek-ai/DeepSeek-V4-Flash-0731:chat` (BID 336) |
+| 335 | DeepSeek V4 Flash | `deepseek-ai/DeepSeek-V4-Flash` | `trustedtokens:zai-org/GLM-5.3-Flash:chat` (BID 332) |
 
-Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog row carries `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 335, so nothing is orphaned. Flash-0731 is the same-family successor at the same price; V4 Pro is still live but is a different (and much more expensive) tier. BID 335 is not a `ProviderDefaultsService` recommendation.
+Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog row carries `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 335, so nothing is orphaned. BID 335 is not a `ProviderDefaultsService` recommendation.
+
+### TrustedTokens DeepSeek V4 Flash 0731 and V4 Pro shutdown (2026-09-17)
+
+TrustedTokens dropped the remaining DeepSeek V4 ids (`deepseek-ai/DeepSeek-V4-Flash-0731` and `deepseek-ai/DeepSeek-V4-Pro-0813`). The hourly health check confirmed both Gone (provider catalog 404/400) at 2026-09-17 12:16 UTC. No same-family DeepSeek V4 replacement remains on TrustedTokens; GLM-5.3-Flash matches the Flash price ($0.15 / $0.30), GLM-5.3 is the remaining TrustedTokens flagship.
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 336 | DeepSeek V4 Flash 0731 | `deepseek-ai/DeepSeek-V4-Flash-0731` | `trustedtokens:zai-org/GLM-5.3-Flash:chat` (BID 332) |
+| 337 | DeepSeek V4 Pro | `deepseek-ai/DeepSeek-V4-Pro-0813` | `trustedtokens:zai-org/GLM-5.3:chat` (BID 331) |
+
+Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 336 or 337, so nothing is orphaned. Neither BID is a `ProviderDefaultsService` recommendation. The health monitor skips rows that carry `BRETIREDON`, so this also stops the incident mail for these ids.
+
+### OpenAI deprecation notice (2026-10-02, shutdown 2027-04-01)
+
+OpenAI announced by email on 2026-10-02 that `gpt-5.4-nano`, `gpt-5.1` and `gpt-5.3-codex` stop being served on **2027-04-01**. Only `gpt-5.4-nano` was ever in the catalog; `gpt-5.1` and `gpt-5.3-codex` have no `BMODELS` row (the retired BIDs 193/194 are `gpt-5.3`, a different id).
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 234 | GPT-5.4 nano | `gpt-5.4-nano` | `openai:gpt-5.6-luna:chat` (GPT-5.6 Luna, BID 255) |
+
+**Retired ahead of the shutdown, on purpose.** Neither detector sees an announced deprecation: `app:models:check-availability` reports a model only once the provider stops serving it, and OpenAI's `/v1/models` carries no deprecation date. Waiting for the check means users hit the failure first on 2027-04-01. The provider's notice (mail or [deprecations page](https://developers.openai.com/api/docs/deprecations)) is the only early signal, so a notice is retired by hand on the day it arrives.
+
+GPT-5.6 Luna is the suggested successor `app:models:check-availability` would print for BID 234 and the same price tier ($0.20 in both, $1.20 vs $1.25 out) on the same Responses API, with vision on top. Retired via the registry, no migration. No shipped `DEFAULTMODEL` binding or `ProviderDefaultsService` recommendation names BID 234; any binding an operator or user stored (`DEFAULTMODEL`, a widget's `aiModelId`, a prompt's `aiModel`) follows `BSUCCESSORID` to Luna at resolution time.
+
+### OpenAI image model shutdowns (2026-10-23 / 2026-12-01)
+
+The OpenAI image guide ([image prompting](https://developers.openai.com/api/docs/guides/image-prompting), model reference) states that `gpt-image-1` is scheduled to shut down on **2026-10-23** and `gpt-image-1.5` on **2026-12-01**. Both were active and selectable catalog rows, so every binding to them would have failed with a provider error after those dates (#2413).
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 29 | gpt-image-1 | `gpt-image-1` | `openai:gpt-image-2.5-flare:text2pic` (GPT Image 2.5 Flare, BID 348) |
+| 151 | gpt-image-1.5 | `gpt-image-1.5` | `openai:gpt-image-2.5-flare:text2pic` (GPT Image 2.5 Flare, BID 348) |
+
+**Retired ahead of the shutdown**, for the same reason as BID 234: the availability check only reports a model once OpenAI stops serving it. Flare is the same provider and key on the same Responses API edit path, ranks above both on the public image-edit boards (LMArena image edit 2026-10-06: Flare 1481, `gpt-image-1.5` 1370, `gpt-image-1` 1139) and is cheaper per image (`quality_prices.high` 1024²: $0.05268 vs $0.133 / $0.167). Retired via the registry, no migration: `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` and switches both rows off on deploy, and any stored binding (`DEFAULTMODEL`, a task prompt's pinned `aiModel`, an "Again" pick in chat, an explicit `modelId` on the media API) follows `BSUCCESSORID` to Flare at resolution time (`ModelConfigService::replacementForRetiredModel()`). When neither the successor nor any capability default can serve, the request is refused instead of reaching the shut-down id. No shipped `DEFAULTMODEL` binding or `ProviderDefaultsService` recommendation names either BID. The edit path's fallback model id in `OpenAIProvider` moved to `gpt-image-2.5-flare`.
 
 ## Maintenance links
 
@@ -176,6 +235,7 @@ Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalo
 - TrustedTokens (JSON catalog, not the JS marketing page): https://trustedtokens.eu/api/billing/models · docs https://trustedtokens.eu/docs/
 - A2Agent (models page; `GET /v1/models` is key-gated and answers `401`; not in LiteLLM): https://a2agent.me/models · https://a2agent.me/pricing
 - xAI: https://docs.x.ai/developers/pricing · models https://docs.x.ai/developers/models
+- Cerebras: https://inference-docs.cerebras.ai/models/overview · caching https://inference-docs.cerebras.ai/capabilities/prompt-caching
 
 **Tooling / cross-checks:**
 
@@ -194,19 +254,22 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | Kimi/HuggingFace | ✅ done — pinned DeepInfra (see above) | deepinfra.com |
 | **TheHive** | ✅ verified 2026-07-13 | https://thehive.ai/pricing |
 | Higgsfield | ⚠️ NOT publicly verifiable — see below | dashboard only |
-| **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
+| **Mistral** | ✅ verified 2026-09-24 (cached-input rates added) | https://mistral.ai/pricing/api/ · https://docs.mistral.ai/inference/pricing |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
-| **TrustedTokens** | ✅ verified 2026-09-08 (V4 Flash retired) | https://trustedtokens.eu/api/billing/models |
+| **TrustedTokens** | ✅ verified 2026-09-17 (V4 Flash, Flash-0731 and V4 Pro retired) | https://trustedtokens.eu/api/billing/models |
 | **A2Agent** | ✅ verified 2026-09-14 (public group rate) | https://a2agent.me/models |
-| **xAI Grok Imagine + voice** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
+| **Meta** | ✅ verified 2026-10-13 (Spark, Wonder, Image, Voice Transcribe) | https://dev.meta.ai/docs/pricing-rate-limits |
+| **Cerebras** | ✅ verified 2026-10-03 (pay-as-you-go; matches LiteLLM) | https://inference-docs.cerebras.ai/models/overview |
+| **xAI Grok Imagine + voice** | ✅ verified 2026-09-24 (chat rows are synced; grok-4.7 cache + long-context corrected) | https://docs.x.ai/docs/models · https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
-### xAI / Grok (verified 2026-07-29; Grok 4.6 rows added 2026-08-20)
+### xAI / Grok (verified 2026-09-24; Grok 4.6 rows added 2026-08-20; Grok 4.7 rows added 2026-09-23)
 
 OpenAI-compatible chat/vision at `https://api.x.ai/v1`, plus the Grok Imagine media endpoints and the voice endpoints (`/v1/tts`, `/v1/stt` — note: NOT OpenAI's `/v1/audio/*`). Catalog stores **USD per 1M tokens** for the token rows; cache-read rates live in `json.cache_read_price_per_1M`.
 
 | BID | Model | Catalog in/out | Official (cache) | Long context (> 200k) | Context |
 | --- | ----- | -------------- | ---------------- | --------------------- | ------- |
+| 367 / 368 | `grok-4.7` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.50) | $4.00 / $12.00 (cache $1.00) | 500k |
 | 326 / 327 | `grok-4.6` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.50) | $4.00 / $12.00 | 500k |
 | 313 / 315 | `grok-4.5` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.30) | $4.00 / $12.00 | 500k |
 | 316 | `grok-imagine-image` | — / $0.02 per image | $0.02 (1k and 2k identical) | n/a | n/a |
@@ -230,14 +293,14 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **Images are billed from `default_resolution`, not from the request.** The image path never passes a resolution into `calculateMediaCost()`, so `resolveResolution()` falls back to the catalog's `default_resolution` — and `XaiProvider::generateImage()` sends that same value to xAI. Changing `default_resolution` on BID 318 therefore moves the request AND the price together; changing only `priceOut` would desync them.
 - **`grok-imagine-video-1.5` is image-to-video only.** It carries `features: ['image2video']` + `requires_reference_image`, so `MediaGenerationHandler` explains the missing reference image instead of leaking a provider 400. It is reachable through the IMG2VID default-model slot, which shares the `text2vid` BTAG. Because `XaiProvider` implements `SupportsInlineReferenceImage`, the handler passes the local upload path and the provider inlines it as a data URI — so image-to-video works on xAI without an internet-reachable `APP_URL`, unlike Higgsfield and Veo.
 - **No refund on cancel.** xAI has no cancel endpoint for deferred video renders, so `cancelVideoOperation()` only stops our polling; the render completes upstream and stays billable.
-- **`reasoning_effort` is a grok-4.3-only parameter**, and grok-4.3 is not in the catalog. xAI documents the knob for that model alone (`none` / `low` (default) / `medium` / `high`), so `XaiProvider::REASONING_EFFORT_MODELS` gates it. The reasoning depth of `grok-4.5` and `grok-4.6` — and therefore their output token volume — is not controllable, so a Thinking toggle cannot reduce their cost.
+- **`reasoning_effort` is accepted by grok-4.3 and grok-4.7.** grok-4.3 is not a catalog row (`none` / `low` / `medium` / `high`). grok-4.7 (BIDs 367–368) documents `low` / `medium` / `high` (default) / `xhigh` and rejects `none`, so Thinking off sends `low`. The Text API pricing table (verified 2026-09-24 at https://docs.x.ai/docs/models) lists cached input at $0.50 (<200k) / $1.00 (>=200k) and the same >200k 2× tier as 4.5 / 4.6 — authored as `cache_read_price_per_1M: 0.50` plus a `CONTEXT_PRICING` entry. grok-4.5 and grok-4.6 still reason at a fixed depth.
 - **The voice rows MUST keep their `pricing_mode`.** BID 320 needs `pricing_mode: per_character` and BID 321 needs `per_second`; without it the cost path falls through to per-token and records $0.00 for every call (issue #886b). BID 321 is authored in `$/hour`, which `CostCalculationService` normalises to per-second, so the clip length must never be pre-divided.
 - **Only the REST transcription rate is reachable.** xAI charges $0.20/hour for the streaming STT WebSocket, but `XaiProvider` implements the `POST /v1/stt` REST path only, so no request can be billed at the higher rate. If streaming STT is ever added it needs its own catalog row.
 - **TTS has no per-request cap beyond the character limit.** `/v1/tts` rejects text over 15,000 characters, and the provider checks that locally so the user gets a readable message instead of a 400. Longer texts must be split by the caller — each chunk is billed separately.
-- **The realtime Speech-to-Speech API is deliberately not wired up.** It bills per session minute ($0.05/min, plus $0.004 per text input message) over a WebSocket, and this application has no realtime-voice capability to attach it to. Adding it would need a new capability, a new pricing mode, and session-duration metering.
+- **Live speech-to-speech is a catalog capability, not a chat model.** `gpt-live-1` (BID 389) is `pricing_mode: per_second` at $0.05/min. `gpt-realtime-2.1` (BID 391) and `gpt-realtime-2.1-mini` (BID 392) are `per_audio_token` (audio $32/$64 and $10/$20 per 1M, cached audio $0.40 and $0.30). `gemini-3.8-live` (BID 390) and `gemini-3.8-live-extended-thinking` (BID 393) are `per_audio_token` (audio $3 / $12 per 1M, text $0.75 / $4.50 per 1M). `grok-voice-3.0` (BID 394, display name Grok Voice 3) is `per_second` at $0.08/min plus `text_item_price` $0.004. xAI prices Grok Voice 3.0 the same as Grok Voice 2.0 ($0.08/min, $4.80/hr, plus $0.004 per text input; verified 2026-10-15 at https://docs.x.ai/developers/pricing). The row pins `grok-voice-3.0`; `grok-voice-latest` is an alias that moves. `CostCalculationService::calculateVoiceLiveCost()` prices the voice part. The chat model's answers are added onto the same `VOICE_LIVE` usage row and share the monthly cost budget. There is no minutes quota. The price sync does not auto-write `per_audio_token`.
 - **Embeddings and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.
 
-### TrustedTokens (verified 2026-09-08)
+### TrustedTokens (verified 2026-09-17)
 
 German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`). Per-token rates come from the public billing catalog (not the JS-rendered marketing page); subscription plans (€50 / €200 / €2,000) are prepaid usage credits that draw down against these rates. Catalog stores **USD per 1M tokens** (same unit as every other cloud provider). Cache-read rates are authored in `json.cache_read_price_per_1M`.
 
@@ -248,8 +311,8 @@ German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`)
 | 332 / 333 | `zai-org/GLM-5.3-Flash` (chat + vision) | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 1M |
 | 334 | `tngtech/DeepSeek-TNG-R1T2-Chimera` | $1.00 / $3.00 | $1.00 / $3.00 (cache $0.20) | 164k |
 | 335 | `deepseek-ai/DeepSeek-V4-Flash` | retired 2026-09-08 — see [TrustedTokens DeepSeek V4 Flash shutdown](#trustedtokens-deepseek-v4-flash-shutdown-2026-09-08) | — | — |
-| 336 | `deepseek-ai/DeepSeek-V4-Flash-0731` | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 400k |
-| 337 | `deepseek-ai/DeepSeek-V4-Pro-0813` | $2.25 / $6.75 | $2.25 / $6.75 (cache $0.45) | 200k |
+| 336 | `deepseek-ai/DeepSeek-V4-Flash-0731` | retired 2026-09-17 — see [TrustedTokens DeepSeek V4 Flash 0731 and V4 Pro shutdown](#trustedtokens-deepseek-v4-flash-0731-and-v4-pro-shutdown-2026-09-17) | — | — |
+| 337 | `deepseek-ai/DeepSeek-V4-Pro-0813` | retired 2026-09-17 — see [TrustedTokens DeepSeek V4 Flash 0731 and V4 Pro shutdown](#trustedtokens-deepseek-v4-flash-0731-and-v4-pro-shutdown-2026-09-17) | — | — |
 | 310 / 311 | `Qwen/Qwen3.6-35B-A3B-FP8` (chat + vision) | $0.25 / $1.50 | $0.25 / $1.50 (cache $0.05) | 262k |
 | 312 | `openai/gpt-oss-120b` | $0.15 / $0.60 | $0.15 / $0.60 (cache $0.05) | 131k |
 
@@ -268,6 +331,26 @@ The gateway resells each model under **its upstream vendor's own id**, so `deeps
 | 363 | `deepseek-v4-flash` | $0.14 / $0.28 | $0.14 / $0.28 | 1M |
 | 364 | `MiniMax-M3` | $0.30 / $1.20 | $0.30 / $1.20 | 1M |
 | 365 / 366 | `qwen3.8-flash` (chat + vision) | $0.15 / $0.47 | $0.15 / $0.47 | 1M |
+
+### Meta (verified 2026-10-13)
+
+OpenAI-compatible Chat Completions at `https://api.meta.ai/v1`. Catalog stores **standard** rates (prompts are not used to train Meta's models). Sources: https://dev.meta.ai/docs/pricing-rate-limits and https://dev.meta.ai/docs/models. The Spark contributor id `muse-spark-1.3-contributor` ($0.10 / $0.20, prompts used to improve Meta's products) is intentionally absent. Muse Wonder has no Contributor mode on pay-as-you-go, and Muse Wonder Full is Muse Code only, so neither id is seeded. `reasoning_effort` values are `minimal` / `low` / `medium` / `high` / `xhigh` / `max`; `none` returns HTTP 400, so Thinking off sends `minimal`. Muse Image is a flat $0.01 per image the API returns (`pricing_mode: per_image`, `priceIn` 0 so the prompt is not billed again); failed or filtered images are not billed, and built-in search is included. Muse Voice Transcribe is $0.18 per hour on whole seconds, rounded down (`pricing_mode: per_second`, `inUnit: perhour`). The file endpoint is what we call; the live WebSocket is not. Not in LiteLLM → `unmatched` bucket. Keys are created at https://dev.meta.ai/ (API keys). Synaplan's env var is `META_API_KEY` (Meta's SDK calls the same secret `MODEL_API_KEY`).
+
+| BID | Model | Catalog in/out | Official (cache) | Context |
+| --- | ----- | -------------- | ---------------- | ------- |
+| 369 / 370 | `muse-spark-1.3` (chat + vision) | $1.25 / $4.25 | $1.25 / $4.25 (cache $0.15) | 1M |
+| 396 / 397 | `muse-wonder-1.0` (chat + vision) | $4.00 / $20.00 | $4.00 / $20.00 (cache $0.20) | 1,048,576 |
+| 398 | `muse-image-1.0` (generate + edit) | — / $0.01 per image | $0.01 per returned image (search included) | n/a |
+| 399 | `muse-voice-transcribe-1.0` | $0.18 per hour | $0.18 per hour, whole seconds | max 10 min |
+
+### Cerebras (verified 2026-10-03)
+
+OpenAI-compatible Chat Completions at `https://api.cerebras.ai/v1` (Shared Inference). Catalog stores the pay-as-you-go USD per 1M rate from https://inference-docs.cerebras.ai/models/overview. Prompt caching has **no discount** — cached input is billed at the full input rate (https://inference-docs.cerebras.ai/capabilities/prompt-caching), so every row authors `cache_read_price_per_1M` equal to its input price; leaving it out would bill cache hits at the 0.5x default. LiteLLM lists both ids under the `cerebras/` prefix at the same rates, so the daily sync matches them. Context and output limits are the paid-tier values; the free trial allows 65K context and 32K output.
+
+| BID | Model | Catalog in/out | Official (cache) | Context |
+| --- | ----- | -------------- | ---------------- | ------- |
+| 383 / 384 | `qwen-3.8-27b` (chat + vision) | $0.99 / $1.49 | $0.99 / $1.49 (cache $0.99) | 131K |
+| 385 / 386 | `gpt-oss-120b` (chat + memory extraction) | $0.35 / $0.75 | $0.35 / $0.75 (cache $0.35) | 131K |
 
 ### TheHive (verified 2026-07-13)
 
@@ -300,19 +383,21 @@ Current catalog values are labelled "approximate (credits → USD)" and were lef
 
 Positive: cancel/refund path is sound — FAQ confirms failed/NSFW/cancelled requests are auto-refunded, and our provider sends a cancel on Stop (`cancelRemote`).
 
-### Mistral (verified 2026-07-13 — all correct, no change)
+### Mistral (verified 2026-07-13; cached-input rates added 2026-09-24; Large 4 added 2026-10-07)
 
-Use the **API** price page https://mistral.ai/pricing/api/ (the plain /pricing page is JS-rendered consumer Le Chat plans). All 5 catalog entries already match:
+Use the **API** price page https://docs.mistral.ai/inference/pricing (the plain /pricing page is JS-rendered consumer Le Chat plans). Catalog entries match the Standard-tier rates:
 
 | BID | Model | Catalog | Official |
 | --- | ----- | ------- | -------- |
+| 387 | Mistral Large 4 (`mistral-large-4`) | $0.68 / $2.09 per1M | $0.68 / $2.09 (launch discount; list $1.36 / $4.18) |
+| 388 | Large 4 Vision (same model id) | $0.68 / $2.09 per1M | $0.68 / $2.09 |
 | 245 | Mistral Large 3 (`mistral-large-latest`) | $0.50 / $1.50 per1M | $0.50 / $1.50 |
 | 244 | Mistral Medium 3.5 (`mistral-medium-latest`) | $1.50 / $7.50 per1M | $1.50 / $7.50 |
 | 248 | Medium 3.5 Vision (same model id) | $1.50 / $7.50 per1M | $1.50 / $7.50 |
 | 246 | Voxtral Mini Transcribe (`voxtral-mini-latest`) | $0.003 permin | $0.003/min |
 | 247 | Voxtral TTS (`voxtral-mini-tts-2603`) | $0.000016 perChar | $0.016/1k chars |
 
-**Billing mechanics:** per-token for chat/vision (in/out separate), Voxtral STT per audio-minute, Voxtral TTS per character. 50% batch discount + 90% cached-input discount exist (we don't use them). Our provider sends no price-changing params. Note: FAQ on the consumer page quotes "Large $2/$6" — that's the OLD Large 2411, not Large 3. Voxtral Transcribe (per-min) now carries `pricing_mode: per_second` and is metered via the shared duration path (#1314 fixed).
+**Billing mechanics:** per-token for chat/vision (in/out separate), Voxtral STT per audio-minute, Voxtral TTS per character. 50% batch discount exists (we don't use it). Cached input bills at 10% of the input rate — $0.15 for Medium 3.5, $0.05 for Large 3, $0.068 for Large 4 (sale; list $0.136 — the pricing page rounds both to $0.07 / $0.14) — authored as `cache_read_price_per_1M`. Large 4 is public preview and is **not** what `mistral-large-latest` points at (that alias is still Large 3 / `mistral-large-2512`). The live API bills Large 4 as `mistral-large-4-0-launch-discount`; when that SKU disappears, raise the catalog to the list rate. `mistral-large-latest` rejects `reasoning_effort` (HTTP 400), so that parameter is sent only for `mistral-large-4`. Voxtral Transcribe (per-min) now carries `pricing_mode: per_second` and is metered via the shared duration path (#1314 fixed).
 
 ### Cloudflare Workers AI (verified 2026-07-13 — all correct, no change)
 
@@ -349,7 +434,7 @@ Models not present in LiteLLM at all (Higgsfield, DeepInfra-pinned Kimi, Cloudfl
 
 A drift is a signal to verify, not a value to copy: LiteLLM has carried wrong numbers for weeks (Veo 3.1 Fast, Jina rerank). When the official page confirms the catalog and LiteLLM is the one that is off, the check would otherwise stay red forever on that row — and a monitor that is "always that one row" stops being read. The registry records the verified error instead.
 
-An entry pins the **LiteLLM value** we disagree with (both `litellm_in` and `litellm_out`, in the unit the sync compares in: per 1M tokens for per_token rows, per billable unit for media rows), plus `source`, `verifiedOn` and `reason`. Because the value is pinned rather than the row, the entry silences exactly the pair a human verified and nothing else:
+An entry pins the **LiteLLM value** we disagree with (both `litellm_in` and `litellm_out` for an in/out mismatch, and/or optional per-dimension keys such as `litellm_cache_read` / `litellm_cache_write` / `litellm_in_above`, in the unit the sync compares in: per 1M tokens for per_token rows, per billable unit for media rows), plus `source`, `verifiedOn` and `reason`. Because the value is pinned rather than the row, the entry silences exactly the figure a human verified and nothing else:
 
 | LiteLLM now says | Sync reports | Do |
 | --- | --- | --- |
@@ -375,6 +460,17 @@ Dry-run baseline 2026-07-13: **70 unchanged (per-token + same-mode media, no dri
 
 **Writes stay conservative:** only per_token rows are auto-written. `--force` overrides admin-set prices but does **not** override the mode guard (reclassification always requires a human editing the catalog). Same-mode media drift is surfaced (and fails `--fail-on-drift`) but left for a human to apply in `ModelCatalog.php`.
 
+### Who owns a per-token price (#2309)
+
+LiteLLM owns the **live** per-token price. The catalog owns every other field, and it owns the price again in two cases:
+
+1. **The catalog price changed** since the last successful sync. The sync stores that price in `BJSON.__catalog_price_at_sync` and refreshes `BJSON.__catalog_fingerprint`, so `ModelSeeder` does not mistake the write for an admin edit. The next `app:seed` applies the new catalog price. Until the catalog price changes, seed leaves the LiteLLM price in place (including when a release only changes the description or features). A later sync that runs before that seed keeps the older snapshot, so the catalog change is not recorded as already applied.
+2. **The catalog entry sets `json.pricePinned: true`.** The sync reports the LiteLLM number and does not write it. Seed applies the catalog price. Use this when the official page and LiteLLM disagree and the catalog number must stick — the same intent as `LITELLM_DEVIATIONS`, which already silences a known-wrong LiteLLM pair. A pin is the override; a deviation entry is the drift-check silence. A row can have either or both.
+
+An admin edit (the stored fingerprint no longer matches the row, and the row is not price-pinned) is still preserved. The sync only refreshes the fingerprint when the non-price fields still match the catalog, so a renamed model is not silently claimed back.
+
+`ModelPriceHistory` is unchanged: a sync write is still `source = litellm`, and an admin price is still skipped unless `--force`.
+
 ### Automated daily drift check (CI)
 
 `.github/workflows/price-drift.yml` runs every day at 06:00 UTC (and on manual dispatch): it seeds the catalog and runs `app:sync-model-prices --dry-run --fail-on-drift`. The flag exits with code **2** when any per-token model **or** any same-mode non-per-token model (whisper/tts/veo/imagen, individual resolution tiers included) differs from LiteLLM. Mode-mismatch and unmatched rows never trip it (no false alarms). It lives outside the PR CI on purpose: it depends on the external LiteLLM source, which must never turn a code PR red.
@@ -389,6 +485,10 @@ Since the check is daily, the *absence* of a Discord post is itself a signal: th
 Two traps that already cost a broken run: the report file is written under `backend/` (the check step's `working-directory`), so any step reading it must set the same `working-directory` or use the explicit `backend/` prefix — otherwise `cat drift-report.txt` fails with `No such file or directory` and the step dies under `bash -e`. And the drift step sets `COLUMNS: 120` because Symfony's `Terminal` reads that variable while `SymfonyStyle` caps a block at its own `MAX_LINE_LENGTH` of 120: without it the report wraps at the CI default of 80 and the counter block breaks mid-sentence. 120 is the ceiling — the counter line is longer than that and will always occupy two lines, which is why the workflow extracts it as a block instead of grepping for one line.
 
 You can run the same check locally: `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run --fail-on-drift; echo $?` (0 = no drift, 2 = drift).
+
+> Resolved drift (2026-10-08, #2392): the daily check flagged the Claude Sonnet 5.5 rows (BIDs 379/380) under `Cache / long-context price drift` — cache read: catalog **0.20** (effective, the Anthropic-wide 0.1x fallback) vs LiteLLM **0.10**. **LiteLLM was right and our catalog was wrong.** The [official Anthropic pricing page](https://platform.claude.com/docs/en/about-claude/pricing) lists Claude Sonnet 5.5 at "$2 / MTok" base input and "$0.10 / MTok" for "Cache hits and refreshes", with the footnote "Cache hits and refreshes on Claude Opus 5.5 and Claude Sonnet 5.5 are priced at 0.05x the base input price." Input ($2), output ($10), 5-minute ($2.50) and 1-hour ($4) cache-write rates match the catalog; only the read multiplier differs. The rows authored no `cache_read_price_per_1M` when they were added on 2026-09-29 (the snapshot came from the model overview and migration guide, which do not price cache reads), so every Sonnet 5.5 cache hit was **overcharged 2×** since then. Catalog corrected to an explicit `cache_read_price_per_1M: 0.10` (same shape as the Opus 5.5 override) and rolled out by `Version20261008120000` (full row + fingerprint, guarded on the missing cache key and unchanged input/output prices so an operator's own price survives). No `LITELLM_DEVIATIONS` entry: LiteLLM agrees with the provider.
+
+> Resolved drift (2026-09-24, #2160): the new cache / long-context drift check flagged catalog rows that either authored no `cache_read_price_per_1M` or authored the wrong one. **No LiteLLM input/output price moved** — only cache-read and one missing long-context tier. Official sources: [Google Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing) ("Context caching price" row, text/image/video, Standard paid tier), [Mistral pricing](https://docs.mistral.ai/inference/pricing) ("Cached input" column, Standard tier) and [xAI models / Text API pricing](https://docs.x.ai/docs/models). **Google Gemini Flash family — cache-hit overcharge 5×** (missing key → `CostCalculationService::CACHE_READ_DISCOUNT_DEFAULT` = 0.5× input): `gemini-2.5-flash` BIDs 170/171 (none → **$0.03**, row since #503 / 2026-03-04), `gemini-2.5-flash-lite` BIDs 226/227 (none → **$0.01**, since 2026-05-27), `gemini-3.1-flash-lite` BIDs 191/192 (none → **$0.025**, since #622 / 2026-03-25 as preview id; stable id later), `gemini-3.5-flash` BIDs 237/223 (none → **$0.15**, since 2026-05-27), `gemini-3-flash-preview` BIDs 224/225 (none → **$0.05**, since 2026-05-27). Audio and per-hour storage rates were not modelled. **xAI grok-4.7 BIDs 367/368 — cache-hit overcharge 4×** (`cache_read_price_per_1M` **2.00 → 0.50**) and **long-context undercharge** (no `CONTEXT_PRICING` entry → prompts ≥200k billed at half; added `4.00 / 12.00` with `cache_price_in_above` **1.00**). Wrong since the row was added in #2120 (2026-09-23), when the then-current model page listed input/output only. Rolled out by `Version20260924120000` (full row + fingerprint; Gemini and Mistral guarded on the missing cache key, grok-4.7 on the old 2.00, all on unchanged input/output prices so an operator's own price survives). **Mistral — cache-hit overcharge 5×** (same missing key): `mistral-medium-latest` BIDs 244/248 (none → **$0.15**) and `mistral-large-latest` BID 245 (none → **$0.05**), rows since #1102 / 2026-06-16. After this correction every Google/Mistral/xAI text/chat catalog row that the official pages price for context caching / cached input authors an explicit rate.
 
 > Resolved drift (2026-09-14): the daily check flagged three rows and **no provider had moved a price — no catalog price changed, so there is no migration.** **A2Agent DeepSeek V4 Pro (BID 362, in 0.435 → 1.32, out 0.87 → 3.96) and V4 Flash (BID 363, in 0.14 → 0.30, out 0.28 → 1.20) were false alarms from a cross-vendor id collision.** Both rows are the A2Agent gateway, and the catalog matches its official page exactly (`DeepSeek V4 Pro … $0.435 $0.870`, `DeepSeek V4 Flash … $0.140 $0.280`, server-rendered at https://a2agent.me/models, read 2026-09-14); LiteLLM's numbers are DeepSeek's **first-party** rate (`deepseek-v4-pro`, `litellm_provider: deepseek`, source api-docs.deepseek.com) for a model the gateway resells under the same id. `findLiteLLMKey()` matched the bare id without looking at the vendor, so a 3× upstream rate read as drift on a correct row — and applying it would have overcharged every gateway call by ~200%. Fixed in the matcher, not the data: a bare id now needs LiteLLM to attribute it to our own vendor, which returns both rows to `unmatched` as this document already specified. The A2Agent section's other four rows collide with no bare LiteLLM key; a sweep of every matched row found this the only cross-vendor pair (all others already align, e.g. `jina` → `jina_ai`, `google` → `vertex_ai-*`). **Jina Reranker v2 Multilingual (BID 345) was the expected retirement:** LiteLLM now lists `input_cost_per_token: 5e-08` = our $0.05/1M (output 0), so the `LITELLM_DEVIATIONS` entry pinning 0.018 became obsolete and was deleted — the registry is now empty. The catalog price was already correct and did not change.
 
@@ -409,20 +509,26 @@ You can run the same check locally: `docker compose exec -T backend php bin/cons
 - **GPT-5.6 Sol — re-verify on/after 2026-11-22 (#1561).** OpenAI's 2026-08-21 cut to $4/$20 (long-context $8/$30, cached $0.40) is labelled promotional "at least through 2026-11-21"; OpenAI has published no rate for after that, and third-party trackers flag a possible lapse back to $5/$30. On or after 2026-11-22, re-check the [official pricing page](https://openai.com/api/pricing/): if it reverted, roll the old rate back into `ModelCatalog.php` (rows 251/252 + `CONTEXT_PRICING`) + a data migration; if the promo was extended/made permanent, just refresh this note. The daily drift check is blind to a time-boxed revert (it only diffs against LiteLLM), so this reminder is the only guard.
 - _(cancelled)_ — the Claude Sonnet 5 "revert to $3/$15 after 2026-08-31" reminder was **cancelled** on 2026-08-12 (Anthropic made the $2/$10 rate permanent; see the drift-log note below). Do not reintroduce it.
 
-## Anthropic catalog generations (snapshot 2026-09-02)
+## Anthropic catalog generations (snapshot 2026-09-24; Sonnet 5.5 cache read verified 2026-10-08)
 
-Source: https://platform.claude.com/docs/en/about-claude/models/overview
+Source: https://platform.claude.com/docs/en/about-claude/models/overview · pricing https://platform.claude.com/docs/en/about-claude/pricing
 
 | Model | BIDs (chat / vision) | Price in/out per 1M | Cache read per 1M |
 | ----- | -------------------- | ------------------- | ----------------- |
 | Claude Fable 5.1 | 338 / 339 | $10 / $50 | $0.25 (0.025x base — override, see below) |
 | Claude Fable 5 | 240 / 241 | $10 / $50 | $1.00 (0.1x base — Anthropic-wide default) |
+| Claude Opus 5.5 | 373 / 374 | $4 / $20 | $0.20 (0.05x base — override, see below) |
 | Claude Opus 5 | 257 / 258 | $5 / $25 | $0.50 (0.1x base — Anthropic-wide default) |
+| Claude Sonnet 5.5 | 379 / 380 | $2 / $10 | $0.10 (0.05x base — override, see below) |
 | Claude Sonnet 5 | 249 / 250 (+ 222 MEM) | $2 / $10 (permanent — see 2026-08-12 note) | $0.20 (0.1x base — Anthropic-wide default) |
 | Claude Opus 4.8 | 238 / 239 | $5 / $25 | $0.50 (0.1x base — Anthropic-wide default) |
 | Claude Haiku 4.5 | 162 / 235 | $1 / $5 | $0.10 (0.1x base — Anthropic-wide default) |
 
-Claude Fable 5.1 succeeds Claude Fable 5 at the same input/output price, but Anthropic cut cache-read pricing to a quarter of Fable 5's rate (0.025x base vs the 0.1x every other Anthropic model gets from `CostCalculationService::CACHE_READ_DISCOUNT_ANTHROPIC`). The catalog rows (`ModelCatalog.php` 338/339) carry an explicit `cache_read_price_per_1M: 0.25` override, which `CostCalculationService::getPriceSnapshot()` picks up ahead of the provider-wide discount — see `ModelCatalogTest::testClaudeFable51ModelsAreAvailableWithExpectedApiIds`. Claude Fable 5.1 and Claude Mythos 5.1 also reject forced `tool_choice` (`{"type": "any"}` / `{"type": "tool", ...}`) with a 400; only `"auto"`/`"none"` work — see the note in `AnthropicProvider`'s class docblock (the internal chat pipeline never sends `tool_choice`, so this only bites Messages Gateway clients that force it, and Anthropic's own 400 surfaces the mismatch through the verbatim passthrough).
+Claude Opus 5.5 (released 2026-09-22) sits between Opus 5 and Sonnet 5 on price ($4/$20). Cache reads are 0.05x base input ($0.20/1M), not the Anthropic-wide 0.1x — the catalog rows (BIDs 373/374) carry an explicit `cache_read_price_per_1M: 0.20` override. Adaptive thinking is always on (cannot be disabled); default effort is `medium`. Like Claude Fable 5.1, it rejects forced `tool_choice` (`{"type": "any"}` / `{"type": "tool", ...}`) with a 400 — see `AnthropicProvider` / `StructuredOutputCapability`.
+
+Claude Sonnet 5.5 (released 2026-09-28, BIDs 379/380) keeps Sonnet 5's $2/$10 rate. Cache reads are 0.05x base input ($0.10/1M), not the Anthropic-wide 0.1x — the rows carry an explicit `cache_read_price_per_1M: 0.10` override (#2392). Omitting `thinking` turns adaptive thinking on, and `thinking.type: disabled` is a 400; reasoning off sends `thinking.type: between_tools` (no `display`) at `low` effort unless the caller picked `medium` or `high`. `between_tools` is rejected at `xhigh` and `max`, which this model accepts and which stay on adaptive thinking. The catalog default effort is `high`. It rejects forced `tool_choice` the same way Opus 5.5 does. `claude-sonnet-5` is a prefix of `claude-sonnet-5-5`, so the extended effort ladder and the `between_tools` path are matched on the longer id first.
+
+Claude Fable 5.1 succeeds Claude Fable 5 at the same input/output price, but Anthropic cut cache-read pricing to a quarter of Fable 5's rate (0.025x base vs the 0.1x every other Anthropic model gets from `CostCalculationService::CACHE_READ_DISCOUNT_ANTHROPIC`). The catalog rows (`ModelCatalog.php` 338/339) carry an explicit `cache_read_price_per_1M: 0.25` override, which `CostCalculationService::getPriceSnapshot()` picks up ahead of the provider-wide discount — see `ModelCatalogTest::testClaudeFable51ModelsAreAvailableWithExpectedApiIds`. Claude Fable 5.1, Claude Mythos 5.1, Claude Opus 5.5 and Claude Sonnet 5.5 also reject forced `tool_choice` (`{"type": "any"}` / `{"type": "tool", ...}`) with a 400; only `"auto"`/`"none"` work — see the note in `AnthropicProvider`'s class docblock (the internal chat pipeline never sends `tool_choice`, so this only bites Messages Gateway clients that force it, and Anthropic's own 400 surfaces the mismatch through the verbatim passthrough).
 
 #### Cache-write pricing: 5-minute vs. 1-hour TTL (fixed 2026-09-02)
 
@@ -432,9 +538,9 @@ Anthropic bills prompt-cache **writes** at two different multipliers of the base
 | ---------------- | ---------- | ------------------------------------- |
 | 5-minute cache write (default) | 1.25x | `CACHE_WRITE_MULTIPLIER_ANTHROPIC` |
 | 1-hour cache write (opt-in, `cache_control: {"type": "ephemeral", "ttl": "1h"}`, needs the client `anthropic-beta: extended-cache-ttl-2025-04-11` header) | 2.0x | `CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H` |
-| Cache read (hit) | 0.1x base (0.025x on Claude Fable 5.1 / Claude Mythos 5.1, see above) | `CACHE_READ_DISCOUNT_ANTHROPIC` |
+| Cache read (hit) | 0.1x base (0.025x on Claude Fable 5.1 / Claude Mythos 5.1; 0.05x on Claude Opus 5.5 and Claude Sonnet 5.5, see above) | `CACHE_READ_DISCOUNT_ANTHROPIC` |
 
-Both multipliers are **provider-wide constants**, not per-model catalog fields — Anthropic's pricing page confirms every current model (Fable 5.1, Fable 5, Opus 5, Opus 4.8, Sonnet 5, Haiku 4.5) uses the same 1.25x / 2.0x cache-write split; only cache-*read* pricing varies per model.
+Both multipliers are **provider-wide constants**, not per-model catalog fields — Anthropic's pricing page confirms every current model (Fable 5.1, Fable 5, Opus 5.5, Opus 5, Opus 4.8, Sonnet 5.5, Sonnet 5, Haiku 4.5) uses the same 1.25x / 2.0x cache-write split; only cache-*read* pricing varies per model.
 
 Before this fix, `CostCalculationService` applied the 1.25x multiplier to **every** cache-creation token regardless of TTL, under-billing any 1-hour-TTL write by 37.5% (2.0x actual vs. 1.25x charged). Anthropic's `usage` response breaks the aggregate `cache_creation_input_tokens` down by TTL in a nested `cache_creation: {ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}` object; `MessagesUsage::extractCacheCreation1hTokens()` is the single parsing helper shared by every Anthropic usage-parsing call site (`AnthropicProvider` chat + stream, `AnthropicPassthroughTranslator` complete + both stream paths, `GatewayToolLoop`'s tool-loop stream collector), so the 1h slice flows through to `CostCalculationService::calculateCost()`'s new `$cacheCreation1hTokens` parameter and gets billed at 2.0x while the remainder stays at 1.25x. No `BUSELOG` schema change was needed — only the token *aggregate* is persisted (`BCACHE_CREATION_TOKENS`), and the row's `BCOST` now reflects the correctly blended multiplier.
 
@@ -469,9 +575,7 @@ Comparing the production catalog (`GET /api/v1/admin/models`) against `ModelCata
 
 Every retirement above needed its own hand-written migration, and three of them existed *only* to clean up models an earlier release had dropped from the catalog while leaving them live in every install. #1515 replaced that with a registry: `ModelCatalog::RETIREMENTS`, applied by `ModelRetirementSeeder` on every deploy.
 
-**The whole procedure is now:**
-
-1. Add the entry to `ModelCatalog::RETIREMENTS`, keyed by the retired BID:
+**The whole procedure is one entry in `ModelCatalog::RETIREMENTS`, keyed by the retired BID:**
 
 ```php
 321 => [
@@ -482,12 +586,26 @@ Every retirement above needed its own hand-written migration, and three of them 
 ],
 ```
 
-2. Set `active` and `selectable` to `0` on the catalog row if you are keeping it, or remove the row entirely. Either is fine — the registry is what carries the retirement.
-3. Run `make -C backend test`. No migration, no SQL.
+Then `make -C backend test`. No migration, no SQL, and **no second edit on the catalog row**:
+`ModelCatalog::rows()` derives `active`/`selectable` from this registry, so a row you keep is
+switched off by the entry alone (removing the row entirely is still fine). Setting the flags by
+hand used to be a separate step, and forgetting it shipped fresh installs a model they would
+offer, select and bill for after the provider had switched it off.
+
+`app:models:check-availability` writes the entry for you. For every model it confirms Gone it
+prints the block above, keyed by BID, dated today, with the closest live row of the same provider
+and capability as the suggested successor — the same choice the last three retirements made by
+hand. Confirm the successor against the provider's own notice before pasting: a matching price
+does not prove a matching capability, and `null` stays the right answer when there is no
+replacement.
 
 **What the seeder does**, idempotently and on every container start, for each entry whose row exists and still matches `providerId`: stamps `BRETIREDON` and `BSUCCESSORID`, and forces `BACTIVE = BSELECTABLE = BISDEFAULT = 0`. A re-run writes nothing. A BID an operator repurposed is skipped with a warning. Rows are never deleted — `BMESSAGES` has FKs into `BMODELS` and **BIDs must never be reused**.
 
-The health monitor (`app:model:health-check`) skips every row that carries `BRETIREDON`. A recorded retirement is expected to be missing, so it is not probed and it must not raise the hourly incident mail. Operator-disabled rows without a date stay in the check.
+The health monitor (`app:model:health-check`) skips every row that carries `BRETIREDON`. A recorded retirement is expected to be missing, so it is not probed and it must not raise the incident mail. Operator-disabled rows without a date stay in the check so a recovery shows, but they never raise an alert and the status page counts them as "Switched off", not in the "need attention" count. A row the monitor switched off itself (auto-disable) still counts.
+
+The incident mail and the Discord message name each model at most once per quiet period (`MODELHEALTH.ALERT_THROTTLE_MINUTES`, default 1440 = 24 hours; the message states the configured value). The time is kept on the health row (`BLASTALERTED`, `BLASTALERTEDKIND`), so a cache flush or an all-clear does not reset it. Inside that period a different model is still reported right away, and the same model is reported again only when its problem gets worse (degraded, then offline, then rejected credentials). The all-clear names the models of the incident and is held back while any of them still fails under another kind.
+
+Because nothing checks a retired row any more, its last `BMODELHEALTH` verdict would be frozen at whatever held before the retirement. Each health run therefore deletes the health rows of retired models (`ModelHealthRepository::pruneRetired()`), and the status page (`ModelHealthOverview`) lists retired models in their own collapsed "Retired models" section — with the retirement date and the successor — never inside a provider section and never in the "need attention" count or the Operate badge.
 
 **Why a separate seeder from `ModelSeeder`:** that one treats `BACTIVE`/`BSELECTABLE`/`BISDEFAULT` as operator-owned and never overwrites them, which is right for a live model and wrong for a dead one. A retirement outranks an operator preference — "please keep offering this" on a model the provider switched off only produces a failing request. Keeping the override in its own seeder makes it explicit instead of punching a hole in `ModelSeeder`'s preservation rules.
 
@@ -503,7 +621,36 @@ git diff backend/tests/Unit/Model/__snapshots__/
 
 It also enforces that a recorded successor resolves to exactly one live catalog entry and is not itself retired, so a chain of retirements can never repoint an install at another dead model.
 
-**Still open (follows separately, #1515):** consuming `BSUCCESSORID` at resolution time and surfacing retirement state in the admin UI. Until then, `DEFAULTMODEL` bindings that point at a retired BID are handled as before — repointed or deleted by the migration that accompanied that retirement — and a stale binding degrades through `ModelConfigService`'s logged fallback, since it treats a deactivated row as unusable.
+**The second guard, `RetiredModelReferenceTest`:** a retired id must not be what any class picks.
+The registry switches the catalog row off and the seeder switches the database row off, but neither
+can see an id another class spelled out itself — `GoogleProvider::generateImage()` read
+`$options['model'] ?? 'imagen-4.0-generate-001'` for a month after Google shut that endpoint down,
+on the one path where the caller passes no model. It is not a rare shape: thirteen provider classes
+keep a `DEFAULT_CHAT_MODEL` / `DEFAULT_VISION_MODEL` constant, and `GroqProvider`'s still named
+`meta-llama/llama-4-scout-17b-16e-instruct` when Groq dropped it (fixed by hand in #1513).
+
+The test flags a retired id anywhere in `backend/src/` where a model is **chosen** — assigned
+(`=`, `??=`, which covers a `const` and a parameter default), defaulted (`??`, `?:`) or returned —
+and nowhere else on purpose: a retired id is legitimate in a family check
+(`str_starts_with($model, 'gpt-5')`), in `AnthropicProvider`'s `SUPPORTED_MODELS` (the ids Claude
+Code sends us), and in an OpenAPI `example`. What none of those do is decide which model a request
+goes to; 23 such mentions exist and all of them are correct. When it fires, point the choice at the
+successor the registry records for that BID.
+
+`ModelCatalogRetirementTest` also fails when `CONTEXT_PRICING` still prices a long-context tier for
+a model no live row carries any more — dead config that reads like a live rate. Retiring one tag of
+a model whose other tag lives on changes nothing there: the tier is keyed by `providerId` and
+applies to every row of that model.
+
+**What the registry does not reach:** prose. `README.md` and `docs/CONFIGURATION.md` advertise
+models per provider in editorial summaries, so no test can tell that "Imagen 4" became a lie — it
+stayed in both for a month after the shutdown. When a retirement empties a family at a provider
+(no live row of that family left), fix the provider's line in both files in the same PR.
+
+**Still open (follows separately, #1515):** surfacing retirement state in the admin UI. Stored
+bindings (`DEFAULTMODEL`, a widget's `aiModelId`, a prompt's `aiModel`) are rewritten at
+resolution time: `ModelConfigService` follows `BSUCCESSORID` to the live successor, and only
+falls through to the capability default when the retirement recorded `successor: null`.
 
 ## Related issues
 
@@ -549,18 +696,24 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 | gpt-5.5-pro | 272k | 30 / 180 (30 — no discount) | 60 / 270 (60) |
 | gpt-5.6-luna | 272k | 0.20 / 1.20 (0.02) | 0.40 / 1.80 (0.04) |
 | gpt-6-astra | 272k | 10.00 / 50 (1.00) | 20.00 / 75 (2.00) |
+| gpt-6-sol | 272k | 2.00 / 10 (0.20) | 4.00 / 15 (0.40) |
+| gpt-6.1-sol | 272k | 2.00 / 10 (0.10) | 4.00 / 15 (0.20) |
+| gpt-6-luna | 272k | 0.10 / 0.50 (0.01) | 0.20 / 0.75 (0.02) |
 | gemini-2.5-pro | 200k | 1.25 / 10 (0.125) | 2.50 / 15 (0.25) |
 | gemini-3.1-pro-preview | 200k | 2.00 / 12 (0.20) | 4.00 / 18 (0.40) |
 | grok-4.5 | 200k | 2.00 / 6.00 (0.30) | 4.00 / 12.00 (0.60) |
 | grok-4.6 | 200k | 2.00 / 6.00 (0.50) | 4.00 / 12.00 (1.00) |
+| grok-4.7 | 200k | 2.00 / 6.00 (0.50) | 4.00 / 12.00 (1.00) |
 
 ## Prompt-cache mechanics — read before touching a cache rate
 
 Cache billing has three independent knobs, and getting any of them wrong is invisible in normal testing because a cache hit needs a repeated prefix:
 
 1. **Cache-read rate** — `json.cache_read_price_per_1M` on the model row. When a row authors nothing, `CostCalculationService` falls back to `CACHE_READ_DISCOUNT_DEFAULT` (50%), which is right for the GPT-4o generation but **5× too expensive for everything from GPT-5 up and for Gemini Pro**, where reads are 0.1× the input rate. Author the explicit price on every new row; `ModelCatalogTest::testCachedInputRateIsAuthoredOnEveryVariant()` pins the current lineup. A model sold with **no** cached-input discount (`gpt-5.5-pro`) gets its plain input rate authored as the cache rate — the fallback cuts in on a *missing* key, not on a missing discount, so leaving it blank would under-bill by 2× instead.
-2. **Cache-write multiplier** — `json.cache_write_multiplier`. OpenAI began charging for cache *writes* with GPT-5.6 (1.25× the uncached input rate); GPT-5.5 and earlier incur "no additional cache-write charge", so the field belongs only on the GPT-5.6 family and GPT-6. Anthropic keeps its provider-wide 1.25× / 2.0× (1-hour TTL) constants.
+2. **Cache-write multiplier** — `json.cache_write_multiplier`. OpenAI began charging for cache *writes* with GPT-5.6 (1.25× the uncached input rate); GPT-5.5 and earlier incur "no additional cache-write charge", so the field belongs only on the GPT-5.6 family and GPT-6 (Astra / Sol / Luna). Anthropic keeps its provider-wide 1.25× / 2.0× (1-hour TTL) constants.
 3. **Long-context cache rate** — `cache_price_in_above` in `CONTEXT_PRICING`, see the table above.
+
+The daily drift check (`app:sync-model-prices --dry-run --fail-on-drift`) compares the **effective** cache-read and cache-write rates billing would charge (authored `cache_read_price_per_1M` / `cache_write_multiplier`, or the provider fallback from `CachePriceResolver`) and the long-context tier in `CONTEXT_PRICING` against the matching LiteLLM fields. A missing override that would silently fall back to the wrong rate is drift. A cache or tier difference alone is only reported, never written.
 
 The provider must also report the token counts, and the field names differ: OpenAI's Responses API returns `usage.input_tokens_details.cached_tokens` and `…cache_write_tokens`, Chat Completions uses `prompt_tokens_details`, Anthropic uses `cache_read_input_tokens` / `cache_creation_input_tokens`. The internal pipeline normalises all of them to `cached_tokens` / `cache_creation_tokens` — so an internal key that *looks* right can still be reading a provider key that never exists. `OpenAIProvider` did exactly that (`cache_creation_tokens` instead of `cache_write_tokens`), which kept written tokens at 0 and billed them as ordinary input. When adding a provider, verify the key against the provider's own cost-calculation example, not against our internal name.
 

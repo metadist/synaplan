@@ -10,7 +10,7 @@ use App\Module\Contract\MobileClass;
 use App\Module\Contract\ModuleStatus;
 use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
-use App\Service\IapPricingService;
+use App\Service\Iap\IapPricingService;
 
 /**
  * Mobile in-app purchases — store product mapping plus Apple / Google receipt
@@ -107,10 +107,10 @@ final class MobileIapModule implements FeatureModuleInterface
     public function serviceIds(): array
     {
         return [
-            'App\Service\IapPricingService',
+            'App\Service\Iap\IapPricingService',
             'App\Service\Iap\AppleStoreKitVerifier',
             'App\Service\Iap\GooglePlayVerifier',
-            'App\Service\MobilePurchaseService',
+            'App\Service\Iap\MobilePurchaseService',
             'App\Controller\MobilePurchaseController',
         ];
     }

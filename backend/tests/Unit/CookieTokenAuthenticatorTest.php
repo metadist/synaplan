@@ -7,8 +7,10 @@ namespace App\Tests\Unit;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Security\CookieTokenAuthenticator;
-use App\Service\OidcTokenService;
-use App\Service\TokenService;
+use App\Service\Auth\OidcAccessDenialReason;
+use App\Service\Auth\OidcAccessDeniedException;
+use App\Service\Auth\OidcTokenService;
+use App\Service\Auth\TokenService;
 use PHPUnit\Framework\Constraint\IsType;
 use PHPUnit\Framework\NativeType;
 use PHPUnit\Framework\TestCase;
@@ -216,6 +218,26 @@ class CookieTokenAuthenticatorTest extends TestCase
         $this->authenticator->authenticate($request);
     }
 
+    public function testPolicyDenialDoesNotFallBackToTheAppToken(): void
+    {
+        $request = new Request();
+        $request->cookies->set(OidcTokenService::OIDC_ACCESS_COOKIE, 'valid-but-refused');
+        $request->cookies->set(OidcTokenService::OIDC_PROVIDER_COOKIE, 'keycloak');
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'still-valid-app-token');
+
+        $this->oidcTokenService
+            ->expects($this->once())
+            ->method('getUserFromOidcToken')
+            ->willThrowException(new OidcAccessDeniedException(OidcAccessDenialReason::RoleMissing));
+
+        $this->tokenService->expects($this->never())->method('validateAccessToken');
+
+        $this->expectException(AuthenticationException::class);
+        $this->expectExceptionMessage('Authentication failed');
+
+        $this->authenticator->authenticate($request);
+    }
+
     // ========== authenticate() - App Token Tests ==========
 
     public function testAuthenticateSucceedsWithValidAppToken(): void
@@ -399,5 +421,36 @@ class CookieTokenAuthenticatorTest extends TestCase
         $this->assertSame('Authentication failed', $content['error']);
         $this->assertSame('Test error', $content['message']);
         $this->assertSame('AUTH_FAILED', $content['code']);
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function anonymousOnFailurePathProvider(): iterable
+    {
+        yield 'runtime config' => ['/api/v1/config/runtime', 'GET'];
+        yield 'setup state' => ['/api/v1/setup/state', 'GET'];
+        yield 'setup admin' => ['/api/v1/setup/admin', 'POST'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('anonymousOnFailurePathProvider')]
+    public function testOnAuthenticationFailureContinuesAnonymouslyOnPreLoginRoutes(string $path, string $method): void
+    {
+        $request = Request::create($path, $method);
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'signed-for-a-deleted-user');
+
+        $result = $this->authenticator->onAuthenticationFailure($request, new AuthenticationException('User not found'));
+
+        $this->assertNull($result);
+    }
+
+    public function testOnAuthenticationFailureStillRejectsOtherRoutes(): void
+    {
+        $request = Request::create('/api/v1/config/runtime/extra', 'GET');
+
+        $response = $this->authenticator->onAuthenticationFailure($request, new AuthenticationException('User not found'));
+
+        $this->assertInstanceOf(\Symfony\Component\HttpFoundation\JsonResponse::class, $response);
+        $this->assertSame(401, $response->getStatusCode());
     }
 }

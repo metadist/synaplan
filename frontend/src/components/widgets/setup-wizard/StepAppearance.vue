@@ -11,13 +11,13 @@
           <input
             v-model="primaryColor"
             type="color"
-            class="w-12 h-10 rounded-lg cursor-pointer border border-light-border/30 dark:border-dark-border/20 bg-transparent"
+            class="w-12 h-10 rounded-xl cursor-pointer border border-light-border/30 dark:border-dark-border/20 bg-transparent"
             data-testid="input-primary-color"
           />
           <input
             v-model="primaryColor"
             type="text"
-            class="w-28 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-28 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           />
         </div>
       </div>
@@ -31,13 +31,13 @@
           <input
             v-model="iconColor"
             type="color"
-            class="w-12 h-10 rounded-lg cursor-pointer border border-light-border/30 dark:border-dark-border/20 bg-transparent"
+            class="w-12 h-10 rounded-xl cursor-pointer border border-light-border/30 dark:border-dark-border/20 bg-transparent"
             data-testid="input-icon-color"
           />
           <input
             v-model="iconColor"
             type="text"
-            class="w-28 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-28 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           />
         </div>
       </div>
@@ -53,7 +53,7 @@
             :key="theme"
             type="button"
             :class="[
-              'flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors',
+              'flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors',
               defaultTheme === theme
                 ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)] txt-brand'
                 : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary',
@@ -80,7 +80,7 @@
             :key="option.value"
             type="button"
             :class="[
-              'px-3 py-2 rounded-lg border text-xs font-medium transition-colors',
+              'px-3 py-2 rounded-xl border text-xs font-medium transition-colors',
               position === option.value
                 ? 'border-[var(--brand)] bg-[var(--brand-alpha-light)] txt-brand'
                 : 'border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary',

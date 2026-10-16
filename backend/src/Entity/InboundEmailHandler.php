@@ -198,7 +198,7 @@ class InboundEmailHandler
      * Get decrypted password
      * Note: Requires EncryptionService - use in Service layer.
      */
-    public function getDecryptedPassword(\App\Service\EncryptionService $encryptionService): string
+    public function getDecryptedPassword(\App\Service\Security\EncryptionService $encryptionService): string
     {
         if (empty($this->password)) {
             return '';
@@ -211,7 +211,7 @@ class InboundEmailHandler
      * Set password from plaintext (encrypts automatically)
      * Note: Requires EncryptionService - use in Service layer.
      */
-    public function setDecryptedPassword(string $plaintext, \App\Service\EncryptionService $encryptionService): self
+    public function setDecryptedPassword(string $plaintext, \App\Service\Security\EncryptionService $encryptionService): self
     {
         if (empty($plaintext)) {
             $this->password = '';
@@ -321,7 +321,7 @@ class InboundEmailHandler
         int $smtpPort,
         string $smtpUsername,
         string $smtpPassword,
-        \App\Service\EncryptionService $encryptionService,
+        \App\Service\Security\EncryptionService $encryptionService,
         string $smtpSecurity = 'SSL/TLS',
     ): self {
         $config = $this->config ?? [];
@@ -341,7 +341,7 @@ class InboundEmailHandler
     /**
      * Get SMTP credentials (decrypts password).
      */
-    public function getSmtpCredentials(\App\Service\EncryptionService $encryptionService): ?array
+    public function getSmtpCredentials(\App\Service\Security\EncryptionService $encryptionService): ?array
     {
         if (!isset($this->config['smtp'])) {
             return null;

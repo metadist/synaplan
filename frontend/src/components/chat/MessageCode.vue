@@ -13,7 +13,7 @@
       </span>
 
       <button
-        class="flex items-center gap-1.5 px-2 py-1 rounded txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-xs"
+        class="flex items-center gap-1.5 px-2 py-1 rounded-xl txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-xs"
         data-testid="btn-copy"
         @click="copyCode"
       >

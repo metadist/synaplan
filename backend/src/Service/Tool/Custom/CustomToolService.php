@@ -93,15 +93,23 @@ final readonly class CustomToolService
         if (empty($limit['allowed'])) {
             throw new InvalidToolTemplateException('Too many tries. Wait a minute and try again.');
         }
+        $request = $this->executor->resolve($tool, $input, includeSecret: false);
         if (SideEffect::Read->value === $tool->getSideEffect()) {
             $result = $this->executor->execute($tool, $input, (int) $actor->getId());
 
-            return ['sent' => true, 'result' => $result];
+            return [
+                'sent' => true,
+                'request' => $request,
+                'response' => [
+                    'status' => $result['status'],
+                    'body' => $result['body'],
+                    'truncated' => $result['truncated'],
+                ],
+                'result' => $result,
+            ];
         }
 
-        $resolved = $this->executor->resolve($tool, $input, includeSecret: false);
-
-        return ['sent' => false, 'request' => $resolved];
+        return ['sent' => false, 'request' => $request];
     }
 
     /**
@@ -140,7 +148,7 @@ final readonly class CustomToolService
             $payload = [
                 'name' => $name,
                 'title' => (string) ($operation['summary'] ?? $operationId),
-                'description' => (string) ($operation['summary'] ?? ''),
+                'description' => (string) ($operation['description'] ?? $operation['summary'] ?? ''),
                 'sideEffect' => $sideEffect,
                 'spec' => $spec,
                 'inputSchema' => is_array($operation['inputSchema'] ?? null) ? $operation['inputSchema'] : null,

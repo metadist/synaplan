@@ -11,6 +11,7 @@ use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use Doctrine\Common\Collections\ArrayCollection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class NodeContextTest extends TestCase
@@ -190,5 +191,52 @@ final class NodeContextTest extends TestCase
         $ctx = $this->context($this->message('the input'));
 
         self::assertSame('the input', $ctx->resolve('$message.text'));
+    }
+
+    /**
+     * Planner models spell the text field in several ways. Every alias must
+     * hand over the node text — a literal `$n1.output` in the prompt makes
+     * the answering model report that no data was provided.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function textAliasProvider(): iterable
+    {
+        foreach (NodeContext::TEXT_FIELD_ALIASES as $alias) {
+            yield $alias => [$alias];
+        }
+    }
+
+    #[DataProvider('textAliasProvider')]
+    public function testTextFieldAliasesResolveToNodeText(string $alias): void
+    {
+        $ctx = $this->context($this->message());
+        $ctx->setResult('n1', NodeResult::ok("Bucket 'demo' exists and is accessible."));
+
+        self::assertSame("Bucket 'demo' exists and is accessible.", $ctx->resolve('$n1.'.$alias));
+        self::assertSame(
+            "Head check: Bucket 'demo' exists and is accessible.",
+            $ctx->resolve('Head check: $n1.'.$alias),
+        );
+    }
+
+    public function testBraceSpellingIsInterpolated(): void
+    {
+        $ctx = $this->context($this->message('the question'));
+        $ctx->setResult('n1', NodeResult::ok('{"locationConstraint":"eu-central-003"}'));
+
+        self::assertSame(
+            'Region: {"locationConstraint":"eu-central-003"} for the question',
+            $ctx->resolve('Region: ${n1.text} for ${message.text}'),
+        );
+    }
+
+    public function testFileFieldsKeepTheirMeaning(): void
+    {
+        $ctx = $this->context($this->message());
+        $ctx->setResult('n1', NodeResult::ok('caption', [['path' => 'a.png', 'type' => 'image']]));
+
+        self::assertSame(['path' => 'a.png', 'type' => 'image'], $ctx->resolve('$n1.file'));
+        self::assertSame([['path' => 'a.png', 'type' => 'image']], $ctx->resolve('$n1.files'));
     }
 }

@@ -1,0 +1,390 @@
+<template>
+  <div
+    v-if="isGuest"
+    class="flex flex-col gap-3 px-4 pt-2"
+    data-testid="section-sidebar-chats-guest"
+  >
+    <p class="text-sm txt-secondary">{{ $t('guest.banner.subtitle') }}</p>
+    <router-link
+      :to="configStore.auth.registrationEnabled ? '/register' : '/login'"
+      class="btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium min-h-11"
+      data-testid="btn-sidebar-v2-guest-signup"
+    >
+      {{ configStore.auth.registrationEnabled ? $t('guest.banner.signUp') : $t('auth.signIn') }}
+    </router-link>
+  </div>
+  <div v-else data-testid="section-sidebar-chats" :data-chats-loading="chatsLoading">
+    <div v-if="iamSharingEnabled" class="mt-4" data-testid="section-sidebar-incoming">
+      <div class="group/section relative">
+        <button
+          type="button"
+          :class="sectionToggleClass"
+          :aria-expanded="incomingExpanded"
+          aria-controls="sidebar-incoming-list"
+          data-testid="btn-sidebar-v2-incoming-toggle"
+          :title="$t('iam.incoming.purpose')"
+          @click="incomingExpanded = !incomingExpanded"
+        >
+          <InboxArrowDownIcon :class="sectionIconClass" aria-hidden="true" />
+          <span class="truncate">{{ $t('iam.incoming.menu') }}</span>
+          <span
+            v-if="incomingStore.hasNew"
+            class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
+            data-testid="text-sidebar-v2-incoming-count"
+            >{{ incomingStore.unseenCount }}</span
+          >
+          <ChevronDownIcon :class="chevronClass(incomingExpanded)" aria-hidden="true" />
+        </button>
+        <router-link
+          v-if="groupsEnabled"
+          to="/groups"
+          :class="sectionHoverLinkClass"
+          data-testid="btn-sidebar-v2-incoming-groups"
+          :title="$t('nav.myGroups')"
+          :aria-label="$t('nav.myGroups')"
+        >
+          <UserGroupIcon class="w-4 h-4" aria-hidden="true" />
+        </router-link>
+      </div>
+      <div v-show="incomingExpanded" id="sidebar-incoming-list" class="px-2">
+        <p
+          v-if="incomingChatList.length === 0"
+          class="sidebar-empty-hint px-3 py-2 text-sm"
+          data-testid="text-sidebar-v2-incoming-empty"
+        >
+          {{ $t('iam.incoming.emptyText') }}
+        </p>
+        <ChatHistoryList
+          v-else
+          :chats="incomingChatList"
+          list-test-id="list-chat-v2-incoming"
+          :active-chat-id="chatsStore.activeChatId"
+          :title-of="displayTitle"
+          :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
+          :generating="isGenerating"
+          :answer-ready="isAnswerReady"
+          @select="selectChat"
+          @share="shareChat"
+          @rename="renameChat"
+          @delete="deleteChat"
+          @archive="archiveChat"
+          @export="exportChat"
+          @pin="toggleChatPin"
+        />
+      </div>
+    </div>
+
+    <div v-if="pinnedChats.length > 0" class="mt-5" data-testid="section-sidebar-pinned">
+      <div class="group/section relative">
+        <button
+          type="button"
+          :class="sectionToggleClass"
+          :aria-expanded="pinnedExpanded"
+          aria-controls="sidebar-pinned-list"
+          data-testid="btn-sidebar-v2-pinned-toggle"
+          @click="pinnedExpanded = !pinnedExpanded"
+        >
+          <Icon icon="ph:push-pin" :class="sectionIconClass" aria-hidden="true" />
+          {{ $t('nav.pinned') }}
+          <ChevronDownIcon :class="chevronClass(pinnedExpanded)" aria-hidden="true" />
+        </button>
+      </div>
+      <div v-show="pinnedExpanded" id="sidebar-pinned-list" class="px-2">
+        <ChatHistoryList
+          :chats="pinnedChats"
+          list-test-id="list-chat-v2-pinned"
+          :active-chat-id="chatsStore.activeChatId"
+          :title-of="displayTitle"
+          :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
+          :generating="isGenerating"
+          :answer-ready="isAnswerReady"
+          @select="selectChat"
+          @share="shareChat"
+          @rename="renameChat"
+          @delete="deleteChat"
+          @archive="archiveChat"
+          @export="exportChat"
+          @pin="toggleChatPin"
+        />
+      </div>
+    </div>
+
+    <div class="mt-5">
+      <div class="group/section relative">
+        <button
+          type="button"
+          :class="sectionToggleClass"
+          :aria-expanded="chatsExpanded"
+          aria-controls="sidebar-chat-list"
+          data-testid="btn-sidebar-v2-chats-toggle"
+          @click="chatsExpanded = !chatsExpanded"
+        >
+          <ClockIcon :class="sectionIconClass" aria-hidden="true" />
+          {{ $t('nav.chatHistory') }}
+          <ChevronDownIcon :class="chevronClass(chatsExpanded)" aria-hidden="true" />
+        </button>
+        <router-link
+          to="/chats"
+          :class="sectionHoverLinkClass"
+          data-testid="btn-chat-v2-show-all"
+          :title="$t('chat.showAll')"
+          :aria-label="$t('chat.showAll')"
+        >
+          <ArrowUpRightIcon class="w-4 h-4" aria-hidden="true" />
+        </router-link>
+      </div>
+
+      <div v-show="chatsExpanded" id="sidebar-chat-list" class="px-2">
+        <ChatHistoryList
+          :chats="unpinnedChats"
+          :active-chat-id="chatsStore.activeChatId"
+          :title-of="displayTitle"
+          :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
+          :generating="isGenerating"
+          :answer-ready="isAnswerReady"
+          :group-of="dateGroupLabel"
+          @select="selectChat"
+          @share="shareChat"
+          @rename="renameChat"
+          @delete="deleteChat"
+          @archive="archiveChat"
+          @export="exportChat"
+          @pin="toggleChatPin"
+        >
+          <template #empty>
+            <p
+              v-if="chatsReady && pinnedChats.length === 0"
+              class="sidebar-empty-hint px-3 py-2 text-sm"
+              data-testid="text-sidebar-v2-chats-empty"
+            >
+              {{ $t('nav.chatsEmpty') }}
+            </p>
+          </template>
+        </ChatHistoryList>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import {
+  ArrowUpRightIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  InboxArrowDownIcon,
+  UserGroupIcon,
+} from '@heroicons/vue/24/outline'
+import { Icon } from '@iconify/vue'
+import ChatHistoryList from './ChatHistoryList.vue'
+import { chatDateGroup } from './chatDateGroups'
+import { listOverflows, scrollerGrewWithContent } from './chatHistoryPaging'
+import { chatsPanelRefresh } from '@/composables/useNavSections'
+import { useMidnightNow } from '@/composables/useMidnightNow'
+import { useI18n } from 'vue-i18n'
+import { useChatHistory, type HistoryChat } from '@/composables/useChatHistory'
+import { isIamGroupsEnabled } from '@/composables/useIamFeature'
+import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
+
+const {
+  iamSharingEnabled,
+  pinnedChats,
+  unpinnedChats,
+  incomingChatList,
+  displayTitle,
+  formatTimestamp,
+  isGenerating,
+  isAnswerReady,
+  selectChat,
+  renameChat,
+  toggleChatPin,
+  deleteChat,
+  archiveChat,
+  exportChat,
+  shareChat,
+  chatsStore,
+  incomingStore,
+} = useChatHistory()
+
+const CHATS_EXPANDED_KEY = 'sidebar-chats-expanded'
+const PINNED_EXPANDED_KEY = 'sidebar-pinned-expanded'
+const INCOMING_EXPANDED_KEY = 'sidebar-incoming-expanded'
+
+const readExpanded = (key: string): boolean => {
+  try {
+    return localStorage.getItem(key) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+const rememberExpanded = (key: string, open: boolean) => {
+  try {
+    localStorage.setItem(key, String(open))
+  } catch {
+    // Private mode can block storage. The section still toggles for this visit.
+  }
+}
+
+const sectionToggleClass =
+  'sidebar-section-label mb-0.5 flex w-full items-center gap-1.5 bg-transparent px-4 py-1 text-left text-[15px] font-semibold hover:bg-transparent focus:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]'
+
+const sectionIconClass = 'h-4 w-4 flex-shrink-0 txt-secondary'
+
+const sectionChevronBase =
+  'h-3.5 w-3.5 flex-shrink-0 transition-[opacity,rotate] duration-200 ease-out motion-reduce:transition-none'
+
+/**
+ * An open section shows its chevron on hover only. A folded one always shows
+ * it, pointing right, or the heading would look like an empty list.
+ */
+const chevronClass = (expanded: boolean): string =>
+  expanded
+    ? `${sectionChevronBase} opacity-0 group-hover/section:opacity-100 group-focus-visible/section:opacity-100`
+    : `${sectionChevronBase} -rotate-90 opacity-100`
+
+const sectionSideLinkClass =
+  'absolute right-3 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md txt-secondary transition-opacity hover:text-[var(--txt-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]'
+
+const sectionHoverLinkClass =
+  sectionSideLinkClass +
+  ' pointer-events-none opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/section:pointer-events-auto group-hover/section:opacity-100'
+
+const groupsEnabled = computed(() => isIamGroupsEnabled())
+
+const { t } = useI18n()
+/**
+ * One "now" per list change, so every row is bucketed against the same day —
+ * and a fresh one at midnight, so the headings cannot go stale while the
+ * sidebar stays mounted overnight.
+ */
+const midnightNow = useMidnightNow()
+const dateGroupLabels = computed(() => {
+  const now = midnightNow.value
+  return new Map(
+    unpinnedChats.value.map((chat) => [
+      chat.id,
+      t(`chat.browser.${chatDateGroup(chat.updatedAt || chat.createdAt, now)}`),
+    ])
+  )
+})
+const dateGroupLabel = (chat: HistoryChat): string | null =>
+  dateGroupLabels.value.get(chat.id) ?? null
+
+const authStore = useAuthStore()
+const configStore = useConfigStore()
+const isGuest = computed(() => !authStore.isAuthenticated)
+
+const chatsExpanded = ref(readExpanded(CHATS_EXPANDED_KEY))
+const pinnedExpanded = ref(readExpanded(PINNED_EXPANDED_KEY))
+const incomingExpanded = ref(readExpanded(INCOMING_EXPANDED_KEY))
+const chatsReady = ref(false)
+let filling = false
+
+const chatsLoading = computed(() => (!chatsReady.value || chatsStore.loading ? 'true' : 'false'))
+
+watch(chatsExpanded, (open) => {
+  rememberExpanded(CHATS_EXPANDED_KEY, open)
+  if (open) void nextTick(() => fillUntilScrollable())
+})
+watch(pinnedExpanded, (open) => rememberExpanded(PINNED_EXPANDED_KEY, open))
+watch(incomingExpanded, (open) => rememberExpanded(INCOMING_EXPANDED_KEY, open))
+
+const scrollRoot = (): HTMLElement | null => {
+  const root = document.querySelector('[data-testid="section-sidebar-scroll"]')
+  return root instanceof HTMLElement ? root : null
+}
+
+/**
+ * If the loaded page does not fill the menu, ask for the next page. Stop once
+ * the list can scroll, or if the pane grows with the rows (it is not a real
+ * scrollport, and continuing would download every chat).
+ *
+ * Progress tracks the server offset, not the visible row count: a fetched
+ * page of only pinned, empty, or widget-session chats adds no visible rows,
+ * but the older valid chats are still waiting on later pages.
+ */
+const fillUntilScrollable = async () => {
+  if (filling || !chatsExpanded.value || !chatsStore.railHasMore || chatsStore.railLoading) return
+  const root = scrollRoot()
+  if (!root || root.clientHeight === 0) return
+  if (listOverflows(root.clientHeight, root.scrollHeight)) return
+  const before = { clientHeight: root.clientHeight, scrollHeight: root.scrollHeight }
+  const beforeOffset = chatsStore.railOffset
+  filling = true
+  try {
+    await chatsStore.loadRailChats(false)
+  } finally {
+    filling = false
+  }
+  await nextTick()
+  const next = scrollRoot()
+  if (!next || scrollerGrewWithContent(before, next)) return
+  if (chatsStore.railOffset === beforeOffset) return
+  await fillUntilScrollable()
+}
+
+/** One more page from the server. Further pages wait for the next scroll. */
+const showMoreChats = () => {
+  if (!chatsExpanded.value) return
+  return chatsStore.loadRailChats(false)
+}
+
+watch(
+  () => unpinnedChats.value.length,
+  () => {
+    if (chatsReady.value) void nextTick(() => fillUntilScrollable())
+  }
+)
+
+defineExpose({ showMoreChats })
+
+const refreshChats = async () => {
+  // The chats store sends signed-out callers to the login page.
+  if (isGuest.value) return
+  chatsReady.value = false
+  // Incoming has its own section and fails closed; a slow share lookup must
+  // not hold the user's own list in its loading state.
+  void incomingStore.load()
+  try {
+    await chatsStore.loadRailChats(true)
+  } finally {
+    chatsReady.value = true
+    void nextTick(() => fillUntilScrollable())
+  }
+}
+
+watch(chatsPanelRefresh, () => {
+  void refreshChats()
+})
+
+watch(isGuest, (guest) => {
+  if (!guest) void refreshChats()
+})
+
+onMounted(() => {
+  void refreshChats()
+})
+</script>
+
+<style scoped>
+/* Empty hint is the darkest ink. Section labels sit between it and the
+   lighter chat titles (#3b4353 / #cdd1da). Both stay above WCAG AA on the
+   list column. */
+.sidebar-empty-hint {
+  color: #293141;
+}
+
+.sidebar-section-label {
+  color: #2d3545;
+}
+
+.dark .sidebar-empty-hint {
+  color: #a7afbe;
+}
+
+.dark .sidebar-section-label {
+  color: #b0b7c4;
+}
+</style>

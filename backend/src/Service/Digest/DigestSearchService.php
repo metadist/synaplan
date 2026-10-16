@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Digest;
 
 use App\Entity\Message;
+use App\Repository\MessageDigestRepository;
 use App\Repository\MessageRepository;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Psr\Log\LoggerInterface;
@@ -26,6 +27,7 @@ final readonly class DigestSearchService
     public function __construct(
         private QdrantClientInterface $qdrantClient,
         private MessageRepository $messageRepository,
+        private MessageDigestRepository $digestRepository,
         private MessageDigestConfig $config,
         private LoggerInterface $logger,
     ) {
@@ -34,14 +36,19 @@ final readonly class DigestSearchService
     /**
      * Search + recency re-rank + stage-2 message pull.
      *
-     * @param float[]  $queryVector   Embedding of the current user prompt (memory embedding model)
-     * @param int|null $excludeChatId Digests from this chat are dropped — its recent
-     *                                messages are already in the context verbatim
-     * @param int|null $now           Injectable clock for deterministic tests
+     * Hits are confirmed against BMESSAGEDIGESTS (active row, same user)
+     * before they can reach a prompt. A Qdrant point whose row was
+     * deactivated or deleted is dropped even when its payload still says active.
+     *
+     * @param float[]   $queryVector       Embedding of the current user prompt (memory embedding model)
+     * @param list<int> $excludeMessageIds Message ids already in the prompt verbatim. Digests of
+     *                                     those messages are dropped; older messages of the same
+     *                                     chat stay searchable
+     * @param int|null  $now               Injectable clock for deterministic tests
      *
      * @return list<array{message_id: int, chat_id: int, title: string, channel: string, source_date: int, score: float, effective_score: float, excerpt: string|null}>
      */
-    public function search(int $userId, array $queryVector, ?int $excludeChatId = null, ?int $now = null): array
+    public function search(int $userId, array $queryVector, array $excludeMessageIds = [], ?int $now = null): array
     {
         if ([] === $queryVector) {
             return [];
@@ -50,8 +57,8 @@ final readonly class DigestSearchService
         $topK = $this->config->getTopK();
 
         try {
-            // Over-fetch so the current-chat exclusion below cannot
-            // short-change the caller.
+            // Over-fetch so dropping the verbatim window and unconfirmed
+            // points cannot short-change the caller.
             $rawHits = $this->qdrantClient->searchDigests(
                 $queryVector,
                 $userId,
@@ -64,30 +71,78 @@ final readonly class DigestSearchService
             return [];
         }
 
+        $exclude = [];
+        foreach ($excludeMessageIds as $messageId) {
+            $exclude[(int) $messageId] = true;
+        }
+
+        /** @var list<array{payload: array<string, mixed>, message_id: int, digest_id: int|null, score: float}> $candidates */
+        $candidates = [];
+        foreach ($rawHits as $hit) {
+            if (!is_array($hit)) {
+                continue;
+            }
+            $payload = is_array($hit['payload'] ?? null) ? $hit['payload'] : [];
+            $messageId = (int) ($payload['message_id'] ?? 0);
+            $title = trim((string) ($payload['title'] ?? ''));
+            if (0 === $messageId || '' === $title) {
+                continue;
+            }
+            $candidates[] = [
+                'payload' => $payload,
+                'message_id' => $messageId,
+                'digest_id' => self::digestIdOfHit($userId, $hit, $payload),
+                'score' => (float) ($hit['score'] ?? 0.0),
+            ];
+        }
+
+        if ([] === $candidates) {
+            return [];
+        }
+
+        $digestIds = [];
+        foreach ($candidates as $candidate) {
+            if (null !== $candidate['digest_id']) {
+                $digestIds[] = $candidate['digest_id'];
+            }
+        }
+
+        try {
+            $active = $this->digestRepository->findActiveMatches(
+                $userId,
+                array_column($candidates, 'message_id'),
+                $digestIds,
+            );
+        } catch (\Throwable $e) {
+            $this->logger->error('Digest confirmation failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
+
+            return [];
+        }
+
+        $activeMessages = array_fill_keys($active['message_ids'], true);
+        $activeDigests = array_fill_keys($active['digest_ids'], true);
+
         $now ??= time();
         $halfLifeSeconds = $this->config->getRecencyHalfLifeDays() * 86400;
 
         $hits = [];
-        foreach ($rawHits as $hit) {
-            $payload = $hit['payload'] ?? [];
-            $messageId = (int) ($payload['message_id'] ?? 0);
-            $chatId = (int) ($payload['chat_id'] ?? 0);
-            $title = trim((string) ($payload['title'] ?? ''));
-
-            if (0 === $messageId || '' === $title) {
-                continue;
-            }
-            if (null !== $excludeChatId && $chatId === $excludeChatId) {
+        foreach ($candidates as $candidate) {
+            $messageId = $candidate['message_id'];
+            $digestId = $candidate['digest_id'];
+            $confirmed = isset($activeMessages[$messageId])
+                || (null !== $digestId && isset($activeDigests[$digestId]));
+            if (!$confirmed || isset($exclude[$messageId])) {
                 continue;
             }
 
+            $payload = $candidate['payload'];
             $sourceDate = (int) ($payload['source_date'] ?? 0);
-            $score = (float) ($hit['score'] ?? 0.0);
+            $score = $candidate['score'];
 
             $hits[] = [
                 'message_id' => $messageId,
-                'chat_id' => $chatId,
-                'title' => $title,
+                'chat_id' => (int) ($payload['chat_id'] ?? 0),
+                'title' => trim((string) ($payload['title'] ?? '')),
                 'channel' => (string) ($payload['channel'] ?? ''),
                 'source_date' => $sourceDate,
                 'score' => $score,
@@ -100,6 +155,35 @@ final readonly class DigestSearchService
         $hits = array_slice($hits, 0, $topK);
 
         return $this->pullTopMessages($userId, $hits);
+    }
+
+    /**
+     * Digest id carried by the Qdrant payload (`digest_id`, or the logical
+     * point id `dig_{user}_{id}` stored as `_point_id` / the hit id).
+     *
+     * @param array<string, mixed> $hit
+     * @param array<string, mixed> $payload
+     */
+    private static function digestIdOfHit(int $userId, array $hit, array $payload): ?int
+    {
+        if (isset($payload['digest_id']) && is_numeric($payload['digest_id'])) {
+            $id = (int) $payload['digest_id'];
+            if ($id > 0) {
+                return $id;
+            }
+        }
+
+        foreach ([$payload['_point_id'] ?? null, $hit['id'] ?? null] as $candidate) {
+            if (!is_string($candidate) || '' === $candidate) {
+                continue;
+            }
+            $parsed = MessageDigestService::digestIdFromPointId($userId, $candidate);
+            if (null !== $parsed && $parsed > 0) {
+                return $parsed;
+            }
+        }
+
+        return null;
     }
 
     /**

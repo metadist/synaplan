@@ -11,6 +11,9 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class ApiKeyRepository extends ServiceEntityRepository
 {
+    /** Skip repeat writes when the key was already seen within this window. */
+    private const LAST_USED_MIN_INTERVAL_SECONDS = 60;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, ApiKey::class);
@@ -41,6 +44,36 @@ class ApiKeyRepository extends ServiceEntityRepository
             ->orderBy('a.created', 'DESC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Record that this key authenticated a request.
+     *
+     * The write is its own statement, so it is stored even when the request
+     * never flushes the entity manager. A key already seen in the last minute
+     * is left unchanged.
+     */
+    public function touchLastUsed(ApiKey $apiKey): void
+    {
+        $id = $apiKey->getId();
+        if (null === $id) {
+            return;
+        }
+
+        $now = time();
+        $previous = $apiKey->getLastUsed();
+        if ($previous > 0 && ($now - $previous) < self::LAST_USED_MIN_INTERVAL_SECONDS) {
+            return;
+        }
+
+        $apiKey->setLastUsed($now);
+        $this->getEntityManager()->getConnection()->executeStatement(
+            'UPDATE BAPIKEYS SET BLASTUSED = :now WHERE BID = :id',
+            [
+                'now' => $now,
+                'id' => $id,
+            ],
+        );
     }
 
     /**

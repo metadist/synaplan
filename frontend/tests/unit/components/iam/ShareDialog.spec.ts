@@ -12,7 +12,7 @@ const { showSuccess, showError } = vi.hoisted(() => ({
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
     listShares: vi.fn().mockResolvedValue([]),
-    searchSubjects: vi.fn().mockResolvedValue([]),
+    searchSubjects: vi.fn().mockResolvedValue({ subjects: [], personScope: 'shared-group' }),
     grantShare: vi.fn(),
     revokeShare: vi.fn(),
   },
@@ -60,7 +60,10 @@ describe('ShareDialog', () => {
     showSuccess.mockReset()
     showError.mockReset()
     vi.mocked(iamApi.listShares).mockResolvedValue([])
-    vi.mocked(iamApi.searchSubjects).mockResolvedValue([])
+    vi.mocked(iamApi.searchSubjects).mockResolvedValue({
+      subjects: [],
+      personScope: 'shared-group',
+    })
   })
 
   it('does not render when closed', () => {
@@ -80,6 +83,52 @@ describe('ShareDialog', () => {
     )
     expect(wrapper.get('[data-testid="iam-share-find"]').text()).toContain('Incoming chats')
     expect(wrapper.get('[data-testid="iam-share-empty"]').text()).toBe('Only you can see this.')
+  })
+
+  it('hides the explanation lines while the suggestion list is open', async () => {
+    const wrapper = mountDialog()
+    const display = (testId: string) =>
+      wrapper.get(`[data-testid="${testId}"]`).attributes('style') ?? ''
+
+    expect(display('iam-share-consequence')).not.toContain('display: none')
+    expect(display('iam-share-find')).not.toContain('display: none')
+
+    await wrapper.get('[data-testid="input-iam-subject-search"]').trigger('focus')
+
+    expect(wrapper.find('[data-testid="list-iam-subjects"]').exists()).toBe(true)
+    expect(display('iam-share-consequence')).toContain('display: none')
+    expect(display('iam-share-find')).toContain('display: none')
+  })
+
+  it('shows the explanations again when the suggestion list closes', async () => {
+    const wrapper = mountDialog()
+    const display = (testId: string) =>
+      wrapper.get(`[data-testid="${testId}"]`).attributes('style') ?? ''
+
+    await wrapper.get('[data-testid="input-iam-subject-search"]').trigger('focus')
+    expect(display('iam-share-consequence')).toContain('display: none')
+
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="list-iam-subjects"]').exists()).toBe(false)
+    expect(display('iam-share-consequence')).not.toContain('display: none')
+    expect(display('iam-share-find')).not.toContain('display: none')
+  })
+
+  it('shows the explanations again after the dialog is reopened', async () => {
+    const wrapper = mountDialog()
+    const display = (testId: string) =>
+      wrapper.get(`[data-testid="${testId}"]`).attributes('style') ?? ''
+
+    await wrapper.get('[data-testid="input-iam-subject-search"]').trigger('focus')
+    expect(display('iam-share-consequence')).toContain('display: none')
+
+    await wrapper.setProps({ isOpen: false })
+    await wrapper.setProps({ isOpen: true })
+
+    expect(display('iam-share-consequence')).not.toContain('display: none')
+    expect(display('iam-share-find')).not.toContain('display: none')
   })
 
   it('uses assistant copy and hides the public-link section', () => {
@@ -116,9 +165,10 @@ describe('ShareDialog', () => {
   })
 
   it('names the recipient path after a successful share', async () => {
-    vi.mocked(iamApi.searchSubjects).mockResolvedValue([
-      { type: 'group', id: 1, name: 'Sales', pinned: false },
-    ])
+    vi.mocked(iamApi.searchSubjects).mockResolvedValue({
+      subjects: [{ type: 'group', id: 1, name: 'Sales', pinned: false }],
+      personScope: 'shared-group',
+    })
     vi.mocked(iamApi.grantShare).mockResolvedValue({
       id: 9,
       kind: 'conversation',
@@ -203,6 +253,48 @@ describe('ShareDialog', () => {
     await flushPromises()
 
     expect(showError).toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('keeps an inert everyone share listed, explains it, and offers only Remove', async () => {
+    vi.mocked(iamApi.listShares).mockResolvedValue([
+      {
+        id: 12,
+        kind: 'conversation',
+        resourceId: '1',
+        subjectType: 'everyone',
+        subjectId: 0,
+        permission: 'use',
+        name: '',
+        effective: false,
+      },
+      {
+        id: 13,
+        kind: 'conversation',
+        resourceId: '1',
+        subjectType: 'group',
+        subjectId: 1,
+        permission: 'use',
+        name: 'Sales',
+        effective: true,
+      },
+    ])
+
+    const wrapper = mountDialog()
+    await flushPromises()
+
+    const inert = wrapper.get('[data-testid="iam-share-row-12"]')
+    expect(inert.text()).toContain('Everyone with an account')
+    expect(inert.text()).toContain('nobody else can use it')
+    expect(
+      (inert.get('[data-testid="btn-iam-permission"]').element as HTMLButtonElement).disabled
+    ).toBe(true)
+    expect(inert.find('[data-testid="btn-iam-share-remove-12"]').exists()).toBe(true)
+
+    const active = wrapper.get('[data-testid="iam-share-row-13"]')
+    expect(
+      (active.get('[data-testid="btn-iam-permission"]').element as HTMLButtonElement).disabled
+    ).toBe(false)
     wrapper.unmount()
   })
 })

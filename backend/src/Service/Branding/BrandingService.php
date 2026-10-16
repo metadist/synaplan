@@ -76,6 +76,26 @@ final readonly class BrandingService
     public const DEFAULT_POWERED_BY_LABEL = 'Synaplan';
     public const DEFAULT_POWERED_BY_URL = 'https://www.synaplan.com';
 
+    /**
+     * Style settings the Operate "reset to default style" action restores: the
+     * light + dark brand colors and the font settings. Name, logos, legal
+     * links, navigation and attribution are brand identity, not style, and are
+     * deliberately kept.
+     *
+     * @var list<string>
+     */
+    public const STYLE_RESET_KEYS = [
+        self::KEY_PRIMARY_COLOR,
+        self::KEY_SECONDARY_COLOR,
+        self::KEY_ACCENT_COLOR,
+        self::KEY_PRIMARY_COLOR_DARK,
+        self::KEY_SECONDARY_COLOR_DARK,
+        self::KEY_ACCENT_COLOR_DARK,
+        self::KEY_FONT_FAMILY,
+        self::KEY_HEADING_FONT_FAMILY,
+        self::KEY_FONT_URL,
+    ];
+
     public function __construct(
         private ConfigRepository $configRepository,
     ) {
@@ -135,6 +155,30 @@ final readonly class BrandingService
             'poweredByLabel' => $this->value(self::KEY_POWERED_BY_LABEL, self::DEFAULT_POWERED_BY_LABEL),
             'poweredByUrl' => $this->value(self::KEY_POWERED_BY_URL, self::DEFAULT_POWERED_BY_URL),
         ];
+    }
+
+    /**
+     * Wordmark for one theme, resolved like the frontend's useBrandLogo: the
+     * dark logo only applies to a dark theme, the light logo covers both. Null
+     * means nothing is configured and the caller should use the bundled asset.
+     */
+    public function getLogoUrl(bool $dark): ?string
+    {
+        $darkLogo = $dark ? $this->value(self::KEY_LOGO_DARK_URL, '') : '';
+        $logo = '' !== $darkLogo ? $darkLogo : $this->value(self::KEY_LOGO_URL, '');
+
+        return '' !== $logo ? $logo : null;
+    }
+
+    /**
+     * Compact brand mark for one theme: the dedicated icon, else the wordmark,
+     * so a logo-only branding config still replaces the Synaplan bird.
+     */
+    public function getIconUrl(bool $dark): ?string
+    {
+        $icon = $this->value(self::KEY_ICON_URL, '');
+
+        return '' !== $icon ? $icon : $this->getLogoUrl($dark);
     }
 
     private function value(string $setting, string $default): string

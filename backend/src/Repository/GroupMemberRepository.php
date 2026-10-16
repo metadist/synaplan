@@ -40,6 +40,29 @@ class GroupMemberRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param list<int> $groupIds
+     *
+     * @return list<GroupMember>
+     */
+    public function findByGroupIds(array $groupIds): array
+    {
+        if ([] === $groupIds) {
+            return [];
+        }
+
+        /** @var list<GroupMember> $members */
+        $members = $this->createQueryBuilder('m')
+            ->where('m.groupId IN (:ids)')
+            ->setParameter('ids', $groupIds)
+            ->orderBy('m.groupId', 'ASC')
+            ->addOrderBy('m.created', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $members;
+    }
+
+    /**
      * @return list<GroupMember>
      */
     public function findByGroupId(int $groupId): array
@@ -137,6 +160,34 @@ class GroupMemberRepository extends ServiceEntityRepository
             ->setParameter('groupId', $groupId)
             ->getQuery()
             ->execute();
+    }
+
+    /**
+     * Accounts that share at least one group with this user, excluding the user.
+     *
+     * @return list<int>
+     */
+    public function findCoMemberUserIds(int $userId): array
+    {
+        $groupIds = array_map(
+            static fn (GroupMember $member): int => $member->getGroupId(),
+            $this->findByUserId($userId),
+        );
+        if ([] === $groupIds) {
+            return [];
+        }
+
+        /** @var list<int|string> $ids */
+        $ids = $this->createQueryBuilder('m')
+            ->select('DISTINCT m.userId')
+            ->where('m.groupId IN (:groupIds)')
+            ->andWhere('m.userId != :userId')
+            ->setParameter('groupIds', $groupIds)
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return array_map(static fn (int|string $id): int => (int) $id, $ids);
     }
 
     public function deleteByUserId(int $userId): void

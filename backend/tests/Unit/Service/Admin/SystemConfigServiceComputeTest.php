@@ -7,11 +7,11 @@ namespace App\Tests\Unit\Service\Admin;
 use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
+use App\Service\Auth\RegistrationConfig;
+use App\Service\Chat\GuestChatConfig;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\Contract\ComputeHealth;
-use App\Service\EncryptionService;
-use App\Service\GuestChatConfig;
-use App\Service\RegistrationConfig;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -113,6 +113,56 @@ final class SystemConfigServiceComputeTest extends TestCase
 
         self::assertFalse($result['success']);
         self::assertStringContainsString('not reachable', (string) ($result['message'] ?? ''));
+    }
+
+    public function testRefusesEnableBelowRequiredTier(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->never())->method('setValue');
+        $repo->method('getValue')->willReturn('gvisor');
+
+        $result = $this->service($repo)->setValue('COMPUTE_ENABLED', 'true');
+
+        self::assertFalse($result['success']);
+        self::assertStringContainsString('Standard isolation', (string) ($result['message'] ?? ''));
+        self::assertStringContainsString('Strong isolation', (string) ($result['message'] ?? ''));
+    }
+
+    public function testAcceptsEnableWhenTierMeetsRequirement(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->once())->method('setValue');
+        $repo->method('getValue')->willReturn(null);
+
+        self::assertTrue($this->service($repo)->setValue('COMPUTE_ENABLED', 'true')['success']);
+    }
+
+    public function testSwitchingComputeOffIsAlwaysAllowed(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->once())->method('setValue');
+        $repo->method('getValue')->willReturn('microvm');
+
+        self::assertTrue($this->service($repo)->setValue('COMPUTE_ENABLED', 'false')['success']);
+    }
+
+    public function testRefusesUnknownIsolationTier(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->never())->method('setValue');
+
+        $result = $this->service($repo)->setValue('COMPUTE_REQUIRE_TIER', 'quantum');
+
+        self::assertFalse($result['success']);
+        self::assertStringContainsString('docker, gvisor, microvm', (string) ($result['message'] ?? ''));
+    }
+
+    public function testAcceptsKnownIsolationTier(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->once())->method('setValue');
+
+        self::assertTrue($this->service($repo)->setValue('COMPUTE_REQUIRE_TIER', 'gvisor')['success']);
     }
 
     private function service(ConfigRepository $repo): SystemConfigService

@@ -77,10 +77,9 @@ final readonly class AgentRuntimeResolver
         }
 
         if (!$agent->hasPublishedVersion()) {
-            if ($isOwner) {
-                return $this->fromDefinition($agent, $user, $this->validator->validate($agent->getDraft()), '', null);
-            }
-            throw AgentNotPublishedException::forId($agentId);
+            // A shared draft can be tried in a private chat. The router only
+            // lists published assistants, so this never auto-selects a draft.
+            return $this->fromDefinition($agent, $user, $this->validator->validate($agent->getDraft()), '', null);
         }
 
         $version = $this->versions->find($agent->getPublishedVersionId());

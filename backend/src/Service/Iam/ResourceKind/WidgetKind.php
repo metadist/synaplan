@@ -15,6 +15,8 @@ use Psr\Cache\CacheItemPoolInterface;
  */
 final readonly class WidgetKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     public const KEY = 'widget';
     public const LIST_CACHE_PREFIX = 'iam.widget_list.';
 
@@ -67,7 +69,7 @@ final readonly class WidgetKind implements ShareableResourceKindInterface
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
         $widget = $this->findWidget($resourceId);
         if (null === $widget) {

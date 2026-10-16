@@ -14,11 +14,18 @@
 import AxeBuilder from '@axe-core/playwright'
 import { test, expect, LOGGED_OUT, type Page } from '../test-setup'
 import { openApp } from '../helpers/auth'
+import { ChatHelper } from '../helpers/chat'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
 
 const NAV = selectors.nav
 const CHAT = selectors.chat
+/**
+ * An empty composer puts live voice in the send slot. Typed text brings the
+ * send button back. Either control is the primary action the layout guard
+ * has to keep on screen.
+ */
+const composerAction = `${CHAT.sendBtn}, [data-testid="btn-chat-live-voice"]`
 
 /**
  * Touch-target floor in px — §4.3 #1/#2: interactive nav targets are 44 px
@@ -120,6 +127,24 @@ async function waitForAnimationsSettled(page: Page) {
   })
 }
 
+async function axeIn(page: Page, selector: string, surface: string) {
+  await waitForAnimationsSettled(page)
+  const results = await new AxeBuilder({ page })
+    .include(selector)
+    .withTags(['wcag2a', 'wcag2aa'])
+    .analyze()
+  const severe = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+  expect(severe, `${surface}: ${severe.map((v) => v.id).join(', ')}`).toEqual([])
+}
+
+async function paintTheme(page: Page, mode: 'light' | 'dark') {
+  await page.evaluate((dark) => {
+    localStorage.setItem('theme', dark ? 'dark' : 'light')
+    document.documentElement.classList.toggle('dark', dark)
+    document.documentElement.classList.remove('theme-oled')
+  }, mode === 'dark')
+}
+
 async function axeBlocking(page: Page, surface: string) {
   await waitForAnimationsSettled(page)
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
@@ -161,7 +186,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await expectNoHorizontalOverflow(page, 'chat')
 
     await expectInsideViewport(page, CHAT.textInput, 'chat input')
-    await expectInsideViewport(page, CHAT.sendBtn, 'send button')
+    await expectInsideViewport(page, composerAction, 'composer action')
   })
 
   test('primary nav controls carry visible labels and meet target size', async ({ page }) => {
@@ -189,7 +214,9 @@ test.describe('@ci @layout UI guard — chat surface', () => {
 
       const tabs = page.locator('[data-testid^="btn-mobile-nav-"]')
       const count = await tabs.count()
-      expect(count, 'drawer renders New/History/Files/More buttons').toBe(4)
+      // "Shared with me" only renders while chat sharing is enabled.
+      const incoming = await page.locator('[data-testid="btn-mobile-nav-incoming"]').count()
+      expect(count, 'drawer renders New/History/Files/Search/More buttons').toBe(5 + incoming)
 
       for (let i = 0; i < count; i++) {
         const tab = tabs.nth(i)
@@ -217,15 +244,17 @@ test.describe('@ci @layout UI guard — chat surface', () => {
       const btn = navButtons.nth(i)
       const testid = await btn.getAttribute('data-testid')
 
-      // Phase 2 contract (§4.1 #3): every rail control carries an
-      // ALWAYS-VISIBLE label node — tooltips are additive, never the only
-      // affordance.
-      const label = btn.locator(NAV.railLabel)
-      await expect(label, `${testid}: rail label node missing`).toBeVisible()
-      expect(
-        ((await label.textContent()) ?? '').trim() !== '',
-        `${testid}: rail label is empty`
-      ).toBe(true)
+      // Icon rail: each control has an accessible name and a 44px target.
+      // Visible text lives in the context panel, not under the icon.
+      const name = (await btn.getAttribute('aria-label')) ?? ''
+      expect(name.trim() !== '', `${testid}: accessible name missing`).toBe(true)
+
+      const box = await btn.boundingBox()
+      expect(box, `${testid}: not rendered`).not.toBeNull()
+      if (box) {
+        expect(box.width, `${testid}: tap target too narrow`).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+        expect(box.height, `${testid}: tap target too short`).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+      }
     }
   })
 
@@ -249,17 +278,15 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     expect(await sections.count(), 'more section renders section rows').toBeGreaterThanOrEqual(2)
     await expect(sheet.locator(NAV.mobileMoreAccountSection)).toBeVisible()
 
-    // Accordion: tapping Manage expands five groups; Channels reveals Inbound.
+    // Accordion: tapping Manage expands three groups; Apps reveals the directory.
     await sheet.locator(NAV.mobileMoreManage).click()
     await expect(sheet.locator(NAV.mobileMoreGroup('assistants'))).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
     await expect(sheet.locator(NAV.mobileMoreGroup('automations'))).toBeVisible()
-    await expect(sheet.locator(NAV.mobileMoreGroup('channels'))).toBeVisible()
-    await expect(sheet.locator(NAV.mobileMoreGroup('connections'))).toBeVisible()
-    await expect(sheet.locator(NAV.mobileMoreGroup('developer'))).toBeVisible()
-    await sheet.locator(NAV.mobileMoreGroup('channels')).click()
-    await expect(sheet.locator(NAV.mobileMoreInbound)).toBeVisible({
+    await expect(sheet.locator(NAV.mobileMoreGroup('apps'))).toBeVisible()
+    await sheet.locator(NAV.mobileMoreGroup('apps')).click()
+    await expect(sheet.locator(NAV.mobileMoreApps)).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
 
@@ -329,9 +356,9 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     } else {
       await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await page.locator(NAV.sidebarV2ChatNav).click()
-      await expect(page.locator(NAV.modalChatManager)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expectNoHorizontalOverflow(page, 'history sheet')
-      await expectInsideViewport(page, NAV.modalChatManager, 'history sheet')
+      await expect(page.locator(NAV.sidebarChats)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expectNoHorizontalOverflow(page, 'chat list panel')
+      await expectInsideViewport(page, NAV.sidebarChats, 'chat list panel')
     }
   })
 
@@ -339,7 +366,89 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     await page.setViewportSize({ width: 320, height: 800 })
     await openApp(page)
     await expectNoHorizontalOverflow(page, 'chat @320px')
-    await expectInsideViewport(page, CHAT.sendBtn, 'send button @320px')
+    await expectInsideViewport(page, composerAction, 'composer action @320px')
+    await expectInsideViewport(
+      page,
+      '[data-testid="section-chat-controls"]',
+      'composer controls @320px'
+    )
+    await expectInsideViewport(page, CHAT.modelToggle, 'model chip @320px')
+    const controls = page.locator('[data-testid="section-chat-controls"]')
+    const overflow = await controls.evaluate((el) => el.scrollWidth - el.clientWidth)
+    expect(overflow, 'composer controls overflow @320px').toBeLessThanOrEqual(1)
+  })
+
+  test('composer control bar stays one row for a long and a short model name', async ({ page }) => {
+    await openApp(page)
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+    const pickModel = async (preferLong: boolean): Promise<string> => {
+      await page.locator(CHAT.modelToggle).click()
+      const panel = page.locator('[data-testid="dropdown-model-panel"]')
+      await expect(panel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      const options = panel.locator('.model-option__name')
+      const count = await options.count()
+      expect(count).toBeGreaterThan(0)
+      let chosen = 0
+      let chosenName = ''
+      for (let i = 0; i < count; i++) {
+        const name = (await options.nth(i).innerText()).trim()
+        if (
+          chosenName === '' ||
+          (preferLong ? name.length > chosenName.length : name.length < chosenName.length)
+        ) {
+          chosen = i
+          chosenName = name
+        }
+      }
+      await options.nth(chosen).click()
+      await expect(panel).toBeHidden({ timeout: TIMEOUTS.SHORT })
+      return chosenName
+    }
+
+    const assertBar = async (width: number, modelName: string) => {
+      await page.setViewportSize({ width, height: 800 })
+      const controls = page.locator('[data-testid="section-chat-controls"]')
+      await expect(controls).toBeVisible()
+      const spread = await controls.evaluate((el) => {
+        const centers = [...el.children].map((child) => {
+          const box = child.getBoundingClientRect()
+          return box.top + box.height / 2
+        })
+        return Math.max(...centers) - Math.min(...centers)
+      })
+      expect(spread, `control bar wraps @${width} for ${modelName}`).toBeLessThanOrEqual(2)
+      const overflow = await controls.evaluate((el) => el.scrollWidth - el.clientWidth)
+      expect(overflow, `control bar overflows @${width}`).toBeLessThanOrEqual(1)
+
+      const toggle = page.locator(CHAT.modelToggle)
+      await expect(toggle).toHaveAttribute(
+        'aria-label',
+        new RegExp(modelName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      )
+      const box = await toggle.boundingBox()
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+      for (const selector of [CHAT.plusToggle, composerAction]) {
+        const target = await page.locator(selector).boundingBox()
+        expect(target?.height ?? 0, selector).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+        expect(target?.width ?? 0, selector).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+      }
+      const files = page.locator('[data-testid="conversation-files-toggle"]')
+      if (await files.count()) {
+        const filesBox = await files.boundingBox()
+        expect(filesBox?.height ?? 0).toBeGreaterThanOrEqual(MIN_TARGET_PX)
+      }
+      const summary = page.locator('[data-testid="chip-tools-summary"]')
+      const badge = page.locator('[data-testid="badge-plus-tools-count"]')
+      expect((await summary.isVisible()) || (await badge.isVisible())).toBeTruthy()
+    }
+
+    const longName = await pickModel(true)
+    for (const width of [320, 390]) {
+      await assertBar(width, longName)
+    }
+    const shortName = await pickModel(false)
+    await assertBar(390, shortName)
   })
 })
 
@@ -363,13 +472,13 @@ test.describe('@ci @layout UI guard — key pages', () => {
     }
   })
 
-  test('channels page (inbound config) has no overflow', async ({ page }) => {
+  test('apps directory has no overflow', async ({ page }) => {
     await openApp(page)
-    await page.goto('/channels')
-    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
+    await page.goto('/apps')
+    await expect(page.locator(selectors.apps.page)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
-    await expectNoHorizontalOverflow(page, 'channels (inbound)')
+    await expectNoHorizontalOverflow(page, 'apps')
   })
 
   test('AI models page header stays inside the card (B1 regression)', async ({ page }) => {
@@ -435,9 +544,18 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
     await openApp(page)
     await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     if (!isMobileViewport(page)) {
+      // openApp reopens the worker account's last chat, which earlier tests
+      // filled; the empty-chat scan needs a chat that is actually empty.
+      await new ChatHelper(page).startNewChat()
       await axeBlocking(page, 'empty-chat')
-      await page.locator(NAV.sidebarV2Manage).click()
-      await expect(page.locator(NAV.navDropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await page.locator(NAV.sidebarV2Assistants).click()
+      await expect(page.locator(NAV.sidebarPanel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      // The click hides the rail tooltip, but the leave transition keeps the
+      // node mounted for a frame. axe folds that opacity into color-contrast,
+      // so scan only once the node is gone.
+      await expect(page.locator(NAV.sidebarRailTooltip)).toHaveCount(0, {
+        timeout: TIMEOUTS.SHORT,
+      })
       await axeBlocking(page, 'manage-panel')
     }
   })
@@ -450,6 +568,37 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
       await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await axeBlocking(page, 'login')
     })
+  })
+
+  test('a sent message keeps its edit controls readable in light and dark', async ({ page }) => {
+    test.skip(
+      isMobileViewport(page),
+      'Phone chrome hides the desktop rail. The contrast scan runs on desktop.'
+    )
+    await openApp(page)
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    const chat = new ChatHelper(page)
+    await chat.startNewChat()
+    const previous = await chat.sendMessage('Hello from the contrast check')
+    await chat.waitForAnswer(previous, true)
+    // Edit is shown once the message is stored. The optimistic row has no id.
+    await page.reload()
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    const edit = page.getByTestId('btn-message-edit').last()
+    await expect(edit).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+    await paintTheme(page, 'light')
+    await axeIn(page, '[data-testid="user-message-bubble"]', 'user-message-light')
+    await paintTheme(page, 'dark')
+    await axeIn(page, '[data-testid="user-message-bubble"]', 'user-message-dark')
+
+    await edit.click()
+    await expect(page.getByTestId('message-edit-form')).toBeVisible()
+    await axeIn(page, '[data-testid="user-message-bubble"]', 'user-message-edit-dark')
+    await paintTheme(page, 'light')
+    await axeIn(page, '[data-testid="user-message-bubble"]', 'user-message-edit-light')
+    await page.getByTestId('btn-message-edit-cancel').click()
+    await expect(page.getByTestId('message-edit-form')).toBeHidden()
   })
 
   test('AI models — light and dark', async ({ page }) => {

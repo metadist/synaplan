@@ -92,7 +92,7 @@ const activeStateLabel = computed(() => `${enabledRules.value}/4`)
         </span>
         <button
           type="button"
-          class="text-xs px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/30 txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+          class="text-xs px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/30 txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
           :disabled="disabled"
           @click="resetRules"
         >

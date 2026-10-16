@@ -8,6 +8,8 @@
 export const PROMPTS = {
   SMOKE_TEST: 'Ai, this is a smoke test. Answer with "success" add nothing else',
   CHAT_SMOKE: 'Ai, this is a smoke test. Reply with one short sentence.',
+  /** One inline and one display formula; the user bubble must render both with KaTeX. */
+  MATH_FORMULAS: 'Math check: $E = mc^2$ and $$\\int_0^1 x^2\\,dx$$',
   FIRST_MESSAGE: 'First message',
   SECOND_MESSAGE: 'Second message',
   CORS_TEST: 'Test CORS message',

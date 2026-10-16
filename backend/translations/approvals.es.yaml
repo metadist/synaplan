@@ -1,0 +1,8 @@
+approval:
+  chat_followup:
+    executed: 'Listo: %preview%.'
+    executed_with_result: 'Listo: %preview%. Resultado: %result%'
+    failed: 'No se pudo ejecutar %preview%: %reason%. No se envió nada.'
+    failed_generic: 'No se pudo ejecutar %preview%. No se envió nada.'
+    rejected: 'De acuerdo, no lo ejecuté. No se envió nada.'
+    unsupported: '%preview% aún no se puede ejecutar tras la aprobación. No se envió nada.'

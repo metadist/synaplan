@@ -34,6 +34,18 @@ class GroupRepository extends ServiceEntityRepository
         }
     }
 
+    /**
+     * @template T
+     *
+     * @param callable(): T $callback
+     *
+     * @return T
+     */
+    public function transactional(callable $callback): mixed
+    {
+        return $this->getEntityManager()->wrapInTransaction($callback);
+    }
+
     public function findOneBySlug(string $slug): ?Group
     {
         return $this->findOneBy(['slug' => $slug]);

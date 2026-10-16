@@ -52,11 +52,15 @@ final class ModelImportApplierTest extends KernelTestCase
         self::assertSame(1, $chat->getSelectable());
         self::assertSame(0, $chat->getIsDefault());
         self::assertSame('itest-endpoint', $chat->getJson()['endpoint'] ?? null);
+        // #2110: imported rows are free by nature and must stay visible in the
+        // model pickers despite their zero price.
+        self::assertSame(1, $chat->getShowWhenFree());
+        self::assertFalse($chat->isHiddenBecauseFree());
         $firstSeen = $chat->getJson()['meta']['import']['lastSeenAt'] ?? 0;
         self::assertGreaterThan(0, $firstSeen);
 
-        // An operator makes it a non-selectable default.
-        $chat->setSelectable(0)->setIsDefault(1);
+        // An operator makes it a non-selectable default and hides it when free.
+        $chat->setSelectable(0)->setIsDefault(1)->setShowWhenFree(0);
         $this->em->flush();
         $this->em->clear();
 
@@ -70,7 +74,95 @@ final class ModelImportApplierTest extends KernelTestCase
         self::assertInstanceOf(Model::class, $reloaded);
         self::assertSame(0, $reloaded->getSelectable(), 'operator BSELECTABLE survives re-import');
         self::assertSame(1, $reloaded->getIsDefault(), 'operator BISDEFAULT survives re-import');
+        self::assertSame(0, $reloaded->getShowWhenFree(), 'operator BSHOWWHENFREE survives re-import');
         self::assertGreaterThan($firstSeen, $reloaded->getJson()['meta']['import']['lastSeenAt'] ?? 0);
+    }
+
+    public function testImportedChatRowIsVisibleDespiteZeroPrice(): void
+    {
+        // #2110: a self-imported Ollama chat model carries no per-token price
+        // and must still reach the chat dropdown and the Chat-Default picker.
+        $result = $this->applier->apply('ollama', [
+            ['providerId' => self::PROVIDER_ID, 'name' => 'Qwen3 Test', 'tags' => ['chat']],
+        ]);
+
+        self::assertSame(1, $result['created']);
+
+        $chat = $this->models->findOneBy(['service' => 'ollama', 'tag' => 'chat', 'providerId' => self::PROVIDER_ID]);
+        self::assertInstanceOf(Model::class, $chat);
+        self::assertSame(0.0, $chat->getPriceIn());
+        self::assertSame(0.0, $chat->getPriceOut());
+        self::assertSame(1, $chat->getShowWhenFree());
+        self::assertFalse($chat->isHiddenBecauseFree());
+    }
+
+    public function testPublishedOpenRouterPriceIsStoredAndShowWhenFreeStaysOn(): void
+    {
+        $result = $this->applier->apply('openai_compatible:itest-endpoint', [[
+            'providerId' => self::PROVIDER_ID,
+            'name' => 'Paid route',
+            'tags' => ['chat'],
+            'priceKnown' => true,
+            'priceIn' => 0.15,
+            'priceOut' => 0.6,
+        ]]);
+
+        self::assertSame(1, $result['created']);
+        $chat = $this->models->findOneBy(['service' => 'OpenAICompatible', 'tag' => 'chat', 'providerId' => self::PROVIDER_ID]);
+        self::assertInstanceOf(Model::class, $chat);
+        self::assertEqualsWithDelta(0.15, $chat->getPriceIn(), 0.000001);
+        self::assertEqualsWithDelta(0.6, $chat->getPriceOut(), 0.000001);
+        self::assertSame(1, $chat->getShowWhenFree());
+        self::assertTrue($chat->isPriceKnown());
+        self::assertFalse($chat->isHiddenBecauseFree());
+    }
+
+    public function testMissingListingPriceStaysSelectableAndIsNotFree(): void
+    {
+        $this->applier->apply('openai_compatible:itest-endpoint', [[
+            'providerId' => self::PROVIDER_ID,
+            'tags' => ['chat'],
+            'priceKnown' => false,
+        ]]);
+
+        $chat = $this->models->findOneBy(['service' => 'OpenAICompatible', 'tag' => 'chat', 'providerId' => self::PROVIDER_ID]);
+        self::assertInstanceOf(Model::class, $chat);
+        self::assertSame(0.0, $chat->getPriceIn());
+        self::assertSame(0.0, $chat->getPriceOut());
+        self::assertSame(1, $chat->getShowWhenFree());
+        self::assertFalse($chat->isPriceKnown());
+        self::assertFalse($chat->isHiddenBecauseFree());
+    }
+
+    public function testReimportDoesNotOverwriteAPriceTheAdminTyped(): void
+    {
+        $source = 'openai_compatible:itest-endpoint';
+        $row = [
+            'providerId' => self::PROVIDER_ID,
+            'tags' => ['chat'],
+            'priceKnown' => true,
+            'priceIn' => 0.15,
+            'priceOut' => 0.6,
+        ];
+        $this->applier->apply($source, [$row]);
+
+        $chat = $this->models->findOneBy(['service' => 'OpenAICompatible', 'tag' => 'chat', 'providerId' => self::PROVIDER_ID]);
+        self::assertInstanceOf(Model::class, $chat);
+        $chat->setPriceIn(9.0)->setPriceOut(8.0);
+        $this->em->flush();
+        $this->em->clear();
+
+        $again = $row;
+        $again['priceIn'] = 3.0;
+        $again['priceOut'] = 4.0;
+        $second = $this->applier->apply($source, [$again]);
+        self::assertSame(0, $second['created']);
+        self::assertSame(1, $second['skipped']);
+
+        $reloaded = $this->models->findOneBy(['service' => 'OpenAICompatible', 'tag' => 'chat', 'providerId' => self::PROVIDER_ID]);
+        self::assertInstanceOf(Model::class, $reloaded);
+        self::assertEqualsWithDelta(9.0, $reloaded->getPriceIn(), 0.000001);
+        self::assertEqualsWithDelta(8.0, $reloaded->getPriceOut(), 0.000001);
     }
 
     public function testUnknownTagsAreIgnored(): void

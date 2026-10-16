@@ -10,7 +10,7 @@
       <div class="flex flex-wrap gap-2">
         <button
           type="button"
-          class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-3 py-1.5 rounded-xl text-sm font-medium"
           :disabled="index === 0"
           :aria-label="$t('workflows.moveUp')"
           @click="emit('move', -1)"
@@ -19,7 +19,7 @@
         </button>
         <button
           type="button"
-          class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-3 py-1.5 rounded-xl text-sm font-medium"
           :disabled="index >= total - 1"
           :aria-label="$t('workflows.moveDown')"
           @click="emit('move', 1)"
@@ -28,7 +28,7 @@
         </button>
         <button
           type="button"
-          class="btn-danger px-3 py-1.5 rounded-lg text-sm font-medium"
+          class="btn-danger px-3 py-1.5 rounded-xl text-sm font-medium"
           @click="emit('remove')"
         >
           {{ $t('workflows.deleteStep') }}

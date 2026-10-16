@@ -6,7 +6,7 @@ namespace App\Tests\Unit\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\WhisperProvider;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -28,12 +28,19 @@ final class WhisperProviderTest extends TestCase
         self::assertContains('speech_to_text', $this->provider->getCapabilities());
     }
 
-    public function testAvailabilityDelegatesToWhisperService(): void
+    public function testAvailabilityIsTheOnDiskInstallAndDoesNotProbeTheBinary(): void
     {
-        $this->whisperService->method('isAvailable')->willReturn(true);
+        $this->whisperService->expects(self::never())->method('isAvailable');
+        $this->whisperService->method('isInstalled')->willReturn(true);
 
         self::assertTrue($this->provider->isAvailable());
-        self::assertTrue($this->provider->getStatus()['healthy']);
+    }
+
+    public function testStatusUsesTheFullProbe(): void
+    {
+        $this->whisperService->method('isAvailable')->willReturn(false);
+
+        self::assertFalse($this->provider->getStatus()['healthy']);
     }
 
     public function testTranscribeForwardsToWhisperServiceAndDropsCatalogAlias(): void

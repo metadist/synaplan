@@ -9,6 +9,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 class PiperProvider implements TextToSpeechProviderInterface
 {
@@ -33,6 +34,22 @@ class PiperProvider implements TextToSpeechProviderInterface
     ];
 
     private const DEFAULT_VOICE = 'en_US-lessac-medium';
+
+    /** Requested formats the native WebM stream already satisfies. */
+    private const WEBM_STREAM_FORMATS = ['webm', 'opus'];
+
+    private const MIN_SPEED = 0.25;
+    private const MAX_SPEED = 4.0;
+
+    private const ERROR_EXCERPT_LENGTH = 500;
+
+    private const BODY_FORMAT_MP3 = 'mp3';
+    private const BODY_FORMAT_WAV = 'wav';
+
+    /** Mono speech; roughly a fifth of Piper's 16-bit PCM WAV. */
+    private const SPEECH_MP3_BITRATE = '64k';
+
+    private const FFMPEG_TIMEOUT_SECONDS = 30;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -127,21 +144,7 @@ class PiperProvider implements TextToSpeechProviderInterface
 
     public function synthesize(string $text, array $options = []): string
     {
-        $voice = $this->resolveVoice($options);
-
-        $response = $this->httpClient->request('POST', $this->ttsUrl.'/api/tts', [
-            'json' => [
-                'text' => $text,
-                'voice' => $voice,
-                'length_scale' => $options['speed'] ?? 1.0,
-            ],
-        ]);
-
-        if (200 !== $response->getStatusCode()) {
-            throw new ProviderException('Piper TTS failed: '.$response->getContent(false), 'piper');
-        }
-
-        $wavContent = $response->getContent();
+        $wavContent = $this->synthesizeWav($text, $this->resolveVoice($options), $options);
 
         // 2. Save WAV to temp file
         $wavPath = $this->tempDir.'/'.uniqid('piper_', true).'.wav';
@@ -173,9 +176,21 @@ class PiperProvider implements TextToSpeechProviderInterface
         return $filename;
     }
 
+    /**
+     * Not a generator itself: the Piper request and its status check run
+     * before the caller sends response headers, so a failing or unreachable
+     * TTS service surfaces as an error instead of an empty 200 audio body.
+     */
     public function synthesizeStream(string $text, array $options = []): \Generator
     {
         $voice = $this->resolveVoice($options);
+
+        $bodyFormat = $this->bodyFormat($options);
+        if (null !== $bodyFormat) {
+            $wav = $this->synthesizeWav($text, $voice, $options);
+
+            return self::yieldOnce(self::BODY_FORMAT_MP3 === $bodyFormat ? $this->encodeSpeechMp3($wav) : $wav);
+        }
 
         $response = $this->httpClient->request('GET', $this->ttsUrl.'/api/tts', [
             'query' => [
@@ -187,9 +202,17 @@ class PiperProvider implements TextToSpeechProviderInterface
         ]);
 
         if (200 !== $response->getStatusCode()) {
-            throw new ProviderException('Piper TTS streaming failed: '.$response->getContent(false), 'piper');
+            throw new ProviderException('Piper TTS streaming failed: '.self::errorExcerpt($response), 'piper');
         }
 
+        return $this->streamChunks($response);
+    }
+
+    /**
+     * @return \Generator<int, string, void, void>
+     */
+    private function streamChunks(ResponseInterface $response): \Generator
+    {
         foreach ($this->httpClient->stream($response) as $chunk) {
             $content = $chunk->getContent();
             if ('' !== $content) {
@@ -198,9 +221,106 @@ class PiperProvider implements TextToSpeechProviderInterface
         }
     }
 
+    /**
+     * @return \Generator<int, string, void, void>
+     */
+    private static function yieldOnce(string $content): \Generator
+    {
+        yield $content;
+    }
+
     public function getStreamContentType(array $options = []): string
     {
-        return 'audio/webm';
+        return match ($this->bodyFormat($options)) {
+            self::BODY_FORMAT_MP3 => 'audio/mpeg',
+            self::BODY_FORMAT_WAV => 'audio/wav',
+            default => 'audio/webm',
+        };
+    }
+
+    /**
+     * Piper's streaming endpoint only produces WebM/Opus, which some clients
+     * (AVFoundation on iOS) cannot play. A caller that explicitly asks for
+     * mp3 gets one complete MP3 body, any other non-WebM format one WAV body;
+     * callers that send no format keep the WebM stream (null).
+     *
+     * @param array<string, mixed> $options
+     */
+    private function bodyFormat(array $options): ?string
+    {
+        $format = strtolower(trim((string) ($options['format'] ?? '')));
+
+        if ('' === $format || in_array($format, self::WEBM_STREAM_FORMATS, true)) {
+            return null;
+        }
+
+        return self::BODY_FORMAT_MP3 === $format ? self::BODY_FORMAT_MP3 : self::BODY_FORMAT_WAV;
+    }
+
+    /**
+     * Constant bitrate, because a piped MP3 carries no VBR seek index and the
+     * player would have to estimate the duration.
+     */
+    private function encodeSpeechMp3(string $wav): string
+    {
+        $process = new Process([
+            'ffmpeg',
+            '-hide_banner',
+            '-loglevel', 'error',
+            '-f', 'wav',
+            '-i', 'pipe:0',
+            '-codec:a', 'libmp3lame',
+            '-b:a', self::SPEECH_MP3_BITRATE,
+            '-f', 'mp3',
+            'pipe:1',
+        ], null, null, $wav, self::FFMPEG_TIMEOUT_SECONDS);
+
+        $process->run();
+
+        if (!$process->isSuccessful() || '' === $process->getOutput()) {
+            throw new ProviderException('FFmpeg MP3 encoding failed: '.substr($process->getErrorOutput(), 0, self::ERROR_EXCERPT_LENGTH), 'piper');
+        }
+
+        return $process->getOutput();
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function synthesizeWav(string $text, string $voice, array $options): string
+    {
+        $response = $this->httpClient->request('POST', $this->ttsUrl.'/api/tts', [
+            'json' => [
+                'text' => $text,
+                'voice' => $voice,
+                'length_scale' => self::lengthScale($options),
+            ],
+        ]);
+
+        if (200 !== $response->getStatusCode()) {
+            throw new ProviderException('Piper TTS failed: '.self::errorExcerpt($response), 'piper');
+        }
+
+        return $response->getContent();
+    }
+
+    /**
+     * Piper's length_scale is the inverse of a speed factor: below 1.0 speaks
+     * faster, above 1.0 slower.
+     *
+     * @param array<string, mixed> $options
+     */
+    private static function lengthScale(array $options): float
+    {
+        $speed = is_numeric($options['speed'] ?? null) ? (float) $options['speed'] : 1.0;
+        $speed = max(self::MIN_SPEED, min(self::MAX_SPEED, $speed));
+
+        return 1.0 / $speed;
+    }
+
+    private static function errorExcerpt(ResponseInterface $response): string
+    {
+        return 'HTTP '.$response->getStatusCode().': '.substr($response->getContent(false), 0, self::ERROR_EXCERPT_LENGTH);
     }
 
     public function supportsStreaming(): bool

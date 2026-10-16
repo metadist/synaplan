@@ -27,7 +27,7 @@
   >
     <div
       v-if="visible"
-      class="fixed bottom-0 left-0 right-0 md:bottom-32 md:left-1/2 md:-translate-x-1/2 md:w-[720px] md:max-w-[92vw] surface-card border-t md:border border-light-border/30 dark:border-dark-border/30 md:rounded-xl z-[60] h-[85vh] md:h-auto md:max-h-[70vh] flex flex-col"
+      class="fixed bottom-0 left-0 right-0 md:bottom-32 md:left-1/2 md:-translate-x-1/2 md:w-[720px] md:max-w-[92vw] surface-card border-t md:border border-light-border/30 dark:border-dark-border/30 md:!rounded-xl z-[60] h-[85vh] md:h-auto md:max-h-[70vh] flex flex-col"
       role="menu"
       data-testid="comp-command-palette"
       @click.stop

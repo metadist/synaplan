@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\File;
 
 use App\Service\File\FileGenerationEnvelope;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -112,5 +113,37 @@ class FileGenerationEnvelopeTest extends TestCase
         $this->assertFalse(FileGenerationEnvelope::hasSignature('{"BFILEPATH":"a.docx"}'));
         $this->assertFalse(FileGenerationEnvelope::hasSignature('The BFILEPATH field is mentioned in prose.'));
         $this->assertTrue(FileGenerationEnvelope::hasSignature('{"BFILEPATH":"a.docx","BFILETEXT":'));
+    }
+
+    #[DataProvider('provideRequestedFormats')]
+    public function testRequestedFormatDetectsNamedFormats(string $text, ?string $expected): void
+    {
+        $this->assertSame($expected, FileGenerationEnvelope::requestedFormat($text));
+    }
+
+    /**
+     * @return iterable<string, array{string, ?string}>
+     */
+    public static function provideRequestedFormats(): iterable
+    {
+        yield 'german excel' => ['Vergleich Plan und Ist, ich will die Abweichung als Excel.', 'xlsx'];
+        yield 'english xlsx' => ['Compare plan and actual, give me the variance as xlsx.', 'xlsx'];
+        yield 'last match wins' => ['Mach aus dem CSV ein Excel.', 'xlsx'];
+        yield 'source mention loses to output' => ['Create a Word document from this Excel spreadsheet.', 'docx'];
+        yield 'von csv nach excel' => ['Konvertiere von CSV nach Excel.', 'xlsx'];
+        yield 'url source never elects' => ['Lad https://example.com/data.xlsx und mach ein Diagramm.', null];
+        yield 'csv explicit' => ['Export the table as CSV, please.', 'csv'];
+        yield 'named text file' => ['Save it into a text file counter_weekday.txt', 'txt'];
+        yield 'text file without extension' => ['Save the count as a text file.', 'txt'];
+        yield 'markdown file' => ['Write the notes as markdown in notes.md', 'md'];
+        yield 'convert txt to markdown' => ['Convert report.txt to Markdown', 'md'];
+        yield 'spreadsheet exported as text' => ['Export the spreadsheet as a text file', 'txt'];
+        yield 'text file converted to markdown' => ['Convert a text file to Markdown', 'md'];
+        yield 'word document' => ['Write it as a Word document.', 'docx'];
+        yield 'german word compound' => ['Schreib mir ein Word-Dokument dazu.', 'docx'];
+        yield 'powerpoint' => ['Make me a PowerPoint deck from this.', 'pptx'];
+        yield 'bare word is not a format' => ['In other words, summarize it.', null];
+        yield 'pdf stays with the export logic' => ['Create a PDF agenda.', null];
+        yield 'no format named' => ['Vergleich Plan und Ist.', null];
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Support;
 
+use App\Service\Multitask\Execution\Runner\AskUserRunner;
 use App\Service\Multitask\Execution\Runner\CalendarEventRunner;
 use App\Service\Multitask\Execution\Runner\ChatRunner;
 use App\Service\Multitask\Execution\Runner\CodeRunRunner;
@@ -62,6 +63,7 @@ final class SkillCatalogFactory
         EmailMeRunner::class,
         SaveToFolderRunner::class,
         ComposeReplyRunner::class,
+        AskUserRunner::class,
         ToolCallRunner::class,
         OutboundWebhookRunner::class,
         ConditionRunner::class,

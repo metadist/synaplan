@@ -36,6 +36,13 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
 {
     private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+    /**
+     * Smallest non-zero thinking budget for a chosen "low" level.
+     * Zero disables thinking on Flash, so low has to stay above it and
+     * below the medium budget (1024).
+     */
+    private const LOW_THINKING_BUDGET = 512;
     private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
 
     /**
@@ -640,17 +647,16 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             return ['thinkingBudget' => $budget];
         }
 
-        // Cross-provider semantic levels. We default to 'low' for chat to
-        // make TTFT acceptable on Gemini 3.x Pro models. Callers that
-        // explicitly want deeper reasoning (e.g. an "extended thinking"
-        // toggle in the UI) can set 'high'.
+        // Cross-provider semantic levels. Thinking off stays a zero budget
+        // on Flash (and is omitted on Pro, which rejects 0). A chosen `low`
+        // is a real, smaller budget — not off.
         $effort = $options['reasoning_effort'] ?? null;
 
-        // The legacy `reasoning => true/false` flag (already used by some
-        // providers) maps to 'high'/'low' here so we don't break callers
-        // that flip reasoning on without choosing a level.
+        // The legacy `reasoning => true/false` flag maps to high / off so
+        // callers that flip reasoning without choosing a level keep the
+        // previous on/off behaviour.
         if (null === $effort && array_key_exists('reasoning', $options)) {
-            $effort = ((bool) $options['reasoning']) ? 'high' : 'low';
+            $effort = ((bool) $options['reasoning']) ? 'high' : 'off';
         }
 
         if (null === $effort) {
@@ -665,7 +671,8 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         $isPro = '' !== $model && $this->isProGeminiModel($model);
 
         return match ($effort) {
-            'off', 'none', 'disabled', 'low' => $isPro ? null : ['thinkingBudget' => 0],
+            'off', 'none', 'disabled' => $isPro ? null : ['thinkingBudget' => 0],
+            'low' => ['thinkingBudget' => self::LOW_THINKING_BUDGET],
             'medium' => ['thinkingBudget' => 1024],
             'high' => ['thinkingBudget' => 8192],
             'dynamic' => ['thinkingBudget' => -1],
@@ -677,7 +684,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function generateImage(string $prompt, array $options = []): array
     {
-        $model = $options['model'] ?? 'imagen-4.0-generate-001';
+        // Nano Banana 2, the successor ModelCatalog::RETIREMENTS[115] records for
+        // Imagen 4.0: Google shut the Imagen 4 endpoints down on 2026-08-17, so
+        // the previous default 404'd for every caller that passed no model.
+        $model = $options['model'] ?? 'gemini-3.1-flash-image';
         $inputImages = $options['images'] ?? [];
 
         if (null === $this->resolveApiKey()) {
@@ -777,6 +787,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 }
             }
 
+            if ([] === $images) {
+                throw $this->geminiNoImage($data, $model);
+            }
+
             return $images;
         } catch (ProviderException $e) {
             throw $e;
@@ -788,7 +802,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     /**
      * Pic2pic: generate an image from input images + text using Gemini native API.
      *
-     * @param string   $model      Gemini image model (e.g. gemini-3.1-flash-image-preview)
+     * @param string   $model      Gemini image model (e.g. gemini-3.1-flash-image)
      * @param string   $prompt     Text instruction
      * @param string[] $imagePaths Absolute paths to input images
      *
@@ -862,12 +876,45 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 }
             }
 
+            if ([] === $images) {
+                throw $this->geminiNoImage($data, $model);
+            }
+
             return $images;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google Gemini pic2pic error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * A finish the content check lets through (STOP, MAX_TOKENS, …) can still
+     * carry no image, e.g. when the model answers a question about the photo
+     * in prose. The exception keeps that reply so callers can show it.
+     *
+     * @param array<string, mixed> $data generateContent response
+     */
+    private function geminiNoImage(array $data, string $model): ProviderException
+    {
+        $candidate = is_array($data['candidates'][0] ?? null) ? $data['candidates'][0] : [];
+        $finishReason = is_string($candidate['finishReason'] ?? null) ? $candidate['finishReason'] : null;
+
+        $textResponse = null;
+        foreach ($candidate['content']['parts'] ?? [] as $part) {
+            if (true === ($part['thought'] ?? false)) {
+                continue;
+            }
+            if (is_string($part['text'] ?? null) && '' !== trim($part['text'])) {
+                $textResponse = $part['text'];
+                break;
+            }
+        }
+
+        $exception = ProviderException::noImage('google', $model, $textResponse, $finishReason);
+        $this->logger->warning('Google Gemini: image model returned no image', $exception->logContext());
+
+        return $exception;
     }
 
     /**
@@ -921,7 +968,9 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     /**
      * Generate image using Imagen via Gemini API (API key) or Vertex AI (project ID + OAuth).
      *
-     * Gemini API: available for imagen-4.0-generate-001
+     * The catalog carries no Imagen row any more — Google shut the Imagen 4 ids
+     * down on 2026-08-17 (see ModelCatalog::RETIREMENTS[115]) — so this path now
+     * only serves an Imagen model an operator added themselves.
      *
      * @see https://ai.google.dev/gemini-api/docs/imagen
      */
@@ -976,7 +1025,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             'timeout' => 120,
         ]);
 
-        return $this->parseImagenResponse($response->toArray());
+        return $this->parseImagenResponse($response->toArray(), $model);
     }
 
     /**
@@ -1006,12 +1055,13 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             'timeout' => 120,
         ]);
 
-        return $this->parseImagenResponse($response->toArray());
+        return $this->parseImagenResponse($response->toArray(), $model);
     }
 
-    private function parseImagenResponse(array $data): array
+    private function parseImagenResponse(array $data, string $model): array
     {
         $images = [];
+        $filteredReason = null;
         foreach ($data['predictions'] ?? [] as $prediction) {
             if (isset($prediction['bytesBase64Encoded'])) {
                 $mimeType = $prediction['mimeType'] ?? 'image/png';
@@ -1019,7 +1069,18 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                     'url' => 'data:'.$mimeType.';base64,'.$prediction['bytesBase64Encoded'],
                     'revised_prompt' => null,
                 ];
+            } elseif (null === $filteredReason && is_string($prediction['raiFilteredReason'] ?? null)) {
+                $filteredReason = $prediction['raiFilteredReason'];
             }
+        }
+
+        if ([] === $images) {
+            $exception = null !== $filteredReason && '' !== trim($filteredReason)
+                ? ProviderException::imageFiltered('google', $model, $filteredReason)
+                : ProviderException::noImage('google', $model, null, null);
+            $this->logger->warning('Google Imagen: no image in response', $exception->logContext());
+
+            throw $exception;
         }
 
         return $images;

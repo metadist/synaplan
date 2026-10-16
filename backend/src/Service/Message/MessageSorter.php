@@ -16,14 +16,14 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Agent\AgentService;
-use App\Service\DiscordNotificationService;
 use App\Service\File\ConversationFile;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
-use App\Service\PromptService;
+use App\Service\Notification\DiscordNotificationService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\Usage\RecordedUsage;
@@ -139,6 +139,8 @@ final readonly class MessageSorter
         private ?AgentConfig $agentConfig = null,
         private ?AgentService $agentService = null,
         private ?UserRepository $users = null,
+        private ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
+        private ?ConnectedSystemsHint $connectedSystems = null,
     ) {
     }
 
@@ -183,8 +185,8 @@ final readonly class MessageSorter
                     'language' => $messageData['BLANG'] ?? 'en',
                     // No LLM ran on the rule-based path, so there is no
                     // BWEBSEARCH vote. The final web-search decision is made by
-                    // WebSearchTopicPolicy in MessageProcessor (a custom topic
-                    // that needs live data can set tool_internet=true).
+                    // WebSearchTopicPolicy in MessageProcessor (the user can
+                    // still ask for a search explicitly).
                     'web_search' => false,
                     // No LLM ran, so there is no BREADPAGES vote either.
                     'read_pages' => null,
@@ -256,6 +258,12 @@ final readonly class MessageSorter
         if (null !== $this->officePdfRouting) {
             $promptText = $this->officePdfRouting->decoratePrompt($promptText);
         }
+        // Connected systems (MCP servers) the BMULTI vote has to know about —
+        // appended, not templated, so stored prompt rows need no migration.
+        // Empty for users without a connection: their prompt is unchanged.
+        if (null !== $this->connectedSystems) {
+            $promptText .= $this->connectedSystems->renderForSorter($userId);
+        }
 
         // Build messages array for AI
         $messages = [
@@ -266,7 +274,7 @@ final readonly class MessageSorter
         $fileAnnotationBudget = self::FILE_ANNOTATION_BUDGET;
         foreach ($conversationHistory as $msg) {
             if ('IN' === $msg->getDirection()) {
-                $msgText = $msg->getText();
+                $msgText = $this->modelFacingText($msg->getText());
                 if ($msg->getFileText()) {
                     $msgText .= ' User provided a file: '.$msg->getFileType().', saying: \''.substr($msg->getFileText(), 0, 200).'\'';
                 }
@@ -274,8 +282,9 @@ final readonly class MessageSorter
                 $messages[] = ['role' => 'user', 'content' => $msgText];
             } elseif ('OUT' === $msg->getDirection()) {
                 // Truncate assistant responses
-                $assistantText = substr($msg->getText(), 0, 200);
-                if (strlen($msg->getText()) > 200) {
+                $modelText = $this->modelFacingText($msg->getText());
+                $assistantText = substr($modelText, 0, 200);
+                if (strlen($modelText) > 200) {
                     $assistantText .= '...';
                 }
                 $assistantText .= $this->fileAnnotation($msg, $fileAnnotationBudget);
@@ -423,6 +432,7 @@ final readonly class MessageSorter
                     'tokens' => $recordedSortingUsage->totalTokens,
                     'prompt_tokens' => $recordedSortingUsage->promptTokens,
                     'completion_tokens' => $recordedSortingUsage->completionTokens,
+                    'price_known' => $recordedSortingUsage->priceKnown,
                 ] : null,
             ], $routingDecision->toClassificationFields());
         } catch (StructuredOutputViolationException $e) {
@@ -587,6 +597,13 @@ final readonly class MessageSorter
      * path stays query-free. Returns an empty string once the shared budget is
      * spent or the turn has no file.
      */
+    private function modelFacingText(?string $text): string
+    {
+        return null !== $this->mediaTextRenderer
+            ? $this->mediaTextRenderer->forModel($text)
+            : GeneratedMediaTextRenderer::renderModel((string) $text);
+    }
+
     private function fileAnnotation(Message $message, int &$budget): string
     {
         if ($budget <= 0) {
@@ -713,11 +730,10 @@ final readonly class MessageSorter
 
         $data = $decoded->data;
 
-        // Parse BWEBSEARCH (can be 0, 1, true, false)
-        $webSearch = false;
-        if (isset($data['BWEBSEARCH'])) {
-            $webSearch = (bool) $data['BWEBSEARCH'];
-        }
+        // BWEBSEARCH counts as a vote for search only as 1, true, "1" or
+        // "true". Anything else — "false", "yes", "on", garbage — is no vote,
+        // so malformed sorter output can never trigger a search.
+        $webSearch = in_array($data['BWEBSEARCH'] ?? null, [1, true, '1', 'true'], true);
 
         // Parse BREADPAGES (0 = snippets only, 2 or 3 = dump that many
         // result pages into the answer prompt). Null when the model omitted

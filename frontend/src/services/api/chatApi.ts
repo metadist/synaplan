@@ -15,6 +15,24 @@ import { UserMemorySchema } from './userMemoriesApi'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
 import { GetApiChatsMessagesResponseSchema } from '@/generated/api-schemas'
+
+export const ConversationFileRowSchema = z.object({
+  id: z.number().int().nullable(),
+  reference: z.string(),
+  name: z.string(),
+  category: z.enum(['image', 'document', 'audio', 'video', 'other']),
+  origin: z.enum(['attached', 'uploaded', 'generated']),
+  fileType: z.string(),
+  messageId: z.number().int().nullable(),
+  hasText: z.boolean(),
+})
+
+export const GetConversationFilesResponseSchema = z.object({
+  success: z.boolean(),
+  files: z.array(ConversationFileRowSchema),
+})
+
+export type ConversationFileRow = z.infer<typeof ConversationFileRowSchema>
 import type { StreamUpdatePayload } from '@/types/chatStream'
 
 /**
@@ -123,10 +141,27 @@ let tokenProactiveTimer: ReturnType<typeof setTimeout> | null = null
  * `POST /api/v1/auth/refresh`, log a misleading "session expired" error
  * and force-redirect to `/login?reason=session_expired`.
  */
+/**
+ * Cookie-refresh already on the wire, if any. Principal-swap callers await
+ * this AFTER taking the auth-mutation lock. The promise is only assigned once
+ * `awaitAuthMutation()` has resolved, so joining it cannot deadlock on the
+ * lock we hold — it is a real in-flight fetch that must finish (and write
+ * its Set-Cookie) before the swap response becomes the last writer.
+ */
+export function getInFlightRefresh(): Promise<boolean> | null {
+  return tokenRefreshPromise
+}
+
 async function refreshAccessToken(): Promise<boolean> {
   if (!hasSessionHint()) {
     return false
   }
+
+  // Wait for an in-progress impersonation/login swap BEFORE recording an
+  // in-flight fetch. Putting this inside the coalesced promise used to make
+  // getInFlightRefresh() return a waiter parked on the lock — awaiting that
+  // from the swap deadlocked until the 15s force-release.
+  await awaitAuthMutation()
 
   if (tokenRefreshPromise) {
     return tokenRefreshPromise
@@ -134,11 +169,6 @@ async function refreshAccessToken(): Promise<boolean> {
 
   tokenRefreshPromise = (async () => {
     try {
-      // This pool is invisible to the httpClient auth-mutation lock. Let an
-      // in-progress impersonation swap settle first, else this fires with
-      // pre-swap cookies and clobbers the new session.
-      await awaitAuthMutation()
-
       const refreshResponse = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
@@ -719,6 +749,8 @@ export const chatApi = {
     chatId?: number
     onUpdate: (data: StreamUpdatePayload) => void
     includeReasoning?: boolean
+    /** Chosen level when the model publishes one. Omitted keeps the model default. */
+    reasoningEffort?: string
     webSearch?: boolean
     /** Active vue-i18n locale — seeds inbound BLANG / Brave search language. */
     language?: string
@@ -751,6 +783,7 @@ export const chatApi = {
     }
     if (opts.trackId) paramsObj.trackId = opts.trackId.toString()
     if (opts.includeReasoning) paramsObj.reasoning = '1'
+    if (opts.reasoningEffort) paramsObj.reasoningEffort = opts.reasoningEffort
     if (opts.webSearch) paramsObj.webSearch = '1'
     if (opts.language) paramsObj.language = opts.language
     if (opts.modelId) paramsObj.modelId = opts.modelId.toString()
@@ -789,7 +822,32 @@ export const chatApi = {
     return httpClient(`/api/v1/messages/history?${params}`, { method: 'GET' })
   },
 
-  async enhanceMessage(text: string): Promise<{ original: string; enhanced: string }> {
+  async linkTurn(messageId: number, kind: 'again' | 'edit', previousId: number) {
+    return httpClient(`/api/v1/messages/${messageId}/turn-link`, {
+      method: 'POST',
+      body: JSON.stringify({ kind, previousId }),
+    })
+  },
+
+  async selectVersion(messageId: number, kind: 'answer' | 'edit') {
+    return httpClient(`/api/v1/messages/${messageId}/select-version`, {
+      method: 'POST',
+      body: JSON.stringify({ kind }),
+    })
+  },
+
+  async answerAskUser(messageId: number, nodeId: string, answer: string, skip = false) {
+    return httpClient(`/api/v1/messages/${messageId}/ask-user`, {
+      method: 'POST',
+      body: JSON.stringify({ nodeId, answer, skip }),
+    })
+  },
+
+  async enhanceMessage(text: string): Promise<{
+    original: string
+    enhanced: string
+    summary?: 'unchanged' | 'capitalized' | 'rewritten'
+  }> {
     return httpClient<{ original: string; enhanced: string }>('/api/v1/messages/enhance', {
       method: 'POST',
       body: JSON.stringify({ text }),
@@ -800,6 +858,17 @@ export const chatApi = {
     return httpClient(`/api/v1/chats/${chatId}/messages?offset=${offset}&limit=${limit}`, {
       method: 'GET',
       schema: GetApiChatsMessagesResponseSchema,
+    })
+  },
+
+  /**
+   * Files this chat can still use on later turns (uploads and generated
+   * artefacts). The same list is on GET /api/v1/chats/{id} as `conversationFiles`.
+   */
+  async getConversationFiles(chatId: number) {
+    return httpClient(`/api/v1/chats/${chatId}/files`, {
+      method: 'GET',
+      schema: GetConversationFilesResponseSchema,
     })
   },
 
@@ -856,6 +925,7 @@ export const chatApi = {
     status: string
     extracted_text_length: number
     extraction_error?: 'audio_transcription_failed' | 'document_extraction_failed'
+    speech_failure?: 'speech_off' | 'binary_missing' | 'model_missing' | 'transcription_failed'
     extraction_strategy?: string
     text?: string
     language?: string
@@ -890,6 +960,7 @@ export const chatApi = {
     language?: string
     duration?: number
     extraction_error?: 'audio_transcription_failed' | 'document_extraction_failed'
+    speech_failure?: 'speech_off' | 'binary_missing' | 'model_missing' | 'transcription_failed'
   }> {
     // Derive the extension from the actual recording MIME so Safari/macOS
     // (audio/mp4) uploads as `.m4a` and stays on the transcription path,
@@ -912,14 +983,17 @@ export const chatApi = {
   /**
    * Stop streaming - notify backend to stop streaming
    */
-  async stopStream(trackId?: number): Promise<{ success: boolean; message: string }> {
+  async stopStream(
+    trackId?: number,
+    chatId?: number | null
+  ): Promise<{ success: boolean; message: string }> {
     console.log('📡 chatApi.stopStream called with trackId:', trackId)
     try {
       const result = await httpClient<{ success: boolean; message: string }>(
         '/api/v1/messages/stop-stream',
         {
           method: 'POST',
-          body: JSON.stringify({ trackId }),
+          body: JSON.stringify({ trackId, chatId: chatId ?? undefined }),
         }
       )
       console.log('📡 chatApi.stopStream response:', result)
@@ -954,10 +1028,14 @@ export const chatApi = {
    * Cancel a single multitask media node (per-card Stop button) without
    * stopping the rest of the turn.
    */
-  async cancelTask(trackId: number, nodeId: string): Promise<{ success: boolean }> {
+  async cancelTask(
+    trackId: number,
+    nodeId: string,
+    chatId?: number | null
+  ): Promise<{ success: boolean }> {
     return httpClient<{ success: boolean }>('/api/v1/messages/cancel-node', {
       method: 'POST',
-      body: JSON.stringify({ trackId: String(trackId), nodeId }),
+      body: JSON.stringify({ trackId: String(trackId), nodeId, chatId: chatId ?? undefined }),
     })
   },
 

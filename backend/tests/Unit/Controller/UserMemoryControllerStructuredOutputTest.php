@@ -9,10 +9,11 @@ use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Controller\UserMemoryController;
 use App\Entity\User;
+use App\Service\Digest\LongTermMemoryService;
+use App\Service\Memory\UserMemoryService;
 use App\Service\ModelConfigService;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
-use App\Service\UserMemoryService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\Container;
@@ -53,6 +54,7 @@ final class UserMemoryControllerStructuredOutputTest extends TestCase
             $this->modelConfigService,
             $this->createMock(RateLimitService::class),
             $structuredOutputConfig,
+            $this->createStub(LongTermMemoryService::class),
         );
 
         $container = new Container();

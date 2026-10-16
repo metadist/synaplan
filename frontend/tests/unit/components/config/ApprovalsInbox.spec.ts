@@ -38,7 +38,7 @@ describe('ApprovalsInbox', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockList.mockResolvedValue({ pendingCount: 0, approvals: [] })
-    mockGetNotify.mockResolvedValue('instant')
+    mockGetNotify.mockResolvedValue({ mode: 'instant', mailConfigured: true })
   })
 
   it('shows the empty-state next action when nothing is pending', async () => {

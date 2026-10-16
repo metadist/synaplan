@@ -64,6 +64,7 @@ vi.mock('@/services/authService', async () => {
       logout: vi.fn(),
       revokeAllSessions: vi.fn(),
       handleOAuthCallback: vi.fn(),
+      getInFlightRefresh: vi.fn().mockReturnValue(null),
       // chatsStore / historyStore guard their network methods behind this
       // helper; even though our tests only touch synchronous setters, leave
       // the door open so a future test doesn't trip a redirect-to-login.
@@ -98,6 +99,11 @@ vi.mock('@/services/api/impersonationApi', () => ({
 
 vi.mock('@/services/api/chatApi', () => ({
   clearSseToken: vi.fn(),
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
+}))
+
+vi.mock('@/services/apiService', () => ({
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock('@/stores/userMemories', () => ({
@@ -109,7 +115,7 @@ vi.mock('@/stores/userFeedback', () => ({
 }))
 
 describe('useAuthStore — impersonation', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia())
     // Module-scoped and deliberately not cleared by logout itself.
     endSessionTeardown()
@@ -124,6 +130,8 @@ describe('useAuthStore — impersonation', () => {
     configReloadMock.mockReset()
     configReloadMock.mockResolvedValue(undefined)
     localStorage.clear()
+    const chatApi = await import('@/services/api/chatApi')
+    vi.mocked(chatApi.getInFlightRefresh).mockReturnValue(null)
   })
 
   afterEach(() => {
@@ -192,6 +200,38 @@ describe('useAuthStore — impersonation', () => {
     const refreshOrder = vi.mocked(httpClient.refreshAccessToken).mock.invocationCallOrder[0]
     const startOrder = startApiMock.mock.invocationCallOrder[0]
     expect(refreshOrder).toBeLessThan(startOrder)
+  })
+
+  it('startImpersonation waits for a chatApi refresh already on the wire before swapping', async () => {
+    const chatApi = await import('@/services/api/chatApi')
+    const authServiceModule = (await import('@/services/authService')) as unknown as {
+      __setUser: (u: unknown) => void
+      __setImpersonator: (i: unknown) => void
+    }
+
+    let resolveRefresh: (value: boolean) => void = () => undefined
+    const refreshPromise = new Promise<boolean>((resolve) => {
+      resolveRefresh = resolve
+    })
+    vi.mocked(chatApi.getInFlightRefresh).mockReturnValue(refreshPromise)
+
+    startApiMock.mockResolvedValueOnce({ success: true })
+    authServiceModule.__setUser({ id: 99, email: 'target@example.com', level: 'PRO' })
+    authServiceModule.__setImpersonator({ id: 1, email: 'admin@example.com', level: 'ADMIN' })
+
+    const store = useAuthStore()
+    const startPromise = store.startImpersonation(99)
+
+    await vi.waitFor(() => {
+      expect(chatApi.getInFlightRefresh).toHaveBeenCalled()
+    })
+    expect(startApiMock).not.toHaveBeenCalled()
+
+    resolveRefresh(true)
+    const result = await startPromise
+
+    expect(result.success).toBe(true)
+    expect(startApiMock).toHaveBeenCalledTimes(1)
   })
 
   it('startImpersonation surfaces a server error verbatim and leaves state untouched', async () => {

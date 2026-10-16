@@ -1,11 +1,16 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { openApp } from '../helpers/auth'
-import { ChatHelper } from '../helpers/chat'
+import { ChatHelper, openChatManager } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
 test.describe('@ci @smoke Chat Share', () => {
   test('user can share chat and open shared link in incognito', async ({ page }) => {
+    // Cold-boot arrange plus a full chat round-trip plus the share roundtrip
+    // does not fit the 60s default under shard load. Without the headroom the
+    // generous waits inside openApp() and waitForAnswer() cannot be reached:
+    // the test dies on the wall clock and reports no failing step.
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     const uniqueMessage = `Chat share E2E ${Date.now()} – please reply briefly.`
 
     await test.step('Arrange: login via UI', async () => {
@@ -32,12 +37,7 @@ test.describe('@ci @smoke Chat Share', () => {
       const v2ChatNav = page.locator(selectors.nav.sidebarV2ChatNav)
       const v2Visible = await v2ChatNav.isVisible()
       if (v2Visible) {
-        await v2ChatNav.click()
-        const modal = page.locator(selectors.nav.modalChatManager)
-        await modal.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-        await modal
-          .locator(selectors.nav.chatManagerListRows)
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+        const modal = await openChatManager(page)
         const lastChatRow = modal.locator(selectors.nav.chatV2Row).first()
         await lastChatRow.scrollIntoViewIfNeeded()
         await lastChatRow.hover()

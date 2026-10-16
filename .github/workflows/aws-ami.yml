@@ -191,7 +191,7 @@ jobs:
           persist-credentials: false
 
       - name: Assume the build role
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
           role-session-name: synaplan-ami-${{ github.run_id }}
@@ -213,7 +213,7 @@ jobs:
       - name: Install Packer
         uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3
         with:
-          version: 1.16.0
+          version: 1.16.1
 
       - name: Build
         env:
@@ -302,7 +302,7 @@ jobs:
           fi
 
       - name: Upload the build manifest
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: packer-manifest-${{ matrix.architecture }}
           path: packer-manifest.json
@@ -340,7 +340,7 @@ jobs:
           persist-credentials: false
 
       - name: Assume the build role
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
           role-session-name: synaplan-verify-${{ github.run_id }}
@@ -352,7 +352,7 @@ jobs:
           role-duration-seconds: 7200
 
       - name: Download the build manifest
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: packer-manifest-x86_64
 
@@ -515,7 +515,7 @@ jobs:
       # succeeds even where the first one has long expired.
       - name: Refresh the credentials
         if: always()
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
           role-session-name: synaplan-teardown-${{ github.run_id }}

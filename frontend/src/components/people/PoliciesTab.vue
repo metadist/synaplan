@@ -9,7 +9,7 @@
           <select
             id="policy-group"
             v-model="selectedId"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="select-policy-group"
           >
             <option :value="null" disabled>{{ $t('people.policies.chooseGroup') }}</option>
@@ -63,7 +63,7 @@
               >
                 <span class="font-medium">{{ $t(`people.policies.capability.${cap}`) }}</span>
                 <select
-                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-full mt-1 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   :value="stringSetting(`DEFAULTMODEL.${cap}`)"
                   :data-testid="`select-default-${cap}`"
                   @change="
@@ -103,6 +103,15 @@
             </h3>
             <p class="txt-secondary text-sm mb-4">{{ $t('people.policies.allowedHelper') }}</p>
             <p
+              v-if="limitedCapabilityNames.length > 0"
+              class="txt-secondary text-sm mb-4"
+              data-testid="hint-allowed-limits"
+            >
+              {{
+                $t('people.policies.allowedLimits', { names: limitedCapabilityNames.join(', ') })
+              }}
+            </p>
+            <p
               v-if="isLocked('MODELS.ALLOWED')"
               class="txt-secondary text-sm mb-4"
               data-testid="hint-policy-lock-ignored"
@@ -110,7 +119,7 @@
               {{ $t('people.policies.lockIgnored') }}
             </p>
             <div class="max-h-64 overflow-y-auto space-y-4" data-testid="list-allowed-models">
-              <template v-for="cap in defaultCapabilities" :key="cap">
+              <template v-for="cap in allowListCapabilities" :key="cap">
                 <div v-if="modelsFor(cap).length > 0" class="space-y-2">
                   <p class="text-xs font-medium txt-secondary">
                     {{ $t(`people.policies.capability.${cap}`) }}
@@ -144,7 +153,7 @@
                   $t(`people.policies.feature.${featureI18nKey(key)}`)
                 }}</span>
                 <select
-                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-full mt-1 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   :value="featureMode(key)"
                   :data-testid="`select-feature-${featureI18nKey(key)}`"
                   @change="onFeature(key, ($event.target as HTMLSelectElement).value)"
@@ -175,7 +184,7 @@
               {{ $t('people.policies.rateLimit') }}
             </h3>
             <select
-              class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               :value="stringSetting('RATELIMITS.TIER')"
               data-testid="select-rate-tier"
               @change="onSelect('RATELIMITS.TIER', ($event.target as HTMLSelectElement).value)"
@@ -195,7 +204,7 @@
           <div class="flex justify-end">
             <button
               type="button"
-              class="btn-primary px-4 py-2.5 rounded-lg"
+              class="btn-primary px-4 py-2.5 rounded-xl"
               :disabled="saving"
               data-testid="btn-save-policies"
               @click="save"
@@ -223,6 +232,20 @@ const { t } = useI18n()
 const { success, error } = useNotification()
 
 const defaultCapabilities = ['CHAT', 'VECTORIZE', 'PIC2TEXT', 'SOUND2TEXT', 'MEM', 'TOOLS'] as const
+const allowListCapabilities = [
+  'CHAT',
+  'SORT',
+  'ANALYZE',
+  'MEM',
+  'VECTORIZE',
+  'PIC2TEXT',
+  'TEXT2PIC',
+  'PIC2PIC',
+  'TEXT2VID',
+  'IMG2VID',
+  'SOUND2TEXT',
+  'TEXT2SOUND',
+] as const satisfies readonly Capability[]
 const featureKeys = [
   'SAVEDTASKS.ENABLED',
   'DESKTOP_AGENT.ENABLED',
@@ -237,12 +260,16 @@ const featureKeys = [
   'TOOLS.APPROVALS_ENABLED',
   'TOOLS.CUSTOM_HTTP_ENABLED',
   'WORKFLOWS.BUILDER_ENABLED',
+  'CHAT.EXPORT_ENABLED',
+  'CHAT.SHARE_ENABLED',
 ] as const
 /** Code defaults used when no instance row exists. Matches the PHP resolvers. */
 const featureBuiltinOn = new Set<string>([
   'MULTITASK.ROUTING_ENABLED',
   'MULTITASK.URL_FETCH_ENABLED',
   'TOOLS.REGISTRY_ENABLED',
+  'CHAT.EXPORT_ENABLED',
+  'CHAT.SHARE_ENABLED',
 ])
 const tiers = ['NEW', 'PRO', 'TEAM', 'BUSINESS'] as const
 const lockableKeys = [
@@ -379,6 +406,20 @@ function catalogKey(model: AIModel): string {
 function modelsFor(cap: string): AIModel[] {
   return modelsByCap.value[cap as Capability] ?? []
 }
+
+const limitedCapabilityNames = computed(() => {
+  const selectedTags = new Set(
+    allowedKeys.value.map((key) => key.split(':').at(-1)?.toLowerCase() ?? '')
+  )
+  if (selectedTags.size === 0) {
+    return []
+  }
+  return allowListCapabilities
+    .filter((cap) =>
+      modelsFor(cap).some((model) => selectedTags.has((model.tag ?? '').toLowerCase()))
+    )
+    .map((cap) => t(`people.policies.capability.${cap}`))
+})
 
 function featureI18nKey(key: string): string {
   return key.replaceAll('.', '_')

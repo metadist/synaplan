@@ -223,11 +223,24 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
             return $this->mockTaskPlan($userContent, $schema);
         }
 
+        // Search palette AI tier (tools:smart_search). Checked before the
+        // generic search-query branch below, whose markers it also contains.
+        if (str_contains($systemContent, 'Smart Search Interpreter')) {
+            return $this->mockSmartSearchInterpret($userContent);
+        }
+
         // Memory extraction (tools:memory_extraction): the user prompt built by
         // MemoryExtractionService carries these two stable markers.
         if (str_contains($userContent, 'Current Message (from the user):')
             && str_contains($userContent, '"action": "create"')) {
             return $this->mockMemoryExtraction($userContent, $schema);
+        }
+
+        // Message digest (tools:message_digest): MessageDigestService always
+        // starts the user prompt with this marker, including when the system
+        // prompt in the database differs from the catalog fallback.
+        if (str_contains($userContent, 'Message batch (each line starts with [#id direction channel date]):')) {
+            return $this->mockMessageDigest($userContent, $schema);
         }
 
         // Search-query-style request (e.g. SearchQueryGenerator with tools:search prompt): return cleaned query like fallbackExtraction
@@ -557,7 +570,7 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
      * so the schema-aware branch returns that envelope and fills in the
      * schema's nullable `memory_id`. Without a schema the stub keeps its
      * original bare-array shape — {@see
-     * \App\Service\MemoryExtractionService::parseMemoriesFromResponse()}
+     * \App\Service\Memory\MemoryExtractionService::parseMemoriesFromResponse()}
      * accepts both via regex, so neither shape is a compatibility risk.
      */
     private function mockMemoryExtraction(string $userContent, ?StructuredOutputSchema $schema): string
@@ -586,6 +599,51 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         }
 
         return json_encode($memories, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Mock message digest: deterministic contract for E2E tests.
+     *
+     * Each user line whose text contains `remember: <title>` becomes one
+     * digest for that message id. Every other line yields nothing, so ordinary
+     * chat turns never create long-term memory entries. Assistant lines are
+     * skipped because the canned chat reply echoes the user's text.
+     *
+     * Schema-aware: {@see \App\AI\StructuredOutput\Schema\MessageDigestSchema}
+     * wraps the list under `digests`. Without a schema the stub returns a
+     * bare array. {@see
+     * \App\Service\Digest\MessageDigestService::parseDigestsFromResponse()}
+     * accepts both.
+     */
+    private function mockMessageDigest(string $userContent, ?StructuredOutputSchema $schema): string
+    {
+        $digests = [];
+        $parts = preg_split('/(?=\[#\d+\s+\S+\s+\S+\s+\d{4}-\d{2}-\d{2}\])/', $userContent) ?: [];
+        foreach ($parts as $part) {
+            if (!preg_match('/^\[#(\d+)\s+user\s+\S+\s+\d{4}-\d{2}-\d{2}\]\s*(.*)$/s', $part, $match)) {
+                continue;
+            }
+            if (!preg_match('/remember:\s*([^\n]+)/', $match[2], $titleMatch)) {
+                continue;
+            }
+            $title = trim($titleMatch[1]);
+            if ('' === $title) {
+                continue;
+            }
+            $digests[] = [
+                'title' => $title,
+                'message_id' => (int) $match[1],
+            ];
+        }
+
+        if (null !== $schema) {
+            $wrapped = ['digests' => $digests];
+            $this->assertMatchesSchema($wrapped, $schema);
+
+            return json_encode($wrapped, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }
+
+        return json_encode($digests, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
     private function detectLanguage(string $text, string $fallback = 'en'): string
@@ -755,6 +813,39 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
             '4k', 'uhd' => '4K',
             default => '1080p',
         };
+    }
+
+    /**
+     * Mock palette interpretation: points at the first setting candidate,
+     * else the first candidate, so E2E can walk the Best action card
+     * without a real provider. No candidate line yields the chat hand-off.
+     */
+    private function mockSmartSearchInterpret(string $userContent): string
+    {
+        preg_match_all('/^- id=([^|]+?) \| kind=(\w+) \| title=([^|\n]+)/m', $userContent, $matches, PREG_SET_ORDER);
+        if ([] === $matches) {
+            return (string) json_encode(['intent' => 'answer', 'targetIds' => [], 'answer' => 'A chat can help with this.']);
+        }
+
+        $pick = $matches[0];
+        foreach ($matches as $match) {
+            if ('setting' === $match[2]) {
+                $pick = $match;
+                break;
+            }
+        }
+        $intent = match ($pick[2]) {
+            'setting' => 'change_setting',
+            'command' => 'run_command',
+            'page' => 'navigate',
+            default => 'find',
+        };
+
+        return (string) json_encode([
+            'intent' => $intent,
+            'targetIds' => [trim($pick[1])],
+            'answer' => 'Test pick: '.trim($pick[3]).'.',
+        ]);
     }
 
     /**

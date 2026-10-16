@@ -5,10 +5,10 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
 use App\Repository\UserRepository;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Client\ClientContextResolver;
-use App\Service\IapPricingService;
-use App\Service\PremiumFeatureGate;
+use App\Service\Iap\IapPricingService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -386,7 +386,7 @@ class SubscriptionController extends AbstractController
             $paymentMethods = array_filter(array_map('trim', explode(',', $this->stripePaymentMethods)));
             $session = \Stripe\Checkout\Session::create([
                 'customer' => $customerId,
-                'payment_method_types' => $paymentMethods,
+                'allowed_payment_method_types' => $paymentMethods,
                 'line_items' => [[
                     'price' => $priceId,
                     'quantity' => 1,
@@ -579,7 +579,7 @@ class SubscriptionController extends AbstractController
 
             $session = \Stripe\Checkout\Session::create([
                 'customer' => $customerId,
-                'payment_method_types' => $paymentMethods,
+                'allowed_payment_method_types' => $paymentMethods,
                 'line_items' => [[
                     'price_data' => [
                         'currency' => 'eur',

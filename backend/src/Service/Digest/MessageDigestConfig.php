@@ -11,8 +11,8 @@ use App\Repository\ConfigRepository;
  *
  * All settings have code-side defaults, so no seeder rows are required —
  * operators can override any of them by inserting a BCONFIG row with
- * ownerId 0. The per-user cursor lives in the same group with the user's
- * id as owner.
+ * ownerId 0. The per-user cursor and the per-batch failure counter live
+ * in the same group with the user's id as owner.
  */
 final class MessageDigestConfig
 {
@@ -23,6 +23,9 @@ final class MessageDigestConfig
     public const KEY_MAX_BATCHES_PER_USER = 'MAX_BATCHES_PER_USER';
     public const KEY_QUIET_SECONDS = 'QUIET_SECONDS';
     public const KEY_CURSOR = 'CURSOR';
+    public const KEY_CURSOR_FAILURES = 'CURSOR_FAILURES';
+    public const KEY_LAST_DIGESTED_AT = 'LAST_DIGESTED_AT';
+    public const KEY_START_AFTER_ID = 'START_AFTER_ID';
     public const KEY_TOP_K = 'TOP_K';
     public const KEY_MIN_SCORE = 'MIN_SCORE';
     public const KEY_RECENCY_HALF_LIFE_DAYS = 'RECENCY_HALF_LIFE_DAYS';
@@ -90,20 +93,105 @@ final class MessageDigestConfig
     }
 
     /**
-     * Per-user digest cursor: the highest message id a run has already
-     * SCANNED (not necessarily digested — batches that yield no key message
-     * advance it too, so they are never re-billed).
+     * Per-user digest cursor: the highest message id of the contiguous
+     * scanned prefix. A batch with no key message still advances it. A row
+     * skipped only for the quiet window bounds it, and a failed batch does
+     * not move it. A user without a stored cursor starts at
+     * {@see getStartAfterId()}.
      */
     public function getCursor(int $userId): int
     {
         $raw = $this->configRepository->getValue($userId, self::CONFIG_GROUP, self::KEY_CURSOR);
 
-        return null !== $raw ? max(0, (int) $raw) : 0;
+        return null !== $raw ? max(0, (int) $raw) : $this->getStartAfterId();
+    }
+
+    /**
+     * Highest message id that existed when long-term memory was introduced,
+     * written once by a migration. The scheduled and after-turn passes never
+     * digest messages at or below it; only an explicit backfill reaches them.
+     */
+    public function getStartAfterId(): int
+    {
+        return max(0, $this->getInt(self::KEY_START_AFTER_ID, 0));
     }
 
     public function setCursor(int $userId, int $messageId): void
     {
         $this->configRepository->setValue($userId, self::CONFIG_GROUP, self::KEY_CURSOR, (string) $messageId);
+    }
+
+    /**
+     * Move the cursor forward. An id at or below the stored cursor is ignored.
+     */
+    public function advanceCursor(int $userId, int $messageId): void
+    {
+        if ($messageId > $this->getCursor($userId)) {
+            $this->setCursor($userId, $messageId);
+        }
+    }
+
+    /**
+     * Failures of the batch that starts at this cursor, stored as `"<cursor>:<count>"`.
+     *
+     * @return array{start: int, count: int}|null
+     */
+    public function getCursorFailures(int $userId): ?array
+    {
+        $raw = $this->configRepository->getValue($userId, self::CONFIG_GROUP, self::KEY_CURSOR_FAILURES);
+        if (null === $raw || 1 !== preg_match('/^(\d+):(\d+)$/', $raw, $matches)) {
+            return null;
+        }
+
+        return ['start' => (int) $matches[1], 'count' => (int) $matches[2]];
+    }
+
+    public function setCursorFailures(int $userId, int $batchStart, int $count): void
+    {
+        $this->configRepository->setValue(
+            $userId,
+            self::CONFIG_GROUP,
+            self::KEY_CURSOR_FAILURES,
+            $batchStart.':'.$count,
+        );
+    }
+
+    public function clearCursorFailures(int $userId): void
+    {
+        $this->configRepository->deleteValue($userId, self::CONFIG_GROUP, self::KEY_CURSOR_FAILURES);
+    }
+
+    /**
+     * Unix time when the scheduled run last finished this user. A user with
+     * no row has never been reached and sorts ahead of everyone else.
+     *
+     * @param list<int> $userIds
+     *
+     * @return array<int, int> userId => unix time
+     */
+    public function lastDigestedAtFor(array $userIds): array
+    {
+        $raw = $this->configRepository->getValuesForOwners($userIds, self::CONFIG_GROUP, self::KEY_LAST_DIGESTED_AT);
+        $times = [];
+        foreach ($raw as $userId => $value) {
+            $times[$userId] = max(0, (int) $value);
+        }
+
+        return $times;
+    }
+
+    /**
+     * Record that the scheduled run finished this user, including a pass that
+     * found nothing to index. A killed run has no row for the user it was
+     * still working on, so the next night starts there.
+     */
+    public function markDigested(int $userId, int $at): void
+    {
+        if ($userId <= 0 || $at <= 0) {
+            return;
+        }
+
+        $this->configRepository->setValue($userId, self::CONFIG_GROUP, self::KEY_LAST_DIGESTED_AT, (string) $at);
     }
 
     // --- Retrieval knobs (Sprint 4) ---

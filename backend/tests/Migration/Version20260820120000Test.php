@@ -52,7 +52,7 @@ final class Version20260820120000Test extends KernelTestCase
     public function testItDeactivatesTheRetiredRowAndDropsItsBinding(): void
     {
         $this->givenModelRow(self::RETIRED_STT_BID, self::RETIRED_STT_PROVIDER_ID);
-        $ownerId = $this->anyUserId();
+        $ownerId = $this->givenOwner();
         $this->givenDefaultModelBinding($ownerId, 'SOUND2TEXT', self::RETIRED_STT_BID);
 
         $this->runMigration();
@@ -72,7 +72,7 @@ final class Version20260820120000Test extends KernelTestCase
     public function testItIsIdempotent(): void
     {
         $this->givenModelRow(self::RETIRED_STT_BID, self::RETIRED_STT_PROVIDER_ID);
-        $ownerId = $this->anyUserId();
+        $ownerId = $this->givenOwner();
         $this->givenDefaultModelBinding($ownerId, 'SOUND2TEXT', self::RETIRED_STT_BID);
 
         $this->runMigration();
@@ -99,7 +99,7 @@ final class Version20260820120000Test extends KernelTestCase
     {
         $this->givenModelRow(self::RETIRED_STT_BID, self::RETIRED_STT_PROVIDER_ID);
         $this->givenModelRow(self::UNRELATED_BID, 'whisper-large-v3');
-        $ownerId = $this->anyUserId();
+        $ownerId = $this->givenOwner();
         $this->givenDefaultModelBinding($ownerId, 'SOUND2TEXT', self::UNRELATED_BID);
 
         $this->runMigration();
@@ -149,12 +149,25 @@ final class Version20260820120000Test extends KernelTestCase
         );
     }
 
-    private function anyUserId(): int
+    /**
+     * The test database may or may not carry fixtures, so each case brings its
+     * own owner. Raw INSERT keeps the row on this test's rolled-back connection.
+     */
+    private function givenOwner(): int
     {
-        $userId = $this->connection->fetchOne('SELECT BID FROM BUSER ORDER BY BID ASC LIMIT 1');
-        self::assertNotFalse($userId, 'test database has no user to attach fixtures to');
+        $this->connection->executeStatement(
+            'INSERT INTO BUSER (BCREATED, BMAIL, BPROVIDERID, BUSERLEVEL, BUSERDETAILS, BPAYMENTDETAILS)
+             VALUES (:created, :mail, :provider, :level, :details, :details)',
+            [
+                'created' => date('YmdHis'),
+                'mail' => 'migration-owner-'.bin2hex(random_bytes(4)).'@example.com',
+                'provider' => 'local',
+                'level' => 'NEW',
+                'details' => '{}',
+            ]
+        );
 
-        return (int) $userId;
+        return (int) $this->connection->lastInsertId();
     }
 
     private function givenDefaultModelBinding(int $ownerId, string $setting, int $modelId): void

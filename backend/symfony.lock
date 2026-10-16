@@ -22,6 +22,9 @@
             "ref": "dfc51177476fb39d014ed89944cde53dc3326d23"
         }
     },
+    "deptrac/deptrac": {
+        "version": "4.7.2"
+    },
     "doctrine/deprecations": {
         "version": "1.1",
         "recipe": {

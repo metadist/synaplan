@@ -14,7 +14,7 @@ const i18n = createI18n({
           filter: {
             label: 'Filter chats',
             all: 'All',
-            private: 'Private',
+            private: 'Owned',
             group: 'Group',
             widget: 'Widget',
           },
@@ -33,7 +33,7 @@ const mountFilter = (props: Partial<FilterProps>) =>
   })
 
 describe('ChatKindFilter', () => {
-  it('offers All / Private / Group by default and Widget on request', () => {
+  it('offers All / Owned / Group by default and Widget on request', () => {
     const compact = mountFilter({})
     expect(compact.findAll('button').map((b) => b.attributes('data-testid'))).toEqual([
       'btn-chat-filter-all',

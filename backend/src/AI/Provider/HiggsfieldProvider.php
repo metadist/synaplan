@@ -27,7 +27,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *   The Higgsfield API uses a key+secret pair: `Authorization: Key {key}:{secret}`.
  *   Credentials are resolved at the {@see AiFacade} layer (per-user override on
  *   top of a platform-wide env default) and passed in via $options['credentials'].
- *   The instance pair from Models & keys ({@see ProviderKeyStore}, provider
+ *   The instance pair from Providers & keys ({@see ProviderKeyStore}, provider
  *   `higgsfield`) is only used when the caller did not pre-resolve
  *   credentials (e.g. health-check, isAvailable()).
  *
@@ -1065,7 +1065,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
     }
 
     /**
-     * The instance pair from Models & keys; the store reports a key only when
+     * The instance pair from Providers & keys; the store reports a key only when
      * the secret half is present as well.
      *
      * @return array{api_key: string, api_secret: string}|null

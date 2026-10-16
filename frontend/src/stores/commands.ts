@@ -1,7 +1,15 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import type { z } from 'zod'
 import config from '@/stores/config'
-import { i18n } from '@/i18n'
+import { useAuthStore } from '@/stores/auth'
+import { i18n } from '@/i18n/instance'
+import { httpClient } from '@/services/api/httpClient'
+import { GetApiSavedPromptsListResponseSchema } from '@/generated/api-schemas'
+
+export type SavedPromptRow = NonNullable<
+  z.infer<typeof GetApiSavedPromptsListResponseSchema>['prompts']
+>[number]
 
 export interface Command {
   name: string
@@ -9,6 +17,8 @@ export interface Command {
   usage: string
   requiresArgs: boolean
   icon: string
+  /** When set, choosing the command inserts this text instead of a slash command. */
+  promptBody?: string
   /** True for commands contributed by an installed plugin's manifest. */
   isPlugin?: boolean
   /** Owning plugin id (plugin commands only). */
@@ -67,7 +77,7 @@ function helpCommand(): Command {
  */
 export function pluginCommands(): Command[] {
   const result: Command[] = []
-  for (const plugin of config.plugins) {
+  for (const plugin of config?.plugins ?? []) {
     const chatCommands = plugin.chatCommands
     if (!chatCommands) {
       continue
@@ -93,11 +103,62 @@ export function pluginCommands(): Command[] {
   return result
 }
 
+function savedPromptCommand(row: SavedPromptRow): Command {
+  return {
+    name: row.command,
+    description: row.name || row.command,
+    usage: `/${row.command}`,
+    requiresArgs: false,
+    icon: 'mdi:text-box-outline',
+    promptBody: row.body,
+  }
+}
+
 export const useCommandsStore = defineStore('commands', () => {
+  const savedPrompts = ref<Command[]>([])
+  // Only the newest request may write the list, so a slow earlier response
+  // cannot bring back a prompt that was deleted in the meantime.
+  let savedPromptsRequest = 0
+
+  function setSavedPrompts(rows: readonly SavedPromptRow[]): void {
+    savedPromptsRequest += 1
+    savedPrompts.value = rows.filter((row) => row.command && row.body).map(savedPromptCommand)
+  }
+
+  /** Forget the prompts of the previous principal (logout, login, impersonation swap). */
+  function reset(): void {
+    savedPromptsRequest += 1
+    savedPrompts.value = []
+  }
+
+  /**
+   * Fetch the saved prompts again. The composer calls this each time the
+   * slash menu opens, so a prompt created or deleted on Prompts is listed
+   * without a reload. A failed request keeps the list from the last load.
+   */
+  async function loadSavedPrompts(): Promise<void> {
+    // The endpoint is signed-in only; a 401 would send a guest to the login page.
+    if (!useAuthStore().isAuthenticated) {
+      reset()
+      return
+    }
+    const request = ++savedPromptsRequest
+    try {
+      const data = await httpClient('/api/v1/saved-prompts', {
+        schema: GetApiSavedPromptsListResponseSchema,
+      })
+      if (request !== savedPromptsRequest) return
+      setSavedPrompts(data.prompts ?? [])
+    } catch {
+      // Keep the previous list: a failed refresh must not empty the menu.
+    }
+  }
+
   const commands = computed<Command[]>(() => [
     ...commandsData,
-    ...(config.features.selfAware ? [helpCommand()] : []),
+    ...(config?.features?.selfAware ? [helpCommand()] : []),
     ...pluginCommands(),
+    ...savedPrompts.value,
   ])
 
   const recentCommands = ref<string[]>(JSON.parse(localStorage.getItem('recentCommands') || '[]'))
@@ -117,5 +178,8 @@ export const useCommandsStore = defineStore('commands', () => {
     recentCommands,
     addRecentCommand,
     getCommand,
+    loadSavedPrompts,
+    setSavedPrompts,
+    reset,
   }
 })

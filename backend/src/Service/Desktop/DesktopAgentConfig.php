@@ -9,23 +9,20 @@ use App\Service\Config\LayeredConfigResolver;
 use App\Service\Feature\FeatureFlagEnv;
 
 /**
- * Feature-flag resolver for the Synaplan Desktop agent (the whole desktop
+ * Feature-flag resolver for Synaplan Desktop (the whole desktop
  * pairing / job-queue surface).
  *
  * Flags live in BCONFIG group {@see self::CONFIG_GROUP}:
  *   - ENABLED — master switch: expose pairing, device CRUD, the job queue, and
- *     the MCP check-in tools. When OFF, every desktop route is 404 and the
- *     desktop MCP tools are absent from `tools/list` (invariant C8).
+ *     the MCP check-in tools. When OFF, every desktop route is 404, the
+ *     Desktop page is hidden, a paired computer cannot chat, waiting tasks
+ *     are not picked up, and the desktop MCP tools are absent from
+ *     `tools/list` (invariant C8).
  *
  * Resolution mirrors {@see \App\Service\SavedTask\SavedTaskConfig}: a per-user
  * row (BOWNERID = userId) overrides the global row (BOWNERID = 0), which
- * overrides the built-in code default (OFF).
- *
- * The whole Desktop epic ships to `main` with this flag OFF (master plan
- * decision 21): the seeder inserts a global `0` row and no migration turns it
- * on. Turning it on is an explicit operator / per-user action, so a
- * consumer-less feature is inert on every existing and new install until the
- * client exists.
+ * overrides the built-in code default (OFF). The seeder inserts a global `1`
+ * row on new installs, so the page is shown unless an operator turns it off.
  */
 final readonly class DesktopAgentConfig
 {

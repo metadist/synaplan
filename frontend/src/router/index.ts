@@ -24,11 +24,31 @@ import {
   resolveSetupGate,
   SETUP_ROUTE,
 } from '@/router/setupGate'
-import { i18n } from '@/i18n'
+import {
+  BUNDLE_PANEL_I18N_NAMESPACES,
+  CHROME_I18N_NAMESPACES,
+  i18n,
+  loadNamespaces,
+  rememberRouteNamespaces,
+} from '@/i18n'
+import type { SupportedLanguage } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
-import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
-import { aiAccountsRouteGuard } from '@/composables/useAiAccounts'
-import { adminUsersTabRedirect, groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
+import { normalizeSettingsRoute, settingsLocationFor } from '@/composables/useSettingsSections'
+import { assistantsRouteGuard } from '@/router/assistantGuards'
+import { aiModelsTabRedirect, routingRedirect, topicsRedirect } from '@/router/aiSettingsRedirects'
+import {
+  approvalsRouteGuard,
+  connectionsRedirect,
+  savedTasksRouteGuard,
+} from '@/router/featureSurfaceGuards'
+import { appRouteGuard } from '@/router/appGuards'
+import { groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
+import {
+  adminDashboardRedirect,
+  aiInfrastructureRedirect,
+  modelStatusRedirect,
+  systemConfigRedirect,
+} from '@/router/operateRedirects'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
 
@@ -74,6 +94,14 @@ export function brandName(): string {
   return useConfigStore().branding.name || APP_NAME
 }
 
+/**
+ * `/profile` stays a named route so existing links and guards keep working.
+ * A `redirect` record would skip the auth guard, so this runs from beforeEnter.
+ */
+function profileToSettings(to: RouteLocationNormalized): RouteLocationRaw {
+  return settingsLocationFor(to)
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -82,50 +110,75 @@ const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('@/views/LoginView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.login' },
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.login', i18n: ['auth'] },
     },
     {
       path: '/register',
       name: 'register',
       component: () => import('@/views/RegisterView.vue'),
       beforeEnter: guardRegistration,
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.register' },
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.register', i18n: ['auth'] },
     },
     {
       path: '/forgot-password',
       name: 'forgot-password',
       component: () => import('@/views/ForgotPasswordView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.forgotPassword' },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.forgotPassword',
+        i18n: ['auth'],
+      },
     },
     {
       path: '/reset-password',
       name: 'reset-password',
       component: () => import('@/views/ResetPasswordView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.resetPassword' },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.resetPassword',
+        i18n: ['auth'],
+      },
     },
     {
       path: '/verify-email',
       name: 'verify-email',
       component: () => import('@/views/VerifyEmailView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.verifyEmail' },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.verifyEmail',
+        i18n: ['auth'],
+      },
     },
     {
       path: '/verify-email-callback',
       name: 'verify-email-callback',
       component: () => import('@/views/VerifyEmailCallbackView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.verifyEmail' },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.verifyEmail',
+        i18n: ['auth'],
+      },
     },
     {
       path: '/email-verified',
       name: 'email-verified',
       component: () => import('@/views/EmailVerifiedView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.emailVerified' },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.emailVerified',
+        i18n: ['auth'],
+      },
     },
     {
       path: '/auth/callback',
       name: 'oauth-callback',
       component: () => import('../components/auth/OAuthCallback.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.login' },
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.login', i18n: ['auth'] },
     },
     {
       // Partner-platform confirm card (Nextcloud / ownCloud / Outlook).
@@ -134,7 +187,12 @@ const router = createRouter({
       path: '/connect/platform',
       name: 'platform-connect',
       component: () => import('@/views/PlatformConnectView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.platformConnect' },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.platformConnect',
+        i18n: ['admin'],
+      },
     },
     {
       // Kept so Synamail's buildDialogUrl stays unchanged. Every query
@@ -151,7 +209,7 @@ const router = createRouter({
       path: '/logged-out',
       name: 'logged-out',
       component: () => import('@/views/LoggedOutView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut' },
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut', i18n: ['auth'] },
     },
     {
       // First-run setup of the INSTALLATION (not of a user): reachable only
@@ -161,7 +219,7 @@ const router = createRouter({
       path: '/setup',
       name: SETUP_ROUTE,
       component: () => import('@/views/SetupWizardView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.setup' },
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.setup', i18n: ['auth'] },
     },
     {
       // MOBILE-APP SEAM (first-run onboarding): native-only first-run welcome
@@ -170,7 +228,12 @@ const router = createRouter({
       path: '/onboarding',
       name: 'onboarding',
       component: () => import('@/views/OnboardingView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.onboarding' },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.onboarding',
+        i18n: ['auth'],
+      },
     },
     {
       // MOBILE-APP SEAM (Epic 9.1): public account-deletion info page. Google
@@ -180,7 +243,12 @@ const router = createRouter({
       path: '/account-deletion',
       name: 'account-deletion',
       component: () => import('@/views/AccountDeletionView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.accountDeletion' },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.accountDeletion',
+        i18n: ['auth'],
+      },
     },
     // Shared chat with optional language parameter for SEO
     // /shared/de/abc123 -> German UI
@@ -191,13 +259,25 @@ const router = createRouter({
       path: '/shared/:lang([a-z]{2})/:token',
       name: 'shared-chat-lang',
       component: () => import('@/views/SharedChatView.vue'),
-      meta: { requiresAuth: false, public: true },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        // Shared messages render memory/feedback badges (knowledge) via MessageText
+        // plus the demo setup CTA (auth).
+        i18n: ['chat', 'files', 'knowledge', 'auth'],
+      },
     },
     {
       path: '/shared/:token',
       name: 'shared-chat',
       component: () => import('@/views/SharedChatView.vue'),
-      meta: { requiresAuth: false, public: true },
+      meta: {
+        requiresAuth: false,
+        public: true,
+        // Shared messages render memory/feedback badges (knowledge) via MessageText
+        // plus the demo setup CTA (auth).
+        i18n: ['chat', 'files', 'knowledge', 'auth'],
+      },
     },
 
     // NOTE: There is intentionally no '/error' route.
@@ -208,7 +288,7 @@ const router = createRouter({
       path: '/loading',
       name: 'loading',
       component: LoadingView,
-      meta: { requiresAuth: false },
+      meta: { requiresAuth: false, i18n: [] },
     },
 
     // Chat route (accessible for both authenticated users and guests)
@@ -216,153 +296,187 @@ const router = createRouter({
       path: '/',
       name: 'chat',
       component: () => import('@/views/ChatView.vue'),
-      meta: { requiresAuth: false, allowGuest: true, titleKey: 'pageTitles.chat' },
+      meta: {
+        requiresAuth: false,
+        allowGuest: true,
+        titleKey: 'pageTitles.chat',
+        tour: 'chats',
+        // Chat renders message badges (knowledge: memories/feedback), media-job
+        // and plugin states (tools), the assistant banner (assistants) and the
+        // model sorting label + desktop-run panel (config). All must be present
+        // on first paint — see routeCoverage.spec.ts.
+        i18n: ['chat', 'files', 'knowledge', 'tools', 'assistants', 'config'],
+      },
     },
 
     // Protected routes (require authentication)
     //
-    // Canonical URL tree since the 2026-06 navigation IA cleanup (§4.6):
-    //   /channels/*  — ways conversations reach Synaplan (widgets, email, API)
-    //   /ai/*        — AI machinery (models, instructions, routing)
-    //   /files/*     — knowledge base (browse + search)
-    // The old /tools/* and /config/* paths redirect below (kept ≥ 2 releases
-    // for bookmarks/docs; see redirects.spec.ts).
+    // Canonical URL tree since the 2026-10 UX overhaul
+    // (_devextras/planning/20261009-ux-overhaul):
+    //   /apps/*                          — everything the user connects
+    //   /channels/widgets/*              — chat widgets (own editor)
+    //   /ai/*, /prompts, /tasks, /approvals — assistants and how they work
+    //   /files/*                         — library
+    // Older URLs redirect below (see redirects.spec.ts).
     {
-      path: '/channels',
-      name: 'channels',
+      path: '/apps',
+      name: 'apps',
+      component: () => import('@/views/AppsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.apps', i18n: ['tools'], tour: 'apps' },
+    },
+    {
+      path: '/apps/connected',
+      name: 'apps-connected',
+      component: () => import('@/views/AppsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.appsConnected', i18n: ['tools'] },
+    },
+    {
+      path: '/apps/api/docs',
+      name: 'apps-api-docs',
       component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configInbound' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiDocs', i18n: ['config'] },
+    },
+    {
+      path: '/apps/:appId',
+      name: 'app-detail',
+      component: () => import('@/views/AppDetailView.vue'),
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.appDetail',
+        // App panels reuse the channel, connection, key and assistant pickers.
+        i18n: ['tools', 'config', 'assistants'],
+      },
+      beforeEnter: appRouteGuard,
     },
     {
       path: '/channels/widgets',
       name: 'channels-widgets',
       component: () => import('@/views/WidgetsView.vue'),
-      meta: { requiresAuth: true, helpId: 'tools.chatWidget', titleKey: 'pageTitles.chatWidget' },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.chatWidget',
+        // The widget editor reuses the model capability labels (config).
+        i18n: ['widgets', 'config'],
+      },
     },
     {
       path: '/channels/widgets/live-support',
-      name: 'live-support',
-      component: () => import('../views/LiveSupportView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.liveSupport' },
+      redirect: (to) => ({
+        path: '/channels/widgets',
+        query: { ...to.query, tab: 'conversations' },
+      }),
     },
     {
       path: '/channels/widgets/:widgetId/chats',
       name: 'widget-chats',
       component: () => import('../views/WidgetSessionsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetChats' },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.widgetChats',
+        // Session transcripts render memory/feedback badges (knowledge) via MessageText;
+        // the editor reuses the model capability labels (config).
+        i18n: ['widgets', 'knowledge', 'config'],
+      },
     },
     {
       path: '/channels/widgets/:widgetId',
       name: 'widget-detail',
       component: () => import('@/views/WidgetDetailView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.widgetDetail' },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.widgetDetail',
+        // The widget editor reuses the model capability labels (config).
+        i18n: ['widgets', 'config'],
+      },
     },
     {
-      path: '/channels/email',
-      name: 'channels-email',
-      component: () => import('@/views/ToolsView.vue'),
-      meta: { requiresAuth: true, helpId: 'tools.mailHandler', titleKey: 'pageTitles.mailHandler' },
-    },
-    {
-      path: '/channels/mcp',
-      name: 'channels-mcp',
+      path: '/tasks',
+      name: 'saved-tasks',
       component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.mcpServers' },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.savedTasks',
+        i18n: ['config'],
+        tour: 'tasks',
+      },
+      beforeEnter: savedTasksRouteGuard,
     },
     {
-      path: '/channels/connections',
-      name: 'channels-connections',
+      path: '/approvals',
+      name: 'approvals',
       component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.connections' },
-    },
-    {
-      path: '/channels/tasks',
-      name: 'channels-saved-tasks',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.savedTasks' },
-    },
-    {
-      path: '/channels/approvals',
-      name: 'channels-approvals',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.approvals' },
-    },
-    {
-      path: '/channels/agents',
-      name: 'channels-agents',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.aiAgents' },
-    },
-    {
-      path: '/channels/desktop',
-      name: 'channels-desktop',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.desktop' },
-    },
-    {
-      path: '/channels/platform-links',
-      name: 'channels-platform-links',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.linkedPlatforms' },
-    },
-    {
-      path: '/channels/api',
-      name: 'channels-api',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiKeys' },
-    },
-    {
-      path: '/channels/api/docs',
-      name: 'channels-api-docs',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configApiDocs' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.approvals', i18n: ['chat', 'config'] },
+      beforeEnter: approvalsRouteGuard,
     },
     {
       path: '/ai/models',
       name: 'ai-models',
       component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels', i18n: ['config'] },
+      beforeEnter: aiModelsTabRedirect,
     },
     {
-      path: '/ai/providers',
-      name: 'ai-accounts',
-      component: () => import('@/views/AiAccountsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.aiAccounts' },
-      beforeEnter: aiAccountsRouteGuard,
-    },
-    {
-      path: '/ai/instructions',
-      name: 'ai-instructions',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configTaskPrompts' },
-      beforeEnter: instructionsRouteGuard,
+      path: '/prompts',
+      name: 'prompts',
+      component: () => import('@/views/PromptsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.prompts', i18n: ['chat'] },
     },
     {
       path: '/ai/assistants',
       name: 'ai-assistants',
       component: () => import('@/views/AssistantsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.assistants' },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.assistants',
+        i18n: ['assistants'],
+        tour: 'assistants',
+      },
       beforeEnter: assistantsRouteGuard,
     },
     {
       path: '/ai/assistants/:id',
       name: 'ai-assistant-builder',
       component: () => import('@/views/AssistantsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.assistantBuilder' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.assistantBuilder', i18n: ['assistants'] },
       beforeEnter: assistantsRouteGuard,
     },
+    // --- Redirects from the 2026-06 tree (UX overhaul; keep ≥ 2 releases) ---
+    { path: '/channels', redirect: '/apps' },
+    { path: '/ai/task-prompts', redirect: topicsRedirect },
+    { path: '/ai/instructions', redirect: topicsRedirect },
+    // A guard, not a redirect: it must run after auth has loaded who is an admin.
     {
       path: '/ai/routing',
-      name: 'ai-routing',
       component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configSortingPrompt' },
+      meta: { requiresAuth: true },
+      beforeEnter: routingRedirect,
     },
+    { path: '/channels/email', redirect: '/apps/mailbox' },
+    // OAuth callbacks still land here with `?m365=` / `?dropbox=`.
+    { path: '/channels/connections', redirect: connectionsRedirect },
+    { path: '/channels/mcp', redirect: (to) => ({ path: '/apps/mcp', query: to.query }) },
+    { path: '/channels/platform-links', redirect: '/apps/connected' },
+    { path: '/channels/agents', redirect: '/apps/claude-code' },
+    { path: '/channels/desktop', redirect: '/apps/desktop' },
+    { path: '/channels/api', redirect: '/apps/api' },
+    { path: '/channels/api/docs', redirect: '/apps/api/docs' },
+    { path: '/channels/tasks', redirect: (to) => ({ path: '/tasks', query: to.query }) },
+    { path: '/channels/approvals', redirect: (to) => ({ path: '/approvals', query: to.query }) },
+    {
+      path: '/ai/providers',
+      redirect: (to) =>
+        to.query.section === 'anthropic' ? '/apps/claude-code' : '/apps/higgsfield',
+    },
+    { path: '/ai/providers/higgsfield', redirect: '/apps/higgsfield' },
     // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
     // The Summarizer page now arms Tools › Summarize a document in chat.
     // POST /api/v1/summary/generate stays (Nextcloud + plugin consumers).
-    { path: '/tools', redirect: '/channels' },
+    { path: '/tools', redirect: '/apps' },
     { path: '/tools/chat-widget', redirect: '/channels/widgets' },
-    { path: '/tools/chat-widget/live-support', redirect: '/channels/widgets/live-support' },
+    {
+      path: '/tools/chat-widget/live-support',
+      redirect: { path: '/channels/widgets', query: { tab: 'conversations' } },
+    },
     {
       path: '/tools/chat-widget/:widgetId/chats',
       redirect: (to) => ({
@@ -374,30 +488,26 @@ const router = createRouter({
       path: '/tools/chat-widget/:widgetId',
       redirect: (to) => ({ path: `/channels/widgets/${to.params.widgetId}`, query: to.query }),
     },
-    { path: '/tools/mail-handler', redirect: '/channels/email' },
+    { path: '/tools/mail-handler', redirect: '/apps/mailbox' },
     { path: '/ai/summarizer', redirect: { path: '/', query: { tool: 'summarize' } } },
     { path: '/tools/doc-summary', redirect: { path: '/', query: { tool: 'summarize' } } },
-    {
-      path: '/ai/providers/higgsfield',
-      redirect: { path: '/ai/providers', query: { section: 'higgsfield' } },
-    },
     {
       path: '/plugins/:pluginName',
       name: 'plugin-view',
       component: () => import('@/views/PluginView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.plugins' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.plugins', i18n: ['tools'] },
     },
     {
       path: '/files',
       name: 'files',
       component: () => import('@/views/FilesView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.files' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.files', i18n: ['files'], tour: 'library' },
     },
     {
       path: '/memories',
       name: 'memories',
       component: () => import('@/views/MemoriesView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.memories' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.memories', i18n: ['knowledge'] },
       beforeEnter: (_to, _from, next) => {
         // Check if memory service is available
         const configStore = useConfigStore()
@@ -413,7 +523,7 @@ const router = createRouter({
       path: '/feedbacks',
       name: 'feedbacks',
       component: () => import('@/views/FeedbackView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.feedback' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.feedback', i18n: ['knowledge'] },
       beforeEnter: (_to, _from, next) => {
         // Check if memory service is available (feedbacks stored in same service)
         const configStore = useConfigStore()
@@ -430,7 +540,7 @@ const router = createRouter({
       path: '/files/search',
       name: 'files-search',
       component: () => import('@/views/RagSearchView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.ragSearch' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.ragSearch', i18n: ['files'] },
     },
     {
       // Incoming inbox: files pushed in by integrations (Outlook/Nextcloud/
@@ -438,7 +548,7 @@ const router = createRouter({
       path: '/files/incoming',
       name: 'files-incoming',
       component: () => import('@/views/IncomingView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.files' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.files', i18n: ['files'] },
     },
     {
       // Generated-media gallery: images/video/audio created in chats, saved so
@@ -446,37 +556,35 @@ const router = createRouter({
       path: '/files/generated',
       name: 'files-generated',
       component: () => import('@/views/GeneratedView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.files' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.files', i18n: ['files'] },
     },
     {
       path: '/files/workspace',
       name: 'files-workspace',
       component: () => import('@/views/WorkspaceView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.filesWorkspace' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.filesWorkspace', i18n: ['files'] },
     },
-    {
-      // Vector storage (Qdrant/MariaDB) inventory: how many files and vectors
-      // are stored for the user, plus a global admin view.
-      path: '/files/vectors',
-      name: 'files-vectors',
-      component: () => import('@/views/VectorStorageView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.vectorStorage' },
-    },
+    { path: '/files/vectors', redirect: '/admin/vectors' },
 
     // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
     { path: '/rag', redirect: '/files/search' },
-    { path: '/config', redirect: '/channels' },
-    { path: '/config/inbound', redirect: '/channels' },
+    { path: '/config', redirect: '/apps' },
+    { path: '/config/inbound', redirect: '/apps' },
     { path: '/config/ai-models', redirect: '/ai/models' },
-    { path: '/config/task-prompts', redirect: '/ai/instructions' },
+    { path: '/config/task-prompts', redirect: topicsRedirect },
     { path: '/config/sorting-prompt', redirect: '/ai/routing' },
-    { path: '/config/api-keys', redirect: '/channels/api' },
-    { path: '/config/api-documentation', redirect: '/channels/api/docs' },
+    { path: '/config/api-keys', redirect: '/apps/api' },
+    { path: '/config/api-documentation', redirect: '/apps/api/docs' },
     {
       path: '/statistics',
       name: 'statistics',
       component: () => import('@/views/StatisticsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.statistics' },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.statistics',
+        // Usage tables reuse the action labels (config).
+        i18n: ['admin', 'config'],
+      },
       beforeEnter: (to) => {
         if (to.hash === '#chats') {
           return { path: '/chats' }
@@ -488,43 +596,57 @@ const router = createRouter({
       path: '/chats',
       name: 'chats',
       component: () => import('@/views/ChatsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.allChats' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.allChats', i18n: ['chat', 'files'] },
     },
     {
-      // Language and theme are stored on the device, not on the account, so a
-      // guest can reach this page. The account block inside it hides itself
-      // when nobody is signed in.
+      // Bare /settings and old hashes (#profile, #memories, #app) pick a section.
       path: '/settings',
       name: 'settings',
+      redirect: (to) => settingsLocationFor(to),
+    },
+    {
+      // Theme stays on the device. Language is also saved on the account from
+      // this page. Guests only reach appearance; each signed-in section is its
+      // own page, listed in the profile sidebar.
+      path: '/settings/:section',
+      name: 'settings-section',
       component: () => import('@/views/SettingsView.vue'),
-      meta: { requiresAuth: false, titleKey: 'pageTitles.settings' },
+      beforeEnter: (to) => normalizeSettingsRoute(to),
+      meta: {
+        requiresAuth: false,
+        titleKey: 'pageTitles.settings',
+        i18n: ['settings', 'config', 'tools', ...BUNDLE_PANEL_I18N_NAMESPACES],
+      },
     },
     {
       path: '/testv',
       name: 'test',
       component: () => import('@/views/TestView.vue'),
-      meta: { requiresAuth: false }, // Test page accessible without auth
+      meta: { requiresAuth: false, i18n: [] }, // Test page accessible without auth
     },
     {
       path: '/profile',
       name: 'profile',
-      component: () => import('@/views/ProfileView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.profile' },
+      component: () => import('@/views/SettingsView.vue'),
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.profile',
+        i18n: ['settings', 'config', 'tools'],
+      },
+      beforeEnter: (to) => profileToSettings(to),
     },
     {
       path: '/groups',
       name: 'my-groups',
       component: () => import('@/views/MyGroupsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.myGroups' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.myGroups', i18n: ['admin'] },
       beforeEnter: groupsRouteGuard,
     },
     {
-      // Conversations other people or groups shared with me ("incoming").
-      // Sibling of /files/incoming, which is the file inbox.
+      // Chats shared with me: the full chat list, filtered to incoming.
+      // The phone drawer links here; old bookmarks keep working.
       path: '/chats/incoming',
-      name: 'chats-incoming',
-      component: () => import('@/views/ChatsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.incoming' },
+      redirect: { name: 'chats', query: { type: 'group' } },
     },
     {
       // Dead end for an account that still carries a deployment-generated
@@ -533,65 +655,134 @@ const router = createRouter({
       path: '/change-password',
       name: CHANGE_PASSWORD_ROUTE,
       component: () => import('@/views/ForcedPasswordChangeView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.changePassword' },
+      meta: { requiresAuth: true, titleKey: 'pageTitles.changePassword', i18n: ['auth'] },
     },
     {
       path: '/admin',
       name: 'admin',
       component: () => import('@/views/AdminView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.admin' },
-      beforeEnter: adminUsersTabRedirect,
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.admin',
+        i18n: ['admin', 'config'],
+        tour: 'admin',
+      },
+      beforeEnter: adminDashboardRedirect,
     },
     {
       path: '/admin/features',
       name: 'admin-features',
       component: () => import('@/views/FeatureStatusView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.adminFeatures',
+        i18n: ['admin', 'config'],
+      },
     },
-    {
-      path: '/admin/model-status',
-      name: 'admin-model-status',
-      component: () => import('@/views/ModelStatusView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminModelStatus' },
-    },
+    // Model health is a tab of AI infrastructure (Operate topic regrouping).
+    { path: '/admin/model-status', redirect: modelStatusRedirect },
     {
       path: '/admin/config',
       name: 'admin-config',
       component: () => import('@/views/AdminConfigView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminConfig' },
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.adminConfig',
+        i18n: ['admin', 'config', ...BUNDLE_PANEL_I18N_NAMESPACES],
+      },
+      beforeEnter: systemConfigRedirect,
+    },
+    {
+      path: '/admin/vectors',
+      name: 'admin-vectors',
+      component: () => import('@/views/VectorStorageView.vue'),
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.vectorStorage',
+        i18n: ['files', 'admin'],
+      },
     },
     {
       path: '/admin/setup',
       name: 'admin-setup',
       component: () => import('@/views/ProviderSetupView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminSetup' },
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.adminSetup',
+        i18n: ['admin', 'config'],
+      },
+      beforeEnter: aiInfrastructureRedirect,
+    },
+    {
+      path: '/admin/partners',
+      name: 'admin-partners',
+      component: () => import('@/views/PartnersView.vue'),
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.adminPartners',
+        i18n: ['admin'],
+      },
+    },
+    {
+      path: '/partners/join/:token',
+      name: 'partners-join',
+      component: () => import('@/views/PartnersJoinView.vue'),
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.adminPartners',
+        i18n: ['admin'],
+      },
     },
     {
       path: '/admin/people',
       name: 'admin-people',
       component: () => import('@/views/PeopleView.vue'),
-      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminPeople' },
+      meta: {
+        requiresAuth: true,
+        requiresAdmin: true,
+        titleKey: 'pageTitles.adminPeople',
+        i18n: ['admin', 'config'],
+      },
       beforeEnter: peopleRouteGuard,
     },
     {
       path: '/subscription',
       name: 'subscription',
       component: () => import('@/views/SubscriptionView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.subscription' },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.subscription',
+        i18n: ['settings', 'config', 'tools'],
+      },
       beforeEnter: guardSubscription,
     },
     {
       path: '/subscription/success',
       name: 'subscription-success',
       component: () => import('@/views/SubscriptionSuccessView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.subscriptionSuccess' },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.subscriptionSuccess',
+        i18n: ['settings', 'config', 'tools'],
+      },
       beforeEnter: guardSubscription,
     },
     {
       path: '/subscription/cancel',
       name: 'subscription-cancel',
       component: () => import('@/views/SubscriptionCancelView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.subscriptionCancel' },
+      meta: {
+        requiresAuth: true,
+        titleKey: 'pageTitles.subscriptionCancel',
+        i18n: ['settings', 'config', 'tools'],
+      },
       beforeEnter: guardSubscription,
     },
     // 404 - Must be last
@@ -599,7 +790,7 @@ const router = createRouter({
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('@/views/NotFoundView.vue'),
-      meta: { requiresAuth: false, titleKey: 'pageTitles.notFound' },
+      meta: { requiresAuth: false, titleKey: 'pageTitles.notFound', i18n: [] },
     },
   ],
 })
@@ -757,7 +948,27 @@ function targetPath(target: RouteLocationRaw): string {
 
 // Global navigation guard for authentication
 // With cookie-based auth, we wait for auth check then verify session
+function i18nNamespacesForRoute(to: RouteLocationNormalized): string[] {
+  const declared = Array.isArray(to.meta.i18n) ? [...to.meta.i18n] : []
+  // Public marketing/auth screens have no sidebar. Authenticated (and guest)
+  // chrome always needs admin/settings/auth/chat for Incoming + Logout.
+  if (to.meta.public === true && to.meta.requiresAuth === false) {
+    return declared
+  }
+  return [...CHROME_I18N_NAMESPACES, ...declared]
+}
+
 router.beforeEach(async (to, _from, next) => {
+  const extraNamespaces = rememberRouteNamespaces(i18nNamespacesForRoute(to))
+  try {
+    const locale = i18n.global.locale.value
+    if (typeof locale === 'string') {
+      await loadNamespaces(locale as SupportedLanguage, extraNamespaces)
+    }
+  } catch (error) {
+    console.error('[i18n] Failed to load route namespaces', error)
+  }
+
   // First-run setup comes BEFORE the auth wait: leftover cookies from a wiped
   // admin must not stall the visitor on /login, and the 10s auth timeout must
   // not skip the wizard. Answered from the runtime config the SPA already holds,

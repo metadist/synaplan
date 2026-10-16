@@ -1,21 +1,20 @@
 <template>
   <div data-testid="incoming-inbox">
-    <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-4">
-      <div class="min-w-0">
-        <h2 class="text-xl font-semibold txt-primary">{{ $t('files.incoming.title') }}</h2>
-        <p class="text-sm txt-secondary">{{ $t('files.incoming.subtitle') }}</p>
-      </div>
-      <div v-if="files.length > 0" class="flex items-center gap-2 sm:ml-auto">
+    <div
+      v-if="files.length > 0"
+      class="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 mb-4"
+    >
+      <div class="flex items-center gap-2">
         <select
           v-model="bulkGroup"
-          class="px-2 py-2 text-sm rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+          class="px-2 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
           data-testid="select-incoming-bulk-group"
         >
           <option value="">{{ $t('files.incoming.keepAll') }}</option>
           <option v-for="g in groups" :key="g.name" :value="g.name">{{ g.name }}</option>
         </select>
         <button
-          class="btn-primary px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 disabled:opacity-50"
+          class="btn-primary px-3 py-2 rounded-xl text-sm flex items-center gap-1.5 disabled:opacity-50"
           :disabled="busy"
           data-testid="btn-incoming-keep-all"
           @click="keepAll"
@@ -24,7 +23,7 @@
           {{ bulkGroup ? $t('files.incoming.assignGroup') : $t('files.incoming.keepAll') }}
         </button>
         <button
-          class="px-3 py-2 rounded-lg border border-red-500/40 text-red-500 hover:bg-red-500/10 transition-colors text-sm flex items-center gap-1.5 disabled:opacity-50"
+          class="px-3 py-2 rounded-xl border border-red-500/40 text-red-500 hover:bg-red-500/10 transition-colors text-sm flex items-center gap-1.5 disabled:opacity-50"
           :disabled="busy"
           data-testid="btn-incoming-dismiss-all"
           @click="dismissAll"
@@ -48,19 +47,16 @@
       </div>
     </div>
 
-    <!-- Empty state -->
-    <div
+    <EmptyState
       v-else-if="files.length === 0"
-      class="flex flex-col items-center justify-center py-16 px-4 text-center"
-      data-testid="incoming-empty"
-    >
-      <div
-        class="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4"
-      >
-        <Icon icon="mdi:inbox-arrow-down-outline" class="w-8 h-8 text-gray-400" />
-      </div>
-      <p class="text-sm txt-secondary max-w-sm">{{ $t('files.empty.incomingBody') }}</p>
-    </div>
+      bare
+      :icon="InboxArrowDownIcon"
+      :title="$t('files.empty.incomingBody')"
+      :action-label="$t('files.empty.incomingAction')"
+      to="/apps/connected"
+      test-id="incoming-empty"
+      action-test-id="btn-incoming-empty-action"
+    />
 
     <!-- Incoming rows -->
     <div v-else class="space-y-2">
@@ -91,7 +87,7 @@
         </div>
         <div class="flex items-center gap-1 shrink-0">
           <select
-            class="hidden sm:block px-2 py-1.5 text-xs rounded-lg bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
+            class="hidden sm:block px-2 py-1.5 text-xs rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30"
             :value="''"
             :disabled="busy"
             :aria-label="$t('files.incoming.assignGroup')"
@@ -102,7 +98,7 @@
             <option v-for="g in groups" :key="g.name" :value="g.name">{{ g.name }}</option>
           </select>
           <button
-            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
+            class="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
             :title="$t('files.incoming.open')"
             :disabled="busy"
             :data-testid="`btn-incoming-open-${file.id}`"
@@ -111,7 +107,7 @@
             <ArrowDownTrayIcon class="w-4 h-4" />
           </button>
           <button
-            class="px-2.5 py-1.5 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+            class="px-2.5 py-1.5 rounded-xl bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center gap-1 disabled:opacity-50"
             :disabled="busy"
             :data-testid="`btn-incoming-keep-${file.id}`"
             @click="keep(file)"
@@ -120,7 +116,7 @@
             {{ $t('files.incoming.keep') }}
           </button>
           <button
-            class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/80 hover:text-red-500 transition-colors disabled:opacity-50"
+            class="p-1.5 rounded-xl hover:bg-red-500/10 text-red-400/80 hover:text-red-500 transition-colors disabled:opacity-50"
             :title="$t('files.incoming.dismiss')"
             :disabled="busy"
             :data-testid="`btn-incoming-dismiss-${file.id}`"
@@ -142,6 +138,9 @@ import { ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { refreshIncomingCount } from '@/composables/useLibraryLinks'
+import { InboxArrowDownIcon } from '@heroicons/vue/24/outline'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import FileVectorPill from './FileVectorPill.vue'
 import FileSourceBadge from './FileSourceBadge.vue'
@@ -202,6 +201,7 @@ const keep = async (file: FileItem, group?: string) => {
     showError(t('files.toast.genericError', { reason: '' }))
   } finally {
     busy.value = false
+    void refreshIncomingCount()
   }
 }
 
@@ -220,6 +220,7 @@ const dismiss = async (file: FileItem) => {
     showError(t('files.toast.genericError', { reason: '' }))
   } finally {
     busy.value = false
+    void refreshIncomingCount()
   }
 }
 
@@ -250,6 +251,7 @@ const keepAll = async () => {
     showError(t('files.toast.genericError', { reason: '' }))
   } finally {
     busy.value = false
+    void refreshIncomingCount()
   }
 }
 
@@ -265,6 +267,7 @@ const dismissAll = async () => {
     showError(t('files.toast.genericError', { reason: '' }))
   } finally {
     busy.value = false
+    void refreshIncomingCount()
   }
 }
 

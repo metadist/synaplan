@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit;
 
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -27,6 +27,21 @@ class WhisperServiceTest extends TestCase
         }
     }
 
+    public function testSpeechOffIsDistinctFromAMissingBinary(): void
+    {
+        $service = new WhisperService(
+            $this->logger,
+            '/nonexistent/whisper',
+            $this->tempDir,
+            'base',
+            '/usr/bin/ffmpeg',
+            false,
+        );
+
+        $this->assertSame('speech_off', $service->unavailableReason());
+        $this->assertFalse($service->isInstalled());
+    }
+
     public function testIsAvailableReturnsFalseWhenBinaryNotFound(): void
     {
         $service = new WhisperService(
@@ -38,6 +53,41 @@ class WhisperServiceTest extends TestCase
         );
 
         $this->assertFalse($service->isAvailable());
+        $this->assertFalse($service->isInstalled());
+        $this->assertSame('binary_missing', $service->unavailableReason());
+    }
+
+    public function testIsInstalledRequiresTheDefaultModelButNotARunningBinary(): void
+    {
+        $fakeBinary = $this->tempDir.'/whisper';
+        file_put_contents($fakeBinary, "#!/bin/sh\nexit 1\n");
+        chmod($fakeBinary, 0755);
+
+        $withoutModel = new WhisperService(
+            $this->logger,
+            $fakeBinary,
+            $this->tempDir.'/models',
+            'base',
+            '/usr/bin/ffmpeg'
+        );
+        $this->assertFalse($withoutModel->isInstalled());
+        $this->assertSame('model_missing', $withoutModel->unavailableReason());
+
+        $modelsDir = $this->tempDir.'/models';
+        mkdir($modelsDir);
+        touch($modelsDir.'/ggml-base.bin');
+
+        $withModel = new WhisperService(
+            $this->logger,
+            $fakeBinary,
+            $modelsDir,
+            'base',
+            '/usr/bin/ffmpeg'
+        );
+
+        $this->assertTrue($withModel->isInstalled());
+        $this->assertFalse($withModel->isAvailable());
+        $this->assertNull($withModel->unavailableReason());
     }
 
     public function testIsAvailableReturnsFalseWhenModelNotFound(): void

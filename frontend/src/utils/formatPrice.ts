@@ -1,4 +1,4 @@
-import { i18n } from '@/i18n'
+import { i18n } from '@/i18n/instance'
 
 /**
  * Format a plan price with its server-configured currency (ISO 4217) in the

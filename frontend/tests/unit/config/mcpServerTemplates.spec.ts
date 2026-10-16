@@ -14,8 +14,8 @@ describe('mcpServerTemplates', () => {
   })
 
   it('clears a named template when it is clicked again', () => {
-    expect(nextMcpServerTemplate('jira', 'jira')).toBe(MCP_CUSTOM_TEMPLATE)
-    expect(nextMcpServerTemplate('confluence', 'confluence')).toBe(MCP_CUSTOM_TEMPLATE)
+    expect(nextMcpServerTemplate('github', 'github')).toBe(MCP_CUSTOM_TEMPLATE)
+    expect(nextMcpServerTemplate('n8n', 'n8n')).toBe(MCP_CUSTOM_TEMPLATE)
   })
 
   it('does not clear Custom when it is already selected', () => {
@@ -25,7 +25,7 @@ describe('mcpServerTemplates', () => {
   })
 
   it('switches from one named template to another', () => {
-    expect(nextMcpServerTemplate('jira', 'confluence')).toBe('confluence')
+    expect(nextMcpServerTemplate('github', 'n8n')).toBe('n8n')
     expect(nextMcpServerTemplate(MCP_CUSTOM_TEMPLATE, 'github')).toBe('github')
   })
 
@@ -44,5 +44,13 @@ describe('mcpServerTemplates', () => {
     expect(notion.urlPrefill).toBe('https://mcp.notion.com/mcp')
     expect(isOAuthTemplate(higgsfield)).toBe(true)
     expect(higgsfield.urlPrefill).toBe('https://mcp.higgsfield.ai/mcp')
+  })
+
+  it('connects Jira and Confluence with an Atlassian sign-in, not a pasted token', () => {
+    const atlassian = findMcpServerTemplate('atlassian')
+    expect(isOAuthTemplate(atlassian)).toBe(true)
+    expect(atlassian.urlPrefill).toBe('https://mcp.atlassian.com/v2/mcp')
+    expect(atlassian.authHeader).toBe('')
+    expect(visibleMcpServerTemplates(false).map((t) => t.key)).not.toContain('atlassian')
   })
 })

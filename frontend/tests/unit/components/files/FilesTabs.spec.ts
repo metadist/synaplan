@@ -1,60 +1,50 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createI18n } from 'vue-i18n'
-import { createMemoryHistory, createRouter } from 'vue-router'
 import FilesTabs from '@/components/files/FilesTabs.vue'
-import en from '@/i18n/en.json'
 
-const runtimeFeatures = { computeWorkspacesEnabled: false }
-
-vi.mock('@/services/api/httpClient', () => ({
-  getConfigSync: () => ({ features: runtimeFeatures }),
-}))
-
-vi.mock('@/services/filesService', () => ({
-  default: { getFacets: vi.fn().mockResolvedValue({ incoming: 0 }) },
-}))
-
-vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ isAdmin: false }),
-}))
-
-function mountTabs() {
-  const i18n = createI18n({
-    legacy: false,
-    locale: 'en',
-    messages: { en },
-  })
-  const router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/files', component: { template: '<div />' } },
-      { path: '/files/workspace', component: { template: '<div />' } },
+const { route, links } = vi.hoisted(() => ({
+  route: { path: '/files' },
+  links: {
+    value: [
+      { id: 'browse', to: '/files', label: 'Browse' },
+      { id: 'incoming', to: '/files/incoming', label: 'Incoming', badge: 3 },
+      { id: 'generated', to: '/files/generated', label: 'Generated' },
+      { id: 'search', to: '/files/search', label: 'Search' },
     ],
-  })
-  return mount(FilesTabs, {
-    props: { active: 'files' },
+  },
+}))
+
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
+  useRoute: () => route,
+}))
+
+vi.mock('@/composables/useLibraryLinks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/composables/useLibraryLinks')>()),
+  useLibraryLinks: () => ({ links }),
+}))
+
+const mountHeader = () =>
+  mount(FilesTabs, {
     global: {
-      plugins: [i18n, router],
-      stubs: { Icon: { template: '<i />' } },
+      stubs: {
+        PageHeader: {
+          props: ['title', 'subtitle'],
+          template: '<header><p data-testid="subtitle">{{ subtitle }}</p></header>',
+        },
+      },
     },
   })
-}
 
 describe('FilesTabs', () => {
   beforeEach(() => {
-    runtimeFeatures.computeWorkspacesEnabled = false
+    route.path = '/files'
   })
 
-  it('hides the Workspace tab when the folder flag is off', () => {
-    runtimeFeatures.computeWorkspacesEnabled = false
-    const wrapper = mountTabs()
-    expect(wrapper.find('[data-testid="tab-files-workspace"]').exists()).toBe(false)
-  })
-
-  it('shows the Workspace tab when the folder flag is on', () => {
-    runtimeFeatures.computeWorkspacesEnabled = true
-    const wrapper = mountTabs()
-    expect(wrapper.get('[data-testid="tab-files-workspace"]').text()).toContain('Workspace')
+  it('explains the current Library section and does not repeat the sidebar links', () => {
+    route.path = '/files/generated'
+    const wrapper = mountHeader()
+    expect(wrapper.get('[data-testid="subtitle"]').text()).toContain('Finished results')
+    expect(wrapper.find('[data-testid="files-tabs"]').exists()).toBe(false)
   })
 })

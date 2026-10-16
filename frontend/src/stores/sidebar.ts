@@ -1,16 +1,27 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
+const PANEL_COLLAPSED_KEY = 'sidebar-panel-collapsed'
+
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === 'true'
+  } catch {
+    return false
+  }
+}
+
 export const useSidebarStore = defineStore('sidebar', () => {
   const isOpen = ref(false)
-  const isCollapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true')
-  const showChats = ref(localStorage.getItem('sidebar-show-chats') !== 'false')
-
   /**
-   * History sheet (recent chats). Shared state so both the desktop rail and
-   * the mobile bottom nav can open the same sheet (rendered by SidebarV2).
+   * Desktop context panel folded away, leaving only the icon rail. Own key:
+   * the retired sidebar wrote `sidebar-collapsed`, and a stale value from it
+   * must not fold the panel on someone's first visit.
    */
-  const chatSheetOpen = ref(false)
+  const isCollapsed = ref(readFlag(PANEL_COLLAPSED_KEY))
+  /** Below the dock width the panel opens above the content. Never remembered. */
+  const panelOverlayOpen = ref(false)
+  const showChats = ref(localStorage.getItem('sidebar-show-chats') !== 'false')
 
   /**
    * Mobile push-drawer (primary navigation on small screens). Opening it slides
@@ -31,18 +42,6 @@ export const useSidebarStore = defineStore('sidebar', () => {
     mobileDrawerOpen.value = !mobileDrawerOpen.value
   }
 
-  const openChatSheet = () => {
-    chatSheetOpen.value = true
-  }
-
-  const closeChatSheet = () => {
-    chatSheetOpen.value = false
-  }
-
-  const toggleChatSheet = () => {
-    chatSheetOpen.value = !chatSheetOpen.value
-  }
-
   // Disclosure state for chat groups
   const chatDisclosure = ref({
     my: localStorage.getItem('sidebar-disclosure-my') !== 'false',
@@ -50,7 +49,11 @@ export const useSidebarStore = defineStore('sidebar', () => {
   })
 
   watch(isCollapsed, (value) => {
-    localStorage.setItem('sidebar-collapsed', String(value))
+    try {
+      localStorage.setItem(PANEL_COLLAPSED_KEY, String(value))
+    } catch {
+      // Private mode can block storage. The panel still folds for this visit.
+    }
   })
 
   watch(showChats, (value) => {
@@ -98,9 +101,9 @@ export const useSidebarStore = defineStore('sidebar', () => {
   return {
     isOpen,
     isCollapsed,
+    panelOverlayOpen,
     showChats,
     chatDisclosure,
-    chatSheetOpen,
     mobileDrawerOpen,
     toggle,
     close,
@@ -108,9 +111,6 @@ export const useSidebarStore = defineStore('sidebar', () => {
     toggleCollapsed,
     toggleShowChats,
     toggleChatDisclosure,
-    openChatSheet,
-    closeChatSheet,
-    toggleChatSheet,
     openMobileDrawer,
     closeMobileDrawer,
     toggleMobileDrawer,

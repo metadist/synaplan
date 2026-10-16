@@ -28,13 +28,14 @@
                 'flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
                 dialog.danger
                   ? 'bg-red-500/10 text-red-500'
-                  : dialog.type === 'confirm'
-                    ? 'bg-blue-500/10 text-blue-500'
-                    : 'bg-[var(--brand)]/10 text-[var(--brand)]',
+                  : 'bg-[var(--brand)]/10 text-[var(--brand)]',
               ]"
             >
               <ExclamationTriangleIcon v-if="dialog.danger" class="w-6 h-6" />
-              <QuestionMarkCircleIcon v-else-if="dialog.type === 'confirm'" class="w-6 h-6" />
+              <QuestionMarkCircleIcon
+                v-else-if="dialog.type === 'confirm' || dialog.type === 'choice'"
+                class="w-6 h-6"
+              />
               <InformationCircleIcon v-else class="w-6 h-6" />
             </div>
 
@@ -50,15 +51,25 @@
           </p>
 
           <!-- Input for prompt -->
+          <textarea
+            v-if="dialog.type === 'prompt' && dialog.multiline"
+            ref="inputRef"
+            v-model="inputValue"
+            rows="5"
+            :placeholder="dialog.placeholder"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-dialog-prompt"
+            @keydown.esc="handleCancel"
+          />
           <input
-            v-if="dialog.type === 'prompt'"
+            v-else-if="dialog.type === 'prompt'"
             ref="inputRef"
             v-model="inputValue"
             type="text"
             :placeholder="dialog.placeholder"
-            class="w-full px-4 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+            class="w-full px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 surface-card txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
             data-testid="input-dialog-prompt"
-            @keydown.enter="handleConfirm"
+            @keydown.enter.prevent="handleConfirm"
             @keydown.esc="handleCancel"
           />
 
@@ -66,15 +77,23 @@
           <div class="flex gap-3 justify-end pt-2">
             <button
               v-if="dialog.type !== 'alert'"
-              class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
+              class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm font-medium"
               data-testid="btn-dialog-cancel"
               @click="handleCancel"
             >
               {{ dialog.cancelText }}
             </button>
             <button
+              v-if="dialog.extraText"
+              class="btn-danger px-4 py-2 rounded-xl text-sm font-medium"
+              data-testid="btn-dialog-extra"
+              @click="handleExtra"
+            >
+              {{ dialog.extraText }}
+            </button>
+            <button
               :class="[
-                'px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                'px-4 py-2 rounded-xl text-sm font-medium transition-all',
                 dialog.danger ? 'bg-red-500 hover:bg-red-600 text-white' : 'btn-primary',
               ]"
               data-testid="btn-dialog-confirm"
@@ -102,9 +121,10 @@ import {
 const { dialog, close } = useDialog()
 const { teleportTarget } = useFullscreenTeleportTarget()
 const inputValue = ref('')
-const inputRef = ref<HTMLInputElement>()
+const inputRef = ref<HTMLInputElement | HTMLTextAreaElement>()
 const panelRef = ref<HTMLElement>()
 let previouslyFocused: HTMLElement | null = null
+let restoreFocusTimer: ReturnType<typeof setTimeout> | null = null
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -117,10 +137,18 @@ function focusableInPanel(): HTMLElement[] {
 }
 
 // Reset input value when dialog opens; trap focus inside the panel.
+function clearRestoreFocus(): void {
+  if (restoreFocusTimer !== null) {
+    clearTimeout(restoreFocusTimer)
+    restoreFocusTimer = null
+  }
+}
+
 watch(
   () => dialog.value.isOpen,
   async (isOpen) => {
     if (isOpen) {
+      clearRestoreFocus()
       previouslyFocused =
         document.activeElement instanceof HTMLElement ? document.activeElement : null
       inputValue.value = dialog.value.defaultValue || ''
@@ -132,21 +160,43 @@ watch(
       }
       return
     }
-    previouslyFocused?.focus()
+    // Restoring focus inside this keydown re-activates the button that
+    // opened the prompt (Enter is still down), so the same dialog opens
+    // again (#2056). Move focus after the key event has finished.
+    const restore = previouslyFocused
     previouslyFocused = null
+    clearRestoreFocus()
+    restoreFocusTimer = setTimeout(() => {
+      restoreFocusTimer = null
+      restore?.focus()
+    }, 0)
   }
 )
 
 const handleConfirm = () => {
+  if (!dialog.value.isOpen) return
   const resolve = dialog.value.resolve
   if (resolve) {
-    if (dialog.value.type === 'confirm') {
+    if (dialog.value.type === 'choice') {
+      ;(resolve as (value: 'confirm' | 'extra' | null) => void)('confirm')
+    } else if (dialog.value.type === 'confirm') {
       ;(resolve as (value: boolean) => void)(true)
     } else if (dialog.value.type === 'prompt') {
-      ;(resolve as (value: string | null) => void)(inputValue.value || null)
+      // OK resolves the raw input — even empty. Cancel/Escape/backdrop resolve
+      // null via close(), so callers can tell "confirmed without a note"
+      // (reject with no reason) apart from "dismissed".
+      ;(resolve as (value: string | null) => void)(inputValue.value)
     } else {
       ;(resolve as () => void)()
     }
+  }
+  dialog.value.isOpen = false
+}
+
+const handleExtra = () => {
+  const resolve = dialog.value.resolve
+  if (resolve && dialog.value.type === 'choice') {
+    ;(resolve as (value: 'confirm' | 'extra' | null) => void)('extra')
   }
   dialog.value.isOpen = false
 }
@@ -183,7 +233,10 @@ const handleGlobalKeydown = (event: KeyboardEvent) => {
     return
   }
 
-  if (event.key === 'Enter' && dialog.value.type === 'confirm') {
+  if (
+    event.key === 'Enter' &&
+    (dialog.value.type === 'confirm' || dialog.value.type === 'choice')
+  ) {
     event.preventDefault()
     handleConfirm()
   }
@@ -199,6 +252,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearRestoreFocus()
   document.removeEventListener('keydown', handleGlobalKeydown)
 })
 </script>

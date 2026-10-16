@@ -40,3 +40,7 @@ email:
     company: 'Synaplan'
     rights: 'Alle Rechte vorbehalten'
 
+
+  workspace_expiry:
+    subject: 'Dein Datei-Arbeitsbereich wird bald gelöscht'
+    body: "Dein Synaplan-Datei-Arbeitsbereich war länger ungenutzt und wird in %days% Tagen gelöscht, mitsamt den Dateien, die die KI für dich erstellt hat. Öffne ihn vorher, um ihn zu behalten:\n\n%url%\n\nWenn du nichts tust, werden die Dateien unwiederbringlich entfernt."

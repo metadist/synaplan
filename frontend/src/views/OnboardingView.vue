@@ -19,7 +19,7 @@
     <div class="relative z-30 flex items-center justify-between px-6 pt-2">
       <div ref="languageMenuRef" class="relative">
         <button
-          class="h-9 pl-2.5 pr-2 rounded-lg surface-card ring-1 ring-black/[0.06] dark:ring-white/[0.1] shadow-sm txt-primary text-sm font-medium inline-flex items-center gap-1.5 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
+          class="h-9 pl-2.5 pr-2 rounded-xl surface-card ring-1 ring-black/[0.06] dark:ring-white/[0.1] shadow-sm txt-primary text-sm font-medium inline-flex items-center gap-1.5 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
           data-testid="btn-language-toggle"
           :aria-expanded="languageMenuOpen"
           aria-haspopup="listbox"
@@ -36,7 +36,7 @@
         <Transition name="lang-menu">
           <ul
             v-if="languageMenuOpen"
-            class="absolute left-0 mt-2 w-44 rounded-xl surface-elevated ring-1 ring-black/[0.06] dark:ring-white/[0.1] shadow-lg overflow-hidden py-1"
+            class="absolute left-0 mt-2 w-44 !rounded-xl surface-elevated ring-1 ring-black/[0.06] dark:ring-white/[0.1] shadow-lg overflow-hidden py-1"
             role="listbox"
             data-testid="menu-language"
           >
@@ -101,7 +101,7 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import OnboardingWelcomeStep from '@/components/onboarding/OnboardingWelcomeStep.vue'
 import { markOnboardingCompleted } from '@/composables/useOnboarding'
-import { languageOptions } from '@/i18n'
+import { languageOptions, setLocale, type SupportedLanguage } from '@/i18n'
 
 const router = useRouter()
 const { locale } = useI18n()
@@ -117,8 +117,7 @@ const languageMenuOpen = ref(false)
 const languageMenuRef = ref<HTMLElement | null>(null)
 
 const selectLanguage = (value: string) => {
-  locale.value = value
-  localStorage.setItem('language', value)
+  void setLocale(value as SupportedLanguage)
   languageMenuOpen.value = false
 }
 

@@ -42,6 +42,57 @@ final readonly class CentrifugoPublisher implements RealtimePublisherInterface
 
     public function publish(ChannelInterface $channel, string $eventType, array $payload): void
     {
+        $this->send('publish', [
+            'channel' => $channel->name(),
+            'data' => $this->envelope($eventType, $payload),
+        ], $channel->name(), $eventType);
+    }
+
+    /**
+     * @param list<ChannelInterface> $channels
+     * @param array<string, mixed>   $payload
+     */
+    public function publishMany(array $channels, string $eventType, array $payload): void
+    {
+        if ([] === $channels) {
+            return;
+        }
+
+        $names = array_map(static fn (ChannelInterface $channel): string => $channel->name(), $channels);
+        if (1 === count($names)) {
+            $this->send('publish', [
+                'channel' => $names[0],
+                'data' => $this->envelope($eventType, $payload),
+            ], $names[0], $eventType);
+
+            return;
+        }
+
+        $this->send('broadcast', [
+            'channels' => $names,
+            'data' => $this->envelope($eventType, $payload),
+        ], implode(',', $names), $eventType);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
+     * @return array{type: string, ts: int, data: array<string, mixed>}
+     */
+    private function envelope(string $eventType, array $payload): array
+    {
+        return [
+            'type' => $eventType,
+            'ts' => (int) (microtime(true) * 1000),
+            'data' => $payload,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function send(string $method, array $params, string $channel, string $eventType): void
+    {
         if (!$this->enabled) {
             return;
         }
@@ -52,21 +103,11 @@ final readonly class CentrifugoPublisher implements RealtimePublisherInterface
             return;
         }
 
-        // Refuse to operate against a gateway still using the shipped
-        // placeholder API key in production — a publicly known key means
-        // anyone can publish into user/widget channels. Realtime degrades
-        // (REST stays the source of truth) instead of running forgeable.
         if ('prod' === $this->environment && str_starts_with($this->apiKey, 'changeme')) {
             $this->logger->error('Centrifugo publish skipped: REALTIME_API_KEY still has the "changeme" placeholder value — set a strong random key before enabling realtime in production');
 
             return;
         }
-
-        $envelope = [
-            'type' => $eventType,
-            'ts' => (int) (microtime(true) * 1000),
-            'data' => $payload,
-        ];
 
         try {
             $response = $this->httpClient->request('POST', $this->apiUrl, [
@@ -75,11 +116,8 @@ final readonly class CentrifugoPublisher implements RealtimePublisherInterface
                     'X-API-Key' => $this->apiKey,
                 ],
                 'json' => [
-                    'method' => 'publish',
-                    'params' => [
-                        'channel' => $channel->name(),
-                        'data' => $envelope,
-                    ],
+                    'method' => $method,
+                    'params' => $params,
                 ],
                 'timeout' => 2.0,
                 'max_duration' => 3.0,
@@ -89,14 +127,14 @@ final readonly class CentrifugoPublisher implements RealtimePublisherInterface
             if ($status < 200 || $status >= 300) {
                 $this->logger->warning('Centrifugo publish returned non-2xx', [
                     'status' => $status,
-                    'channel' => $channel->name(),
+                    'channel' => $channel,
                     'event' => $eventType,
                     'body' => mb_substr((string) $response->getContent(false), 0, 500),
                 ]);
             }
         } catch (\Throwable $e) {
             $this->logger->warning('Centrifugo publish failed', [
-                'channel' => $channel->name(),
+                'channel' => $channel,
                 'event' => $eventType,
                 'error' => $e->getMessage(),
             ]);

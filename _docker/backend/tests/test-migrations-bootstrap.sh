@@ -10,6 +10,7 @@
 #   4. Legacy DB, unrelated  (metadata table has non-baseline rows)  → register baseline
 #   5. Legacy DB, healthy    (baseline row already present)          → no-op
 #   8. Half-applied baseline (BAPIKEYS present, BUSER absent)        → drop orphan tables, then no-op
+#  14. A count query that crashes                                   → change nothing, retryable status
 #
 # The test doubles simulate the DB by maintaining $DB_STATE in-process. `php`
 # (and therefore `dbal:run-sql`) is shadowed via a function override, and
@@ -239,6 +240,78 @@ _drop_all_tables() {
     DB_STATE[VERSION_ROW_COUNT]=0
 }
 
+# A count query that crashes (php SIGILL, OOM kill, lost connection) must not
+# read as "0 tables". Cases 14-16 make the named query fail.
+FAILING_QUERY=""
+_working_count_sql="$(declare -f _count_sql)"
+_count_sql() {
+    if [ -n "$FAILING_QUERY" ] && [[ "$1" == *"$FAILING_QUERY"* ]]; then
+        return 1
+    fi
+    _count_sql_fake "$@"
+}
+eval "${_working_count_sql/_count_sql/_count_sql_fake}"
+
+echo "▶ Case 14: populated DB whose BUSER count crashes — no drop, no metadata change, retryable status"
+reset_state
+DB_STATE[HAS_BUSER]=1
+DB_STATE[HAS_BAPIKEYS]=1
+DB_STATE[HAS_VERSIONS_TABLE]=1
+DB_STATE[HAS_BASELINE_ROW]=1
+FAILING_QUERY="table_name = 'BUSER'"
+bootstrap_migrations_metadata "" "test-buser-count-crash" >/dev/null 2>&1
+_rc=$?
+assert_eq 2 "$_rc"                        "bootstrap returns BOOTSTRAP_STATE_UNKNOWN"
+assert_eq 0 "${DB_STATE[DROP_CALLS]}"     "_drop_all_tables NOT called"
+assert_eq 1 "${DB_STATE[HAS_BUSER]}"      "BUSER still present"
+
+echo "▶ Case 15: BUSER-less DB whose BAPIKEYS count crashes — no drop"
+reset_state
+DB_STATE[HAS_BAPIKEYS]=1
+FAILING_QUERY="table_name = 'BAPIKEYS'"
+bootstrap_migrations_metadata "" "test-bapikeys-count-crash" >/dev/null 2>&1
+_rc=$?
+assert_eq 2 "$_rc"                        "bootstrap returns BOOTSTRAP_STATE_UNKNOWN"
+assert_eq 0 "${DB_STATE[DROP_CALLS]}"     "_drop_all_tables NOT called"
+
+echo "▶ Case 16: legacy DB whose metadata-table count crashes — table not created, nothing marked applied"
+reset_state
+DB_STATE[HAS_BUSER]=1
+FAILING_QUERY="table_name = 'doctrine_migration_versions'"
+bootstrap_migrations_metadata "" "test-versions-count-crash" >/dev/null 2>&1
+_rc=$?
+assert_eq 2 "$_rc"                        "bootstrap returns BOOTSTRAP_STATE_UNKNOWN"
+assert_eq 0 "${DB_STATE[CREATE_CALLS]}"   "_create_metadata_table NOT called"
+assert_eq 0 "${DB_STATE[REGISTER_CALLS]}" "_register_baseline_migration NOT called"
+FAILING_QUERY=""
+
+echo "▶ Case 17: real _count_sql fails on a crashed console and on output without a number"
+_fake_count_sql="$(declare -f _count_sql)"
+# shellcheck disable=SC1090
+. "$LIB"
+php() { return 132; }
+_out=$(_count_sql "SELECT 1"); _rc=$?
+assert_eq 1 "$_rc"                        "crashed console → non-zero"
+assert_eq "" "$_out"                      "crashed console → no count printed"
+php() { echo "Illegal instruction"; return 0; }
+_out=$(_count_sql "SELECT 1"); _rc=$?
+assert_eq 1 "$_rc"                        "output without a number → non-zero"
+php() { printf ' ---------- \n  COUNT(*)  \n ---------- \n  1         \n ---------- \n'; }
+_out=$(_count_sql "SELECT 1"); _rc=$?
+assert_eq 0 "$_rc"                        "normal table output → zero"
+assert_eq 1 "$_out"                       "normal table output → count"
+unset -f php
+eval "$_fake_count_sql"
+_create_metadata_table() {
+    DB_STATE[CREATE_CALLS]=$((DB_STATE[CREATE_CALLS] + 1))
+    DB_STATE[HAS_VERSIONS_TABLE]=1
+}
+_register_baseline_migration() {
+    DB_STATE[REGISTER_CALLS]=$((DB_STATE[REGISTER_CALLS] + 1))
+    DB_STATE[HAS_BASELINE_ROW]=1
+    DB_STATE[VERSION_ROW_COUNT]=$((DB_STATE[VERSION_ROW_COUNT] + 1))
+}
+
 # ---------------------------------------------------------------------------
 # Retry wrapper (run_migrations_with_retry)
 #
@@ -253,10 +326,15 @@ MIGRATE_CALLS=0
 MIGRATE_FAIL_UNTIL=0   # _run_doctrine_migrate fails while MIGRATE_CALLS <= this
 BOOTSTRAP_FAILS=0      # when 1, bootstrap_migrations_metadata returns non-zero
 
+BOOTSTRAP_UNKNOWN_UNTIL=0  # bootstrap returns BOOTSTRAP_STATE_UNKNOWN while BOOTSTRAP_CALLS <= this
+
 bootstrap_migrations_metadata() {
     BOOTSTRAP_CALLS=$((BOOTSTRAP_CALLS + 1))
     if [ "$BOOTSTRAP_FAILS" -eq 1 ]; then
         return 1
+    fi
+    if [ "$BOOTSTRAP_CALLS" -le "$BOOTSTRAP_UNKNOWN_UNTIL" ]; then
+        return "$BOOTSTRAP_STATE_UNKNOWN"
     fi
     return 0
 }
@@ -304,6 +382,23 @@ BOOTSTRAP_FAILS=0
 assert_eq 1 "$_rc"               "run_migrations_with_retry returns 1 when bootstrap fails"
 assert_eq 1 "$BOOTSTRAP_CALLS"   "bootstrap attempted exactly once (no retry on unrecoverable setup failure)"
 assert_eq 0 "$MIGRATE_CALLS"     "migrate never attempted after a failed bootstrap"
+
+echo "▶ Case 18: bootstrap could not read the schema twice — retried, migrate runs only once the state is known"
+BOOTSTRAP_CALLS=0 ; MIGRATE_CALLS=0 ; MIGRATE_FAIL_UNTIL=0 ; BOOTSTRAP_UNKNOWN_UNTIL=2
+MIGRATION_MAX_ATTEMPTS=5 run_migrations_with_retry "" "test-retry-unknown" >/dev/null 2>&1
+_rc=$?
+assert_eq 0 "$_rc"               "run_migrations_with_retry returns 0"
+assert_eq 3 "$BOOTSTRAP_CALLS"   "bootstrap retried until the state was readable"
+assert_eq 1 "$MIGRATE_CALLS"     "migrate never ran on an unknown state"
+
+echo "▶ Case 19: schema state never readable — gives up after MIGRATION_MAX_ATTEMPTS without migrating"
+BOOTSTRAP_CALLS=0 ; MIGRATE_CALLS=0 ; BOOTSTRAP_UNKNOWN_UNTIL=999
+MIGRATION_MAX_ATTEMPTS=3 run_migrations_with_retry "" "test-retry-unknown-forever" >/dev/null 2>&1
+_rc=$?
+BOOTSTRAP_UNKNOWN_UNTIL=0
+assert_eq 1 "$_rc"               "run_migrations_with_retry returns 1"
+assert_eq 3 "$BOOTSTRAP_CALLS"   "bootstrap attempted MIGRATION_MAX_ATTEMPTS times"
+assert_eq 0 "$MIGRATE_CALLS"     "migrate never ran"
 
 # ---------------------------------------------------------------------------
 # Case 7: MySQL backslash escape regression test

@@ -6,9 +6,9 @@ namespace App\Service\Microsoft;
 
 use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
 use App\Service\OAuth\OAuthProviderConfig;
 use App\Service\OAuth\OAuthProviderSource;
+use App\Service\Security\EncryptionService;
 
 /**
  * Microsoft identity platform app registration (BCONFIG group M365, ownerId=0).

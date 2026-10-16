@@ -1,0 +1,20 @@
+[
+  {
+    "type": "server_tool_use",
+    "id": "srvtoolu_01HUranyxaWc8P1UAGp6UAfb",
+    "name": "web_fetch",
+    "input": { "url": "https://nodejs.org/en" }
+  },
+  {
+    "type": "tool_use",
+    "id": "srvtoolu_unpaired_fetch",
+    "name": "web_fetch",
+    "input": { "url": "https://nodejs.org/en/blog" }
+  },
+  {
+    "type": "tool_use",
+    "id": "toolu_search",
+    "name": "web_search",
+    "input": { "query": "Node.js LTS" }
+  }
+]

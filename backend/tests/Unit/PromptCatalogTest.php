@@ -159,6 +159,24 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('WRITE it in the user\'s language', $mediamaker);
     }
 
+    /**
+     * The digest schema is `{"digests": [...]}`; a prompt that asks for a bare
+     * array makes strict providers reject the answer and retry the call.
+     * Requests and "file created" notes are what the index filled up with.
+     */
+    public function testMessageDigestPromptAsksForTheSchemaShapeAndFactsOnly(): void
+    {
+        $prompt = $this->catalogPrompt('tools:message_digest');
+
+        $this->assertStringContainsString('{"digests": [', $prompt);
+        $this->assertStringContainsString('Return {"digests": []}', $prompt);
+        $this->assertStringNotContainsString('Return [] or null', $prompt);
+        $this->assertStringContainsString('A request to the assistant to do something', $prompt);
+        $this->assertStringContainsString('A note that a file was created', $prompt);
+        $this->assertStringContainsString('Name the facts, not the action', $prompt);
+        $this->assertStringContainsString('a German-speaking user gets German lines for an English contract', $prompt);
+    }
+
     private function catalogPrompt(string $topic): string
     {
         foreach (PromptCatalog::all() as $entry) {
@@ -233,6 +251,70 @@ final class PromptCatalogTest extends TestCase
         // Engine-off default: the planner still refuses real PDFs. The live
         // OfficePdfRoutingDecorator rewrites this only when OFFICE_CONVERT_URL is set.
         $this->assertStringContainsString('Real PDFs are NOT supported', $plan['prompt']);
+    }
+
+    public function testPlanPromptRoutesScriptExecutionToCodeRun(): void
+    {
+        $plan = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:plan' === $entry['topic']) {
+                $plan = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($plan);
+        // Rule 3a: an explicit script/program/code execution request beats the
+        // image-edit rule — "write a python script and apply ..." must plan
+        // code_run, never an AI image re-render.
+        $this->assertStringContainsString('rule 3a wins', $plan['prompt']);
+        $this->assertStringContainsString('3a. Script / program / code', $plan['prompt']);
+        $this->assertStringContainsString('→ `code_run`', $plan['prompt']);
+        $this->assertStringContainsString('params.inputFileIds', $plan['prompt']);
+        // Issues #2047/#2049: charts from attached tables and pixel edits on
+        // attached images arbitrate to code_run even when the request names
+        // no runtime — and producing a new file is never a "question" (rule 6).
+        $this->assertStringContainsString('built FROM an attached table', $plan['prompt']);
+        $this->assertStringContainsString('pixel edit on an attached image', $plan['prompt']);
+        $this->assertStringContainsString('Producing a NEW file from a document', $plan['prompt']);
+        // Issue #2048: the script must compute the requested grouping, not
+        // relabel its output to match the request.
+        $this->assertStringContainsString('must be the grouping in the output', $plan['prompt']);
+        // Issue #2051: an explicitly named office format must be honoured.
+        $this->assertStringContainsString('A format named in the request', $plan['prompt']);
+        $this->assertStringContainsString('save it into a text file', $plan['prompt']);
+        $this->assertStringContainsString('never claim a file was written', $plan['prompt']);
+    }
+
+    public function testPlanPromptRequiresFetchBeforeGeneration(): void
+    {
+        $plan = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:plan' === $entry['topic']) {
+                $plan = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($plan);
+        // Issue #2050: a generator node must consume the url_fetch output and
+        // never invent content when the named source was not read.
+        $this->assertStringContainsString('never invent rows or', $plan['prompt']);
+    }
+
+    public function testOfficeMakerPromptHonorsNamedFormat(): void
+    {
+        $officemaker = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('officemaker' === $entry['topic']) {
+                $officemaker = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($officemaker);
+        // Issue #2051: "als Excel" must come back as .xlsx, never .csv.
+        $this->assertStringContainsString('BFILEPATH MUST use that extension', $officemaker['prompt']);
     }
 
     public function testGeneralPromptDoesNotBounceAlreadyPhrasedCreateRequests(): void

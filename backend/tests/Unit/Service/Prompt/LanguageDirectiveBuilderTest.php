@@ -43,6 +43,17 @@ class LanguageDirectiveBuilderTest extends TestCase
         $this->assertAntiEchoClausePresent($directive);
     }
 
+    public function testForLanguageTreatsClassificationAsAHintNotAHardPin(): void
+    {
+        $directive = LanguageDirectiveBuilder::buildForLanguage('en');
+
+        $this->assertStringContainsString('same language the user writes in', $directive);
+        $this->assertStringContainsString('looks like English', $directive);
+        $this->assertStringContainsString('unless that message is clearly in another language', $directive);
+        $this->assertStringNotContainsString("the user's current message is in English", $directive);
+        $this->assertAntiEchoClausePresent($directive);
+    }
+
     public function testForOutputLanguagePinsReplyWithoutClaimingInboundLanguage(): void
     {
         $directive = LanguageDirectiveBuilder::buildForOutputLanguage('es');

@@ -1,7 +1,45 @@
 import type { Locator, Page } from '@playwright/test'
 import { expect } from '@playwright/test'
 import { selectors } from './selectors'
+import { assertStreamSucceeded } from './stream'
 import { TIMEOUTS } from '../config/config'
+
+/**
+ * Focus the desktop chats panel and wait until its list has finished loading.
+ * The panel loads chats on mount, so this does not wait for a fresh GET —
+ * it waits until `data-chats-loading` is false and a row is painted.
+ */
+export async function openChatManager(page: Page): Promise<Locator> {
+  const panel = page.locator(selectors.nav.sidebarChats)
+  await page.locator(selectors.nav.sidebarV2ChatNav).click()
+  await expect(panel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  await expect(panel).toHaveAttribute('data-chats-loading', 'false', {
+    timeout: TIMEOUTS.STANDARD,
+  })
+  await panel
+    .locator(selectors.nav.chatManagerListRows)
+    .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+  return panel
+}
+
+/**
+ * Persist a unique title on the active chat through the API so a later
+ * History / All chats search does not have to win the row-menu race.
+ */
+export async function nameActiveChat(page: Page, title: string): Promise<void> {
+  const chatId = await page.evaluate(() => window.localStorage.getItem('synaplan_active_chat_id'))
+  if (!chatId) {
+    throw new Error('nameActiveChat: no synaplan_active_chat_id in localStorage')
+  }
+  const response = await page.request.patch(`/api/v1/chats/${chatId}`, {
+    data: { title },
+  })
+  if (!response.ok()) {
+    throw new Error(
+      `nameActiveChat: PATCH /api/v1/chats/${chatId} failed: ${response.status()} ${await response.text()}`
+    )
+  }
+}
 
 export class ChatHelper {
   constructor(private page: Page) {}
@@ -53,26 +91,7 @@ export class ChatHelper {
     // fast at the done/error race below, so this does not mask real breakage.
     await newBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
 
-    const errorNotice = newBubble.locator(selectors.chat.chatError)
-    const result = await Promise.race([
-      newBubble
-        .locator(selectors.chat.messageDone)
-        .waitFor({ state: 'visible', timeout: raceTimeout })
-        .then(() => 'done' as const),
-      errorNotice.waitFor({ state: 'visible', timeout: raceTimeout }).then(() => 'error' as const),
-    ])
-    // message-done must not be treated as success when the honest error
-    // notice is also (or subsequently) on the bubble — the catalog sentence
-    // is no longer in section-message-text, so reading the body would hang.
-    if (result === 'error' || (await errorNotice.isVisible())) {
-      const explanation = errorNotice.locator('[data-testid="chat-error-body"]')
-      const text = (await explanation.isVisible()) ? (await explanation.innerText()).trim() : ''
-      throw new Error(
-        text
-          ? `Assistant message ended in error state: ${text}`
-          : 'Assistant message ended in error state (chat-error-notice visible)'
-      )
-    }
+    await assertStreamSucceeded(newBubble, raceTimeout)
 
     const answerBody = newBubble.locator(selectors.chat.assistantAnswerBody).last()
     await answerBody.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
@@ -112,6 +131,14 @@ export class ChatHelper {
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
     }
 
+    // Leaving the loop with nothing to read is not a slow render, it is an
+    // empty answer. Returning it silently pushed the failure into whichever
+    // assertion the caller happened to make next, so the report named that
+    // assertion instead of the empty stream.
+    if (lastText.length === 0) {
+      throw new Error(`Assistant answer body stayed empty for ${MAX_WAIT_MS}ms after message-done`)
+    }
+
     return lastText.toLowerCase()
   }
 
@@ -124,12 +151,12 @@ export class ChatHelper {
     await this.page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
     await this.page.reload()
     await this.page
-      .locator(selectors.nav.sidebarV2Manage)
+      .locator(selectors.nav.sidebarV2Assistants)
       .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
 
   /**
-   * Start a new chat. Supports V2 (sidebar plus button) and V1 (chat toggle + dropdown).
+   * Start a new chat from the sidebar New Chat button.
    *
    * Waits for the new chat to be fully committed by asserting the empty-state
    * marker (`state-empty`) is visible. This is required to avoid a race with
@@ -142,15 +169,24 @@ export class ChatHelper {
    */
   async startNewChat(): Promise<void> {
     const v2NewChatBtn = this.page.locator(selectors.nav.sidebarV2NewChat)
-    try {
-      await v2NewChatBtn.waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-      await v2NewChatBtn.click()
-    } catch {
-      await this.page.locator(selectors.chat.chatBtnToggle).waitFor({ state: 'visible' })
-      await this.page.locator(selectors.chat.chatBtnToggle).click()
-      await this.page.locator(selectors.chat.newChatButton).waitFor({ state: 'visible' })
-      await this.page.locator(selectors.chat.newChatButton).click()
-    }
+    const v2Shell = this.page.locator(selectors.nav.sidebar)
+
+    // page.goto() resolves before the Vue shell paints, so a cold boot needs
+    // the long wait. New Chat lives in the chats panel, which the Chats rail
+    // icon opens. A one-shot probe can race the panel paint, and in the overlay
+    // a second click on Chats closes the panel again — so retry until visible.
+    await v2Shell.waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+    await expect(async () => {
+      if (!(await v2NewChatBtn.isVisible())) {
+        await this.page.locator(selectors.nav.sidebarV2ChatNav).click({ timeout: TIMEOUTS.SHORT })
+      }
+      await expect(v2NewChatBtn).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    }).toPass({ timeout: TIMEOUTS.LONG })
+    await v2NewChatBtn.click()
+
+    // The button stays disabled until the new chat is the active one. Until
+    // then a late boot list can still point the composer at the previous chat.
+    await expect(v2NewChatBtn).toBeEnabled({ timeout: TIMEOUTS.STANDARD })
 
     const textInput = this.page.locator(selectors.chat.textInput)
     await textInput.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
@@ -171,6 +207,57 @@ export class ChatHelper {
       undefined,
       { timeout: TIMEOUTS.STANDARD }
     )
+  }
+
+  /**
+   * Full reload, then wait until the open chat's transcript is actually back.
+   *
+   * `page.reload()` resolves on the document load event, a few hundred
+   * milliseconds in. The bubbles only exist after the cold boot's
+   * GET /chats/:id/messages, and on a shared CI runner that request regularly
+   * lands just past STANDARD (10s). Waiting on the bubble from document load
+   * therefore times out as the player is mounting.
+   */
+  async reload(): Promise<void> {
+    const messagesReady = this.page.waitForResponse(
+      (res) => {
+        try {
+          const url = new URL(res.url())
+          return (
+            /\/api\/v1\/chats\/\d+\/messages$/.test(url.pathname) &&
+            res.request().method() === 'GET' &&
+            res.ok()
+          )
+        } catch {
+          return false
+        }
+      },
+      { timeout: TIMEOUTS.VERY_LONG }
+    )
+    await this.page.reload()
+    await messagesReady
+  }
+
+  /**
+   * `page.goBack()` into the chat, then wait until the cold boot got as far as
+   * openApp() waits for.
+   *
+   * Coming back from a page that was opened with `page.goto()` is a full page
+   * load. The chat list request only starts after the runtime config and the
+   * session check, and on a shared CI runner that chain alone took more than
+   * STANDARD (10s). The composer then needs the list or the access probe that
+   * runs beside it.
+   */
+  async goBack(): Promise<void> {
+    const chatsLoaded = this.page.waitForResponse(
+      (res) =>
+        new URL(res.url()).pathname.endsWith('/api/v1/chats') &&
+        res.request().method() === 'GET' &&
+        res.ok(),
+      { timeout: TIMEOUTS.VERY_LONG }
+    )
+    await this.page.goBack()
+    await chatsLoaded
   }
 
   async attachFile(file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {

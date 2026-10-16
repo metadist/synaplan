@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
+import { useNotification } from '@/composables/useNotification'
+import { i18n } from '@/i18n/instance'
 import { ref, computed, watch } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
+import { PutApiChatsTagsResponseSchema } from '@/generated/api-schemas'
+import { chatApi } from '@/services/api/chatApi'
+import { isRecoverableStreamError } from '@/utils/streamError'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useHistoryStore } from '@/stores/history'
@@ -9,10 +14,25 @@ import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
+import { chatGoneStatus } from '@/utils/chatAccessError'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { buildChatShareUrl } from '@/utils/urlHelper'
+import { CHAT_HISTORY_PAGE } from '@/components/sidebar/chatHistoryPaging'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
+/** Finished-but-unopened chats, per user. A reload must keep the dot until that chat is opened. */
+const READY_CHAT_STORAGE_PREFIX = 'synaplan_ready_chat_ids_'
+/**
+ * Chats this browser left while the answer was still running. If the tab
+ * closes before the answer lands, the next list load turns them into the
+ * finished dot once the server no longer reports the run.
+ */
+const DEPARTED_RUN_STORAGE_PREFIX = 'synaplan_departed_run_chat_ids_'
+const UNACKNOWLEDGED_CHAT_LIMIT = 40
+/** First half-minute of a dropped background stream, then a slower follow-up. */
+const DETACHED_POLL_FAST_ATTEMPTS = 15
+const DETACHED_POLL_FAST_MS = 2000
+const DETACHED_POLL_SLOW_MS = 8000
 
 /** Page size for the mobile history drawer's infinite scroll. */
 const HISTORY_PAGE_SIZE = 20
@@ -43,9 +63,21 @@ export interface Chat {
   updatedAt: string
   messageCount?: number
   isShared?: boolean
-  source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api'
+  /** IAM grants on an owned chat. A public link stays on isShared. */
+  shareSummary?: {
+    everyone: boolean
+    people: number
+    groups: string[]
+  }
+  source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api' | 'telegram'
   widgetSession?: WidgetSessionInfo | null
   firstMessagePreview?: string | null
+  /** True when this chat is in the Pinned category. */
+  pinned?: boolean
+  /** When the chat was last pinned. Null when it is not pinned. */
+  pinnedAt?: string | null
+  archived?: boolean
+  tags?: string[]
   access?: 'owner' | 'read' | 'use'
 }
 
@@ -80,14 +112,64 @@ export const useChatsStore = defineStore('chats', () => {
   const activeChatId = ref<number | null>(readActiveChatId())
   const conversationAccess = ref<'owner' | 'read' | 'use' | null>(null)
   const conversationSource = ref<ConversationSource | null>(null)
+  // The access probe failed for a reason other than "gone": access stays
+  // null (no composer), so the view must say so and offer a retry.
+  const conversationAccessFailed = ref(false)
   let conversationAccessSeq = 0
   const loading = ref(false)
   const error = ref<string | null>(null)
+  /**
+   * Bumped at the start of every `loadChats()`, on `$reset`, and after any
+   * local list mutation a previously started GET cannot know about (rename /
+   * delete / generated title). A response whose generation no longer matches
+   * is dropped so it cannot replace a title the user just saved, resurrect a
+   * chat they just deleted, or leak the previous user's list after logout.
+   * The counter stays monotonic — resetting it to 0 would let a pre-logout
+   * `seq === 1` match the next user's first load.
+   *
+   * Creates and activity bumps are merged into the applied snapshot instead
+   * of bumping this counter: discarding the boot GET because the user clicked
+   * New Chat mid-load would drop every other chat. Only ids recorded in
+   * `locallyCreatedIds` are kept when the snapshot omits them — otherwise a
+   * chat deleted on another device would come back on every refresh.
+   */
+  let chatsLoadSeq = 0
+  /** Ids `createChat()` added that a snapshot started beforehand cannot list. */
+  const locallyCreatedIds = new Set<number>()
+  /**
+   * True once the full chat list has loaded successfully in this session.
+   * The desktop menu only pages (`loadRailChats`), so on a non-chat landing
+   * (e.g. Settings) `chats` may hold just the first merged page.
+   * `findOrCreateEmptyChat()` checks this before scanning, or a reusable
+   * empty chat beyond the first page is missed and duplicated.
+   */
+  let chatsListLoaded = false
+  /**
+   * In-flight creates of chats that start empty. Their chat is not in `chats`
+   * yet, so `findOrCreateEmptyChat()` waits for them instead of creating a
+   * second empty chat (boot auto-create + "New Chat", or a double click).
+   */
+  const pendingEmptyCreates = new Set<Promise<Chat | null>>()
+  /**
+   * Boot GET /chats while it has not applied yet. New Chat must wait for it:
+   * choosing against the still-empty local list creates a duplicate, then the
+   * late response runs ensureValidActiveChat() and puts the previous thread
+   * back on screen.
+   */
+  let listLoading: Promise<void> | null = null
+  /**
+   * Live generating marks, keyed by chat id → `chatsLoadSeq` at mark time.
+   * Applied only to loads that were already in flight (`epoch >= loadSeq`) so
+   * a later snapshot can turn the marker off after the user walked away.
+   */
+  const liveGeneratingEpoch = new Map<number, number>()
+  /** Live clears, same generation rule as `liveGeneratingEpoch`. */
+  const liveClearedEpoch = new Map<number, number>()
 
   /**
    * Paginated history for the mobile drawer. Kept separate from `chats` so the
-   * global list (chat switching, desktop rail, `ensureValidActiveChat`) is not
-   * affected by the incremental, page-by-page loading of the drawer.
+   * global list (chat switching, `ensureValidActiveChat`) is not affected by
+   * the incremental, page-by-page loading of the drawer.
    */
   const historyChats = ref<Chat[]>([])
   const historyLoading = ref(false)
@@ -95,17 +177,58 @@ export const useChatsStore = defineStore('chats', () => {
   const historyOffset = ref(0)
 
   /**
+   * Pages for the desktop chat menu. Separate from `chats`, which chat
+   * switching still loads in full. The menu appends a page when its list
+   * reaches the end instead of downloading every chat up front.
+   */
+  const railChats = ref<Chat[]>([])
+  const railHasMore = ref(true)
+  const railLoading = ref(false)
+  const railOffset = ref(0)
+  let railLoadSeq = 0
+  /** Chats removed here. A menu page requested before the removal must not bring them back. */
+  const removedChatIds = new Set<number>()
+
+  /**
    * Chats whose answer is still being written on the server. A turn survives
    * the client disconnect it was started from, so this marks the chats a user
    * can return to and keep watching.
    */
   const activeRunChatIds = ref<Set<number>>(new Set())
+  /**
+   * Chats whose background answer has finished and the user has not opened
+   * them yet. The sidebar keeps a dot, in a different color, until that click.
+   * Stored per user so a reload keeps it.
+   */
+  const readyChatIds = ref<Set<number>>(new Set())
+  /**
+   * Chats the user left while the answer was still running. Not shown on its
+   * own: a still-running one stays on the blue dot, a finished one moves into
+   * `readyChatIds` on the next list load.
+   */
+  const departedChatIds = new Set<number>()
+  /** Chats with a pin PATCH in flight. A second toggle waits until the first settles. */
+  const pinPendingChatIds = ref<Set<number>>(new Set())
+  /** Quiet re-attach of a turn the user walked away from. Keyed by chat id. */
+  const detachedRunStops = new Map<number, () => void>()
+  /** Bumped to cancel an in-flight poll for that chat. */
+  const detachedPollGeneration = new Map<number, number>()
+  const detachedPollsInFlight = new Set<number>()
+  /**
+   * User whose stored marks are already in memory. `$reset` clears memory
+   * without writing, so a logout cannot wipe the previous account's dots.
+   */
+  let hydratedForUserId: number | null = null
 
   const normalizeChat = (chat: unknown): Chat => {
     const c = chat as Chat
     return {
       ...c,
       widgetSession: c.widgetSession ?? null,
+      pinned: c.pinned === true,
+      pinnedAt: typeof c.pinnedAt === 'string' ? c.pinnedAt : null,
+      archived: c.archived === true,
+      tags: Array.isArray(c.tags) ? c.tags.filter((tag) => typeof tag === 'string') : [],
     }
   }
 
@@ -171,31 +294,121 @@ export const useChatsStore = defineStore('chats', () => {
 
   // Once the incoming list has arrived, an active chat that is neither mine nor
   // shared with me (revoked share, stale storage) falls back like before.
+  // Wait until the own list has loaded too, including when that list is empty:
+  // a stored id is kept while incoming is still in flight, and skipping the
+  // empty list left it selected. Sharing then hides the composer for good.
   watch(
     () => useIncomingStore().loaded,
     (incomingLoaded) => {
-      if (incomingLoaded && chats.value.length > 0) ensureValidActiveChat()
+      if (incomingLoaded && chatsListLoaded) ensureValidActiveChat()
     }
   )
 
-  async function loadChats() {
+  function invalidateInFlightChatsLoad() {
+    chatsLoadSeq += 1
+    loading.value = false
+  }
+
+  function mergeLoadedChat(local: Chat | undefined, server: Chat): Chat {
+    if (!local) {
+      return server
+    }
+    const localTs = Date.parse(local.updatedAt ?? '') || 0
+    const serverTs = Date.parse(server.updatedAt ?? '') || 0
+    return {
+      ...server,
+      updatedAt: localTs > serverTs ? local.updatedAt : server.updatedAt,
+      messageCount:
+        Math.max(local.messageCount ?? 0, server.messageCount ?? 0) || server.messageCount,
+      firstMessagePreview: local.firstMessagePreview ?? server.firstMessagePreview,
+    }
+  }
+
+  function applyLiveRunOverlay(serverRunIds: number[], loadSeq: number): Set<number> {
+    const nextRuns = new Set(serverRunIds)
+    for (const [id, epoch] of liveGeneratingEpoch) {
+      if (epoch >= loadSeq) {
+        nextRuns.add(id)
+      } else {
+        liveGeneratingEpoch.delete(id)
+      }
+    }
+    for (const [id, epoch] of liveClearedEpoch) {
+      if (epoch >= loadSeq) {
+        nextRuns.delete(id)
+      } else {
+        liveClearedEpoch.delete(id)
+      }
+    }
+    return nextRuns
+  }
+
+  function applyChatsFromServer(incoming: Chat[], serverRunIds: number[], loadSeq: number) {
+    const serverIds = new Set(incoming.map((chat) => chat.id))
+    const localById = new Map(chats.value.map((chat) => [chat.id, chat]))
+    const merged = incoming.map((server) => mergeLoadedChat(localById.get(server.id), server))
+    const createdLocally = chats.value.filter(
+      (chat) => locallyCreatedIds.has(chat.id) && !serverIds.has(chat.id)
+    )
+    for (const id of serverIds) {
+      locallyCreatedIds.delete(id)
+    }
+    chats.value = createdLocally.length > 0 ? [...createdLocally, ...merged] : merged
+    activeRunChatIds.value = applyLiveRunOverlay(serverRunIds, loadSeq)
+  }
+
+  const viewingArchived = ref(false)
+
+  async function loadChats(archived: '0' | '1' = '0') {
     if (!checkAuthOrRedirect()) return
 
+    const seq = ++chatsLoadSeq
     loading.value = true
     error.value = null
 
+    const run = (async () => {
+      try {
+        const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
+          `/api/v1/chats?archived=${archived}`
+        )
+        viewingArchived.value = archived === '1'
+        if (seq !== chatsLoadSeq) {
+          return
+        }
+        applyChatsFromServer(
+          (data.chats || []).map((chat) => normalizeChat(chat)),
+          data.activeRunChatIds ?? [],
+          seq
+        )
+        chatsListLoaded = true
+        ensureValidActiveChat()
+        reconcileUnacknowledgedChats(true)
+      } catch (err: unknown) {
+        if (seq !== chatsLoadSeq) {
+          return
+        }
+        error.value = getErrorMessage(err) || 'Failed to load chats'
+        console.error('Error loading chats:', err)
+      } finally {
+        if (seq === chatsLoadSeq) {
+          loading.value = false
+        }
+      }
+    })()
+
+    listLoading = run
     try {
-      const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
-        '/api/v1/chats'
-      )
-      chats.value = (data.chats || []).map((chat) => normalizeChat(chat))
-      activeRunChatIds.value = new Set(data.activeRunChatIds ?? [])
-      ensureValidActiveChat()
-    } catch (err: unknown) {
-      error.value = getErrorMessage(err) || 'Failed to load chats'
-      console.error('Error loading chats:', err)
+      await run
     } finally {
-      loading.value = false
+      if (listLoading === run) {
+        listLoading = null
+      }
+    }
+    // A newer load superseded this one, so this response was dropped. Callers
+    // decide on the list right after (the chat view picks or creates the open
+    // chat), so they wait for the load whose list is actually applied.
+    while (listLoading) {
+      await listLoading
     }
   }
 
@@ -209,16 +422,284 @@ export const useChatsStore = defineStore('chats', () => {
    * turn finishes. The chat view drives it live from the stream's own
    * `run_started` and terminal events instead.
    */
+  function storageUserId(): number | null {
+    const getUser = authService.getUser
+    if (typeof getUser !== 'function') return null
+    const id = getUser().value?.id
+    return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null
+  }
+
+  function readStoredChatIds(key: string): Set<number> {
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) return new Set()
+      const parsed: unknown = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return new Set()
+      return new Set(
+        parsed.filter(
+          (id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0
+        )
+      )
+    } catch (error) {
+      console.warn('Unable to read chat marks from storage', error)
+      return new Set()
+    }
+  }
+
+  function writeStoredChatIds(key: string, ids: Set<number>) {
+    try {
+      if (ids.size === 0) {
+        localStorage.removeItem(key)
+        return
+      }
+      localStorage.setItem(key, JSON.stringify([...ids]))
+    } catch (error) {
+      console.warn('Unable to persist chat marks', error)
+    }
+  }
+
+  function trimChatIds(ids: Set<number>) {
+    while (ids.size > UNACKNOWLEDGED_CHAT_LIMIT) {
+      const oldest = ids.values().next().value
+      if (oldest === undefined) return
+      ids.delete(oldest)
+    }
+  }
+
+  function hydrateUnacknowledgedChats() {
+    const userId = storageUserId()
+    if (userId === null || userId === hydratedForUserId) return
+    hydratedForUserId = userId
+    readyChatIds.value = readStoredChatIds(`${READY_CHAT_STORAGE_PREFIX}${userId}`)
+    departedChatIds.clear()
+    for (const id of readStoredChatIds(`${DEPARTED_RUN_STORAGE_PREFIX}${userId}`)) {
+      departedChatIds.add(id)
+    }
+  }
+
+  function persistUnacknowledgedChats() {
+    const userId = storageUserId()
+    if (userId === null || userId !== hydratedForUserId) return
+    writeStoredChatIds(`${READY_CHAT_STORAGE_PREFIX}${userId}`, readyChatIds.value)
+    writeStoredChatIds(`${DEPARTED_RUN_STORAGE_PREFIX}${userId}`, departedChatIds)
+  }
+
+  function rememberDepartedChat(chatId: number) {
+    hydrateUnacknowledgedChats()
+    if (departedChatIds.has(chatId)) return
+    departedChatIds.add(chatId)
+    trimChatIds(departedChatIds)
+    persistUnacknowledgedChats()
+  }
+
+  function forgetDepartedChat(chatId: number) {
+    hydrateUnacknowledgedChats()
+    if (!departedChatIds.delete(chatId)) return
+    persistUnacknowledgedChats()
+  }
+
   function markChatGenerating(chatId: number, generating: boolean) {
     // Replaced rather than mutated: a Set is not deeply reactive, so template
     // reads of activeRunChatIds would not re-render on add/delete alone.
     const next = new Set(activeRunChatIds.value)
     if (generating) {
+      liveGeneratingEpoch.set(chatId, chatsLoadSeq)
+      liveClearedEpoch.delete(chatId)
       next.add(chatId)
+      dismissReadyChat(chatId)
+      if (activeChatId.value === chatId) forgetDepartedChat(chatId)
     } else {
+      liveClearedEpoch.set(chatId, chatsLoadSeq)
+      liveGeneratingEpoch.delete(chatId)
       next.delete(chatId)
     }
     activeRunChatIds.value = next
+  }
+
+  function dismissReadyChat(chatId: number) {
+    hydrateUnacknowledgedChats()
+    if (!readyChatIds.value.has(chatId)) return
+    const next = new Set(readyChatIds.value)
+    next.delete(chatId)
+    readyChatIds.value = next
+    persistUnacknowledgedChats()
+  }
+
+  /**
+   * The background turn finished. Drop the "still answering" mark and keep a
+   * quieter dot until the user opens the chat. Opening the chat itself clears
+   * the dot: the person is already looking at the answer.
+   */
+  function markChatAnswerReady(chatId: number) {
+    hydrateUnacknowledgedChats()
+    departedChatIds.delete(chatId)
+    if (activeChatId.value === chatId) {
+      dismissReadyChat(chatId)
+      persistUnacknowledgedChats()
+      markChatGenerating(chatId, false)
+      return
+    }
+    markChatGenerating(chatId, false)
+    const next = new Set(readyChatIds.value)
+    next.add(chatId)
+    trimChatIds(next)
+    readyChatIds.value = next
+    persistUnacknowledgedChats()
+  }
+
+  /**
+   * Apply stored marks to the list the server just returned.
+   *
+   * A chat the user is looking at is acknowledged. A chat they left, whose
+   * run is no longer active, becomes the finished dot. A chat that is running
+   * again loses the finished dot so the blue one wins.
+   *
+   * @param fullList True when `chats` is the complete list. A single menu page
+   *   must not drop a mark for a chat that simply was not on that page.
+   */
+  function reconcileUnacknowledgedChats(fullList: boolean) {
+    hydrateUnacknowledgedChats()
+    const runs = activeRunChatIds.value
+    const openId = activeChatId.value
+    const known = new Set(chats.value.map((chat) => chat.id))
+    const readyNext = new Set(readyChatIds.value)
+    let changed = false
+
+    const acknowledge = (id: number) => {
+      if (departedChatIds.delete(id)) changed = true
+      if (readyNext.delete(id)) changed = true
+    }
+
+    if (openId !== null) acknowledge(openId)
+
+    for (const id of [...departedChatIds]) {
+      if (fullList && !known.has(id)) {
+        departedChatIds.delete(id)
+        changed = true
+        continue
+      }
+      if (runs.has(id)) continue
+      departedChatIds.delete(id)
+      readyNext.add(id)
+      changed = true
+    }
+
+    for (const id of [...readyNext]) {
+      if (runs.has(id) || id === openId || (fullList && !known.has(id))) {
+        if (readyNext.delete(id)) changed = true
+      }
+    }
+    trimChatIds(readyNext)
+    const readyChanged =
+      readyNext.size !== readyChatIds.value.size ||
+      [...readyNext].some((id) => !readyChatIds.value.has(id))
+    if (readyChanged) {
+      readyChatIds.value = readyNext
+      changed = true
+    }
+
+    if (changed) persistUnacknowledgedChats()
+    ensureDepartedPolls()
+  }
+
+  function ensureDepartedPolls() {
+    for (const chatId of departedChatIds) {
+      if (!activeRunChatIds.value.has(chatId)) continue
+      if (chatId === activeChatId.value) continue
+      if (detachedRunStops.has(chatId)) continue
+      if (detachedPollsInFlight.has(chatId)) continue
+      if (!detachedPollGeneration.has(chatId)) detachedPollGeneration.set(chatId, 0)
+      const generation = detachedPollGeneration.get(chatId) ?? 0
+      detachedPollsInFlight.add(chatId)
+      void pollDetachedRun(chatId, generation).finally(() => {
+        detachedPollsInFlight.delete(chatId)
+      })
+    }
+  }
+
+  function stopDetachedRunWatch(chatId?: number) {
+    const ids =
+      chatId === undefined
+        ? new Set<number>([...detachedRunStops.keys(), ...detachedPollGeneration.keys()])
+        : [chatId]
+    for (const id of ids) {
+      detachedRunStops.get(id)?.()
+      detachedRunStops.delete(id)
+      detachedPollGeneration.set(id, (detachedPollGeneration.get(id) ?? 0) + 1)
+    }
+  }
+
+  async function pollDetachedRun(chatId: number, generation: number) {
+    let attempt = 0
+    while (detachedPollGeneration.get(chatId) === generation) {
+      const waitMs =
+        attempt < DETACHED_POLL_FAST_ATTEMPTS ? DETACHED_POLL_FAST_MS : DETACHED_POLL_SLOW_MS
+      attempt += 1
+      await new Promise((resolve) => {
+        setTimeout(resolve, waitMs)
+      })
+      if (detachedPollGeneration.get(chatId) !== generation) return
+      if (activeChatId.value === chatId) return
+      await loadChats()
+      if (detachedPollGeneration.get(chatId) !== generation) return
+      // The list load moves a finished run onto the ready dot. Keep going
+      // only while the server still says this chat is answering.
+      if (!departedChatIds.has(chatId) || !activeRunChatIds.value.has(chatId)) return
+    }
+  }
+
+  /**
+   * Follow a turn after the user left its chat. The visible stream is already
+   * closed; this one only updates the sidebar when the answer lands.
+   */
+  function watchDetachedRun(chatId: number, runId: string) {
+    stopDetachedRunWatch(chatId)
+    rememberDepartedChat(chatId)
+    markLocalTurnFinished(chatId)
+    let stopped = false
+    const stop = chatApi.attachStream({
+      runId,
+      onUpdate: (data) => {
+        if (stopped) return
+        if (typeof data.chatTitle === 'string' && data.chatTitle !== '') {
+          applyChatTitle(chatId, data.chatTitle)
+        }
+        if (data.status !== 'complete' && data.status !== 'error') return
+        stopped = true
+        detachedRunStops.delete(chatId)
+        // The user came back. The open chat owns the dot: a finished turn
+        // clears it, a dropped connection leaves the blue mark for the
+        // visible stream. Neither case paints the "answer ready" dot.
+        if (activeChatId.value === chatId) {
+          if (isRecoverableStreamError(data)) {
+            forgetDepartedChat(chatId)
+            return
+          }
+          if (data.status === 'complete') {
+            markChatAnswerReady(chatId)
+            return
+          }
+          forgetDepartedChat(chatId)
+          markChatGenerating(chatId, false)
+          return
+        }
+        if (isRecoverableStreamError(data)) {
+          ensureDepartedPolls()
+          return
+        }
+        if (data.status === 'complete') {
+          markChatAnswerReady(chatId)
+          bumpChatActivity(chatId)
+          return
+        }
+        forgetDepartedChat(chatId)
+        markChatGenerating(chatId, false)
+      },
+    })
+    detachedRunStops.set(chatId, () => {
+      stopped = true
+      stop()
+    })
   }
 
   /**
@@ -264,7 +745,96 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
-  async function createChat(title?: string): Promise<Chat | null> {
+  function isLocallyCreated(chatId: number): boolean {
+    return locallyCreatedIds.has(chatId)
+  }
+
+  /**
+   * Keep `chats` in step with a menu page. Pin, rename, and delete then find a
+   * chat the menu loaded before the full list, and a title changed elsewhere
+   * replaces the stale one. A local write since the request started keeps
+   * its own value.
+   */
+  function mergeRailPage(page: Chat[], mutatedSinceRequest: boolean) {
+    const serverById = new Map(page.map((chat) => [chat.id, chat]))
+    const known = new Set<number>()
+    const next = chats.value.map((local) => {
+      known.add(local.id)
+      const server = serverById.get(local.id)
+      if (!server || mutatedSinceRequest) return local
+      return mergeLoadedChat(local, server)
+    })
+    const missing = page.filter((chat) => !known.has(chat.id))
+    chats.value = missing.length > 0 ? [...next, ...missing] : next
+  }
+
+  function forgetRailChat(chatId: number) {
+    if (!railChats.value.some((chat) => chat.id === chatId)) return
+    railChats.value = railChats.value.filter((chat) => chat.id !== chatId)
+    // Offset pagination counts server rows, so forgetting a loaded row moves
+    // every later row one position forward. Without this the next page starts
+    // one row too far in and permanently skips a chat.
+    railOffset.value = Math.max(0, railOffset.value - 1)
+  }
+
+  /**
+   * One page of chats for the desktop menu.
+   *
+   * @param reset When true, start over at offset 0 and replace the menu list.
+   *   Otherwise append the next page. A reset supersedes a page already in
+   *   flight. No-op while a page is in flight, or when nothing more remains,
+   *   unless resetting.
+   */
+  async function loadRailChats(reset = false) {
+    if (!checkAuthOrRedirect()) return
+    if (!reset && (railLoading.value || !railHasMore.value)) return
+
+    const seq = ++railLoadSeq
+    const mutationSeq = chatsLoadSeq
+    const offset = reset ? 0 : railOffset.value
+    railLoading.value = true
+
+    try {
+      const data = await httpClient(`/api/v1/chats?limit=${CHAT_HISTORY_PAGE}&offset=${offset}`, {
+        schema: GetApiChatsListResponseSchema,
+      })
+      if (seq !== railLoadSeq) return
+
+      const received = (data.chats ?? []).map((chat) => normalizeChat(chat))
+      const page = received.filter((chat) => !removedChatIds.has(chat.id))
+      if (reset) {
+        railChats.value = page
+      } else {
+        const seen = new Set(railChats.value.map((chat) => chat.id))
+        railChats.value = [...railChats.value, ...page.filter((chat) => !seen.has(chat.id))]
+      }
+      mergeRailPage(page, chatsLoadSeq !== mutationSeq)
+      railOffset.value = offset + received.length
+      railHasMore.value = data.hasMore === true
+      if (Array.isArray(data.activeRunChatIds)) {
+        activeRunChatIds.value = applyLiveRunOverlay(data.activeRunChatIds, chatsLoadSeq)
+        reconcileUnacknowledgedChats(false)
+      }
+    } catch (err: unknown) {
+      if (seq !== railLoadSeq) return
+      console.error('Error loading chat menu:', err)
+    } finally {
+      if (seq === railLoadSeq) {
+        railLoading.value = false
+      }
+    }
+  }
+
+  function createChat(title?: string): Promise<Chat | null> {
+    const request = postNewChat(title)
+    if (title === undefined || isDefaultChatTitle(title)) {
+      pendingEmptyCreates.add(request)
+      void request.finally(() => pendingEmptyCreates.delete(request))
+    }
+    return request
+  }
+
+  async function postNewChat(title?: string): Promise<Chat | null> {
     if (!checkAuthOrRedirect()) return null
 
     loading.value = true
@@ -284,6 +854,7 @@ export const useChatsStore = defineStore('chats', () => {
 
       const newChat = normalizeChat(data.chat)
 
+      locallyCreatedIds.add(newChat.id)
       chats.value.unshift(newChat)
       if (activeChatId.value === selectionAtRequest) {
         updateActiveChatSelection(newChat.id)
@@ -336,6 +907,26 @@ export const useChatsStore = defineStore('chats', () => {
       void incognitoStore.endSession()
     }
 
+    if (pendingEmptyCreates.size > 0) {
+      await Promise.all(pendingEmptyCreates)
+    }
+
+    // A click that lands while the boot list is still in flight must not
+    // decide against `chats === []`. That creates a chat the selection guard
+    // then refuses to show, because the list response moves the selection to
+    // the previous thread.
+    while (listLoading) {
+      await listLoading
+    }
+
+    // The menu only pages, so on a non-chat landing (e.g. Settings) `chats`
+    // may hold just the first merged page. Scanning that for a reusable empty
+    // chat misses one sitting beyond the loaded pages and creates a
+    // duplicate. Load the complete list first when it never arrived.
+    if (!chatsListLoaded) {
+      await loadChats()
+    }
+
     // Find all empty chats (not widget sessions, no messages, default title).
     // #732: exclude the active chat when local history already has messages
     // (e.g. cancelled stream) — list metadata can still look empty, so reuse
@@ -373,8 +964,66 @@ export const useChatsStore = defineStore('chats', () => {
     return await createChat()
   }
 
+  async function toggleChatPin(chatId: number) {
+    if (!checkAuthOrRedirect()) return
+
+    const chat = chats.value.find((c) => c.id === chatId)
+    if (!chat || pinPendingChatIds.value.has(chatId)) return
+
+    const previousPinned = chat.pinned === true
+    const previousPinnedAt = chat.pinnedAt ?? null
+    const nextPinned = !previousPinned
+    chat.pinned = nextPinned
+    chat.pinnedAt = nextPinned ? new Date().toISOString() : null
+    invalidateInFlightChatsLoad()
+    pinPendingChatIds.value = new Set(pinPendingChatIds.value).add(chatId)
+
+    try {
+      await httpClient(`/api/v1/chats/${chatId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ pinned: nextPinned }),
+      })
+      invalidateInFlightChatsLoad()
+    } catch (err: unknown) {
+      const current = chats.value.find((c) => c.id === chatId)
+      if (current) {
+        current.pinned = previousPinned
+        current.pinnedAt = previousPinnedAt
+      }
+      error.value = getErrorMessage(err) || 'Failed to update chat'
+      useNotification().error(i18n.global.t('chat.pinSaveFailed'))
+      console.error('Error pinning chat:', err)
+    } finally {
+      const next = new Set(pinPendingChatIds.value)
+      next.delete(chatId)
+      pinPendingChatIds.value = next
+    }
+  }
+
+  async function updateChatTags(chatId: number, tags: string[]): Promise<string[]> {
+    if (!checkAuthOrRedirect()) {
+      throw new Error('Not signed in')
+    }
+
+    invalidateInFlightChatsLoad()
+    const saved = await httpClient(`/api/v1/chats/${chatId}/tags`, {
+      method: 'PUT',
+      body: JSON.stringify({ tags }),
+      schema: PutApiChatsTagsResponseSchema,
+    })
+    const stored = saved.tags ?? []
+    const chat = chats.value.find((c) => c.id === chatId)
+    if (chat) {
+      chat.tags = stored
+    }
+    invalidateInFlightChatsLoad()
+    return stored
+  }
+
   async function updateChatTitle(chatId: number, title: string) {
     if (!checkAuthOrRedirect()) return
+
+    invalidateInFlightChatsLoad()
 
     try {
       await httpClient(`/api/v1/chats/${chatId}`, {
@@ -386,6 +1035,9 @@ export const useChatsStore = defineStore('chats', () => {
       if (chat) {
         chat.title = title
       }
+      // A load that started while the PATCH was in flight can have been
+      // served the old title. Drop it so it cannot land after this write.
+      invalidateInFlightChatsLoad()
     } catch (err: unknown) {
       error.value = getErrorMessage(err) || 'Failed to update chat'
       console.error('Error updating chat:', err)
@@ -397,14 +1049,52 @@ export const useChatsStore = defineStore('chats', () => {
    * value is already persisted, so re-sending it would be a redundant PATCH.
    */
   function applyChatTitle(chatId: number, title: string) {
+    invalidateInFlightChatsLoad()
     const chat = chats.value.find((c) => c.id === chatId)
     if (chat) {
       chat.title = title
     }
+    const rail = railChats.value.find((c) => c.id === chatId)
+    if (rail && rail !== chat) {
+      rail.title = title
+    }
+  }
+
+  async function setChatArchived(chatId: number, archived: boolean) {
+    if (!checkAuthOrRedirect()) return
+    await httpClient(`/api/v1/chats/${chatId}/${archived ? 'archive' : 'unarchive'}`, {
+      method: 'POST',
+    })
+    const chat = chats.value.find((row) => row.id === chatId)
+    if (chat) chat.archived = archived
+    if (archived) {
+      chats.value = chats.value.filter((row) => row.id !== chatId)
+      forgetRailChat(chatId)
+      if (activeChatId.value === chatId) {
+        updateActiveChatSelection(chats.value[0]?.id ?? null)
+      }
+    } else {
+      await loadChats(viewingArchived.value ? '1' : '0')
+    }
+  }
+
+  async function downloadChatExport(chatId: number, format: 'md' | 'json' | 'pdf') {
+    if (!checkAuthOrRedirect()) return
+    const blob = await httpClient<Blob>(`/api/v1/chats/${chatId}/export?format=${format}`, {
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `chat-${chatId}.${format === 'md' ? 'md' : format}`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   async function deleteChat(chatId: number, silent: boolean = false) {
     if (!checkAuthOrRedirect()) return
+
+    invalidateInFlightChatsLoad()
 
     try {
       await httpClient(`/api/v1/chats/${chatId}`, {
@@ -412,7 +1102,14 @@ export const useChatsStore = defineStore('chats', () => {
       })
 
       const wasActiveChat = activeChatId.value === chatId
+      locallyCreatedIds.delete(chatId)
+      stopDetachedRunWatch(chatId)
+      dismissReadyChat(chatId)
+      forgetDepartedChat(chatId)
       chats.value = chats.value.filter((c) => c.id !== chatId)
+      removedChatIds.add(chatId)
+      forgetRailChat(chatId)
+      invalidateInFlightChatsLoad()
 
       // If the deleted chat was active and it was the last chat, create a new one
       if (wasActiveChat && chats.value.length === 0) {
@@ -490,6 +1187,7 @@ export const useChatsStore = defineStore('chats', () => {
     ++conversationAccessSeq
     conversationAccess.value = 'owner'
     conversationSource.value = null
+    conversationAccessFailed.value = false
   }
 
   async function loadConversationAccess(chatId: number) {
@@ -509,6 +1207,7 @@ export const useChatsStore = defineStore('chats', () => {
     const seq = ++conversationAccessSeq
     conversationAccess.value = null
     conversationSource.value = null
+    conversationAccessFailed.value = false
     try {
       const data = await httpClient<{
         chat: {
@@ -526,13 +1225,28 @@ export const useChatsStore = defineStore('chats', () => {
         owner: parseOwner(data.chat.owner),
         sharedVia: parseSharedVia(data.chat.sharedVia),
       }
-    } catch {
+    } catch (err: unknown) {
       if (seq !== conversationAccessSeq) {
+        return
+      }
+      const gone = chatGoneStatus(err)
+      if (gone) {
+        void releaseUnavailableChat(chatId, gone)
         return
       }
       conversationAccess.value = null
       conversationSource.value = null
+      conversationAccessFailed.value = true
     }
+  }
+
+  function retryConversationAccess(): Promise<void> {
+    const chatId = activeChatId.value
+    if (!chatId) {
+      resolveConversationAccessAsOwn()
+      return Promise.resolve()
+    }
+    return loadConversationAccess(chatId)
   }
 
   async function getShareInfo(chatId: number) {
@@ -559,6 +1273,8 @@ export const useChatsStore = defineStore('chats', () => {
 
   function setActiveChat(chatId: number) {
     updateActiveChatSelection(chatId)
+    dismissReadyChat(chatId)
+    forgetDepartedChat(chatId)
   }
 
   /**
@@ -595,6 +1311,20 @@ export const useChatsStore = defineStore('chats', () => {
     if (options.firstMessagePreview && !chat.firstMessagePreview) {
       chat.firstMessagePreview = options.firstMessagePreview
     }
+
+    const historyIndex = historyChats.value.findIndex((item) => item.id === chatId)
+    if (historyIndex >= 0) {
+      const row = historyChats.value[historyIndex]
+      row.updatedAt = chat.updatedAt
+      row.messageCount = chat.messageCount
+      if (chat.firstMessagePreview && !row.firstMessagePreview) {
+        row.firstMessagePreview = chat.firstMessagePreview
+      }
+      if (historyIndex > 0) {
+        historyChats.value.splice(historyIndex, 1)
+        historyChats.value.unshift(row)
+      }
+    }
   }
 
   /**
@@ -610,30 +1340,123 @@ export const useChatsStore = defineStore('chats', () => {
    * @param options.firstMessagePreview Optional preview to lift an "empty" chat
    *   out of the empty-chat filter once it has real content.
    */
+  const localTurnCompletions = new Map<number, number>()
+
+  /**
+   * This tab just finished its own turn and already updated the sidebar.
+   * The matching realtime event must not count that message again.
+   */
+  function markLocalTurnFinished(chatId: number): void {
+    localTurnCompletions.set(chatId, (localTurnCompletions.get(chatId) ?? 0) + 1)
+  }
+
+  function clearLocalTurnFinished(chatId: number): void {
+    localTurnCompletions.delete(chatId)
+  }
+
+  function consumeLocalTurnFinished(chatId: number): boolean {
+    const pending = localTurnCompletions.get(chatId) ?? 0
+    if (pending <= 0) return false
+    if (pending === 1) {
+      localTurnCompletions.delete(chatId)
+    } else {
+      localTurnCompletions.set(chatId, pending - 1)
+    }
+    return true
+  }
+
   async function noteExternalActivity(
     chatId: number,
     options: { firstMessagePreview?: string } = {}
   ) {
+    const ownTurn = consumeLocalTurnFinished(chatId)
     const chat = chats.value.find((c) => c.id === chatId)
-    if (chat) {
-      bumpChatActivity(chatId, { firstMessagePreview: options.firstMessagePreview })
-      return
+    if (!ownTurn) {
+      if (chat) {
+        bumpChatActivity(chatId, { firstMessagePreview: options.firstMessagePreview })
+      } else {
+        await loadChats()
+      }
     }
 
-    await loadChats()
+    // Another tab, or a person this chat is shared with, just received a
+    // finished turn. Reload the open thread unless this tab is still streaming
+    // it itself, or just finished that stream (#2057).
+    if (!ownTurn && activeChatId.value === chatId && !useHistoryStore().hasLiveStream()) {
+      void useHistoryStore().loadMessages(chatId, 0, 50, true)
+    }
+  }
+
+  const releasingChats = new Map<number, Promise<'deleted' | 'unshared'>>()
+
+  /**
+   * The open conversation answered 404 or 403. Drop the selection, stop the
+   * loaders that would keep retrying it, and say what happened (#2061).
+   */
+  function releaseUnavailableChat(
+    chatId: number,
+    status: 403 | 404
+  ): Promise<'deleted' | 'unshared'> {
+    const existing = releasingChats.get(chatId)
+    if (existing) return existing
+
+    const job = (async () => {
+      const owned = chats.value.some((chat) => chat.id === chatId)
+      const reason: 'deleted' | 'unshared' = status === 404 && owned ? 'deleted' : 'unshared'
+      chats.value = chats.value.filter((chat) => chat.id !== chatId)
+      removedChatIds.add(chatId)
+      forgetRailChat(chatId)
+      useIncomingStore().drop(chatId)
+      if (activeChatId.value === chatId) {
+        useHistoryStore().discardMessages()
+        updateActiveChatSelection(null)
+      }
+      useNotification().info(
+        i18n.global.t(reason === 'deleted' ? 'chat.goneDeleted' : 'chat.goneUnshared')
+      )
+      await Promise.all([loadChats(), useIncomingStore().load()])
+      if (activeChatId.value === null) {
+        ensureValidActiveChat()
+      }
+      return reason
+    })().finally(() => {
+      releasingChats.delete(chatId)
+    })
+
+    releasingChats.set(chatId, job)
+    return job
   }
 
   function $reset() {
+    stopDetachedRunWatch()
+    localTurnCompletions.clear()
     chats.value = []
-    conversationAccess.value = null
-    conversationSource.value = null
-    conversationAccessSeq = 0
+    invalidateInFlightChatsLoad()
+    locallyCreatedIds.clear()
+    chatsListLoaded = false
+    liveGeneratingEpoch.clear()
+    liveClearedEpoch.clear()
     activeRunChatIds.value = new Set()
+    readyChatIds.value = new Set()
+    departedChatIds.clear()
+    detachedPollsInFlight.clear()
+    hydratedForUserId = null
+    pinPendingChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
     historyHasMore.value = true
     historyLoading.value = false
+    railChats.value = []
+    railOffset.value = 0
+    railHasMore.value = true
+    railLoading.value = false
+    railLoadSeq += 1
+    removedChatIds.clear()
     updateActiveChatSelection(null)
+    // Nothing is open. Settle as the viewer's own chat: leaving access at
+    // null hides the composer when sharing is on, and the ChatView watcher
+    // does not run again if the selection was already empty.
+    resolveConversationAccessAsOwn()
     loading.value = false
     error.value = null
   }
@@ -643,7 +1466,9 @@ export const useChatsStore = defineStore('chats', () => {
     activeChatId,
     conversationAccess,
     conversationSource,
+    conversationAccessFailed,
     loadConversationAccess,
+    retryConversationAccess,
     resolveConversationAccessAsOwn,
     activeChat,
     loading,
@@ -651,20 +1476,38 @@ export const useChatsStore = defineStore('chats', () => {
     historyChats,
     historyLoading,
     historyHasMore,
+    railChats,
+    railHasMore,
+    railLoading,
+    railOffset,
+    loadRailChats,
+    isLocallyCreated,
     activeRunChatIds,
+    readyChatIds,
+    pinPendingChatIds,
     markChatGenerating,
+    watchDetachedRun,
+    stopDetachedRunWatch,
+    viewingArchived,
     loadChats,
     loadChatHistory,
     createChat,
     findOrCreateEmptyChat,
     updateChatTitle,
+    updateChatTags,
+    toggleChatPin,
     applyChatTitle,
     deleteChat,
+    setChatArchived,
+    downloadChatExport,
     shareChat,
     getShareInfo,
     setActiveChat,
     bumpChatActivity,
     noteExternalActivity,
+    markLocalTurnFinished,
+    clearLocalTurnFinished,
+    releaseUnavailableChat,
     $reset,
   }
 })

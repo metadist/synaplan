@@ -2,7 +2,7 @@
   <div data-testid="section-groups">
     <div class="flex justify-end mb-4">
       <button
-        class="btn-primary px-4 py-2.5 rounded-lg"
+        class="btn-primary px-4 py-2.5 rounded-xl"
         data-testid="btn-create-group"
         @click="createGroup"
       >
@@ -51,8 +51,12 @@
               <td class="py-3 px-3 txt-primary font-medium">{{ group.name }}</td>
               <td class="py-3 px-3">
                 <span
-                  class="pill text-xs"
-                  :title="group.kind === 'directory' ? (group.externalSource ?? '') : undefined"
+                  class="inline-flex items-center px-2 py-0.5 rounded-md text-xs txt-secondary bg-black/5 dark:bg-white/10"
+                  :title="
+                    group.kind === 'directory'
+                      ? group.externalSource || $t('people.groups.fromLoginHint')
+                      : $t('people.groups.manualHint')
+                  "
                   >{{
                     group.kind === 'directory'
                       ? $t('people.groups.fromLogin')
@@ -66,14 +70,14 @@
               <td class="py-3 px-3 text-right">
                 <div v-if="group.kind === 'manual'" class="flex justify-end gap-1">
                   <button
-                    class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5"
+                    class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
                     :data-testid="`btn-rename-group-${group.id}`"
                     @click.stop="renameGroup(group)"
                   >
                     {{ $t('people.groups.rename') }}
                   </button>
                   <button
-                    class="icon-ghost icon-ghost--danger p-2 rounded-lg"
+                    class="icon-ghost icon-ghost--danger p-2 rounded-xl"
                     :data-testid="`btn-delete-group-${group.id}`"
                     @click.stop="deleteGroup(group)"
                   >
@@ -108,6 +112,7 @@ const { success, error: showError } = useNotification()
 
 const groups = ref<IamGroup[]>([])
 const loading = ref(false)
+const deleteInFlight = ref(false)
 const selectedId = ref<number | null>(null)
 const selectedGroup = computed(
   () => groups.value.find((group) => group.id === selectedId.value) ?? null
@@ -163,14 +168,36 @@ async function renameGroup(group: IamGroup) {
   }
 }
 
-async function deleteGroup(group: IamGroup) {
-  const confirmed = await confirm({
-    title: t('people.groups.delete'),
-    message: t('people.groups.deleteConfirm', { name: group.name }),
-    danger: true,
-  })
-  if (!confirmed) return
+async function groupDeleteMessage(group: IamGroup): Promise<string> {
   try {
+    const [shares, config] = await Promise.all([
+      iamApi.listGroupShares(group.id),
+      iamApi.getGroupConfig(group.id),
+    ])
+    const shareCount = shares.length
+    const policyCount = Object.values(config.settings).filter(
+      (row) => row.source === 'group'
+    ).length
+    return t('people.groups.deleteConfirm', {
+      name: group.name,
+      shares: t('people.groups.deleteConfirmShares', shareCount),
+      policies: t('people.groups.deleteConfirmPolicies', policyCount),
+    })
+  } catch {
+    return t('people.groups.deleteConfirmUnknown', { name: group.name })
+  }
+}
+
+async function deleteGroup(group: IamGroup) {
+  if (deleteInFlight.value) return
+  deleteInFlight.value = true
+  try {
+    const confirmed = await confirm({
+      title: t('people.groups.delete'),
+      message: await groupDeleteMessage(group),
+      danger: true,
+    })
+    if (!confirmed) return
     await iamApi.deleteGroup(group.id)
     success(t('people.groups.deleted'))
     if (selectedId.value === group.id) {
@@ -179,6 +206,8 @@ async function deleteGroup(group: IamGroup) {
     await loadGroups()
   } catch (error) {
     showError(error instanceof Error ? error.message : t('people.groups.saveError'))
+  } finally {
+    deleteInFlight.value = false
   }
 }
 

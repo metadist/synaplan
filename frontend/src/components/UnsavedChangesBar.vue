@@ -1,18 +1,20 @@
 <template>
   <Transition
-    enter-active-class="transition-all duration-300 ease-out"
+    enter-active-class="duration-300 ease-out"
     enter-from-class="translate-y-full opacity-0"
     enter-to-class="translate-y-0 opacity-100"
-    leave-active-class="transition-all duration-200 ease-in"
+    leave-active-class="duration-200 ease-in"
     leave-from-class="translate-y-0 opacity-100"
     leave-to-class="translate-y-full opacity-0"
   >
     <div
       v-if="show"
-      class="fixed bottom-0 left-0 right-0 z-50 pointer-events-none"
+      ref="barEl"
+      class="fixed bottom-0 z-40 pointer-events-none"
+      :style="barStyle"
       data-testid="section-unsaved-bar"
     >
-      <div class="max-w-7xl mx-auto px-4 pb-4 md:px-8 md:pb-6">
+      <div class="pb-4 md:pb-6">
         <div
           class="surface-card shadow-xl rounded-xl p-4 md:p-6 pointer-events-auto border-2 border-[var(--brand)]"
           data-testid="comp-unsaved-card"
@@ -40,7 +42,7 @@
             >
               <button
                 :disabled="isSaving"
-                class="flex-1 md:flex-none px-6 py-3 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2"
+                class="flex-1 md:flex-none px-6 py-3 rounded-xl border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-medium text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2"
                 data-testid="btn-unsaved-discard"
                 @click="handleDiscard"
               >
@@ -49,7 +51,7 @@
               <button
                 v-if="showPreview"
                 :disabled="isSaving"
-                class="flex-1 md:flex-none px-6 py-3 rounded-lg border-2 border-[var(--brand)]/30 txt-primary hover:bg-[var(--brand)]/10 transition-colors font-medium text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2"
+                class="flex-1 md:flex-none px-6 py-3 rounded-xl border-2 border-[var(--brand)]/30 txt-primary hover:bg-[var(--brand)]/10 transition-colors font-medium text-base min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2"
                 data-testid="btn-unsaved-preview"
                 @click="handlePreview"
               >
@@ -57,7 +59,7 @@
               </button>
               <button
                 :disabled="isSaving"
-                class="flex-1 md:flex-none btn-primary px-8 py-3 rounded-lg font-semibold text-base min-h-[48px] shadow-lg hover:shadow-xl transition-shadow disabled:opacity-70 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand)] flex items-center justify-center gap-2"
+                class="flex-1 md:flex-none btn-primary px-8 py-3 rounded-xl font-semibold text-base min-h-[48px] shadow-lg hover:shadow-xl transition-shadow disabled:opacity-70 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand)] flex items-center justify-center gap-2"
                 data-testid="btn-unsaved-save"
                 @click="handleSave"
               >
@@ -95,8 +97,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ExclamationCircleIcon } from '@heroicons/vue/24/outline'
+import { matchesPhoneChrome } from '@/composables/usePhoneChrome'
 
 const props = defineProps<{
   show: boolean
@@ -110,11 +113,103 @@ const emit = defineEmits<{
 }>()
 
 const isSaving = ref(false)
+const instance = getCurrentInstance()
+const barEl = ref<HTMLElement | null>(null)
+const frame = ref<{ left: string; width: string } | null>(null)
+let resizeObserver: ResizeObserver | null = null
 
+// Fixed to the viewport, this bar used to span the window and cover the
+// sidebars. It stays pinned to the bottom, but only as wide as the content
+// column it is rendered in. Phone chrome makes that column the containing
+// block (will-change: transform), so the offset is relative to it.
+const barStyle = computed(() => {
+  // Only the rise is animated. Tailwind v4 moves the bar with the `translate`
+  // property, not `transform`. Animating `left` (the old transition-all)
+  // made it travel in from the bottom-left corner.
+  const motion = { transitionProperty: 'translate, opacity' }
+  if (!frame.value) {
+    return { visibility: 'hidden' as const, ...motion }
+  }
+  return { left: frame.value.left, width: frame.value.width, ...motion }
+})
+
+function contentOriginLeft(): number {
+  if (typeof window.matchMedia !== 'function' || !matchesPhoneChrome()) return 0
+  const layer = document.querySelector('[data-testid="section-main-shell"]')
+  if (!(layer instanceof HTMLElement)) return 0
+  const layerRect = layer.getBoundingClientRect()
+  const borderLeft = Number.parseFloat(getComputedStyle(layer).borderLeftWidth) || 0
+  return layerRect.left + borderLeft
+}
+
+function placeBar(): boolean {
+  const parent = barEl.value?.parentElement
+  if (!parent) return false
+  const rect = parent.getBoundingClientRect()
+  const style = getComputedStyle(parent)
+  const padLeft = Number.parseFloat(style.paddingLeft) || 0
+  const padRight = Number.parseFloat(style.paddingRight) || 0
+  const borderLeft = Number.parseFloat(style.borderLeftWidth) || 0
+  const borderRight = Number.parseFloat(style.borderRightWidth) || 0
+  const width = rect.width - borderLeft - borderRight - padLeft - padRight
+  if (width <= 0) return false
+  const left = rect.left + borderLeft + padLeft - contentOriginLeft()
+  frame.value = { left: `${left}px`, width: `${width}px` }
+  return true
+}
+
+function stopTracking() {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  window.removeEventListener('resize', placeBar)
+}
+
+function startTracking() {
+  stopTracking()
+  const placed = placeBar()
+  if (!placed) requestAnimationFrame(() => placeBar())
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => placeBar())
+    const parent = barEl.value?.parentElement
+    if (parent) resizeObserver.observe(parent)
+    const main = document.getElementById('main-content')
+    if (main && main !== parent) resizeObserver.observe(main)
+  }
+  window.addEventListener('resize', placeBar)
+}
+
+type SaveListener = () => void | Promise<void>
+
+function saveListeners(): SaveListener[] {
+  const raw = instance?.vnode.props?.onSave
+  if (typeof raw === 'function') return [raw as SaveListener]
+  if (Array.isArray(raw)) {
+    return raw.filter((listener): listener is SaveListener => typeof listener === 'function')
+  }
+  return []
+}
+
+// emit() drops the listener's promise, so a failed save left isSaving true
+// until the bar hid and both buttons stayed disabled. Call the listener and
+// release the bar when it is still open after the attempt.
 const handleSave = async () => {
   if (isSaving.value) return
   isSaving.value = true
-  emit('save')
+  try {
+    for (const listener of saveListeners()) {
+      try {
+        await listener()
+      } catch {
+        // One listener failing must not skip the others, and must not
+        // leave the bar on Saving. The page shows the failure.
+      }
+    }
+  } finally {
+    await nextTick()
+    if (props.show) {
+      isSaving.value = false
+    }
+  }
 }
 
 const handleDiscard = () => {
@@ -146,25 +241,28 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 watch(
   () => props.show,
-  (newVal) => {
-    if (!newVal) {
+  async (visible) => {
+    if (!visible) {
       isSaving.value = false
+      stopTracking()
+      frame.value = null
+      return
     }
-    // Don't auto-focus buttons - let user continue typing
+    await nextTick()
+    startTracking()
   }
 )
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
+  if (props.show) {
+    await nextTick()
+    startTracking()
+  }
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
-})
-
-defineExpose({
-  resetSaving: () => {
-    isSaving.value = false
-  },
+  stopTracking()
 })
 </script>

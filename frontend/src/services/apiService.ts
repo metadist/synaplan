@@ -2,6 +2,7 @@ import type { AIModel } from '@/stores/models'
 import {
   getApiBaseUrl,
   isDefinitiveAuthRejection,
+  awaitAuthMutation,
   refreshAccessToken as refreshTokenViaHttpClient,
 } from '@/services/api/httpClient'
 import { isNativeApp } from '@/services/api/nativeRuntime'
@@ -78,6 +79,15 @@ function redirectToSessionExpired(): void {
  * unauthenticated callers never trigger an `/api/v1/auth/refresh` round-trip
  * just to get an expected 401 back.
  */
+/**
+ * Cookie-refresh already on the wire, if any. Same contract as chatApi /
+ * httpClient: the promise is only assigned after `awaitAuthMutation()`, so
+ * a principal-swap holder can join it without deadlocking on its own lock.
+ */
+export function getInFlightRefresh(): Promise<boolean> | null {
+  return tokenRefreshPromise
+}
+
 async function refreshAccessToken(): Promise<boolean> {
   // Native uses Bearer tokens — delegate to the canonical refresh which rotates
   // the secure-stored tokens. apiService's cookie refresh can't work
@@ -90,6 +100,11 @@ async function refreshAccessToken(): Promise<boolean> {
   if (!hasSessionHint()) {
     return false
   }
+
+  // This pool used to skip the auth-mutation lock entirely, so a 401 from
+  // files/RAG during impersonation could Set-Cookie an admin token after
+  // the swap and unmount the banner. Park here first, then record in-flight.
+  await awaitAuthMutation()
 
   if (tokenRefreshPromise) {
     return tokenRefreshPromise

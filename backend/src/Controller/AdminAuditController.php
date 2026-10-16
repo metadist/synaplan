@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\AuditLogEntryRepository;
+use App\Service\Iam\AuditRowLabels;
 use App\Service\Iam\IamConfig;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,6 +23,7 @@ final class AdminAuditController extends AbstractController
     public function __construct(
         private readonly IamConfig $iamConfig,
         private readonly AuditLogEntryRepository $auditLogEntryRepository,
+        private readonly AuditRowLabels $auditRowLabels,
     ) {
     }
 
@@ -55,9 +57,12 @@ final class AdminAuditController extends AbstractController
                                 properties: [
                                     new OA\Property(property: 'id', type: 'integer'),
                                     new OA\Property(property: 'actorId', type: 'integer'),
+                                    new OA\Property(property: 'actorName', type: 'string', nullable: true, example: 'Ada Lovelace'),
                                     new OA\Property(property: 'action', type: 'string'),
                                     new OA\Property(property: 'kind', type: 'string'),
                                     new OA\Property(property: 'resourceId', type: 'string'),
+                                    new OA\Property(property: 'resourceName', type: 'string', nullable: true, example: 'Q3 plan'),
+                                    new OA\Property(property: 'subjectName', type: 'string', nullable: true, example: 'Sales'),
                                     new OA\Property(property: 'subject', type: 'object', nullable: true),
                                     new OA\Property(property: 'ip', type: 'string'),
                                     new OA\Property(property: 'created', type: 'integer'),
@@ -98,15 +103,20 @@ final class AdminAuditController extends AbstractController
         if ($hasMore) {
             $rows = array_slice($rows, 0, $limit);
         }
+        $labels = $this->auditRowLabels->forRows($rows);
         $entries = [];
-        foreach ($rows as $row) {
+        foreach ($rows as $index => $row) {
+            $label = $labels[$index] ?? ['actorName' => null, 'resourceName' => null, 'subjectName' => null];
             $entries[] = [
                 'id' => (int) $row->getId(),
                 'actorId' => $row->getActorId(),
+                'actorName' => $label['actorName'],
                 'action' => $row->getAction(),
                 'kind' => $row->getResourceKind(),
                 'resourceId' => $row->getResourceId(),
+                'resourceName' => $label['resourceName'],
                 'subject' => $this->normalizeSubject($row->getSubject()),
+                'subjectName' => $label['subjectName'],
                 'ip' => $row->getIp(),
                 'created' => $row->getCreated(),
             ];

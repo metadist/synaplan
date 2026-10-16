@@ -1,6 +1,7 @@
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { openApp } from '../helpers/auth'
+import { openMemories } from '../helpers/memories'
 import { ChatHelper } from '../helpers/chat'
 import { TIMEOUTS, INTERVALS, getApiUrl } from '../config/config'
 
@@ -23,8 +24,7 @@ test.describe('@ci Memories', () => {
 
     await test.step('Arrange: open the memories page', async () => {
       await openApp(page)
-      await page.goto('/memories')
-      await page.locator(MEM.btnCreate).waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+      await openMemories(page)
     })
 
     await test.step('Act: create a memory via the advanced form', async () => {
@@ -67,6 +67,11 @@ test.describe('@ci Memories', () => {
   })
 
   test('a chat turn with a memorizable fact creates a memory automatically', async ({ page }) => {
+    // Cold-boot arrange plus a chat round-trip plus waiting for the extractor
+    // does not fit the 60s default under shard load; without the headroom the
+    // generous waits inside openApp() and waitForAnswer() cannot be reached
+    // and the test dies on the wall clock, reporting no failing step.
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     const value = `teal-${Date.now()}`
     const chat = new ChatHelper(page)
 
@@ -100,7 +105,7 @@ test.describe('@ci Memories', () => {
     })
 
     await test.step('Assert: the memory is visible on the memories page', async () => {
-      await page.goto('/memories')
+      await openMemories(page)
       await expect(
         page.locator(MEM.item).filter({ hasText: value }).filter({ visible: true })
       ).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })

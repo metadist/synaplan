@@ -43,7 +43,7 @@ use Doctrine\Migrations\AbstractMigration;
  * the shared MariaDB Galera cluster.
  *
  * @see \App\Model\ModelCatalog
- * @see \App\Service\CostCalculationService::calculateMediaCost()
+ * @see \App\Service\Usage\CostCalculationService::calculateMediaCost()
  */
 final class Version20260712120000 extends AbstractMigration
 {

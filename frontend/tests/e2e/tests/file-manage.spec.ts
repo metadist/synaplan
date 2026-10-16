@@ -86,7 +86,7 @@ test.describe('@ci File Management', () => {
       ).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
     })
 
-    await test.step('Assert: the share button sits on the tile without hovering', async () => {
+    await test.step('Assert: the share button appears when the folder tile is hovered', async () => {
       // Return to the root grid deterministically instead of depending on the
       // in-folder back button (which is absent if a refresh bounced us to root).
       await page.goto('/files')
@@ -101,9 +101,10 @@ test.describe('@ci File Management', () => {
         return
       }
 
-      // Move the pointer away from the grid: the share affordance is the one
-      // action that must be visible at rest, unlike delete / use-in-chat.
+      // Same as delete and use-in-chat: hidden until the pointer is on the tile.
       await page.mouse.move(0, 0)
+      await expect(shareButton).toHaveCSS('opacity', '0')
+      await card.hover()
       await expect(shareButton).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await expect(shareButton).toHaveCSS('opacity', '1')
       // Sibling of the tile button, not nested in it: clicking share must not

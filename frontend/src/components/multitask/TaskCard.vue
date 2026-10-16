@@ -22,7 +22,22 @@ const emit = defineEmits<{
   /** Stop a running media step (per-card Stop button). */
   cancel: [nodeId: string]
   followup: [prompt: string]
+  askUser: [payload: { nodeId: string; answer: string; skip: boolean }]
 }>()
+
+const askChoice = ref('')
+const askText = ref('')
+const askError = ref('')
+
+function submitAsk(): void {
+  const text = askText.value.trim() || askChoice.value
+  if (text === '') {
+    askError.value = t('taskPlan.askNeedAnswer')
+    return
+  }
+  askError.value = ''
+  emit('askUser', { nodeId: props.card.nodeId, answer: text, skip: false })
+}
 
 const aiConfigStore = useAiConfigStore()
 
@@ -68,7 +83,9 @@ const showSkeleton = computed(
 // goes through ComputeClient::cancel() on the PHP wait timeout, not this button.
 const isComputeKind = computed(() => props.card.kind === 'compute')
 
-const canCancel = computed(() => isMediaKind.value && props.card.state === 'running')
+const canCancel = computed(
+  () => !props.isReadonly && isMediaKind.value && props.card.state === 'running'
+)
 
 // Live render progress (e.g. Higgsfield video) — a moving bar instead of a
 // static spinner. Only meaningful once the backend has reported a percentage.
@@ -170,13 +187,31 @@ const retryModel = computed((): AIModel | null => {
 })
 
 const canRetry = computed(
-  () => props.card.state === 'failed' && !!props.card.prompt && retryModel.value !== null
+  () =>
+    !props.isReadonly &&
+    props.card.state === 'failed' &&
+    !!props.card.prompt &&
+    retryModel.value !== null
 )
 
 const handleRetry = () => {
   if (!props.card.prompt || !retryModel.value) return
   emit('retry', { prompt: props.card.prompt, modelId: retryModel.value.id })
 }
+
+const detailsOpen = ref(false)
+const showFullOutput = ref(false)
+const durationLabel = computed(() => {
+  if (typeof props.card.durationMs !== 'number') return ''
+  const seconds = Math.max(1, Math.round(props.card.durationMs / 1000))
+  return t('taskPlan.duration', { seconds }, seconds)
+})
+const outputText = computed(() => props.card.stepOutput ?? '')
+const outputShown = computed(() =>
+  showFullOutput.value || outputText.value.length <= 800
+    ? outputText.value
+    : outputText.value.slice(0, 800)
+)
 </script>
 
 <template>
@@ -197,7 +232,7 @@ const handleRetry = () => {
     <div class="flex items-center gap-2 mb-1">
       <Icon :icon="iconForKind" class="w-4 h-4 flex-shrink-0 txt-secondary" />
       <span class="text-sm font-medium txt-primary flex-1 truncate">
-        {{ $t(title, $t(`taskPlan.kind.${card.kind}`)) }}
+        {{ card.query || $t(title, $t(`taskPlan.kind.${card.kind}`)) }}
       </span>
 
       <button
@@ -214,7 +249,7 @@ const handleRetry = () => {
       <button
         v-if="canCopy"
         type="button"
-        class="p-1 rounded txt-muted hover:txt-primary transition-colors"
+        class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
         :aria-label="$t('taskPlan.copyText')"
         :title="$t('taskPlan.copyText')"
         data-testid="task-card-copy"
@@ -224,9 +259,20 @@ const handleRetry = () => {
       </button>
 
       <button
+        type="button"
+        class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
+        :aria-label="$t('taskPlan.details')"
+        :aria-expanded="detailsOpen"
+        data-testid="task-card-details-toggle"
+        @click="detailsOpen = !detailsOpen"
+      >
+        <Icon :icon="detailsOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="w-4 h-4" />
+      </button>
+
+      <button
         v-if="isCollapsible"
         type="button"
-        class="p-1 rounded txt-muted hover:txt-primary transition-colors"
+        class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
         :aria-label="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
         :aria-expanded="!collapsed"
         :title="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
@@ -318,6 +364,59 @@ const handleRetry = () => {
       {{ card.error }}
     </div>
 
+    <form
+      v-if="card.askUser && card.state === 'waiting_approval'"
+      class="space-y-2"
+      data-testid="ask-user-card"
+      @submit.prevent="submitAsk"
+    >
+      <p class="text-sm txt-primary">{{ card.askUser.question }}</p>
+      <p v-if="isReadonly" class="text-sm txt-secondary">{{ $t('taskPlan.askReadOnly') }}</p>
+      <label
+        v-for="option in card.askUser.options"
+        :key="option"
+        class="flex items-center gap-2 text-sm txt-primary"
+      >
+        <input
+          v-model="askChoice"
+          type="radio"
+          :name="`ask-user-${card.nodeId}`"
+          :value="option"
+          :disabled="isReadonly"
+        />
+        <span>{{ option }}</span>
+        <span v-if="option === card.askUser.recommended" class="text-xs txt-secondary">{{
+          $t('taskPlan.recommended')
+        }}</span>
+      </label>
+      <textarea
+        v-if="card.askUser.allowText"
+        v-model="askText"
+        :disabled="isReadonly"
+        class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
+        rows="2"
+        data-testid="input-ask-user"
+      />
+      <p v-if="askError" class="text-sm text-red-600 dark:text-red-400">{{ askError }}</p>
+      <div v-if="!isReadonly" class="flex flex-wrap gap-2">
+        <button
+          type="submit"
+          class="btn-primary px-4 py-2.5 text-sm font-medium"
+          data-testid="btn-ask-user-submit"
+        >
+          {{ $t('taskPlan.askSubmit') }}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 text-sm font-medium"
+          data-testid="btn-ask-user-skip"
+          @click="emit('askUser', { nodeId: card.nodeId, answer: '', skip: true })"
+        >
+          {{ $t('taskPlan.askSkip') }}
+        </button>
+      </div>
+    </form>
+
     <!-- Cancelled by the user: neutral note, no error styling -->
     <div
       v-else-if="card.state === 'cancelled'"
@@ -380,6 +479,40 @@ const handleRetry = () => {
         {{ $t('message.mediaJob.backgroundHint') }}
       </p>
     </template>
+
+    <div v-if="detailsOpen" class="mt-2 space-y-2" data-testid="task-card-details">
+      <p class="text-xs txt-secondary">
+        {{ $t(`taskPlan.state.${card.state}`) }}
+        <span v-if="durationLabel"> · {{ durationLabel }}</span>
+      </p>
+      <p v-if="!card.stepInput && !outputText" class="text-sm txt-secondary">
+        {{ $t('taskPlan.noDetails') }}
+      </p>
+      <div v-if="card.stepInput">
+        <p class="text-xs font-medium txt-secondary mb-1">{{ $t('taskPlan.input') }}</p>
+        <pre
+          class="text-xs txt-primary whitespace-pre-wrap break-words surface-chip p-2 rounded-xl"
+          >{{ card.stepInput }}</pre>
+      </div>
+      <div v-if="outputText">
+        <p class="text-xs font-medium txt-secondary mb-1">{{ $t('taskPlan.output') }}</p>
+        <pre
+          class="text-xs txt-primary whitespace-pre-wrap break-words surface-chip p-2 rounded-xl"
+          >{{ outputShown }}</pre>
+        <button
+          v-if="outputText.length > 800"
+          type="button"
+          class="btn-secondary mt-1 px-3 py-2 rounded-xl text-xs font-medium"
+          data-testid="task-card-output-more"
+          @click="showFullOutput = !showFullOutput"
+        >
+          {{ showFullOutput ? $t('taskPlan.showLess') : $t('taskPlan.showMore') }}
+        </button>
+        <p v-if="card.stepOutputTruncated" class="text-xs txt-secondary mt-1">
+          {{ $t('taskPlan.outputTruncated') }}
+        </p>
+      </div>
+    </div>
   </div>
 </template>
 

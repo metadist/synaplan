@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { hasMathFormulas, processKatexInMarkdown } from '@/composables/useMarkdownKatex'
+import { useMarkdown } from '@/composables/useMarkdown'
 
 // Regression (issue #903): currency like "19 $/Monat … 39 $" must NOT be
 // detected/rendered as a math formula. The naive `$…$` matcher used to eat
@@ -62,5 +63,49 @@ describe('processKatexInMarkdown', () => {
   it('leaves empty delimiters untouched (no empty formula rendered)', async () => {
     expect(await processKatexInMarkdown('Leeres $$$$ hier')).toBe('Leeres $$$$ hier')
     expect(await processKatexInMarkdown('Leeres \\(\\) hier')).toBe('Leeres \\(\\) hier')
+  })
+})
+
+// Runs the real katex package through the same call MessageText makes
+// (KaTeX -> marked -> DOMPurify), so a KaTeX upgrade that changes its API,
+// options or markup, or a sanitizer change that strips its output, fails here.
+describe('KaTeX rendering in the chat markdown pipeline', () => {
+  async function renderChat(markdown: string): Promise<HTMLElement> {
+    const container = document.createElement('div')
+    container.innerHTML = await useMarkdown().renderAsync(markdown, {
+      processFileMarkers: false,
+      katex: true,
+    })
+    return container
+  }
+
+  const glyphs = (el: Element | null | undefined) => el?.textContent?.replace(/[\s\u200b]/g, '')
+
+  it('renders an inline formula and keeps the surrounding markdown', async () => {
+    const el = await renderChat('Die Formel $E = mc^2$ ist **wichtig**')
+
+    const formula = el.querySelector('.katex-inline > .katex')
+    expect(el.querySelector('.katex-error')).toBeNull()
+    expect(glyphs(formula)).toBe('E=mc2')
+    expect(glyphs(formula?.querySelector('.msupsub'))).toBe('2')
+    // KaTeX positions glyphs with inline styles; the sanitizer must keep them.
+    expect(formula?.querySelector('[style*="height"]')).not.toBeNull()
+    expect(el.querySelector('strong')?.textContent).toBe('wichtig')
+  })
+
+  it('renders block formulas in display mode', async () => {
+    const el = await renderChat('Fläche:\n\n$$\\int_0^1 x^2\\,dx = \\frac{1}{3}$$')
+
+    const display = el.querySelector('.katex-block > .katex-display')
+    expect(el.querySelector('.katex-error')).toBeNull()
+    expect(display?.querySelector('.mop')?.textContent).toContain('∫')
+    expect(display?.querySelector('.mfrac')).not.toBeNull()
+  })
+
+  it('marks an invalid formula with katex-error instead of failing the message', async () => {
+    const el = await renderChat('Kaputt: $\\frac{1}$ und **weiter**')
+
+    expect(el.querySelector('.katex-error')?.textContent).toBe('\\frac{1}')
+    expect(el.querySelector('strong')?.textContent).toBe('weiter')
   })
 })

@@ -39,6 +39,9 @@ type Config struct {
 	MaxRequestBytes   int64
 	MaxFiles          int
 	ArtefactMIMEAllow []string
+	// ProxyImage overrides the proxy container image. Empty resolves the
+	// sidecar's own image, so stock deploys need no setting.
+	ProxyImage string
 }
 
 // Load reads COMPUTE_* environment variables. Auth token must be ≥ 32 bytes.
@@ -69,6 +72,7 @@ func Load() (*Config, error) {
 		MaxRequestBytes:   int64(p.int("COMPUTE_MAX_REQUEST_BYTES", 32*1024*1024)),
 		MaxFiles:          p.int("COMPUTE_MAX_FILES", 32),
 		ArtefactMIMEAllow: splitCSV(env("COMPUTE_ARTEFACT_MIME_ALLOW", strings.Join(defaultMIME, ","))),
+		ProxyImage:        strings.TrimSpace(os.Getenv("COMPUTE_PROXY_IMAGE")),
 	}
 	if p.err != nil {
 		return nil, p.err

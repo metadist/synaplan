@@ -56,13 +56,11 @@ final class PluginAgentInstallerTest extends TestCase
         $publisher->expects(self::once())->method('publish')->with($created, $admin, 'Plugin pack');
 
         $shares = $this->createMock(ShareService::class);
-        $shares->expects(self::once())->method('grant')->with(
+        $shares->expects(self::once())->method('grantPlatformDistribution')->with(
             $admin,
             AgentKind::KEY,
             '44',
-            Share::SUBJECT_EVERYONE,
-            0,
-            Permission::Use->value,
+            Permission::Use,
         );
 
         $iam = $this->createMock(IamConfig::class);

@@ -17,6 +17,7 @@
  */
 const CHANNEL_SOURCE_TOKENS: ReadonlySet<string> = new Set([
   'whatsapp',
+  'telegram',
   'email',
   'web',
   'widget',

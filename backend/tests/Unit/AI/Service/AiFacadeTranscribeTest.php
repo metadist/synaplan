@@ -9,11 +9,11 @@ use App\AI\Health\ModelHealthRecorder;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
-use App\Service\CircuitBreaker;
-use App\Service\DiscordNotificationService;
+use App\Service\Email\InternalEmailService;
 use App\Service\File\UserUploadPathBuilder;
-use App\Service\InternalEmailService;
+use App\Service\Infrastructure\CircuitBreaker;
 use App\Service\ModelConfigService;
+use App\Service\Notification\DiscordNotificationService;
 use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -365,6 +365,90 @@ class AiFacadeTranscribeTest extends TestCase
             'model' => 'whisper-large-v3',
             'model_id' => 330,
         ]);
+    }
+
+    public function testHasConfiguredSttProviderUsesTheStoredBinding(): void
+    {
+        $this->modelConfig->expects($this->once())
+            ->method('getConfiguredDefaultModel')
+            ->with('SOUND2TEXT', 42)
+            ->willReturn(21);
+        $this->modelConfig->expects($this->never())->method('getDefaultModel');
+        $this->modelConfig->method('isConfiguredModelUsable')->with(21)->willReturn(false);
+
+        $this->assertFalse($this->facade->hasConfiguredSttProvider(42));
+    }
+
+    public function testHasConfiguredSttProviderIsTrueForAUsableCloudBinding(): void
+    {
+        $this->modelConfig->method('getConfiguredDefaultModel')->with('SOUND2TEXT', 42)->willReturn(21);
+        $this->modelConfig->method('isConfiguredModelUsable')->with(21)->willReturn(true);
+        $this->modelConfig->method('getProviderForModel')->with(21)->willReturn('Groq');
+
+        $this->assertTrue($this->facade->hasConfiguredSttProvider(42));
+    }
+
+    public function testHasConfiguredSttProviderIsFalseWhenTheStoredBindingIsWhisper(): void
+    {
+        $this->modelConfig->method('getConfiguredDefaultModel')->with('SOUND2TEXT', 42)->willReturn(330);
+        $this->modelConfig->method('isConfiguredModelUsable')->with(330)->willReturn(true);
+        $this->modelConfig->method('getProviderForModel')->with(330)->willReturn('whisper');
+
+        $this->assertFalse($this->facade->hasConfiguredSttProvider(42));
+    }
+
+    public function testMismatchedDetectionRetriesWithTheChannelLanguage(): void
+    {
+        $groq = $this->mockSttProvider('groq');
+        $call = 0;
+        $groq->expects($this->exactly(2))
+            ->method('transcribe')
+            ->willReturnCallback(function (string $path, array $opts) use (&$call): array {
+                ++$call;
+                if (1 === $call) {
+                    self::assertArrayNotHasKey('language', $opts);
+
+                    return ['text' => 'Ви витас', 'language' => 'russian', 'duration' => 2.0, 'segments' => []];
+                }
+                self::assertSame('de', $opts['language'] ?? null);
+
+                return ['text' => 'Wie wird das Wetter', 'language' => 'de', 'duration' => 2.0, 'segments' => []];
+            });
+
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')->with('groq')->willReturn($groq);
+        $this->transcriptionUsageRecorder->expects(self::once())
+            ->method('record')
+            ->with(42, null, 'groq', 'whisper-large-v3', 4.0, ['language' => 'de'])
+            ->willReturn(null);
+
+        $result = $this->facade->transcribe('audio.mp3', 42, [
+            'provider' => 'groq',
+            'model' => 'whisper-large-v3',
+            'channel_language' => 'de',
+        ]);
+
+        self::assertSame('Wie wird das Wetter', $result['text']);
+        self::assertSame('de', $result['language']);
+    }
+
+    public function testDetectionInsideTheExpectedSetIsASingleCall(): void
+    {
+        $groq = $this->mockSttProvider('groq');
+        $groq->expects($this->once())
+            ->method('transcribe')
+            ->with('audio.mp3', $this->callback(static fn (array $opts): bool => !array_key_exists('language', $opts)))
+            ->willReturn(['text' => 'Hello there', 'language' => 'en', 'duration' => 1.5, 'segments' => []]);
+
+        $this->registry->expects(self::any())->method('getSpeechToTextProvider')->with('groq')->willReturn($groq);
+
+        $result = $this->facade->transcribe('audio.mp3', 42, [
+            'provider' => 'groq',
+            'model' => 'whisper-large-v3',
+            'channel_language' => 'de',
+        ]);
+
+        self::assertSame('Hello there', $result['text']);
+        self::assertSame('en', $result['language']);
     }
 
     private function mockSttProvider(string $name): SpeechToTextProviderInterface&MockObject

@@ -1,0 +1,34 @@
+# Drop these values next to an openDesk Helmfile. This is not an openDesk fork.
+# Meeting notes stays off until synaplan.url and synaplan.transcribeToken are set.
+#
+# Jitsi (Nordeck) then points jicofo.transcription.url-template at
+#   wss://<notes-host>/transcribe?sessionId={{MEETING_ID}}&sendBack=true
+# with an Authorization header of the transcriber auth token.
+# See docs/OPENDESK_MEETING_NOTES.md in the Synaplan repository.
+
+synaplan:
+  url: https://synaplan.example
+  transcribeToken: ""
+  sttModel: ""
+
+transcriber:
+  mode: opendesk
+  publicUrl: https://notes.example
+  authToken: ""
+  language: auto
+  commitAfterMs: 8000
+
+notes:
+  nextcloudFolder: /Meetings
+  matrixRoom: ""
+  saveToSynaplan: true
+
+matrix:
+  homeserver: https://matrix.example
+  userId: "@synaplan-notes:example"
+  accessToken: ""
+
+nextcloud:
+  url: https://files.example
+  user: ""
+  appPassword: ""

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Usage;
 
+use App\Entity\Message;
+
 /**
  * Immutable result of {@see \App\Service\RateLimitService::recordUsage()}.
  *
@@ -24,6 +26,7 @@ final readonly class RecordedUsage
         public int $promptTokens,
         public int $completionTokens,
         public int $totalTokens,
+        public bool $priceKnown = true,
     ) {
     }
 
@@ -31,7 +34,7 @@ final readonly class RecordedUsage
      * Build the canonical message-usage shape shared by live SSE events and
      * persisted message metadata.
      *
-     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string, priceKnown: bool}
      */
     public function toMessageUsage(?string $provider, ?string $model, string $kind): array
     {
@@ -42,6 +45,41 @@ final readonly class RecordedUsage
             'cost' => $this->chargedCost,
             'modelKey' => self::modelKey($provider, $model),
             'kind' => $kind,
+            'priceKnown' => $this->priceKnown,
+        ];
+    }
+
+    /**
+     * Persist the charged cost and, when the model published no price, a flag
+     * the history API reads back. Absent flag means the price was known.
+     */
+    public function attachChatCost(Message $message): void
+    {
+        $message->setMeta('ai_chat_cost', $this->chargedCost);
+        if (!$this->priceKnown) {
+            $message->setMeta('ai_chat_price_known', '0');
+        }
+    }
+
+    /**
+     * Turn a sorter payload into the usage-extra row every channel stores.
+     *
+     * @param array<string, mixed> $sortingUsage
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string, priceKnown: bool}
+     */
+    public static function fromSortingUsage(array $sortingUsage, ?string $provider, ?string $model): array
+    {
+        $known = $sortingUsage['price_known'] ?? true;
+
+        return [
+            'promptTokens' => (int) ($sortingUsage['prompt_tokens'] ?? 0),
+            'completionTokens' => (int) ($sortingUsage['completion_tokens'] ?? 0),
+            'totalTokens' => (int) ($sortingUsage['tokens'] ?? 0),
+            'cost' => (string) ($sortingUsage['cost'] ?? '0'),
+            'modelKey' => self::modelKey($provider, $model),
+            'kind' => 'SORT',
+            'priceKnown' => false !== $known,
         ];
     }
 

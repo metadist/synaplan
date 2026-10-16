@@ -55,7 +55,7 @@
       <div class="flex items-center gap-2" @click.stop>
         <button
           v-if="session.mode === 'ai' && !session.isExpired"
-          class="px-3 py-1.5 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 font-medium transition-colors"
+          class="px-3 py-1.5 rounded-xl bg-green-500/10 hover:bg-green-500/20 text-green-600 dark:text-green-400 font-medium transition-colors"
           @click="$emit('takeover', session)"
         >
           <Icon icon="heroicons:hand-raised" class="w-3.5 h-3.5 inline mr-1" />
@@ -63,7 +63,7 @@
         </button>
         <button
           v-else-if="session.mode === 'waiting' && !session.isExpired"
-          class="px-3 py-1.5 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 font-medium transition-colors"
+          class="px-3 py-1.5 rounded-xl bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 font-medium transition-colors"
           @click="$emit('takeover', session)"
         >
           <Icon icon="heroicons:chat-bubble-left-ellipsis" class="w-3.5 h-3.5 inline mr-1" />

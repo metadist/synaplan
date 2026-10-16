@@ -74,6 +74,35 @@ final class MessageApiFormatterUsageTest extends TestCase
         self::assertSame('0.031200', $usage['cost']);
         self::assertSame('openai:gpt-4o', $usage['modelKey']);
         self::assertSame('LLM', $usage['kind']);
+        self::assertTrue($usage['priceKnown']);
+    }
+
+    public function testUnknownPriceSurvivesHistorySerialization(): void
+    {
+        $m = $this->makeOutMessage();
+        $m->setMeta('ai_chat_usage', json_encode([
+            'prompt_tokens' => 10,
+            'completion_tokens' => 4,
+            'total_tokens' => 14,
+        ]));
+        $m->setMeta('ai_chat_cost', '0.000000');
+        $m->setMeta('ai_chat_price_known', '0');
+        $m->setMeta('ai_usage_extra', json_encode([[
+            'promptTokens' => 8,
+            'completionTokens' => 2,
+            'totalTokens' => 10,
+            'cost' => '0.000000',
+            'modelKey' => 'openaicompatible:router',
+            'kind' => 'SORT',
+            'priceKnown' => false,
+        ]]));
+
+        $formatted = $this->formatter->format($m);
+
+        self::assertIsArray($formatted['usage']);
+        self::assertFalse($formatted['usage']['priceKnown']);
+        self::assertIsArray($formatted['usageExtra']);
+        self::assertFalse($formatted['usageExtra'][0]['priceKnown']);
     }
 
     public function testUsageOmittedWhenNoMetaPresent(): void
@@ -132,6 +161,25 @@ final class MessageApiFormatterUsageTest extends TestCase
         self::assertIsArray($usageExtra);
         self::assertSame('PLANNING', $usageExtra[0]['kind']);
         self::assertSame('0.004200', $usageExtra[0]['cost']);
+    }
+
+    public function testLiveVoiceModelIsListedBesideTheSynaplanModel(): void
+    {
+        $m = $this->makeOutMessage();
+        $m->setTopic('mediamaker');
+        $m->setMeta('voice_provider', 'OpenAI');
+        $m->setMeta('voice_model_name', 'GPT Live');
+        $m->setMeta('voice_model_id', '15');
+        $m->setMeta('ai_chat_provider', 'Anthropic');
+        $m->setMeta('ai_chat_model', 'Claude Sonnet');
+        $m->setMeta('ai_chat_model_id', '5');
+
+        $row = $this->formatter->format($m);
+
+        self::assertSame('mediamaker', $row['topic']);
+        self::assertSame('GPT Live', $row['aiModels']['voice']['model']);
+        self::assertSame(15, $row['aiModels']['voice']['model_id']);
+        self::assertSame('Claude Sonnet', $row['aiModels']['chat']['model']);
     }
 
     public function testIncomingMessageHasNoUsage(): void

@@ -38,7 +38,7 @@
               </button>
               <button
                 type="button"
-                class="p-2 rounded-lg icon-ghost"
+                class="p-2 rounded-xl icon-ghost"
                 :aria-label="$t('common.close')"
                 data-testid="document-preview-close"
                 @click="close"

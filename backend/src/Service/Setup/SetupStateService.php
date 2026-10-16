@@ -51,7 +51,7 @@ final class SetupStateService implements ResetInterface
 
     /**
      * Operator kill switch. Unset or empty keeps the wizard available, matching
-     * the env parsing of {@see \App\Service\RegistrationConfig}.
+     * the env parsing of {@see \App\Service\Auth\RegistrationConfig}.
      */
     public function isWizardEnabled(): bool
     {

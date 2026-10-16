@@ -17,12 +17,19 @@
         type="checkbox"
         class="mt-1"
         :checked="store.current?.routable ?? false"
+        :disabled="store.current?.status !== 'published'"
         data-testid="chk-routable"
         @change="onRoutable(($event.target as HTMLInputElement).checked)"
       />
       <span>
         <span class="txt-primary text-sm">{{ $t('assistants.routable') }}</span>
         <span class="block txt-secondary text-sm">{{ $t('assistants.routableHint') }}</span>
+        <span
+          v-if="store.current?.status === 'draft'"
+          class="block txt-secondary text-sm"
+          data-testid="hint-share-draft"
+          >{{ $t('assistants.shareDraftHint') }}</span
+        >
       </span>
     </label>
 
@@ -31,7 +38,7 @@
       <textarea
         v-model="changelog"
         rows="3"
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.changelogPlaceholder')"
         data-testid="input-publish-changelog"
       />
@@ -40,7 +47,7 @@
     <div class="flex flex-wrap gap-2">
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="publishing || store.current?.status === 'archived'"
         data-testid="btn-publish-assistant"
         @click="onPublish"
@@ -49,8 +56,8 @@
       </button>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
-        :disabled="store.current?.status !== 'published'"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+        :disabled="!store.current || store.current.status === 'archived'"
         data-testid="btn-share-assistant"
         @click="shareOpen = true"
       >
@@ -59,7 +66,7 @@
       <button
         v-if="store.current?.status === 'published'"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-archive-assistant"
         @click="onArchive"
       >
@@ -68,7 +75,7 @@
       <button
         v-else-if="store.current?.status === 'archived'"
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-unarchive-assistant"
         @click="onUnarchive"
       >
@@ -76,7 +83,7 @@
       </button>
       <button
         type="button"
-        class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-delete-assistant"
         @click="onDelete"
       >
@@ -110,7 +117,13 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
-import { agentsApi, type AgentUsage, type AgentVersionCard } from '@/services/api/agentsApi'
+import {
+  agentFieldPath,
+  agentsApi,
+  type AgentUsage,
+  type AgentVersionCard,
+} from '@/services/api/agentsApi'
+import { ApiError } from '@/services/api/httpClient'
 import { useAgentsStore } from '@/stores/agents'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import AssistantUsagePanel from './AssistantUsagePanel.vue'
@@ -122,7 +135,7 @@ const emit = defineEmits<{
 const store = useAgentsStore()
 const { t } = useI18n()
 const { confirm } = useDialog()
-const { success, error } = useNotification()
+const { success, error, warning } = useNotification()
 
 const changelog = ref('')
 const publishing = ref(false)
@@ -194,7 +207,12 @@ async function onPublish(): Promise<void> {
   if (!ok) return
   publishing.value = true
   try {
-    await store.saveDraft()
+    try {
+      await store.saveDraft()
+    } catch {
+      // saveDraft already toasts or marks the field — do not add a second "publish failed".
+      return
+    }
     await agentsApi.publish(id, changelog.value)
     await store.load(id)
     changelog.value = ''
@@ -202,11 +220,23 @@ async function onPublish(): Promise<void> {
     success(t('assistants.publishSuccess'))
   } catch (err) {
     const message = err instanceof Error ? err.message : ''
-    error(
-      message.includes('nothing_changed')
-        ? t('assistants.nothingChanged')
-        : t('assistants.publishFailed')
-    )
+    const code = err instanceof ApiError ? (err.code ?? '') : ''
+    const unchanged = code === 'nothing_changed' || message.includes('nothing_changed')
+    if (unchanged) {
+      warning(t('assistants.nothingChanged'))
+      try {
+        await store.load(id)
+        await reload()
+      } catch {
+        // The toast already explains; status refresh is best-effort.
+      }
+      return
+    }
+    const path = agentFieldPath(err)
+    if (path) {
+      store.setFieldError(path, message)
+    }
+    error(t('assistants.publishFailed'))
   } finally {
     publishing.value = false
   }

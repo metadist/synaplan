@@ -12,6 +12,8 @@ import {
 const props = defineProps<{
   mediaJob: MediaJobInfo
   modelLabel?: string
+  /** Shared (non-owner) view: hide Stop. Refresh stays, it only re-reads status. */
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -175,7 +177,7 @@ const failureMessage = computed(() => {
             {{ $t('message.mediaJob.refreshStatus') }}
           </button>
           <button
-            v-if="!isFailed"
+            v-if="!isFailed && !readonly"
             type="button"
             class="inline-flex items-center gap-1 rounded-full border border-danger px-2 py-0.5 text-xs text-danger hover:bg-black/5 dark:hover:bg-white/5 disabled:cursor-wait disabled:opacity-60"
             :disabled="isCancelling"

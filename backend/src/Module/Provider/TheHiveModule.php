@@ -14,7 +14,7 @@ use App\Module\Contract\ModuleStatus;
  * TheHive — media generation provider keyed by a single instance key.
  *
  * `isConfigured()` mirrors `TheHiveProvider::isAvailable()`: the key comes
- * from Models & keys ({@see ProviderKeyStore}, `THEHIVE_API_KEY` bootstrap),
+ * from Providers & keys ({@see ProviderKeyStore}, `THEHIVE_API_KEY` bootstrap),
  * so a key saved at runtime counts without a restart.
  */
 final class TheHiveModule implements FeatureModuleInterface
@@ -54,7 +54,7 @@ final class TheHiveModule implements FeatureModuleInterface
     {
         $status = $this->keyStore->getStatus(self::ID);
         if (!$status['configured']) {
-            return ModuleStatus::absent('No TheHive API key — add one under AI infrastructure › Models & keys or set THEHIVE_API_KEY');
+            return ModuleStatus::absent('No TheHive API key — add one under AI infrastructure › Providers & keys or set THEHIVE_API_KEY');
         }
 
         return new ModuleStatus(

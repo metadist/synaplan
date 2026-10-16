@@ -33,6 +33,25 @@ test('classifies compute sidecars as no-app-impact', () => {
   assert.equal(result.classification, 'no-app-impact')
 })
 
+test('classifies the quickstart deployment as no-app-impact', () => {
+  const result = classifyFiles(
+    [
+      entry('deploy/quickstart/compose.yaml', 'A'),
+      entry('deploy/quickstart/.env.example', 'A'),
+      entry('tests/quickstart-compose.test.mjs', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'no-app-impact')
+})
+
+test('classifies a removed local worktree gitlink as no-app-impact', () => {
+  const result = classifyFiles([entry('.worktrees/fix-2282-voice-reply', 'D')], policy)
+
+  assert.equal(result.classification, 'no-app-impact')
+})
+
 test('classifies allow-listed internal backend files as backend-only', () => {
   const result = classifyFiles([
     entry('backend/src/Service/ReportExportService.php', 'M'),
@@ -105,10 +124,25 @@ test('classifies more-kinds share cards as ota-candidate', () => {
   assert.equal(result.classification, 'ota-candidate')
 })
 
+test('classifies split i18n locale namespaces as ota-candidate', () => {
+  const result = classifyFiles(
+    [
+      entry('frontend/src/i18n/locales/en/core.json', 'A'),
+      entry('frontend/src/i18n/locales/de/config.json', 'A'),
+      entry('frontend/src/i18n/locales/fr/widgets.json', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'ota-candidate')
+})
+
 test('classifies web-layer application code and assets as ota-candidate', () => {
   const paths = [
     'frontend/src/views/ChatView.styles.css',
     'frontend/src/i18n/de.json',
+    'frontend/src/i18n/locales/en/core.json',
+    'frontend/src/i18n/locales/de/chat.json',
     'frontend/src/assets/logo.svg',
     'frontend/src/components/icons/ProviderIcon.vue',
     'frontend/src/components/ChatComposer.vue',
@@ -210,10 +244,16 @@ test('local development, deployment, and test tooling does not trigger an app re
     '_devextras/reorganize-env.sh',
     '_devextras/screenvideo/package.json',
     '_1st_install_linux.sh',
+    'install.sh',
+    '.env.example',
     'docker-compose.yml',
+    'docker-compose-minimal.yml',
     'docker-compose.test.yml',
     'deploy/compose.yaml',
     'deploy/scripts/selfhost.sh',
+    'deploy/scripts/secrets-init.sh',
+    'deploy/scripts/tests/test-secrets-init.sh',
+    'deploy/scripts/tests/test-centrifugo-env.sh',
     'deploy/host/update.sh',
     'deploy/host/caddy/Caddyfile.domain',
     'deploy/aws/packer/synaplan.pkr.hcl',
@@ -229,6 +269,7 @@ test('local development, deployment, and test tooling does not trigger an app re
     'server.json',
     'renovate.json5',
     'LICENSE',
+    'redocly.yaml',
     'Makefile',
     '.editorconfig',
     '.vscode/settings.json',
@@ -269,6 +310,34 @@ test('classifies all server-side code and server-delivered plugins as backend-on
 
   for (const path of backendPaths) {
     assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'backend-only', path)
+  }
+})
+
+test('classifies the telegram channel as backend-only plus ota-candidate', () => {
+  const backendPaths = [
+    'backend/src/Module/Channel/TelegramModule.php',
+    'backend/src/Controller/TelegramWebhookController.php',
+    'backend/src/Controller/TelegramChannelController.php',
+    'backend/src/Service/Telegram/TelegramInboundService.php',
+    'backend/src/Service/Telegram/TelegramMessageFormatter.php',
+    'backend/src/Service/Telegram/TelegramPairResult.php',
+    'backend/migrations/Version20260929120000.php',
+  ]
+
+  for (const path of backendPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'backend-only', path)
+  }
+
+  const webPaths = [
+    'frontend/src/components/config/TelegramChannelCard.vue',
+    'frontend/src/components/config/TelegramChannelFacts.vue',
+    'frontend/src/components/config/TelegramConnectForm.vue',
+    'frontend/src/components/config/TelegramPairingPanel.vue',
+    'frontend/src/services/api/telegramChannelApi.ts',
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'ota-candidate', path)
   }
 })
 
@@ -349,6 +418,48 @@ test('classifies the first-run setup wizard as backend-only plus ota-candidate',
     classifyFiles([entry('_docker/backend/docker-entrypoint.sh', 'M')], policy).classification,
     'no-app-impact'
   )
+})
+
+test('classifies the branding-style reset as backend-only plus ota-candidate', () => {
+  const backendPaths = [
+    'backend/src/Controller/AdminSystemConfigController.php',
+    'backend/src/Service/Admin/SystemConfigService.php',
+    'backend/src/Service/Branding/BrandingService.php',
+  ]
+
+  for (const path of backendPaths) {
+    assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'backend-only', path)
+  }
+
+  // The reset card, theme tokens and translations are ordinary web-layer code.
+  const webPaths = [
+    'frontend/src/components/admin/BrandingStyleResetCard.vue',
+    'frontend/src/composables/useSystemConfig.ts',
+    'frontend/src/services/api/adminConfigApi.ts',
+    'frontend/src/style.css',
+    'frontend/src/style-v2.css',
+    'frontend/src/utils/brandingTheme.ts',
+    'frontend/src/views/AdminConfigView.vue',
+    'frontend/src/i18n/locales/en/admin.json',
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'ota-candidate', path)
+  }
+})
+
+test('classifies the global ambient background as ota-candidate', () => {
+  const webPaths = [
+    'frontend/src/components/AmbientBackground.vue',
+    'frontend/src/utils/ambientPlacement.ts',
+    'frontend/src/App.vue',
+    'frontend/src/views/LoginView.vue',
+    'frontend/src/views/RegisterView.vue',
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'M')], policy).classification, 'ota-candidate', path)
+  }
 })
 
 test('uses the highest classification for mixed changes', () => {

@@ -89,7 +89,7 @@ final class McpOAuthController extends AbstractController
     #[OA\Get(
         path: '/api/v1/mcp-servers/oauth/callback',
         summary: 'OAuth provider redirects the browser here after consent',
-        description: 'Public by design: the request arrives cross-site, so no auth cookie is present. The signed state identifies the user. Always answers with a redirect back to Channels → MCP Servers.',
+        description: 'Public by design: the request arrives cross-site, so no auth cookie is present. The signed state identifies the user. Always answers with a redirect back to Manage → Connections → MCP Servers.',
         tags: ['MCP Servers'],
         parameters: [
             new OA\Parameter(name: 'code', in: 'query', required: false, schema: new OA\Schema(type: 'string')),

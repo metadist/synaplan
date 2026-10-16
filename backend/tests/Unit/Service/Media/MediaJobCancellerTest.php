@@ -53,7 +53,7 @@ final class MediaJobCancellerTest extends TestCase
         $this->aiFacade->expects(self::once())
             ->method('cancelVideoOperation')
             ->with('op-1', 'google', 7, new IsType(NativeType::Array));
-        $this->jobService->expects(self::once())->method('markCancelled')->with($job);
+        $this->jobService->expects(self::once())->method('markCancelled')->with($job)->willReturn(true);
         $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 
         self::assertTrue($this->canceller->cancel($job));
@@ -69,7 +69,7 @@ final class MediaJobCancellerTest extends TestCase
 
         // No provider operation handle for synchronous media.
         $this->aiFacade->expects(self::never())->method('cancelVideoOperation');
-        $this->jobService->expects(self::once())->method('markCancelled')->with($job);
+        $this->jobService->expects(self::once())->method('markCancelled')->with($job)->willReturn(true);
         $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 
         self::assertTrue($this->canceller->cancel($job));
@@ -82,6 +82,18 @@ final class MediaJobCancellerTest extends TestCase
         $this->aiFacade->expects(self::never())->method('cancelVideoOperation');
         $this->jobService->expects(self::never())->method('markCancelled');
         $this->messageSync->expects(self::never())->method('syncTerminalState');
+
+        self::assertFalse($this->canceller->cancel($job));
+    }
+
+    public function testCancelReturnsFalseWhenTheJobAlreadyFinished(): void
+    {
+        $job = (new MediaJob())
+            ->setUserId(7)
+            ->setType(MediaJob::TYPE_IMAGE)
+            ->setStatus(MediaJob::STATUS_SUBMITTING);
+        $this->jobService->expects(self::once())->method('markCancelled')->with($job)->willReturn(false);
+        $this->messageSync->expects(self::once())->method('syncTerminalState')->with($job);
 
         self::assertFalse($this->canceller->cancel($job));
     }

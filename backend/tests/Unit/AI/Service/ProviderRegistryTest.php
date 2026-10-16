@@ -151,6 +151,22 @@ class ProviderRegistryTest extends TestCase
 
         $this->assertSame(['test', 'second'], array_keys($registry->getProvidersForCapability('chat')));
         $this->assertSame(['test'], $registry->getAvailableProviders('chat'), 'an unavailable provider is listed as registered but not as available');
+
+        $skipped = $this->createMock(ChatProviderInterface::class);
+        $skipped->method('getName')->willReturn('skipped');
+        $skipped->expects($this->never())->method('isAvailable');
+        $withSkip = $this->createRegistry(
+            chat: [
+                'test' => static fn (): TestProvider => new TestProvider(),
+                'skipped' => static fn (): ChatProviderInterface => $skipped,
+            ],
+            embedding: ['test' => static fn (): TestProvider => new TestProvider()],
+        );
+        $this->assertSame(
+            ['test'],
+            $withSkip->getAvailableProviders('chat', exclude: ['skipped']),
+            'an excluded provider must not be probed'
+        );
         $this->assertSame(['test', 'second'], array_keys($registry->getUniqueProviders()));
         $this->assertCount(2, $registry->getAllProviders());
     }

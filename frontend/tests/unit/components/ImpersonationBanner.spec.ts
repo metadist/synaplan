@@ -46,6 +46,7 @@ vi.mock('@/services/authService', async () => {
       getUser: () => userRef,
       getImpersonator: () => impersonatorRef,
       getCurrentUser: vi.fn().mockResolvedValue(null),
+      getInFlightRefresh: vi.fn().mockReturnValue(null),
       logout: vi.fn(),
     },
   }
@@ -71,12 +72,19 @@ vi.mock('@/stores/history', () => ({
 }))
 vi.mock('@/services/api/chatApi', () => ({
   clearSseToken: vi.fn(),
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
+}))
+vi.mock('@/services/apiService', () => ({
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
 }))
 vi.mock('@/stores/userMemories', () => ({
   useMemoriesStore: () => ({ $reset: vi.fn() }),
 }))
 vi.mock('@/stores/userFeedback', () => ({
   useFeedbackStore: () => ({ $reset: vi.fn() }),
+}))
+vi.mock('@/stores/chatModelPick', () => ({
+  useChatModelPickStore: () => ({ clear: vi.fn() }),
 }))
 // #1381: auth.ts tears the realtime client down and resubscribes mediaJobs on
 // every principal swap. Stub both so the banner spec stays hermetic and fast.
@@ -174,7 +182,7 @@ describe('ImpersonationBanner', () => {
     const wrapper = await mountBanner()
     await wrapper.find('[data-testid="btn-impersonation-exit"]').trigger('click')
     // Allow the awaited stop + resetUserScopedClientState (dynamic imports of
-    // chats/history) + refreshUser() chain to flush before asserting.
+    // chats/history/model pick) + refreshUser() chain to flush before asserting.
     await flushPromises()
 
     expect(stopImpersonationMock).toHaveBeenCalledTimes(1)

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
-use App\Service\WidgetExportService;
+use App\Service\Widget\WidgetExportService;
 use PHPUnit\Framework\TestCase;
 
 class WidgetExportServiceTest extends TestCase

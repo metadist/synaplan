@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Entity\File;
 use App\Entity\Message;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -48,7 +49,8 @@ class FileRepository extends ServiceEntityRepository
             ->andWhere('mf.ephemeral = false')
             ->setParameter('userId', $userId);
 
-        if ($groupKey) {
+        // "0" is a legal folder name. A truthy check would drop the filter.
+        if (null !== $groupKey && '' !== $groupKey) {
             if (!empty($vectorFileIds)) {
                 $qb->andWhere('(mf.groupKey = :groupKey OR mf.id IN (:vectorFileIds))')
                     ->setParameter('groupKey', $groupKey)
@@ -59,70 +61,7 @@ class FileRepository extends ServiceEntityRepository
             }
         }
 
-        $search = $filters['search'] ?? null;
-        if (null !== $search && '' !== $search) {
-            // §4.4: match the original (source) name too, so an Outlook
-            // attachment is findable by the name the user recognises.
-            $qb->andWhere('(mf.fileName LIKE :search OR mf.originalName LIKE :search OR mf.fileText LIKE :search)')
-                ->setParameter('search', '%'.$search.'%');
-        }
-
-        $fileType = $filters['file_type'] ?? null;
-        if (null !== $fileType && '' !== $fileType) {
-            $types = array_filter(array_map('trim', explode(',', $fileType)));
-            if (1 === count($types)) {
-                $qb->andWhere('mf.fileType = :fileType')
-                    ->setParameter('fileType', $types[0]);
-            } elseif (count($types) > 1) {
-                $qb->andWhere('mf.fileType IN (:fileTypes)')
-                    ->setParameter('fileTypes', $types);
-            }
-        }
-
-        $source = $filters['source'] ?? null;
-        if (null !== $source && '' !== $source) {
-            $sources = array_filter(array_map('trim', explode(',', $source)));
-            if (count($sources) >= 1) {
-                $qb->andWhere('mf.source IN (:sources)')
-                    ->setParameter('sources', $sources);
-            }
-        }
-
-        $vectorState = $filters['vector_state'] ?? null;
-        if (null !== $vectorState && '' !== $vectorState) {
-            $states = array_filter(array_map('trim', explode(',', $vectorState)));
-            if (count($states) >= 1) {
-                $qb->andWhere('mf.vectorState IN (:vectorStates)')
-                    ->setParameter('vectorStates', $states);
-            }
-        }
-
-        $incoming = $filters['incoming'] ?? null;
-        if (null !== $incoming) {
-            $qb->andWhere('mf.incoming = :incoming')
-                ->setParameter('incoming', $incoming);
-        }
-
-        $originKind = $filters['origin_kind'] ?? null;
-        if (null !== $originKind && '' !== $originKind) {
-            $kinds = array_filter(array_map('trim', explode(',', $originKind)));
-            if (count($kinds) >= 1) {
-                $qb->andWhere('mf.originKind IN (:originKinds)')
-                    ->setParameter('originKinds', $kinds);
-            }
-        }
-
-        $dateFrom = $filters['date_from'] ?? null;
-        if (null !== $dateFrom) {
-            $qb->andWhere('mf.createdAt >= :dateFrom')
-                ->setParameter('dateFrom', $dateFrom);
-        }
-
-        $dateTo = $filters['date_to'] ?? null;
-        if (null !== $dateTo) {
-            $qb->andWhere('mf.createdAt <= :dateTo')
-                ->setParameter('dateTo', $dateTo);
-        }
+        $this->applyListingFilters($qb, 'mf', $filters);
 
         [$sortField, $sortDir] = $this->resolveSort($filters['sort'] ?? null);
         $qb->orderBy('mf.'.$sortField, $sortDir);
@@ -136,6 +75,24 @@ class FileRepository extends ServiceEntityRepository
             ->getResult();
 
         return ['files' => $files, 'total' => $total];
+    }
+
+    /**
+     * True when the library list would be non-empty. Same rows as an unfiltered
+     * list: the owner's files, without incognito uploads.
+     */
+    public function existsForUser(int $userId): bool
+    {
+        $found = $this->createQueryBuilder('mf')
+            ->select('mf.id')
+            ->where('mf.userId = :userId')
+            ->andWhere('mf.ephemeral = false')
+            ->setParameter('userId', $userId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getScalarResult();
+
+        return [] !== $found;
     }
 
     /**
@@ -267,6 +224,52 @@ class FileRepository extends ServiceEntityRepository
     public function findFilesByMessageIds(int $userId, array $messageIds, int $limit = 30): array
     {
         return $this->findByMessageIds($userId, $messageIds, $limit, false);
+    }
+
+    /**
+     * Every file linked to any message in this chat, newest first.
+     *
+     * The history window can drop the upload turn, so a follow-up that only
+     * walks the messages still in the thread will miss the PDF. Chat-scoped
+     * lookup keeps those files available for the catalog and DAG fallback.
+     *
+     * Query by chat via subselects so a long conversation does not materialize
+     * every message ID into an `IN (...)` list before `$limit` can apply.
+     *
+     * @return list<File>
+     */
+    public function findFilesByChatId(int $userId, int $chatId, int $limit = 30): array
+    {
+        if ($chatId <= 0) {
+            return [];
+        }
+
+        $messageIdsDql = $this->getEntityManager()->createQueryBuilder()
+            ->select('chatMessage.id')
+            ->from(Message::class, 'chatMessage')
+            ->where('chatMessage.chatId = :chatId')
+            ->andWhere('chatMessage.userId = :userId')
+            ->getDQL();
+
+        $attachedIdsDql = $this->getEntityManager()->createQueryBuilder()
+            ->select('attached.id')
+            ->from(Message::class, 'msg')
+            ->innerJoin('msg.files', 'attached')
+            ->where('msg.chatId = :chatId')
+            ->andWhere('msg.userId = :userId')
+            ->andWhere('attached.userId = :userId')
+            ->getDQL();
+
+        return $this->createQueryBuilder('f')
+            ->distinct()
+            ->where('f.userId = :userId')
+            ->andWhere('(f.messageId IN ('.$messageIdsDql.') OR f.id IN ('.$attachedIdsDql.'))')
+            ->setParameter('userId', $userId)
+            ->setParameter('chatId', $chatId)
+            ->orderBy('f.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
     }
 
     /**
@@ -446,9 +449,11 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
+     *
      * @return array<string, int> group name => file count
      */
-    public function getGroupCountsByUser(int $userId): array
+    public function getGroupCountsByUser(int $userId, array $filters = []): array
     {
         $qb = $this->createQueryBuilder('f')
             ->select('f.groupKey AS name, COUNT(f.id) AS cnt')
@@ -461,12 +466,88 @@ class FileRepository extends ServiceEntityRepository
             ->groupBy('f.groupKey')
             ->orderBy('f.groupKey', 'ASC');
 
+        $this->applyListingFilters($qb, 'f', $filters);
+
         $groups = [];
         foreach ($qb->getQuery()->getResult() as $row) {
             $groups[$row['name']] = (int) $row['cnt'];
         }
 
         return $groups;
+    }
+
+    /**
+     * Same predicates as the file list, so a folder count only includes files
+     * the current search or filters would actually show.
+     *
+     * @param array{search?: ?string, file_type?: ?string, date_from?: ?int, date_to?: ?int, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, sort?: ?string} $filters
+     */
+    private function applyListingFilters(QueryBuilder $qb, string $alias, array $filters): void
+    {
+        $search = $filters['search'] ?? null;
+        if (null !== $search && '' !== $search) {
+            // Match the original (source) name too, so an Outlook attachment
+            // is findable by the name the user recognises.
+            $qb->andWhere(sprintf('(%1$s.fileName LIKE :search OR %1$s.originalName LIKE :search OR %1$s.fileText LIKE :search)', $alias))
+                ->setParameter('search', '%'.$search.'%');
+        }
+
+        $fileType = $filters['file_type'] ?? null;
+        if (null !== $fileType && '' !== $fileType) {
+            $types = array_values(array_filter(array_map('trim', explode(',', $fileType))));
+            if (1 === count($types)) {
+                $qb->andWhere(sprintf('%s.fileType = :fileType', $alias))
+                    ->setParameter('fileType', $types[0]);
+            } elseif (count($types) > 1) {
+                $qb->andWhere(sprintf('%s.fileType IN (:fileTypes)', $alias))
+                    ->setParameter('fileTypes', $types);
+            }
+        }
+
+        $source = $filters['source'] ?? null;
+        if (null !== $source && '' !== $source) {
+            $sources = array_filter(array_map('trim', explode(',', $source)));
+            if (count($sources) >= 1) {
+                $qb->andWhere(sprintf('%s.source IN (:sources)', $alias))
+                    ->setParameter('sources', $sources);
+            }
+        }
+
+        $vectorState = $filters['vector_state'] ?? null;
+        if (null !== $vectorState && '' !== $vectorState) {
+            $states = array_filter(array_map('trim', explode(',', $vectorState)));
+            if (count($states) >= 1) {
+                $qb->andWhere(sprintf('%s.vectorState IN (:vectorStates)', $alias))
+                    ->setParameter('vectorStates', $states);
+            }
+        }
+
+        $incoming = $filters['incoming'] ?? null;
+        if (null !== $incoming) {
+            $qb->andWhere(sprintf('%s.incoming = :incoming', $alias))
+                ->setParameter('incoming', $incoming);
+        }
+
+        $originKind = $filters['origin_kind'] ?? null;
+        if (null !== $originKind && '' !== $originKind) {
+            $kinds = array_filter(array_map('trim', explode(',', $originKind)));
+            if (count($kinds) >= 1) {
+                $qb->andWhere(sprintf('%s.originKind IN (:originKinds)', $alias))
+                    ->setParameter('originKinds', $kinds);
+            }
+        }
+
+        $dateFrom = $filters['date_from'] ?? null;
+        if (null !== $dateFrom) {
+            $qb->andWhere(sprintf('%s.createdAt >= :dateFrom', $alias))
+                ->setParameter('dateFrom', $dateFrom);
+        }
+
+        $dateTo = $filters['date_to'] ?? null;
+        if (null !== $dateTo) {
+            $qb->andWhere(sprintf('%s.createdAt <= :dateTo', $alias))
+                ->setParameter('dateTo', $dateTo);
+        }
     }
 
     /**
@@ -547,5 +628,60 @@ class FileRepository extends ServiceEntityRepository
         if ($changed) {
             $this->getEntityManager()->flush();
         }
+    }
+
+    /**
+     * Ids of the non-ephemeral files inside these knowledge folders, newest first.
+     *
+     * @param list<array{0: int, 1: string}> $folders (ownerId, groupKey) pairs
+     *
+     * @return list<int>
+     */
+    public function findIdsInFolders(array $folders, int $limit): array
+    {
+        if ([] === $folders) {
+            return [];
+        }
+
+        $qb = $this->createQueryBuilder('f')
+            ->select('f.id')
+            ->where('f.ephemeral = false')
+            ->orderBy('f.updatedAt', 'DESC')
+            ->setMaxResults($limit);
+        $match = $qb->expr()->orX();
+        foreach ($folders as $i => [$ownerId, $groupKey]) {
+            $match->add("(f.userId = :owner{$i} AND f.groupKey = :group{$i})");
+            $qb->setParameter("owner{$i}", $ownerId)->setParameter("group{$i}", $groupKey);
+        }
+        $qb->andWhere($match);
+
+        return array_map(static fn (array $row): int => (int) $row['id'], $qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Non-ephemeral files of one owner for the Smart Search index, with only
+     * the first `$textChars` characters of the extracted text, so a full
+     * re-index never hydrates whole documents.
+     *
+     * @return list<array{id: int, originalName: ?string, fileName: string, text: string, updatedAt: int}>
+     */
+    public function findSearchRowsForUser(int $userId, int $textChars): array
+    {
+        $rows = $this->createQueryBuilder('f')
+            ->select('f.id', 'f.originalName', 'f.fileName', 'SUBSTRING(f.fileText, 1, :chars) AS text', 'f.updatedAt')
+            ->where('f.userId = :userId')
+            ->andWhere('f.ephemeral = false')
+            ->setParameter('userId', $userId)
+            ->setParameter('chars', $textChars)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_values(array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'originalName' => null === $row['originalName'] ? null : (string) $row['originalName'],
+            'fileName' => (string) $row['fileName'],
+            'text' => (string) $row['text'],
+            'updatedAt' => (int) $row['updatedAt'],
+        ], $rows));
     }
 }

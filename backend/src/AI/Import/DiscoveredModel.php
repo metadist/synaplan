@@ -24,6 +24,9 @@ final readonly class DiscoveredModel
         public ?int $sizeBytes = null,
         public ?string $family = null,
         public ?array $probe = null,
+        public ?float $priceInPerMillion = null,
+        public ?float $priceOutPerMillion = null,
+        public bool $priceKnown = false,
     ) {
     }
 
@@ -40,11 +43,14 @@ final readonly class DiscoveredModel
             $this->sizeBytes,
             $this->family,
             $probe,
+            $this->priceInPerMillion,
+            $this->priceOutPerMillion,
+            $this->priceKnown,
         );
     }
 
     /**
-     * @return array{providerId: string, name: string, guessedTags: list<string>, exists: bool, sizeBytes: int|null, family: string|null, probe: array<string, mixed>|null}
+     * @return array{providerId: string, name: string, guessedTags: list<string>, exists: bool, sizeBytes: int|null, family: string|null, probe: array<string, mixed>|null, priceInPerMillion: float|null, priceOutPerMillion: float|null, priceKnown: bool}
      */
     public function toArray(): array
     {
@@ -56,6 +62,9 @@ final readonly class DiscoveredModel
             'sizeBytes' => $this->sizeBytes,
             'family' => $this->family,
             'probe' => $this->probe,
+            'priceInPerMillion' => $this->priceInPerMillion,
+            'priceOutPerMillion' => $this->priceOutPerMillion,
+            'priceKnown' => $this->priceKnown,
         ];
     }
 }

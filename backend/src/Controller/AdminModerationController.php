@@ -8,7 +8,7 @@ use App\Entity\ContentReport;
 use App\Entity\User;
 use App\Repository\ContentReportRepository;
 use App\Repository\UserRepository;
-use App\Service\ContentModerationService;
+use App\Service\Message\ContentModerationService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;

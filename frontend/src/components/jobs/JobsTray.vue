@@ -49,7 +49,7 @@ function handleOpen(chatId: number): void {
         <p class="text-sm font-semibold txt-primary">{{ $t('jobs.tray.title') }}</p>
         <button
           type="button"
-          class="rounded-md p-1 txt-muted hover:bg-black/5 dark:hover:bg-white/5"
+          class="rounded-xl p-1 txt-muted hover:bg-black/5 dark:hover:bg-white/5"
           :aria-label="$t('jobs.tray.close')"
           data-testid="jobs-tray-close"
           @click="emit('close')"

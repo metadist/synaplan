@@ -22,7 +22,7 @@
           <p class="text-sm txt-secondary mt-1">{{ widget.name }}</p>
         </div>
         <button
-          class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center"
+          class="w-10 h-10 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center"
           :aria-label="$t('common.close')"
           data-testid="btn-close"
           @click="$emit('close')"
@@ -41,7 +41,7 @@
               {{ $t('widgets.htmlCode') }}
             </h3>
             <button
-              class="px-4 py-2 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-sm font-medium flex items-center gap-2"
+              class="px-4 py-2 rounded-xl bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-sm font-medium flex items-center gap-2"
               data-testid="btn-copy-html"
               @click="copyToClipboard(embedCode, 'HTML')"
             >
@@ -86,7 +86,7 @@
         class="flex-shrink-0 surface-card border-t border-light-border/30 dark:border-dark-border/20 px-6 py-4 flex items-center justify-end gap-3 z-10"
       >
         <button
-          class="px-6 py-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary font-medium"
+          class="px-6 py-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary font-medium"
           data-testid="btn-close-footer"
           @click="$emit('close')"
         >

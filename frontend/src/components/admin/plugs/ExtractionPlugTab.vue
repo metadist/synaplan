@@ -10,7 +10,7 @@
       <p class="txt-secondary">{{ $t('aiInfra.extraction.loadFailed') }}</p>
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
         @click="load"
       >
         {{ $t('common.retry') }}
@@ -20,68 +20,94 @@
     <template v-else>
       <ExtractionSidecarPanel :adapters="adapters" />
 
-      <div v-for="family in families" :key="family" class="surface-card rounded-lg p-4 mb-4">
-        <h3 class="text-sm font-semibold txt-primary mb-3">
-          {{ $t(`aiInfra.extraction.family.${family}`) }}
-        </h3>
-        <ol class="space-y-2">
-          <li
-            v-for="(key, index) in chains[family] ?? []"
-            :key="`${family}-${key}-${index}`"
-            class="flex items-center gap-2"
-          >
-            <span class="flex-1 min-w-0 text-sm txt-primary">{{ labelFor(key) }}</span>
-            <button
-              type="button"
-              class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-medium"
-              :disabled="index === 0"
-              :aria-label="$t('aiInfra.extraction.moveUp')"
-              @click="move(family, index, -1)"
-            >
-              {{ $t('aiInfra.extraction.moveUp') }}
-            </button>
-            <button
-              type="button"
-              class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-medium"
-              :disabled="index === (chains[family]?.length ?? 0) - 1"
-              :aria-label="$t('aiInfra.extraction.moveDown')"
-              @click="move(family, index, 1)"
-            >
-              {{ $t('aiInfra.extraction.moveDown') }}
-            </button>
-            <button
-              type="button"
-              class="btn-danger px-3 py-1.5 rounded-lg text-xs font-medium"
-              @click="removeKey(family, index)"
-            >
-              {{ $t('aiInfra.extraction.remove') }}
-            </button>
-          </li>
-        </ol>
-        <div class="mt-3 flex flex-col sm:flex-row gap-2">
-          <select
-            v-model="addKey[family]"
-            class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          >
-            <option value="">{{ $t('aiInfra.extraction.addPlaceholder') }}</option>
-            <option v-for="option in unusedKeys(family)" :key="option" :value="option">
-              {{ labelFor(option) }}
-            </option>
-          </select>
-          <button
-            type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
-            :disabled="!addKey[family]"
-            @click="add(family)"
-          >
-            {{ $t('aiInfra.extraction.add') }}
-          </button>
-        </div>
+      <div class="flex justify-end mb-4">
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
+          data-testid="btn-extraction-accordion-toggle-all"
+          @click="
+            allExtractionSectionsOpen
+              ? collapseAllExtractionSections()
+              : expandAllExtractionSections()
+          "
+        >
+          {{
+            allExtractionSectionsOpen
+              ? $t('admin.config.accordion.collapseAll')
+              : $t('admin.config.accordion.expandAll')
+          }}
+        </button>
       </div>
+
+      <AccordionStack testid="extraction-accordion" class="mb-4">
+        <AccordionSection
+          v-for="family in families"
+          :key="family"
+          :panel-id="`extraction-section-${family}`"
+          :title="$t(`aiInfra.extraction.family.${family}`)"
+          :open="isExtractionSectionOpen(family)"
+          :header-testid="`btn-extraction-section-${family}`"
+          @toggle="toggleExtractionSection(family)"
+        >
+          <ol class="space-y-2">
+            <li
+              v-for="(key, index) in chains[family] ?? []"
+              :key="`${family}-${key}-${index}`"
+              class="flex items-center gap-2"
+            >
+              <span class="flex-1 min-w-0 text-sm txt-primary">{{ labelFor(key) }}</span>
+              <button
+                type="button"
+                class="btn-secondary px-3 py-1.5 rounded-xl text-xs font-medium"
+                :disabled="index === 0"
+                :aria-label="$t('aiInfra.extraction.moveUp')"
+                @click="move(family, index, -1)"
+              >
+                {{ $t('aiInfra.extraction.moveUp') }}
+              </button>
+              <button
+                type="button"
+                class="btn-secondary px-3 py-1.5 rounded-xl text-xs font-medium"
+                :disabled="index === (chains[family]?.length ?? 0) - 1"
+                :aria-label="$t('aiInfra.extraction.moveDown')"
+                @click="move(family, index, 1)"
+              >
+                {{ $t('aiInfra.extraction.moveDown') }}
+              </button>
+              <button
+                type="button"
+                class="btn-danger px-3 py-1.5 rounded-xl text-xs font-medium"
+                @click="removeKey(family, index)"
+              >
+                {{ $t('aiInfra.extraction.remove') }}
+              </button>
+            </li>
+          </ol>
+          <div class="mt-3 flex flex-col sm:flex-row gap-2">
+            <select
+              v-model="addKey[family]"
+              class="flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            >
+              <option value="">{{ $t('aiInfra.extraction.addPlaceholder') }}</option>
+              <option v-for="option in unusedKeys(family)" :key="option" :value="option">
+                {{ labelFor(option) }}
+              </option>
+            </select>
+            <button
+              type="button"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+              :disabled="!addKey[family]"
+              @click="add(family)"
+            >
+              {{ $t('aiInfra.extraction.add') }}
+            </button>
+          </div>
+        </AccordionSection>
+      </AccordionStack>
 
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mb-8"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mb-8"
         :disabled="saving"
         data-testid="extraction-save-chains"
         @click="save"
@@ -100,7 +126,7 @@
         />
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
           :disabled="!testFile || testing"
           data-testid="extraction-test-button"
           @click="runTest"
@@ -134,6 +160,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import AccordionSection from '@/components/AccordionSection.vue'
+import AccordionStack from '@/components/AccordionStack.vue'
+import { useAccordion } from '@/composables/useAccordion'
 import { useNotification } from '@/composables/useNotification'
 import ExtractionSidecarPanel from '@/components/admin/plugs/ExtractionSidecarPanel.vue'
 import {
@@ -148,6 +177,13 @@ const { t } = useI18n()
 const { success, error: showError } = useNotification()
 
 const families = ['document', 'text', 'image', 'audio', 'audio_no_cloud', 'video'] as const
+const {
+  isOpen: isExtractionSectionOpen,
+  toggle: toggleExtractionSection,
+  expandAll: expandAllExtractionSections,
+  collapseAll: collapseAllExtractionSections,
+  allOpen: allExtractionSectionsOpen,
+} = useAccordion(() => [...families])
 
 const loading = ref(true)
 const loadFailed = ref(false)

@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 
 export interface UnsavedChangesOptions {
   extraDirtyCheck?: ComputedRef<boolean>
+  successMessage?: () => string
 }
 
 export function useUnsavedChanges<T>(
@@ -47,7 +48,7 @@ export function useUnsavedChanges<T>(
 
         // Show success notification after bar is hidden
         setTimeout(() => {
-          success(t('unsavedChanges.saved'))
+          success(options?.successMessage?.() ?? t('unsavedChanges.saved'))
         }, 200)
       } catch (error) {
         // If validation fails, keep the bar open

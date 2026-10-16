@@ -143,7 +143,14 @@ const server = http.createServer(async (req, res) => {
   // Any other path gets the onboarding page (read fresh so edits show up
   // without a container restart while developing the page itself).
   try {
-    const html = await readFile(HTML_PATH)
+    const backendPort = process.env.SYNAPLAN_BACKEND_PORT || '8000'
+    const mailPort = process.env.SYNAPLAN_MAILHOG_UI_PORT || '8025'
+    const dbPort = process.env.SYNAPLAN_PHPMYADMIN_PORT || '8082'
+    let html = await readFile(HTML_PATH, 'utf8')
+    html = html
+      .replaceAll('http://localhost:8000', `http://localhost:${backendPort}`)
+      .replaceAll('http://localhost:8025', `http://localhost:${mailPort}`)
+      .replaceAll('http://localhost:8082', `http://localhost:${dbPort}`)
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',

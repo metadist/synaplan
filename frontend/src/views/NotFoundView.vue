@@ -56,14 +56,14 @@
       >
         <router-link
           to="/"
-          class="btn-primary px-8 py-3 rounded-lg font-semibold flex items-center gap-2 min-w-[200px] justify-center"
+          class="btn-primary px-8 py-3 rounded-xl font-semibold flex items-center gap-2 min-w-[200px] justify-center"
           data-testid="btn-home"
         >
           <HomeIcon class="w-5 h-5" />
           {{ $t('notFound.goHome') }}
         </router-link>
         <button
-          class="px-8 py-3 rounded-lg border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-semibold flex items-center gap-2 min-w-[200px] justify-center"
+          class="px-8 py-3 rounded-xl border-2 border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors font-semibold flex items-center gap-2 min-w-[200px] justify-center"
           data-testid="btn-back"
           @click="goBack"
         >
@@ -103,11 +103,14 @@
             />
             <span class="text-sm txt-primary">{{ $t('nav.files') }}</span>
           </router-link>
-          <router-link to="/profile" class="p-4 rounded-lg hover-surface transition-colors group">
-            <UserCircleIcon
+          <router-link
+            to="/settings/profile"
+            class="p-4 rounded-lg hover-surface transition-colors group"
+          >
+            <Cog6ToothIcon
               class="w-6 h-6 mx-auto mb-2 txt-secondary group-hover:text-[var(--brand)] transition-colors"
             />
-            <span class="text-sm txt-primary">{{ $t('nav.profile') }}</span>
+            <span class="text-sm txt-primary">{{ $t('nav.preferences') }}</span>
           </router-link>
         </div>
       </div>
@@ -131,7 +134,6 @@ import {
   ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
   FolderIcon,
-  UserCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const router = useRouter()

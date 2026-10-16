@@ -6,11 +6,11 @@ namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
-use App\Service\EncryptionService;
 use App\Service\OAuth\OAuthClient;
 use App\Service\OAuth\OAuthException;
 use App\Service\OAuth\OAuthProviderConfig;
-use App\Service\OAuthStateService;
+use App\Service\OAuth\OAuthStateService;
+use App\Service\Security\EncryptionService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 

@@ -103,7 +103,32 @@ final class OpenAiToolShapesTest extends TestCase
 
         self::assertSame('lookup', $mapped[0]['name']);
         self::assertSame('find', $mapped[0]['description']);
-        self::assertSame(['type' => 'object', 'properties' => []], $mapped[0]['input_schema']);
+        self::assertSame('{}', self::json($mapped[0]['input_schema']['properties']));
+    }
+
+    public function testEmptyPropertiesStayJsonObjectsOnEveryWireFormat(): void
+    {
+        $tool = [[
+            'name' => 'CronList',
+            'description' => 'list',
+            'input_schema' => ['type' => 'object', 'properties' => []],
+        ]];
+
+        $chat = OpenAiToolShapes::toChatCompletionsTools($tool);
+        $responses = OpenAiToolShapes::toResponsesTools($tool);
+        $gemini = OpenAiToolShapes::toGeminiDeclarations($tool);
+
+        self::assertSame('{}', self::json($chat[0]['function']['parameters']['properties']));
+        self::assertSame('{}', self::json($responses[0]['parameters']['properties']));
+        self::assertSame('{}', self::json($gemini[0]['parametersJsonSchema']['properties']));
+    }
+
+    private static function json(mixed $value): string
+    {
+        $encoded = json_encode($value);
+        self::assertIsString($encoded);
+
+        return $encoded;
     }
 
     public function testToGeminiDeclarationsMatchesTranslatorSanitising(): void

@@ -1,0 +1,634 @@
+{
+    "anonymous": {
+        "setupKeys": [
+            "wizardRequired",
+            "wizardEnabled",
+            "demoLoginHint"
+        ],
+        "shape": {
+            "aiProviders": "list",
+            "auth": {
+                "guestChatEnabled": "bool",
+                "mailerConfigured": "bool",
+                "registrationEnabled": "bool"
+            },
+            "billing": {
+                "enabled": "bool"
+            },
+            "branding": {
+                "accentColor": "string",
+                "accentColorDark": "string",
+                "accountDeletionUrl": "string",
+                "defaultRoute": "string",
+                "fontFamily": "string",
+                "fontUrl": "string",
+                "headingFontFamily": "string",
+                "homepageUrl": "string",
+                "iconUrl": "string",
+                "landingPage": "string",
+                "logoDarkUrl": "string",
+                "logoUrl": "string",
+                "name": "string",
+                "poweredByLabel": "string",
+                "poweredByUrl": "string",
+                "primaryColor": "string",
+                "primaryColorDark": "string",
+                "privacyUrl": "string",
+                "resolvedIconDarkUrl": "string",
+                "resolvedIconUrl": "string",
+                "resolvedLogoDarkUrl": "string",
+                "resolvedLogoUrl": "string",
+                "secondaryColor": "string",
+                "secondaryColorDark": "string",
+                "showPoweredBy": "bool",
+                "tagline": "string",
+                "termsUrl": "string"
+            },
+            "build": {
+                "ip": "string",
+                "version": "string"
+            },
+            "chatActions": {
+                "export": "bool",
+                "share": "bool"
+            },
+            "chatWelcome": {
+                "showStoreCards": "bool",
+                "showWidgetPromo": "bool"
+            },
+            "client": {
+                "appVersion": "null",
+                "isMobileApp": "bool",
+                "platform": "string"
+            },
+            "features": {
+                "agentsEnabled": "bool",
+                "bundleEnabled": "bool",
+                "computeEnabled": "bool",
+                "computeWorkspacesEnabled": "bool",
+                "desktopAgentEnabled": "bool",
+                "documentToolsEnabled": "bool",
+                "help": "bool",
+                "iamGroups": "bool",
+                "iamImpersonationDisabled": "bool",
+                "iamPolicies": "bool",
+                "iamSharing": "bool",
+                "memoryService": "bool",
+                "officeConvertEnabled": "bool",
+                "platformLinksEnabled": "bool",
+                "savedTasks": "bool",
+                "selfAware": "bool",
+                "smartSearchAi": "bool",
+                "toolsApprovalsEnabled": "bool",
+                "toolsCustomHttpEnabled": "bool",
+                "toolsRegistryEnabled": "bool",
+                "workflowsBuilderEnabled": "bool"
+            },
+            "googleTag": {
+                "enabled": "bool",
+                "tagId": "string"
+            },
+            "marketingNews": {
+                "enabled": "bool"
+            },
+            "mobile": {
+                "androidAppUrl": "string",
+                "iosAppUrl": "string",
+                "minVersion": "string",
+                "updateEnforceAfter": "string",
+                "updateRequired": "bool"
+            },
+            "modules": {
+                "chat_artifacts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "compute": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "docling": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "federation": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "google_ai": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "higgsfield": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "live_voice": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "local_ai": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "mobile_iap": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "office_convert": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "opendesk_stt": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "piper_tts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "searxng": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "stripe_billing": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "telegram": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "thehive": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "tika": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "whatsapp": {
+                    "configured": "bool",
+                    "gated": "bool"
+                }
+            },
+            "plugins": "list",
+            "progressNarration": {
+                "models": "bool",
+                "steps": "bool",
+                "timings": "bool"
+            },
+            "realtime": {
+                "enabled": "bool",
+                "wsUrl": "string"
+            },
+            "recaptcha": {
+                "enabled": "bool",
+                "siteKey": "string"
+            },
+            "setup": {
+                "demoLoginHint": "bool",
+                "wizardEnabled": "bool",
+                "wizardRequired": "bool"
+            },
+            "speech": {
+                "speechToTextAvailable": "bool",
+                "webSpeechEnabled": "bool",
+                "whisperEnabled": "bool"
+            },
+            "usageTaximeter": {
+                "enabled": "bool"
+            },
+            "voiceLive": {
+                "enabled": "bool"
+            }
+        },
+        "signals": {
+            "auth.guestChatEnabled": true,
+            "auth.registrationEnabled": true,
+            "billing.enabled": true
+        }
+    },
+    "authenticated": {
+        "setupKeys": [
+            "wizardRequired",
+            "wizardEnabled",
+            "demoLoginHint",
+            "chatReady"
+        ],
+        "shape": {
+            "aiProviders": "list",
+            "auth": {
+                "guestChatEnabled": "bool",
+                "mailerConfigured": "bool",
+                "registrationEnabled": "bool"
+            },
+            "billing": {
+                "enabled": "bool"
+            },
+            "branding": {
+                "accentColor": "string",
+                "accentColorDark": "string",
+                "accountDeletionUrl": "string",
+                "defaultRoute": "string",
+                "fontFamily": "string",
+                "fontUrl": "string",
+                "headingFontFamily": "string",
+                "homepageUrl": "string",
+                "iconUrl": "string",
+                "landingPage": "string",
+                "logoDarkUrl": "string",
+                "logoUrl": "string",
+                "name": "string",
+                "poweredByLabel": "string",
+                "poweredByUrl": "string",
+                "primaryColor": "string",
+                "primaryColorDark": "string",
+                "privacyUrl": "string",
+                "resolvedIconDarkUrl": "string",
+                "resolvedIconUrl": "string",
+                "resolvedLogoDarkUrl": "string",
+                "resolvedLogoUrl": "string",
+                "secondaryColor": "string",
+                "secondaryColorDark": "string",
+                "showPoweredBy": "bool",
+                "tagline": "string",
+                "termsUrl": "string"
+            },
+            "build": {
+                "ip": "string",
+                "version": "string"
+            },
+            "chatActions": {
+                "export": "bool",
+                "share": "bool"
+            },
+            "chatWelcome": {
+                "showStoreCards": "bool",
+                "showWidgetPromo": "bool"
+            },
+            "client": {
+                "appVersion": "null",
+                "isMobileApp": "bool",
+                "platform": "string"
+            },
+            "features": {
+                "agentsEnabled": "bool",
+                "bundleEnabled": "bool",
+                "computeEnabled": "bool",
+                "computeWorkspacesEnabled": "bool",
+                "desktopAgentEnabled": "bool",
+                "documentToolsEnabled": "bool",
+                "help": "bool",
+                "iamGroups": "bool",
+                "iamImpersonationDisabled": "bool",
+                "iamPolicies": "bool",
+                "iamSharing": "bool",
+                "memoryService": "bool",
+                "officeConvertEnabled": "bool",
+                "platformLinksEnabled": "bool",
+                "savedTasks": "bool",
+                "selfAware": "bool",
+                "smartSearchAi": "bool",
+                "toolsApprovalsEnabled": "bool",
+                "toolsCustomHttpEnabled": "bool",
+                "toolsRegistryEnabled": "bool",
+                "workflowsBuilderEnabled": "bool"
+            },
+            "googleTag": {
+                "enabled": "bool",
+                "tagId": "string"
+            },
+            "marketingNews": {
+                "enabled": "bool"
+            },
+            "mobile": {
+                "androidAppUrl": "string",
+                "iosAppUrl": "string",
+                "minVersion": "string",
+                "updateEnforceAfter": "string",
+                "updateRequired": "bool"
+            },
+            "modules": {
+                "chat_artifacts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "compute": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "docling": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "federation": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "google_ai": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "higgsfield": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "live_voice": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "local_ai": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "mobile_iap": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "office_convert": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "opendesk_stt": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "piper_tts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "searxng": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "stripe_billing": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "telegram": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "thehive": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "tika": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "whatsapp": {
+                    "configured": "bool",
+                    "gated": "bool"
+                }
+            },
+            "plugins": "list",
+            "progressNarration": {
+                "models": "bool",
+                "steps": "bool",
+                "timings": "bool"
+            },
+            "realtime": {
+                "enabled": "bool",
+                "wsUrl": "string"
+            },
+            "recaptcha": {
+                "enabled": "bool",
+                "siteKey": "string"
+            },
+            "setup": {
+                "chatReady": "bool",
+                "demoLoginHint": "bool",
+                "wizardEnabled": "bool",
+                "wizardRequired": "bool"
+            },
+            "speech": {
+                "speechToTextAvailable": "bool",
+                "webSpeechEnabled": "bool",
+                "whisperEnabled": "bool"
+            },
+            "usageTaximeter": {
+                "enabled": "bool"
+            },
+            "voiceLive": {
+                "enabled": "bool"
+            }
+        },
+        "signals": {
+            "auth.guestChatEnabled": true,
+            "auth.registrationEnabled": true,
+            "billing.enabled": true
+        }
+    },
+    "oidc": {
+        "setupKeys": [
+            "wizardRequired",
+            "wizardEnabled",
+            "demoLoginHint"
+        ],
+        "shape": {
+            "aiProviders": "list",
+            "auth": {
+                "guestChatEnabled": "bool",
+                "mailerConfigured": "bool",
+                "registrationEnabled": "bool"
+            },
+            "billing": {
+                "enabled": "bool"
+            },
+            "branding": {
+                "accentColor": "string",
+                "accentColorDark": "string",
+                "accountDeletionUrl": "string",
+                "defaultRoute": "string",
+                "fontFamily": "string",
+                "fontUrl": "string",
+                "headingFontFamily": "string",
+                "homepageUrl": "string",
+                "iconUrl": "string",
+                "landingPage": "string",
+                "logoDarkUrl": "string",
+                "logoUrl": "string",
+                "name": "string",
+                "poweredByLabel": "string",
+                "poweredByUrl": "string",
+                "primaryColor": "string",
+                "primaryColorDark": "string",
+                "privacyUrl": "string",
+                "resolvedIconDarkUrl": "string",
+                "resolvedIconUrl": "string",
+                "resolvedLogoDarkUrl": "string",
+                "resolvedLogoUrl": "string",
+                "secondaryColor": "string",
+                "secondaryColorDark": "string",
+                "showPoweredBy": "bool",
+                "tagline": "string",
+                "termsUrl": "string"
+            },
+            "build": {
+                "ip": "string",
+                "version": "string"
+            },
+            "chatActions": {
+                "export": "bool",
+                "share": "bool"
+            },
+            "chatWelcome": {
+                "showStoreCards": "bool",
+                "showWidgetPromo": "bool"
+            },
+            "client": {
+                "appVersion": "null",
+                "isMobileApp": "bool",
+                "platform": "string"
+            },
+            "features": {
+                "agentsEnabled": "bool",
+                "bundleEnabled": "bool",
+                "computeEnabled": "bool",
+                "computeWorkspacesEnabled": "bool",
+                "desktopAgentEnabled": "bool",
+                "documentToolsEnabled": "bool",
+                "help": "bool",
+                "iamGroups": "bool",
+                "iamImpersonationDisabled": "bool",
+                "iamPolicies": "bool",
+                "iamSharing": "bool",
+                "memoryService": "bool",
+                "officeConvertEnabled": "bool",
+                "platformLinksEnabled": "bool",
+                "savedTasks": "bool",
+                "selfAware": "bool",
+                "smartSearchAi": "bool",
+                "toolsApprovalsEnabled": "bool",
+                "toolsCustomHttpEnabled": "bool",
+                "toolsRegistryEnabled": "bool",
+                "workflowsBuilderEnabled": "bool"
+            },
+            "googleTag": {
+                "enabled": "bool",
+                "tagId": "string"
+            },
+            "marketingNews": {
+                "enabled": "bool"
+            },
+            "mobile": {
+                "androidAppUrl": "string",
+                "iosAppUrl": "string",
+                "minVersion": "string",
+                "updateEnforceAfter": "string",
+                "updateRequired": "bool"
+            },
+            "modules": {
+                "chat_artifacts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "compute": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "docling": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "federation": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "google_ai": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "higgsfield": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "live_voice": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "local_ai": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "mobile_iap": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "office_convert": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "opendesk_stt": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "piper_tts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "searxng": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "stripe_billing": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "telegram": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "thehive": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "tika": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "whatsapp": {
+                    "configured": "bool",
+                    "gated": "bool"
+                }
+            },
+            "plugins": "list",
+            "progressNarration": {
+                "models": "bool",
+                "steps": "bool",
+                "timings": "bool"
+            },
+            "realtime": {
+                "enabled": "bool",
+                "wsUrl": "string"
+            },
+            "recaptcha": {
+                "enabled": "bool",
+                "siteKey": "string"
+            },
+            "setup": {
+                "demoLoginHint": "bool",
+                "wizardEnabled": "bool",
+                "wizardRequired": "bool"
+            },
+            "speech": {
+                "speechToTextAvailable": "bool",
+                "webSpeechEnabled": "bool",
+                "whisperEnabled": "bool"
+            },
+            "usageTaximeter": {
+                "enabled": "bool"
+            },
+            "voiceLive": {
+                "enabled": "bool"
+            }
+        },
+        "signals": {
+            "auth.guestChatEnabled": false,
+            "auth.registrationEnabled": false,
+            "billing.enabled": true
+        }
+    }
+}

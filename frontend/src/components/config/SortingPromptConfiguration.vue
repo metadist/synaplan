@@ -7,16 +7,23 @@
       data-testid="section-routing-overview"
     />
 
-    <!-- Prominent callout: custom prompts live in Task Prompts -->
+    <!-- Saved prompts (/command) and the planner's task prompts are different pages. -->
     <div
       class="p-4 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex items-start gap-3"
       data-testid="callout-custom-prompts"
     >
       <Icon icon="heroicons:light-bulb" class="w-5 h-5 text-[var(--brand)] flex-shrink-0 mt-0.5" />
       <p class="text-sm txt-secondary leading-relaxed">
-        {{ $t('config.routing.customCalloutBody') }}
-        <router-link to="/ai/instructions" class="text-[var(--brand)] hover:underline font-medium">
+        <span>{{ $t('config.routing.customCalloutBody') }}</span>
+        <router-link to="/prompts" class="ml-1 text-[var(--brand)] hover:underline font-medium">
           {{ $t('config.routing.customCalloutLink') }}
+        </router-link>
+        <span class="ml-1">{{ $t('config.routing.taskPromptsCalloutBody') }}</span>
+        <router-link
+          to="/ai/models?tab=topics"
+          class="ml-1 text-[var(--brand)] hover:underline font-medium"
+        >
+          {{ $t('config.routing.taskPromptsCalloutLink') }}
         </router-link>
       </p>
     </div>
@@ -114,7 +121,7 @@
             </div>
           </div>
           <button
-            class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-4 py-2 rounded-xl border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-planner-toggle-mode"
             :disabled="loadingPlanner"
             @click="togglePlannerEditMode"
@@ -134,7 +141,7 @@
             v-for="tab in ['rendered', 'source']"
             :key="tab"
             :class="[
-              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              'px-4 py-2 rounded-xl text-sm font-medium transition-colors',
               plannerTab === tab
                 ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
                 : 'surface-chip txt-secondary hover:txt-primary',
@@ -164,13 +171,13 @@
           v-else
           v-model="plannerPrompt.prompt"
           rows="22"
-          class="w-full px-4 py-3 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
+          class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
           data-testid="input-planner-prompt"
         />
 
         <div v-if="plannerEditMode" class="flex gap-3">
           <button
-            class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="btn-primary px-6 py-2.5 rounded-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-planner-save"
             :disabled="savingPlanner || loadingPlanner"
             @click="savePlannerPrompt"
@@ -179,7 +186,7 @@
             {{ $t('config.routing.plannerSave') }}
           </button>
           <button
-            class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-6 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-planner-reset"
             :disabled="savingPlanner || loadingPlanner"
             @click="resetPlannerPrompt"
@@ -187,46 +194,6 @@
             {{ $t('config.routing.plannerReset') }}
           </button>
         </div>
-      </div>
-    </div>
-
-    <!-- Planner Model (all users): choose which model powers the planner -->
-    <div class="surface-card overflow-hidden" data-testid="section-routing-planner-model">
-      <div class="p-6">
-        <div class="flex items-start gap-3 mb-4">
-          <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
-            <Icon icon="heroicons:cpu-chip" class="w-5 h-5 text-[var(--brand)]" />
-          </div>
-          <div class="min-w-0">
-            <h3 class="text-lg font-semibold txt-primary">
-              {{ $t('config.routing.plannerModelTitle') }}
-            </h3>
-            <p class="text-sm txt-secondary mt-0.5">
-              {{ $t('config.routing.plannerModelDesc') }}
-            </p>
-          </div>
-        </div>
-
-        <label class="block text-sm font-medium txt-primary mb-2" for="planner-model-select">
-          {{ $t('config.routing.plannerModelLabel') }}
-        </label>
-        <select
-          id="planner-model-select"
-          :value="plannerModelId ?? ''"
-          :disabled="loadingPlannerModel || savingPlannerModel"
-          class="w-full max-w-md px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50"
-          data-testid="select-planner-model"
-          @change="onPlannerModelChange(($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">{{ $t('config.routing.plannerModelAuto') }}</option>
-          <option v-for="model in plannerModels" :key="model.id" :value="model.id">
-            {{ model.name }} ({{ model.service }})
-          </option>
-        </select>
-
-        <p v-if="plannerModelId === null" class="text-xs txt-secondary mt-2">
-          {{ $t('config.routing.plannerModelFallbackHint') }}
-        </p>
       </div>
     </div>
 
@@ -370,7 +337,7 @@
                       {{ $t('config.sortingPrompt.tabSource') }}
                     </h3>
                     <button
-                      class="px-4 py-2 rounded-lg border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="px-4 py-2 rounded-xl border border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="btn-toggle-mode"
                       :disabled="!canEdit || loading"
                       @click="toggleEditMode"
@@ -399,13 +366,13 @@
                     v-else
                     v-model="sortingPrompt.promptContent"
                     rows="25"
-                    class="w-full px-4 py-3 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
+                    class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none font-mono"
                     data-testid="input-prompt"
                   />
 
                   <div v-if="editMode" class="flex gap-3">
                     <button
-                      class="btn-primary px-6 py-2.5 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="btn-primary px-6 py-2.5 rounded-xl flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="btn-save"
                       :disabled="saving || loading"
                       @click="savePrompt"
@@ -414,7 +381,7 @@
                       {{ $t('config.sortingPrompt.savePrompt') }}
                     </button>
                     <button
-                      class="px-6 py-2.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="px-6 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="btn-reset"
                       :disabled="saving || loading"
                       @click="resetPrompt"
@@ -479,8 +446,6 @@ import type { SortingPromptData } from '@/mocks/sortingPrompt'
 import { promptsApi } from '@/services/api/promptsApi'
 import type { SortingPromptPayload } from '@/services/api/promptsApi'
 import { getConfigValues, updateConfigValue } from '@/services/api/adminConfigApi'
-import { getModels, getPlannerModel, savePlannerModel } from '@/services/api/configApi'
-import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
 import { useAuthStore } from '@/stores/auth'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
@@ -505,16 +470,6 @@ const plannerEditMode = ref(false)
 const loadingPlanner = ref(false)
 const savingPlanner = ref(false)
 
-// --- Planner model selection (per-user DEFAULTMODEL.PLAN) -------------------
-// Lets any user pick which model powers the multi-task planner without needing
-// DB access (#1143). The pool is the chat-tagged models — the same set the
-// Sorting model dropdown uses. `null` means "no override": the planner falls
-// back to the user's Sorting model.
-const plannerModels = ref<AIModel[]>([])
-const plannerModelId = ref<number | null>(null)
-const loadingPlannerModel = ref(false)
-const savingPlannerModel = ref(false)
-
 // --- Legacy fallback disclosure (collapsed by default) ----------------------
 const legacyOpen = ref(false)
 
@@ -534,7 +489,7 @@ const { success, error: showError, warning } = useNotification()
 const { t, locale } = useI18n()
 const markdownRenderer = getMarkdownRenderer()
 
-const getPromptLink = (topic: string) => `/ai/instructions?topic=${encodeURIComponent(topic)}`
+const getPromptLink = (topic: string) => `/ai/models?tab=topics&topic=${encodeURIComponent(topic)}`
 
 // --- AI-fallback markdown rendering (kept verbatim from previous component) -
 const renderedPromptText = computed(
@@ -819,45 +774,12 @@ const resetPlannerPrompt = () => {
   plannerTab.value = 'rendered'
 }
 
-// --- Planner model load / save ---------------------------------------------
-const loadPlannerModel = async () => {
-  loadingPlannerModel.value = true
-  try {
-    const [modelsRes, plannerRes] = await Promise.all([getModels(), getPlannerModel()])
-    plannerModels.value = modelsRes.success ? (modelsRes.models.CHAT ?? []) : []
-    plannerModelId.value = plannerRes.modelId
-  } catch (err) {
-    const message = err instanceof Error ? err.message : t('config.routing.plannerModelLoadFailed')
-    showError(message)
-  } finally {
-    loadingPlannerModel.value = false
-  }
-}
-
-const onPlannerModelChange = async (rawValue: string) => {
-  const nextId = rawValue === '' ? null : Number(rawValue)
-  const previous = plannerModelId.value
-  plannerModelId.value = nextId
-  savingPlannerModel.value = true
-  try {
-    await savePlannerModel(nextId)
-    success(t('config.routing.plannerModelSaved'))
-  } catch (err) {
-    plannerModelId.value = previous
-    const message = err instanceof Error ? err.message : t('config.routing.plannerModelSaveFailed')
-    showError(message)
-  } finally {
-    savingPlannerModel.value = false
-  }
-}
-
 watch(locale, () => {
   loadSortingPrompt()
 })
 
 onMounted(() => {
   loadSortingPrompt()
-  loadPlannerModel()
   if (isAdmin.value) {
     loadRoutingToggles()
     loadPlannerPrompt()

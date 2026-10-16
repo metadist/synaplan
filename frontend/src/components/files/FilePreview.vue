@@ -69,7 +69,7 @@
           {{ displayName }}
         </span>
         <span
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] text-[11px] font-medium transition-colors group-hover/play:bg-[var(--brand)]/20"
+          class="btn-primary inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium group-hover/play:bg-[var(--brand-hover)]"
         >
           <Icon icon="mdi:play" class="w-3.5 h-3.5" />
           {{ t('files.preview.play') }}

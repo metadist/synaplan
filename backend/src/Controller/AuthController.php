@@ -8,16 +8,18 @@ use App\Entity\User;
 use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
+use App\Service\Auth\ImpersonationService;
+use App\Service\Auth\NativeAuthHandoffService;
+use App\Service\Auth\OidcAccessDeniedException;
+use App\Service\Auth\OidcTokenService;
+use App\Service\Auth\RecaptchaService;
+use App\Service\Auth\RegistrationConfig;
+use App\Service\Auth\TokenService;
+use App\Service\Chat\GuestSessionService;
 use App\Service\Client\ClientContextResolver;
-use App\Service\GuestSessionService;
-use App\Service\ImpersonationService;
-use App\Service\InternalEmailService;
-use App\Service\NativeAuthHandoffService;
-use App\Service\OidcTokenService;
-use App\Service\RecaptchaService;
-use App\Service\RegistrationConfig;
-use App\Service\TokenService;
-use App\Service\UserLifecycleService;
+use App\Service\Email\InternalEmailService;
+use App\Service\Email\MailerConfig;
+use App\Service\Iam\UserLifecycleService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -55,6 +57,7 @@ class AuthController extends AbstractController
         private NativeAuthHandoffService $handoffService,
         private UserLifecycleService $userLifecycleService,
         private RegistrationConfig $registrationConfig,
+        private MailerConfig $mailerConfig,
     ) {
         $this->resendCooldownMinutes = (int) ($_ENV['EMAIL_VERIFICATION_COOLDOWN_MINUTES'] ?? 2);
         $this->maxResendAttempts = (int) ($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? 5);
@@ -194,16 +197,19 @@ class AuthController extends AbstractController
             properties: [
                 new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
                 new OA\Property(property: 'password', type: 'string', format: 'password', example: 'SecurePass123!'),
+                new OA\Property(property: 'language', type: 'string', nullable: true, description: 'UI language used during signup (de, en, es, fr, tr). Stored before the verification email is sent.', example: 'de'),
             ]
         )
     )]
     #[OA\Response(
-        response: 201,
-        description: 'User registered successfully',
+        response: 200,
+        description: 'Registration accepted. The same body is returned when the email already exists.',
         content: new OA\JsonContent(
+            required: ['success', 'message', 'mailDelivered'],
             properties: [
-                new OA\Property(property: 'message', type: 'string', example: 'User registered successfully'),
-                new OA\Property(property: 'user_id', type: 'integer', example: 123),
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string'),
+                new OA\Property(property: 'mailDelivered', type: 'boolean', description: 'False when this install cannot send mail. Does not reveal whether the address was new.'),
             ]
         )
     )]
@@ -237,10 +243,7 @@ class AuthController extends AbstractController
                 'ip' => $request->getClientIp(),
             ]);
 
-            return $this->json([
-                'success' => true,
-                'message' => 'If this email is not already registered, you will receive a verification email shortly.',
-            ], Response::HTTP_OK);
+            return $this->json($this->registrationAccepted(), Response::HTTP_OK);
         }
 
         // Check if user exists
@@ -256,23 +259,21 @@ class AuthController extends AbstractController
             // Hash the password anyway to prevent timing attacks
             $this->passwordHasher->hashPassword($existingUser, $dto->password);
 
-            return $this->json([
-                'success' => true,
-                'message' => 'If this email is not already registered, you will receive a verification email shortly.',
-            ], Response::HTTP_OK);
+            return $this->json($this->registrationAccepted(), Response::HTTP_OK);
         }
 
         $user = $this->userLifecycleService->createUser(
             email: $dto->email,
             plainPassword: $dto->password,
+            userDetails: null !== $dto->language ? ['language' => $dto->language] : [],
         );
 
         // Generate verification token
         $token = $this->tokenRepository->createToken($user, 'email_verification', 86400); // 24h
 
-        // Send verification email
+        $delivered = false;
         try {
-            $this->internalEmailService->sendVerificationEmail(
+            $delivered = $this->internalEmailService->sendVerificationEmail(
                 $user->getMail(),
                 $token->getToken(),
                 $user->getLocale()
@@ -284,12 +285,29 @@ class AuthController extends AbstractController
             ]);
         }
 
-        $this->logger->info('User registered', ['user_id' => $user->getId()]);
+        $this->logger->info('User registered', ['user_id' => $user->getId(), 'mail_delivered' => $delivered]);
 
-        return $this->json([
+        return $this->json($this->registrationAccepted(), Response::HTTP_OK);
+    }
+
+    /**
+     * Same shape for a new account, an address that already exists, and a
+     * send that failed. `mailDelivered` follows only whether this install
+     * can send mail, so a delivery error cannot reveal that the address was new.
+     *
+     * @return array{success: true, message: string, mailDelivered: bool}
+     */
+    private function registrationAccepted(): array
+    {
+        $mailDelivered = $this->mailerConfig->isConfigured();
+
+        return [
             'success' => true,
-            'message' => 'If this email is not already registered, you will receive a verification email shortly.',
-        ], Response::HTTP_OK);
+            'mailDelivered' => $mailDelivered,
+            'message' => $mailDelivered
+                ? 'If this email is not already registered, you will receive a verification email shortly.'
+                : 'No verification email was sent. An administrator has to confirm the account before sign-in.',
+        ];
     }
 
     #[Route('/login', name: 'login', methods: ['POST'])]
@@ -324,6 +342,7 @@ class AuthController extends AbstractController
                     new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
                     new OA\Property(property: 'firstName', type: 'string', nullable: true, description: 'First name from Personal Information; null until the user sets it.', example: 'John'),
                     new OA\Property(property: 'mustChangePassword', type: 'boolean', description: 'The account still uses a password the deployment generated. Every API route except the password change is blocked until it is replaced.', example: false),
+                    new OA\Property(property: 'language', type: 'string', nullable: true, description: 'Account language (de, en, es, fr, tr), or null when the account has none yet.', example: 'en'),
                 ]),
             ]
         )
@@ -405,6 +424,7 @@ class AuthController extends AbstractController
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
                 'firstName' => $this->extractFirstName($user),
                 'mustChangePassword' => $user->mustChangePassword(),
+                'language' => $user->getPreferredLanguage(),
             ],
         ];
 
@@ -634,6 +654,26 @@ class AuthController extends AbstractController
     }
 
     /**
+     * End an OIDC session that the identity provider still considers valid
+     * but this instance no longer admits. Same answer as a rejected refresh.
+     */
+    private function oidcSessionEnded(string $reason): JsonResponse
+    {
+        $this->logger->info($reason);
+
+        $response = new JsonResponse([
+            'error' => 'Session expired',
+            'code' => 'OIDC_SESSION_EXPIRED',
+            'message' => 'Your session has expired. Please log in again.',
+        ], Response::HTTP_UNAUTHORIZED);
+
+        $this->tokenService->clearAuthCookies($response);
+        $this->oidcTokenService->clearOidcCookies($response);
+
+        return $response;
+    }
+
+    /**
      * Refresh OIDC tokens against identity provider (Keycloak).
      * If Keycloak rejects the refresh (user logged out), session is terminated.
      */
@@ -641,7 +681,11 @@ class AuthController extends AbstractController
     {
         $existingOidcAccess = $request->cookies->get(OidcTokenService::OIDC_ACCESS_COOKIE);
         if (is_string($existingOidcAccess) && '' !== $existingOidcAccess) {
-            $knownUser = $this->oidcTokenService->getUserFromOidcToken($existingOidcAccess, $provider);
+            try {
+                $knownUser = $this->oidcTokenService->getUserFromOidcToken($existingOidcAccess, $provider);
+            } catch (OidcAccessDeniedException) {
+                return $this->oidcSessionEnded('OIDC refresh refused by instance policy');
+            }
             if ($knownUser instanceof User && !$knownUser->isActive()) {
                 $response = $this->accountSuspendedResponse($knownUser, 'OIDC refresh');
                 $this->tokenService->clearAuthCookies($response);
@@ -673,7 +717,11 @@ class AuthController extends AbstractController
         }
 
         // Get user from the new access token
-        $user = $this->oidcTokenService->getUserFromOidcToken($newTokens['access_token'], $provider);
+        try {
+            $user = $this->oidcTokenService->getUserFromOidcToken($newTokens['access_token'], $provider);
+        } catch (OidcAccessDeniedException) {
+            return $this->oidcSessionEnded('OIDC refresh refused by instance policy');
+        }
 
         if (!$user) {
             $response = new JsonResponse([
@@ -818,6 +866,7 @@ class AuthController extends AbstractController
     }
 
     #[Route('/verify-email', name: 'verify_email', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/auth/verify-email', summary: 'Confirm an email address with a verification token', tags: ['Authentication'])]
     public function verifyEmail(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -864,6 +913,7 @@ class AuthController extends AbstractController
     }
 
     #[Route('/forgot-password', name: 'forgot_password', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/auth/forgot-password', summary: 'Email a password reset link', tags: ['Authentication'])]
     public function forgotPassword(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -904,6 +954,7 @@ class AuthController extends AbstractController
     }
 
     #[Route('/reset-password', name: 'reset_password', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/auth/reset-password', summary: 'Set a new password with a reset token', tags: ['Authentication'])]
     public function resetPassword(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -948,6 +999,7 @@ class AuthController extends AbstractController
     }
 
     #[Route('/resend-verification', name: 'resend_verification', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/auth/resend-verification', summary: 'Send the email verification message again', tags: ['Authentication'])]
     public function resendVerification(Request $request): JsonResponse
     {
         $data = json_decode($request->getContent(), true);
@@ -1063,7 +1115,7 @@ class AuthController extends AbstractController
                 new OA\Property(
                     property: 'user',
                     type: 'object',
-                    required: ['id', 'email', 'level', 'emailVerified', 'created', 'isAdmin', 'memoriesEnabled', 'mustChangePassword'],
+                    required: ['id', 'email', 'level', 'emailVerified', 'created', 'isAdmin', 'memoriesEnabled', 'mustChangePassword', 'language'],
                     properties: [
                         new OA\Property(property: 'id', type: 'integer', example: 42),
                         new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
@@ -1074,6 +1126,7 @@ class AuthController extends AbstractController
                         new OA\Property(property: 'memoriesEnabled', type: 'boolean', example: true),
                         new OA\Property(property: 'firstName', type: 'string', nullable: true, description: 'First name from Personal Information; null until the user sets it.', example: 'John'),
                         new OA\Property(property: 'mustChangePassword', type: 'boolean', description: 'The account still uses a password the deployment generated. Every API route except the password change is blocked until it is replaced.', example: false),
+                        new OA\Property(property: 'language', type: 'string', nullable: true, description: 'Account language (de, en, es, fr, tr), or null when the account has none yet.', example: 'en'),
                     ]
                 ),
                 new OA\Property(
@@ -1112,6 +1165,7 @@ class AuthController extends AbstractController
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
                 'firstName' => $this->extractFirstName($user),
                 'mustChangePassword' => $user->mustChangePassword(),
+                'language' => $user->getPreferredLanguage(),
             ],
             'impersonator' => $impersonator ? [
                 'id' => $impersonator->getId(),

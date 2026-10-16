@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Repository\UserRepository;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Seeds the example widget configuration (BCONFIG group=widget_1) for the demo user.
@@ -17,7 +18,8 @@ use Doctrine\DBAL\Connection;
  * The owner is resolved at runtime by looking up the demo user's email instead of
  * hard-coding a BID, so reordering UserFixtures cannot orphan these BCONFIG rows.
  */
-final readonly class DemoWidgetConfigSeeder
+#[AsTaggedItem(priority: 10)]
+final readonly class DemoWidgetConfigSeeder implements SeederInterface
 {
     /**
      * Email of the demo user that owns the example widget config. Created by
@@ -40,6 +42,16 @@ final readonly class DemoWidgetConfigSeeder
         private UserRepository $userRepository,
         private string $environment,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'demo-widget';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=widget_1, ownerId=2 — dev/test only, no-op in prod';
     }
 
     public function seed(): SeedResult

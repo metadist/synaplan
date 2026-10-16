@@ -43,9 +43,15 @@ condensed hardest). The newest turns are always replayed word for word.
 ## Message digests (deep memory)
 
 A daily job walks each user's new messages and asks the memory model to pick
-the **KEY messages** — documents, decisions, important facts/amounts/dates —
-and write one searchable title per message ("office rent letter to realtor
-about the increase of payments"). Each digest row is embedded and indexed in
+the **KEY messages** — documents with their content, results, decisions,
+important facts/amounts/dates — and write one searchable title per message
+("office rent letter to realtor about the increase of payments"). Requests to
+the assistant ("make a chart of this") and notes that a file was created are
+skipped; only the facts they contain count. Titles are written in the language
+the user writes in, so a German question also finds an English contract. The
+model sees the existing titles
+of the batch's chats and the user's 30 newest titles, so a task repeated in
+another chat is not indexed twice. Each digest row is embedded and indexed in
 Qdrant.
 
 During a chat turn, the user's prompt embedding (already computed for memory
@@ -59,11 +65,18 @@ quoted digest title instead.
 - **Job:** `app:digest:run` — self-locking, scheduler-driven (daily, wired in
   `container-runtime.sh`). Per-user cost caps (`BATCH_SIZE` ×
   `MAX_BATCHES_PER_USER` model calls max per run) and a per-user cursor, so
-  every message is billed exactly once. Messages in the *live* chat younger
-  than `QUIET_SECONDS` are left to the rolling summary. After each completed
+  every message is billed once. A failed model call keeps the cursor; a
+  provider outage stops the whole run, and a batch that fails three times is
+  skipped. Every batch checks the user's cost budget first. Messages in the
+  *live* chat younger than `QUIET_SECONDS` are left to the rolling summary,
+  and a pass stops below them until they leave that window. After each completed
   turn, `DigestOtherChatsCommand` indexes the user's other chats without
   that quiet window. A short verbatim tail of the most recently updated
   other chat is also injected on the hot path (SQL only, no digest wait).
+- **Start point:** a migration stores the newest message id at upgrade time
+  as `DIGEST.START_AFTER_ID`. A user without a stored cursor starts after it,
+  so existing history is not indexed (or billed) automatically; use the
+  backfill below for that. A fresh install stores 0.
 - **Exclusions:** widget/guest chats are never digested; users with memories
   disabled are skipped; the whole feature honours the user's memory opt-out at
   retrieval time too.
@@ -71,6 +84,15 @@ quoted digest title instead.
   5000); on overflow the oldest are deactivated first.
 - **Cleanup:** deleting a chat deactivates its digests and drops their
   vectors; account deletion purges rows and vectors.
+- **User view:** Memories → *Long-term memory* lists the active entries
+  (title, date, channel, source chat) with *Open in chat*, a single delete
+  and *Delete all* (`GET /api/v1/user/message-digests/entries`,
+  `DELETE /api/v1/user/message-digests/{id}`,
+  `DELETE /api/v1/user/message-digests`). A delete deactivates the row and
+  drops its vector; the same message is never digested again. Entries are
+  part of the memory export (`longTermMemory`). The tab stays while the server
+  kill switch is off and entries remain, and disappears once it is off and
+  empty.
 - **Admin knobs:** Admin → System Configuration → Routing → *Deep memory
   (message digests)* (`DIGEST.*` BCONFIG rows, ownerId 0). Kill switch:
   `DIGEST_ENABLED` (stops both indexing and retrieval).
@@ -82,7 +104,8 @@ All commands run inside the backend container
 
 ### Backfill history for existing users
 
-New installs index forward from day one. To index pre-existing history:
+Indexing runs forward from `DIGEST.START_AFTER_ID`. To index older history
+(billed to each user's budget):
 
 ```bash
 # One user, last 12 months, capped at 20 model calls
@@ -94,6 +117,10 @@ php bin/console app:digest:backfill --all-users --since-days=365
 # Preview what the model would pick, storing nothing
 php bin/console app:digest:backfill --user=123 --since-days=365 --dry-run
 ```
+
+A dry run (also on `app:digest:run`) still calls the model and is billed; it
+prints a table of the proposed titles with their message ids. Later batches see
+the titles earlier batches proposed, as a real run would.
 
 Backfill never moves the per-user cursor; idempotency comes from the
 one-digest-per-message unique key, so overlapping runs are safe.
@@ -116,7 +143,7 @@ re-run after an interruption.
 | ------ | ------ |
 | `CONVERSATION_SUMMARY_ENABLED` (admin UI) | no summary injection or refreshes |
 | `DIGEST_ENABLED` (admin UI) | no daily indexing, no retrieval in chat |
-| user's own memories toggle | that user is skipped by indexing AND retrieval |
+| user's own memories toggle | that user is skipped by indexing AND retrieval; existing entries stay until the user deletes them |
 
 ### Quality evaluation (live model calls, not part of CI)
 

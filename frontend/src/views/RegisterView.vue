@@ -14,16 +14,12 @@
       <div
         class="absolute -bottom-24 right-1/4 w-[28rem] h-[28rem] bg-brand/4 dark:bg-brand/8 rounded-full blur-3xl animate-float-delayed"
       ></div>
-      <img
-        :src="iconSrc"
-        alt=""
-        class="absolute top-[8%] right-[5%] w-[280px] opacity-[0.035] dark:opacity-[0.06] rotate-12 pointer-events-none select-none"
-      />
+      <!-- The bird watermark moved to the global AmbientBackground in App.vue. -->
     </div>
 
     <button
       v-if="isNativeApp()"
-      class="absolute left-6 h-9 w-9 rounded-lg icon-ghost flex items-center justify-center z-20"
+      class="absolute left-6 h-9 w-9 rounded-xl icon-ghost flex items-center justify-center z-20"
       style="top: calc(env(safe-area-inset-top, 0px) + 1.5rem)"
       :aria-label="$t('common.back')"
       data-testid="btn-back"
@@ -38,7 +34,7 @@
     >
       <button
         v-if="isNativeServerControlAvailable()"
-        class="h-9 w-9 rounded-lg icon-ghost flex items-center justify-center"
+        class="h-9 w-9 rounded-xl icon-ghost flex items-center justify-center"
         :aria-label="$t('nativeServer.changeServer')"
         :title="$t('nativeServer.changeServer')"
         data-testid="btn-change-server"
@@ -47,21 +43,19 @@
         <ServerIcon class="w-4 h-4" />
       </button>
       <button
-        class="h-9 px-3 rounded-lg icon-ghost text-xs font-medium"
+        class="h-9 px-3 rounded-xl icon-ghost text-xs font-medium"
         data-testid="btn-language-toggle"
         @click="cycleLanguage"
       >
         {{ currentLanguage.toUpperCase() }}
       </button>
       <button
-        class="h-9 w-9 rounded-lg icon-ghost flex items-center justify-center"
-        :aria-label="
-          themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-        "
+        class="h-9 w-9 rounded-xl icon-ghost flex items-center justify-center"
+        :aria-label="$t('appearance.cycle')"
         data-testid="btn-theme-toggle"
         @click="toggleTheme"
       >
-        <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-4 h-4" />
+        <SunIcon v-if="themeStore.isDark?.value" class="w-4 h-4" />
         <MoonIcon v-else class="w-4 h-4" />
       </button>
     </div>
@@ -109,7 +103,11 @@
                 {{ $t('auth.registrationSuccess') }}
               </h3>
               <p class="txt-secondary text-sm leading-relaxed mb-6 max-w-xs mx-auto">
-                {{ $t('auth.registrationSuccessDesc') }}
+                {{
+                  registrationNeedsAdmin
+                    ? $t('auth.registrationNoMailDesc')
+                    : $t('auth.registrationSuccessDesc')
+                }}
               </p>
               <button
                 class="auth-submit-btn btn-primary"
@@ -181,7 +179,7 @@
                   class="w-4.5 h-4.5"
                 />
                 <span class="group-hover:translate-x-0.5 transition-transform duration-200">{{
-                  provider.name
+                  socialProviderLabel(provider, t)
                 }}</span>
               </button>
             </div>
@@ -267,7 +265,7 @@
                 />
                 <button
                   type="button"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-xl txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
                   :aria-label="showPassword ? $t('auth.hidePassword') : $t('auth.showPassword')"
                   data-testid="btn-toggle-password"
                   @click="showPassword = !showPassword"
@@ -307,7 +305,7 @@
                 />
                 <button
                   type="button"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-xl txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
                   :aria-label="
                     showConfirmPassword ? $t('auth.hidePassword') : $t('auth.showPassword')
                   "
@@ -422,7 +420,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { supportedLanguages } from '@/i18n'
+import { socialProviderLabel } from '@/utils/socialProviderLabel'
+import { cycleLocale } from '@/i18n'
 import {
   SunIcon,
   MoonIcon,
@@ -448,18 +447,14 @@ import { consumePendingRedirect, isSafeRedirectPath } from '@/utils/pendingAuthR
 
 const router = useRouter()
 const route = useRoute()
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 const themeStore = useTheme()
 const { getToken: getReCaptchaToken } = useRecaptcha()
 const config = useConfigStore()
 
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
+const isDark = themeStore.isDark
 
-const { logoSrc, iconSrc } = useBrandLogo(isDark)
+const { logoSrc } = useBrandLogo(isDark)
 
 const fullName = ref('')
 const email = ref('')
@@ -471,18 +466,10 @@ const focusedField = ref<string | null>(null)
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const currentIndex = supportedLanguages.indexOf(
-    locale.value as (typeof supportedLanguages)[number]
-  )
-  locale.value = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
-  localStorage.setItem('language', locale.value)
+  void cycleLocale()
 }
 
-const toggleTheme = () => {
-  const themes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system']
-  const currentIndex = themes.indexOf(themeStore.theme.value)
-  themeStore.setTheme(themes[(currentIndex + 1) % themes.length])
-}
+const toggleTheme = () => themeStore.cycleTheme()
 
 // The native shell has no browser back button, so auth pages would otherwise be a
 // dead end for guests. Go back in history when possible, else fall back to the
@@ -499,6 +486,7 @@ const { register, error: authError, loading, clearError } = useAuth()
 const passwordErrors = ref<string[]>([])
 const emailError = ref('')
 const registrationSuccess = ref(false)
+const registrationNeedsAdmin = ref(false)
 // Native OAuth errors surface through the same banner as registration errors.
 // Provider catalogue + the provider round trip live in the shared composable.
 const {
@@ -537,8 +525,11 @@ const handleRegister = async () => {
   if (password.value !== confirmPassword.value) return
 
   const recaptchaToken = await getReCaptchaToken('register')
-  const success = await register(email.value, password.value, recaptchaToken)
-  if (success) registrationSuccess.value = true
+  const result = await register(email.value, password.value, recaptchaToken, String(locale.value))
+  if (result.success) {
+    registrationNeedsAdmin.value = !result.mailDelivered
+    registrationSuccess.value = true
+  }
 }
 
 const handleSocialLogin = async (provider: string) => {

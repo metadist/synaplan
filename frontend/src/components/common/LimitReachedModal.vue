@@ -124,7 +124,7 @@
               </span>
               <div class="flex items-center gap-2">
                 <button
-                  class="w-8 h-8 rounded-lg surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                  class="w-8 h-8 rounded-xl surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
                   :disabled="topupSteps <= 1 || topupLoading"
                   data-testid="btn-topup-decrement"
                   @click="topupSteps = Math.max(1, topupSteps - 1)"
@@ -138,7 +138,7 @@
                   {{ topupSteps }}
                 </span>
                 <button
-                  class="w-8 h-8 rounded-lg surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                  class="w-8 h-8 rounded-xl surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
                   :disabled="topupSteps >= TOPUP_MAX_STEPS || topupLoading"
                   data-testid="btn-topup-increment"
                   @click="topupSteps = Math.min(TOPUP_MAX_STEPS, topupSteps + 1)"
@@ -151,7 +151,7 @@
             <!-- Top-up Button (monthly cost-budget exceeded) -->
             <button
               v-if="showTopup"
-              class="btn-primary w-full px-6 py-3 rounded-lg font-semibold text-base flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+              class="btn-primary w-full px-6 py-3 rounded-xl font-semibold text-base flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="topupLoading"
               data-testid="btn-topup"
               @click="handleTopup"
@@ -187,7 +187,7 @@
             <!-- Upgrade Button -->
             <button
               v-if="purchaseAllowed"
-              class="w-full px-6 py-3 rounded-lg font-semibold text-base flex items-center justify-center gap-2 group"
+              class="w-full px-6 py-3 rounded-xl font-semibold text-base flex items-center justify-center gap-2 group"
               :class="
                 showTopup
                   ? 'surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10'
@@ -215,7 +215,7 @@
             <!-- Phone Verification (for ANONYMOUS) -->
             <button
               v-if="userLevel === 'ANONYMOUS' && !phoneVerified"
-              class="w-full px-6 py-3 rounded-lg font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
+              class="w-full px-6 py-3 rounded-xl font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
               data-testid="btn-verify-phone"
               @click="handleVerifyPhone"
             >

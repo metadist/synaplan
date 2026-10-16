@@ -14,6 +14,8 @@ use App\Service\Iam\Permission;
  */
 final readonly class SavedTaskKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     public const KEY = 'saved_task';
 
     public function __construct(
@@ -69,7 +71,7 @@ final readonly class SavedTaskKind implements ShareableResourceKindInterface
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
     }
 

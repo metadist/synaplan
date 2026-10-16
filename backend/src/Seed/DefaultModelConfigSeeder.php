@@ -6,6 +6,8 @@ namespace App\Seed;
 
 use App\Model\ModelCatalog;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for global default-model configuration in BCONFIG (ownerId=0).
@@ -19,7 +21,8 @@ use Doctrine\DBAL\Connection;
  *
  * NEVER overwrites operator-tuned values, even if they differ from the seed defaults.
  */
-final readonly class DefaultModelConfigSeeder
+#[AsTaggedItem(priority: 320)]
+final readonly class DefaultModelConfigSeeder implements SeederInterface
 {
     /**
      * Production defaults: every capability points at a stable catalog key. The
@@ -53,8 +56,11 @@ final readonly class DefaultModelConfigSeeder
         // ModelCatalog row id 220 ("Memory extraction model") which is a
         // system-only clone of Groq gpt-oss-120b — fast and cheap.
         ['group' => 'DEFAULTMODEL', 'setting' => 'MEM',        'modelKey' => 'groq:openai/gpt-oss-120b:mem'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'modelKey' => 'google:gemini-3.1-flash-image-preview:text2pic'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2PIC',    'modelKey' => 'google:gemini-3.1-flash-image-preview:text2pic'],
+        // #2407: Flare for both new images and edits. Sunburst stays selectable.
+        // Existing global rows that still name Nano Banana 2 are repointed in
+        // seed(), after ModelSeeder has inserted Flare. A chosen model stays.
+        ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'modelKey' => 'openai:gpt-image-2.5-flare:text2pic'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2PIC',    'modelKey' => 'openai:gpt-image-2.5-flare:text2pic'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID',   'modelKey' => 'google:veo-3.1-generate-preview:text2vid'],
         // IMG2VID (animate an attached image). Defaults to Higgsfield DoP
         // Standard — an image-to-video model. Shares the text2vid BTAG (see
@@ -66,6 +72,7 @@ final readonly class DefaultModelConfigSeeder
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'modelKey' => 'google:gemini-2.5-flash-preview-tts:text2sound'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2TEXT',   'modelKey' => 'groq:qwen/qwen3.6-27b:pic2text'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'SOUND2TEXT', 'modelKey' => 'groq:whisper-large-v3:sound2text'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'VOICE_LIVE', 'modelKey' => 'openai:gpt-live-1:voice2voice'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE',    'modelKey' => 'anthropic:claude-sonnet-5:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'VECTORIZE',  'modelKey' => 'ollama:bge-m3:vectorize'],
     ];
@@ -115,17 +122,68 @@ final readonly class DefaultModelConfigSeeder
     ) {
     }
 
+    public function label(): string
+    {
+        return 'defaults';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=DEFAULTMODEL/ai';
+    }
+
     public function seed(): SeedResult
     {
         if ('test' === $this->environment) {
             return BConfigSeeder::insertIfMissing($this->connection, 'default_model_config', self::TEST_DEFAULTS);
         }
 
-        return BConfigSeeder::insertIfMissing(
+        $result = BConfigSeeder::insertIfMissing(
             $this->connection,
             'default_model_config',
             [...self::resolveProdDefaults(), ...self::PROD_FLAGS],
         );
+        $this->repointGlobalNanoBananaImageDefaults();
+
+        return $result;
+    }
+
+    /**
+     * Move the global image defaults from Nano Banana 2 to Flare.
+     *
+     * Runs from app:seed, after ModelSeeder, because a migration executes
+     * before the catalog row exists on an install that is upgrading from a
+     * release without Flare. Only BOWNERID 0 moves, and only while the value
+     * is still BID 371 and the Flare row is the active text2pic model.
+     */
+    public function repointGlobalNanoBananaImageDefaults(): int
+    {
+        $flare = ModelCatalog::findBidByKey('openai:gpt-image-2.5-flare:text2pic');
+        if (null === $flare) {
+            return 0;
+        }
+
+        return (int) $this->connection->executeStatement(<<<'SQL'
+            UPDATE BCONFIG
+               SET BVALUE = :flare
+             WHERE BOWNERID = 0
+               AND BGROUP = 'DEFAULTMODEL'
+               AND BSETTING IN ('TEXT2PIC', 'PIC2PIC')
+               AND BVALUE = '371'
+               AND EXISTS (
+                   SELECT 1
+                     FROM BMODELS
+                    WHERE BID = :flareId
+                      AND BPROVID = 'gpt-image-2.5-flare'
+                      AND BTAG = 'text2pic'
+                      AND BACTIVE = 1
+               )
+        SQL, [
+            'flare' => (string) $flare,
+            'flareId' => $flare,
+        ], [
+            'flareId' => ParameterType::INTEGER,
+        ]);
     }
 
     /**

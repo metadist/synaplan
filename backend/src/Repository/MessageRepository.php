@@ -6,11 +6,14 @@ use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MessageRepository extends ServiceEntityRepository
 {
     private const DELETE_ID_BATCH = 500;
+    private const FIRST_TEXTS_CHUNK = 500;
 
     public function __construct(ManagerRegistry $registry)
     {
@@ -26,6 +29,41 @@ class MessageRepository extends ServiceEntityRepository
             ->addOrderBy('m.id', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Distinct two-letter language codes from this user's recent messages.
+     * `NN` is the "not yet detected" placeholder and is not a language they speak.
+     *
+     * @return list<string>
+     */
+    public function findRecentLanguageCodes(int $userId, int $limit = 20): array
+    {
+        /** @var list<mixed> $rows */
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.language')
+            ->where('m.userId = :userId')
+            ->andWhere('m.language NOT IN (:ignored)')
+            ->setParameter('userId', $userId)
+            ->setParameter('ignored', ['NN', ''])
+            ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        $codes = [];
+        foreach ($rows as $code) {
+            if (!is_string($code)) {
+                continue;
+            }
+            $code = strtolower($code);
+            if (1 === preg_match('/^[a-z]{2}$/', $code) && !in_array($code, $codes, true)) {
+                $codes[] = $code;
+            }
+        }
+
+        return $codes;
     }
 
     public function findRecentByUser(int $userId, int $limit = 10): array
@@ -68,19 +106,34 @@ class MessageRepository extends ServiceEntityRepository
      *
      * Used as fallback when chatId is not available (backward compatibility).
      * For new code with chatId, use findChatHistory() instead.
+     *
+     * Returns the NEWEST $limit messages of the thread, oldest first, so a
+     * long thread yields the turns the current question continues rather than
+     * its first ten messages. $excludeMessageId leaves the message being
+     * answered out, exactly like findChatHistory().
+     *
+     * @return list<Message>
      */
-    public function findConversationHistory(int $userId, string $trackingId, int $limit = 10): array
+    public function findConversationHistory(int $userId, string $trackingId, int $limit = 10, ?int $excludeMessageId = null): array
     {
-        return $this->createQueryBuilder('m')
+        $qb = $this->createQueryBuilder('m')
             ->where('m.userId = :userId')
             ->andWhere('m.trackingId = :trackingId')
             ->setParameter('userId', $userId)
             ->setParameter('trackingId', $trackingId)
-            ->orderBy('m.unixTimestamp', 'ASC')
-            ->addOrderBy('m.id', 'ASC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
+            ->setMaxResults($limit);
+
+        if (null !== $excludeMessageId) {
+            $qb->andWhere('m.id != :excludeId')
+                ->setParameter('excludeId', $excludeMessageId);
+        }
+
+        /** @var list<Message> $newestFirst */
+        $newestFirst = $qb->getQuery()->getResult();
+
+        return array_reverse($newestFirst);
     }
 
     /**
@@ -148,6 +201,45 @@ class MessageRepository extends ServiceEntityRepository
 
         // Reverse to get oldest first (for proper conversation order)
         return array_reverse($result);
+    }
+
+    /**
+     * True when a message of this chat cites the chunk id in rag_sources.
+     * A substring hit is not enough: the id must be that source's chunkId.
+     */
+    public function chatCitesChunk(int $chatId, string $chunkId): bool
+    {
+        if ($chatId <= 0 || '' === $chunkId) {
+            return false;
+        }
+
+        $values = $this->getEntityManager()->createQueryBuilder()
+            ->select('meta.metaValue')
+            ->from(MessageMeta::class, 'meta')
+            ->innerJoin(Message::class, 'message', 'WITH', 'message.id = meta.messageId')
+            ->where('message.chatId = :chatId')
+            ->andWhere('meta.metaKey = :metaKey')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('metaKey', 'rag_sources')
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        foreach ($values as $raw) {
+            if (!is_string($raw) || !str_contains($raw, $chunkId)) {
+                continue;
+            }
+            $decoded = json_decode($raw, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            foreach ($decoded as $row) {
+                if (is_array($row) && (string) ($row['chunkId'] ?? '') === $chunkId) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -227,6 +319,24 @@ class MessageRepository extends ServiceEntityRepository
         $rows = $qb->getQuery()->getResult();
 
         return $rows;
+    }
+
+    /**
+     * Ids of all messages in a chat, regardless of author. Used by share-revoke
+     * cleanup to find feedback entries derived from the conversation.
+     *
+     * @return list<int>
+     */
+    public function findIdsByChatId(int $chatId): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.id')
+            ->where('m.chatId = :chatId')
+            ->setParameter('chatId', $chatId)
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_map(static fn (array $row): int => (int) reset($row), $rows);
     }
 
     /**
@@ -420,6 +530,57 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Smallest message id above `$afterId` that matches the digest candidate
+     * content and source predicates but was excluded only by the quiet-window
+     * predicate of {@see findDigestCandidates()}.
+     *
+     * With a live chat, that predicate excludes only young live-chat rows and
+     * young chat-less rows, so older history can still move the cursor.
+     * The outer parentheses on the live-chat form are load-bearing: Doctrine
+     * andWhere() concatenates with AND and does not wrap the expression, so
+     * an ungrouped OR would bypass the user, cursor, and source predicates.
+     */
+    public function lowestSkippedDigestCandidateId(
+        int $userId,
+        int $afterId,
+        int $beforeUnix,
+        ?int $sinceUnix = null,
+        ?int $liveChatId = null,
+    ): ?int {
+        $qb = $this->createQueryBuilder('m')
+            ->select('MIN(m.id)')
+            ->where('m.userId = :userId')
+            ->andWhere('m.id > :afterId')
+            ->andWhere("(m.text != '' OR m.fileText != '')")
+            ->andWhere(
+                'm.chatId IS NULL OR m.chatId NOT IN (
+                    SELECT c.id FROM App\Entity\Chat c WHERE c.source IN (:excludedSources)
+                )'
+            )
+            ->setParameter('userId', $userId)
+            ->setParameter('afterId', $afterId)
+            ->setParameter('excludedSources', ['widget', 'guest']);
+
+        if (null !== $liveChatId && $liveChatId > 0) {
+            $qb->andWhere('((m.chatId IS NULL OR m.chatId = :liveChatId) AND m.unixTimestamp >= :beforeUnix)')
+                ->setParameter('liveChatId', $liveChatId)
+                ->setParameter('beforeUnix', $beforeUnix);
+        } else {
+            $qb->andWhere('m.unixTimestamp >= :beforeUnix')
+                ->setParameter('beforeUnix', $beforeUnix);
+        }
+
+        if (null !== $sinceUnix) {
+            $qb->andWhere('m.unixTimestamp >= :sinceUnix')
+                ->setParameter('sinceUnix', $sinceUnix);
+        }
+
+        $value = $qb->getQuery()->getSingleScalarResult();
+
+        return null === $value || '' === $value ? null : (int) $value;
+    }
+
+    /**
      * Verbatim tail of the user's most recently updated other chat (not widget/guest).
      *
      * @return list<Message> chronological (oldest first)
@@ -575,6 +736,101 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * The inbound row a Telegram update already stored, so a retried worker
+     * job neither answers the same message twice nor leaves it unanswered.
+     */
+    public function findTelegramUpdate(int $userId, string $metaKey, string $updateKey): ?Message
+    {
+        $result = $this->createQueryBuilder('m')
+            ->innerJoin('m.metadata', 'updateMeta', 'WITH', 'updateMeta.metaKey = :metaKey')
+            ->where('m.userId = :userId')
+            ->andWhere('m.messageType = :messageType')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('updateMeta.metaValue = :updateKey')
+            ->setParameter('metaKey', $metaKey)
+            ->setParameter('userId', $userId)
+            ->setParameter('messageType', 'TGRM')
+            ->setParameter('direction', 'IN')
+            ->setParameter('updateKey', $updateKey)
+            ->orderBy('m.id', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result instanceof Message ? $result : null;
+    }
+
+    /**
+     * The owner's stored Telegram message for a Telegram message id in one
+     * Telegram chat.
+     */
+    public function findTelegramInbound(int $userId, string $tgChatId, string $externalId): ?Message
+    {
+        $result = $this->createQueryBuilder('m')
+            ->innerJoin('m.metadata', 'externalMeta', 'WITH', 'externalMeta.metaKey = :externalKey AND externalMeta.metaValue = :externalId')
+            ->innerJoin('m.metadata', 'chatMeta', 'WITH', 'chatMeta.metaKey = :chatKey AND chatMeta.metaValue = :tgChatId')
+            ->where('m.userId = :userId')
+            ->andWhere('m.messageType = :messageType')
+            ->andWhere('m.direction = :direction')
+            ->setParameter('externalKey', 'external_id')
+            ->setParameter('externalId', $externalId)
+            ->setParameter('chatKey', 'tg_chat_id')
+            ->setParameter('tgChatId', $tgChatId)
+            ->setParameter('userId', $userId)
+            ->setParameter('messageType', 'TGRM')
+            ->setParameter('direction', 'IN')
+            ->orderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result instanceof Message ? $result : null;
+    }
+
+    /**
+     * The current bot answer to one Telegram inbound message: the newest
+     * reply that was not replaced by a later one.
+     */
+    public function findTelegramAnswer(int $userId, int $inboundId): ?Message
+    {
+        $result = $this->createQueryBuilder('m')
+            ->innerJoin('m.metadata', 'replyMeta', 'WITH', 'replyMeta.metaKey = :replyKey AND replyMeta.metaValue = :inboundId')
+            ->leftJoin('m.metadata', 'supersededMeta', 'WITH', 'supersededMeta.metaKey = :supersededKey')
+            ->where('m.userId = :userId')
+            ->andWhere('m.messageType = :messageType')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('supersededMeta.id IS NULL')
+            ->setParameter('replyKey', 'tg_reply_to')
+            ->setParameter('inboundId', (string) $inboundId)
+            ->setParameter('supersededKey', 'superseded_by')
+            ->setParameter('userId', $userId)
+            ->setParameter('messageType', 'TGRM')
+            ->setParameter('direction', 'OUT')
+            ->orderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result instanceof Message ? $result : null;
+    }
+
+    public function hasInboundAfter(int $chatId, int $messageId): bool
+    {
+        $count = $this->createQueryBuilder('m')
+            ->select('COUNT(m.id)')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('m.id > :messageId')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('direction', 'IN')
+            ->setParameter('messageId', $messageId)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count > 0;
+    }
+
+    /**
      * Find a recent incoming email by deterministic fingerprint.
      *
      * Used as a fallback idempotency strategy when external message ID is missing.
@@ -626,11 +882,13 @@ class MessageRepository extends ServiceEntityRepository
 
     /**
      * Get the last message for each of the given chat IDs.
-     * Returns an array keyed by chatId with the message text.
+     *
+     * Direction and provider let the session list hide an AI scratchpad
+     * without rewriting a visitor or operator message.
      *
      * @param int[] $chatIds
      *
-     * @return array<int, string>
+     * @return array<int, array{text: string, direction: string, provider: string}>
      */
     public function getLastMessageTextForChats(array $chatIds): array
     {
@@ -643,7 +901,7 @@ class MessageRepository extends ServiceEntityRepository
 
         // Use MAX(BID) to get the actual last message (BID is auto-increment)
         $sql = '
-            SELECT m.BCHATID as chat_id, m.BTEXT as text
+            SELECT m.BCHATID as chat_id, m.BTEXT as text, m.BDIRECT as direction, m.BPROVIDX as provider
             FROM BMESSAGES m
             INNER JOIN (
                 SELECT BCHATID, MAX(BID) as max_id
@@ -657,12 +915,16 @@ class MessageRepository extends ServiceEntityRepository
         $result = $conn->executeQuery(
             $sql,
             [$chatIds, $chatIds],
-            [\Doctrine\DBAL\ArrayParameterType::INTEGER, \Doctrine\DBAL\ArrayParameterType::INTEGER]
+            [ArrayParameterType::INTEGER, ArrayParameterType::INTEGER]
         );
 
         $messages = [];
         foreach ($result->fetchAllAssociative() as $row) {
-            $messages[(int) $row['chat_id']] = (string) $row['text'];
+            $messages[(int) $row['chat_id']] = [
+                'text' => (string) $row['text'],
+                'direction' => (string) $row['direction'],
+                'provider' => (string) $row['provider'],
+            ];
         }
 
         return $messages;
@@ -750,11 +1012,68 @@ class MessageRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('m')
             ->where('m.status IN (:statuses)')
             ->andWhere('m.unixTimestamp < :cutoff')
-            ->setParameter('statuses', $statuses, \Doctrine\DBAL\ArrayParameterType::STRING)
+            ->setParameter('statuses', $statuses, ArrayParameterType::STRING)
             ->setParameter('cutoff', $cutoffUnix)
             ->orderBy('m.unixTimestamp', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * The first user-written texts of a chat, oldest first (Smart Search
+     * indexes them so an untitled chat is still findable by what was asked).
+     *
+     * @return list<string>
+     */
+    public function findFirstInboundTexts(int $chatId, int $limit): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.text')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.direction = :direction')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('direction', 'IN')
+            ->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_values(array_map(static fn (array $row): string => (string) $row['text'], $rows));
+    }
+
+    /**
+     * {@see findFirstInboundTexts()} for many chats in one query per chunk
+     * (a full Smart Search re-index would otherwise ask once per chat).
+     *
+     * @param list<int> $chatIds
+     *
+     * @return array<int, list<string>> chat id => texts, oldest first
+     */
+    public function findFirstInboundTextsForChats(array $chatIds, int $perChat): array
+    {
+        $texts = [];
+        foreach (array_chunk(array_values(array_unique($chatIds)), self::FIRST_TEXTS_CHUNK) as $chunk) {
+            $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+                <<<'SQL'
+                    SELECT BCHATID, BTEXT FROM (
+                      SELECT BCHATID, BTEXT,
+                        ROW_NUMBER() OVER (PARTITION BY BCHATID ORDER BY BUNIXTIMES ASC, BID ASC) AS RN
+                      FROM BMESSAGES
+                      WHERE BCHATID IN (:chatIds) AND BDIRECT = 'IN'
+                    ) ranked
+                    WHERE RN <= :perChat
+                    ORDER BY BCHATID, RN
+                SQL,
+                ['chatIds' => $chunk, 'perChat' => $perChat],
+                ['chatIds' => ArrayParameterType::INTEGER, 'perChat' => ParameterType::INTEGER],
+            );
+            foreach ($rows as $row) {
+                $texts[(int) $row['BCHATID']][] = (string) $row['BTEXT'];
+            }
+        }
+
+        return $texts;
     }
 }

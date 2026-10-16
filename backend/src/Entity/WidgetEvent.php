@@ -22,7 +22,7 @@ use Doctrine\ORM\Mapping as ORM;
  * INSERT, so there is no read-modify-write race (the previous cache approach
  * rewrote one array and silently dropped concurrent events).
  *
- * Interim design: a Redis-backed {@see \App\Service\WidgetEventStoreInterface}
+ * Interim design: a Redis-backed {@see \App\Service\Widget\WidgetEventStoreInterface}
  * implementation is planned to replace DB polling with push.
  */
 #[ORM\Entity(repositoryClass: WidgetEventRepository::class)]

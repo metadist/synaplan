@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
+use App\Service\Message\Processing\TurnHistoryLoader;
 use App\Service\ModelConfigService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -137,12 +138,12 @@ final readonly class ConversationSummaryService
             return false;
         }
 
-        // Match the hot path's window contract: MessageProcessor loads at most
+        // Match the hot path's window contract: TurnHistoryLoader loads at most
         // HISTORY_MAX_MESSAGES, then recentTail trims that by char budget.
         // Applying only the char budget to the FULL history would leave short
         // message chats unsummarized forever (everything fits in 8000 chars).
-        $window = count($fullHistory) > MessageProcessor::HISTORY_MAX_MESSAGES
-            ? array_slice($fullHistory, -MessageProcessor::HISTORY_MAX_MESSAGES)
+        $window = count($fullHistory) > TurnHistoryLoader::HISTORY_MAX_MESSAGES
+            ? array_slice($fullHistory, -TurnHistoryLoader::HISTORY_MAX_MESSAGES)
             : $fullHistory;
         $tail = $this->recentTail($window, $this->config->getRecentVerbatimChars());
         $olderCount = count($fullHistory) - count($tail);

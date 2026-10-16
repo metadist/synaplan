@@ -7,7 +7,8 @@ namespace App\Tests\Unit\Service\Message\Handler;
 use App\AI\Service\AiFacade;
 use App\Entity\Model;
 use App\Entity\User;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\ThumbnailService;
@@ -19,12 +20,13 @@ use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
+use App\Service\Memory\MemoryExtractionDispatcher;
+use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\MediaPromptExtractor;
+use App\Service\Message\PerfPipelineFlag;
 use App\Service\ModelConfigService;
-use App\Service\PerfPipelineFlag;
-use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -82,8 +84,11 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
             $this->createMock(ThumbnailService::class),
             $this->rateLimitService,
             new MediaErrorMessageBuilder(),
-            $this->createMock(MessageBusInterface::class),
-            $this->createMock(PerfPipelineFlag::class),
+            new PendingMemoryExtraction(
+                new MemoryExtractionDispatcher($this->createMock(MessageBusInterface::class), new NullLogger()),
+                $this->createMock(PerfPipelineFlag::class),
+                new NullLogger(),
+            ),
             $this->createMock(MediaCancellationStore::class),
             $this->mediaJobConfig,
             $this->mediaJobService,
@@ -188,7 +193,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         // job failed, sync the message, and surface a localized error in the
         // same turn — no empty bubble, no endless poll.
         $this->mediaJobDispatcher->expects(self::once())->method('dispatch')->with($job)->willReturn(false);
-        $this->mediaJobService->expects(self::once())->method('markFailed')->with($job, new IsType(NativeType::String));
+        $this->mediaJobService->expects(self::once())->method('markFailed')->with($job, new IsType(NativeType::String))->willReturn(true);
         $this->mediaJobMessageSync->expects(self::once())->method('syncTerminalState')->with($job);
         $this->aiFacade->expects(self::never())->method('generateVideo');
 

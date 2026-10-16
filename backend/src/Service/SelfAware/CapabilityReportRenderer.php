@@ -7,13 +7,19 @@ namespace App\Service\SelfAware;
 /**
  * Compact, deterministic prompt block for a {@see CapabilityReport}.
  *
- * Budget: ≤ ~350 tokens (~1 400 characters at 4 chars/token).
+ * Budget: ≤ ~600 tokens (~2 400 characters at 4 chars/token). The budget grew
+ * with the product: assistants, approvals, custom tools and sharing joined the
+ * inventory in 4.8/4.9, and an answer that omits them lies by omission. The
+ * block stays cached per user and is only injected on the product topics.
+ * RULES and the optional MODEL line ride directly under the header so a
+ * truncated tail can never cut them. MODEL is per request (the model that
+ * is answering), so it is passed in rather than stored on the report.
  */
 final readonly class CapabilityReportRenderer
 {
-    public const MAX_CHARS = 1400;
+    public const MAX_CHARS = 2400;
 
-    public function render(CapabilityReport $report): string
+    public function render(CapabilityReport $report, ?string $modelLine = null): string
     {
         $available = $this->joinFacts($report->byState(CapabilityState::Available), includeAlternative: false);
         $needsSetup = $this->joinNeedsSetup($report);
@@ -21,18 +27,25 @@ final readonly class CapabilityReportRenderer
 
         $lines = [
             '## This Synaplan installation (live, version '.$report->version.')',
-            'AVAILABLE NOW: '.('' !== $available ? $available : 'none'),
-            'NEEDS SETUP: '.('' !== $needsSetup ? $needsSetup : 'none'),
-            'NOT AVAILABLE: '.('' !== $absent ? $absent : 'none'),
             $this->rulesLine($report),
         ];
+        if (null !== $modelLine && '' !== trim($modelLine)) {
+            $lines[] = $modelLine;
+        }
+        $lines[] = 'AVAILABLE NOW: '.('' !== $available ? $available : 'none');
+        $lines[] = 'NEEDS SETUP: '.('' !== $needsSetup ? $needsSetup : 'none');
+        $lines[] = 'NOT AVAILABLE: '.('' !== $absent ? $absent : 'none');
 
         $block = implode("\n", $lines);
         if (strlen($block) <= self::MAX_CHARS) {
             return $block;
         }
 
-        return substr($block, 0, self::MAX_CHARS - 1).'…';
+        $ellipsis = '…';
+
+        // Byte budget, character boundary: mb_strcut backs up to a valid UTF-8
+        // sequence so a multibyte label can never be split mid-character.
+        return mb_strcut($block, 0, self::MAX_CHARS - strlen($ellipsis), 'UTF-8').$ellipsis;
     }
 
     /**
@@ -87,7 +100,7 @@ final readonly class CapabilityReportRenderer
 
     private function rulesLine(CapabilityReport $report): string
     {
-        $rules = 'RULES: When asked whether you can do something, answer from the lists above and nothing else. '
+        $rules = 'RULES: Answer capability questions from the lists below only. '
             .'Say plainly what is not available here and offer the closest alternative. '
             .'Never promise, describe, or link a file you are not delivering in this turn. '
             .'Never quote prices, plan limits or quotas.';

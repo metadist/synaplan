@@ -13,6 +13,8 @@ use App\Service\Iam\Permission;
  */
 final readonly class KnowledgeFolderKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     public const KEY = 'knowledge_folder';
 
     public function __construct(
@@ -66,7 +68,7 @@ final readonly class KnowledgeFolderKind implements ShareableResourceKindInterfa
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
     }
 

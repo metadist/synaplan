@@ -9,6 +9,7 @@ use App\AI\Messages\Tools\CodeExecutionTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\AI\Service\AiFacade;
+use App\AI\Stream\StreamChunk;
 use App\Entity\ComputeRun;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
@@ -29,7 +30,8 @@ use Psr\Log\LoggerInterface;
  *
  * Injects Synaplan MCP + web_search on dual-gated models, executes only what
  * Synaplan owns, and relays client-owned tool_calls as finish_reason
- * tool_calls. Intermediate server rounds are never streamed.
+ * tool_calls. Synaplan-owned tool calls are not streamed; answer text is
+ * forwarded as the model produces it.
  *
  * Mixed turns (owned + client-owned in one answer): execute owned calls
  * first, then return the leftover client-owned tool_calls without a
@@ -141,8 +143,8 @@ final readonly class OpenAiGatewayToolLoop
     }
 
     /**
-     * Stream only the final assistant text or the client-owned tool_calls.
-     * Intermediate Synaplan rounds are suppressed (run via complete()).
+     * Stream answer text as the model produces it. Synaplan-owned tool rounds
+     * stay inside the loop; only client-owned tool_calls are emitted as deltas.
      *
      * @param list<array<string, mixed>> $messages
      * @param array<string, mixed>       $options
@@ -151,42 +153,126 @@ final readonly class OpenAiGatewayToolLoop
      */
     public function stream(User $user, array $messages, callable $callback, array $options): array
     {
-        $result = $this->complete($user, $messages, $options);
-        $toolCalls = $this->normalizeToolCalls($result['tool_calls'] ?? []);
-        if ([] !== $toolCalls && 'tool_calls' === ($result['finish_reason'] ?? '')) {
-            foreach ($toolCalls as $index => $call) {
-                $fn = is_array($call['function'] ?? null) ? $call['function'] : [];
-                $arguments = (string) ($fn['arguments'] ?? '{}');
-                $mid = (int) max(1, (int) ceil(strlen($arguments) / 2));
-                $callback([
-                    'type' => 'tool_call_delta',
-                    'index' => $index,
-                    'id' => $call['id'] ?? null,
-                    'name' => $fn['name'] ?? null,
-                    'arguments' => substr($arguments, 0, $mid),
-                ]);
-                $callback([
-                    'type' => 'tool_call_delta',
-                    'index' => $index,
-                    'id' => null,
-                    'name' => null,
-                    'arguments' => substr($arguments, $mid),
-                ]);
+        $forwardText = static function (mixed $chunk) use ($callback): void {
+            if (!\is_string($chunk) && !\is_array($chunk)) {
+                return;
             }
-            $callback(['type' => 'finish', 'finish_reason' => 'tool_calls']);
-        } else {
-            $content = is_string($result['content'] ?? null) ? $result['content'] : '';
-            if ('' !== $content) {
-                $callback($content);
+            $text = StreamChunk::visibleText($chunk);
+            if ('' !== $text) {
+                $callback($text);
             }
-            $callback(['type' => 'finish', 'finish_reason' => is_string($result['finish_reason'] ?? null) ? $result['finish_reason'] : 'stop']);
+        };
+
+        if ('none' === ($options['tool_choice'] ?? null)) {
+            $result = $this->aiFacade->chatStream($messages, $forwardText, $user->getId(), $options);
+            $callback(['type' => 'finish', 'finish_reason' => 'stop']);
+
+            return $this->streamMetadata($result, $options, []);
         }
 
+        $clientTools = isset($options['tools']) && is_array($options['tools']) ? $options['tools'] : [];
+        $assistant = $options['runtime_profile'] ?? null;
+        $assistant = $assistant instanceof RuntimeProfile ? $assistant : null;
+        $snapshot = $this->catalog->build($user, $clientTools, $assistant);
+        $merged = $this->mergeTools($snapshot['tools'], $clientTools);
+        if ([] === $merged) {
+            $result = $this->aiFacade->chatStream($messages, $forwardText, $user->getId(), $options);
+            $callback(['type' => 'finish', 'finish_reason' => 'stop']);
+
+            return $this->streamMetadata($result, $options, []);
+        }
+
+        $options['tools'] = $merged;
+        $maxIterations = $this->config->mcpMaxIterations($user->getId());
+        $deadline = microtime(true) + self::WALL_CLOCK_SECONDS;
+        $notes = [];
+        $summedUsage = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
+        $last = [];
+
+        for ($i = 0; $i < $maxIterations; ++$i) {
+            if (microtime(true) > $deadline) {
+                break;
+            }
+
+            $last = $this->aiFacade->chatStream($messages, $forwardText, $user->getId(), $options);
+            $summedUsage = $this->addUsage($summedUsage, is_array($last['usage'] ?? null) ? $last['usage'] : []);
+
+            $toolCalls = $this->normalizeToolCalls($last['tool_calls'] ?? []);
+            $finish = is_string($last['finish_reason'] ?? null) ? $last['finish_reason'] : '';
+            if ('tool_calls' !== $finish && [] === $toolCalls) {
+                $callback(['type' => 'finish', 'finish_reason' => '' !== $finish ? $finish : 'stop']);
+
+                return $this->streamMetadata($last, $options, $notes, $summedUsage);
+            }
+
+            $partition = $this->partition($toolCalls, $snapshot['dispatch']);
+            if ([] !== $partition['client']) {
+                if ([] !== $partition['ours']) {
+                    $executed = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes, $assistant);
+                    unset($executed);
+                }
+                $this->emitClientToolDeltas($partition['client'], $callback);
+                $callback(['type' => 'finish', 'finish_reason' => 'tool_calls']);
+
+                return $this->streamMetadata($last, $options, $notes, $summedUsage);
+            }
+
+            if ([] === $partition['ours']) {
+                $callback(['type' => 'finish', 'finish_reason' => '' !== $finish ? $finish : 'stop']);
+
+                return $this->streamMetadata($last, $options, $notes, $summedUsage);
+            }
+
+            $results = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes, $assistant);
+            $messages = $this->appendToolTurn($messages, $toolCalls, $results);
+        }
+
+        $callback(['type' => 'finish', 'finish_reason' => 'stop']);
+
+        return $this->streamMetadata($last, $options, $notes, $summedUsage);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $toolCalls
+     */
+    private function emitClientToolDeltas(array $toolCalls, callable $callback): void
+    {
+        foreach ($toolCalls as $index => $call) {
+            $fn = is_array($call['function'] ?? null) ? $call['function'] : [];
+            $arguments = (string) ($fn['arguments'] ?? '{}');
+            $mid = (int) max(1, (int) ceil(strlen($arguments) / 2));
+            $callback([
+                'type' => 'tool_call_delta',
+                'index' => $index,
+                'id' => $call['id'] ?? null,
+                'name' => $fn['name'] ?? null,
+                'arguments' => substr($arguments, 0, $mid),
+            ]);
+            $callback([
+                'type' => 'tool_call_delta',
+                'index' => $index,
+                'id' => null,
+                'name' => null,
+                'arguments' => substr($arguments, $mid),
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed>                                                      $result
+     * @param array<string, mixed>                                                      $options
+     * @param list<string>                                                              $notes
+     * @param array{prompt_tokens: int, completion_tokens: int, total_tokens: int}|null $usage
+     *
+     * @return array<string, mixed>
+     */
+    private function streamMetadata(array $result, array $options, array $notes, ?array $usage = null): array
+    {
         return [
             'provider' => $result['provider'] ?? 'unknown',
             'model' => $result['model'] ?? ($options['model'] ?? 'unknown'),
-            'usage' => $result['usage'] ?? [],
-            'loop_notes' => $result['loop_notes'] ?? [],
+            'usage' => $usage ?? (is_array($result['usage'] ?? null) ? $result['usage'] : []),
+            'loop_notes' => $notes,
         ];
     }
 

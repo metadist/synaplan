@@ -3,10 +3,11 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
+use App\Service\Auth\OAuthLoginResponder;
 use App\Service\ModelConfigService;
-use App\Service\OAuthLoginResponder;
-use App\Service\OAuthStateService;
+use App\Service\OAuth\OAuthStateService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -57,7 +58,10 @@ class GoogleAuthController extends AbstractController
         $native = $request->query->getBoolean('native');
 
         // Generate signed state token (no session required)
-        $state = $this->oauthStateService->generateState('google', $native ? ['native' => true] : []);
+        $state = $this->oauthStateService->generateState('google', AccountLanguage::withSignupLanguage(
+            $native ? ['native' => true] : [],
+            $request->query->get('language'),
+        ));
 
         $params = [
             'client_id' => $this->googleClientId,
@@ -147,7 +151,11 @@ class GoogleAuthController extends AbstractController
             ]);
 
             // Find or create user
-            $user = $this->findOrCreateUser($userInfo, $googleRefreshToken);
+            $user = $this->findOrCreateUser(
+                $userInfo,
+                $googleRefreshToken,
+                AccountLanguage::normalize($statePayload['language'] ?? null),
+            );
 
             $this->logger->info('Google OAuth successful', [
                 'user_id' => $user->getId(),
@@ -167,7 +175,7 @@ class GoogleAuthController extends AbstractController
         }
     }
 
-    private function findOrCreateUser(array $userInfo, ?string $refreshToken): User
+    private function findOrCreateUser(array $userInfo, ?string $refreshToken, ?string $signupLanguage = null): User
     {
         $email = $userInfo['email'] ?? null;
         $googleId = $userInfo['id'] ?? null;
@@ -230,6 +238,9 @@ class GoogleAuthController extends AbstractController
         }
 
         $user->setUserDetails($userDetails);
+        if ($isNewUser) {
+            $user->applySignupLanguage($signupLanguage);
+        }
 
         if (!$user->isEmailVerified() && ($userInfo['verified_email'] ?? false)) {
             $user->setEmailVerified(true);

@@ -26,7 +26,7 @@ Unknown JSON fields are rejected (`json.Decoder.DisallowUnknownFields`). `image`
 | `payload_too_large` | 413 | Body larger than `COMPUTE_MAX_REQUEST_BYTES` (`Content-Length` or streamed) |
 | `invalid_workspace` | 400 | `workspace.kind` is not `run` / `user` |
 | `workspace_not_found` · `workspace_not_owned` · `workspace_quota_exceeded` | 404 · 403 · 409 | User workspace checks |
-| `egress_not_allowed` | 400 | **Any** non-empty `egress.allow`. Egress is not implemented in A0–A2; every run is `NetworkMode=none`. |
+| `egress_not_allowed` | 400 | Non-empty `egress.allow` while disabled, or an entry failing the pin policy (unpinned IPs, private range, over `COMPUTE_EGRESS_MAX_HOSTS`). Enabled + policy-clean lists get a per-run proxy. |
 | `capacity_exceeded` | 429 | `running + queued >= COMPUTE_MAX_CONCURRENT + COMPUTE_QUEUE_MAX`; `Retry-After: 5` |
 | `run_not_found` · `artefact_not_found` | 404 | Unknown run, unknown / symlinked artefact, or a run whose scratch was deleted or pruned |
 | `mime_not_allowed` | 403 | Download of an artefact or workspace file whose MIME is not on `COMPUTE_ARTEFACT_MIME_ALLOW` |
@@ -35,7 +35,7 @@ Unknown JSON fields are rejected (`json.Decoder.DisallowUnknownFields`). `image`
 
 ## `GET /v1/health` (unauthenticated)
 
-See `tests/fixtures/compute-contract/health.json`. Fields: `protocol`, `tier`, `images`, `capacity`, `caps`, `features`. `features.egress` is always `false` in A0–A2.
+See `tests/fixtures/compute-contract/health.json`. Fields: `protocol`, `tier`, `images`, `capacity`, `caps`, `features`. `features.egress` follows `COMPUTE_EGRESS_ENABLED`.
 
 ## `POST /v1/runs`
 

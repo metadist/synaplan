@@ -37,7 +37,9 @@ final class ReapStuckChatCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $lock = $this->lockFactory->createLock('chat-stuck-reaper', 120);
+        // Outlasts the scheduler's 300 s cap plus its 30 s kill grace, so runs on two
+        // nodes never overlap.
+        $lock = $this->lockFactory->createLock('chat-stuck-reaper', 600);
         if (!$lock->acquire()) {
             $io->note('Previous stuck-chat reaper run is still active. Skipping.');
 

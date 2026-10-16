@@ -82,6 +82,22 @@ final readonly class GeneratedDocumentStore
             $fileData['export'] = 'pdf';
         }
 
+        // A format named in the request wins over the envelope extension
+        // ("als Excel" must not come back as .csv, #2051) — but only within
+        // the spreadsheet family, where the CSV payload the model produced
+        // renders into either container. Anything else stays as generated.
+        $requestedFormat = FileGenerationEnvelope::requestedFormat((string) $message->getText());
+        if (null !== $requestedFormat && $this->isSafeFormatOverride($extension, $requestedFormat)) {
+            $this->logger->info('GeneratedDocumentStore: honoring named format over envelope extension', [
+                'filename' => $filename,
+                'envelope_extension' => $extension,
+                'requested_format' => $requestedFormat,
+            ]);
+            $extension = $requestedFormat;
+            $fileData['extension'] = $requestedFormat;
+            $filename = pathinfo($filename, PATHINFO_FILENAME).'.'.$requestedFormat;
+        }
+
         try {
             if ('pptx' === strtolower($extension)) {
                 $content = PptxRequestDirectiveResolver::apply($content, (string) $message->getText());
@@ -113,6 +129,20 @@ final readonly class GeneratedDocumentStore
 
             return null;
         }
+    }
+
+    /**
+     * Whether the envelope extension may be replaced with the requested
+     * format. Only renames within the spreadsheet family, where the payload
+     * the model produced (CSV text) renders into either container.
+     */
+    private function isSafeFormatOverride(string $envelopeExtension, string $requestedFormat): bool
+    {
+        $family = ['csv', 'xls', 'xlsx'];
+
+        return in_array(strtolower($envelopeExtension), $family, true)
+            && in_array($requestedFormat, $family, true)
+            && strtolower($envelopeExtension) !== $requestedFormat;
     }
 
     /**

@@ -29,7 +29,7 @@
         <button
           v-if="canContinue"
           type="button"
-          class="btn-primary mt-2 px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center"
+          class="btn-primary mt-2 px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center"
           data-testid="btn-continue-as-copy"
           @click="$emit('continue')"
         >

@@ -60,7 +60,7 @@
           <p class="txt-secondary mb-6">Your email has been successfully verified.</p>
           <router-link
             to="/login"
-            class="btn-primary px-6 py-3 rounded-lg inline-block"
+            class="btn-primary px-6 py-3 rounded-xl inline-block"
             data-testid="link-success-login"
           >
             Go to Login
@@ -84,7 +84,7 @@
           <p class="txt-secondary mb-6">{{ error || 'Invalid or expired verification token.' }}</p>
           <router-link
             to="/login"
-            class="btn-secondary px-6 py-3 rounded-lg inline-block"
+            class="btn-secondary px-6 py-3 rounded-xl inline-block"
             data-testid="link-error-login"
           >
             Back to Login

@@ -32,7 +32,12 @@ final class ModuleDescriptorContractTest extends TestCase
         'stripe_billing',
         'mobile_iap',
         'whatsapp',
+        'telegram',
+        'federation',
         'compute',
+        'opendesk_stt',
+        'live_voice',
+        'chat_artifacts',
     ];
 
     public function testTheDescriptorSetIsExactlyThePlan(): void

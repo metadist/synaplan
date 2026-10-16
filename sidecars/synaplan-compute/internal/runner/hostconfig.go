@@ -29,8 +29,9 @@ const (
 )
 
 // Spec is the only input Hardened accepts. Docker.Create is the only caller
-// that turns this into a container. There is no network field on purpose:
-// every run is NetworkMode none until an egress proxy exists.
+// that turns this into a container. Egress is nil for offline runs; when set
+// the container joins that private network with proxy env and dead DNS (see
+// EgressNet). There is deliberately no way to name any other network.
 type Spec struct {
 	ImageRef      string
 	Cmd           []string
@@ -41,6 +42,15 @@ type Spec struct {
 	Runtime       string
 	User          string
 	Labels        map[string]string
+	Egress        *EgressAttachment
+}
+
+// EgressAttachment carries a provisioned EgressNet into the run container.
+type EgressAttachment struct {
+	// Network is the per-run internal network name (EgressNetworkName).
+	Network string
+	// ProxyURL is the http://IP:port of the run's proxy (IP literal: no DNS).
+	ProxyURL string
 }
 
 // Policy bounds where bind-mount sources may come from. Empty roots refuse
@@ -91,6 +101,16 @@ func Hardened(spec Spec) (container.Config, container.HostConfig) {
 		Labels:     labels,
 	}
 
+	networkMode := networkNone
+	var dns []string
+	if spec.Egress != nil {
+		networkMode = spec.Egress.Network
+		cfg.Env = ProxyEnv(spec.Egress.ProxyURL)
+		// Dead resolver: the run container must not resolve anything
+		// itself — the proxy dials pinned IPs. Invalidates DNS exfil.
+		dns = []string{"127.0.0.1"}
+	}
+
 	mounts := []mount.Mount{
 		bind(spec.WorkHost, workDir),
 		bind(spec.OutHost, outDir),
@@ -100,7 +120,8 @@ func Hardened(spec Spec) (container.Config, container.HostConfig) {
 	}
 
 	hc := container.HostConfig{
-		NetworkMode:    networkNone,
+		NetworkMode:    container.NetworkMode(networkMode),
+		DNS:            dns,
 		ReadonlyRootfs: true,
 		Tmpfs: map[string]string{
 			"/tmp": tmpfsOpts,
@@ -160,8 +181,8 @@ func ValidateHardened(cfg container.Config, hc container.HostConfig, p Policy) e
 	if !hc.ReadonlyRootfs {
 		return fmt.Errorf("ReadonlyRootfs must be true")
 	}
-	if len(cfg.Env) != 0 {
-		return fmt.Errorf("Env must be empty (no proxy variables)")
+	if len(cfg.Env) != 0 && string(hc.NetworkMode) == networkNone {
+		return fmt.Errorf("Env must be empty without an egress network (no proxy variables)")
 	}
 	if hc.Privileged {
 		return fmt.Errorf("Privileged must never be set")
@@ -169,8 +190,8 @@ func ValidateHardened(cfg container.Config, hc container.HostConfig, p Policy) e
 	if hc.Init == nil || !*hc.Init {
 		return fmt.Errorf("Init must be true")
 	}
-	if string(hc.NetworkMode) != networkNone {
-		return fmt.Errorf("NetworkMode must be none, got %q", hc.NetworkMode)
+	if err := validateNetworkMode(cfg, hc); err != nil {
+		return err
 	}
 	if hc.PidMode != "" || hc.IpcMode != "" || hc.UTSMode != "" || hc.UsernsMode != "" || hc.CgroupnsMode != "" {
 		return fmt.Errorf("pid/ipc/uts/userns/cgroupns modes must be default")
@@ -219,6 +240,69 @@ func ValidateHardened(cfg container.Config, hc container.HostConfig, p Policy) e
 		return fmt.Errorf("legacy Binds/VolumesFrom must be empty; use Mounts")
 	}
 	return validateMounts(hc.Mounts, p)
+}
+
+// validateNetworkMode allows exactly two shapes: fully offline (none, no
+// env, no DNS override), or a per-run egress network with dead DNS and
+// exactly the three proxy variables pointing at an http:// URL.
+func validateNetworkMode(cfg container.Config, hc container.HostConfig) error {
+	mode := string(hc.NetworkMode)
+	if mode == networkNone {
+		if len(hc.DNS) != 0 {
+			return fmt.Errorf("Dns must be empty without an egress network")
+		}
+		return nil
+	}
+	if !isEgressNetworkName(mode) {
+		return fmt.Errorf("NetworkMode must be none or a per-run egress network, got %q", mode)
+	}
+	if len(hc.DNS) != 1 || hc.DNS[0] != "127.0.0.1" {
+		return fmt.Errorf("egress Dns must be exactly [127.0.0.1]")
+	}
+	want := map[string]bool{"HTTP_PROXY=": false, "HTTPS_PROXY=": false, "NO_PROXY=": false}
+	if len(cfg.Env) != len(want) {
+		return fmt.Errorf("egress Env must be exactly HTTP_PROXY, HTTPS_PROXY, NO_PROXY")
+	}
+	for _, kv := range cfg.Env {
+		matched := false
+		for prefix := range want {
+			if !strings.HasPrefix(kv, prefix) {
+				continue
+			}
+			if want[prefix] {
+				return fmt.Errorf("egress Env has duplicate %s", prefix)
+			}
+			want[prefix] = true
+			matched = true
+			value := kv[len(prefix):]
+			if prefix == "NO_PROXY=" {
+				if value != "localhost,127.0.0.1" {
+					return fmt.Errorf("egress NO_PROXY must be localhost,127.0.0.1")
+				}
+				continue
+			}
+			if !strings.HasPrefix(value, "http://") || strings.ContainsAny(value, " \t\r\n") {
+				return fmt.Errorf("egress %s must be an http:// URL", prefix)
+			}
+		}
+		if !matched {
+			return fmt.Errorf("egress Env has unexpected variable %q", kv)
+		}
+	}
+	return nil
+}
+
+func isEgressNetworkName(mode string) bool {
+	rest, ok := strings.CutPrefix(mode, egressNetworkPrefix)
+	if !ok || rest == "" {
+		return false
+	}
+	for _, r := range rest {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+			return false
+		}
+	}
+	return true
 }
 
 func validateUser(user string) error {

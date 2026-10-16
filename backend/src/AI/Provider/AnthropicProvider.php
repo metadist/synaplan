@@ -41,10 +41,11 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * declared tools are dropped
  * ({@see ToolCallingCapability::conflictsWithStructuredOutput()}).
  *
- * Note on Claude Fable 5.1 / Claude Mythos 5.1: those models reject forced
- * tool_choice ({"type": "any"} or {"type": "tool", "name": ...}) with a 400
- * invalid_request_error — only "auto" (default) and "none" are accepted.
- * That rules out the structured-output dialect for them, so
+ * Note on Claude Fable 5.1 / Claude Mythos 5.1 / Claude Opus 5.5 / Claude
+ * Sonnet 5.5: those models reject forced tool_choice ({"type": "any"} or
+ * {"type": "tool", "name": ...}) with a 400 invalid_request_error — only
+ * "auto" (default) and "none" are accepted. That rules out the
+ * structured-output dialect for them, so
  * {@see StructuredOutputCapability} reports it as unsupported and callers
  * fall back to the prose-instruction path. Ordinary tool declarations are
  * unaffected: they send tool_choice `auto`. For `required` / named tools
@@ -74,11 +75,64 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-4-8',
         'claude-sonnet-4-6',
         'claude-opus-5',
+        'claude-opus-5-5',
         'claude-sonnet-5',
         'claude-haiku-4-5',
         'claude-fable-5',
         'claude-fable-5-1',
     ];
+
+    /**
+     * Models that reject `thinking.type: disabled` and still think when the
+     * field is omitted. Reasoning off sends `output_config.effort: low`.
+     *
+     * Measured on Claude Opus 5.5. Opus 5 and Fable 5.1 are omitted until the
+     * same rejection is confirmed. Claude Sonnet 5.5 is listed separately
+     * ({@see self::BETWEEN_TOOLS_MODELS}): omitting the field turns adaptive
+     * thinking on, and `disabled` is a 400.
+     */
+    private const ALWAYS_ON_THINKING_MODELS = [
+        'claude-opus-5-5',
+    ];
+
+    /**
+     * Models whose lowest thinking setting is `thinking.type: between_tools`.
+     *
+     * Omitting the field runs adaptive thinking. `disabled` and a `display`
+     * field next to `between_tools` are both 400. `between_tools` is accepted
+     * only at low, medium, and high effort; xhigh and max require adaptive
+     * thinking.
+     *
+     * Longer prefixes must be listed before shorter ones. `claude-sonnet-5`
+     * is a prefix of `claude-sonnet-5-5`, so this list is matched on its own
+     * and never via the Sonnet 5 entries above.
+     */
+    private const BETWEEN_TOOLS_MODELS = [
+        'claude-sonnet-5-5',
+    ];
+
+    /**
+     * Models whose thinking `display` defaults to `omitted`, so the text
+     * between tool calls arrives as an empty thinking block.
+     *
+     * Longer prefixes must be listed before shorter ones (`claude-opus-5-5`
+     * before `claude-opus-5`) because matching is prefix-based.
+     */
+    private const OMITTED_THINKING_DISPLAY_MODELS = [
+        'claude-opus-4-8',
+        'claude-opus-4-7',
+        'claude-opus-5-5',
+        'claude-opus-5',
+        'claude-sonnet-5',
+        'claude-fable-5-1',
+        'claude-fable-5',
+    ];
+
+    /**
+     * Beta that lets `thinking.display: updates` return the short progress
+     * line these models write between tool calls, without the full summary.
+     */
+    private const THINKING_DISPLAY_UPDATES_BETA = 'thinking-display-updates-2026-08-18';
 
     /** Models that require adaptive thinking format instead of manual budget_tokens. */
     private const ADAPTIVE_THINKING_MODELS = [
@@ -87,6 +141,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-4-8',
         'claude-sonnet-4-6',
         'claude-opus-5',
+        'claude-opus-5-5',
         'claude-sonnet-5',
         'claude-fable-5',
         'claude-fable-5-1',
@@ -103,6 +158,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-4-7',
         'claude-opus-4-8',
         'claude-opus-5',
+        'claude-opus-5-5',
         'claude-sonnet-5',
         'claude-fable-5',
         'claude-fable-5-1',
@@ -297,6 +353,10 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
 
             $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
+            $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyChosenEffort($requestBody, $model, $options);
+            $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyBetweenToolsThinking($requestBody, $model, $thinkingEnabled);
 
             $this->logger->info('Anthropic: Chat request', [
                 'model' => $model,
@@ -306,7 +366,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             ]);
 
             $response = $this->httpClient->request('POST', self::BASE_URL.'/messages', [
-                'headers' => $this->getHeaders(),
+                'headers' => $this->requestHeaders($requestBody, false),
                 'json' => $requestBody,
                 'timeout' => $this->timeout,
             ]);
@@ -474,6 +534,10 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
 
             $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
+            $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyChosenEffort($requestBody, $model, $options);
+            $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyBetweenToolsThinking($requestBody, $model, $thinkingEnabled);
 
             // Only accumulate when the request really declares tools. A forced
             // schema tool also streams its `input` as `input_json_delta`, but
@@ -491,9 +555,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             ]);
 
             $response = $this->httpClient->request('POST', self::BASE_URL.'/messages', [
-                'headers' => array_merge($this->getHeaders(), [
-                    'Accept' => 'text/event-stream',
-                ]),
+                'headers' => $this->requestHeaders($requestBody, true),
                 'json' => $requestBody,
                 'timeout' => $this->timeout,
                 'buffer' => false, // Don't buffer the response
@@ -729,6 +791,26 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         ];
     }
 
+    /**
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, string>
+     */
+    private function requestHeaders(array $requestBody, bool $stream): array
+    {
+        $headers = $this->getHeaders();
+        if ($stream) {
+            $headers['Accept'] = 'text/event-stream';
+        }
+
+        $thinking = $requestBody['thinking'] ?? null;
+        if (\is_array($thinking) && 'updates' === ($thinking['display'] ?? null)) {
+            $headers['anthropic-beta'] = self::THINKING_DISPLAY_UPDATES_BETA;
+        }
+
+        return $headers;
+    }
+
     private function supportsThinking(string $model): bool
     {
         foreach (self::THINKING_MODELS as $thinkingModel) {
@@ -793,11 +875,250 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     {
         foreach (self::ADAPTIVE_THINKING_MODELS as $adaptiveModel) {
             if (str_starts_with($model, $adaptiveModel)) {
-                return ['type' => 'adaptive'];
+                $config = ['type' => 'adaptive'];
+                if ($this->thinkingDisplayDefaultsToOmitted($model)) {
+                    // Without this the model still thinks, but the summary —
+                    // including the line it writes between tool calls — is empty.
+                    $config['display'] = 'summarized';
+                }
+
+                return $config;
             }
         }
 
         return ['type' => 'enabled', 'budget_tokens' => 5000];
+    }
+
+    /**
+     * Keep the short progress line visible when thinking cannot be turned off.
+     *
+     * These models write that line into a thinking block. The default display
+     * omits the text, so the chat shows nothing between tool calls. `updates`
+     * returns only that line, not the full reasoning summary the person turned off.
+     *
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function applyProgressThinkingDisplay(array $requestBody, string $model, bool $thinkingEnabled): array
+    {
+        if ($thinkingEnabled || !$this->thinkingCannotBeDisabled($model)) {
+            return $requestBody;
+        }
+
+        if (!$this->thinkingDisplayDefaultsToOmitted($model)) {
+            return $requestBody;
+        }
+
+        $requestBody['thinking'] = [
+            'type' => 'adaptive',
+            'display' => 'updates',
+        ];
+
+        $this->logger->info('Anthropic: progress text requested while reasoning is off', [
+            'model' => $model,
+        ]);
+
+        return $requestBody;
+    }
+
+    private function thinkingDisplayDefaultsToOmitted(string $model): bool
+    {
+        foreach (self::OMITTED_THINKING_DISPLAY_MODELS as $omittedModel) {
+            if (str_starts_with($model, $omittedModel)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Keep thinking at the minimum the model allows when the user turned reasoning off.
+     *
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function applyMinimumThinkingEffort(array $requestBody, string $model, bool $thinkingEnabled): array
+    {
+        if ($thinkingEnabled || !$this->thinkingCannotBeDisabled($model)) {
+            return $requestBody;
+        }
+
+        $outputConfig = $requestBody['output_config'] ?? [];
+        if (!\is_array($outputConfig)) {
+            $outputConfig = [];
+        }
+        if (!isset($outputConfig['effort'])) {
+            $outputConfig['effort'] = 'low';
+        }
+        $requestBody['output_config'] = $outputConfig;
+
+        $this->logger->info('Anthropic: reasoning off uses minimum effort', [
+            'model' => $model,
+            'effort' => $outputConfig['effort'],
+        ]);
+
+        return $requestBody;
+    }
+
+    /**
+     * Send a chosen reasoning level as output_config.effort.
+     *
+     * Absent when the caller did not pick a level, so reasoning-on stays
+     * adaptive with no forced effort. xhigh and max clamp to high — Claude
+     * rejects those names — except on models that accept the extended ladder
+     * ({@see self::BETWEEN_TOOLS_MODELS}). Medium and high turn thinking on
+     * when the model supports it; low stays a real (cheapest) level and does
+     * not force it.
+     *
+     * @param array<string, mixed> $requestBody
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function applyChosenEffort(array $requestBody, string $model, array $options): array
+    {
+        if (!$this->usesAdaptiveThinking($model)) {
+            return $requestBody;
+        }
+
+        $requested = $options['reasoning_effort'] ?? null;
+        if (!is_string($requested) || '' === $requested) {
+            return $requestBody;
+        }
+
+        $effort = $this->normalizeEffort($model, strtolower($requested));
+        if (null === $effort) {
+            return $requestBody;
+        }
+
+        $outputConfig = $requestBody['output_config'] ?? [];
+        if (!\is_array($outputConfig)) {
+            $outputConfig = [];
+        }
+        $outputConfig['effort'] = $effort;
+        $requestBody['output_config'] = $outputConfig;
+
+        if (\in_array($effort, ['medium', 'high'], true) && $this->supportsThinking($model) && !isset($requestBody['thinking'])) {
+            $requestBody['thinking'] = $this->buildThinkingConfig($model);
+        }
+
+        if (isset($requestBody['thinking'])) {
+            unset($requestBody['temperature']);
+        }
+
+        return $requestBody;
+    }
+
+    /**
+     * Lowest thinking setting on models that reject `thinking.type: disabled`.
+     *
+     * Reasoning off sends `between_tools` and, when the caller picked no
+     * level, effort `low`. `display` is omitted: the API rejects it next to
+     * `between_tools`. xhigh and max are not valid with `between_tools`, so
+     * those stay on adaptive thinking.
+     *
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function applyBetweenToolsThinking(array $requestBody, string $model, bool $thinkingEnabled): array
+    {
+        if ($thinkingEnabled || !$this->usesBetweenToolsThinking($model)) {
+            return $requestBody;
+        }
+
+        $outputConfig = $requestBody['output_config'] ?? [];
+        if (!\is_array($outputConfig)) {
+            $outputConfig = [];
+        }
+
+        $effort = isset($outputConfig['effort']) && \is_string($outputConfig['effort'])
+            ? strtolower($outputConfig['effort'])
+            : null;
+
+        if (\in_array($effort, ['xhigh', 'max'], true)) {
+            $requestBody['thinking'] = $this->buildThinkingConfig($model);
+            unset($requestBody['temperature']);
+
+            $this->logger->info('Anthropic: extended effort keeps adaptive thinking', [
+                'model' => $model,
+                'effort' => $effort,
+            ]);
+
+            return $requestBody;
+        }
+
+        if (null === $effort) {
+            $outputConfig['effort'] = 'low';
+            $requestBody['output_config'] = $outputConfig;
+        }
+
+        $requestBody['thinking'] = ['type' => 'between_tools'];
+        unset($requestBody['temperature']);
+
+        $this->logger->info('Anthropic: reasoning off uses between_tools', [
+            'model' => $model,
+            'effort' => $requestBody['output_config']['effort'] ?? null,
+        ]);
+
+        return $requestBody;
+    }
+
+    /**
+     * xhigh and max pass through only on the extended ladder. Every other
+     * adaptive model still clamps them to high.
+     */
+    private function normalizeEffort(string $model, string $requested): ?string
+    {
+        if ($this->usesBetweenToolsThinking($model)) {
+            return match ($requested) {
+                'low', 'medium', 'high', 'xhigh', 'max' => $requested,
+                default => null,
+            };
+        }
+
+        return match ($requested) {
+            'low' => 'low',
+            'medium' => 'medium',
+            'high', 'xhigh', 'max' => 'high',
+            default => null,
+        };
+    }
+
+    private function usesAdaptiveThinking(string $model): bool
+    {
+        foreach (self::ADAPTIVE_THINKING_MODELS as $adaptiveModel) {
+            if (str_starts_with($model, $adaptiveModel)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function thinkingCannotBeDisabled(string $model): bool
+    {
+        foreach (self::ALWAYS_ON_THINKING_MODELS as $alwaysOn) {
+            if (str_starts_with($model, $alwaysOn)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function usesBetweenToolsThinking(string $model): bool
+    {
+        foreach (self::BETWEEN_TOOLS_MODELS as $betweenToolsModel) {
+            if (str_starts_with($model, $betweenToolsModel)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

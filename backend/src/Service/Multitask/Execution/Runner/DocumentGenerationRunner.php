@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\Message;
+use App\Service\Agent\Policy\AssistantPlanLimits;
 use App\Service\File\DocumentImageCatalog;
+use App\Service\File\FileGenerationEnvelope;
+use App\Service\File\UnreadSourceGuard;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -13,6 +16,7 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Runtime\RuntimeProfile;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -37,6 +41,7 @@ final readonly class DocumentGenerationRunner implements TaskRunner
     public function __construct(
         private ChatHandler $handler,
         private LoggerInterface $logger,
+        private UnreadSourceGuard $unreadSourceGuard,
     ) {
     }
 
@@ -51,7 +56,7 @@ final readonly class DocumentGenerationRunner implements TaskRunner
     public function describe(): array
     {
         return [
-            new SkillDescriptor(Capability::DocumentGeneration, 'Generate an Office document (CSV/XLSX/DOCX/PPTX). Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").'),
+            new SkillDescriptor(Capability::DocumentGeneration, 'Generate a file the user asked to receive (CSV/XLSX/DOCX/PPTX/TXT/MD), including "save it into a text file". Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").'),
         ];
     }
 
@@ -63,9 +68,33 @@ final readonly class DocumentGenerationRunner implements TaskRunner
             return NodeResult::failed('no prompt for document_generation');
         }
 
+        // A format named in the ORIGINAL request ("als Excel") wins even when
+        // the planner's prompt no longer mentions it. Appending the directive
+        // keeps the envelope consistent; GeneratedDocumentStore enforces the
+        // same rule deterministically as a backstop (#2051).
+        $namedFormat = FileGenerationEnvelope::requestedFormat((string) $context->message->getText());
+        if (null !== $namedFormat) {
+            $prompt .= "\n\nThe file MUST be a .{$namedFormat} file (the user explicitly asked for this format).";
+        }
+        $prompt = $this->withAssistantInstructions($prompt, $context);
+
         $language = is_string($context->classification['language'] ?? null)
             ? $context->classification['language']
             : ($context->message->getLanguage() ?: 'en');
+
+        $refusal = $this->unreadSourceGuard->refusalFor(
+            (string) $context->message->getText(),
+            $context->classification['url_pages_read'] ?? null,
+            $language,
+        );
+        if (null !== $refusal) {
+            return NodeResult::ok($refusal, [], [
+                'document_generation' => [
+                    'created' => false,
+                    'reason' => 'source_unread',
+                ],
+            ]);
+        }
 
         $synthetic = $this->syntheticMessage($context, $prompt, $language);
 
@@ -224,6 +253,21 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         }
 
         return ltrim($relative, '/');
+    }
+
+    /**
+     * Keep the officemaker envelope contract, and still hand the assistant's
+     * template to the model that writes the file body.
+     */
+    private function withAssistantInstructions(string $prompt, NodeContext $context): string
+    {
+        $profile = $context->options['runtime_profile'] ?? $context->classification['runtime_profile'] ?? null;
+        $instructions = AssistantPlanLimits::instructions($profile instanceof RuntimeProfile ? $profile : null);
+        if (null === $instructions) {
+            return $prompt;
+        }
+
+        return $prompt."\n\nFollow these assistant instructions for the file content. Still answer with the file envelope only.\n".$instructions;
     }
 
     private function syntheticMessage(NodeContext $context, string $prompt, string $language): Message

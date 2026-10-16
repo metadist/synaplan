@@ -1,0 +1,5 @@
+image_generated: "İstediğiniz görsel burada."
+video_generated: "İstediğiniz video burada."
+audio_generated: "İstediğiniz ses burada."
+file_generated: "'{filename}' dosyasını sizin için oluşturdum. Şimdi indirebilirsiniz."
+file_generation_failed: "Dosya oluşturulamadı. Lütfen tekrar deneyin."

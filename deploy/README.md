@@ -11,13 +11,36 @@ other development services.
 - Optional `local-ai` profile: at least 16 GB RAM and substantially more disk
 - Optional `office` profile (Collabora CODE sidecar): about +2 GB RAM; off by
   default so the 8 GB Cloud-AI floor stays valid
-- A reverse proxy terminating HTTPS in front of `127.0.0.1:8000`
+- HTTPS for anyone off this machine: your own reverse proxy, or the opt-in
+  [local network](#local-network) certificate when the network has no public route
 
 All database, cache, vector, upload, model, and backup data lives below
 `deploy/data/`. Back up that directory only through the lifecycle hooks so the
 database and vector snapshots are consistent.
 
 ## First installation
+
+The shortest start is [`quickstart/compose.yaml`](quickstart/compose.yaml): one
+file, no git checkout, no `.env` required, and it pastes as-is into a Docker GUI
+such as Portainer or Dockge. Everything has a default, the secrets are generated
+on the first start, and all data lives in named volumes. Exact commands: root
+README "Published image, no git checkout"; backup and rollback:
+[Quickstart volumes](../docs/UPDATE_SELFHOST.md#quickstart-volumes).
+
+This directory's `compose.yaml` is the full contract: optional profiles
+(office, local AI, file work), the closed-network TLS proxy, `./data` bind
+mounts, and the lifecycle scripts. Copied with `selfhost.env.example` (as
+`.env`) into an empty directory, it starts with `docker compose up -d` as well;
+keep `SYNAPLAN_VERSION` on a release tag and leave the eight secrets commented
+out. The first start generates them into `data/secrets.env` and refuses a
+`replace-with-*` example value without creating anything. Back
+`data/secrets.env` up with the database. Open `http://127.0.0.1:8000` unless
+`SYNAPLAN_HTTP_BIND` or `SYNAPLAN_HTTP_PORT` changed. On macOS and Windows,
+keep that directory on a Linux filesystem or use the quickstart: MariaDB
+cannot run its migrations on a case-insensitive bind mount. The steps below are
+the same contract from a clone of this repository, plus prepare, validate, and
+smoke-test. `prepare.sh` writes `data/secrets.env`
+first; the one-shot in `compose.yaml` then only copies that file.
 
 ```bash
 cp deploy/selfhost.env.example deploy/.env
@@ -56,6 +79,18 @@ calls `ensure_deployment_secrets`, which resolves each of them once:
   `MARIADB_PASSWORD` would lock the application out of its own data permanently.
   Restore the variable in your configuration, or write the known value into
   `deploy/data/secrets.env`.
+
+A plain `docker compose up` runs the same rules in the `secrets-init` one-shot,
+without `prepare.sh`. An existing `data/secrets.env` is never rewritten. Every
+secret must already be in that file; a value set only in `.env` is not used
+once the file exists. A missing value is generated only while the file does
+not exist yet and `data/mariadb` is still empty. A `replace-with-*` example
+value stops the start before anything is created. The application, the
+database, and the realtime service each receive only the secrets they use.
+The web container does not receive the database root password or the realtime
+admin password. The application reads `DB_PASSWORD`, so its start command
+copies `MARIADB_PASSWORD` onto `DB_PASSWORD` before the entrypoint builds the
+database URL.
 
 Because the file is authoritative and is exported before Compose runs, editing
 one of these eight variables in `deploy/.env` no longer changes the running
@@ -167,9 +202,30 @@ stays in the app (login + file ownership). `OFFICE_CONVERT_URL=disabled` turns
 the engine off. Details:
 [Office documents](https://docs.synaplan.com/index.php/office-documents).
 
+## File work (secure compute)
+
+Spoken answers start with the stack. File work stays a one-line profile
+because it mounts the host Docker socket:
+
+```dotenv
+COMPOSE_PROFILES=compute
+```
+
+`prepare.sh` writes the token to `data/compute.token` (and creates the
+scratch dirs) when `COMPOSE_PROFILES` includes `compute`, including when
+that line exists only in this env file. It does not print the token and
+does not write it back into `.env`. Re-running the deploy keeps the same
+token. That generated value is the production token. Do not copy the local
+demo token from
+`docker-compose.yml` (`synaplan-dev-compute-token-change-me-32b`); that
+default exists so a developer clone starts without a new secret. Combine
+profiles with a comma (`local-ai,office,compute`). Never publish port
+`8080`. A multi-node cluster must use a separate gVisor box — never T1 on
+the web nodes. Details: [docs/COMPUTE.md](../docs/COMPUTE.md).
+
 ## Network and persistence
 
-Only the web service binds a host port. MariaDB, Redis, Centrifugo, Tika, Qdrant,
+By default only the web service binds a host port. The opt-in `local-tls` profile also publishes 443 and 80. MariaDB, Redis, Centrifugo, Tika, Qdrant,
 Ollama, Whisper, and Collabora (when the `office` profile is on) remain on the Compose network. The default bind is
 `127.0.0.1:8000`. A managed platform whose HTTPS proxy runs in its own container
 cannot reach that address and needs `SYNAPLAN_HTTP_BIND` set to the host
@@ -178,6 +234,25 @@ interface the proxy connects to — the Docker bridge gateway, usually
 publishes ports through its own iptables rules, which a host firewall such as
 ufw does not close, so the app would be reachable as plain HTTP from the
 internet and the HTTPS proxy could be bypassed.
+
+## Local network
+
+Opt-in. Off until `deploy/scripts/local-tls.sh` runs.
+
+Use it on a network with no route to the public internet, when people open the app by the machine's address. Any IPv4 address on that network is accepted: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10`, `169.254.0.0/16`, and any other block you assigned and do not announce.
+
+```bash
+deploy/scripts/local-tls.sh 10.0.0.15
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+The command writes `deploy/data/tls/` (`key.pem` mode `0600`), adds `local-tls` to `COMPOSE_PROFILES`, and sets `APP_URL`, `FRONTEND_URL` and `REALTIME_ALLOWED_ORIGINS` to `https://10.0.0.15`. Colleagues open that URL. The browser warns once. Ports 80 and 443 must be free. `SYNAPLAN_HTTP_BIND` stays `127.0.0.1`.
+
+A further address on another interface is another argument (`deploy/scripts/local-tls.sh 10.0.0.15 192.168.1.20`). Back up `data/tls` with the rest of `deploy/data`. Creating the certificate again makes every browser warn again.
+
+A public name keeps your own HTTPS proxy. Leave `local-tls` out of `COMPOSE_PROFILES` for that install.
+
+Walkthrough: [Local network](https://docs.synaplan.com/local-network).
 
 Persistent paths:
 
@@ -189,6 +264,8 @@ Persistent paths:
 - `data/backups`: restricted MariaDB dumps and Qdrant collection snapshots
 - `data/secrets.env`: the deployment's generated secrets, mode `0600` — required
   to open the restored database, so it must be in every backup
+- `data/tls`: the opt-in local-network certificate and its private key. Back it
+  up with the rest of `data/` so browsers keep the exception they already stored
 
 `deploy/data/` must never be committed.
 

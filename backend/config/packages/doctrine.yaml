@@ -10,10 +10,13 @@ parameters:
     #     created by Version20260607010000 and written via plain DBAL inserts
     #     (see App\Service\Multitask\TaskPlanStore) — deliberately no Doctrine
     #     entity, so without this filter schema:validate proposes DROPping it.
+    #   - `BSEARCHINDEX` is the Smart Search keyword + vector index, created by
+    #     Version20260930100000 and written via DBAL
+    #     (see App\Repository\SearchIndexRepository).
     # The filter is a regex applied to table names by DBAL's comparator — migrations
     # still run normally because they use raw `addSql(...)`, not schema diff. Keep
     # the negative-lookahead list in sync across ADD events.
-    app.doctrine.schema_filter: '~^(?!(messenger_messages|BMESSAGE_TASKS)$).*$~'
+    app.doctrine.schema_filter: '~^(?!(messenger_messages|BMESSAGE_TASKS|BSEARCHINDEX)$).*$~'
 
 doctrine:
     dbal:

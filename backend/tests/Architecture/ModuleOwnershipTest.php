@@ -47,7 +47,12 @@ final class ModuleOwnershipTest extends TestCase
         'stripe_billing',
         'mobile_iap',
         'whatsapp',
+        'telegram',
+        'federation',
         'compute',
+        'opendesk_stt',
+        'live_voice',
+        'chat_artifacts',
     ];
 
     /**
@@ -87,8 +92,10 @@ final class ModuleOwnershipTest extends TestCase
             'A2AGENT_API_KEY',
             'HUGGINGFACE_API_KEY',
             'XAI_API_KEY',
+            'META_API_KEY',
+            'CEREBRAS_API_KEY',
             'PERPLEXITY_API_KEY',
-            // Speech provider key managed by ProviderKeyStore (Models & keys);
+            // Speech provider key managed by ProviderKeyStore (Providers & keys);
             // no module of its own until an ElevenLabs TTS provider ships.
             'ELEVENLABS_API_KEY',
             'CLOUDFLARE_ACCOUNT_ID',
@@ -129,7 +136,14 @@ final class ModuleOwnershipTest extends TestCase
             'OIDC_ADMIN_ROLES',
             'OIDC_ROLE_CLAIMS',
             'OIDC_SCOPES',
+            'OIDC_PROVIDER_LABEL',
             'OIDC_AUTO_REDIRECT',
+            'OIDC_ORG_CODE',
+            'OIDC_ORG_CLAIM',
+            'OIDC_REQUIRED_ROLE',
+            'OIDC_REQUIRED_PERMISSIONS',
+            'OIDC_PERMISSIONS_CLAIM',
+            'OIDC_ALLOW_USER_PROVISIONING',
             'RECAPTCHA_ENABLED',
             'RECAPTCHA_SECRET_KEY',
             'RECAPTCHA_MIN_SCORE',
@@ -177,6 +191,7 @@ final class ModuleOwnershipTest extends TestCase
             'GMAIL_USERNAME',
             'GMAIL_PASSWORD',
             'DISCORD_WEBHOOK_URL',
+            'MODEL_DISCOVERY_ENABLED',
         ],
         // Anthropic-compatible Messages gateway upstream (desktop client path).
         'messages_gateway' => [
@@ -199,7 +214,7 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testModuleIdsMatchThePlan(): void
     {
-        $this->assertCount(13, self::MODULE_IDS);
+        $this->assertCount(18, self::MODULE_IDS);
 
         $declared = array_keys($this->allModules());
         sort($declared);

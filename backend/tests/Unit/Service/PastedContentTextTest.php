@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
-use App\Service\PastedContentText;
+use App\Service\Chat\PastedContentText;
 use PHPUnit\Framework\TestCase;
 
 final class PastedContentTextTest extends TestCase

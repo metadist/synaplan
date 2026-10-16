@@ -30,6 +30,7 @@ export function emptyAgentDraft(): AgentDraft {
     knowledge: {
       ownFolder: true,
       folders: [],
+      fileIds: [],
       includeUserFiles: false,
       ragLimit: 8,
       ragMinScore: 0.6,

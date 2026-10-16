@@ -25,7 +25,7 @@ namespace App\AI\Credential;
  *    model health and the model inventory must not read it as a listing.
  *
  * Every env var listed here is *managed*: the legacy system-config page shows
- * it read-only and points at Models & keys ({@see SystemConfigService}).
+ * it read-only and points at Providers & keys ({@see SystemConfigService}).
  */
 final class ProviderKeyCatalog
 {
@@ -142,6 +142,30 @@ final class ProviderKeyCatalog
                 'headers' => ['Authorization' => 'Bearer {key}'],
             ],
         ],
+        'meta' => [
+            'displayName' => 'Meta',
+            'envVar' => 'META_API_KEY',
+            'consoleUrl' => 'https://dev.meta.ai/',
+            'freeTier' => false,
+            'recommended' => false,
+            'validation' => [
+                'method' => 'GET',
+                'url' => 'https://api.meta.ai/v1/models',
+                'headers' => ['Authorization' => 'Bearer {key}'],
+            ],
+        ],
+        'cerebras' => [
+            'displayName' => 'Cerebras',
+            'envVar' => 'CEREBRAS_API_KEY',
+            'consoleUrl' => 'https://cloud.cerebras.ai/',
+            'freeTier' => true,
+            'recommended' => false,
+            'validation' => [
+                'method' => 'GET',
+                'url' => 'https://api.cerebras.ai/v1/models',
+                'headers' => ['Authorization' => 'Bearer {key}'],
+            ],
+        ],
         'xai' => [
             'displayName' => 'xAI',
             'envVar' => 'XAI_API_KEY',
@@ -227,7 +251,7 @@ final class ProviderKeyCatalog
     /**
      * Reverse lookup: which provider does an env var (e.g. "GROQ_API_KEY" or
      * "HIGGSFIELD_API_SECRET") bootstrap? Used by the admin system-config
-     * surface to mark those fields as managed by Models & keys.
+     * surface to mark those fields as managed by Providers & keys.
      */
     public static function providerForEnvVar(string $envVar): ?string
     {

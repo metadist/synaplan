@@ -6,7 +6,7 @@ import { useRealtimeStore } from '@/stores/realtime'
 import { useUsageTaximeterStore } from '@/stores/usageTaximeter'
 import { useNotification } from '@/composables/useNotification'
 import { getConfigSync } from '@/services/api/httpClient'
-import { i18n } from '@/i18n'
+import { i18n } from '@/i18n/instance'
 import { applyMediaJobUpdateToMessage, type MediaJobUpdate } from '@/utils/messageMapper'
 import {
   fetchActiveMediaJobs,

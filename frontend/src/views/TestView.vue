@@ -1,10 +1,10 @@
 <template>
   <MainLayout>
     <div
-      class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
+      class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-test"
     >
-      <div class="max-w-7xl mx-auto space-y-6">
+      <div class="max-w-[100rem] mx-auto space-y-6">
         <div class="surface-card p-6" data-testid="section-header">
           <h1 class="text-3xl font-bold txt-primary mb-2">Testing Ground</h1>
           <p class="txt-secondary text-sm">Test notifications and other functionalities</p>
@@ -63,9 +63,9 @@
             >
             <router-link
               data-testid="link-route"
-              to="/channels/email"
+              to="/apps/mailbox"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/channels/email</router-link
+              >/apps/mailbox</router-link
             >
             <router-link
               data-testid="link-route"
@@ -75,9 +75,9 @@
             >
             <router-link
               data-testid="link-route"
-              to="/channels"
+              to="/apps"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/channels</router-link
+              >/apps</router-link
             >
             <router-link
               data-testid="link-route"
@@ -87,21 +87,21 @@
             >
             <router-link
               data-testid="link-route"
-              to="/ai/instructions"
+              to="/ai/models?tab=topics"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/ai/instructions</router-link
+              >/ai/models?tab=topics</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/ai/routing"
+              to="/admin/setup?tab=behavior"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/ai/routing</router-link
+              >/admin/setup?tab=behavior</router-link
             >
             <router-link
               data-testid="link-route"
-              to="/channels/api"
+              to="/apps/api"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/channels/api</router-link
+              >/apps/api</router-link
             >
             <router-link
               data-testid="link-route"
@@ -255,14 +255,14 @@
               <input
                 type="text"
                 placeholder="Enter text..."
-                class="w-full px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               />
             </div>
 
             <div>
               <label class="block text-sm font-semibold txt-primary mb-2">Select</label>
               <select
-                class="w-full px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               >
                 <option>Option 1</option>
                 <option>Option 2</option>
@@ -275,7 +275,7 @@
               <textarea
                 rows="4"
                 placeholder="Enter text..."
-                class="w-full px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
               ></textarea>
             </div>
 

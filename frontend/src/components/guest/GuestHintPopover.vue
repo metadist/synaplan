@@ -15,7 +15,7 @@
           aria-modal="true"
         >
           <button
-            class="absolute top-2.5 right-2.5 icon-ghost w-7 h-7 flex items-center justify-center rounded-lg"
+            class="absolute top-2.5 right-2.5 icon-ghost w-7 h-7 flex items-center justify-center rounded-xl"
             data-testid="guest-hint-close"
             :aria-label="$t('common.close')"
             @click="$emit('close')"

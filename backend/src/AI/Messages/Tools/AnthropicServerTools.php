@@ -30,6 +30,9 @@ final class AnthropicServerTools
     /** Canonical name Anthropic (and Synaplan's passthrough) use for page fetch. */
     public const WEB_FETCH_NAME = 'web_fetch';
 
+    /** Canonical name for Anthropic / Synaplan web search. */
+    public const WEB_SEARCH_NAME = 'web_search';
+
     /** Explicit marker some clients set on ordinary client tools. */
     private const CLIENT_TOOL_TYPE = 'custom';
 
@@ -70,6 +73,15 @@ final class AnthropicServerTools
         return self::isServerToolDeclaration($tool)
             && \is_string($type)
             && str_starts_with($type, self::WEB_FETCH_TYPE_PREFIX);
+    }
+
+    /**
+     * A tool name Anthropic (not Synaplan) executes when it is not in the
+     * catalog dispatch map. Must not be handed to the desktop as a client tool.
+     */
+    public static function isPassthroughServerToolName(string $name): bool
+    {
+        return self::WEB_FETCH_NAME === $name || self::WEB_SEARCH_NAME === $name;
     }
 
     /**

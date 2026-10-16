@@ -6,12 +6,14 @@ namespace App\Tests\Unit\Service\Iam;
 
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
+use App\Service\Iam\ConversationFeedbackCleanup;
 use App\Service\Iam\Exception\UnknownResourceKindException;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
 use App\Service\Iam\ResourceKind\ResourceKindRegistry;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 final class ResourceKindRegistryTest extends TestCase
 {
@@ -36,7 +38,11 @@ final class ResourceKindRegistryTest extends TestCase
 
     public function testConversationSupportsReadAndUse(): void
     {
-        $kind = new ConversationKind($this->createStub(ChatRepository::class));
+        $kind = new ConversationKind(
+            $this->createStub(ChatRepository::class),
+            $this->createStub(ConversationFeedbackCleanup::class),
+            new NullLogger()
+        );
 
         self::assertSame('conversation', $kind->key());
         self::assertSame([Permission::Read, Permission::Use], $kind->supportedPermissions());

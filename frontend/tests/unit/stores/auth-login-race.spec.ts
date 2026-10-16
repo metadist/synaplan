@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 import { useAuthStore } from '@/stores/auth'
+import { useChatModelPickStore } from '@/stores/chatModelPick'
 
 const loginApiMock = vi.fn()
 
@@ -71,6 +72,11 @@ vi.mock('@/stores/history', () => ({
 
 vi.mock('@/services/api/chatApi', () => ({
   clearSseToken: vi.fn(),
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
+}))
+
+vi.mock('@/services/apiService', () => ({
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock('@/stores/userMemories', () => ({
@@ -79,6 +85,11 @@ vi.mock('@/stores/userMemories', () => ({
 
 vi.mock('@/stores/userFeedback', () => ({
   useFeedbackStore: () => ({ $reset: vi.fn() }),
+}))
+
+const resetCommands = vi.hoisted(() => vi.fn())
+vi.mock('@/stores/commands', () => ({
+  useCommandsStore: () => ({ reset: resetCommands }),
 }))
 
 vi.mock('@/services/iapPostAuthRedemption', () => ({
@@ -123,6 +134,40 @@ describe('useAuthStore — login cookie race', () => {
     expect(loginApiMock).toHaveBeenCalledTimes(1)
     expect(httpClient.endAuthMutation).toHaveBeenCalledTimes(1)
     expect(store.user?.email).toBe('rs@example.com')
+  })
+
+  it('clears an explicit model pick when another account logs in', async () => {
+    const httpClient = await import('@/services/api/httpClient')
+    vi.mocked(httpClient.getInFlightRefresh).mockReturnValue(null)
+
+    const pick = useChatModelPickStore()
+    pick.selectedModelId = 240
+
+    loginApiMock.mockImplementation(async () => {
+      const { authService } = await import('@/services/authService')
+      authService.getUser().value = { id: 2, email: 'rs@example.com', level: 'ADMIN' }
+      return { success: true }
+    })
+
+    const ok = await useAuthStore().login('rs@example.com', 'secret')
+
+    expect(ok).toBe(true)
+    expect(pick.selectedModelId).toBeNull()
+  })
+
+  it("forgets the previous account's saved prompts when another account logs in", async () => {
+    const httpClient = await import('@/services/api/httpClient')
+    vi.mocked(httpClient.getInFlightRefresh).mockReturnValue(null)
+    resetCommands.mockClear()
+
+    loginApiMock.mockImplementation(async () => {
+      const { authService } = await import('@/services/authService')
+      authService.getUser().value = { id: 3, email: 'second@example.com', level: 'NEW' }
+      return { success: true }
+    })
+
+    expect(await useAuthStore().login('second@example.com', 'secret')).toBe(true)
+    expect(resetCommands).toHaveBeenCalledTimes(1)
   })
 
   it('releases the lock when login is rejected', async () => {

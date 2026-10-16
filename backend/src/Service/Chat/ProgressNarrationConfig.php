@@ -22,7 +22,7 @@ use App\Repository\ConfigRepository;
  *                               (OFF: generic wording, "Sending your request…")
  *  - {@see self::KEY_TIMINGS} — per-step durations and the live elapsed counter
  *
- * Mirrors {@see \App\Service\UsageTaximeterConfig}: read once at the public
+ * Mirrors {@see \App\Service\Usage\UsageTaximeterConfig}: read once at the public
  * runtime-config seam; the frontend does the rest. The SSE payload itself is
  * not filtered — API consumers keep the full metadata either way.
  */

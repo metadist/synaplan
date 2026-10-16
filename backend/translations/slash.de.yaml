@@ -1,0 +1,7 @@
+needs_argument: 'Schreibe nach dem Befehl, was erstellt werden soll, zum Beispiel: /%command% %example%'
+docs_not_found: 'In deiner Wissensbasis wurde keine passende Datei gefunden.'
+example_pic: 'ein Hund am Strand'
+example_vid: 'eine Drohnenaufnahme von Bergen'
+example_tts: 'hallo, wie geht es dir'
+example_search: 'Wetter in Berlin heute'
+example_docs: 'Rechnung März'

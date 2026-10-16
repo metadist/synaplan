@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Message;
 
 use App\AI\Exception\ChatFailureReason;
-use App\Service\DiscordNotificationService;
 use App\Service\Message\ChatErrorNotifier;
 use App\Service\Message\ChatErrorView;
+use App\Service\Notification\DiscordNotificationService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;

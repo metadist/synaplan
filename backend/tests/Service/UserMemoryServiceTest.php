@@ -10,9 +10,9 @@ use App\Entity\UserMemory;
 use App\Repository\UserMemoryRepository;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Memory\MemoryEmbeddingModelResolver;
+use App\Service\Memory\UserMemoryService;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
-use App\Service\UserMemoryService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -99,6 +99,22 @@ final class UserMemoryServiceTest extends TestCase
         $result = $this->service->isAvailable();
 
         $this->assertFalse($result);
+    }
+
+    public function testIsReachableNowTrustsACachedPositive(): void
+    {
+        $this->qdrantClient->method('isAvailable')->willReturn(true);
+        $this->qdrantClient->expects($this->never())->method('refreshHealth');
+
+        $this->assertTrue($this->service->isReachableNow());
+    }
+
+    public function testIsReachableNowReprobesACachedNegative(): void
+    {
+        $this->qdrantClient->method('isAvailable')->willReturn(false);
+        $this->qdrantClient->expects($this->once())->method('refreshHealth')->willReturn(true);
+
+        $this->assertTrue($this->service->isReachableNow());
     }
 
     public function testGetQdrantClientReturnsClient(): void

@@ -11,7 +11,7 @@ use App\Service\File\PdfRasterizer;
 use App\Service\File\TextCleaner;
 use App\Service\File\TikaClient;
 use App\Service\File\VideoAnalysisService;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;

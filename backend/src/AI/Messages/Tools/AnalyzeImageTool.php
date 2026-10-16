@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\AI\Messages\Tools;
 
 use App\AI\Service\AiFacade;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Security\SsrfGuard;
 use App\Service\Vision\VisionModelResolver;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpClientExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Synaplan's PIC2TEXT / vision models, exposed to the Messages gateway as a
@@ -35,8 +39,10 @@ final readonly class AnalyzeImageTool
         private AiFacade $aiFacade,
         private VisionModelResolver $visionModelResolver,
         private SsrfGuard $ssrfGuard,
+        private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private ?ChatErrorPresenter $errorPresenter = null,
     ) {
     }
 
@@ -86,7 +92,7 @@ final readonly class AnalyzeImageTool
      *
      * @return array{text: string, isError: bool, summary: string}
      */
-    public function execute(array $input, ?int $userId = null): array
+    public function execute(array $input, ?int $userId = null, ?string $locale = null): array
     {
         $prompt = \is_string($input['prompt'] ?? null) ? trim($input['prompt']) : '';
         if ('' === $prompt) {
@@ -119,13 +125,23 @@ final readonly class AnalyzeImageTool
                 'isError' => false,
                 'summary' => 'image',
             ];
+        } catch (\InvalidArgumentException $e) {
+            // Input validation copy is written for the API client — pass it
+            // through untouched.
+            return $this->error($e->getMessage());
         } catch (\Throwable $e) {
             $this->logger->warning('AnalyzeImageTool: analysis failed', [
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->error('Image analysis failed: '.$e->getMessage());
+            // The tool result goes back to the API client: present the
+            // localized reason, keep the raw message in the log (#1074).
+            $copy = $this->errorPresenter instanceof ChatErrorPresenter
+                ? $this->errorPresenter->present($e, $locale ?? 'en')->userText
+                : 'Something went wrong while answering this request. Please try again.';
+
+            return $this->error($copy);
         } finally {
             if (null !== $relativePath) {
                 $full = rtrim($this->uploadDir, '/').'/'.ltrim($relativePath, '/');
@@ -193,26 +209,60 @@ final readonly class AnalyzeImageTool
             throw new \InvalidArgumentException('image_url points at a blocked host.');
         }
 
-        $ctx = stream_context_create([
-            'http' => [
-                'timeout' => 20,
-                'follow_location' => 0,
-                'user_agent' => 'Synaplan-MessagesGateway/1.0',
-            ],
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-            ],
-        ]);
+        $host = trim((string) parse_url($url, \PHP_URL_HOST), '[]');
+        if ('' === $host) {
+            throw new \InvalidArgumentException('image_url points at a blocked host.');
+        }
 
-        $binary = @file_get_contents($url, false, $ctx);
-        if (false === $binary || '' === $binary) {
+        $options = [
+            'timeout' => 20,
+            'max_duration' => 20,
+            'max_redirects' => 0,
+            'verify_peer' => true,
+            'verify_host' => true,
+            'buffer' => false,
+            'headers' => [
+                'User-Agent' => 'Synaplan-MessagesGateway/1.0',
+                // identity: the client must not inflate the body before the cap below.
+                'Accept-Encoding' => 'identity',
+            ],
+        ];
+        // A hostname is connected to the public address the guard just accepted.
+        // Leaving the name to be resolved again would let it point somewhere else.
+        if (false === filter_var($host, \FILTER_VALIDATE_IP)) {
+            $pinned = $this->ssrfGuard->pinnedIps($host);
+            if ([] === $pinned) {
+                throw new \InvalidArgumentException('image_url points at a blocked host.');
+            }
+            $options['resolve'] = [$host => $pinned[0]];
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', $url, $options);
+            $status = $response->getStatusCode();
+            if ($status < 200 || $status >= 300) {
+                $response->cancel();
+                throw new \InvalidArgumentException('Failed to download image_url.');
+            }
+            $declared = (int) ($response->getHeaders(false)['content-length'][0] ?? 0);
+            if ($declared > self::MAX_BASE64_CHARS) {
+                $response->cancel();
+                throw new \InvalidArgumentException('Downloaded image is too large.');
+            }
+            $binary = $this->readCapped($response);
+        } catch (\InvalidArgumentException $e) {
+            throw $e;
+        } catch (HttpClientExceptionInterface $e) {
+            $this->logger->warning('AnalyzeImageTool: image download failed', [
+                'host' => $host,
+                'error' => $e->getMessage(),
+            ]);
+            throw new \InvalidArgumentException('Failed to download image_url.', 0, $e);
+        }
+
+        if ('' === $binary) {
             throw new \InvalidArgumentException('Failed to download image_url.');
         }
-        if (strlen($binary) > self::MAX_BASE64_CHARS) {
-            throw new \InvalidArgumentException('Downloaded image is too large.');
-        }
-
         $finfo = new \finfo(\FILEINFO_MIME_TYPE);
         $mime = strtolower((string) $finfo->buffer($binary));
         if (!isset(self::MEDIA_EXTENSIONS[$mime])) {
@@ -220,6 +270,31 @@ final readonly class AnalyzeImageTool
         }
 
         return $this->writeBytes($binary, self::MEDIA_EXTENSIONS[$mime]);
+    }
+
+    /**
+     * Reads the body in chunks and stops at the cap. getContent() would hold
+     * the whole decoded payload first, including a body whose Content-Length
+     * is missing or smaller than the decoded bytes.
+     */
+    private function readCapped(ResponseInterface $response): string
+    {
+        $binary = '';
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            if ($chunk->isTimeout()) {
+                continue;
+            }
+            if ($chunk->isLast()) {
+                break;
+            }
+            $binary .= $chunk->getContent();
+            if (strlen($binary) > self::MAX_BASE64_CHARS) {
+                $response->cancel();
+                throw new \InvalidArgumentException('Downloaded image is too large.');
+            }
+        }
+
+        return $binary;
     }
 
     private function writeBytes(string $binary, string $ext): string

@@ -4,22 +4,20 @@
       class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-files-workspace"
     >
-      <div class="max-w-7xl mx-auto space-y-6">
-        <FilesTabs active="workspace" />
+      <div class="max-w-[100rem] mx-auto space-y-6">
+        <FilesTabs />
 
         <div class="surface-card p-4 sm:p-6 space-y-4">
           <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
-              <h2 class="text-xl font-semibold txt-primary">{{ $t('files.workspace.title') }}</h2>
-              <p class="text-sm txt-secondary mt-1">{{ $t('files.workspace.subtitle') }}</p>
-              <p v-if="info?.exists" class="text-xs txt-muted mt-2">
+              <p v-if="info?.exists" class="text-xs txt-muted">
                 {{ $t('files.workspace.usage', { used: info.usedMb, quota: info.quotaMb }) }}
               </p>
             </div>
             <button
               v-if="info?.exists"
               type="button"
-              class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium self-start disabled:opacity-50 disabled:cursor-not-allowed"
+              class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium self-start disabled:opacity-50 disabled:cursor-not-allowed"
               data-testid="btn-workspace-delete"
               :disabled="busy"
               @click="onDelete"
@@ -40,7 +38,7 @@
             <p class="text-sm text-red-600 dark:text-red-400 max-w-sm">{{ error }}</p>
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
               data-testid="btn-workspace-retry"
               @click="reload"
             >
@@ -56,7 +54,7 @@
             <p class="text-sm txt-secondary max-w-sm">{{ $t('files.workspace.empty') }}</p>
             <router-link
               to="/"
-              class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4 inline-flex items-center"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4 inline-flex items-center"
               data-testid="btn-workspace-empty-chat"
             >
               {{ $t('files.workspace.emptyAction') }}
@@ -69,28 +67,20 @@
             data-testid="workspace-files"
           >
             <li v-for="file in files" :key="file.path" class="flex items-center gap-3 py-3">
-              <Icon icon="mdi:file-outline" class="w-5 h-5 txt-secondary shrink-0" />
+              <Icon :icon="previewIconForName(file.path)" class="w-5 h-5 txt-secondary shrink-0" />
               <div class="flex-1 min-w-0">
                 <p class="text-sm txt-primary truncate">{{ file.path }}</p>
                 <p class="text-xs txt-muted">{{ formatSize(file.size) }}</p>
               </div>
-              <div class="flex flex-wrap gap-2 shrink-0">
-                <button
-                  type="button"
-                  class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
-                  data-testid="btn-workspace-preview"
-                  @click="onPreview(file)"
-                >
-                  {{ $t('files.workspace.preview') }}
-                </button>
-                <button
-                  type="button"
-                  class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
-                  data-testid="btn-workspace-download"
-                  @click="onDownload(file)"
-                >
-                  {{ $t('files.workspace.download') }}
-                </button>
+              <div class="flex items-center gap-0.5 shrink-0">
+                <FileRowActions :actions="rowActions(file)" />
+                <FilePushMenu
+                  size="row"
+                  source="workspace"
+                  :targets="cloudTargets"
+                  :path="file.path"
+                  :file-name="workspaceFileName(file.path)"
+                />
               </div>
             </li>
           </ul>
@@ -117,7 +107,7 @@
           <button
             ref="previewCloseButton"
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-workspace-preview-close"
             @click="closePreview"
           >
@@ -147,6 +137,10 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import FilesTabs from '@/components/files/FilesTabs.vue'
+import FilePushMenu from '@/components/files/FilePushMenu.vue'
+import FileRowActions, { type FileRowAction } from '@/components/files/FileRowActions.vue'
+import { previewIconForName } from '@/services/filePreview'
+import { useCloudFolderTargets } from '@/composables/useCloudFolderTargets'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { getConfigSync } from '@/services/api/httpClient'
@@ -172,6 +166,7 @@ const { t } = useI18n()
 const router = useRouter()
 const { confirm } = useDialog()
 const { success, error: notifyError } = useNotification()
+const { targets: cloudTargets } = useCloudFolderTargets()
 
 const loading = ref(true)
 const busy = ref(false)
@@ -255,6 +250,23 @@ async function onDownload(file: ComputeWorkspaceFile) {
     notifyError(t('files.workspace.downloadError'))
   }
 }
+
+// Canonical file-row actions, shared with /files via FileRowActions (U9/U12).
+// Test IDs stay stable for the E2E selectors.
+const rowActions = (file: ComputeWorkspaceFile): FileRowAction[] => [
+  {
+    id: 'preview',
+    title: t('files.workspace.preview'),
+    testid: 'btn-workspace-preview',
+    onSelect: () => onPreview(file),
+  },
+  {
+    id: 'download',
+    title: t('files.workspace.download'),
+    testid: 'btn-workspace-download',
+    onSelect: () => onDownload(file),
+  },
+]
 
 // Only the latest preview click may publish its result; an older response
 // arriving later is dropped without creating an object URL.

@@ -1,0 +1,1413 @@
+{
+  "adminModelStatus": {
+    "subtitle": "Hangi AI modelleri şu anda çalışıyor, hangileri çalışmıyor.",
+    "loading": "Model durumu yükleniyor…",
+    "loadFailed": "Model durumu yüklenemedi.",
+    "never": "hiç",
+    "noMatches": "Seçili filtrelere uyan model yok.",
+    "freeHint": "Kontrol ücretsizdir: sağlayıcılara yalnızca hangi modelleri yayınladıkları sorulur. Bunun için hiçbir zaman bir AI modeli çalıştırılmaz.",
+    "states": {
+      "online": "Çevrimiçi",
+      "degraded": "Sorunlu",
+      "offline": "Çevrimdışı",
+      "unconfigured": "Kurulmamış",
+      "unknown": "Bilinmiyor"
+    },
+    "sources": {
+      "probe": "sağlayıcının model listesi",
+      "listing": "içe aktarma kaynağı listesi",
+      "traffic": "gerçek kullanım"
+    },
+    "summary": {
+      "allGood": "Tüm modeller yanıt veriyor",
+      "problems": "{count} model ilgi bekliyor",
+      "lastCheck": "Son kontrol",
+      "monitoringOff": "Otomatik kontrol kapalı, bu nedenle bu sayfa yalnızca bilinen son durumu gösterir."
+    },
+    "filters": {
+      "onlyProblems": "Yalnızca sorunları göster",
+      "capability": "Görev",
+      "allCapabilities": "Tüm görevler"
+    },
+    "provider": {
+      "affected": "{count} etkilendi"
+    },
+    "retired": {
+      "label": "Kullanımdan kaldırıldı",
+      "title": "Kullanımdan kaldırılan modeller",
+      "hint": "Sağlayıcı bu modelleri artık sunmuyor. Kapatıldılar, artık kontrol edilmiyorlar ve hiçbir zaman sorun olarak sayılmıyorlar.",
+      "retiredOn": "{date} tarihinde kullanımdan kaldırıldı",
+      "successor": "Yerine gelen: {name}",
+      "noSuccessor": "Yerine gelen model yok"
+    },
+    "model": {
+      "lastSuccess": "Son çalıştığı zaman",
+      "errorRate": "Son {total} çağrının %{percent} kadarı başarısız oldu",
+      "source": "Dayanak",
+      "autoDisabled": "Otomatik olarak kapatıldı",
+      "switchedOff": "Kapalı",
+      "exempt": "Otomatik kapatmadan muaf"
+    },
+    "actions": {
+      "refresh": "Şimdi kontrol et",
+      "refreshProvider": "Bu sağlayıcıyı kontrol et",
+      "refreshProviderAria": "{provider} sağlayıcısını şimdi kontrol et",
+      "resetCounters": "Hata geçmişini temizle",
+      "exempt": "Otomasyondan muaf tut",
+      "unexempt": "Otomasyona tekrar izin ver"
+    },
+    "confirmResetTitle": "Hata geçmişi temizlensin mi?",
+    "confirmResetMessage": "Bundan sonra \"{name}\" yalnızca yeni kullanıma göre değerlendirilir. Modelin kaldırıldığını zaten tespit eden bir kontrol geri alınmaz.",
+    "messages": {
+      "refreshed": "{count} model kontrol edildi.",
+      "refreshFailed": "Kontrol tamamlanamadı.",
+      "exempted": "Bu model artık otomatik kapatmadan muaf.",
+      "unexempted": "Otomatik kapatma bu model için tekrar geçerli.",
+      "exemptFailed": "Muafiyet değiştirilemedi.",
+      "countersReset": "Hata geçmişi temizlendi.",
+      "countersResetFailed": "Hata geçmişi temizlenemedi."
+    }
+  },
+  "platformConnect": {
+    "title": "Synaplan’ı bağla",
+    "subtitle": "{client} uygulamasının bu Synaplan hesabını kullanmasına izin ver.",
+    "loading": "Oturumunuz kontrol ediliyor…",
+    "confirmPrompt": "{host} üzerindeki {client} uygulamasını {uid} olarak bağla?",
+    "connectButton": "{client} bağla",
+    "scopesNote": "Sohbetlere, dosyalara ve aramaya erişim verir. Anahtar platformda kalır — buraya yazmazsınız.",
+    "connecting": "Bağlanıyor…",
+    "successTitle": "Bağlandı.",
+    "successSubtitle": "Kendiliğinden kapanmazsa bu pencereyi kapatabilirsiniz.",
+    "errorTitle": "Bağlanılamadı",
+    "retry": "Yeniden dene",
+    "helpLine": "Bu pencere başka bir uygulama tarafından açıldı. Kapatmak güvenlidir.",
+    "notYou": "Siz değil misiniz? Çıkış yapın",
+    "errorMissingState": "Bu bağlantı isteği eksik. Diğer uygulamadan yeniden başlayın.",
+    "errorOfficeNotReady": "Office.js kullanılamıyor. Bu sayfa Outlook içinden açılmalıdır.",
+    "errorNotSignedIn": "Oturum açmadınız. Pencereyi yenileyip yeniden oturum açın.",
+    "errorIssuanceFailed": "Synaplan bu bağlantıyı tamamlayamadı.",
+    "errorUnknownClient": "Bu bağlantı isteği tanınmıyor.",
+    "errorFlagOff": "Bu platformu bağlamak bu Synaplan kurulumunda açık değil.",
+    "errorNoDeliveryChannel": "Synaplan bağlantıyı Outlook'a geri iletemedi. Bu sayfayı Outlook içinden açıp yeniden deneyin.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "bu uygulama"
+    }
+  },
+  "admin": {
+    "liveVoice": {
+      "title": "Canlı sohbetler",
+      "intro": "Şu anda konuşan kişiler. Birini bitirmek mikrofonu birkaç saniye içinde durdurur. Zaten kaydedilen döküm sohbette kalır.",
+      "empty": "Kimse canlı sohbette değil.",
+      "loading": "Yükleniyor…",
+      "seconds": "{seconds} sn",
+      "someone": "bu kişi",
+      "kill": "Sohbeti bitir",
+      "killTitle": "Bu canlı sohbet bitsin mi?",
+      "killMessage": "Bu, {email} için canlı sohbeti bitirir. Zaten kaydedilen döküm sohbette kalır. Başka bir şey gönderilmez.",
+      "killed": "Sohbet birkaç saniye içinde duracak.",
+      "killFailed": "Sohbet bitirilemedi.",
+      "loadFailed": "Canlı sohbetler yüklenemedi.",
+      "directHint": "Bu açıkken, sonraki OpenAI sohbeti tarayıcıdan bağlanır. Google ve xAI bu sunucuda kalır. Kapatmak, sürmekte olan bir sohbeti taşımaz.",
+      "directTurnOn": "Doğrudan bağlantıyı aç",
+      "directTurnOff": "Doğrudan bağlantıyı kapat",
+      "directSaved": "Kaydedildi. Sonraki OpenAI sohbeti bu ayarı kullanır.",
+      "directFailed": "Doğrudan bağlantı ayarı kaydedilemedi."
+    },
+    "title": "İşlet",
+    "description": "Sunucunuza genel bakış: kullanıcılar, kayıtlar ve kullanım.",
+    "tabs": {
+      "overview": "Genel Bakış",
+      "users": "Kullanıcılar",
+      "usage": "Kullanım",
+      "appServer": "Uygulama sunucusu"
+    },
+    "overview": {
+      "totalUsers": "Toplam Kullanıcı",
+      "recentUsers": "Son Kullanıcılar"
+    },
+    "systemInfo": {
+      "title": "Sistem Bilgisi",
+      "refresh": "Yenile",
+      "loadError": "Sistem bilgisi yüklenemedi",
+      "phpVersion": "PHP Sürümü",
+      "memoryLimit": "Bellek Sınırı",
+      "inUse": "{value} kullanımda",
+      "diskFree": "Boş Disk",
+      "ofTotal": "toplam {value} içinden",
+      "diskUsage": "Disk kullanımı",
+      "opcache": "OPcache",
+      "enabled": "Etkin",
+      "disabled": "Devre dışı",
+      "peakMemory": "En Yüksek Bellek",
+      "uploadMax": "Maks. Yükleme Boyutu",
+      "postMax": "Maks. POST Boyutu",
+      "maxExecTime": "Maks. Çalışma Süresi",
+      "os": "İşletim Sistemi",
+      "server": "Sunucu",
+      "hostname": "Ana Bilgisayar Adı"
+    },
+    "analytics": {
+      "registrations": "Kullanıcı Kayıtları",
+      "usageByAction": "Eylem Bazında Kullanım",
+      "period": {
+        "7d": "7 Gün",
+        "30d": "30 Gün",
+        "90d": "90 Gün",
+        "1y": "1 Yıl",
+        "all": "Tüm Zamanlar"
+      },
+      "groupBy": {
+        "day": "Gün",
+        "week": "Hafta",
+        "month": "Ay"
+      }
+    },
+    "users": {
+      "email": "E-posta",
+      "level": "Seviye",
+      "type": "Tür",
+      "provider": "Sağlayıcı",
+      "created": "Oluşturulma",
+      "status": "Durum",
+      "actions": "İşlemler",
+      "delete": "Kullanıcıyı sil",
+      "currentUser": "(Sen)",
+      "verified": "Doğrulanmış",
+      "notVerified": "Doğrulanmadı",
+      "notVerifiedHint": "Hesap doğrulanana kadar bu kullanıcı oturum açamaz.",
+      "addUser": "Kullanıcı ekle",
+      "displayName": "Görünen ad",
+      "password": "Parola",
+      "createUser": "Hesap oluştur",
+      "accountCreated": "Hesap oluşturuldu. Hemen oturum açabilir.",
+      "createFailed": "Hesap oluşturulamadı.",
+      "markVerified": "Doğrulanmış işaretle",
+      "markVerifiedConfirm": "{email} e-postayı açmadan oturum açabilir.",
+      "verifiedNow": "Hesap doğrulandı.",
+      "verifyFailed": "Hesap doğrulanamadı.",
+      "resendVerification": "Doğrulama e-postasını yeniden gönder",
+      "resendVerificationConfirm": "{email} adresine başka bir doğrulama e-postası gönderilsin mi?",
+      "resent": "Doğrulama e-postası gönderildi.",
+      "resendFailed": "Doğrulama e-postası gönderilmedi.",
+      "registrationNoMail": "Kayıt açık, ancak e-posta yapılandırılmamış. Yeni hesaplar, Kullanıcılar'da doğrulayana kadar doğrulanmamış kalır. E-posta göndermek için MAILER_DSN ayarla.",
+      "unverified": "Doğrulanmamış",
+      "searchPlaceholder": "E-posta ile ara...",
+      "noUsers": "Kullanıcı bulunamadı",
+      "deleteConfirmTitle": "Kullanıcı Silinsin mi?",
+      "deleteConfirmDesc": "{email} kullanıcısını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+      "deleteConfirmCheckbox": "Evet, tüm kullanıcı verilerinin silinmesini onaylıyorum (sohbetler, widgetlar, belgeler dahil)",
+      "userDeleted": "{email} kullanıcısı başarıyla silindi",
+      "userDeleteFailed": "Kullanıcı silinemedi",
+      "levelUpdated": "Kullanıcı seviyesi {level} olarak güncellendi",
+      "levelUpdateFailed": "Kullanıcı seviyesi güncellenemedi",
+      "levelConfirmTitle": "{email} kullanıcısının seviyesi değiştirilsin mi?",
+      "levelConfirmMessage": "{email} {oldLevel} seviyesinden {newLevel} seviyesine geçiyor. Yeni seviye hemen uygulanır.",
+      "levelConfirmAdmin": "{email} tüm yönetici işlevlerine tam erişimi olan bir yönetici oluyor. Bu hemen uygulanır.",
+      "levelConfirmAction": "Seviyeyi değiştir",
+      "loadFailed": "Kullanıcılar yüklenemedi",
+      "invalidResponse": "Sunucu beklenmedik bir yanıt gönderdi"
+    },
+    "impersonate": {
+      "button": "Kullanıcı olarak görüntüle",
+      "buttonTitle": "Bu kullanıcı olarak oturum aç",
+      "confirmTitle": "{email} olarak oturum açılsın mı?",
+      "confirmMessage": "{email} olarak oturum açacaksın. Yapılan tüm eylemler ve değişiklikler bu hesaba atfedilecektir. Bittiğinde üstteki bandı kullanarak çıkabilirsin.",
+      "confirmAction": "Oturumu başlat",
+      "started": "Uygulamayı şimdi {email} olarak görüntülüyorsun.",
+      "startFailed": "Kimliğe bürünme başlatılamadı",
+      "disabled": "Bu kuruluşta başka bir kullanıcı olarak görüntüleme kapalı.",
+      "disabledTitle": "Başka bir kullanıcı olarak görüntüleme kapalı",
+      "cannotImpersonateSelf": "Kendi kimliğine bürünemezsin.",
+      "banner": {
+        "viewing": "{email} olarak görüntüleniyor",
+        "adminLabel": "Yönetici oturumu: {email}",
+        "exitButton": "Çık",
+        "exitButtonTitle": "Yönetici oturumunu geri yükle"
+      },
+      "stopped": "Yönetici oturumu geri yüklendi.",
+      "stopFailed": "Kimliğe bürünme sonlandırılamadı"
+    },
+    "prompts": {
+      "shortDesc": "Kısa Açıklama",
+      "prompt": "Prompt",
+      "selectionRules": "Seçim Kuralları",
+      "selectionRulesPlaceholder": "İsteğe bağlı: Bu promptun otomatik seçimi için kurallar",
+      "edit": "Düzenle",
+      "write": "Yaz",
+      "preview": "Önizleme",
+      "previewEmpty": "Henüz gösterilecek bir şey yok. Önce promptu yazın.",
+      "saved": "{topic} promptu kaydedildi.",
+      "saveFailed": "Bu prompt kaydedilemedi. Düzenlemeleriniz formda duruyor.",
+      "loadFailed": "Promptlar yüklenemedi.",
+      "retry": "Yeniden dene",
+      "empty": "Bu sunucuda yüklü sistem promptu yok.",
+      "discardTitle": "Kaydedilmemiş değişiklikler silinsin mi?",
+      "discardMessage": "Başka bir promptta kaydedilmemiş değişiklikler var. Bu değişiklikler silinecek."
+    },
+    "usage": {
+      "title": "Kullanım İstatistikleri",
+      "period": {
+        "day": "24 Saat",
+        "week": "7 Gün",
+        "month": "30 Gün",
+        "all": "Tüm Zamanlar"
+      },
+      "totalRequests": "İstekler",
+      "totalTokens": "Tokenlar",
+      "totalCost": "Maliyet",
+      "avgLatency": "Ort. Gecikme",
+      "byAction": "Eylem Bazında",
+      "byProvider": "Sağlayıcı Bazında",
+      "topModels": "En Çok Kullanılan Modeller",
+      "topUsers": "En Aktif Kullanıcılar",
+      "topUsersHint": "Seçilen dönemde en çok API isteği yapan kullanıcılar (en fazla 25).",
+      "topUsersEmpty": "Bu dönem için kullanım verisi yok. \"Tüm zamanlar\"ı deneyin veya kullanıcı etkinliği bekleyin.",
+      "model": "Model",
+      "requests": "istek",
+      "tokens": "token",
+      "cost": "Maliyet",
+      "activeSubscriptions": "Aktif Abonelikler",
+      "subscriptionOverview": "Abonelik Özeti"
+    },
+    "subscriptions": {
+      "title": "Abonelik Planları",
+      "description": "Her abonelik seviyesi için fiyatları, maliyet bütçelerini ve aktif durumu yönetin. Fiyatlar kullanıcılara onboarding sırasında ve abonelik sayfasında gösterilir.",
+      "level": "Seviye",
+      "name": "Ad",
+      "priceMonthly": "Fiyat/Ay",
+      "priceYearly": "Fiyat/Yıl",
+      "currency": "Para birimi",
+      "budgetMonthly": "Bütçe/Ay",
+      "budgetYearly": "Bütçe/Yıl",
+      "active": "Aktif",
+      "actions": "İşlemler",
+      "edit": "Düzenle",
+      "save": "Kaydet",
+      "cancel": "İptal",
+      "saveSuccess": "Plan başarıyla güncellendi",
+      "saveError": "Plan güncellenemedi",
+      "loadError": "Abonelikler yüklenemedi",
+      "noSubscriptions": "Abonelik planı bulunamadı. Önce veritabanında abonelik planları oluşturun.",
+      "budgetHint": "Bütçe, fatura dönemi başına izin verilen maksimum token maliyetini (EUR cinsinden) tanımlar. Sınırsız kullanım için 0 olarak ayarlayın. Fiyatlar herkese açık gösterim fiyatlarıdır; mobil uygulamadaki satın almalar uygulama mağazası fiyatını kullanır."
+    },
+    "moderation": {
+      "title": "İçerik moderasyonu",
+      "description": "Bildirilen içeriği inceleyin ve gerekirse ilgili hesabı askıya alın veya yasaklayın.",
+      "empty": "Bu filtreye uyan bildirim yok.",
+      "loadError": "Bildirimler yüklenemedi",
+      "updateError": "Güncelleme başarısız",
+      "reportUpdated": "Bildirim güncellendi",
+      "userStatusUpdated": "Hesap durumu güncellendi",
+      "unresolvedUser": "Sahibi belirlenemedi",
+      "totalCount": "{count} bildirim",
+      "suspend": "Askıya al",
+      "ban": "Yasakla",
+      "reactivate": "Yeniden etkinleştir",
+      "filters": {
+        "all": "Tümü",
+        "open": "Açık",
+        "reviewed": "İncelendi",
+        "actioned": "İşlem yapıldı",
+        "dismissed": "Reddedildi"
+      },
+      "col": {
+        "reason": "Neden",
+        "content": "İçerik",
+        "reportedUser": "Bildirilen kullanıcı",
+        "created": "Bildirildi",
+        "status": "Durum",
+        "actions": "İşlemler"
+      },
+      "reportStatus": {
+        "open": "Açık",
+        "reviewed": "İncelendi",
+        "actioned": "İşlem yapıldı",
+        "dismissed": "Reddedildi"
+      },
+      "accountStatus": {
+        "active": "Aktif",
+        "suspended": "Askıya alındı",
+        "banned": "Yasaklandı"
+      },
+      "confirm": {
+        "suspended": {
+          "title": "Hesap askıya alınsın mı?",
+          "message": "{user} askıya alınsın mı? Oturumu kapatılır ve yeniden etkinleştirilene kadar platformu kullanamaz."
+        },
+        "banned": {
+          "title": "Hesap yasaklansın mı?",
+          "message": "{user} yasaklansın mı? Bu, hesabı kalıcı olarak engeller. Yalnızca ağır ihlaller için kullanın."
+        },
+        "active": {
+          "title": "Hesap yeniden etkinleştirilsin mi?",
+          "message": "{user} yeniden etkinleştirilsin mi? Yeniden giriş yapıp platformu kullanabilir."
+        }
+      }
+    },
+    "config": {
+      "title": "Sistem yapılandırması",
+      "description": "Bu sunucunun oturum açma, özellikler ve araçlar, kanallar ve görünüm ayarları.",
+      "aiPointer": "AI sağlayıcıları, anahtarlar, modeller, belge okuma ve arama AI altyapısı altında ayarlanır.",
+      "aiPointerLink": "AI altyapısını aç",
+      "loadError": "Yapılandırma yüklenemedi",
+      "saveError": "Yapılandırma kaydedilemedi",
+      "savedButNotRefreshed": "Kaydedildi, ancak menüler yenilenemedi. Değişikliği görmek için sayfayı yeniden yükleyin.",
+      "saved": "Yapılandırma kaydedildi",
+      "dbOverridesEnv": "Veritabanında şifreli saklanır — .env içindeki eşleşen herhangi bir değerin üzerine yazar.",
+      "managedKeys": {
+        "title": "Sağlayıcı anahtarları AI altyapısı › Sağlayıcılar ve anahtarlar altında yönetilir.",
+        "helm": "Ortamda veya bir Helm chart'ında tanımlanan anahtarlar otomatik olarak alınır — chart kurulumunun bu sayfaya ihtiyacı yoktur. Sağlayıcılar ve anahtarları yalnızca arayüzden bir anahtar eklemek veya geçersiz kılmak için kullanın.",
+        "stateNone": "ayarlanmadı",
+        "stateDb": "arayüzde geçersiz kılındı",
+        "stateEnv": "ortam / Helm",
+        "summary": "{env} ortamdan, {db} arayüzde geçersiz kılındı.",
+        "cta": "Sağlayıcılar ve anahtarları aç"
+      },
+      "envOverridesDb": "{key} ortam değişkeni kilitlemiş. Şu anki değer: {value}. Bu kurulumun ortamında {key} değerini ayarlayın ve sunucuyu yeniden başlatın.",
+      "unsaved": "Kaydedilmemiş değişiklikler",
+      "clear": "Sil",
+      "clearHint": "Kayıtlı değeri kaldırır. Yeniden varsayılan kullanılır.",
+      "cleared": "Kaldırıldı — yeniden varsayılan kullanılıyor.",
+      "testConnection": "Bağlantıyı test et",
+      "testFailed": "Bağlantı testi başarısız",
+      "commandCopied": "Komut panoya kopyalandı",
+      "groups": {
+        "access": "Erişim",
+        "features": "Özellikler ve araçlar",
+        "channels": "Kanallar ve uygulamalar",
+        "appearance": "Görünüm",
+        "more": "Diğer ayarlar"
+      },
+      "accordion": {
+        "expandAll": "Tümünü genişlet",
+        "collapseAll": "Tümünü daralt",
+        "jumpTo": "Bölüme git"
+      },
+      "brandingMode": {
+        "light": "AÇIK mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler açık modda geçerlidir. Koyu mod renklerini düzenlemek için uygulamayı koyu moda geçirin.",
+        "dark": "KOYU mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler koyu modda geçerlidir. Açık mod renklerini düzenlemek için uygulamayı açık moda geçirin."
+      },
+      "brandingReset": {
+        "title": "Varsayılan stile sıfırla",
+        "description": "Açık ve koyu mod için varsayılan Synaplan renklerini ve yazı tiplerini geri yükler. Ad, logolar, yasal bağlantılar, açılış sayfaları ve atıf değişmeden kalır.",
+        "button": "Stili sıfırla",
+        "resetting": "Sıfırlanıyor…",
+        "confirmTitle": "Stil varsayılanlara sıfırlansın mı?",
+        "confirmMessage": "Özel renkleriniz ve yazı tipleriniz (açık ve koyu mod) Synaplan varsayılanlarıyla değiştirilecek. Ad, logolar, bağlantılar ve atıf değişmeyecek. Bu işlem geri alınamaz.",
+        "success": "Stil sıfırlandı — varsayılanlar yeniden kullanılıyor.",
+        "partial": "{reset} ayar sıfırlandı, {failed} başarısız oldu — başarısız olanlar değerlerinizi korudu.",
+        "failed": "Stil sıfırlanamadı. Değerleriniz değişmedi.",
+        "unconfirmed": "Stilin sıfırlanıp sıfırlanmadığı doğrulanamadı. Geçerli stili görmek için sayfayı yenileyin."
+      },
+      "restartBanner": {
+        "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
+        "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",
+        "copyCommand": "Komutu Kopyala",
+        "copyFailed": "Kopyalanamadı. Komutu seçip elle kopyalayın."
+      },
+      "m365": {
+        "title": "Bu alanlar işe yaramadan önce: Azure’da bir uygulama kaydet",
+        "intro": "Microsoft 365 oturum açma, Azure’da bir uygulama kaydı gerektirir. Bunu bir kez yaparsın, yaklaşık beş dakika sürer ve sonrasında herkes kendi hesabını bağlayabilir.",
+        "portalLink": "Azure portalı → Uygulama kayıtları",
+        "step1": "{portal} bağlantısını aç ve “Yeni kayıt” seçeneğini seç. Ad serbesttir, örneğin “Synaplan”.",
+        "step2": "“Yeniden yönlendirme URI’si” altında platform türü olarak Web (SPA değil) seç ve tam olarak şu adresi yapıştır:",
+        "step3": "“API izinleri” → “İzin ekle” → “Microsoft Graph” → “Temsilci izinleri” yolunu izle ve şu izinlerin tümünü ekle:",
+        "step3Note": "offline_access isteğe bağlı değildir: onsuz Microsoft yenileme belirteci vermez ve zamanlanmış her çalışma bir saat sonra durur.",
+        "step4": "“Sertifikalar ve gizli diziler” → “Yeni istemci gizli dizisi” yolunu izle ve Değer sütununu kopyala — Gizli Dizi Kimliğini değil. Yalnızca bu bir kez gösterilir.",
+        "step5": "İstemci kimliğini ve gizli diziyi aşağıdaki alanlara yapıştır, kiracıyı ayarla ve M365_ENABLED seçeneğini aç. Kullanıcılar sonra kendi hesaplarını Uygulamalar › Microsoft 365 altından bağlar.",
+        "ready": "Hazır — kullanıcılar Microsoft 365 hesaplarını Uygulamalar › Microsoft 365 altından bağlayabilir.",
+        "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve M365_ENABLED seçeneğini aç.",
+        "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala."
+      },
+      "dropbox": {
+        "title": "Bu alanlar çalışmadan önce: Dropbox App Console’da bir uygulama oluştur",
+        "intro": "Dropbox bağlantısı bir Dropbox uygulaması gerektirir. Bunu bir kez yaparsın, yaklaşık beş dakika sürer ve sonrasında her kullanıcı kendi hesabını bağlayabilir.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "{console} sayfasını aç ve “Create app”i seç. “Scoped access” ve “Full Dropbox” seçeneklerini seç. İsim fark etmez, örneğin “Synaplan”.",
+        "step2": "“Permissions” sekmesinde şu iki izni etkinleştir ve “Submit”e tıkla:",
+        "step3": "“Settings” sekmesinde “OAuth 2 → Redirect URIs” altına tam olarak bu adresi ekle:",
+        "step4": "Yine “Settings” sekmesinde App key ve App secret değerlerini kopyala (“Show”a tıkla).",
+        "step5": "App key ve secret’ı aşağıdaki alanlara yapıştır ve DROPBOX_ENABLED seçeneğini aç. Kullanıcılar hesaplarını Uygulamalar › Dropbox altında bağlar.",
+        "ready": "Hazır — kullanıcılar Dropbox hesaplarını Uygulamalar › Dropbox altında bağlayabilir.",
+        "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve DROPBOX_ENABLED seçeneğini aç.",
+        "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala.",
+        "resetTitle": "Tüm Dropbox bağlantılarını sıfırla",
+        "resetDescription": "Bu kurulumdaki tüm kullanıcıların Dropbox bağlantısını, kayıtlı token'lar dahil kaldırır. Dropbox uygulaması veya izinleri değiştirildikten sonra kullanışlıdır — ardından herkes hesabını yeniden bağlayabilir.",
+        "resetButton": "Bağlantıları sıfırla",
+        "resetConfirmTitle": "Tüm Dropbox bağlantıları sıfırlansın mı?",
+        "resetConfirmMessage": "Tüm kullanıcıların Dropbox bağlantısı kaldırılacak ve her kullanıcının Dropbox hesabını yeniden bağlaması gerekecek. Bu işlem geri alınamaz.",
+        "resetDone": "Kaldırılacak Dropbox bağlantısı yok | 1 Dropbox bağlantısı kaldırıldı | {count} Dropbox bağlantısı kaldırıldı",
+        "resetFailed": "Sıfırlama başarısız oldu. Lütfen tekrar deneyin."
+      },
+      "tabs": {
+        "auth": "Oturum açma ve kayıt olma",
+        "sharing": "Paylaşım ve denetim kaydı",
+        "features": "Özellikler",
+        "web_search": "Web araması",
+        "tools": "Araçlar ve otomasyon",
+        "email": "E-posta",
+        "channels": "Kanallar ve entegrasyonlar",
+        "mobile": "Mobil uygulama",
+        "branding": "Marka görünümü",
+        "interface": "Arayüz",
+        "guest_landing": "Misafir karşılama sayfası"
+      },
+      "tabIntro": {
+        "auth": "Kimlerin kayıt olup oturum açabileceği ve hangi oturum açma sağlayıcılarının sunulduğu.",
+        "sharing": "Kullanıcıların herkesle neleri paylaşabileceği, hangi oturum açma gruplarının eşitlendiği ve denetim kaydının ne kadar süre saklandığı.",
+        "features": "Bu sunucudaki herkes için özellikleri tamamen açın veya kapatın. Değişiklikler hemen geçerli olur.",
+        "web_search": "Sohbet için web'de kimin arama yapacağını seçin ve bir sorguyla test edin.",
+        "tools": "AI'ın kendi başına yapabilecekleri: kayıtlı görevler, araçlar için onay kuralları ve korumalı alanda dosya çalışması.",
+        "email": "Kayıt, parola ve bildirim e-postalarını gönderen posta sunucusu.",
+        "channels": "WhatsApp ve e-posta gibi gelen kanallar ile Microsoft 365, Dropbox ve MCP bağlantıları.",
+        "mobile": "Bağlanabilecek en eski uygulama sürümü ve uygulamaların nereden indirileceği.",
+        "branding": "Ad, renkler, yazı tipleri, logolar ve yasal bağlantılar.",
+        "interface": "Kullanımın gösterilip gösterilmediği ve sohbetin çalışırken neler gösterdiği.",
+        "guest_landing": "Misafir karşılama sayfasında ziyaretçilere gösterilen haberler.",
+        "more": "Henüz bir konuya ayrılmamış ayarlar."
+      },
+      "panelSettings": {
+        "web_search": {
+          "title": "Brave Search ayarları",
+          "hint": "Varsayılan sağlayıcı Brave Search için API anahtarı ve sonuç sayısı."
+        }
+      },
+      "sections": {
+        "ai_selfhosted": "Kendi barındırılan AI (NVIDIA Triton)",
+        "ai_tts": "Sesli çıktı (metinden sese)",
+        "ai_cloud": "Ek sağlayıcı ayarları",
+        "ai_embeddings": "Embedding'ler (Cloudflare Workers AI)",
+        "processing_tika": "Apache Tika",
+        "processing_docling": "Docling",
+        "processing_rasterize": "PDF rasterleştirici",
+        "processing_whisper": "Whisper (ses dökümü)",
+        "vectordb_qdrant": "Vektör veritabanı (Qdrant)",
+        "vectordb_qdrant_search": "Arama eşikleri ve sınırları",
+        "routing_multitask": "Çok adımlı yönlendirme",
+        "routing_conversation_summary": "Sürekli sohbet özeti",
+        "routing_deep_memory": "Derin hafıza (mesaj özetleri)",
+        "processing_media": "Arka planda medya üretimi",
+        "processing_brave": "Brave Search",
+        "routing_saved_tasks": "Kayıtlı görevler",
+        "routing_tools": "Araç onay kuralları",
+        "processing_compute": "Dosya çalışması"
+      },
+      "fields": {
+        "TIKA_BASE_URL": "Apache Tika URL’si",
+        "TIKA_TIMEOUT_MS": "İstek zaman aşımı (ms)",
+        "TIKA_RETRIES": "En fazla yeniden deneme",
+        "TIKA_HTTP_USER": "HTTP kimlik doğrulama kullanıcı adı",
+        "TIKA_HTTP_PASS": "HTTP kimlik doğrulama parolası",
+        "DOCLING_BASE_URL": "Docling serve URL’si (boş = kapalı)",
+        "DOCLING_TIMEOUT_MS": "İstek zaman aşımı (ms)",
+        "DOCLING_MAX_BYTES": "En fazla dosya boyutu (bayt)",
+        "RASTERIZE_DPI": "PDF rasterleştirme DPI’sı",
+        "RASTERIZE_PAGE_CAP": "Rasterleştirilecek en fazla sayfa",
+        "RASTERIZE_TIMEOUT_MS": "Rasterleştirme zaman aşımı (ms)",
+        "WHISPER_ENABLED": "Ses transkripsiyonunu aç",
+        "WHISPER_DEFAULT_MODEL": "Varsayılan Whisper modeli",
+        "BRAVE_SEARCH_ENABLED": "Web aramasını aç",
+        "BRAVE_SEARCH_API_KEY": "Brave Search API anahtarı",
+        "BRAVE_SEARCH_COUNT": "Arama başına sonuç",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Sohbetin kilitlenmemesi için görüntü, video ve ses üretimini arka planda çalıştır. Asistan canlı durum gösterir ve bitince bir bildirim verir. Kapalıyken tur, dosya hazır olana kadar bekler. Worker konteyneri gerekir.",
+        "COMPUTE_ENABLED": "Asistan, seçtiğin dosyaların kopyaları üzerinde kısa dosya çalışması (Python veya Node) yapabilir. Compute sidecar’ı gerekir (COMPUTE_URL + COMPUTE_TOKEN). Yerel bir docker compose up bu sidecar’ı başlatır ve bunu açar.",
+        "COMPUTE_REQUIRE_TIER": "Dosya çalışması açılmadan önce sidecar’ın bildirmesi gereken en düşük yalıtım: Standart (düz Docker), Güçlü yalıtım (gVisor) veya Sanal makine (microVM). Synaplan Cloud güçlü yalıtım ister.",
+        "COMPUTE_WORKSPACES_ENABLED": "Asistanın önceki çalışmayı sürdürebilmesi için dosya çalışması koşuları arasında bir klasör tut. Dosyalar → Çalışma alanı içeriği gösterir. Dosya çalışmasının kendisinin de açık olması gerekir.",
+        "COMPUTE_EGRESS_ENABLED": "Bir dosya çalışması koşusu, asistanın adlandırdığı kısa bir genel web sitesi listesinden indirme yapabilir. Varsayılan kapalı — koşular çevrimdışı kalır. Özel veya yerel adresler her zaman reddedilir. Yalnızca sidecar web sitesi erişimi sunuyorsa açılabilir.",
+        "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Bir koşu web’den indirecekse, günlük dosya çalışması otomatik çalışacak olsa bile önce sahibine sor. Varsayılan açık.",
+        "COMPUTE_EGRESS_MAX_HOSTS": "Bir dosya çalışması koşusunun listeleyebileceği web sitesi sayısı. Varsayılan 8.",
+        "COMPUTE_DEFAULT_TIMEOUT_SEC": "Bir dosya çalışması koşusunun alabileceği varsayılan saniye.",
+        "COMPUTE_DEFAULT_MEMORY_MB": "Bir dosya çalışması koşusu için megabayt cinsinden varsayılan bellek tavanı.",
+        "COMPUTE_DEFAULT_CPU": "Bir dosya çalışması koşusu için varsayılan CPU payı.",
+        "COMPUTE_DEFAULT_PIDS": "Bir dosya çalışması koşusu için varsayılan süreç tavanı.",
+        "COMPUTE_DEFAULT_OUTPUT_MB": "Koşunun oluşturabileceği dosyalar için megabayt cinsinden varsayılan boyut tavanı.",
+        "COMPUTE_MAX_TIMEOUT_SEC": "Bir dosya çalışması koşusu için saniye cinsinden sert üst sınır.",
+        "COMPUTE_POLICY_INTERACTIVE": "Sahip oradayken (sohbet veya canlı bir API çağrısı): dosya çalışmasını otomatik çalıştır, önce sor veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
+        "COMPUTE_POLICY_UNATTENDED": "Kayıtlı bir görev dosya çalışmasını kendi başına çalıştırdığında: önce sor (varsayılan), otomatik çalıştır veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
+        "COMPUTE_WORKSPACE_TTL_DAYS": "Bir dosya çalışması klasörünün temizlik onu kaldırmadan önce kaç gün kullanılmadan durabileceği. Varsayılan 90.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Uygulamalar › Synaplan Desktop altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir.",
+        "FEATURE_SEARCH_AI_ENABLED": "Arama paletinde AI yardımı (Ctrl/Cmd+K): Günlük dilde sorulan bir soruda araç modeli en uygun sonucu seçer ve nedenini tek cümleyle söyler. Kendi başına hiçbir şeyi değiştirmez. Her kullanım kısa bir AI çağrısıdır. Kapalıyken anahtar kelime ve anlam araması çalışmaya devam eder."
+      },
+      "fieldOptions": {
+        "COMPUTE_REQUIRE_TIER": {
+          "docker": "Standart (düz Docker)",
+          "gvisor": "Güçlü yalıtım (gVisor)",
+          "microvm": "Sanal makine (microVM)"
+        },
+        "COMPUTE_POLICY_INTERACTIVE": {
+          "auto": "Otomatik çalıştır",
+          "approve": "Önce sor",
+          "block": "Hiç çalıştırma"
+        },
+        "COMPUTE_POLICY_UNATTENDED": {
+          "auto": "Otomatik çalıştır",
+          "approve": "Önce sor",
+          "block": "Hiç çalıştırma"
+        }
+      },
+      "valueSet": "Bu ayarın kayıtlı bir değeri var.",
+      "valueEmpty": "Bu ayar hâlâ boş.",
+      "search": {
+        "label": "Ayarlarda ara",
+        "placeholder": "Ada veya anahtara göre arayın, örn. kayıt veya SMTP",
+        "noHits": "“{query}” ile eşleşen ayar yok.",
+        "clear": "Aramayı temizle"
+      }
+    },
+    "attention": {
+      "title": "İlgi gerekiyor",
+      "allGood": "Şu anda ilginizi gerektiren bir şey yok.",
+      "loadFailed": "Sunucu durumu yüklenemedi. Tekrar deneyin.",
+      "models": "{count} model ilgi gerektiriyor.",
+      "unhealthy": "{name} açık ama yanıt vermiyor.",
+      "needsSetup": "{name} açık ama henüz kurulmadı.",
+      "openModelHealth": "Model sağlığını aç",
+      "openStatus": "Sistem durumunu aç",
+      "cards": {
+        "people": "Kullanıcılar",
+        "peopleHint": "Bu sunucudaki hesaplar",
+        "signups": "Yeni kayıtlar",
+        "signupsHint": "Aşağıdaki grafiğin döneminde",
+        "features": "Kapalı özellikler",
+        "featuresHint": "Kapalı veya kurulmamış",
+        "models": "Kontrol edilecek modeller",
+        "modelsHint": "Çevrimdışı, hatalı veya kullanımdan kalkmış"
+      }
+    }
+  },
+  "statistics": {
+    "title": "Synaplan'a hoş geldiniz!",
+    "messageStats": "Mesaj İstatistikleri",
+    "totalMessages": "Toplam Mesaj",
+    "messagesSent": "Gönderilen Mesajlar",
+    "messagesReceived": "Alınan Mesajlar",
+    "totalFiles": "Toplam Dosya",
+    "filesSent": "Gönderilen Dosyalar",
+    "filesReceived": "Alınan Dosyalar",
+    "latestFiles": "Son Dosyalar",
+    "received": "Alınan",
+    "sent": "Gönderilen"
+  },
+  "aiInfra": {
+    "modelImport": {
+      "title": "Modelleri içe aktar",
+      "importModels": "Modelleri içe aktar",
+      "importPulled": "İndirilen modelleri içe aktar",
+      "unreachable": "Bu uç nokta yanıt vermedi. Test bölümünden kontrol edip tekrar deneyin.",
+      "empty": "Bu uç nokta içe aktarılacak model sunmuyor.",
+      "selectAllNew": "Tüm yenileri seç",
+      "probeLabel": "Her modelin ne yapabildiğini kontrol et (biraz kredi harcar)",
+      "colModel": "Model",
+      "colTags": "Yetenekler",
+      "colPrice": "1 milyon token başına fiyat",
+      "colStatus": "Durum",
+      "exists": "Zaten eklendi",
+      "new": "Yeni",
+      "tagsHint": "İzin verilen yetenekler: {tags}. Birden fazlasını virgülle ayırın.",
+      "pricePair": "{in} giriş / {out} çıkış",
+      "apply": "{count} içe aktar",
+      "applying": "İçe aktarılıyor…",
+      "applied": "{created} model satırı içe aktarıldı, {skipped} zaten mevcut olan atlandı.",
+      "applyFailed": "Modeller içe aktarılamadı.",
+      "noValidTags": "Seçili her modele en az bir geçerli yetenek verin.",
+      "filterLabel": "Modelleri süz",
+      "filterPlaceholder": "Ada veya kimliğe göre süz"
+    },
+    "extraction": {
+      "lead": "Belgelerin nasıl metne dönüşeceğini seçin. Docling tabloları ve başlıkları korur; çalışmıyorsa Tika kullanılır ve yükleme asla başarısız olmaz.",
+      "family": {
+        "document": "Belgeler",
+        "text": "Düz metin",
+        "image": "Görseller",
+        "audio": "Ses",
+        "audio_no_cloud": "Bulut STT olmadan ses",
+        "video": "Video"
+      },
+      "moveUp": "Yukarı",
+      "moveDown": "Aşağı",
+      "remove": "Kaldır",
+      "add": "Ekle",
+      "addPlaceholder": "Bir bağdaştırıcı ekle…",
+      "healthAvailable": "kullanılabilir",
+      "healthUnavailable": "kullanılamıyor",
+      "sidecarSettings": "Her hizmet için adresler, zaman aşımları ve bağlantı testi bu sekmedeki Okuma hizmetleri altında.",
+      "sidecarSettingsLink": "Okuma hizmetlerine git",
+      "servicesTitle": "Okuma hizmetleri",
+      "servicesHint": "Tika, Docling, PDF rasterleştirici ve Whisper'ın nerede çalıştığı ve sınırları.",
+      "testTitle": "Bir dosyayla dene",
+      "testHint": "Bir örnek yükleyin. Hangi bağdaştırıcının kazandığını ve diğerlerinin neden kaybettiğini görürsünüz.",
+      "testButton": "Bir dosyayla dene",
+      "testing": "Deneniyor…",
+      "winner": "Kazanan: {winner}",
+      "attemptMs": "{ms} ms",
+      "doclingUnavailableTika": "Docling kullanılamıyor — yerine Tika kullanıldı",
+      "doclingRejectedTika": "Docling’e erişildi ancak dosyayı reddetti — yerine Tika kullanıldı",
+      "save": "Zinciri kaydet",
+      "saved": "Çıkarım zinciri kaydedildi. Sonraki yükleme bunu kullanır.",
+      "saveFailed": "Çıkarım zinciri kaydedilemedi",
+      "emptyChain": "Her dosya türü için en az bir bağdaştırıcı gerekir.",
+      "loadFailed": "Çıkarım ayarları yüklenemedi",
+      "verdict": {
+        "quality_ok": "kabul edildi",
+        "not_applicable": "denetlenmedi",
+        "markdown_structure": "kabul edildi (tablo veya başlık)",
+        "empty": "boş",
+        "low_quality": "çok az yararlı metin",
+        "unavailable": "kullanılamıyor",
+        "rejected": "ulaşıldı ancak dosya reddedildi",
+        "unsupported": "bu dosyayı desteklemiyor",
+        "unknown": "bilinmeyen bağdaştırıcı",
+        "skipped": "atlandı",
+        "rewritten": "sonraki bağdaştırıcı için dönüştürüldü"
+      }
+    },
+    "webSearch": {
+      "lead": "Sohbet için webde kimin arayacağını seçin. Sonraki arama yeni sağlayıcıyı kullanır, yeniden başlatma gerekmez. Test sorgusu başlıkları gösterir, böylece çalıştığını görürsünüz.",
+      "docs": "Belgeler",
+      "healthAvailable": "kullanılabilir",
+      "healthUnavailable": "kullanılamıyor",
+      "capabilities": "Yetenekler",
+      "capability": {
+        "freshness": "Tazelik",
+        "country": "Ülke",
+        "language": "Dil",
+        "siteFilter": "Site filtresi",
+        "fullContent": "Tam sayfa metni",
+        "answer": "Yanıt"
+      },
+      "sovereignty": {
+        "selfHosted": "kendi barındırmanız",
+        "eu": "AB",
+        "usCloud": "ABD bulutu"
+      },
+      "apiKey": "API anahtarı",
+      "apiKeyPlaceholder": "Bir API anahtarı yapıştırın",
+      "saveKey": "Anahtarı kaydet",
+      "keySaved": "Anahtar kaydedildi ve doğrulandı. Sonraki arama bunu kullanabilir.",
+      "fallback": "Yedek sağlayıcı",
+      "fallbackNone": "Yedek yok",
+      "allowUsers": "Kullanıcıların kendi sağlayıcılarını seçmesine izin ver",
+      "save": "Web aramasını kaydet",
+      "saved": "Web araması ayarları kaydedildi. Sonraki sohbet araması bunları kullanır.",
+      "savedInactive": "{provider} hazır değil ({reason}). Sohbetteki web araması sonuç döndürmez.",
+      "savedInactiveFallback": "{provider} hazır değil ({reason}). Sohbetteki web araması yedek sağlayıcıyı kullanır.",
+      "savedInactiveBoth": "{provider} hazır değil ({reason}). Yedek sağlayıcı da hazır değil. Sohbetteki web araması sonuç döndürmez.",
+      "saveFailed": "Web araması ayarları kaydedilemedi",
+      "loadFailed": "Web araması ayarları yüklenemedi",
+      "testTitle": "Test sorgusu",
+      "testHint": "Kısa bir sorgu çalıştırın. Etkin sağlayıcıdan en fazla beş başlık görürsünüz.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Test sorgusu",
+      "testing": "Test ediliyor…",
+      "testProvider": "{provider} yanıtladı",
+      "testProviderFallback": "{provider} yanıtladı ({from} yerine)",
+      "allowUsersHint": "Bu açıkken her kişi Tercihler’den farklı bir arama sağlayıcısı seçebilir."
+    },
+    "rerank": {
+      "title": "Yeniden sıralama",
+      "lead": "Arama birçok parçayı bulduktan sonra bir yeniden sıralayıcı en yararlı olanları öne alır. Bir test faydasını gösterene kadar kapalı bırakın. Kapalıyken sohbet değişmez.",
+      "enable": "Belge aramasında yeniden sıralamayı kullan",
+      "model": "Yeniden sıralama modeli",
+      "modelNone": "Model seçilmedi",
+      "multiplier": "Kaç ekstra parça getirilecek (2–10)",
+      "budgetMs": "Bu kadar milisaniyeden sonra vazgeç (100–5000)",
+      "llmFallback": "Yeniden sıralama modeli yoksa sohbet modelini kullan",
+      "llmFallbackHint": "Her aramada özet modelini kullanır ve daha pahalı olabilir. Ayrı bir yeniden sıralama modeli tercih edin.",
+      "healthAvailable": "kullanılabilir",
+      "healthUnavailable": "kullanılamıyor",
+      "apiKey": {
+        "jina": "Jina API anahtarı",
+        "cohere": "Cohere API anahtarı",
+        "voyage": "Voyage API anahtarı"
+      },
+      "apiKeyPlaceholder": "API anahtarı yapıştırın",
+      "saveKey": "Anahtarı kaydet",
+      "keySaved": "Anahtar kaydedildi. Sonraki yeniden sıralama bunu kullanabilir.",
+      "save": "Yeniden sıralamayı kaydet",
+      "saved": "Yeniden sıralama ayarları kaydedildi. Sonraki belge araması bunları kullanır.",
+      "savedOff": "Yeniden sıralama ayarları kaydedildi. Belge araması orijinal vektör sırasını korur.",
+      "savedInactive": "Yeniden sıralama ayarları kaydedildi. Bir yeniden sıralama modeli veya sohbet modeli yedeği hazır olana kadar etkisiz kalır.",
+      "saveFailed": "Yeniden sıralama ayarları kaydedilemedi",
+      "loadFailed": "Yeniden sıralama ayarları yüklenemedi",
+      "testTitle": "Örnek parçalarla test et",
+      "testHint": "Bir soru yazın ve her satıra bir parça koyun. Yeni sırayı görürsünüz, böylece çalıştığını kontrol edersiniz.",
+      "testQueryPlaceholder": "Fatura toplamı nedir?",
+      "testDocumentsPlaceholder": "Fatura toplamı 120 euro.\nMesai saatleri 9-17.",
+      "testButton": "Sırayı test et",
+      "testing": "Test ediliyor…",
+      "lastEval": {
+        "title": "Son ölçüm",
+        "line": "{date} tarihinde: doğru parça yeniden sıralama olmadan {recallOff}, onunla {recallOn}. En yavaş yanıtlar {p95Off} ms olmadan, {p95On} ms onunla."
+      }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "Arama paletinin (Ctrl/Cmd+K) arkasındaki modeller. Herkes için bir model seçene kadar arama soruları her kişinin kendi sohbet modelini kullanır. Arama dizini, başka bir model seçene kadar belgelerin embedding modelini izler.",
+      "loading": "Arama modelleri yükleniyor…",
+      "loadFailed": "Arama modelleri yüklenemedi.",
+      "noModel": "model yok",
+      "undo": "Geri al",
+      "ai": {
+        "label": "Arama soruları için AI modeli",
+        "hint": "İlk seçenek, her kişinin zaten kullandığı sohbet modelini kullanır. «Herkes için aynı model» altındaki her model tüm sunucu için geçerlidir. Yalnızca bir sonucu gösterir ve kendi başına hiçbir şeyi değiştirmez.",
+        "inherit": "Her kişinin sohbet modeli",
+        "globalGroup": "Herkes için aynı model",
+        "userChat": "Arama soruları her kişinin sohbet modelini kullanır. Seninki {model}.",
+        "userChatUnavailable": "Arama soruları her kişinin sohbet modelini kullanır. Seninki şu anda yanıt veremiyor, bu yüzden araman AI yardımı göstermiyor.",
+        "ready": "Herkesin arama sorularını {model} yanıtlıyor.",
+        "off": "Aramada AI yardımı kapalı, bu yüzden palet AI satırı göstermiyor.",
+        "openFlag": "Özellikler bölümünden aç",
+        "unavailable": "Seçilen model şu anda yanıt veremiyor, bu yüzden palet AI satırı göstermiyor. Başka bir model seç veya sağlayıcısını kur.",
+        "saved": "Herkesin arama soruları artık {model} kullanıyor.",
+        "savedUserChat": "Arama soruları yeniden her kişinin sohbet modelini kullanıyor.",
+        "restored": "Herkesin arama soruları yeniden {model} kullanıyor.",
+        "restoredUserChat": "Arama soruları yeniden her kişinin sohbet modelini kullanıyor."
+      },
+      "embed": {
+        "label": "Arama dizini için embedding modeli",
+        "hint": "Sayfaları, ayarları, sohbetleri ve dosyaları anlamlarına göre bulur. Değiştirmek tüm dizini arka planda yeniden okur.",
+        "inherit": "Belgelerin embedding modeliyle aynı: {model}",
+        "separate": "Arama ve belgeler farklı embedding modelleri kullanıyor, bu yüzden her arama iki kısa embedding çağrısı yapar.",
+        "otherRun": "Başka bir embedding değişikliği sürüyor. Bitince bu modeli değiştirebilirsin.",
+        "confirmTitle": "Aramanın embedding modeli değiştirilsin mi?",
+        "confirmMessage": "Arama {count} girdiyi arka planda {model} ile yeniden okur, her biri için kısa bir embedding çağrısı. Bir girdi bitene kadar yalnızca anahtar kelimelerle bulunur. Değişiklik başarısız olursa arama {current} ile devam eder.",
+        "confirm": "Değiştir ve yeniden oku",
+        "started": "Arama {model} modeline geçiyor. İlerlemeyi burada izleyebilirsin.",
+        "savedNoRun": "Arama {model} kullanıyor. Dizin zaten uygun, hiçbir şeyin yeniden okunması gerekmedi."
+      },
+      "reason": {
+        "notPulled": "Ollama'da indirilmedi",
+        "providerUnavailable": "{service} için API anahtarı yok"
+      },
+      "index": {
+        "empty": "Arama dizini henüz boş. Synaplan kullanıldıkça dolar.",
+        "keywordOnly": "Dizin embedding modeliyle okunana kadar arama yalnızca anahtar kelimelerle bulur.",
+        "coverage": "{rows} dizin girdisinden {embedded} tanesi anlamına göre bulunabilir."
+      },
+      "run": {
+        "running": "Dizin {model} ile yeniden okunuyor: {total} girdiden {done} tanesi. Arama bu sırada çalışmaya devam eder.",
+        "completed": "Arama dizini {model} kullanıyor.",
+        "partial": "Arama dizini {model} kullanıyor. {count} girdi okunamadı ve değişene kadar yalnızca anahtar kelimelerle bulunur.",
+        "failed": "Dizinin {model} modeline geçişi başarısız oldu, bu yüzden arama yeniden {previous} kullanıyor. Zaten geçirilmiş girdiler yeniden okunana kadar yalnızca anahtar kelimelerle bulunur. Yeniden denemek için yukarıdan bir model seç.",
+        "cancelled": "Dizinin {model} modeline geçişi durduruldu. Arama {previous} ile devam ediyor."
+      },
+      "refused": {
+        "invalid_model": "{model} şu anda arama için kullanılamıyor. Önceki model kalıyor.",
+        "probe_failed": "{model} bir test çağrısına yanıt vermedi, bu yüzden hiçbir şey değiştirilmedi.",
+        "run_in_progress": "Başka bir embedding değişikliği sürüyor. Hiçbir şey değiştirilmedi; bitince yeniden dene.",
+        "unknown": "Model değiştirilemedi. Önceki model kalıyor."
+      }
+    }
+  },
+  "providerHelp": {
+    "openAria": "Bunu nasıl kurarsınız",
+    "createKeyLink": "API anahtarı oluştur",
+    "downloadLink": "Ollama'yı indir",
+    "groq": {
+      "title": "Groq API anahtarı",
+      "message": "Groq konsolunda ücretsiz bir Groq API anahtarı oluşturun ve buraya yapıştırın. Ücretsiz katman genellikle bir dakikadan kısa sürede sohbete başlamak için yeterlidir."
+    },
+    "openai": {
+      "title": "OpenAI API anahtarı",
+      "message": "OpenAI hesabınızda (API keys sayfası) bir API anahtarı oluşturun ve buraya yapıştırın. Kullanım OpenAI tarafından faturalandırılır."
+    },
+    "anthropic": {
+      "title": "Anthropic API anahtarı",
+      "message": "Anthropic konsolunda (Ayarlar → Keys) bir API anahtarı oluşturun ve Claude modellerini kullanmak için buraya yapıştırın."
+    },
+    "google": {
+      "title": "Google Gemini API anahtarı",
+      "message": "Google AI Studio'da bir Gemini API anahtarı oluşturun ve buraya yapıştırın. Birçok model için ücretsiz katman vardır."
+    },
+    "mistral": {
+      "title": "Mistral API anahtarı",
+      "message": "Mistral konsolunda bir API anahtarı oluşturun ve buraya yapıştırın. Mistral başlangıç için ücretsiz katman sunar."
+    },
+    "trustedtokens": {
+      "title": "TrustedTokens API anahtarı",
+      "message": "TrustedTokens'ta (Hesap → API Erişimi) bir API anahtarı oluşturun ve buraya yapıştırın. Çıkarım, AB veri yerleşimli Alman GPU'larda çalışır."
+    },
+    "a2agent": {
+      "title": "A2Agent API anahtarı",
+      "message": "A2Agent'ta (pano → API anahtarları) kullanıma göre ücretlendirilen bir API anahtarı oluşturun ve buraya yapıştırın. İstemler, bu ağ geçidi üzerinden Çin anakarasındaki model sağlayıcıları (Qwen, DeepSeek, MiniMax) tarafından işlenir. A2Agent, Çin anakarası dışındaki kullanıcılara hizmet verir. AB kişisel verisi işleyen işletmeciler bunu kendi DPA'larına göre kararlaştırmalıdır."
+    },
+    "meta": {
+      "title": "Meta API anahtarı",
+      "message": "Meta Model API panelinde (API keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, Muse Spark, Muse Wonder, Muse Image ve Muse Voice Transcribe'ı açar. İstemleri Meta işler."
+    },
+    "cerebras": {
+      "title": "Cerebras API anahtarı",
+      "message": "Cerebras Cloud panelinde (API Keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, çok hızlı yanıtlarla GPT OSS 120B ve Qwen 3.8 27B'yi açar. İstemleri ABD'de Cerebras işler."
+    },
+    "huggingface": {
+      "title": "HuggingFace API jetonu",
+      "message": "HuggingFace ayarlarında bir erişim jetonu oluşturun ve HuggingFace Inference modellerini kullanmak için buraya yapıştırın."
+    },
+    "xai": {
+      "title": "xAI API anahtarı",
+      "message": "xAI konsolunda bir API anahtarı oluşturun ve Grok modellerini kullanmak için buraya yapıştırın."
+    },
+    "perplexity": {
+      "title": "Perplexity API anahtarı",
+      "message": "Perplexity hesabınızda bir API anahtarı oluşturun ve Sonar modellerini kullanmak için buraya yapıştırın. Sistem yapılandırması › Web araması altında Perplexity seçerseniz aynı anahtar web araması için de kullanılır."
+    },
+    "ollama": {
+      "title": "Ollama ile yerel AI",
+      "message": "Ollama'yı indirin ve gpt-oss:120b gibi güçlü bir model çekin (daha az RAM varsa llama3.2 gibi daha küçük bir model). API anahtarı gerekmez — Synaplan yapılandırılan URL'deki Ollama ile konuşur."
+    }
+  },
+  "people": {
+    "title": "Kullanıcılar",
+    "subtitle": "Bu sunucudaki hesaplar, gruplar, kurallar ve bildirilen içerikler.",
+    "tabs": {
+      "users": "Kullanıcılar",
+      "groups": "Gruplar",
+      "policies": "Kurallar",
+      "linkedPlatforms": "Platform örnekleri",
+      "moderation": "Moderasyon",
+      "audit": "Kayıt"
+    },
+    "openPeople": "Kullanıcılar’ı aç",
+    "backToOperate": "İşlet’e dön",
+    "myGroups": {
+      "subtitle": "Bu kuruluşta üye olduğunuz gruplar.",
+      "emptyMember": "Henüz bir grupta değilsiniz. Bir yönetici sizi Kullanıcılar sayfasından ekleyebilir.",
+      "emptyAdmin": "Henüz grup yok. Kullanıcılar sayfasından bir tane oluşturun.",
+      "leave": "Ayrıl",
+      "leaveConfirm": "\"{name}\" grubundan ayrılmak istiyor musunuz? Bu grubun görebildiklerine erişiminizi kaybedersiniz. Bu grupla paylaştıklarınız diğer üyelerle paylaşılmış kalır. Bunları daha sonra her öğenin Paylaş penceresinden geri alabilirsiniz.",
+      "leaveConfirmWithShares": "\"{name}\" grubundan ayrılmak istiyor musunuz? Bu grubun görebildiklerine erişiminizi kaybedersiniz. Bu grupla paylaştığınız {count} öğe diğer üyelerle paylaşılmış kalır. Ayrılmak bunu korur. Ayrıl ve paylaşımları kaldır bunları siler.",
+      "leaveAndStopSharing": "Ayrıl ve paylaşımları kaldır",
+      "left": "Gruptan ayrıldınız. Paylaştığınız öğeler diğer üyelerle paylaşılmış kalır.",
+      "leftAndStopped": "Gruptan ayrıldınız ve bu grupla paylaşımlarınızı kaldırdınız.",
+      "leaveFailed": "Gruptan ayrılamadı.",
+      "leaveDirectory": "Bu üyelik girişinizden gelir; burada ayrılamazsınız.",
+      "ledBy": "Yöneten: {name}",
+      "noLeader": "Bu grubu henüz kimse yönetmiyor.",
+      "alsoIn": "Bu grupta ayrıca: {names}",
+      "onlyYou": "Bu gruptaki tek kullanıcı sizsiniz.",
+      "sharedLine": "Bu grupla paylaşılanlar: {items}",
+      "youCanLeave": "Ayrılabilirsiniz. O zaman bu grubun görebildiklerine erişiminizi kaybedersiniz.",
+      "youLead": "Bu grubu siz yönetiyorsunuz. Ayrılabilirsiniz; o zaman bu grubun görebildiklerine erişiminizi kaybedersiniz."
+    },
+    "users": {
+      "groups": "Gruplar",
+      "identities": "Giriş"
+    },
+    "groups": {
+      "name": "Ad",
+      "kind": "Tür",
+      "members": "Üyeler",
+      "memberCount": "{count} üye",
+      "fromLogin": "Girişinizden",
+      "manual": "Elle",
+      "create": "Grup oluştur",
+      "createTitle": "Grup oluştur",
+      "createPrompt": "Grup adı",
+      "rename": "Yeniden adlandır",
+      "renameTitle": "Grubu yeniden adlandır",
+      "delete": "Sil",
+      "deleteConfirm": "\"{name}\" grubunu silmek istiyor musunuz? Kullanıcılar kurulumda kalır. {shares}. {policies}.",
+      "deleteConfirmShares": "Bu grupla {count} paylaşım sona erer",
+      "deleteConfirmPolicies": "Grubun {count} kuralı kaldırılır",
+      "deleteConfirmUnknown": "\"{name}\" grubunu silmek istiyor musunuz? Kullanıcılar kurulumda kalır. Bu grupla paylaşımlar sona erer ve grubun kuralları kaldırılır.",
+      "empty": "Henüz grup yok. Daha sonra paylaşmak için bir tane oluşturun.",
+      "loadError": "Gruplar yüklenemedi.",
+      "saveError": "Grup kaydedilemedi.",
+      "created": "Grup oluşturuldu.",
+      "renamed": "Grup yeniden adlandırıldı.",
+      "deleted": "Grup silindi.",
+      "directoryReadOnly": "Bu grup girişinizden gelir; burada yeniden adlandırılamaz veya silinemez.",
+      "directoryManagedHint": "Girişten gelen üyelikler bir sonraki oturumda güncellenir. Yine de kullanıcıları elle ekleyebilirsiniz.",
+      "addMember": "Kullanıcı ekle",
+      "addMemberPlaceholder": "Ad veya e-posta ile ara",
+      "addMemberNotFound": "Bu ad veya e-posta ile eşleşen kullanıcı yok.",
+      "removeMember": "Kaldır",
+      "removeConfirm": "{email} bu gruptan kaldırılsın mı? Bu kullanıcının grupla paylaştıkları paylaşılmış kalır.",
+      "roleMember": "Üye",
+      "roleManager": "Yönetici",
+      "memberAdded": "Kullanıcı gruba eklendi.",
+      "memberRemoved": "Kullanıcı gruptan kaldırıldı.",
+      "sharedWith": "Bu grupla paylaşılanlar",
+      "sharedEmpty": "Bu grupla henüz hiçbir şey paylaşılmadı.",
+      "sharedLoading": "Paylaşılan öğeler yükleniyor…",
+      "resourceKind": {
+        "conversation": "Sohbet",
+        "knowledge_folder": "Klasör",
+        "assistant": "AI asistanı",
+        "saved_task": "Kayıtlı görev",
+        "widget": "Sohbet widget'ı",
+        "agent": "Ajan",
+        "tool": "Araç"
+      },
+      "manualHint": "Synaplan içinde elle oluşturuldu, oturumdan gelmedi.",
+      "fromLoginHint": "Şirket oturumundan oluşturuldu.",
+      "roleLabel": "Rol",
+      "roleUpdated": "Rol güncellendi."
+    },
+    "audit": {
+      "when": "Ne zaman",
+      "who": "Kim",
+      "actionLabel": "İşlem",
+      "kind": "Tür",
+      "resource": "Kaynak",
+      "subject": "Ayrıntılar",
+      "empty": "Henüz denetim kaydı yok.",
+      "more": "Daha fazla yükle",
+      "loadError": "Denetim kaydı yüklenemedi.",
+      "filterAll": "Tümü",
+      "action": {
+        "share_grant": "Paylaşıldı",
+        "share_revoke": "Paylaşım kaldırıldı",
+        "group_create": "Grup oluşturuldu",
+        "group_update": "Grup güncellendi",
+        "group_rename": "Grup yeniden adlandırıldı",
+        "group_delete": "Grup silindi",
+        "group_member_set": "Üye eklendi",
+        "group_member_remove": "Üye kaldırıldı",
+        "group_member_leave": "Gruptan ayrıldı",
+        "directory_sync": "Giriş grubu güncellendi",
+        "impersonation_start": "Kullanıcı olarak görüntüleme başladı",
+        "impersonation_stop": "Kullanıcı olarak görüntüleme bitti",
+        "admin_metadata_view": "Kaynak listesine bakıldı",
+        "policy_set": "Grup kuralları güncellendi",
+        "policy_lock": "Ayar kilitlendi",
+        "platform_link_linked": "Platform bağlandı",
+        "platform_link_disconnected": "Platform bağlantısı kesildi",
+        "platform_link_reassigned": "Platform bağlantısı başka bir hesaba taşındı",
+        "platform_link_exchange_failed": "Platform bağlantısı başarısız",
+        "platform_link_redirect_rejected": "Platform yönlendirmesi reddedildi",
+        "platform_instance_registered": "Platform kaydedildi",
+        "platform_instance_approved": "Platform onaylandı",
+        "platform_instance_revoked": "Platform iptal edildi",
+        "admin_user_level_change": "Kullanıcı seviyesi değiştirildi",
+        "messages_gateway_flags": "Ağ geçidi ayarları değiştirildi",
+        "messages_gateway_upstream": "Ağ geçidi adresi değiştirildi",
+        "messages_gateway_aliases": "Model takma adları değiştirildi"
+      },
+      "what": "Ne oldu",
+      "emptyNote": "Bu kayıt kimin ne yaptığını tutar. Sohbet veya dosya içeriğini açmaz.",
+      "someone": "Birisi",
+      "anItem": "bir öğe",
+      "sentence": {
+        "shareGrant": "{who}, “{resource}” öğesini {subject} ile paylaştı.",
+        "shareRevoke": "{who}, “{resource}” paylaşımını {subject} ile durdurdu.",
+        "withSubject": "{who}: {action} — {resource}, {subject} ile.",
+        "generic": "{who}: {action} — {resource}."
+      },
+      "on": "Açık",
+      "off": "Kapalı",
+      "none": "yok",
+      "changeLine": "{label}: {old} → {new}",
+      "gatewaySetting": {
+        "ENABLED": "Ağ geçidi",
+        "ALLOW_OPERATOR_KEY": "Sunucu anahtarı",
+        "MCP_TOOLS_ENABLED": "Araç sunucuları",
+        "MCP_TOOLS_WITH_CLIENT_TOOLS": "İstemci araçlarıyla araç sunucuları",
+        "MCP_MAX_ITERATIONS": "Araç turları",
+        "WEB_SEARCH_MODE": "Web araması",
+        "WEB_FETCH_MODE": "Web okuma",
+        "VISION_MODE": "Görüntü anlama",
+        "VISION_IMAGE_DETAIL": "Görüntü ayrıntısı",
+        "VISION_MAX_IMAGES": "İstek başına görüntü",
+        "CONTEXT_INJECTION_ENABLED": "Ek bağlam",
+        "BUDGET_NOTICE_ENABLED": "Bütçe uyarısı",
+        "SESSION_SUMMARY_ENABLED": "Oturum özeti",
+        "MODEL_ALIASES": "Model takma adları",
+        "UPSTREAM_URL": "Ağ geçidi adresi"
+      }
+    },
+    "linkedPlatforms": {
+      "intro": "Bu Synaplan’ı kullanmak isteyen Nextcloud, ownCloud ve Outlook sunucuları. Kullanıcılarının hesaplarını Uygulamalar altında bağlayabilmesi için birini onaylayın.",
+      "empty": "Henüz kayıtlı platform yok.",
+      "client": "Platform",
+      "host": "Adres",
+      "status": "Durum",
+      "actions": "İşlemler",
+      "approve": "Onayla",
+      "revoke": "İptal et",
+      "approved": "Platform onaylandı.",
+      "revoked": "Platform iptal edildi.",
+      "approveError": "Platform onaylanamadı.",
+      "revokeError": "Platform iptal edilemedi.",
+      "loadError": "Platformlar yüklenemedi.",
+      "revokeTitle": "Bu platform iptal edilsin mi?",
+      "revokeConfirm": "Bu platform iptal edilsin mi? Bağlı tüm anahtarlar çalışmayı durdurur.",
+      "statusValue": {
+        "active": "Etkin",
+        "pending": "Onay bekliyor",
+        "revoked": "İptal edildi"
+      },
+      "emptyHint": "Biri Nextcloud, ownCloud veya Outlook’a Synaplan eklentisini kurup bu sunucunun adresini girdiğinde sunucu kaydolur.",
+      "emptyAction": "Kurulum adımlarını göster"
+    },
+    "policies": {
+      "group": "Grup",
+      "chooseGroup": "Bir grup seçin",
+      "helper": "Bu ayarlar gruptaki herkes için geçerlidir. Kişisel ayar öne geçer. Bir kurulum kilidi hem grup değerini hem kişisel ayarları yok sayar.",
+      "pickGroup": "Kurallarını düzenlemek için bir grup seçin.",
+      "defaultModels": "Varsayılan modeller",
+      "allowedModels": "İzin verilen modeller",
+      "allowedHelper": "Herkesin tüm modelleri kullanması için her kullanımı boş bırakın. İşaretlenen modeller yalnızca o kullanımı sınırlar. İşareti olmayan bir kullanım açık kalır.",
+      "allowedLimits": "Bu sınırlar: {names}. Diğer kullanımlar açık kalır.",
+      "features": "Özellikler",
+      "featuresHelper": "Bu grubun bir özelliği açması veya kapatması gerekmiyorsa kurulum varsayılanını bırakın.",
+      "featureOn": "Bu grup için açık",
+      "featureOff": "Bu grup için kapalı",
+      "inheritedOn": "Kurulum varsayılanı açık.",
+      "inheritedOff": "Kurulum varsayılanı kapalı.",
+      "inheritedUnset": "Kurulumda varsayılan yok, bu yüzden kapalı.",
+      "willInherit": "Kaydettikten sonra kurulum varsayılanı kullanılır.",
+      "groupForcesOn": "Bu grup, üyeleri için bunu açar.",
+      "groupForcesOff": "Bu grup, üyeleri için bunu kapatır.",
+      "rateLimit": "Kullanım sınırı düzeyi",
+      "useGlobal": "Kurulum varsayılanını kullan",
+      "useBillingTier": "Kullanıcının planını kullan",
+      "conflict": "Başka bir grup farklı bir varsayılan belirlemiş. En küçük numaralı grup kazanır.",
+      "locks": "Kilitli kurulum varsayılanları",
+      "locksHelper": "Bu kilitler bir gruba değil, tüm kuruluma uygulanır. Kilit açıkken yalnızca kurulum varsayılanı kullanılır. Grup ve kişisel değerler kayıtlı kalır ama yok sayılır. Yeniden kullanmak için kilidi kapatın.",
+      "save": "Kuralları kaydet",
+      "saved": "Grup kuralları kaydedildi.",
+      "lockSaved": "Kurulum kilidi güncellendi.",
+      "lockIgnored": "Kurulum kilidi açıkken kullanılmaz.",
+      "lockMissingDefault": "Kilitlenecek bir kurulum varsayılanı yok. Önce kurulum değerini ayarlayın, sonra kilitleyin.",
+      "loadError": "Kurallar yüklenemedi.",
+      "saveError": "Kurallar kaydedilemedi.",
+      "capability": {
+        "CHAT": "Sohbet",
+        "SORT": "Sıralama",
+        "ANALYZE": "Analiz",
+        "VECTORIZE": "Arama",
+        "PIC2TEXT": "Görüntüden metin",
+        "TEXT2PIC": "Metinden görüntü",
+        "PIC2PIC": "Görüntü düzenleme",
+        "TEXT2VID": "Metinden video",
+        "IMG2VID": "Görüntüden video",
+        "SOUND2TEXT": "Konuşmadan metin",
+        "TEXT2SOUND": "Metinden konuşma",
+        "MEM": "Bellek",
+        "TOOLS": "Araçlar"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Kayıtlı görevler",
+        "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
+        "DOCUMENT_TOOLS_ENABLED": "Belge araçları",
+        "SEARCH_AI_ENABLED": "Aramada AI yardımı",
+        "MULTITASK_ROUTING_ENABLED": "Çok adımlı yönlendirme",
+        "MULTITASK_PARALLEL_ENABLED": "Paralel adımlar",
+        "MULTITASK_URL_FETCH_ENABLED": "Web sayfalarını getir",
+        "MULTITASK_MCP_FETCH_ENABLED": "Bağlı araçlardan oku",
+        "MULTITASK_MCP_ACTION_ENABLED": "Bağlı araçlarla işlem yap",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-posta ara",
+        "TOOLS_REGISTRY_ENABLED": "Araç kataloğu",
+        "TOOLS_APPROVALS_ENABLED": "Araç onayları",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Özel HTTP araçları",
+        "WORKFLOWS_BUILDER_ENABLED": "Görev adımları düzenleyicisi",
+        "CHAT_EXPORT_ENABLED": "Sohbetleri dışa aktar",
+        "CHAT_SHARE_ENABLED": "Sohbetleri paylaş"
+      }
+    },
+    "intro": {
+      "users": "Burada hesabı olan herkes. Seviye değiştirin, adres doğrulayın veya bir hesabı kapatın.",
+      "groups": "Gruplar kullanıcıları bir araya getirir; asistanları paylaşır ve kuralları herkes için bir kez belirlersiniz.",
+      "policies": "Politikalar bir grubun neleri kullanabileceğini belirler, örneğin hangi özellikleri veya modelleri.",
+      "moderation": "Kullanıcıların bildirdiği içerikler. İnceleyin, sonra tutun veya kaldırın.",
+      "audit": "Bu sunucuda kimin neyi değiştirdiğinin kaydı, en yenisi önce."
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Görüntüleyebilir",
+      "use": "Kullanabilir",
+      "edit": "Düzenleyebilir",
+      "manage": "Yönetebilir"
+    },
+    "share": "Paylaş",
+    "sharedWithMe": "Benimle paylaşılan",
+    "incoming": {
+      "title": "Gelen sohbetler",
+      "subtitle": "Kullanıcıların veya grupların sizinle paylaştığı sohbetler",
+      "menu": "Gelen sohbetler",
+      "purpose": "Sizinle paylaşılan",
+      "menuNew": "Yeni gelen sohbetler",
+      "new": "Yeni",
+      "newCount": "{count} yeni gelen",
+      "owner": "{name} tarafından",
+      "sourceGroup": "Bu sohbet {owner} adlı kişiye ait. Size \"{name}\" grubu üzerinden ulaştı.",
+      "sourceEveryone": "Bu sohbet {owner} adlı kişiye ait. Hesabı olan herkesle paylaşıldı.",
+      "sourceDirect": "Bu sohbet {owner} adlı kişiye ait. Sizinle kişisel olarak paylaşıldı.",
+      "emptyText": "Gelen sohbet yok",
+      "filter": {
+        "label": "Sohbetleri filtrele",
+        "all": "Tümü",
+        "private": "Size ait",
+        "group": "Grup",
+        "widget": "Widget"
+      },
+      "pill": {
+        "private": "Size ait",
+        "privateTitle": "Bu sohbet size ait. Paylaşmak bunu değiştirmez.",
+        "sharedWithPeople": "{count} kişi",
+        "sharedWithPeopleTitle": "{count} kişiyle paylaşıldı",
+        "group": "Grup",
+        "groupTitle": "\"{name}\" grubuyla paylaşıldı",
+        "groupTitleGeneric": "Bir grupla paylaşıldı",
+        "everyone": "Herkes",
+        "everyoneTitle": "Hesabı olan herkesle paylaşıldı",
+        "direct": "Sizinle paylaşıldı",
+        "directTitle": "Sizinle kişisel olarak paylaşıldı",
+        "from": "{name} tarafından",
+        "widget": "Widget",
+        "widgetTitle": "Sohbet widget'larınızdan birinden gelen bir ziyaretçi görüşmesi"
+      }
+    },
+    "everyone": "Hesabı olan herkes",
+    "owner": "Sahip",
+    "fileUnavailable": "Bu dosya artık kullanılamıyor.",
+    "kind": {
+      "assistant": "AI asistanı",
+      "saved_task": "Kayıtlı görev",
+      "widget": "Sohbet widget'ı"
+    },
+    "runCopy": "Kendi kopyam olarak çalıştır",
+    "runCopyConfirm": "Bu kayıtlı görevin kendi kopyanızı oluşturulsun mu? Yalnızca siz başlattığınızda çalışır.",
+    "assistantNotShared": "Bu görevin AI asistanı sizinle paylaşılmamış.",
+    "assistantNotSharedNamed": "“{name}” AI asistanı sizinle paylaşılmamış. Sahibinden paylaşmasını isteyin, sonra yeniden deneyin.",
+    "sharedBy": "{name} tarafından",
+    "continueAsCopy": "Kendi kopyam olarak devam et",
+    "continueFailed": "Kopyanız oluşturulamadı. Lütfen tekrar deneyin.",
+    "continueNeedsUse": "Kopyanız oluşturulmadı. Bu sohbeti hâlâ okuyabilirsiniz.",
+    "readOnly": "Bu sohbeti görüntüleyebilirsiniz. Mesaj eklemek için kendi kopyanız olarak devam edin.",
+    "sharedFolder": "Paylaşılan · {name}",
+    "banner": {
+      "knowledge_folder": {
+        "sourceGroup": "Bu klasör {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
+        "sourceEveryone": "Bu klasör {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
+        "sourceDirect": "Bu klasör {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
+      },
+      "assistant": {
+        "sourceGroup": "Bu asistan {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
+        "sourceEveryone": "Bu asistan {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
+        "sourceDirect": "Bu asistan {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
+      },
+      "saved_task": {
+        "sourceGroup": "Bu kayıtlı görev {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
+        "sourceEveryone": "Bu kayıtlı görev {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
+        "sourceDirect": "Bu kayıtlı görev {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
+      },
+      "widget": {
+        "sourceGroup": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
+        "sourceEveryone": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
+        "sourceDirect": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
+      }
+    },
+    "dialog": {
+      "title": "\"{name}\" paylaş",
+      "who": "Kim",
+      "searchPlaceholder": "Kullanıcı veya grup ara…",
+      "searchPlaceholderSharedGroup": "Ortak bir gruptaki kullanıcıları veya bir grubu ara…",
+      "permission": "İzin",
+      "sharedWith": "Paylaşılan",
+      "empty": "Bunu yalnızca siz görebilirsiniz.",
+      "cancel": "İptal",
+      "remove": "Kaldır",
+      "removeTitle": "Paylaşımı durdur",
+      "removeConfirm": "{name} kaldırılsın mı?",
+      "removeConfirmConversation": "{name} kaldırılsın mı? Bu sohbeti kaybeder ve artık kendi kopyasını oluşturamaz.",
+      "loadFailed": "Paylaşımlar yüklenemedi.",
+      "saveFailed": "Paylaşılamadı. Lütfen tekrar deneyin.",
+      "shared": "{name} ile paylaşıldı.",
+      "sharedFind": "{name} ile paylaşıldı. {find}",
+      "removed": "{name} ile paylaşım durduruldu.",
+      "removeFailed": "Paylaşım durdurulamadı. Lütfen tekrar deneyin.",
+      "permissionFailed": "İzin değiştirilemedi. Lütfen tekrar deneyin.",
+      "noMatches": "Eşleşen kişi veya grup yok.",
+      "noMatchesSharedGroup": "Ortak bir gruptaki hiç kimse ve hiçbir grup bu adla eşleşmiyor.",
+      "searchFailed": "Kullanıcı veya gruplar aranamadı.",
+      "tryAgain": "Tekrar dene",
+      "everyoneInactive": "Bu paylaşım kayıtlı kalır, ancak herkesle paylaşım kapalıyken başkası bunu kullanamaz. Buradan kaldırabilirsiniz.",
+      "ownerLine": "Sahip · {name}",
+      "publicLink": "Herkese açık bağlantı",
+      "publicLinkHint": "Bağlantısı olan herkes görüntüleyebilir.",
+      "managePublicLink": "Herkese açık bağlantıyı yönet",
+      "openPublicLink": "Herkese açık bağlantıyı yönet",
+      "subjectType": {
+        "user": "kullanıcı",
+        "group": "grup"
+      },
+      "consequence": {
+        "conversation": {
+          "read": "Görebilir — bu sohbeti yalnızca okuyabilirler.",
+          "use": "Kullanabilir — bu sohbete kendi kopyaları olarak devam edebilirler."
+        },
+        "knowledge_folder": {
+          "read": "Görebilir — klasörü görebilirler.",
+          "use": "Kullanabilir — yapay zeka bu dosyaları kullanabilir.",
+          "edit": "Düzenleyebilir — bu klasördeki dosyaları değiştirebilirler.",
+          "manage": "Yönetebilir — bu klasörü başkalarıyla paylaşabilirler."
+        },
+        "assistant": {
+          "read": "Görebilir — kartı görebilir ve kopyalayabilirler.",
+          "use": "Kullanabilir — bu asistanla bir sohbet başlatabilirler.",
+          "edit": "Düzenleyebilir — bu asistanı değiştirebilirler."
+        },
+        "saved_task": {
+          "read": "Görebilir — kartı görebilirler.",
+          "use": "Kullanabilir — kendi kopyalarını oluşturabilirler."
+        },
+        "widget": {
+          "read": "Görebilir — widget ayarlarını açabilirler.",
+          "edit": "Düzenleyebilir — widget ayarlarını değiştirebilirler.",
+          "manage": "Yönetebilir — bu widget'ı başkalarıyla paylaşabilirler."
+        }
+      },
+      "find": {
+        "conversation": "Gelen sohbetler altında bulacaklar.",
+        "knowledge_folder": "Kaynaklar'da paylaşılan olarak görünür.",
+        "assistant": "Asistanlar → Benimle paylaşılan altında bulacaklar.",
+        "saved_task": "Otomasyonlar altında şablon olarak kullanabilirler.",
+        "widget": "Sohbet Widgetları listesinde bulurlar."
+      }
+    }
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (belge metni çıkarma)"
+    },
+    "docling": {
+      "label": "Docling (belge dönüştürme)"
+    },
+    "office_convert": {
+      "label": "Office dönüştürme"
+    },
+    "searxng": {
+      "label": "SearXNG web araması"
+    },
+    "piper_tts": {
+      "label": "Piper metinden sese"
+    },
+    "local_ai": {
+      "label": "Yerel AI (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Higgsfield video üretimi"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "TheHive görsel üretimi"
+    },
+    "stripe_billing": {
+      "label": "Stripe faturalandırma"
+    },
+    "mobile_iap": {
+      "label": "Mobil uygulama içi satın alma"
+    },
+    "whatsapp": {
+      "label": "WhatsApp kanalı"
+    },
+    "telegram": {
+      "label": "Telegram kanalı"
+    },
+    "federation": {
+      "label": "İş ortakları"
+    },
+    "opendesk_stt": {
+      "label": "Toplantı notları"
+    },
+    "live_voice": {
+      "label": "Canlı konuşmalar"
+    },
+    "compute": {
+      "label": "Güvenli dosya çalışması",
+      "running": "Dosya çalışması çalışıyor.",
+      "runningOff": "Sidecar çalışıyor; dosya çalışması Sistem yapılandırması › Araçlar ve otomasyon altında kapalı.",
+      "unreachable": "Dosya çalışması sidecar’ına ulaşılamıyor.",
+      "unset": "COMPUTE_URL veya COMPUTE_TOKEN ayarlı değil.",
+      "reachable": "Sidecar erişilebilir.",
+      "notRunning": "Sidecar çalışmıyor: Dosya çalışması kullanılamıyor."
+    },
+    "state": {
+      "available": "Kullanılabilir",
+      "needs_setup": "Kurulum gerekli",
+      "absent": "Kurulu değil"
+    },
+    "notice": {
+      "title": "{module} bu kurulumda kullanılamıyor",
+      "body": "Bu özellik isteğe bağlıdır. Bu kurulumun yöneticisi tarafından açılır.",
+      "howToEnable": "Nasıl etkinleştirilir",
+      "openFeatureStatus": "Sistem durumunu aç"
+    },
+    "chat_artifacts": {
+      "label": "HTML ve SVG önizlemesi"
+    }
+  },
+  "partners": {
+    "title": "İş ortakları",
+    "subtitle": "Diğer şirketlerle bağlantı kurun. Siz seçene kadar hiçbir şey paylaşılmaz.",
+    "unreachable": "Sunucunuz özel bir adreste, bu yüzden diğer şirketler ona ulaşamaz. İş ortakları genel bir https adresi ister.",
+    "empty": "Diğer şirketlerle çalışın. Bir davet gönderin veya aldığınız bir daveti yapıştırın. Dosyalarınız sunucunuzda kalır.",
+    "companyName": "Şirket adı",
+    "open": "İş ortaklarına aç",
+    "openedLine": "{name} olarak iş ortaklarına açık.",
+    "fingerprint": "Anahtar {fingerprint}",
+    "close": "İş ortaklarına kapat",
+    "closeTitle": "İş ortaklarına kapatılsın mı?",
+    "closeMessage": "Yeni bağlantılar durur. Mevcut her iş ortağı ayrılır. Daha önce kopyalananlar silinmez.",
+    "invite": "İş ortağı davet et",
+    "inviteHelp": "Bu adresi diğer şirketin yöneticisine gönderin. Bir kez geçerlidir ve 7 gün sonra sona erer.",
+    "copy": "Adresi kopyala",
+    "copied": "Adres kopyalandı.",
+    "pasteLabel": "Davetiniz mi var?",
+    "pastePlaceholder": "Davet adresini yapıştırın",
+    "connect": "Bağlan",
+    "connected": "Bağlandı. Henüz iki tarafta da hiçbir şey paylaşılmadı.",
+    "pending": "Davet bekliyor",
+    "active": "Bağlı",
+    "paused": "Duraklatıldı",
+    "pausedByThem": "Karşı taraf bu bağlantıyı duraklattı.",
+    "pause": "Duraklat",
+    "resume": "Sürdür",
+    "disconnect": "Ayır",
+    "disconnectTitle": "{name} ayrılsın mı?",
+    "disconnectMessage": "Bu bağlantı şimdi durur. Daha önce kopyalananlar silinmez.",
+    "removeInvite": "Daveti kaldır",
+    "removeInviteTitle": "Bu davet kaldırılsın mı?",
+    "removeInviteMessage": "Bağlantı artık çalışmaz. Hiçbir şey paylaşılmadı.",
+    "pausedHere": "Duraklatıldı. Siz sürdürmeden bu bağlantıyı kullanamazlar.",
+    "pausedPending": "Burada duraklatıldı. Diğer sunucu henüz onaylamadı.",
+    "resumed": "Sürdürüldü.",
+    "resumedPending": "Burada sürdürüldü. Diğer sunucu henüz onaylamadı.",
+    "disconnected": "Ayrıldı. Bu bağlantı şimdi durur.",
+    "disconnectedPending": "Burada ayrıldı. Diğer sunucu henüz onaylamadı.",
+    "inviteRemoved": "Davet kaldırıldı. Bağlantı artık çalışmaz.",
+    "closed": "Kapatıldı. Yeni bağlantılar durur.",
+    "inviteReady": "Davet hazır. Adresi diğer yöneticiye gönderin.",
+    "loadFailed": "İş ortakları yüklenemedi. Yeniden deneyin.",
+    "joinTitle": "Davetlisiniz",
+    "joinBody": "{name} ({domain}) şirketinizi davet etti. Kendi Synaplan'ınızda Operate, sonra İş ortakları'nı açın ve bu adresi yapıştırın.",
+    "joinInvalid": "Bu davet geçersiz veya süresi dolmuş.",
+    "errors": {
+      "not_reachable": "Sunucunuz özel bir adreste, bu yüzden diğer şirketler ona ulaşamaz. İş ortakları genel bir https adresi ister.",
+      "not_open": "Bağlanmadan önce iş ortaklarına açın.",
+      "invite_invalid": "Bu davet geçersiz.",
+      "invite_expired": "Bu davetin süresi doldu. Yenisini isteyin.",
+      "already_partner": "Bu sunucuyla zaten bağlısınız.",
+      "self": "Bu davet bu sunucuda oluşturuldu.",
+      "peer_unreachable": "Diğer sunucu yanıt vermedi. Hiçbir şey bağlanmadı.",
+      "peer_rejected": "Diğer sunucu isteği reddetti.",
+      "bad_signature": "İsteğin imzası geçerli değil.",
+      "sodium_missing": "Bu sunucu iş ortağı isteklerini imzalayamaz. İmza kitaplığı eksik.",
+      "invalid_name": "En fazla 80 karakterlik bir şirket adı girin.",
+      "invite_limit": "Zaten 20 kullanılmamış davetiniz var. Birini kullanın veya birinin süresi dolsun.",
+      "not_paused_by_us": "Bu bağlantıyı onlar duraklattı. Ayırabilir veya sürdürmelerini bekleyebilirsiniz.",
+      "not_partner": "Bu bağlantı bulunamadı.",
+      "bad_url": "Bu adres genel bir https sunucusu değil.",
+      "replay": "Bu istek zaten kullanıldı."
+    }
+  }
+}

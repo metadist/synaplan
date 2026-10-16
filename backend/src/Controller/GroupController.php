@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\Group;
 use App\Entity\User;
 use App\Service\Iam\Exception\DirectoryGroupReadOnlyException;
 use App\Service\Iam\Exception\GroupMembershipNotFoundException;
 use App\Service\Iam\GroupService;
 use App\Service\Iam\IamConfig;
+use App\Service\Iam\ShareService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,6 +26,7 @@ final class GroupController extends AbstractController
     public function __construct(
         private readonly IamConfig $iamConfig,
         private readonly GroupService $groupService,
+        private readonly ShareService $shareService,
     ) {
     }
 
@@ -56,6 +59,26 @@ final class GroupController extends AbstractController
                                     new OA\Property(property: 'role', type: 'string', enum: ['member', 'manager'], nullable: true),
                                     new OA\Property(property: 'membershipSource', type: 'string', enum: ['manual', 'directory'], nullable: true),
                                     new OA\Property(property: 'canLeave', type: 'boolean', example: true),
+                                    new OA\Property(property: 'leaderName', type: 'string', nullable: true, example: 'Ada Lovelace', description: 'Who leads the group. Null when nobody has the manager role.'),
+                                    new OA\Property(
+                                        property: 'memberNames',
+                                        type: 'array',
+                                        description: 'Other people in the group, not including the signed-in member.',
+                                        items: new OA\Items(type: 'string', example: 'Grace Hopper'),
+                                    ),
+                                    new OA\Property(
+                                        property: 'shares',
+                                        type: 'array',
+                                        description: 'Items shared with the group. Names only — never the content.',
+                                        items: new OA\Items(
+                                            required: ['name', 'kind'],
+                                            properties: [
+                                                new OA\Property(property: 'name', type: 'string', example: 'Q3 plan'),
+                                                new OA\Property(property: 'kind', type: 'string', example: 'conversation'),
+                                            ],
+                                            type: 'object',
+                                        ),
+                                    ),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64'),
                                     new OA\Property(property: 'updated', type: 'integer', format: 'int64'),
                                 ]
@@ -77,18 +100,68 @@ final class GroupController extends AbstractController
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $rows = $this->groupService->groupsOf((int) $user->getId());
+        $userId = (int) $user->getId();
+        $rows = $this->groupService->groupsOf($userId);
+        $groupIds = array_map(static fn (array $row): int => (int) $row['group']->getId(), $rows);
+        $context = $this->groupService->membershipContext($userId, $groupIds);
+        $shared = $this->shareService->sharedNamesForGroups($groupIds);
 
         return $this->json([
             'groups' => array_map(
-                fn (array $row) => $this->groupService->serializeGroup(
-                    $row['group'],
-                    null,
-                    $row['role'],
-                    $row['source'],
-                ),
+                function (array $row) use ($context, $shared): array {
+                    $group = $row['group'];
+                    $id = (int) $group->getId();
+                    $card = $this->groupService->serializeGroup(
+                        $group,
+                        null,
+                        $row['role'],
+                        $row['source'],
+                    );
+                    $card['leaderName'] = $context[$id]['leaderName'] ?? null;
+                    $card['memberNames'] = $context[$id]['memberNames'] ?? [];
+                    $card['shares'] = $shared[$id] ?? [];
+
+                    return $card;
+                },
                 $rows,
             ),
+        ]);
+    }
+
+    #[Route('/{id}/granted-shares', name: 'granted_shares', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/groups/{id}/granted-shares',
+        operationId: 'countMyGrantsToGroup',
+        summary: 'Count items the current user shared with a group',
+        description: 'Counts share rows this user granted to the group. Grants made by other people are not included. Leaving the group does not delete these rows unless the user explicitly chooses to stop sharing.',
+        tags: ['IAM Groups'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'How many items this user shared with the group',
+                content: new OA\JsonContent(
+                    required: ['count'],
+                    properties: [
+                        new OA\Property(property: 'count', type: 'integer', example: 2),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Not a member, or feature disabled'),
+            new OA\Response(response: 409, description: 'Directory membership cannot be left here'),
+        ]
+    )]
+    public function grantedShares(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $group = $this->requireLeavableGroup($id, $user);
+        if ($group instanceof JsonResponse) {
+            return $group;
+        }
+        \assert($user instanceof User);
+
+        return $this->json([
+            'count' => $this->shareService->countOwnGrantsToGroup($user, (int) $group->getId()),
         ]);
     }
 
@@ -97,17 +170,27 @@ final class GroupController extends AbstractController
         path: '/api/v1/groups/{id}/membership',
         operationId: 'leaveMyGroup',
         summary: 'Leave a group you were added to',
-        description: 'Removes the current user from a manual membership. Directory-synced memberships cannot be left here; they return at the next sign-in.',
+        description: 'Removes the current user from a manual membership. Shares this user granted to the group stay in place unless withdrawShares is true. Directory-synced memberships cannot be left here; they return at the next sign-in.',
         tags: ['IAM Groups'],
-        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(
+                name: 'withdrawShares',
+                in: 'query',
+                required: false,
+                description: 'When true, also delete shares this user granted to the group. Omit it to leave those shares in place.',
+                schema: new OA\Schema(type: 'boolean', default: false),
+            ),
+        ],
         responses: [
             new OA\Response(
                 response: 200,
                 description: 'Left the group',
                 content: new OA\JsonContent(
-                    required: ['success'],
+                    required: ['success', 'withdrawnShares'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'withdrawnShares', type: 'integer', example: 0),
                     ]
                 )
             ),
@@ -117,6 +200,33 @@ final class GroupController extends AbstractController
         ]
     )]
     public function leave(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $group = $this->requireLeavableGroup($id, $user);
+        if ($group instanceof JsonResponse) {
+            return $group;
+        }
+        \assert($user instanceof User);
+
+        $ip = (string) ($request->getClientIp() ?? '');
+        $withdraw = $request->query->getBoolean('withdrawShares');
+        $withdrawn = 0;
+
+        try {
+            if ($withdraw) {
+                $withdrawn = $this->groupService->leaveAndStopSharing($group, $user, $ip, $this->shareService);
+            } else {
+                $this->groupService->leave($group, $user, $ip, 0);
+            }
+        } catch (GroupMembershipNotFoundException) {
+            return $this->json(['error' => 'You are not a member of this group.'], Response::HTTP_NOT_FOUND);
+        } catch (DirectoryGroupReadOnlyException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
+        }
+
+        return $this->json(['success' => true, 'withdrawnShares' => $withdrawn]);
+    }
+
+    private function requireLeavableGroup(int $id, ?User $user): Group|JsonResponse
     {
         if (!$user instanceof User) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -131,13 +241,13 @@ final class GroupController extends AbstractController
         }
 
         try {
-            $this->groupService->leave($group, $user, (string) ($request->getClientIp() ?? ''));
+            $this->groupService->assertCanLeave($group, $user);
         } catch (GroupMembershipNotFoundException) {
             return $this->json(['error' => 'You are not a member of this group.'], Response::HTTP_NOT_FOUND);
         } catch (DirectoryGroupReadOnlyException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
         }
 
-        return $this->json(['success' => true]);
+        return $group;
     }
 }

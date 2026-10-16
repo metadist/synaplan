@@ -234,6 +234,18 @@ class FileStorageServiceTest extends TestCase
         $this->assertStringContainsString(date('m').'/', $path);
     }
 
+    public function testStoreRawContentDoesNotCollideOnSameNameInTheSameSecond(): void
+    {
+        $first = $this->service->storeRawContent('one', 123, 'notes.txt', 'text/plain');
+        $second = $this->service->storeRawContent('two', 123, 'notes.txt', 'text/plain');
+
+        $this->assertTrue($first['success']);
+        $this->assertTrue($second['success']);
+        $this->assertNotSame($first['path'], $second['path']);
+        $this->assertTrue($this->service->fileExists($first['path']));
+        $this->assertTrue($this->service->fileExists($second['path']));
+    }
+
     // Helper methods
 
     private function createTestFile(string $filename, string $content): string

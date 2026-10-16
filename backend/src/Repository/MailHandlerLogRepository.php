@@ -49,6 +49,12 @@ final readonly class MailHandlerLogRepository
      * tagged with the correct action + provider discriminator so the
      * other methods on this repository can find it again.
      *
+     * Written with a plain INSERT instead of persist + flush. The entity
+     * maps BUSERID twice (scalar `userId` and the `user` association), and
+     * a flush writes the unset association as NULL. A flush would also push
+     * the handler's half-finished changes mid-run, and one failure closes
+     * the EntityManager for every later handler in the same run.
+     *
      * @throws DbalException on persistence failure
      */
     public function save(int $userId, int $handlerId, UseLog $entry): void
@@ -57,8 +63,18 @@ final readonly class MailHandlerLogRepository
         $entry->setAction(self::ACTION);
         $entry->setProvider((string) $handlerId);
 
-        $this->em->persist($entry);
-        $this->em->flush();
+        $this->em->getConnection()->insert('BUSELOG', [
+            'BUSERID' => $userId,
+            'BUNIXTIMES' => $entry->getUnixTimestamp(),
+            'BACTION' => self::ACTION,
+            'BPROVIDER' => (string) $handlerId,
+            'BSTATUS' => $entry->getStatus(),
+            'BERROR' => $entry->getError(),
+            'BMETADATA' => json_encode($entry->getMetadata(), \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE),
+        ], [
+            'BUSERID' => ParameterType::INTEGER,
+            'BUNIXTIMES' => ParameterType::INTEGER,
+        ]);
     }
 
     /**

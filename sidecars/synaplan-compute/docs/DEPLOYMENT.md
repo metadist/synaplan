@@ -8,27 +8,17 @@ except `GET /v1/health`. PHP holds the same value as `COMPUTE_TOKEN`.
 
 ## T1 — same host (developer / self-host)
 
-Compose profile `compute` in `synaplan/docker-compose.yml`:
-
 ```bash
-COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
-  COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  docker compose --profile compute up -d
+docker compose up -d
 ```
 
-`COMPUTE_TOKEN` must be at least 32 random bytes (`openssl rand -hex 32`
-produces 64 hex characters). Compose interpolates the variable even when
-the profile is off, so it defaults to empty rather than failing
-`docker compose ps`. The sidecar refuses to start if the token is short.
+Local compose builds this sidecar and the Python/Node runtimes, injects a
+development token, and runs the process as root so it can open the host
+Docker socket without a GID setting. PHP never mounts that socket. Never
+publish port `8080`.
 
-The sidecar image runs as distroless `nonroot`. A typical Linux Docker
-socket is `root:docker` mode `0660`, so pass `COMPUTE_DOCKER_GID` (the
-numeric GID of `/var/run/docker.sock`) via `group_add`. Without it every
-accepted run becomes `docker_unavailable`.
-
-The runner never pulls images. On a clean host build the Python and Node
-runtimes first (`make -C sidecars/synaplan-compute images`) and pin those
-digests in `internal/images/map.go`.
+Production self-host: `COMPOSE_PROFILES=compute` in `deploy/.env`, then
+`deploy/scripts/prepare.sh` (writes the token and scratch dirs).
 
 Honest limits: this is hardened Docker on the same machine as PHP
 (`--network none`, dropped caps, read-only rootfs). It is **not** the

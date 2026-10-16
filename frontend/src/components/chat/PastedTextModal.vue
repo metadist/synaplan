@@ -59,7 +59,7 @@
           >
             <button
               type="button"
-              class="btn-secondary px-3 py-2 sm:px-4 rounded-lg text-sm font-medium"
+              class="btn-secondary px-3 py-2 sm:px-4 rounded-xl text-sm font-medium"
               data-testid="btn-pasted-text-cancel"
               @click="emit('close')"
             >
@@ -67,7 +67,7 @@
             </button>
             <button
               type="button"
-              class="btn-primary px-3 py-2 sm:px-4 rounded-lg text-sm font-medium"
+              class="btn-primary px-3 py-2 sm:px-4 rounded-xl text-sm font-medium"
               data-testid="btn-pasted-text-save"
               @click="save"
             >

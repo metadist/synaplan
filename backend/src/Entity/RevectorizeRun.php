@@ -31,6 +31,8 @@ class RevectorizeRun
     public const SCOPE_DOCUMENTS = 'documents';
     public const SCOPE_MEMORIES = 'memories';
     public const SCOPE_ALL = 'all';
+    /** The Smart Search index; bound to DEFAULTMODEL.SEARCH_EMBED, not VECTORIZE. */
+    public const SCOPE_SEARCH = 'search';
 
     public const STATUS_QUEUED = 'queued';
     public const STATUS_RUNNING = 'running';

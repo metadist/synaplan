@@ -4,17 +4,27 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
+use App\AI\Exception\ChatFailureReason;
+use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Service\AiFacade;
 use App\Entity\Connection;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Repository\ConnectionRepository;
+use App\Repository\FileRepository;
 use App\Repository\SearchResultRepository;
+use App\Repository\UserRepository;
 use App\Service\Calendar\CalendarEventService;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Destination\DestinationRegistry;
 use App\Service\Destination\RequestedCalendarDelivery;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\FileStorageService;
+use App\Service\File\UnreadSourceGuard;
+use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ChatErrorView;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\Message\Handler\MediaGenerationHandler;
@@ -34,8 +44,10 @@ use App\Service\Multitask\Execution\Runner\WebSearchRunner;
 use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
+use App\Service\RAG\ChatKnowledgeContextLoader;
 use App\Service\RAG\VectorSearchService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Search\BraveSearchService;
 use App\Tests\Support\WebSearchGatewayFactory;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -51,6 +63,8 @@ final class RunnersTest extends TestCase
         $m->method('getText')->willReturn($text);
         $m->method('getFileText')->willReturn($fileText);
         $m->method('getLanguage')->willReturn('en');
+        $m->method('getUserId')->willReturn(1);
+        $m->method('getChatId')->willReturn(null);
         $m->method('getFile')->willReturn(0);
         $m->method('getFilePath')->willReturn('');
         $m->method('getFiles')->willReturn(new ArrayCollection());
@@ -64,6 +78,8 @@ final class RunnersTest extends TestCase
         $m->method('getText')->willReturn($text);
         $m->method('getFileText')->willReturn('');
         $m->method('getLanguage')->willReturn('en');
+        $m->method('getUserId')->willReturn(1);
+        $m->method('getChatId')->willReturn(null);
         $m->method('getFile')->willReturn(1);
         $m->method('getFilePath')->willReturn('01/000/00001/2026/06/cat.png');
         $m->method('getFileType')->willReturn('png');
@@ -219,6 +235,7 @@ final class RunnersTest extends TestCase
         });
 
         $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('resolveUsableModelId')->willReturnArgument(0);
         // The user explicitly picked a model — the runner must NOT consult the
         // capability/system default at all.
         $modelConfig->expects(self::never())->method('getDefaultModel');
@@ -238,6 +255,36 @@ final class RunnersTest extends TestCase
 
         self::assertTrue($result->isSuccessful());
         self::assertSame(999, $result->metadata['model_id'] ?? null);
+    }
+
+    public function testChatRunnerReplacesAModelTheMemberMayNotUse(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb('pong');
+
+            return ['provider' => 'groq', 'model' => 'openai/gpt-oss-120b'];
+        });
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('resolveUsableModelId')->with(324, 'CHAT', 1)->willReturn(76);
+        $modelConfig->expects(self::never())->method('getDefaultModel');
+        $modelConfig->method('getProviderForModel')->with(76)->willReturn('groq');
+        $modelConfig->method('getModelName')->with(76)->willReturn('openai/gpt-oss-120b');
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'alpha']);
+        $context = new NodeContext(
+            $this->message('alpha'),
+            [],
+            1,
+            ['language' => 'en', 'model_id' => 324],
+        );
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(76, $result->metadata['model_id'] ?? null);
     }
 
     /**
@@ -280,6 +327,66 @@ final class RunnersTest extends TestCase
         self::assertTrue($result->isSuccessful());
         self::assertIsString($capturedSystem);
         self::assertStringContainsString('Extract meeting requests. Ignore newsletters.', $capturedSystem);
+    }
+
+    public function testChatRunnerNamesTheModelThatAnswersInTheSelfAwareBlock(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $capturedSystem = null;
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb) use (&$capturedSystem): array {
+            $capturedSystem = $messages[0]['content'] ?? null;
+            $cb('I am the Synaplan AI assistant.');
+
+            return [];
+        });
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn("About Synaplan\n[PLATFORM_CAPABILITIES]");
+        $promptService = $this->createMock(PromptService::class);
+        $promptService->method('getPromptWithMetadata')->willReturn([
+            'prompt' => $prompt,
+            'metadata' => ['aiModel' => -1],
+        ]);
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('resolveUsableModelId')->willReturnArgument(0);
+        $modelConfig->method('getDefaultModel')->willReturn(10);
+
+        $configRepo = $this->createMock(\App\Repository\ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => \App\Service\SelfAware\SelfAwareConfig::CONFIG_GROUP === $group ? '1' : null,
+        );
+        $inventory = $this->createMock(\App\Service\SelfAware\CapabilityInventory::class);
+        $inventory->method('build')->willReturn(new \App\Service\SelfAware\CapabilityReport([], '5.0.0', false, false));
+        $claude = (new \App\Entity\Model())->setName('Claude Sonnet 4.5')->setService('Anthropic');
+        $gpt = (new \App\Entity\Model())->setName('GPT-4o')->setService('OpenAI');
+        $models = $this->createMock(\App\Repository\ModelRepository::class);
+        $models->method('find')->willReturnCallback(
+            static fn (mixed $id): ?\App\Entity\Model => match ((int) $id) {
+                10 => $claude,
+                20 => $gpt,
+                default => null,
+            },
+        );
+        $decorator = new \App\Service\SelfAware\SelfAwarePromptDecorator(
+            new \App\Service\SelfAware\SelfAwareConfig($configRepo),
+            $inventory,
+            new \App\Service\SelfAware\CapabilityReportRenderer(),
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $models,
+            $modelConfig,
+        );
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $promptService, $this->createMock(LoggerInterface::class), $decorator);
+        $node = new TaskNode('n1', Capability::Chat, [], ['text' => 'Which model are you?'], ['topic_id' => 'synaplan']);
+        $context = new NodeContext($this->message('Which model are you?'), [], 1, ['language' => 'en', 'model_id' => 20]);
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertIsString($capturedSystem);
+        self::assertStringContainsString('This reply is generated by GPT-4o (OpenAI).', $capturedSystem);
+        self::assertStringContainsString('Default model for Chat / General: Claude Sonnet 4.5 (Anthropic).', $capturedSystem);
     }
 
     public function testChatRunnerFallsBackWhenTopicIdIsUnknown(): void
@@ -331,6 +438,7 @@ final class RunnersTest extends TestCase
         ]);
 
         $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('resolveUsableModelId')->willReturnArgument(0);
         $modelConfig->expects(self::never())->method('getDefaultModel');
         $modelConfig->expects(self::once())->method('getProviderForModel')->with(42)->willReturn('ollama');
         $modelConfig->expects(self::once())->method('getModelName')->with(42)->willReturn('pinned-model');
@@ -415,6 +523,96 @@ final class RunnersTest extends TestCase
         self::assertSame(0, $result->metadata['rag_chunks'] ?? null);
     }
 
+    public function testRagQuerySearchesNothingWhenTheAssistantHasNoKnowledge(): void
+    {
+        $vectorSearch = $this->createMock(VectorSearchService::class);
+        $vectorSearch->expects(self::never())->method('semanticSearch');
+        $knowledge = $this->createMock(ChatKnowledgeContextLoader::class);
+        $knowledge->method('assistantScopes')->willReturn([]);
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb('nothing found');
+
+            return [];
+        });
+        $profile = new RuntimeProfile(
+            promptId: 1,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Use only the folders I attached.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: ['tool_internet' => true],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 4,
+        );
+        $runner = new ChatRunner(
+            $aiFacade,
+            $this->createMock(ModelConfigService::class),
+            $vectorSearch,
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $this->createMock(PromptService::class),
+            $this->createMock(LoggerInterface::class),
+            knowledge: $knowledge,
+        );
+
+        $result = $runner->run(
+            new TaskNode('n1', Capability::RagQuery, [], ['text' => 'what is in the folder?']),
+            new NodeContext($this->message('what is in the folder?'), [], 1, [
+                'language' => 'en',
+                'runtime_profile' => $profile,
+            ]),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(0, $result->metadata['rag_chunks'] ?? null);
+    }
+
+    public function testSummarizeKeepsTheTaskContractAndTheAssistantInstructions(): void
+    {
+        $captured = null;
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb) use (&$captured): array {
+            $captured = $messages[0]['content'];
+            $cb('Friday: 10');
+
+            return [];
+        });
+        $profile = new RuntimeProfile(
+            promptId: 1,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Daily report template: weekday and count.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: [],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 4,
+        );
+        $runner = new ChatRunner(
+            $aiFacade,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(VectorSearchService::class),
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $this->createMock(PromptService::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $result = $runner->run(
+            new TaskNode('n1', Capability::Summarize, [], ['text' => 'ten results']),
+            new NodeContext($this->message('ten results'), [], 1, [
+                'language' => 'en',
+                'runtime_profile' => $profile,
+            ]),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertStringContainsString('Return ONLY the summary', (string) $captured);
+        self::assertStringContainsString('Daily report template: weekday and count.', (string) $captured);
+    }
+
     public function testChatRunnerIsolatesModelFailure(): void
     {
         $aiFacade = $this->createMock(AiFacade::class);
@@ -462,6 +660,20 @@ final class RunnersTest extends TestCase
         self::assertFalse($result->isSuccessful());
     }
 
+    public function testText2SoundReportsNoTextWhenNothingIsSpeakable(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('synthesize')->willThrowException(new NoSpeakableTextException());
+
+        $runner = new Text2SoundRunner($aiFacade, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n3', Capability::Text2Sound, [], ['text' => '<think>plan</think>']);
+
+        $result = $runner->run($node, $this->context($this->message()));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame('no text to synthesize', $result->error);
+    }
+
     public function testText2SoundTruncatesLongTextBeforeSynthesize(): void
     {
         $longText = str_repeat('Word ', 1500);
@@ -471,11 +683,12 @@ final class RunnersTest extends TestCase
             ->expects(self::once())
             ->method('synthesize')
             ->with(
-                self::callback(static function (string $text): bool {
-                    return mb_strlen($text) <= \App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS;
+                $longText,
+                'en',
+                self::anything(),
+                self::callback(static function (array $opts): bool {
+                    return 'mp3' === ($opts['format'] ?? null);
                 }),
-                self::anything(),
-                self::anything(),
             )
             ->willReturn([
                 'relativePath' => '1/000/2026/06/tts_x.mp3',
@@ -489,7 +702,28 @@ final class RunnersTest extends TestCase
         $result = $runner->run($node, $this->context($this->message()));
 
         self::assertTrue($result->isSuccessful());
-        self::assertLessThanOrEqual(\App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS, mb_strlen((string) $result->files[0]['source_text']));
+        self::assertLessThanOrEqual(\App\Service\Media\TtsTextSanitizer::MAX_SYNTHESIS_CHARS, mb_strlen((string) $result->files[0]['source_text']));
+    }
+
+    public function testText2SoundPassesClassificationLanguage(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade
+            ->expects(self::once())
+            ->method('synthesize')
+            ->with('Hallo Welt', 'de', self::anything(), self::anything())
+            ->willReturn([
+                'relativePath' => '1/000/2026/06/tts_de.mp3',
+                'provider' => 'piper',
+                'model' => 'piper-multi',
+            ]);
+
+        $runner = new Text2SoundRunner($aiFacade, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n3', Capability::Text2Sound, [], ['text' => 'Hallo Welt'], ['format' => 'mp3']);
+
+        $result = $runner->run($node, new NodeContext($this->message('Hallo Welt'), [], 1, ['language' => 'de']));
+
+        self::assertTrue($result->isSuccessful());
     }
 
     public function testMediaGenerationRunnerProducesImageFile(): void
@@ -500,7 +734,7 @@ final class RunnersTest extends TestCase
             $captured = $classification;
 
             return [
-                'content' => 'Generated image: a dog',
+                'content' => '__IMAGE_GENERATED__',
                 'metadata' => [
                     'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
                     'local_path' => '1/000/dog.png',
@@ -532,6 +766,33 @@ final class RunnersTest extends TestCase
         $result = $runner->run($node, $this->context($this->message('a dog')));
 
         self::assertFalse($result->isSuccessful());
+    }
+
+    /**
+     * An inline image node that gets text instead of a picture must show the
+     * localized quote and recovery sentence. metadata.error is the raw
+     * English exception and must not become the task-card text.
+     */
+    public function testMediaGenerationRunnerUsesTheLocalizedTextReply(): void
+    {
+        $localized = "Google hat kein Bild erstellt, sondern mit Text geantwortet:\n\n> 10\n\n"
+            .'Formuliere die Anfrage als Bildanweisung um oder wähle ein anderes Bildmodell.';
+        $handler = $this->createStub(MediaGenerationHandler::class);
+        $handler->method('handle')->willReturn([
+            'content' => $localized,
+            'metadata' => [
+                'error' => 'Google returned text instead of an image (gemini-3.1-flash-image): "10"',
+            ],
+        ]);
+
+        $runner = new MediaGenerationRunner($handler, $this->createStub(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::ImageGeneration, [], ['prompt' => 'Wie viele Fenster?']);
+
+        $result = $runner->run($node, $this->context($this->message('Wie viele Fenster?')));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame($localized, $result->error);
+        self::assertStringNotContainsString('returned text instead', (string) $result->error);
     }
 
     /**
@@ -584,7 +845,7 @@ final class RunnersTest extends TestCase
                 $capturedOptions = $options;
 
                 return [
-                    'content' => 'Generated image',
+                    'content' => '__IMAGE_GENERATED__',
                     'metadata' => [
                         'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
                         'local_path' => '1/000/dog.png',
@@ -686,8 +947,20 @@ final class RunnersTest extends TestCase
             new CalendarEventService(),
             $storage,
             $this->inertCalendarDelivery(),
+            $this->usersWithoutProfile(),
             $this->createMock(LoggerInterface::class),
         );
+    }
+
+    /**
+     * No stored profile timezone — the runner falls back to the planner zone.
+     */
+    private function usersWithoutProfile(): UserRepository&MockObject
+    {
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturn(null);
+
+        return $users;
     }
 
     /**
@@ -714,7 +987,7 @@ final class RunnersTest extends TestCase
         $node = new TaskNode('n1', Capability::CalendarEvent, [], [
             'title' => 'Meeting with Sanam',
             'start' => '2026-06-10T09:00:00',
-            'timezone' => 'UTC',
+            'timezone' => 'Europe/Berlin',
             'duration_minutes' => 60,
             'attendees' => ['Sanam'],
         ]);
@@ -767,6 +1040,7 @@ final class RunnersTest extends TestCase
             new CalendarEventService(),
             $storage,
             $this->inertCalendarDelivery(),
+            $this->usersWithoutProfile(),
             $this->createMock(LoggerInterface::class),
             approvalGate: $gate,
         );
@@ -844,6 +1118,7 @@ final class RunnersTest extends TestCase
                     new PlannerChannelCatalog($connections),
                     $this->createMock(LoggerInterface::class),
                 ),
+                $this->usersWithoutProfile(),
                 $this->createMock(LoggerInterface::class),
                 uploadDir: $uploadDir,
             );
@@ -896,6 +1171,7 @@ final class RunnersTest extends TestCase
                 new CalendarEventService(),
                 $storage,
                 $this->inertCalendarDelivery(),
+                $this->usersWithoutProfile(),
                 $this->createMock(LoggerInterface::class),
                 uploadDir: $uploadDir,
             );
@@ -903,7 +1179,7 @@ final class RunnersTest extends TestCase
             $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
                 'title' => 'Sync',
                 'start' => '2026-06-10T15:00:00',
-                'timezone' => 'UTC',
+                'timezone' => 'Europe/Berlin',
                 'channel' => 'invented',
             ]);
 
@@ -979,6 +1255,7 @@ final class RunnersTest extends TestCase
                     new PlannerChannelCatalog($connections),
                     $this->createMock(LoggerInterface::class),
                 ),
+                $this->usersWithoutProfile(),
                 $this->createMock(LoggerInterface::class),
                 uploadDir: $uploadDir,
             );
@@ -986,7 +1263,7 @@ final class RunnersTest extends TestCase
             $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
                 'title' => 'Nextcloud Test',
                 'start' => '2026-09-15T09:00:00',
-                'timezone' => 'UTC',
+                'timezone' => 'Europe/Berlin',
             ]);
 
             $result = $runner->run($node, $this->context($this->message(
@@ -1031,6 +1308,7 @@ final class RunnersTest extends TestCase
                 new CalendarEventService(),
                 $storage,
                 $this->inertCalendarDelivery(),
+                $this->usersWithoutProfile(),
                 $this->createMock(LoggerInterface::class),
                 uploadDir: $uploadDir,
             );
@@ -1038,7 +1316,7 @@ final class RunnersTest extends TestCase
             $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
                 'title' => 'Nextcloud Test',
                 'start' => '2026-09-15T09:00:00',
-                'timezone' => 'UTC',
+                'timezone' => 'Europe/Berlin',
             ]);
 
             $result = $runner->run($node, $this->context($this->message(
@@ -1067,7 +1345,7 @@ final class RunnersTest extends TestCase
         $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
             'title' => 'Sync',
             'start' => '2026-06-10T15:00:00',
-            'timezone' => 'UTC',
+            'timezone' => 'Europe/Berlin',
         ]);
 
         $result = $this->calendarRunner()->run(
@@ -1088,7 +1366,7 @@ final class RunnersTest extends TestCase
         ], [
             'title' => 'From params',
             'start' => '2026-06-10T09:00:00',
-            'timezone' => 'UTC',
+            'timezone' => 'Europe/Berlin',
         ]);
 
         $result = $this->calendarRunner()->run($node, $this->context($this->message()));
@@ -1128,7 +1406,7 @@ final class RunnersTest extends TestCase
             ];
         });
 
-        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class));
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UnreadSourceGuard::class));
         $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'Create a docx with a table']);
 
         $result = $runner->run($node, $this->context($this->message('Create a docx with a table')));
@@ -1141,6 +1419,44 @@ final class RunnersTest extends TestCase
         // ChatHandler must be steered to the officemaker file-generation prompt.
         self::assertSame('officemaker', $captured['topic']);
         self::assertSame('document_generation', $captured['intent']);
+    }
+
+    public function testDocumentGenerationKeepsOfficemakerAndPassesAssistantInstructions(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $text = null;
+        $classification = null;
+        $handler->method('handle')->willReturnCallback(function ($msg, $thread, $class) use (&$text, &$classification): array {
+            $text = $msg->getText();
+            $classification = $class;
+
+            return ['metadata' => ['generated_file' => ['filename' => 'report.txt', 'path' => '01/report.txt']]];
+        });
+        $profile = new RuntimeProfile(
+            promptId: 1,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Daily report template: weekday and count.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: [],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 4,
+        );
+
+        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UnreadSourceGuard::class)))->run(
+            new TaskNode('n1', Capability::DocumentGeneration, [], ['prompt' => 'save my daily report as report.txt']),
+            new NodeContext($this->message('save my daily report as report.txt'), [], 1, [
+                'language' => 'en',
+                'runtime_profile' => $profile,
+            ]),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('officemaker', $classification['topic']);
+        self::assertStringContainsString('Daily report template: weekday and count.', (string) $text);
+        self::assertStringContainsString('file envelope only', (string) $text);
     }
 
     /**
@@ -1165,7 +1481,7 @@ final class RunnersTest extends TestCase
         ]]));
 
         $node = new TaskNode('n1x', Capability::DocumentGeneration, ['n1'], ['prompt' => 'write a letter with the photo']);
-        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class)))->run($node, $context);
+        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UnreadSourceGuard::class)))->run($node, $context);
 
         self::assertTrue($result->isSuccessful());
         self::assertSame(['01/000/00001/2026/07/photo.jpg'], $options['document_images']);
@@ -1189,7 +1505,7 @@ final class RunnersTest extends TestCase
         ]]));
 
         $node = new TaskNode('n2', Capability::DocumentGeneration, ['n1'], ['prompt' => 'summarize the audio']);
-        (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class)))->run($node, $context);
+        (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UnreadSourceGuard::class)))->run($node, $context);
 
         self::assertArrayNotHasKey('document_images', (array) $options);
     }
@@ -1209,13 +1525,62 @@ final class RunnersTest extends TestCase
                 'metadata_keys' => ['error'],
             ]);
 
-        $runner = new DocumentGenerationRunner($handler, $logger);
+        $runner = new DocumentGenerationRunner($handler, $logger, $this->createMock(UnreadSourceGuard::class));
         $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'make a doc']);
 
         $result = $runner->run($node, $this->context($this->message('make a doc')));
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('no file', (string) $result->error);
+    }
+
+    /**
+     * Issue #2050: when the unread-source guard refuses, the node ends
+     * honestly — no handler call, no file, one sentence.
+     */
+    public function testDocumentGenerationRefusesUnreadSourceUrl(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $handler->expects(self::never())->method('handle');
+
+        $guard = $this->createMock(UnreadSourceGuard::class);
+        $guard->method('refusalFor')->willReturn('REFUSAL');
+
+        $message = $this->message('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $context = new NodeContext($message, [], 1, ['language' => 'de', 'url_pages_read' => 0]);
+
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $guard);
+        $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'chart from url']);
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(0, $result->files);
+        self::assertSame('REFUSAL', $result->text);
+        self::assertFalse($result->metadata['document_generation']['created'] ?? true);
+        self::assertSame('source_unread', $result->metadata['document_generation']['reason'] ?? null);
+    }
+
+    public function testDocumentGenerationProceedsWhenGuardAllows(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $handler->expects(self::once())->method('handle')->willReturn([
+            'metadata' => ['generated_file' => ['filename' => 'chart.xlsx', 'path' => '01/000/00001/2026/07/chart.xlsx']],
+        ]);
+
+        $guard = $this->createMock(UnreadSourceGuard::class);
+        $guard->method('refusalFor')->willReturn(null);
+
+        $message = $this->message('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $context = new NodeContext($message, [], 1, ['language' => 'de', 'url_pages_read' => 1]);
+
+        $runner = new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $guard);
+        $node = new TaskNode('n1', Capability::DocumentGeneration, [], ['text' => 'chart from url']);
+
+        $result = $runner->run($node, $context);
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
     }
 
     public function testWebSearchReturnsFormattedResults(): void
@@ -1251,6 +1616,34 @@ final class RunnersTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('not configured', (string) $result->error);
+    }
+
+    public function testWebSearchRefusesWhenTheAssistantDisabledInternet(): void
+    {
+        $brave = $this->createMock(BraveSearchService::class);
+        $brave->expects(self::never())->method('search');
+        $runner = new WebSearchRunner($this->createMock(SearchQueryGenerator::class), WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'synaplan']);
+        $profile = new RuntimeProfile(
+            promptId: 1,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Count mentions.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: ['tool_internet' => false],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 4,
+        );
+
+        $result = $runner->run($node, new NodeContext($this->message('search'), [], 1, [
+            'language' => 'en',
+            'runtime_profile' => $profile,
+        ]));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('not allowed to search', (string) $result->error);
     }
 
     public function testWebSearchReusesPrefetchedResultsForWholeMessageQuery(): void
@@ -1437,6 +1830,105 @@ final class RunnersTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('no file', (string) $result->error);
+    }
+
+    /**
+     * Issue #1074 residual: a throwing handler must surface the presented
+     * reason on the card, never the raw exception message.
+     */
+    public function testFileAnalysisPresentsHandlerFailureWithoutRawMessage(): void
+    {
+        $handler = $this->createMock(FileAnalysisHandler::class);
+        $handler->method('handle')->willThrowException(new \RuntimeException('context_length_exceeded: too many tokens'));
+
+        $presenter = $this->createMock(ChatErrorPresenter::class);
+        $presenter->method('present')->willReturn(new ChatErrorView(
+            ChatFailureReason::ContextLengthExceeded,
+            'That document is too large to analyse.',
+            null,
+            false,
+            'context_length_exceeded: too many tokens',
+        ));
+
+        $runner = new FileAnalysisRunner(
+            $handler,
+            $this->createMock(LoggerInterface::class),
+            errorPresenter: $presenter,
+        );
+        $node = new TaskNode('n1', Capability::FileAnalysis, [], ['prompt' => 'summarize it']);
+
+        $result = $runner->run($node, $this->context($this->messageWithFile('summarize it')));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertSame('That document is too large to analyse.', $result->error);
+    }
+
+    public function testFileAnalysisFallsBackToConversationDocument(): void
+    {
+        $file = (new File())
+            ->setUserId(1)
+            ->setFilePath('brief.pdf')
+            ->setFileType('pdf')
+            ->setFileName('brief.pdf')
+            ->setFileSize(12)
+            ->setFileMime('application/pdf')
+            ->setFileText('The brief says hello.')
+            ->setStatus('processed');
+        (new \ReflectionProperty(File::class, 'id'))->setValue($file, 42);
+
+        $entry = new ConversationFile(
+            'file:42',
+            'brief.pdf',
+            ConversationFile::CATEGORY_DOCUMENT,
+            ConversationFile::ORIGIN_UPLOADED,
+            '/tmp/brief.pdf',
+            'brief.pdf',
+            42,
+            100,
+            'IN',
+            'The brief says hello.',
+        );
+
+        $catalog = $this->createMock(ConversationFileCatalog::class);
+        $catalog->expects(self::once())
+            ->method('build')
+            ->willReturnCallback(function (Message $message, array $thread, array $extra, ?string $category, bool $requireOnDisk) use ($entry): array {
+                self::assertSame(42, $message->getChatId());
+                self::assertSame([], $thread);
+                self::assertSame([], $extra);
+                self::assertNull($category);
+                self::assertFalse($requireOnDisk);
+
+                return [$entry];
+            });
+        $catalog->method('analyzableForFollowUp')->willReturn([$entry]);
+
+        $files = $this->createMock(FileRepository::class);
+        $files->expects(self::once())->method('find')->with(42)->willReturn($file);
+
+        $seenMessage = null;
+        $handler = $this->createMock(FileAnalysisHandler::class);
+        $handler->method('handle')->willReturnCallback(function (Message $msg) use (&$seenMessage): array {
+            $seenMessage = $msg;
+
+            return ['content' => 'The brief says hello.', 'metadata' => ['analysis_type' => 'document']];
+        });
+
+        $runner = new FileAnalysisRunner(
+            $handler,
+            $this->createMock(LoggerInterface::class),
+            $catalog,
+            $files,
+        );
+        $node = new TaskNode('n1', Capability::FileAnalysis, [], ['prompt' => 'was steht im brief?']);
+        $inbound = (new Message())->setUserId(1)->setChatId(42)->setText('was steht im brief?')->setLanguage('de')->setDirection('IN');
+
+        $result = $runner->run($node, $this->context($inbound));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertInstanceOf(Message::class, $seenMessage);
+        self::assertSame(42, $seenMessage->getChatId());
+        self::assertTrue($seenMessage->getFiles()->contains($file));
     }
 
     public function testComposeReplyGathersTextAndAttachments(): void

@@ -3,6 +3,9 @@ nelmio_api_doc:
         info:
             title: Synaplan API
             description: Synaplan AI Assistant API Documentation
+            license:
+                name: Apache-2.0
+                url: https://www.apache.org/licenses/LICENSE-2.0.html
             # Sourced from APP_VERSION (git tag, set at build time), matching the
             # runtime config's build.version. Falls back to 'dev' locally.
             version: '%env(default:app_version_default:APP_VERSION)%'
@@ -20,6 +23,11 @@ nelmio_api_doc:
                     type: http
                     scheme: bearer
                     description: 'Bearer token for SSE connections. Get token from /api/v1/auth/token endpoint.'
+                ApiKey:
+                    type: apiKey
+                    in: header
+                    name: X-API-Key
+                    description: 'Synaplan API key (sk_...), sent in the X-API-Key header.'
     areas:
         path_patterns:
             - ^/api(?!/doc$) # Accepts all routes except /api/doc

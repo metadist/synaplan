@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Model;
 
 use App\Model\ModelCatalog;
-use App\Service\CostCalculationService;
+use App\Service\Usage\CostCalculationService;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -496,6 +496,132 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * GPT-6 Sol — released 2026-09-22. Chat + vision share the same upstream
+     * id, official $2/$10 per-1M pricing, $0.20/1M cached input, and the
+     * >272k long-context 2x/1.5x tier via CONTEXT_PRICING.
+     */
+    public function testGpt6SolModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $sol = ModelCatalog::find('openai:gpt-6-sol');
+
+        $this->assertCount(2, $sol, 'Expected gpt-6-sol chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($sol, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6-sol:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6-sol:pic2text'));
+
+        foreach ($sol as $variant) {
+            $this->assertSame('OpenAI', $variant['service']);
+            $this->assertSame('gpt-6-sol', $variant['providerId']);
+            $this->assertSame('gpt-6-sol', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.20, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('responses', $variant['json']['meta']['api'] ?? null);
+        }
+
+        $tier = ModelCatalog::contextPricing('gpt-6-sol');
+        $this->assertNotNull($tier);
+        $this->assertSame(272000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(15.0, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(0.40, $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
+     * GPT-6.1 Sol — released 2026-09-29. Same $2/$10 list price as GPT-6 Sol,
+     * but cached input is $0.10/1M (0.05x), not 0.1x.
+     */
+    public function testGpt61SolModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $sol = ModelCatalog::find('openai:gpt-6.1-sol');
+
+        $this->assertCount(2, $sol, 'Expected gpt-6.1-sol chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($sol, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6.1-sol:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6.1-sol:pic2text'));
+
+        foreach ($sol as $variant) {
+            $this->assertSame('OpenAI', $variant['service']);
+            $this->assertSame('gpt-6.1-sol', $variant['providerId']);
+            $this->assertSame('gpt-6.1-sol', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.10, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('responses', $variant['json']['meta']['api'] ?? null);
+        }
+
+        $tier = ModelCatalog::contextPricing('gpt-6.1-sol');
+        $this->assertNotNull($tier);
+        $this->assertSame(272000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(15.0, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(0.20, $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
+     * Mistral Large 4 is a public-preview id. `mistral-large-latest` still
+     * resolves to Large 3, and the catalog price is the launch discount
+     * ($0.68 / $2.09), not the $1.36 / $4.18 list.
+     */
+    public function testMistralLarge4IsPinnedToThePreviewIdAndLaunchPrice(): void
+    {
+        $rows = ModelCatalog::find('mistral:mistral-large-4');
+
+        $this->assertCount(2, $rows, 'Expected mistral-large-4 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($rows, 'tag'));
+        $this->assertNotSame(
+            ModelCatalog::findBidByKey('mistral:mistral-large-latest:chat'),
+            ModelCatalog::findBidByKey('mistral:mistral-large-4:chat'),
+        );
+
+        foreach ($rows as $row) {
+            $this->assertSame('Mistral', $row['service']);
+            $this->assertSame('mistral-large-4', $row['providerId']);
+            $this->assertSame('mistral-large-4', $row['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(0.68, (float) $row['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(2.09, (float) $row['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.068, (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+
+        $chat = ModelCatalog::find('mistral:mistral-large-4:chat')[0];
+        $this->assertSame('524288', $chat['json']['meta']['context_window'] ?? null);
+        $this->assertContains('reasoning', $chat['json']['features'] ?? []);
+        $this->assertContains('vision', $chat['json']['features'] ?? []);
+    }
+
+    /**
+     * GPT-6 Luna — released 2026-09-22. Chat + vision share the same upstream
+     * id, official $0.10/$0.50 per-1M pricing, $0.01/1M cached input, and the
+     * >272k long-context 2x/1.5x tier via CONTEXT_PRICING.
+     */
+    public function testGpt6LunaModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $luna = ModelCatalog::find('openai:gpt-6-luna');
+
+        $this->assertCount(2, $luna, 'Expected gpt-6-luna chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($luna, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6-luna:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6-luna:pic2text'));
+
+        foreach ($luna as $variant) {
+            $this->assertSame('OpenAI', $variant['service']);
+            $this->assertSame('gpt-6-luna', $variant['providerId']);
+            $this->assertSame('gpt-6-luna', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(0.10, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(0.50, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.01, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('responses', $variant['json']['meta']['api'] ?? null);
+        }
+
+        $tier = ModelCatalog::contextPricing('gpt-6-luna');
+        $this->assertNotNull($tier);
+        $this->assertSame(272000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(0.20, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(0.75, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(0.02, $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
      * Official cached-input rates per 1M tokens, verified against
      * https://developers.openai.com/api/docs/pricing and
      * https://ai.google.dev/gemini-api/docs/pricing on 2026-09-04.
@@ -511,6 +637,9 @@ class ModelCatalogTest extends TestCase
     {
         return [
             'gpt-6-astra' => ['openai:gpt-6-astra', 1.00],
+            'gpt-6-sol' => ['openai:gpt-6-sol', 0.20],
+            'gpt-6.1-sol' => ['openai:gpt-6.1-sol', 0.10],
+            'gpt-6-luna' => ['openai:gpt-6-luna', 0.01],
             'gpt-5.6-sol' => ['openai:gpt-5.6-sol', 0.40],
             'gpt-5.6-terra' => ['openai:gpt-5.6-terra', 0.20],
             'gpt-5.6-luna' => ['openai:gpt-5.6-luna', 0.02],
@@ -520,6 +649,14 @@ class ModelCatalogTest extends TestCase
             'gpt-5.4-nano' => ['openai:gpt-5.4-nano', 0.02],
             'gemini-2.5-pro' => ['google:gemini-2.5-pro', 0.125],
             'gemini-3.1-pro' => ['google:gemini-3.1-pro-preview', 0.20],
+            'gemini-2.5-flash' => ['google:gemini-2.5-flash', 0.03],
+            'gemini-2.5-flash-lite' => ['google:gemini-2.5-flash-lite', 0.01],
+            'gemini-3.1-flash-lite' => ['google:gemini-3.1-flash-lite', 0.025],
+            'gemini-3.5-flash' => ['google:gemini-3.5-flash', 0.15],
+            'gemini-3-flash-preview' => ['google:gemini-3-flash-preview', 0.05],
+            'mistral-medium-3.5' => ['mistral:mistral-medium-latest', 0.15],
+            'mistral-large-3' => ['mistral:mistral-large-latest', 0.05],
+            'mistral-large-4' => ['mistral:mistral-large-4', 0.068],
             'gemini-3.8-flash' => ['google:gemini-3.8-flash', 0.075],
             'gemini-3.7-flash' => ['google:gemini-3.7-flash', 0.075],
             'gemini-3.6-flash' => ['google:gemini-3.6-flash', 0.075],
@@ -625,7 +762,7 @@ class ModelCatalogTest extends TestCase
      */
     public function testCacheWriteMultiplierIsAuthoredOnlyForChargingFamilies(): void
     {
-        $charging = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
+        $charging = ['gpt-6-astra', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
 
         foreach (ModelCatalog::all() as $row) {
             $authored = $row['json']['cache_write_multiplier'] ?? null;
@@ -712,6 +849,59 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Claude Opus 5.5 — released 2026-09-22. Cache reads are 0.05x base input
+     * ($0.20/1M), not the Anthropic-wide 0.1x, so the catalog carries an
+     * explicit `cache_read_price_per_1M` override.
+     */
+    public function testClaudeOpus55ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $opus55 = ModelCatalog::find('anthropic:claude-opus-5-5');
+
+        $this->assertCount(2, $opus55, 'Expected claude-opus-5-5 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($opus55, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-opus-5-5:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-opus-5-5:pic2text'));
+
+        foreach ($opus55 as $variant) {
+            $this->assertSame('Anthropic', $variant['service']);
+            $this->assertSame('claude-opus-5-5', $variant['providerId']);
+            $this->assertSame('claude-opus-5-5', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(4.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(20.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.20, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+    }
+
+    /**
+     * Claude Sonnet 5.5 — released 2026-09-28. Same $2/$10 rate as Sonnet 5.
+     * Cache reads are 0.05x base input ($0.10/1M), not the Anthropic-wide
+     * 0.1x, so the rows carry an explicit `cache_read_price_per_1M` override
+     * (#2392). The chat row's default effort is high.
+     */
+    public function testClaudeSonnet55ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $sonnet55 = ModelCatalog::find('anthropic:claude-sonnet-5-5');
+
+        $this->assertCount(2, $sonnet55, 'Expected claude-sonnet-5-5 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($sonnet55, 'tag'));
+        $this->assertSame(379, ModelCatalog::findBidByKey('anthropic:claude-sonnet-5-5:chat'));
+        $this->assertSame(380, ModelCatalog::findBidByKey('anthropic:claude-sonnet-5-5:pic2text'));
+
+        foreach ($sonnet55 as $variant) {
+            $this->assertSame('Anthropic', $variant['service']);
+            $this->assertSame('claude-sonnet-5-5', $variant['providerId']);
+            $this->assertSame('claude-sonnet-5-5', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.10, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+
+        $chat = ModelCatalog::find('anthropic:claude-sonnet-5-5:chat')[0];
+        $this->assertSame('high', $chat['json']['meta']['reasoning_effort_default'] ?? null);
+        $this->assertSame(128000, $chat['json']['max_tokens'] ?? null);
+    }
+
+    /**
      * Sonnet 5 also backs the MEM-tagged memory-extraction row (BID 222), so the
      * bare `service:providerId` key resolves to three variants — capability
      * bindings must therefore always use the tag-qualified key.
@@ -738,8 +928,8 @@ class ModelCatalogTest extends TestCase
 
     /**
      * TrustedTokens (TNG, Germany) — chat + vision rows from
-     * https://trustedtokens.eu/api/billing/models (re-verified 2026-09-08;
-     * prices unchanged from the 2026-08-29 snapshot except BID 335 retired).
+     * https://trustedtokens.eu/api/billing/models (re-verified 2026-09-17;
+     * prices unchanged from the 2026-08-29 snapshot except BIDs 335–337 retired).
      * Provider ids keep the upstream org/name form. Prices are USD/1M.
      */
     public function testTrustedTokensModelsAreAvailableWithExpectedApiIds(): void
@@ -779,11 +969,19 @@ class ModelCatalogTest extends TestCase
         $this->assertSame(0, $v4Flash[0]['active']);
         $this->assertSame(0, $v4Flash[0]['selectable']);
         $this->assertTrue(ModelCatalog::isRetired(335));
-        $this->assertSame(336, ModelCatalog::successorBid(335));
+        $this->assertSame(332, ModelCatalog::successorBid(335));
         $this->assertSame('deepseek-ai/DeepSeek-V4-Flash-0731', $v4Flash0731[0]['providerId']);
-        $this->assertSame(1, $v4Flash0731[0]['active']);
-        $this->assertSame(1, $v4Flash0731[0]['selectable']);
+        $this->assertSame(336, $v4Flash0731[0]['id']);
+        $this->assertSame(0, $v4Flash0731[0]['active']);
+        $this->assertSame(0, $v4Flash0731[0]['selectable']);
+        $this->assertTrue(ModelCatalog::isRetired(336));
+        $this->assertSame(332, ModelCatalog::successorBid(336));
         $this->assertSame('deepseek-ai/DeepSeek-V4-Pro-0813', $v4Pro[0]['providerId']);
+        $this->assertSame(337, $v4Pro[0]['id']);
+        $this->assertSame(0, $v4Pro[0]['active']);
+        $this->assertSame(0, $v4Pro[0]['selectable']);
+        $this->assertTrue(ModelCatalog::isRetired(337));
+        $this->assertSame(331, ModelCatalog::successorBid(337));
         $this->assertSame('Qwen/Qwen3.6-35B-A3B-FP8', $qwenChat[0]['providerId']);
         $this->assertSame('openai/gpt-oss-120b', $gptOss[0]['providerId']);
 
@@ -932,6 +1130,203 @@ class ModelCatalogTest extends TestCase
         $this->assertSame(200000, $tier['threshold_tokens']);
         $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
         $this->assertEqualsWithDelta(12.0, $tier['price_out_above'], 1e-9);
+    }
+
+    /**
+     * xAI Grok 4.7 — chat + vision added 2026-09-23. Same $2/$6 headline as
+     * 4.6, with a $0.50/1M cache-read rate and the >200k long-context 2x tier
+     * (verified against https://docs.x.ai/docs/models on 2026-09-24). Reasoning
+     * depth is configurable (default high).
+     */
+    public function testGrok47ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $grok47 = ModelCatalog::find('xai:grok-4.7');
+
+        $this->assertCount(2, $grok47, 'Expected grok-4.7 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($grok47, 'tag'));
+        $this->assertSame(367, ModelCatalog::findBidByKey('xai:grok-4.7:chat'));
+        $this->assertSame(368, ModelCatalog::findBidByKey('xai:grok-4.7:pic2text'));
+
+        foreach ($grok47 as $variant) {
+            $this->assertSame('xAI', $variant['service']);
+            $this->assertSame('grok-4.7', $variant['providerId']);
+            $this->assertSame('grok-4.7', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(6.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.50, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+
+        $chat = ModelCatalog::find('xai:grok-4.7:chat')[0];
+        $this->assertSame('high', $chat['json']['reasoning_effort_default'] ?? null);
+        $this->assertContains('tool_use', $chat['json']['features'] ?? []);
+
+        $tier = ModelCatalog::contextPricing('grok-4.7');
+        $this->assertNotNull($tier);
+        $this->assertSame(200000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(12.0, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(1.0, $tier['cache_price_in_above'], 1e-9);
+    }
+
+    /**
+     * xAI Grok Voice 3.0 — speech-to-speech, same BID as the previous pin.
+     * Price verified 2026-10-15: $0.08/min plus $0.004 per text item, identical
+     * to Grok Voice 2.0. The versioned id is pinned; grok-voice-latest moves.
+     */
+    public function testGrokVoice3KeepsThePublishedPerMinutePrice(): void
+    {
+        $model = ModelCatalog::find('xai:grok-voice-3.0:voice2voice')[0] ?? null;
+
+        $this->assertNotNull($model);
+        $this->assertSame(394, $model['id']);
+        $this->assertSame('Grok Voice 3', $model['name']);
+        $this->assertSame('grok-voice-3.0', $model['providerId']);
+        $this->assertSame('grok-voice-3.0', $model['json']['params']['model'] ?? null);
+        $this->assertSame('per_second', $model['json']['pricing_mode'] ?? null);
+        $this->assertEqualsWithDelta(0.08, (float) $model['priceIn'], 1e-9);
+        $this->assertSame('permin', $model['inUnit']);
+        $this->assertEqualsWithDelta(0.0, (float) $model['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.004, (float) ($model['json']['text_item_price'] ?? 0.0), 1e-9);
+        $this->assertSame('eve', $model['json']['voices'][0] ?? null);
+        $this->assertNull(ModelCatalog::findBidByKey('xai:grok-voice-think-fast-2.0:voice2voice'));
+    }
+
+    /**
+     * Meta Muse Spark 1.3 — standard tier only (BIDs 369–370). The contributor
+     * id is cheaper and is used to improve Meta's products, so it stays out.
+     */
+    public function testMuseSparkModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $spark = ModelCatalog::find('meta:muse-spark-1.3');
+
+        $this->assertCount(2, $spark, 'Expected muse-spark-1.3 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($spark, 'tag'));
+        $this->assertSame(369, ModelCatalog::findBidByKey('meta:muse-spark-1.3:chat'));
+        $this->assertSame(370, ModelCatalog::findBidByKey('meta:muse-spark-1.3:pic2text'));
+
+        foreach ($spark as $variant) {
+            $this->assertSame('Meta', $variant['service']);
+            $this->assertSame('muse-spark-1.3', $variant['providerId']);
+            $this->assertSame('muse-spark-1.3', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(1.25, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(4.25, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.15, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('US', $variant['json']['meta']['jurisdiction'] ?? null);
+            $this->assertSame('api.meta.ai', $variant['json']['meta']['host'] ?? null);
+        }
+
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+        $this->assertNotContains('muse-spark-1.3-contributor', $providerIds);
+    }
+
+    /**
+     * Meta Muse Wonder — standard pay-as-you-go id only (BIDs 396–397).
+     * Contributor mode is not sold on Model API, and Muse Wonder Full is
+     * Muse Code only.
+     */
+    public function testMuseWonderModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $wonder = ModelCatalog::find('meta:muse-wonder-1.0');
+
+        $this->assertCount(2, $wonder, 'Expected muse-wonder-1.0 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($wonder, 'tag'));
+        $this->assertSame(396, ModelCatalog::findBidByKey('meta:muse-wonder-1.0:chat'));
+        $this->assertSame(397, ModelCatalog::findBidByKey('meta:muse-wonder-1.0:pic2text'));
+
+        foreach ($wonder as $variant) {
+            $this->assertSame('Meta', $variant['service']);
+            $this->assertSame('muse-wonder-1.0', $variant['providerId']);
+            $this->assertSame('muse-wonder-1.0', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(4.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(20.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.20, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('US', $variant['json']['meta']['jurisdiction'] ?? null);
+            $this->assertSame('api.meta.ai', $variant['json']['meta']['host'] ?? null);
+        }
+
+        $chat = ModelCatalog::find('meta:muse-wonder-1.0:chat')[0];
+        $this->assertSame('high', $chat['json']['reasoning_effort_default'] ?? null);
+        $this->assertSame('1048576', $chat['json']['meta']['context_window'] ?? null);
+        $this->assertContains('tool_use', $chat['json']['features'] ?? []);
+        $this->assertContains('reasoning', $chat['json']['features'] ?? []);
+
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+        $this->assertNotContains('muse-wonder-1.0-contributor', $providerIds);
+    }
+
+    /**
+     * Muse Image is one text-to-image row that also edits (BIDs 398).
+     * Muse Voice Transcribe is the file speech-to-text row (BID 399).
+     */
+    public function testMuseImageAndTranscribeAreAvailableWithExpectedPrices(): void
+    {
+        $image = ModelCatalog::find('meta:muse-image-1.0:text2pic')[0];
+        $this->assertSame(398, $image['id']);
+        $this->assertSame('text2pic', $image['tag']);
+        $this->assertSame('muse-image-1.0', $image['providerId']);
+        $this->assertEqualsWithDelta(0.0, (float) $image['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.01, (float) $image['priceOut'], 1e-9);
+        $this->assertSame('per_image', $image['json']['pricing_mode'] ?? null);
+        $this->assertContains('pic2pic', $image['json']['features'] ?? []);
+
+        $speech = ModelCatalog::find('meta:muse-voice-transcribe-1.0:sound2text')[0];
+        $this->assertSame(399, $speech['id']);
+        $this->assertSame('sound2text', $speech['tag']);
+        $this->assertSame('muse-voice-transcribe-1.0', $speech['providerId']);
+        $this->assertEqualsWithDelta(0.18, (float) $speech['priceIn'], 1e-9);
+        $this->assertSame('perhour', $speech['inUnit']);
+        $this->assertSame('per_second', $speech['json']['pricing_mode'] ?? null);
+        $this->assertSame(600, $speech['json']['meta']['max_audio_seconds'] ?? null);
+    }
+
+    /**
+     * Cerebras Shared Inference — Qwen 3.8 27B (chat + vision) and GPT OSS
+     * 120B (text only), BIDs 383–385. Cached input is billed at the full
+     * input rate, so the authored cache price must equal priceIn; without it
+     * billing would fall back to the 0.5x default and under-bill cache hits.
+     */
+    public function testCerebrasModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $qwen = ModelCatalog::find('cerebras:qwen-3.8-27b');
+
+        $this->assertCount(2, $qwen, 'Expected qwen-3.8-27b chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($qwen, 'tag'));
+        $this->assertSame(383, ModelCatalog::findBidByKey('cerebras:qwen-3.8-27b:chat'));
+        $this->assertSame(384, ModelCatalog::findBidByKey('cerebras:qwen-3.8-27b:pic2text'));
+        $this->assertSame(385, ModelCatalog::findBidByKey('cerebras:gpt-oss-120b:chat'));
+
+        foreach ($qwen as $variant) {
+            $this->assertEqualsWithDelta(0.99, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(1.49, (float) $variant['priceOut'], 1e-9);
+        }
+
+        $gptOss = ModelCatalog::find('cerebras:gpt-oss-120b');
+        $this->assertSame(['chat', 'mem'], array_column($gptOss, 'tag'), 'GPT OSS 120B is text-only on Cerebras');
+        $this->assertSame(386, ModelCatalog::findBidByKey('cerebras:gpt-oss-120b:mem'));
+        foreach ($gptOss as $variant) {
+            $this->assertEqualsWithDelta(0.35, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(0.75, (float) $variant['priceOut'], 1e-9);
+            $this->assertNotContains('vision', $variant['json']['features'] ?? []);
+        }
+
+        $mem = ModelCatalog::find('cerebras:gpt-oss-120b:mem')[0];
+        $this->assertSame(0, $mem['selectable'], 'MEM rows stay out of the chat picker');
+        $this->assertTrue($mem['json']['is_system'] ?? false);
+
+        foreach ([...$qwen, ...$gptOss] as $variant) {
+            $this->assertSame('Cerebras', $variant['service']);
+            $this->assertSame($variant['providerId'], $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta((float) $variant['priceIn'], (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('api.cerebras.ai', $variant['json']['meta']['host'] ?? null);
+            $this->assertSame('US', $variant['json']['meta']['jurisdiction'] ?? null);
+        }
+
+        foreach (['cerebras:qwen-3.8-27b:chat', 'cerebras:gpt-oss-120b:chat'] as $key) {
+            $chat = ModelCatalog::find($key)[0];
+            $this->assertContains('tool_use', $chat['json']['features'] ?? []);
+            $this->assertContains('reasoning', $chat['json']['features'] ?? []);
+            $this->assertLessThanOrEqual(32768, $chat['json']['max_tokens'] ?? 0, 'Free-trial keys cap output at 32K');
+        }
     }
 
     /**
@@ -1212,6 +1607,39 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('per_image', $imagen[0]['json']['pricing_mode'] ?? null);
         $this->assertSame('perImage', $imagen[0]['outUnit'] ?? null);
         $this->assertEqualsWithDelta(0.04, (float) ($imagen[0]['priceOut'] ?? 0.0), 1e-9);
+    }
+
+    /**
+     * Google shut the Nano Banana preview ids down on 2026-06-25. The stable
+     * ids are the ones new installs and the image default bind to.
+     */
+    public function testStableGoogleImageModelsAreActiveAndReplaceThePreviews(): void
+    {
+        $banana2 = ModelCatalog::find('google:gemini-3.1-flash-image:text2pic');
+        $pro = ModelCatalog::find('google:gemini-3-pro-image:text2pic');
+
+        $this->assertCount(1, $banana2);
+        $this->assertCount(1, $pro);
+        $this->assertSame(371, $banana2[0]['id']);
+        $this->assertSame(372, $pro[0]['id']);
+        $this->assertSame(1, $banana2[0]['active']);
+        $this->assertSame(1, $banana2[0]['selectable']);
+        $this->assertSame(1, $pro[0]['active']);
+        $this->assertSame(1, $pro[0]['selectable']);
+        $this->assertEqualsWithDelta(0.067, (float) $banana2[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.134, (float) $pro[0]['priceOut'], 1e-9);
+        $this->assertSame('gemini-3.1-flash-image', $banana2[0]['json']['params']['model'] ?? null);
+        $this->assertSame('gemini-3-pro-image', $pro[0]['json']['params']['model'] ?? null);
+
+        $this->assertTrue(ModelCatalog::isRetired(190));
+        $this->assertTrue(ModelCatalog::isRetired(228));
+        $this->assertSame(371, ModelCatalog::successorBid(190));
+        $this->assertSame(372, ModelCatalog::successorBid(228));
+        $this->assertSame(371, ModelCatalog::successorBid(115));
+
+        $preview = ModelCatalog::find('google:gemini-3.1-flash-image-preview:text2pic');
+        $this->assertSame(0, $preview[0]['active']);
+        $this->assertSame(0, $preview[0]['selectable']);
     }
 
     /**

@@ -12,7 +12,7 @@
               <Icon icon="heroicons:arrow-down-tray" class="w-5 h-5 txt-brand" />
               {{ $t('export.title') }}
             </h2>
-            <button class="p-2 rounded-lg hover-surface transition-colors" @click="$emit('close')">
+            <button class="p-2 rounded-xl hover-surface transition-colors" @click="$emit('close')">
               <Icon icon="heroicons:x-mark" class="w-5 h-5 txt-secondary" />
             </button>
           </div>
@@ -76,7 +76,7 @@
             </label>
             <select
               v-model="dateRange"
-              class="w-full px-3 py-2 rounded-lg surface-chip txt-primary"
+              class="w-full px-3 py-2 rounded-xl surface-chip txt-primary"
             >
               <option value="all">{{ $t('export.allTime') }}</option>
               <option value="today">{{ $t('export.today') }}</option>
@@ -89,16 +89,20 @@
               <input
                 v-model="customFrom"
                 type="date"
-                class="flex-1 px-3 py-2 rounded-lg surface-chip txt-primary"
+                class="flex-1 px-3 py-2 rounded-xl surface-chip txt-primary"
               />
               <span class="self-center txt-secondary">-</span>
               <input
                 v-model="customTo"
                 type="date"
-                class="flex-1 px-3 py-2 rounded-lg surface-chip txt-primary"
+                class="flex-1 px-3 py-2 rounded-xl surface-chip txt-primary"
               />
             </div>
           </div>
+
+          <p class="text-sm txt-secondary" data-testid="export-timezone-hint">
+            {{ timezoneHint }}
+          </p>
 
           <!-- Mode Filter (only show if no sessions selected) -->
           <div v-if="!props.selectedSessionIds || props.selectedSessionIds.length === 0">
@@ -107,7 +111,7 @@
             </label>
             <select
               v-model="modeFilter"
-              class="w-full px-3 py-2 rounded-lg surface-chip txt-primary"
+              class="w-full px-3 py-2 rounded-xl surface-chip txt-primary"
             >
               <option value="">{{ $t('export.allSessions') }}</option>
               <option value="ai">{{ $t('export.aiOnly') }}</option>
@@ -121,14 +125,14 @@
           class="p-4 border-t border-light-border/30 dark:border-dark-border/20 flex justify-end gap-2"
         >
           <button
-            class="px-4 py-2 rounded-lg surface-chip txt-secondary hover-surface transition-colors"
+            class="px-4 py-2 rounded-xl surface-chip txt-secondary hover-surface transition-colors"
             @click="$emit('close')"
           >
             {{ $t('common.cancel') }}
           </button>
           <button
-            :disabled="exporting"
-            class="px-4 py-2 rounded-lg btn-primary disabled:opacity-50"
+            :disabled="exporting || !exportClock"
+            class="px-4 py-2 rounded-xl btn-primary disabled:opacity-50"
             @click="startExport"
           >
             <Icon
@@ -147,10 +151,18 @@
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useConfigStore } from '@/stores/config'
 import * as widgetSessionsApi from '@/services/api/widgetSessionsApi'
+import { ensureAccountTimezone } from '@/composables/useAccountTimezone'
 import { useNotification } from '@/composables/useNotification'
+import {
+  browserTimezone,
+  endOfZonedDayUnix,
+  startOfZonedDayUnix,
+  zonedTodayIso,
+} from '@/utils/zonedDay'
 
 const props = defineProps<{
   widgetId: string
@@ -161,8 +173,29 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
+const { t } = useI18n()
 const { error } = useNotification()
 const configStore = useConfigStore()
+const exportZone = ref<{ tz: string; fromProfile: boolean } | null>(null)
+const exportZoneReady = ref(false)
+
+const exportClock = computed(() => {
+  if (!exportZoneReady.value) return null
+  if (exportZone.value?.fromProfile) {
+    return { tz: exportZone.value.tz, source: 'profile' as const }
+  }
+  const tz = exportZone.value?.tz || browserTimezone()
+  const source = exportZone.value ? ('browser' as const) : ('unavailable' as const)
+  return { tz, source }
+})
+
+const timezoneHint = computed(() => {
+  const clock = exportClock.value
+  if (!clock) return t('export.timezoneLoading')
+  if (clock.source === 'profile') return t('export.timezoneProfile', { tz: clock.tz })
+  if (clock.source === 'unavailable') return t('export.timezoneUnavailable', { tz: clock.tz })
+  return t('export.timezoneBrowser', { tz: clock.tz })
+})
 
 const formats = ref<widgetSessionsApi.ExportFormat[]>([
   {
@@ -193,13 +226,14 @@ const loadFormats = async () => {
 const getDateTimestamps = computed(() => {
   const now = Math.floor(Date.now() / 1000)
   const daySeconds = 86400
+  const zone = exportClock.value?.tz
 
   switch (dateRange.value) {
-    case 'today':
-      return {
-        from: now - daySeconds,
-        to: now,
-      }
+    case 'today': {
+      const today = zone ? zonedTodayIso(zone) : null
+      const from = today && zone ? startOfZonedDayUnix(today, zone) : null
+      return from === null ? { from: now - daySeconds, to: now } : { from, to: now }
+    }
     case '7days':
       return {
         from: now - 7 * daySeconds,
@@ -210,27 +244,29 @@ const getDateTimestamps = computed(() => {
         from: now - 30 * daySeconds,
         to: now,
       }
-    case 'custom':
+    case 'custom': {
+      const from = customFrom.value && zone ? startOfZonedDayUnix(customFrom.value, zone) : null
+      const to = customTo.value && zone ? endOfZonedDayUnix(customTo.value, zone) : null
       return {
-        from: customFrom.value
-          ? Math.floor(new Date(customFrom.value).getTime() / 1000)
-          : undefined,
-        // Add 23:59:59 (daySeconds - 1) to include the full end day
-        to: customTo.value
-          ? Math.floor(new Date(customTo.value).getTime() / 1000) + daySeconds - 1
-          : undefined,
+        from: from === null ? undefined : from,
+        to: to === null ? undefined : to,
       }
+    }
     default:
       return {}
   }
 })
 
 const startExport = async () => {
+  const clock = exportClock.value
+  if (!clock) return
+
   exporting.value = true
 
   try {
     const params: widgetSessionsApi.ExportParams = {
       format: selectedFormat.value,
+      timezone: clock.tz,
     }
 
     // If sessions are selected, use them instead of date/mode filters
@@ -265,6 +301,14 @@ const startExport = async () => {
 }
 
 onMounted(() => {
-  loadFormats()
+  void ensureAccountTimezone().then((ensured) => {
+    if (ensured && ensured.source !== 'device-unsaved') {
+      exportZone.value = { tz: ensured.tz, fromProfile: true }
+    } else if (ensured) {
+      exportZone.value = { tz: ensured.tz, fromProfile: false }
+    }
+    exportZoneReady.value = true
+  })
+  void loadFormats()
 })
 </script>

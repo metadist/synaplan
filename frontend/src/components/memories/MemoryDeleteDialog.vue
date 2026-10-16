@@ -17,7 +17,7 @@
               {{ t('memories.deleteDialog.title') }}
             </h3>
             <button
-              class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
+              class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
               @click="close"
             >
               <Icon icon="mdi:close" class="w-5 h-5 txt-secondary" />

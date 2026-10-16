@@ -8,7 +8,11 @@
     leave-from-class="opacity-100 translate-y-0 scale-100"
     leave-to-class="opacity-0 translate-y-2 scale-[0.98]"
   >
-    <div v-if="tip && !expanded" class="mx-auto max-w-4xl px-4 pb-2" data-testid="comp-promo-tip">
+    <div
+      v-if="tip && !expanded"
+      class="mx-auto max-w-[70rem] px-4 pb-2"
+      data-testid="comp-promo-tip"
+    >
       <div
         :class="[
           'relative overflow-hidden rounded-xl border transition-all duration-200',
@@ -35,7 +39,7 @@
           <div class="flex items-center gap-1.5 flex-shrink-0">
             <button
               :class="[
-                'w-6 h-6 rounded-md flex items-center justify-center transition-colors',
+                'w-6 h-6 rounded-xl flex items-center justify-center transition-colors',
                 isDark ? 'hover:bg-white/5' : 'hover:bg-black/5',
               ]"
               :title="$t('common.expand')"
@@ -45,7 +49,7 @@
             </button>
             <button
               :class="[
-                'w-6 h-6 rounded-md flex items-center justify-center transition-colors',
+                'w-6 h-6 rounded-xl flex items-center justify-center transition-colors',
                 isDark ? 'hover:bg-white/5' : 'hover:bg-black/5',
               ]"
               @click.stop="$emit('dismiss')"
@@ -105,7 +109,7 @@
             <!-- Close button -->
             <button
               :class="[
-                'absolute top-3 right-3 z-10 w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
+                'absolute top-3 right-3 z-10 w-8 h-8 rounded-xl flex items-center justify-center transition-colors',
                 isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-black/5 hover:bg-black/10',
               ]"
               @click="$emit('dismiss')"

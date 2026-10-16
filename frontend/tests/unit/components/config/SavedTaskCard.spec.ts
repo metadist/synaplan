@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
+import { resetAccountTimezone } from '@/composables/useAccountTimezone'
 import type { SavedTask, SavedTaskRun } from '@/services/api/savedTasksApi'
+import { browserTimezone } from '@/utils/zonedDay'
 
 const {
   mockUpdate,
@@ -13,6 +15,9 @@ const {
   mockPush,
   mockConfirm,
   mockSuccess,
+  mockNotifyError,
+  mockGetProfile,
+  mockUpdateProfile,
   mockWorkflowsEnabled,
   mockIamSharing,
 } = vi.hoisted(() => ({
@@ -25,6 +30,9 @@ const {
   mockPush: vi.fn(),
   mockConfirm: vi.fn(),
   mockSuccess: vi.fn(),
+  mockNotifyError: vi.fn(),
+  mockGetProfile: vi.fn(),
+  mockUpdateProfile: vi.fn(),
   mockWorkflowsEnabled: vi.fn(() => false),
   mockIamSharing: vi.fn(() => false),
 }))
@@ -41,7 +49,21 @@ vi.mock('@/services/api/savedTasksApi', () => ({
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: mockSuccess, error: vi.fn() }),
+  useNotification: () => ({ success: mockSuccess, error: mockNotifyError }),
+}))
+
+vi.mock('@/services/api/profileApi', () => ({
+  profileApi: {
+    getProfile: (...args: unknown[]) => mockGetProfile(...args),
+    updateProfile: (...args: unknown[]) => mockUpdateProfile(...args),
+  },
+}))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    user: { id: 4 },
+    isImpersonating: false,
+  }),
 }))
 
 vi.mock('@/composables/useIamFeature', () => ({
@@ -111,7 +133,13 @@ const mountCard = (value: SavedTask, extra: { sharedView?: boolean } = {}) =>
 
 describe('SavedTaskCard', () => {
   beforeEach(() => {
+    resetAccountTimezone()
     vi.clearAllMocks()
+    mockGetProfile.mockResolvedValue({
+      success: true,
+      profile: { timezone: 'America/New_York' },
+    })
+    mockUpdateProfile.mockResolvedValue({ success: true })
     mockWorkflowsEnabled.mockReturnValue(false)
     mockIamSharing.mockReturnValue(false)
     mockConfirm.mockResolvedValue(false)
@@ -396,6 +424,61 @@ describe('SavedTaskCard', () => {
     const emitted = wrapper.emitted('updated')?.[0]?.[0] as SavedTask
     expect(emitted.webhookSecret).toBeUndefined()
     expect(emitted.triggerConfig).toEqual({ token: 'tok-123', hmacConfigured: true })
+  })
+
+  it('saves a time of day in the profile time zone', async () => {
+    const wrapper = mountCard(task())
+    await flushPromises()
+    await wrapper.get('[data-testid="saved-task-schedule"]').setValue('daily')
+    await flushPromises()
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({
+        triggerType: 'schedule',
+        triggerConfig: expect.objectContaining({
+          kind: 'daily',
+          at: '07:00',
+          tz: 'America/New_York',
+        }),
+      })
+    )
+  })
+
+  it('saves an hourly interval without storing a time zone', async () => {
+    mockGetProfile.mockResolvedValue({ success: true, profile: { timezone: '' } })
+    const wrapper = mountCard(task())
+    await flushPromises()
+    await wrapper.get('[data-testid="saved-task-schedule"]').setValue('interval')
+    await flushPromises()
+
+    expect(mockNotifyError).not.toHaveBeenCalled()
+    expect(mockUpdate).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({
+        triggerType: 'schedule',
+        triggerConfig: { kind: 'interval', every_minutes: 60 },
+      })
+    )
+  })
+
+  it('saves a missing profile time zone from this device and uses it', async () => {
+    mockGetProfile.mockResolvedValue({ success: true, profile: { timezone: '' } })
+    const wrapper = mountCard(task())
+    await flushPromises()
+    await wrapper.get('[data-testid="saved-task-schedule"]').setValue('daily')
+    await flushPromises()
+
+    const device = browserTimezone()
+    expect(mockUpdateProfile).toHaveBeenCalledWith({ timezone: device })
+    expect(mockNotifyError).not.toHaveBeenCalled()
+    expect(mockUpdate).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({
+        triggerType: 'schedule',
+        triggerConfig: expect.objectContaining({ kind: 'daily', tz: device }),
+      })
+    )
   })
 
   it('does not delete when the confirm is cancelled', async () => {

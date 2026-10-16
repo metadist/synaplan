@@ -76,6 +76,36 @@ final class UserMemoryRepository extends ServiceEntityRepository
     }
 
     /**
+     * Active feedback entries of other users that reference the given messages.
+     * Used by share-revoke cleanup: content taken from somebody else's
+     * conversation must not outlive the grant (#2068).
+     *
+     * @param list<int> $messageIds
+     *
+     * @return list<UserMemory>
+     */
+    public function findFeedbackReferencingMessages(array $messageIds, int $excludeUserId): array
+    {
+        if ([] === $messageIds) {
+            return [];
+        }
+
+        /** @var list<UserMemory> $memories */
+        $memories = $this->createQueryBuilder('m')
+            ->where('m.messageId IN (:messageIds)')
+            ->andWhere('m.userId != :excludeUserId')
+            ->andWhere('m.active = true')
+            ->andWhere('m.category IN (:categories)')
+            ->setParameter('messageIds', $messageIds)
+            ->setParameter('excludeUserId', $excludeUserId)
+            ->setParameter('categories', ['feedback_negative', 'feedback_positive', 'feedback_false_positive'])
+            ->getQuery()
+            ->getResult();
+
+        return $memories;
+    }
+
+    /**
      * Of the given memory ids, return the subset that are active rows of the
      * user. Used to reconcile Qdrant retrieval hits against the SQL catalog so
      * a memory the UI cannot show is never used in a reply (#1570).

@@ -8,7 +8,7 @@
         data-testid="bulk-actions-bar"
       >
         <div
-          class="max-w-7xl mx-auto flex items-center justify-between gap-2 md:gap-4 flex-wrap md:flex-nowrap"
+          class="max-w-[100rem] mx-auto flex items-center justify-between gap-2 md:gap-4 flex-wrap md:flex-nowrap"
         >
           <div class="flex items-center gap-2 md:gap-3">
             <div
@@ -22,7 +22,7 @@
           </div>
           <div class="flex items-center gap-2">
             <button
-              class="px-3 md:px-4 py-2 rounded-lg txt-secondary hover-surface transition-all text-sm font-medium flex items-center gap-2"
+              class="px-3 md:px-4 py-2 rounded-xl txt-secondary hover-surface transition-all text-sm font-medium flex items-center gap-2"
               data-testid="btn-select-all"
               @click="toggleSelectAll"
             >
@@ -33,7 +33,7 @@
               }}</span>
             </button>
             <button
-              class="px-3 md:px-4 py-2 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium flex items-center gap-2"
+              class="px-3 md:px-4 py-2 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-all text-sm font-medium flex items-center gap-2"
               data-testid="btn-bulk-delete"
               @click="handleBulkDelete"
             >
@@ -41,7 +41,7 @@
               <span class="hidden sm:inline">{{ $t('chat.browser.deleteSelected') }}</span>
             </button>
             <button
-              class="p-2 rounded-lg txt-secondary hover-surface transition-all"
+              class="p-2 rounded-xl txt-secondary hover-surface transition-all"
               :title="$t('common.cancel')"
               data-testid="btn-clear-selection"
               @click="clearSelection"
@@ -134,12 +134,12 @@
           v-model="searchQuery"
           type="text"
           :placeholder="$t('chat.browser.searchPlaceholder')"
-          class="w-full pl-9 md:pl-10 pr-10 py-2.5 md:py-3 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
+          class="w-full pl-9 md:pl-10 pr-10 py-2.5 md:py-3 bg-app border border-light-border dark:border-dark-border rounded-xl txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
           data-testid="input-search-chats"
         />
         <button
           v-if="searchQuery"
-          class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-black/5 dark:hover:bg-white/5"
+          class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-xl hover:bg-black/5 dark:hover:bg-white/5"
           @click="searchQuery = ''"
         >
           <XMarkIcon class="w-4 h-4 txt-secondary" />
@@ -170,7 +170,7 @@
           </label>
           <select
             v-model="selectedDateRange"
-            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
+            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-xl txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
             data-testid="select-date-filter"
           >
             <option value="all">{{ $t('chat.browser.allDates') }}</option>
@@ -190,7 +190,7 @@
           </label>
           <select
             v-model="sortBy"
-            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
+            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-xl txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
             data-testid="select-sort"
           >
             <option value="newest">{{ $t('chat.browser.sortNewest') }}</option>
@@ -297,6 +297,11 @@
                 :label="chat.kindLabel"
                 :is-new="chat.isNew"
               />
+              <ChatGrantPills
+                v-if="iamSharingEnabled && chat.type === 'my'"
+                size="sm"
+                :summary="chat.shareSummary"
+              />
               <span
                 v-if="chat.type === 'shared' && chat.access"
                 class="text-xs txt-secondary"
@@ -323,13 +328,23 @@
                 <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" />
                 <span class="text-xs font-medium">{{ $t('chat.stillGenerating') }}</span>
               </div>
+              <div
+                v-else-if="chatsStore.readyChatIds.has(chat.id)"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--status-success-text)] dark:text-[var(--status-success)] bg-[var(--status-success-muted)]"
+                data-testid="indicator-chat-answer-ready"
+              >
+                <span
+                  class="w-1.5 h-1.5 rounded-full bg-[var(--status-success-text)] dark:bg-[var(--status-success)]"
+                />
+                <span class="text-xs font-medium">{{ $t('chat.answerReady') }}</span>
+              </div>
             </div>
 
             <!-- Chat Title -->
             <h3
               class="text-sm md:text-base font-semibold txt-primary mb-2 truncate group-hover:txt-brand transition-colors"
             >
-              {{ chat.title }}
+              {{ displaySessionTitle(chat.title) }}
             </h3>
 
             <!-- Meta Information -->
@@ -365,7 +380,7 @@
             <!-- Delete Button -->
             <button
               v-if="chat.type !== 'shared'"
-              class="p-1.5 md:p-2 rounded-lg txt-secondary hover:text-red-500 hover:bg-red-500/10 transition-all"
+              class="p-1.5 md:p-2 rounded-xl txt-secondary hover:text-red-500 hover:bg-red-500/10 transition-all"
               :title="$t('common.delete')"
               data-testid="btn-chat-delete"
               @click.stop="handleSingleDelete(chat.id)"
@@ -374,7 +389,7 @@
             </button>
             <!-- Open Button -->
             <button
-              class="px-2 md:px-3 py-1.5 md:py-2 rounded-lg bg-brand/10 txt-brand transition-all flex items-center gap-1 text-sm"
+              class="px-2 md:px-3 py-1.5 md:py-2 rounded-xl bg-brand/10 txt-brand transition-all flex items-center gap-1 text-sm"
               data-testid="btn-chat-open"
               @click.stop="openChat(chat.id)"
             >
@@ -395,7 +410,7 @@
       <!-- Previous Button -->
       <button
         :disabled="currentPage === 1"
-        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
+        class="px-2 md:px-3 py-2 rounded-xl txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
         data-testid="btn-prev-page"
         @click="goToPage(currentPage - 1)"
       >
@@ -405,7 +420,7 @@
       <!-- First Page -->
       <button
         v-if="currentPage > 3"
-        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
+        class="px-2 md:px-3 py-2 rounded-xl txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
         @click="goToPage(1)"
       >
         1
@@ -417,7 +432,7 @@
         v-for="page in visiblePages"
         :key="page"
         :class="[
-          'px-2 md:px-3 py-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base',
+          'px-2 md:px-3 py-2 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base',
           page === currentPage
             ? 'bg-primary text-white font-medium'
             : 'txt-secondary hover-surface',
@@ -434,7 +449,7 @@
       >
       <button
         v-if="currentPage < totalPages - 2"
-        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
+        class="px-2 md:px-3 py-2 rounded-xl txt-secondary hover-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary min-w-[36px] md:min-w-[44px] text-sm md:text-base"
         @click="goToPage(totalPages)"
       >
         {{ totalPages }}
@@ -443,7 +458,7 @@
       <!-- Next Button -->
       <button
         :disabled="currentPage === totalPages"
-        class="px-2 md:px-3 py-2 rounded-lg txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
+        class="px-2 md:px-3 py-2 rounded-xl txt-secondary hover-surface transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary"
         data-testid="btn-next-page"
         @click="goToPage(currentPage + 1)"
       >
@@ -464,7 +479,7 @@
         <h3 class="text-lg font-medium txt-primary mb-2">{{ $t('chats.empty') }}</h3>
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
           data-testid="btn-chats-empty-new"
           :disabled="creatingChat"
           @click="goToNewChat"
@@ -505,6 +520,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { goToFreshChat } from '@/composables/usePinnedAssistant'
 import {
   MagnifyingGlassIcon,
   ChatBubbleLeftRightIcon,
@@ -527,6 +543,7 @@ import { Icon } from '@iconify/vue'
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
 import ChatKindPill from './iam/ChatKindPill.vue'
+import ChatGrantPills from './iam/ChatGrantPills.vue'
 import ChatKindFilter from './iam/ChatKindFilter.vue'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { useIncomingStore } from '@/stores/incoming'
@@ -541,6 +558,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { displaySessionTitle, sessionTitleMatchesQuery } from '@/utils/displaySessionTitle'
 
 const { hideHeader = false } = defineProps<{ hideHeader?: boolean }>()
 
@@ -551,9 +569,18 @@ const { success: showSuccess } = useNotification()
 const { t } = useI18n()
 const { formatRelativeTime } = useDateFormat()
 
+const CHAT_LIST_FILTERS: readonly ChatListFilter[] = ['all', 'private', 'group', 'widget']
+
+/** `?type=group` opens the list on chats shared with me (the old incoming page links here). */
+const typeFromQuery = (): ChatListFilter => {
+  const raw = router.currentRoute.value.query.type
+  const type = CHAT_LIST_FILTERS.find((filter) => filter === raw) ?? 'all'
+  return type === 'group' && !isIamSharingEnabled() ? 'all' : type
+}
+
 // Filter states
 const searchQuery = ref('')
-const selectedType = ref<ChatListFilter>('all')
+const selectedType = ref<ChatListFilter>(typeFromQuery())
 const iamSharingEnabled = computed(() => isIamSharingEnabled())
 const incomingStore = useIncomingStore()
 const selectedDateRange = ref<'all' | 'today' | 'yesterday' | 'lastWeek' | 'lastMonth' | 'older'>(
@@ -622,7 +649,7 @@ const openPublicLinkFromIam = () => {
 
 const openShareModal = (chat: ChatItem) => {
   shareModalChatId.value = chat.id
-  shareModalChatTitle.value = chat.title
+  shareModalChatTitle.value = displaySessionTitle(chat.title)
   if (isIamSharingEnabled()) {
     iamShareResourceId.value = String(chat.id)
     iamShareOpen.value = true
@@ -719,6 +746,11 @@ interface ChatItem {
   kind: ChatKind
   kindLabel: string | null
   isNew: boolean
+  shareSummary?: {
+    everyone: boolean
+    people: number
+    groups: string[]
+  }
 }
 
 // Generate default widget title from session info
@@ -797,6 +829,7 @@ const allChats = computed((): ChatItem[] => {
         kind: 'private',
         kindLabel: null,
         isNew: false,
+        shareSummary: c.shareSummary,
       }
     }
   })
@@ -816,7 +849,7 @@ const filteredChats = computed((): ChatItem[] => {
   // Filter by search query
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    result = result.filter((c) => c.title.toLowerCase().includes(query))
+    result = result.filter((c) => sessionTitleMatchesQuery(c.title, query))
   }
 
   // Filter by date range
@@ -938,6 +971,8 @@ watch([searchQuery, selectedType, selectedDateRange, sortBy], () => {
 })
 
 const openChat = (id: number) => {
+  const shared = sharedChats.value.find((chat) => chat.id === id)
+  if (shared?.isNew) void incomingStore.markChatOpened(id)
   chatsStore.setActiveChat(id)
   router.push('/')
 }
@@ -948,9 +983,7 @@ const goToNewChat = async () => {
   try {
     const chat = await chatsStore.findOrCreateEmptyChat()
     if (!chat) return
-    if (router.currentRoute.value.path !== '/') {
-      await router.push('/')
-    }
+    await goToFreshChat(router, router.currentRoute.value)
   } finally {
     creatingChat.value = false
   }
@@ -959,5 +992,8 @@ const goToNewChat = async () => {
 onMounted(async () => {
   await Promise.all([chatsStore.loadChats(), incomingStore.load()])
   listSettled.value = true
+  // Arriving through the incoming badge is what "seeing" means: the badge goes,
+  // while the rows keep their "new" marker until the next load.
+  if (selectedType.value === 'group' && incomingStore.hasNew) await incomingStore.markSeen()
 })
 </script>

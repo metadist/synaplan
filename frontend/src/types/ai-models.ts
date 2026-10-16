@@ -35,10 +35,22 @@ export interface AIModel {
   rating: number
   priceIn: number
   priceOut: number
+  /** False when the model was imported without a published price. Absent means the price is known (including a real zero). */
+  priceKnown?: boolean
+  /**
+   * Per-image price an image dropdown badges. TEXT2PIC is medium quality at
+   * the default size; PIC2PIC is high, which is what an edit is billed.
+   * Absent on chat rows.
+   */
+  capabilityPrices?: { TEXT2PIC?: number; PIC2PIC?: number }
   selectable?: boolean // Not returned by backend getModels
   description: string | null
   isSystemModel: boolean
   features: string[]
+  /** Discrete reasoning levels, cheapest first. Absent when the model keeps the on/off Thinking control. */
+  reasoningLevels?: string[]
+  /** Level used until the person picks another one. Present only with reasoningLevels. */
+  reasoningEffortDefault?: string | null
   /** Only false in admin views requested with includeUnavailable; regular responses contain available models only. */
   available?: boolean
   unavailableReason?: ModelUnavailableReason | null

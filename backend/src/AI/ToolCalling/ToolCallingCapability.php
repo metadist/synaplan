@@ -50,6 +50,7 @@ final class ToolCallingCapability
      *
      * Two different reasons, same consequence:
      *   - `groq` documents the combination as unsupported and 400s on it.
+     *   - `cerebras` documents it as model-dependent; gpt-oss-120b 400s on it.
      *   - `anthropic` has no native schema mode: structured output IS a forced
      *     tool call ({@see \App\AI\StructuredOutput\StructuredOutputDialect::ANTHROPIC_TOOL_FORCING}),
      *     so the schema and the declared tools write the same
@@ -61,7 +62,7 @@ final class ToolCallingCapability
      * OpenAI-compatible gateway) and only the provider sees the moment where
      * both end up in one payload.
      */
-    private const NO_TOOLS_WITH_STRUCTURED_OUTPUT = ['groq', 'anthropic'];
+    private const NO_TOOLS_WITH_STRUCTURED_OUTPUT = ['groq', 'cerebras', 'anthropic'];
 
     /**
      * `$model` and `$streaming` are part of the question by design, mirroring

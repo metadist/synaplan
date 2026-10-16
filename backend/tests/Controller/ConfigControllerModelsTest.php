@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\AI\Import\ModelImportApplier;
 use App\Entity\User;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -193,5 +194,91 @@ final class ConfigControllerModelsTest extends WebTestCase
                 sprintf('Model "%s" is visible although its provider "%s" reports unavailable.', $row['name'], $service)
             );
         }
+    }
+
+    public function testImportedFreeChatModelAppearsInAdminPicker(): void
+    {
+        // #2110: a self-imported chat model carries no per-token price and must
+        // still reach the capability pickers. The admin full view shows every
+        // row regardless of provider availability, so this fails only when the
+        // free-model filter wrongly hides the import.
+        $providerId = 'itest-2110/Imported-Chat-Model';
+        $container = static::getContainer();
+        $applier = $container->get(ModelImportApplier::class);
+        $em = $container->get(EntityManagerInterface::class);
+
+        $this->deleteImportedTestRow($em, $providerId);
+        try {
+            $applied = $applier->apply('openai_compatible:itest-2110-endpoint', [
+                ['providerId' => $providerId, 'name' => 'Imported Chat Model', 'tags' => ['chat']],
+            ]);
+            self::assertSame(1, $applied['created']);
+
+            $this->loginAs('admin@synaplan.com');
+            $data = $this->fetchModels('?includeUnavailable=1');
+
+            $chatProviderIds = array_map(
+                static fn (array $row): string => (string) $row['providerId'],
+                $data['models']['CHAT'] ?? []
+            );
+            self::assertContains(
+                $providerId,
+                $chatProviderIds,
+                'An imported free chat model must appear in the CHAT picker.'
+            );
+        } finally {
+            $this->deleteImportedTestRow($em, $providerId);
+        }
+    }
+
+    public function testImageRowsCarryTheBilledCapabilityPriceAndChatRowsDoNot(): void
+    {
+        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $admin = new User();
+        $admin->setMail('cost-badge-'.bin2hex(random_bytes(4)).'@test.com');
+        $admin->setPw(password_hash('password', PASSWORD_BCRYPT));
+        $admin->setUserLevel('ADMIN');
+        $admin->setProviderId('local');
+        $admin->setCreated(date('YmdHis'));
+        $admin->setType('WEB');
+        $admin->setEmailVerified(true);
+        $em->persist($admin);
+        $em->flush();
+        $this->authenticateClient($this->client, $admin);
+        $this->client->disableReboot();
+
+        $data = $this->fetchModels('?includeUnavailable=1');
+
+        $picRows = $data['models']['PIC2PIC'] ?? [];
+        self::assertNotEmpty($picRows);
+        foreach ($picRows as $row) {
+            self::assertArrayHasKey('capabilityPrices', $row);
+            self::assertArrayHasKey('TEXT2PIC', $row['capabilityPrices']);
+            self::assertArrayHasKey('PIC2PIC', $row['capabilityPrices']);
+        }
+
+        $flare = null;
+        foreach ($picRows as $row) {
+            if ('gpt-image-2.5-flare' === ($row['providerId'] ?? null)) {
+                $flare = $row;
+                break;
+            }
+        }
+        if (is_array($flare)) {
+            self::assertEqualsWithDelta(0.01317, $flare['capabilityPrices']['TEXT2PIC'], 0.000001);
+            self::assertEqualsWithDelta(0.05268, $flare['capabilityPrices']['PIC2PIC'], 0.000001);
+        }
+
+        $chat = $data['models']['CHAT'][0] ?? null;
+        self::assertIsArray($chat);
+        self::assertArrayNotHasKey('capabilityPrices', $chat);
+    }
+
+    private function deleteImportedTestRow(EntityManagerInterface $em, string $providerId): void
+    {
+        $em->createQuery('DELETE FROM App\Entity\Model m WHERE m.providerId = :pid')
+            ->setParameter('pid', $providerId)
+            ->execute();
+        $em->clear();
     }
 }

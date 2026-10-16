@@ -18,6 +18,15 @@ use App\Repository\ModelRepository;
  * counters from Redis. Opening the page never triggers a provider call — a
  * status page that probes on render turns a browser refresh into API traffic,
  * and an operator watching an incident refreshes a lot.
+ *
+ * Retired rows (BRETIREDON set) are reported in their own list and never
+ * counted. The evaluator stops checking them, so whatever verdict is stored
+ * predates the retirement and would show a dead model as "offline" — or a
+ * superseded one as "online" — forever.
+ *
+ * Rows an operator switched off stay under their provider with their real
+ * state, but are counted as `switchedOff` instead of by state and never need
+ * attention.
  */
 final readonly class ModelHealthOverview
 {
@@ -32,8 +41,9 @@ final readonly class ModelHealthOverview
 
     /**
      * @return array{
-     *     summary: array{total: int, online: int, degraded: int, offline: int, unconfigured: int, unknown: int, needsAttention: int, lastCheck: int, autoDisableEnabled: bool, monitoringEnabled: bool},
-     *     providers: list<array{name: string, displayName: string, needsAttention: int, models: list<array<string, mixed>>}>
+     *     summary: array{total: int, online: int, degraded: int, offline: int, unconfigured: int, unknown: int, switchedOff: int, retired: int, needsAttention: int, lastCheck: int, autoDisableEnabled: bool, monitoringEnabled: bool},
+     *     providers: list<array{name: string, displayName: string, needsAttention: int, models: list<array<string, mixed>>}>,
+     *     retired: list<array{id: int, name: string, providerId: string, capability: string, provider: string, providerDisplayName: string, retiredOn: string, successorName: string|null}>
      * }
      */
     public function build(): array
@@ -43,19 +53,20 @@ final readonly class ModelHealthOverview
         $healthByModel = $this->healthRepository->findIndexedByModelId();
         $displayNames = $this->displayNames->all();
 
+        $modelsById = [];
+        foreach ($models as $model) {
+            $modelsById[(int) $model->getId()] = $model;
+        }
+
         $counts = array_fill_keys(array_map(static fn (ModelHealthState $s): string => $s->value, ModelHealthState::cases()), 0);
         $lastCheck = 0;
         $byProvider = [];
+        $retired = [];
+        $switchedOffCount = 0;
         $now = time();
 
         foreach ($models as $model) {
             $modelId = (int) $model->getId();
-            $health = $healthByModel[$modelId] ?? null;
-            $counters = $this->recorder->snapshot($modelId);
-
-            $state = $health?->getState() ?? ModelHealthState::Unknown;
-            ++$counts[$state->value];
-            $lastCheck = max($lastCheck, $health?->getLastCheck() ?? 0);
 
             // Grouped by the normalised key, not by BSERVICE itself: the
             // catalog holds both "Ollama" and "ollama", which would otherwise
@@ -63,16 +74,51 @@ final readonly class ModelHealthOverview
             // to this key still covers both, because the run matches services
             // case-insensitively.
             $service = ModelCatalog::normalizeProvider($model->getService());
+            // Unregistered services (Jina/Cohere/Voyage rerank, …) are not in
+            // the provider registry. The heading must be the normalised key —
+            // matching $service — not BSERVICE casing.
+            $displayName = $displayNames[$service] ?? $service;
+
+            if ($model->isRetired()) {
+                $successorId = $model->getSuccessorId();
+                $successor = null !== $successorId ? ($modelsById[$successorId] ?? null) : null;
+
+                $retired[] = [
+                    'id' => $modelId,
+                    'name' => $model->getName(),
+                    'providerId' => $model->getProviderId(),
+                    'capability' => $model->getTag(),
+                    'provider' => $service,
+                    'providerDisplayName' => $displayName,
+                    'retiredOn' => $model->getRetiredOn()?->format('Y-m-d') ?? '',
+                    'successorName' => $successor?->getName(),
+                ];
+                continue;
+            }
+
+            $health = $healthByModel[$modelId] ?? null;
+            $counters = $this->recorder->snapshot($modelId);
+
+            $state = $health?->getState() ?? ModelHealthState::Unknown;
+            $lastCheck = max($lastCheck, $health?->getLastCheck() ?? 0);
+
+            // Still listed with its real state, so a recovery is visible, but
+            // counted apart: an operator's own decision is not a problem.
+            $switchedOff = ModelHealth::isSwitchedOffByOperator($model, $health);
+            $needsAttention = !$switchedOff && $state->needsAttention();
+            if ($switchedOff) {
+                ++$switchedOffCount;
+            } else {
+                ++$counts[$state->value];
+            }
+
             $byProvider[$service] ??= [
                 'name' => $service,
-                // Unregistered services (Jina/Cohere/Voyage rerank, …) are
-                // not in the provider registry. The heading must be the
-                // normalised key — matching $name — not BSERVICE casing.
-                'displayName' => $displayNames[$service] ?? $service,
+                'displayName' => $displayName,
                 'needsAttention' => 0,
                 'models' => [],
             ];
-            if ($state->needsAttention()) {
+            if ($needsAttention) {
                 ++$byProvider[$service]['needsAttention'];
             }
 
@@ -82,6 +128,7 @@ final readonly class ModelHealthOverview
                 'providerId' => $model->getProviderId(),
                 'capability' => $model->getTag(),
                 'state' => $state->value,
+                'needsAttention' => $needsAttention,
                 'reason' => $health?->getMessage() ?? '',
                 'source' => $health?->getSource() ?? ModelHealth::SOURCE_PROBE,
                 'lastCheck' => $health?->getLastCheck() ?? 0,
@@ -105,6 +152,12 @@ final readonly class ModelHealthOverview
             return [$b['needsAttention'], $a['displayName']] <=> [$a['needsAttention'], $b['displayName']];
         });
 
+        // Most recent retirement first: that is the one an operator is
+        // likely looking for right after a deploy.
+        usort($retired, static function (array $a, array $b): int {
+            return [$b['retiredOn'], $a['providerDisplayName'], $a['name']] <=> [$a['retiredOn'], $b['providerDisplayName'], $b['name']];
+        });
+
         return [
             'summary' => [
                 'total' => count($models),
@@ -113,12 +166,15 @@ final readonly class ModelHealthOverview
                 'offline' => $counts[ModelHealthState::Offline->value],
                 'unconfigured' => $counts[ModelHealthState::Unconfigured->value],
                 'unknown' => $counts[ModelHealthState::Unknown->value],
+                'switchedOff' => $switchedOffCount,
+                'retired' => count($retired),
                 'needsAttention' => $counts[ModelHealthState::Degraded->value] + $counts[ModelHealthState::Offline->value],
                 'lastCheck' => $lastCheck,
                 'autoDisableEnabled' => $this->config->isAutoDisableEnabled(),
                 'monitoringEnabled' => $this->config->isEnabled(),
             ],
             'providers' => $providers,
+            'retired' => $retired,
         ];
     }
 }

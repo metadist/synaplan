@@ -12,6 +12,8 @@ use App\Service\Tool\ToolsConfig;
 
 final readonly class ToolResourceKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     public const KEY = 'tool';
 
     public function __construct(
@@ -62,7 +64,7 @@ final readonly class ToolResourceKind implements ShareableResourceKindInterface
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
     }
 

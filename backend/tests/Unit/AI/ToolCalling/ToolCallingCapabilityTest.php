@@ -62,6 +62,12 @@ final class ToolCallingCapabilityTest extends TestCase
         self::assertTrue($this->capability->conflictsWithStructuredOutput('Anthropic'));
     }
 
+    public function testCerebrasCannotCombineToolsWithASchema(): void
+    {
+        self::assertTrue($this->capability->conflictsWithStructuredOutput('cerebras'));
+        self::assertFalse($this->capability->supports('cerebras', 'gpt-oss-120b', true));
+    }
+
     public function testProvidersWithANativeSchemaModeReportNoConflict(): void
     {
         foreach (['openai', 'google', 'ollama', 'mistral', 'xai', 'triton'] as $provider) {

@@ -5,7 +5,7 @@ import ShareDialog from '@/components/iam/ShareDialog.vue'
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
     listShares: vi.fn().mockResolvedValue([]),
-    searchSubjects: vi.fn().mockResolvedValue([]),
+    searchSubjects: vi.fn().mockResolvedValue({ subjects: [], personScope: 'shared-group' }),
     grantShare: vi.fn(),
     revokeShare: vi.fn(),
   },

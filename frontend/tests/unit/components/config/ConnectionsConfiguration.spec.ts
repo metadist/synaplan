@@ -77,8 +77,9 @@ function connection(overrides: Partial<ConnectionItem> = {}): ConnectionItem {
   }
 }
 
-const mountPage = async () => {
+const mountPage = async (provider: 'm365' | 'dropbox' | 'dav' = 'm365') => {
   const wrapper = mount(ConnectionsConfiguration, {
+    props: { provider },
     global: {
       stubs: {
         Icon: true,
@@ -106,13 +107,22 @@ describe('ConnectionsConfiguration', () => {
     Object.defineProperty(window, 'location', { value: { href: '' }, writable: true })
   })
 
-  it('offers the three ways to connect something, even with an empty list', async () => {
+  it('shows only the provider of its app page, even with an empty list', async () => {
     const wrapper = await mountPage()
-    const text = wrapper.text()
     expect(wrapper.get('[data-testid="connections-empty"]').text()).toContain('Nothing connected')
-    expect(text).toContain('Microsoft 365')
-    expect(text).toContain('Mailbox (IMAP)')
-    expect(text).toContain('Connected system (MCP)')
+    expect(wrapper.find('[data-testid="provider-m365"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="provider-dropbox"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Mailbox (IMAP)')
+  })
+
+  it('lists only the connections of its provider', async () => {
+    mockList.mockResolvedValue([
+      connection({ id: '1', type: 'm365', name: 'ada@contoso.com' }),
+      connection({ id: '2', type: 'dropbox', name: 'ada@example.com' }),
+    ])
+    const wrapper = await mountPage('dropbox')
+    expect(wrapper.text()).toContain('ada@example.com')
+    expect(wrapper.text()).not.toContain('ada@contoso.com')
   })
 
   it('explains why Microsoft 365 cannot be connected yet, and points admins at the setting', async () => {
@@ -194,7 +204,7 @@ describe('ConnectionsConfiguration', () => {
     mockConfirm.mockResolvedValue(true)
     mockRemove.mockResolvedValue(undefined)
 
-    const wrapper = await mountPage()
+    const wrapper = await mountPage('dav')
     expect(wrapper.find('[data-testid="btn-edit-connection"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="btn-delete-connection"]').exists()).toBe(true)
 
@@ -226,7 +236,7 @@ describe('ConnectionsConfiguration', () => {
       account: 'admin',
     })
 
-    const wrapper = await mountPage()
+    const wrapper = await mountPage('dav')
     await wrapper.get('[data-testid="btn-edit-connection"]').trigger('click')
     await wrapper.get('[data-testid="connection-edit-name"]').setValue('Work files')
     await wrapper.get('[data-testid="connection-edit-form"]').trigger('submit')
@@ -251,13 +261,36 @@ describe('ConnectionsConfiguration', () => {
     expect(mockReplace).toHaveBeenCalledWith({ query: {} })
   })
 
-  it('explains why Dropbox cannot be connected yet, and points admins at the setting', async () => {
+  it('names a personal Microsoft account instead of calling it a cancellation', async () => {
+    route.query = { m365: 'error', reason: 'personal_account' }
+    await mountPage()
+
+    expect(mockError).toHaveBeenCalledWith(expect.stringContaining('personal account'))
+  })
+
+  it('names missing admin consent instead of calling it a cancellation', async () => {
+    route.query = { m365: 'error', reason: 'admin_consent' }
+    await mountPage()
+
+    expect(mockError).toHaveBeenCalledWith(expect.stringContaining('administrator'))
+  })
+
+  it('states Microsoft account preconditions before the user leaves the page', async () => {
+    mockStatus.mockResolvedValue({ available: true, redirectUri: 'https://app/callback' })
     const wrapper = await mountPage()
+
+    expect(wrapper.get('[data-testid="m365-preconditions"]').text()).toContain(
+      'Use a work or school account'
+    )
+  })
+
+  it('explains why Dropbox cannot be connected yet, and points admins at the setting', async () => {
+    const wrapper = await mountPage('dropbox')
     expect(wrapper.find('[data-testid="btn-connect-dropbox"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="provider-dropbox"]').text()).toContain('Not available yet')
 
     isAdmin.value = true
-    const adminWrapper = await mountPage()
+    const adminWrapper = await mountPage('dropbox')
     const card = adminWrapper.get('[data-testid="provider-dropbox"]')
     expect(JSON.parse(card.get('a').attributes('data-to') ?? '{}')).toEqual({
       path: '/admin/config',
@@ -269,7 +302,7 @@ describe('ConnectionsConfiguration', () => {
     mockDropboxStatus.mockResolvedValue({ available: true, redirectUri: 'https://app/callback' })
     mockDropboxAuthorizeUrl.mockResolvedValue('https://www.dropbox.com/oauth2/authorize')
 
-    const wrapper = await mountPage()
+    const wrapper = await mountPage('dropbox')
     await wrapper.get('[data-testid="btn-connect-dropbox"]').trigger('click')
     await flushPromises()
 
@@ -282,7 +315,7 @@ describe('ConnectionsConfiguration', () => {
       connection({ id: '9', type: 'dropbox', name: 'ada@example.com', status: 'connected' }),
     ])
 
-    const wrapper = await mountPage()
+    const wrapper = await mountPage('dropbox')
     expect(wrapper.get('[data-testid="dropbox-connected-hint"]').text()).toContain(
       'ada@example.com'
     )
@@ -293,7 +326,7 @@ describe('ConnectionsConfiguration', () => {
 
   it('turns the Dropbox callback result into a message and clears it from the URL', async () => {
     route.query = { dropbox: 'connected' }
-    await mountPage()
+    await mountPage('dropbox')
 
     expect(mockSuccess).toHaveBeenCalledWith(expect.stringContaining('Dropbox is connected'))
     expect(mockReplace).toHaveBeenCalledWith({ query: {} })

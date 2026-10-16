@@ -13,7 +13,7 @@
 
 use App\Entity\InboundEmailHandler;
 use App\Kernel;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\NullLogger;
 

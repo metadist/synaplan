@@ -301,6 +301,57 @@ class FileControllerTest extends WebTestCase
         $this->assertEquals(404, $response->getStatusCode());
     }
 
+    public function testDeleteGroupRejectsAMissingName(): void
+    {
+        $this->client->request('DELETE', '/api/v1/files/groups', [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+        ]);
+
+        $this->assertSame(400, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testDeleteGroupRemovesTheFolder(): void
+    {
+        $groupKey = 'FOLDER_DELETE_ROUTE_'.bin2hex(random_bytes(4));
+        $testFile = $this->createTestFile('folder-delete.txt', 'inside the folder');
+        $uploadedFile = new UploadedFile($testFile, 'folder-delete.txt', 'text/plain', null, true);
+
+        $this->client->request('POST', '/api/v1/files/upload', [
+            'group_key' => $groupKey,
+        ], [
+            'files' => [$uploadedFile],
+        ], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+        ]);
+
+        $upload = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertSame(200, $this->client->getResponse()->getStatusCode());
+        $this->assertArrayHasKey('id', $upload['files'][0]);
+
+        $this->client->request('DELETE', '/api/v1/files/groups?group_key='.rawurlencode($groupKey), [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+        ]);
+
+        $response = $this->client->getResponse();
+        $this->assertSame(200, $response->getStatusCode(), $response->getContent());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertSame(1, $data['deleted_files']);
+
+        $this->client->request('GET', '/api/v1/files?group_key='.rawurlencode($groupKey), [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+        ]);
+        $listing = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertSame(0, $listing['pagination']['total']);
+
+        $this->client->request('GET', '/api/v1/files/groups', [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+        ]);
+        $groups = json_decode($this->client->getResponse()->getContent(), true);
+        $names = array_column($groups['groups'] ?? [], 'name');
+        $this->assertNotContains($groupKey, $names);
+    }
+
     public function testCheckUploadAllowsValidFile(): void
     {
         $this->client->request(

@@ -1,9 +1,14 @@
 <template>
   <div class="space-y-6" data-testid="page-config-ai-models">
+    <p v-if="isAdminScope" class="text-sm txt-secondary" data-testid="text-ai-models-admin-intro">
+      {{ $t('adminSetup.intro.catalog') }}
+    </p>
     <PageHeader
-      :title="$t('config.aiModels.title')"
-      :subtitle="$t('config.aiModels.description')"
+      v-else
+      :title="$t('config.aiSettings.title')"
+      :subtitle="$t('config.aiSettings.subtitle')"
       icon="heroicons:cpu-chip"
+      tour-id="ai-settings"
       data-testid="section-header"
     >
       <!-- Reset applies to the default-model choices, so it only shows on that tab.
@@ -13,10 +18,13 @@
            button is hidden unless every requiresKey provider has credentials —
            otherwise it would point defaults at models this install cannot use.
            URL/local providers (Ollama, custom endpoints) do not count. -->
-      <template v-if="activeTab === 'choice' && allProvidersAvailable" #actions>
+      <template
+        v-if="activeTab === 'choice' && allProvidersAvailable && defaultsScope === 'user'"
+        #actions
+      >
         <button
           type="button"
-          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          class="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="resetting"
           data-testid="btn-reset-defaults"
           @click="confirmResetDefaults"
@@ -37,14 +45,51 @@
 
     <div
       v-show="activeTab === 'choice'"
+      v-if="!isAdminScope"
       class="surface-card p-6 relative"
-      :class="openDropdown ? 'z-20' : 'z-0'"
+      :class="openDropdown || liveMenuOpen ? 'z-20' : 'z-0'"
       data-testid="section-default-config"
     >
-      <h3 class="text-lg font-semibold txt-primary mb-6 flex items-center gap-2 min-w-0">
+      <h3
+        class="text-lg font-semibold txt-primary flex items-center gap-2 min-w-0"
+        :class="authStore.isAdmin ? 'mb-4' : 'mb-6'"
+      >
         <CpuChipIcon class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
         {{ $t('config.aiModels.defaultConfigTitle') }}
       </h3>
+
+      <!-- Admins choose for whom the defaults below apply. Guests run as a
+           system user with no choices of its own, so they always get the
+           instance defaults, never the admin's personal ones. -->
+      <div v-if="authStore.isAdmin" class="mb-6 space-y-2" data-testid="section-defaults-scope">
+        <div
+          role="group"
+          :aria-label="$t('config.aiModels.scope.label')"
+          class="inline-flex flex-wrap items-center gap-1"
+        >
+          <button
+            v-for="option in scopeOptions"
+            :key="option.value"
+            type="button"
+            :aria-pressed="defaultsScope === option.value"
+            :class="[
+              'pill px-3 py-1.5 text-sm font-medium',
+              defaultsScope === option.value && 'pill--active',
+            ]"
+            :data-testid="`btn-defaults-scope-${option.value}`"
+            @click="setDefaultsScope(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <p class="text-sm txt-secondary" data-testid="text-defaults-scope-hint">
+          {{
+            defaultsScope === 'instance'
+              ? $t('config.aiModels.scope.instanceHint')
+              : $t('config.aiModels.scope.userHint')
+          }}
+        </p>
+      </div>
 
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div
@@ -53,150 +98,277 @@
         <p class="mt-2 txt-secondary">{{ $t('config.aiModels.loadingModels') }}</p>
       </div>
 
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
-        <div
-          v-for="capability in Object.keys(purposeLabels)"
-          :key="capability"
-          :ref="
-            (el: any) => {
-              if (el) capabilityRefs[capability as Capability] = el as HTMLElement
-            }
-          "
-          class="space-y-2 transition-all duration-300 relative"
-          :class="[
-            highlightedCapability === capability || highlightedCapability === 'ALL'
-              ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
-              : '',
-            openDropdown === capability ? 'z-10' : 'z-0',
-          ]"
-          data-testid="item-capability"
+      <div
+        v-else-if="modelsLoadFailed"
+        class="py-6 text-center"
+        data-testid="section-models-load-error"
+      >
+        <p class="text-sm text-red-600 dark:text-red-400">{{ $t('config.aiModels.loadFailed') }}</p>
+        <button
+          type="button"
+          class="btn-primary mt-4 px-4 py-2.5 rounded-xl text-sm font-medium"
+          data-testid="btn-retry-models"
+          @click="retryLoadModels"
         >
-          <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
-            <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
-            <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
-            <span
-              v-if="capability === 'VECTORIZE' && isVectorizeAdminOnly"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-              :title="$t('config.embeddingSwitch.adminOnly.lockTooltip')"
-              data-testid="badge-embedding-admin-only"
-            >
-              <LockClosedIcon class="w-3 h-3" />
-              {{ $t('config.embeddingSwitch.adminOnly.badge') }}
-            </span>
-            <span
-              v-else-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-              :title="$t('config.embeddingSwitch.premium.lockTooltip')"
-              data-testid="badge-embedding-premium"
-            >
-              <LockClosedIcon class="w-3 h-3" />
-              {{ $t('config.embeddingSwitch.premium.badge') }}
-            </span>
-            <span
-              v-if="isCapabilityLocked(capability as Capability)"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30"
-              data-testid="badge-set-by-admin"
-            >
-              {{ $t('config.setByAdmin') }}
-            </span>
-            <span
-              v-else-if="defaultSources[capability as Capability] === 'group'"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium txt-secondary"
-              data-testid="badge-from-group"
-            >
-              {{ $t('config.fromGroup') }}
-            </span>
-          </label>
-          <div class="relative">
-            <button
-              type="button"
-              :class="[
-                'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
-                'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
-                openDropdown === capability && 'ring-2 ring-[var(--brand)]',
-                ((capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
-                  isCapabilityLocked(capability as Capability)) &&
-                  'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
-              ]"
-              :disabled="
-                (capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
-                isCapabilityLocked(capability as Capability)
-              "
-              :title="
-                isCapabilityLocked(capability as Capability)
-                  ? $t('config.setByAdmin')
-                  : capability === 'VECTORIZE' && isVectorizeAdminOnly
-                    ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
-                    : undefined
-              "
-              data-testid="btn-model-dropdown"
-              @click="toggleDropdown(capability as Capability)"
-            >
-              <span class="flex items-center gap-2 truncate">
-                <span class="truncate">{{ getSelectedModelLabel(capability as Capability) }}</span>
-                <ModelCostBadge
-                  v-if="getSelectedModelObj(capability as Capability)"
-                  :model="getSelectedModelObj(capability as Capability)!"
-                  :peers="getModelsByPurpose(capability as Capability)"
-                />
-              </span>
-            </button>
-            <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-              <ServiceIcon
-                :service="getSelectedModelService(capability as Capability)"
-                :size="16"
-              />
-            </div>
-            <ChevronDownIcon
-              :class="[
-                'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none transition-transform',
-                openDropdown === capability && 'rotate-180',
-              ]"
-            />
+          {{ $t('config.aiModels.retry') }}
+        </button>
+      </div>
 
-            <!-- Custom Dropdown -->
-            <div
-              v-if="openDropdown === capability"
-              class="absolute z-50 mt-2 w-full max-h-[60vh] overflow-y-auto dropdown-panel"
-            >
-              <button
-                type="button"
-                class="dropdown-item w-full"
-                data-testid="btn-model-option"
-                @click="selectModel(capability as Capability, null)"
+      <div v-else>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5" data-testid="section-capabilities">
+          <div
+            v-for="capability in Object.keys(purposeLabels)"
+            :key="capability"
+            :ref="
+              (el: any) => {
+                if (el) capabilityRefs[capability as Capability] = el as HTMLElement
+              }
+            "
+            class="space-y-2 transition-all duration-300 relative"
+            :class="[
+              highlightedCapability === capability || highlightedCapability === 'ALL'
+                ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
+                : '',
+              openDropdown === capability ? 'z-10' : 'z-0',
+            ]"
+            data-testid="item-capability"
+          >
+            <label class="flex flex-wrap items-center gap-2 text-sm font-semibold txt-primary">
+              <CpuChipIcon class="w-4 h-4 text-[var(--brand)]" />
+              <span class="flex-1 min-w-0">{{ purposeLabels[capability as Capability] }}</span>
+              <span
+                v-if="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--status-warning-muted)] text-[var(--status-warning-text)] border border-amber-500/30"
+                :title="$t('config.embeddingSwitch.adminOnly.lockTooltip')"
+                data-testid="badge-embedding-admin-only"
               >
-                <span class="txt-secondary italic">{{ $t('config.aiModels.selectModel') }}</span>
-              </button>
+                <LockClosedIcon class="w-3 h-3" />
+                {{ $t('config.embeddingSwitch.adminOnly.badge') }}
+              </span>
+              <span
+                v-else-if="capability === 'VECTORIZE' && !canSwitchEmbedding"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                :title="$t('config.embeddingSwitch.premium.lockTooltip')"
+                data-testid="badge-embedding-premium"
+              >
+                <LockClosedIcon class="w-3 h-3" />
+                {{ $t('config.embeddingSwitch.premium.badge') }}
+              </span>
+              <span
+                v-if="isCapabilityLocked(capability as Capability)"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30"
+                data-testid="badge-set-by-admin"
+              >
+                {{ $t('config.setByAdmin') }}
+              </span>
+              <span
+                v-else-if="defaultSources[capability as Capability] === 'group'"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium txt-secondary"
+                data-testid="badge-from-group"
+              >
+                {{ $t('config.fromGroup') }}
+              </span>
+              <span
+                v-if="restrictedCapabilities.includes(capability)"
+                class="basis-full text-xs font-normal txt-secondary"
+                data-testid="hint-group-model-limit"
+              >
+                {{ groupLimitText }}
+              </span>
+            </label>
+            <div class="relative">
               <button
-                v-for="model in getModelsByPurpose(capability as Capability)"
-                :key="model.id"
                 type="button"
                 :class="[
-                  'dropdown-item w-full',
-                  defaultConfig[capability as Capability] === model.id && 'dropdown-item--active',
+                  'w-full px-4 py-3 pl-10 pr-10 rounded-xl surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
+                  'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
+                  openDropdown === capability && 'ring-2 ring-[var(--brand)]',
+                  ((capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
+                    isCapabilityLocked(capability as Capability)) &&
+                    'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
                 ]"
-                data-testid="btn-model-option"
-                @click="selectModel(capability as Capability, model.id)"
+                :disabled="
+                  (capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
+                  isCapabilityLocked(capability as Capability)
+                "
+                :title="
+                  isCapabilityLocked(capability as Capability)
+                    ? $t('config.setByAdmin')
+                    : capability === 'VECTORIZE' && isVectorizeAdminOnly
+                      ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
+                      : undefined
+                "
+                data-testid="btn-model-dropdown"
+                @click="toggleDropdown(capability as Capability)"
               >
-                <ServiceIcon :service="model.service" :size="20" />
-                <div class="flex-1 min-w-0 text-left">
-                  <div class="flex items-center gap-2">
-                    <span class="font-medium truncate">{{ model.name }}</span>
-                    <ModelCostBadge
-                      :model="model"
-                      :peers="getModelsByPurpose(capability as Capability)"
-                    />
-                  </div>
-                  <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
-                </div>
+                <span class="flex items-center gap-2 truncate">
+                  <span
+                    class="truncate"
+                    :class="{
+                      'txt-model-placeholder': !getSelectedModelObj(capability as Capability),
+                    }"
+                    >{{ getSelectedModelLabel(capability as Capability) }}</span
+                  >
+                  <ModelCostBadge
+                    v-if="getSelectedModelObj(capability as Capability)"
+                    :model="getSelectedModelObj(capability as Capability)!"
+                    :peers="getModelsByPurpose(capability as Capability)"
+                    :capability="capability"
+                  />
+                </span>
               </button>
+              <div class="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ServiceIcon
+                  :service="getSelectedModelService(capability as Capability)"
+                  :size="16"
+                />
+              </div>
+              <ChevronDownIcon
+                :class="[
+                  'absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none transition-transform',
+                  openDropdown === capability && 'rotate-180',
+                ]"
+              />
+
+              <!-- Custom Dropdown -->
+              <div
+                v-if="openDropdown === capability"
+                class="absolute z-50 mt-2 flex w-full max-h-[60vh] flex-col dropdown-panel"
+              >
+                <div
+                  class="shrink-0 border-b border-light-border/30 px-2 pb-3 pt-2 dark:border-dark-border/20"
+                  data-testid="section-model-choice-filter"
+                >
+                  <label class="sr-only" :for="`model-choice-filter-${capability}`">
+                    {{ $t('config.aiModels.dropdownFilterLabel') }}
+                  </label>
+                  <div class="relative">
+                    <MagnifyingGlassIcon
+                      class="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 txt-secondary"
+                      aria-hidden="true"
+                    />
+                    <input
+                      :id="`model-choice-filter-${capability}`"
+                      v-model="dropdownFilter"
+                      type="text"
+                      autocomplete="off"
+                      spellcheck="false"
+                      enterkeyhint="go"
+                      class="w-full rounded-xl surface-card border border-light-border/30 py-1.5 pl-9 pr-9 text-sm txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] dark:border-dark-border/20"
+                      :placeholder="$t('config.aiModels.dropdownFilterPlaceholder')"
+                      data-testid="input-model-choice-filter"
+                      @keydown.enter="onDropdownFilterEnter($event, capability as Capability)"
+                      @keydown.escape.stop.prevent="onDropdownFilterEscape"
+                    />
+                    <button
+                      v-if="dropdownFilter"
+                      type="button"
+                      class="icon-ghost absolute right-1.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md"
+                      :aria-label="$t('config.aiModels.dropdownClearFilter')"
+                      data-testid="btn-model-choice-filter-clear"
+                      @click="clearDropdownFilter"
+                    >
+                      <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+                <div class="flex min-h-0 flex-col gap-1 overflow-y-auto pt-2">
+                  <button
+                    type="button"
+                    class="dropdown-item w-full"
+                    data-testid="btn-model-option"
+                    @click="selectModel(capability as Capability, null)"
+                  >
+                    <span class="txt-model-placeholder">{{
+                      $t('config.aiModels.selectModel')
+                    }}</span>
+                  </button>
+                  <button
+                    v-for="model in visibleModelsFor(capability as Capability)"
+                    :key="model.id"
+                    type="button"
+                    :class="[
+                      'dropdown-item w-full',
+                      defaultConfig[capability as Capability] === model.id &&
+                        'dropdown-item--active',
+                    ]"
+                    data-testid="btn-model-option"
+                    @click="selectModel(capability as Capability, model.id)"
+                  >
+                    <ServiceIcon :service="model.service" :size="20" />
+                    <div class="flex-1 min-w-0 text-left">
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium truncate">{{ model.name }}</span>
+                        <ModelCostBadge
+                          :model="model"
+                          :peers="getModelsByPurpose(capability as Capability)"
+                          :capability="capability"
+                        />
+                      </div>
+                      <div class="text-xs txt-secondary truncate">{{ model.service }}</div>
+                    </div>
+                  </button>
+                  <p
+                    v-if="
+                      dropdownFilter.trim() &&
+                      visibleModelsFor(capability as Capability).length === 0
+                    "
+                    class="px-3 py-2 text-sm txt-secondary"
+                    data-testid="text-model-choice-filter-empty"
+                  >
+                    {{ $t('config.aiModels.dropdownNoMatch', { query: dropdownFilter.trim() }) }}
+                  </p>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+
+        <div
+          v-if="showLiveVoiceChoice"
+          class="mt-6 border-t border-light-border/30 pt-6 dark:border-dark-border/20"
+          data-testid="item-live-voice"
+        >
+          <div
+            ref="liveCard"
+            class="transition-all duration-300"
+            :class="
+              liveHighlight
+                ? 'ring-4 ring-[var(--brand)] ring-offset-4 rounded-xl p-3 bg-[var(--brand)]/5'
+                : ''
+            "
+          >
+            <h4 class="text-base font-semibold txt-primary">{{ t('settings.voice.title') }}</h4>
+            <p class="mt-2 text-sm txt-secondary">
+              {{
+                t('settings.voice.intro', { company: voiceCompany(liveSelected?.provider ?? '') })
+              }}
+            </p>
+            <LiveVoiceDefaults
+              class="mt-5"
+              :models="liveOptions"
+              :model-id="liveModelId"
+              :voice="liveVoice"
+              :locked="liveLocked"
+              :saving="liveSaving"
+              :dismiss="liveMenuDismiss"
+              @update:model-id="liveModelId = $event"
+              @update:voice="liveVoice = $event"
+              @menu="liveMenuOpen = $event"
+              @model-commit="onLiveModelChange"
+              @voice-commit="onLiveVoiceChange"
+            />
+            <LiveVoicePreferences
+              class="mt-5 border-t border-light-border/30 pt-5 dark:border-dark-border/20"
+            />
           </div>
         </div>
       </div>
     </div>
 
-    <div v-show="activeTab === 'list'" class="space-y-6">
+    <PlannerModelCard v-if="!isAdminScope && activeTab === 'choice'" />
+
+    <div v-if="!isAdminScope" v-show="activeTab === 'list'" class="space-y-6">
       <div class="surface-card p-6" data-testid="section-purpose-filters">
         <h2 class="text-xl font-semibold txt-primary mb-4 flex items-center gap-2">
           <FunnelIcon class="w-5 h-5" />
@@ -206,7 +378,7 @@
         <div class="flex flex-wrap gap-2">
           <button
             :class="[
-              'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
+              'px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
               selectedPurpose === null
                 ? 'bg-[var(--brand)] text-white'
                 : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
@@ -220,7 +392,7 @@
             v-for="capability in Object.keys(purposeLabels)"
             :key="capability"
             :class="[
-              'px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
+              'px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
               selectedPurpose === capability
                 ? 'bg-[var(--brand)] text-white'
                 : 'border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5',
@@ -246,14 +418,15 @@
             <!-- Search / Filter -->
             <div class="relative">
               <MagnifyingGlassIcon
-                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
+                class="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 txt-secondary"
+                aria-hidden="true"
               />
               <input
                 v-model="modelSearch"
                 type="search"
                 :placeholder="$t('config.aiModels.searchPlaceholder')"
                 :aria-label="$t('config.aiModels.searchPlaceholder')"
-                class="w-full sm:w-64 pl-9 pr-3 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full sm:w-64 pl-9 pr-3 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-model-search"
               />
             </div>
@@ -274,7 +447,7 @@
             <div class="relative">
               <select
                 v-model="sortBy"
-                class="px-3 py-2 pr-8 rounded-lg border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer appearance-none"
+                class="px-3 py-2 pr-8 rounded-xl border border-light-border/30 dark:border-dark-border/20 bg-light-surface dark:bg-dark-surface txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] cursor-pointer appearance-none"
                 @change="
                   sortDirection = sortBy === 'quality' || sortBy === 'rating' ? 'desc' : 'asc'
                 "
@@ -291,8 +464,33 @@
           </div>
         </div>
 
+        <div v-if="loading" class="text-center py-8" data-testid="section-models-list-loading">
+          <div
+            class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--brand)]"
+          ></div>
+          <p class="mt-2 txt-secondary">{{ $t('config.aiModels.loadingModels') }}</p>
+        </div>
+
         <div
-          v-if="filteredModels.length === 0"
+          v-else-if="modelsLoadFailed"
+          class="py-12 text-center"
+          data-testid="section-models-load-error-list"
+        >
+          <p class="text-sm text-red-600 dark:text-red-400">
+            {{ $t('config.aiModels.loadFailed') }}
+          </p>
+          <button
+            type="button"
+            class="btn-primary mt-4 px-4 py-2.5 rounded-xl text-sm font-medium"
+            data-testid="btn-retry-models-list"
+            @click="retryLoadModels"
+          >
+            {{ $t('config.aiModels.retry') }}
+          </button>
+        </div>
+
+        <div
+          v-else-if="filteredModels.length === 0"
           class="text-center py-12 txt-secondary"
           data-testid="section-models-empty"
         >
@@ -455,7 +653,7 @@
           </span>
           <div class="flex items-center gap-1">
             <button
-              class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              class="p-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               :disabled="modelsPage <= 1"
               @click="modelsPage--"
             >
@@ -465,7 +663,7 @@
               {{ modelsPage }} / {{ modelsTotalPages }}
             </span>
             <button
-              class="p-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              class="p-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
               :disabled="modelsPage >= modelsTotalPages"
               @click="modelsPage++"
             >
@@ -476,15 +674,55 @@
       </div>
     </div>
 
-    <div v-if="authStore.isAdmin && activeTab === 'runs'">
-      <EmbeddingRunsPanel ref="runsPanelRef" />
+    <AppPanelHost v-if="!isAdminScope && activeTab === 'topics'" :loader="loadTopics" />
+
+    <div v-if="isAdminScope && authStore.isAdmin" class="space-y-4">
+      <div class="flex justify-end">
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
+          data-testid="btn-ai-models-edit-accordion-toggle-all"
+          @click="allEditSectionsOpen ? collapseAllEditSections() : expandAllEditSections()"
+        >
+          {{
+            allEditSectionsOpen
+              ? $t('admin.config.accordion.collapseAll')
+              : $t('admin.config.accordion.expandAll')
+          }}
+        </button>
+      </div>
+      <AccordionStack testid="ai-models-edit-accordion">
+        <AccordionSection
+          panel-id="ai-models-section-endpoints"
+          :title="$t('config.openaiEndpoints.title')"
+          :open="isEditSectionOpen('endpoints')"
+          header-testid="btn-ai-models-section-endpoints"
+          @toggle="toggleEditSection('endpoints')"
+        >
+          <OpenAiCompatibleEndpointsPanel embedded @changed="onEndpointChanged" />
+        </AccordionSection>
+        <AccordionSection
+          panel-id="ai-models-section-add"
+          :title="$t('config.aiModels.admin.addForm.title')"
+          :open="isEditSectionOpen('add')"
+          header-testid="btn-ai-models-section-add"
+          @toggle="toggleEditSection('add')"
+        >
+          <AddModelForm embedded @created="onAdminModelCreated" />
+        </AccordionSection>
+        <AccordionSection
+          panel-id="ai-models-section-catalog"
+          :title="$t('config.aiModels.admin.editModels')"
+          :open="isEditSectionOpen('catalog')"
+          header-testid="btn-ai-models-section-catalog"
+          @toggle="toggleEditSection('catalog')"
+        >
+          <AIModelsAdminPanel ref="adminPanelRef" embedded @changed="onCatalogChanged" />
+        </AccordionSection>
+      </AccordionStack>
     </div>
 
-    <div v-if="authStore.isAdmin && activeTab === 'edit'" class="space-y-6">
-      <OpenAiCompatibleEndpointsPanel />
-      <AddModelForm @created="onAdminModelCreated" />
-      <AIModelsAdminPanel ref="adminPanelRef" />
-    </div>
+    <EmbeddingRunsPanel v-if="isAdminScope && authStore.isAdmin" ref="runsPanelRef" />
 
     <EmbeddingSwitchModal
       :open="switchModalOpen"
@@ -512,11 +750,19 @@ import {
   ListBulletIcon,
   LockClosedIcon,
   MagnifyingGlassIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
+import AccordionSection from '@/components/AccordionSection.vue'
+import AccordionStack from '@/components/AccordionStack.vue'
 import AddModelForm from '@/components/config/AddModelForm.vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatibleEndpointsPanel.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AppPanelHost from '@/components/apps/AppPanelHost.vue'
+import PlannerModelCard from '@/components/config/PlannerModelCard.vue'
+import LiveVoiceDefaults from '@/components/config/LiveVoiceDefaults.vue'
+import LiveVoicePreferences from '@/components/config/LiveVoicePreferences.vue'
+import { useAccordion } from '@/composables/useAccordion'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
@@ -532,10 +778,15 @@ import {
   saveDefaultModels,
   checkModelAvailability,
   resetDefaultModels,
+  type DefaultsScope,
 } from '@/services/api/configApi'
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { ApiError } from '@/services/api/httpClient'
+import { fetchLiveVoiceOptions, type LiveVoiceModel } from '@/services/api/liveVoiceApi'
+import { voiceCompany } from '@/services/liveVoice/company'
+import { resolveLiveVoice, setPreferredVoice } from '@/services/liveVoice/preferences'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
 import {
   dedupeModelsByPurpose,
@@ -545,16 +796,108 @@ import {
 import { useI18n } from 'vue-i18n'
 
 type ModelsData = Partial<Record<Capability, AIModel[]>>
-type ModelsTabId = 'choice' | 'list' | 'runs' | 'edit'
+type ModelsTabId = 'choice' | 'list' | 'topics'
+
+const props = withDefaults(defineProps<{ scope?: 'user' | 'admin' }>(), { scope: 'user' })
+/** Admin › AI › Model catalog: catalog editing and embedding runs, no personal defaults. */
+const isAdminScope = computed(() => props.scope === 'admin')
+const loadTopics = () => import('@/components/config/TaskPromptsConfiguration.vue')
 
 const authStore = useAuthStore()
+const configStore = useConfigStore()
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 
+const liveOptions = ref<LiveVoiceModel[]>([])
+const liveModelId = ref<number | null>(null)
+const liveVoice = ref('')
+const liveLocked = ref(false)
+const liveSaving = ref(false)
+const liveHighlight = ref(false)
+const liveCard = ref<HTMLElement | null>(null)
+const liveMenuOpen = ref(false)
+const liveMenuDismiss = ref(0)
+const liveSelected = computed(
+  () => liveOptions.value.find((model) => model.id === liveModelId.value) ?? null
+)
+const showLiveVoiceChoice = computed(
+  () => configStore.voiceLive.enabled && liveOptions.value.length > 0
+)
+
+function syncLiveVoice() {
+  const next = liveSelected.value
+  if (!next) return
+  const listed = next.voices ?? []
+  liveVoice.value = resolveLiveVoice(next.id ?? null, next.provider ?? '', listed, next.voice ?? '')
+}
+
+async function loadLiveOptions() {
+  if (!configStore.voiceLive.enabled) {
+    liveOptions.value = []
+    return
+  }
+  try {
+    const options = await fetchLiveVoiceOptions()
+    liveOptions.value = options.models ?? []
+    const known = liveOptions.value.some((model) => model.id === liveModelId.value)
+    if (!known) {
+      liveModelId.value = options.defaultModelId ?? liveOptions.value[0]?.id ?? null
+    }
+  } catch {
+    liveOptions.value = []
+  }
+}
+
+async function showLiveHighlight() {
+  activeTab.value = 'choice'
+  liveHighlight.value = true
+  await nextTick()
+  liveCard.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  setTimeout(() => {
+    liveHighlight.value = false
+  }, 4000)
+}
+
+async function onLiveModelChange() {
+  syncLiveVoice()
+  if (liveModelId.value === null || liveLocked.value || liveSaving.value) return
+  liveSaving.value = true
+  try {
+    const forEveryone = defaultsScope.value === 'instance'
+    const response = await saveDefaultModels({
+      defaults: { VOICE_LIVE: liveModelId.value },
+      ...(forEveryone ? { global: true } : {}),
+    })
+    if (response.success) {
+      success(
+        forEveryone ? t('config.aiModels.scope.savedInstance') : t('config.aiModels.saveSuccess')
+      )
+    }
+  } catch {
+    showError(t('settings.voice.saveFailed'))
+  } finally {
+    liveSaving.value = false
+  }
+}
+
+function onLiveVoiceChange() {
+  const id = liveSelected.value?.id
+  if (id == null) return
+  setPreferredVoice(id, liveVoice.value)
+}
+
 const activeTab = ref<ModelsTabId>('choice')
 const adminPanelRef = ref<InstanceType<typeof AIModelsAdminPanel> | null>(null)
-const MODELS_TABS = ['choice', 'list', 'runs', 'edit'] as const
+const editSectionIds = ['endpoints', 'add', 'catalog'] as const
+const {
+  isOpen: isEditSectionOpen,
+  toggle: toggleEditSection,
+  expandAll: expandAllEditSections,
+  collapseAll: collapseAllEditSections,
+  allOpen: allEditSectionsOpen,
+} = useAccordion(() => [...editSectionIds])
+const MODELS_TABS = ['choice', 'list', 'topics'] as const
 
 function parseModelsTab(raw: unknown): ModelsTabId | null {
   if (typeof raw !== 'string') return null
@@ -562,17 +905,20 @@ function parseModelsTab(raw: unknown): ModelsTabId | null {
 }
 
 function canOpenModelsTab(tab: ModelsTabId): boolean {
-  if (tab === 'edit' || tab === 'runs') return authStore.isAdmin
-  return true
+  return MODELS_TABS.includes(tab)
 }
 
 function applyTabFromQuery(): void {
+  if (isAdminScope.value) return
   const tab = parseModelsTab(route.query.tab)
   if (!tab || !canOpenModelsTab(tab)) return
+  const previous = activeTab.value
   activeTab.value = tab
+  refreshPickerIfShown(tab, previous)
 }
 
 function syncTabToUrl(tab: ModelsTabId): void {
+  if (isAdminScope.value) return
   const query = { ...route.query }
   if (tab === 'choice') {
     delete query.tab
@@ -585,49 +931,54 @@ function syncTabToUrl(tab: ModelsTabId): void {
   void router.replace({ query })
 }
 
-const tabNavItems = computed<TabNavItem[]>(() => {
-  const items: TabNavItem[] = [
-    {
-      id: 'choice',
-      label: t('config.aiModels.tabs.choice'),
-      icon: 'mdi:tune-variant',
-      testid: 'tab-ai-models-choice',
-    },
-    {
-      id: 'list',
-      label: t('config.aiModels.tabs.list'),
-      icon: 'mdi:format-list-bulleted',
-      testid: 'tab-ai-models-list',
-    },
-  ]
-  if (authStore.isAdmin) {
-    items.push(
-      {
-        id: 'runs',
-        label: t('config.aiModels.tabs.runs'),
-        icon: 'mdi:vector-polyline',
-        testid: 'tab-ai-models-runs',
-      },
-      {
-        id: 'edit',
-        label: t('config.aiModels.tabs.edit'),
-        icon: 'mdi:pencil-ruler',
-        testid: 'tab-ai-models-edit',
-      }
-    )
-  }
-  return items
-})
+const tabNavItems = computed<TabNavItem[]>(() => [
+  {
+    id: 'choice',
+    label: t('config.aiSettings.tabs.defaults'),
+    icon: 'mdi:tune-variant',
+    testid: 'tab-ai-models-choice',
+  },
+  {
+    id: 'list',
+    label: t('config.aiModels.tabs.list'),
+    icon: 'mdi:format-list-bulleted',
+    testid: 'tab-ai-models-list',
+  },
+  {
+    id: 'topics',
+    label: t('config.aiSettings.tabs.topics'),
+    icon: 'heroicons:document-text',
+    testid: 'tab-ai-models-topics',
+  },
+])
 
 function onModelsTabChange(id: string) {
   const tab = id as ModelsTabId
   if (!canOpenModelsTab(tab)) return
+  const previous = activeTab.value
   activeTab.value = tab
   syncTabToUrl(tab)
+  refreshPickerIfShown(tab, previous)
 }
 
 function onAdminModelCreated() {
-  void adminPanelRef.value?.refresh()
+  void adminPanelRef.value?.refresh?.()
+  void loadData({ background: true })
+}
+
+function onCatalogChanged() {
+  void loadData({ background: true })
+}
+
+function onEndpointChanged() {
+  void adminPanelRef.value?.refresh?.()
+  void loadData({ background: true })
+}
+
+function refreshPickerIfShown(tab: ModelsTabId, previous: ModelsTabId): void {
+  if (tab !== previous && (tab === 'choice' || tab === 'list')) {
+    void loadData({ background: true })
+  }
 }
 
 const purposeLabels = computed<Record<Capability, string>>(() => ({
@@ -648,10 +999,24 @@ const purposeLabels = computed<Record<Capability, string>>(() => ({
   TEXT2SOUND: t('config.aiModels.capabilities.text2sound'),
 }))
 
-const loading = ref(false)
+const loading = ref(true)
+const modelsLoadFailed = ref(false)
 const saving = ref(false)
 const resetting = ref(false)
 const availableModels = ref<ModelsData>({})
+const restrictedCapabilities = ref<string[]>([])
+const groupLimitNames = ref<string[]>([])
+const groupLimitsCombined = ref(false)
+const groupLimitText = computed(() => {
+  const names = groupLimitNames.value.filter((name) => name.trim() !== '')
+  if (names.length > 1 || groupLimitsCombined.value) {
+    return t('config.aiModels.groupLimitsCombined', { names: names.join(', ') })
+  }
+  if (names.length === 1) {
+    return t('config.aiModels.groupLimitsNamed', { name: names[0] })
+  }
+  return t('config.aiModels.groupLimitsModels')
+})
 const providers = ref<ProviderAvailability[]>([])
 
 // "Select suggested models" applies the seeded recommendation, which spans
@@ -665,6 +1030,37 @@ const allProvidersAvailable = computed(() => {
 })
 const defaultLocked = ref<Partial<Record<Capability, boolean>>>({})
 const defaultSources = ref<Partial<Record<Capability, 'admin' | 'group' | 'user'>>>({})
+
+const DEFAULTS_SCOPE_KEY = 'ai-models-defaults-scope'
+
+/** Admins start on their own defaults. Everyone is an explicit choice, so a
+ *  visit does not change the models guests and other members get. */
+const readDefaultsScope = (): DefaultsScope => {
+  if (!authStore.isAdmin) return 'user'
+  try {
+    return localStorage.getItem(DEFAULTS_SCOPE_KEY) === 'instance' ? 'instance' : 'user'
+  } catch {
+    return 'user'
+  }
+}
+
+const defaultsScope = ref<DefaultsScope>(readDefaultsScope())
+
+const scopeOptions = computed<{ value: DefaultsScope; label: string }[]>(() => [
+  { value: 'user', label: t('config.aiModels.scope.user') },
+  { value: 'instance', label: t('config.aiModels.scope.instance') },
+])
+
+const setDefaultsScope = (scope: DefaultsScope) => {
+  if (defaultsScope.value === scope) return
+  defaultsScope.value = scope
+  try {
+    localStorage.setItem(DEFAULTS_SCOPE_KEY, scope)
+  } catch {
+    // Private mode can block storage. The scope still applies for this visit.
+  }
+  void loadData({ background: true, replaceDefaults: true })
+}
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
   CHAT: null,
@@ -687,6 +1083,7 @@ const capabilityRefs = ref<Record<Capability, HTMLElement | null>>(
   {} as Record<Capability, HTMLElement | null>
 )
 const openDropdown = ref<Capability | null>(null)
+const dropdownFilter = ref('')
 const showRatings = ref(false)
 const sortBy = ref<'alphabet' | 'service' | 'rating' | 'quality' | 'purpose'>('alphabet')
 const sortDirection = ref<'asc' | 'desc'>('asc')
@@ -760,8 +1157,12 @@ const canSwitchEmbedding = computed(() => {
   return authStore.isPro || authStore.isAdmin
 })
 
+let catalogLoad: Promise<void> = Promise.resolve()
+let catalogRequest = 0
+
 onMounted(async () => {
-  await Promise.all([loadData(), loadEmbeddingGuard()])
+  await Promise.all([catalogLoad, loadEmbeddingGuard(), loadLiveOptions()])
+  syncLiveVoice()
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 
@@ -770,6 +1171,10 @@ onMounted(async () => {
   // Check for highlight query parameter
   const highlightParam = route.query.highlight as string | undefined
   if (!highlightParam) return
+  if (highlightParam === 'VOICE_LIVE') {
+    await showLiveHighlight()
+    return
+  }
 
   const highlight = normalizeHighlight(highlightParam)
   if (!highlight) return
@@ -816,6 +1221,11 @@ watch(
   async (newHighlightParam) => {
     if (!newHighlightParam || typeof newHighlightParam !== 'string') return
 
+    if (newHighlightParam === 'VOICE_LIVE') {
+      await showLiveHighlight()
+      return
+    }
+
     const newHighlight = normalizeHighlight(newHighlightParam)
     if (!newHighlight) return
 
@@ -857,32 +1267,97 @@ const scrollToCapability = (capability: Capability) => {
   }
 }
 
-const loadData = async () => {
-  loading.value = true
+/**
+ * Bumps when a choice is saved. A catalog refresh that started before the
+ * save must not write the old server defaults back over the choice.
+ */
+let savedChoiceEpoch = 0
+
+function choicesMatch(
+  left: Record<Capability, number | null>,
+  right: Record<Capability, number | null>
+): boolean {
+  return (Object.keys(left) as Capability[]).every((key) => left[key] === right[key])
+}
+
+const loadData = async (options?: { background?: boolean; replaceDefaults?: boolean }) => {
+  const requestId = ++catalogRequest
+  const choiceEpochAtStart = savedChoiceEpoch
+  const background = options?.background === true && !modelsLoadFailed.value && !loading.value
+  if (!background) {
+    loading.value = true
+    modelsLoadFailed.value = false
+  }
   try {
-    const [modelsRes, defaultsRes] = await Promise.all([getModels(), getDefaultModels()])
+    const [modelsResult, defaultsResult] = await Promise.allSettled([
+      getModels(),
+      getDefaultModels(defaultsScope.value),
+    ])
 
-    if (modelsRes.success) {
-      availableModels.value = modelsRes.models
-      providers.value = modelsRes.providers ?? []
+    if (requestId !== catalogRequest) {
+      return
     }
 
-    if (defaultsRes.success) {
-      const mergedDefaults: Record<Capability, number | null> = {
-        ...defaultConfig.value,
-        ...(defaultsRes.defaults as Partial<Record<Capability, number | null>>),
+    if (modelsResult.status === 'fulfilled' && modelsResult.value.success) {
+      availableModels.value = modelsResult.value.models
+      providers.value = modelsResult.value.providers ?? []
+      restrictedCapabilities.value = modelsResult.value.restricted ?? []
+      groupLimitNames.value = modelsResult.value.groupLimits?.names ?? []
+      groupLimitsCombined.value = modelsResult.value.groupLimits?.combined === true
+      modelsLoadFailed.value = false
+    } else if (!background) {
+      modelsLoadFailed.value = true
+      console.error(
+        'Failed to load models:',
+        modelsResult.status === 'rejected' ? modelsResult.reason : modelsResult.value
+      )
+    } else {
+      console.error(
+        'Failed to refresh models:',
+        modelsResult.status === 'rejected' ? modelsResult.reason : modelsResult.value
+      )
+    }
+
+    if (defaultsResult.status === 'fulfilled' && defaultsResult.value.success) {
+      // selectModel() stores the new id, waits for the availability check,
+      // then saves every default. A refresh that lands in that window used
+      // to replace the id with the old server value, and the save stored it.
+      const choiceMoved =
+        !options?.replaceDefaults &&
+        (!choicesMatch(defaultConfig.value, originalConfig.value) ||
+          choiceEpochAtStart !== savedChoiceEpoch)
+      if (!choiceMoved) {
+        const mergedDefaults: Record<Capability, number | null> = {
+          ...defaultConfig.value,
+          ...(defaultsResult.value.defaults as Partial<Record<Capability, number | null>>),
+        }
+        defaultConfig.value = mergedDefaults
+        originalConfig.value = { ...mergedDefaults }
+        defaultLocked.value = defaultsResult.value.locked ?? {}
+        defaultSources.value = defaultsResult.value.sources ?? {}
+        const rawDefaults = defaultsResult.value.defaults as Record<string, number | null>
+        const rawLocked = (defaultsResult.value.locked ?? {}) as Record<string, boolean>
+        if (typeof rawDefaults.VOICE_LIVE === 'number') {
+          liveModelId.value = rawDefaults.VOICE_LIVE
+        }
+        liveLocked.value = rawLocked.VOICE_LIVE === true
+        syncLiveVoice()
       }
-      defaultConfig.value = mergedDefaults
-      originalConfig.value = { ...mergedDefaults }
-      defaultLocked.value = defaultsRes.locked ?? {}
-      defaultSources.value = defaultsRes.sources ?? {}
+    } else if (defaultsResult.status === 'rejected') {
+      console.error('Failed to load default models:', defaultsResult.reason)
     }
-  } catch (error) {
-    console.error('Failed to load models:', error)
   } finally {
-    loading.value = false
+    if (requestId === catalogRequest) {
+      loading.value = false
+    }
   }
 }
+
+function retryLoadModels(): void {
+  void loadData()
+}
+
+catalogLoad = loadData()
 
 const modelsByPurpose = computed<Record<string, AIModel[]>>(() => {
   const result: Record<string, AIModel[]> = {}
@@ -894,6 +1369,85 @@ const modelsByPurpose = computed<Record<string, AIModel[]>>(() => {
 
 const getModelsByPurpose = (purpose: Capability): AIModel[] => {
   return modelsByPurpose.value[purpose] || []
+}
+
+const normalizeFilter = (value: string): string =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+const dropdownFilterTerms = computed(() =>
+  normalizeFilter(dropdownFilter.value).split(/\s+/).filter(Boolean)
+)
+
+function modelMatchesDropdownFilter(model: AIModel): boolean {
+  if (dropdownFilterTerms.value.length === 0) return true
+  const text = normalizeFilter(`${model.name} ${model.service} ${model.providerId ?? ''}`)
+  return dropdownFilterTerms.value.every((term) => text.includes(term))
+}
+
+function visibleModelsFor(purpose: Capability): AIModel[] {
+  return getModelsByPurpose(purpose).filter(modelMatchesDropdownFilter)
+}
+
+function choiceTrigger(purpose: Capability): HTMLButtonElement | null {
+  return (
+    capabilityRefs.value[purpose]?.querySelector<HTMLButtonElement>(
+      '[data-testid="btn-model-dropdown"]'
+    ) ?? null
+  )
+}
+
+function choiceFilterInput(purpose: Capability): HTMLInputElement | null {
+  return (
+    capabilityRefs.value[purpose]?.querySelector<HTMLInputElement>(
+      '[data-testid="input-model-choice-filter"]'
+    ) ?? null
+  )
+}
+
+function focusChoiceTrigger(purpose: Capability): void {
+  choiceTrigger(purpose)?.focus()
+}
+
+/** Enter confirms an IME composition before Vue updates the field. */
+function isImeKey(event: KeyboardEvent): boolean {
+  return event.isComposing || event.keyCode === 229
+}
+
+function onDropdownFilterEnter(event: KeyboardEvent, purpose: Capability): void {
+  if (isImeKey(event)) return
+  event.preventDefault()
+  pickFirstFiltered(purpose)
+}
+
+function pickFirstFiltered(purpose: Capability): void {
+  const first = visibleModelsFor(purpose)[0]
+  if (!first) return
+  // Focus the trigger before selectModel so a later embedding dialog can take focus.
+  focusChoiceTrigger(purpose)
+  void selectModel(purpose, first.id)
+}
+
+function clearDropdownFilter(): void {
+  const purpose = openDropdown.value
+  dropdownFilter.value = ''
+  if (purpose) choiceFilterInput(purpose)?.focus()
+}
+
+function closeChoiceDropdown(purpose: Capability | null): void {
+  if (!purpose) return
+  focusChoiceTrigger(purpose)
+  openDropdown.value = null
+}
+
+function onDropdownFilterEscape(): void {
+  if (dropdownFilter.value) {
+    dropdownFilter.value = ''
+    return
+  }
+  closeChoiceDropdown(openDropdown.value)
 }
 
 const selectedModelInfo = computed<Record<string, { label: string; service: string }>>(() => {
@@ -940,6 +1494,14 @@ const toggleDropdown = (capability: Capability) => {
     return
   }
   openDropdown.value = openDropdown.value === capability ? null : capability
+  if (openDropdown.value) liveMenuDismiss.value += 1
+  dropdownFilter.value = ''
+  const opened = openDropdown.value
+  if (opened) {
+    void nextTick(() => {
+      choiceFilterInput(opened)?.focus()
+    })
+  }
 }
 
 const selectModel = async (capability: Capability, modelId: number | null) => {
@@ -1005,13 +1567,19 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
   }
 
   defaultConfig.value[capability] = modelId
+  // Where and what to save is fixed by the click. The availability check
+  // below awaits, and a scope switch meanwhile reloads the other scope's
+  // values into defaultConfig.
+  const saveTarget = { scope: defaultsScope.value, value: modelId }
 
   if (modelId !== null) {
     try {
       const check = await checkModelAvailability(modelId)
 
       if (!check.available) {
-        defaultConfig.value[capability] = previousModelId
+        if (saveTarget.scope === defaultsScope.value) {
+          defaultConfig.value[capability] = previousModelId
+        }
         const modelName =
           getModelsByPurpose(capability).find((m) => m.id === modelId)?.name || `ID ${modelId}`
         if (check.env_var) {
@@ -1031,7 +1599,7 @@ const selectModel = async (capability: Capability, modelId: number | null) => {
     }
   }
 
-  await saveConfiguration()
+  await saveConfiguration(capability, saveTarget)
 }
 
 const onEmbeddingSwitchCancel = () => {
@@ -1051,11 +1619,13 @@ const onEmbeddingSwitchSuccess = async (runId: number) => {
   switchModalTargetId.value = null
   success(t('config.embeddingSwitch.queued', { runId }))
   await loadEmbeddingGuard()
-  if (authStore.isAdmin) {
-    activeTab.value = 'runs'
-    await nextTick()
+  if (!authStore.isAdmin) return
+  if (isAdminScope.value) {
     await runsPanelRef.value?.refresh()
+    return
   }
+  // The run's progress lives on Admin › AI › Model catalog.
+  void router.push({ path: '/admin/setup', query: { tab: 'catalog' } })
 }
 
 const loadEmbeddingGuard = async () => {
@@ -1135,9 +1705,8 @@ const handleClickOutside = (event: MouseEvent) => {
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && openDropdown.value) {
-    openDropdown.value = null
-  }
+  if (event.key !== 'Escape' || !openDropdown.value || isImeKey(event)) return
+  closeChoiceDropdown(openDropdown.value)
 }
 
 /**
@@ -1246,22 +1815,62 @@ watch([selectedPurpose, sortBy, sortDirection, modelSearch], () => {
   modelsPage.value = 1
 })
 
-const saveConfiguration = async () => {
+function warnReplacedChoice(
+  capability: Capability,
+  requestedId: number | null,
+  effectiveId: number | null
+): void {
+  const nameOf = (id: number | null) =>
+    getModelsByPurpose(capability).find((m) => m.id === id)?.name || `ID ${id}`
+  const model = nameOf(requestedId)
+  if (effectiveId === null) {
+    warning(t('config.aiModels.saveReplacedNone', { model }))
+    return
+  }
+  warning(t('config.aiModels.saveReplaced', { model, fallback: nameOf(effectiveId) }))
+}
+
+const saveConfiguration = async (
+  capability: Capability,
+  target?: { scope: DefaultsScope; value: number | null }
+) => {
+  const scope = target?.scope ?? defaultsScope.value
+  const value = target ? target.value : defaultConfig.value[capability]
+  if (value === null) {
+    return
+  }
+
   saving.value = true
   try {
-    // Filter out null values
-    const defaults: Record<string, number> = {}
-    for (const [key, value] of Object.entries(defaultConfig.value)) {
-      if (value !== null) {
-        defaults[key] = value
-      }
-    }
-
-    const response = await saveDefaultModels({ defaults })
+    // Only the capability the person just changed. The dropdown may show a
+    // fallback while the saved row stays the choice that cannot be used yet;
+    // posting every visible id would overwrite that row with the fallback.
+    const forEveryone = scope === 'instance'
+    const response = await saveDefaultModels({
+      defaults: { [capability]: value },
+      ...(forEveryone ? { global: true } : {}),
+    })
 
     if (response.success) {
-      originalConfig.value = { ...defaultConfig.value }
-      success(t('config.aiModels.saveSuccess'))
+      savedChoiceEpoch += 1
+      const replaced = Object.entries(response.replaced ?? {}) as [Capability, number | null][]
+      // The grid may already show the other scope; only its own values are touched.
+      if (scope === defaultsScope.value) {
+        for (const [replacedCapability, effectiveId] of replaced) {
+          warnReplacedChoice(
+            replacedCapability,
+            defaultConfig.value[replacedCapability],
+            effectiveId
+          )
+          defaultConfig.value[replacedCapability] = effectiveId
+        }
+        originalConfig.value = { ...defaultConfig.value }
+      }
+      if (replaced.length === 0) {
+        success(
+          forEveryone ? t('config.aiModels.scope.savedInstance') : t('config.aiModels.saveSuccess')
+        )
+      }
     }
   } catch (err: unknown) {
     console.error('Failed to save configuration:', err)
@@ -1273,6 +1882,8 @@ const saveConfiguration = async () => {
     // and `httpClient.ApiError` now exposes both the message and the code.
     if (err instanceof ApiError && 409 === err.status) {
       showError(t('config.setByAdmin'))
+    } else if (err instanceof ApiError && 'iam.modelNotAllowed' === err.code) {
+      showError(t('config.aiModels.saveErrorNotAllowed'))
     } else if (err instanceof ApiError && 403 === err.status) {
       const reason =
         'requires_premium' === err.code
@@ -1310,7 +1921,7 @@ const confirmResetDefaults = async () => {
       } else {
         success(t('config.aiModels.resetDefaultsSuccess'))
       }
-      await loadData()
+      await loadData({ replaceDefaults: true })
     }
   } catch {
     showError(t('config.aiModels.resetDefaultsError'))

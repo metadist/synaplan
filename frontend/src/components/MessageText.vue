@@ -47,6 +47,7 @@ import { useMessageDigestsStore } from '@/stores/messageDigests'
 import type { MessageDigestReference } from '@/services/api/messageDigestsApi'
 import { useConfigStore } from '@/stores/config'
 import { useNotification } from '@/composables/useNotification'
+import { TOOL_RESULT_MARKER } from '@/utils/apiToolTurn'
 import { findStableMarkdownBoundary } from '@/utils/streamingBoundary'
 import { completeInlineMarkdown } from '@/utils/partialMarkdown'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
@@ -272,7 +273,7 @@ async function scheduleSlowRetry(): Promise<void> {
     if (missingReferencedMemoryIds.value.length === 0) return
     if (isMemoryServiceDefinitelyUnavailable.value) return
 
-    await memoriesStore.fetchMemories(undefined, { timeoutMs: 8000, silent: true }).catch(() => {})
+    await memoriesStore.fetchMemories(undefined, { silent: true }).catch(() => {})
 
     if (missingReferencedMemoryIds.value.length === 0) {
       return
@@ -312,7 +313,7 @@ async function fetchMemoriesWithRetryBestEffort(): Promise<void> {
     if (isMemoryServiceDefinitelyUnavailable.value) return
 
     // First try bulk fetch
-    await memoriesStore.fetchMemories(undefined, { timeoutMs: 8000, silent: true }).catch(() => {})
+    await memoriesStore.fetchMemories(undefined, { silent: true }).catch(() => {})
 
     // If still missing, try to fetch individual memories by ID
     const stillMissing = missingReferencedMemoryIds.value
@@ -418,7 +419,7 @@ const handleMemoryBadgeClick = (event: MouseEvent) => {
         props.memories?.find((m) => m.id === memoryId) ||
         memoriesStore.memories.find((m) => m.id === memoryId)
 
-      // Dispatch window event to open MemoriesDialog in ChatView (stay in chat!)
+      // Opens the Memories page; browser Back returns to this chat.
       if (memory) {
         window.dispatchEvent(new CustomEvent('open-memory-dialog', { detail: { memory } }))
       }
@@ -490,7 +491,7 @@ function buildMemoryBadgeHtml(memory: UserMemory, memoryId: string): string {
   const brainIcon =
     '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M21.33 12.91c.09 1.55-.62 3.04-1.89 3.95l.77 1.49c.23.45.26.98.06 1.45c-.19.47-.58.84-1.06 1l-.79.25a1.69 1.69 0 0 1-1.86-.55L14.44 18c-.89-.15-1.73-.53-2.44-1.10c-.5.15-1 .23-1.5.23c-.88 0-1.76-.27-2.5-.79c-.53.16-1.07.23-1.62.22c-.79.01-1.57-.15-2.3-.45a4.1 4.1 0 0 1-2.43-3.61c-.08-.72.04-1.45.35-2.11c-.29-.75-.32-1.57-.07-2.33C2.3 7.11 3 6.32 3.87 5.82c.58-1.69 2.21-2.82 4-2.7c1.6-1.5 4.05-1.66 5.83-.37c.42-.11.86-.17 1.3-.17c1.36-.03 2.65.57 3.5 1.64c2.04.53 3.5 2.35 3.58 4.47c.05 1.11-.25 2.20-.86 3.13c.07.36.11.72.11 1.09m-5-1.41c.57.07 1.02.5 1.02 1.07a1 1 0 0 1-1 1h-.63c-.32.9-.88 1.69-1.62 2.29c.25.09.51.14.77.21c5.13-.07 4.53-3.2 4.53-3.25a2.59 2.59 0 0 0-2.69-2.49a1 1 0 0 1-1-1a1 1 0 0 1 1-1c1.23.03 2.41.49 3.33 1.30c.05-.29.08-.59.08-.89c-.06-1.24-.62-2.32-2.87-2.53c-1.25-2.96-4.4-1.32-4.4-.4c-.03.23.21.72.25.75a1 1 0 0 1 1 1c0 .55-.45 1-1 1c-.53-.02-1.03-.22-1.43-.56c-.48.31-1.03.5-1.6.56c-.57.05-1.04-.35-1.07-.90a.97.97 0 0 1 .88-1.10c.16-.02.94-.14.94-.77c0-.66.25-1.29.68-1.79c-.92-.25-1.91.08-2.91 1.29C6.75 5 6 5.25 5.45 7.2C4.5 7.67 4 8 3.78 9c1.08-.22 2.19-.13 3.22.25c.5.19.78.75.59 1.29c-.19.52-.77.78-1.29.59c-.73-.32-1.55-.34-2.30-.06c-.32.27-.32.83-.32 1.27c0 .74.37 1.43 1 1.83c.53.27 1.12.41 1.71.40q-.225-.39-.39-.81a1.038 1.038 0 0 1 1.96-.68c.4 1.14 1.42 1.92 2.62 2.05c1.37-.07 2.59-.88 3.19-2.13c.23-1.38 1.34-1.5 2.56-1.5m2 7.47l-.62-1.3-.71.16l1 1.25zm-4.65-8.61a1 1 0 0 0-.91-1.03c-.71-.04-1.4.2-1.93.67c-.57.58-.87 1.38-.84 2.19a1 1 0 0 0 1 1c.57 0 1-.45 1-1c0-.27.07-.54.23-.76c.12-.10.27-.15.43-.15c.55.03 1.02-.38 1.02-.92"></path></svg>'
 
-  return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-medium hover:bg-[var(--brand)] hover:text-white transition-all border border-[var(--brand)]/20 hover:border-[var(--brand)] cursor-pointer align-middle" data-memory-id="${memoryId}" onclick="event.preventDefault()">${brainIcon}<span class="font-medium max-w-[160px] truncate">${escapedKey}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-nowrap" style="display:block"><span class="surface-elevated px-3 py-2 rounded-lg" style="display:block"><span class="flex items-center gap-2"><span class="pill text-[10px] px-1.5 py-0.5">${escapedCategory}</span><span class="text-xs font-medium txt-primary">${escapedKey}</span></span><span class="text-[11px] txt-secondary mt-1 max-w-[200px] truncate" style="display:block">${escapedValue}</span></span></span></span>`
+  return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref inline-flex items-center gap-1 px-2 py-0.5 rounded-xl bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-medium hover:bg-[var(--brand)] hover:text-white transition-all border border-[var(--brand)]/20 hover:border-[var(--brand)] cursor-pointer align-middle" data-memory-id="${memoryId}" onclick="event.preventDefault()">${brainIcon}<span class="font-medium max-w-[160px] truncate">${escapedKey}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-nowrap" style="display:block"><span class="surface-elevated px-3 py-2 rounded-lg" style="display:block"><span class="flex items-center gap-2"><span class="pill text-[10px] px-1.5 py-0.5">${escapedCategory}</span><span class="text-xs font-medium txt-primary">${escapedKey}</span></span><span class="text-[11px] txt-secondary mt-1 max-w-[200px] truncate" style="display:block">${escapedValue}</span></span></span></span>`
 }
 
 // Terminal badge for a memory the viewer is not allowed to open (issue #1880).
@@ -523,8 +524,11 @@ function buildMessageRefBadgeHtml(reference: MessageDigestReference): string {
       : ''
   const historyIcon =
     '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7v2a9 9 0 0 0 0-18m-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>'
+  const openLabel = escapeHtmlForBadge(
+    t('messageRefs.openSource', { title: reference.title })
+  ).replace(/"/g, '&quot;')
 
-  return `<span class="memory-badge-wrapper inline relative group"><button type="button" class="memory-ref message-ref inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-medium hover:bg-[var(--brand)] hover:text-white transition-all border border-[var(--brand)]/20 hover:border-[var(--brand)] cursor-pointer align-middle" data-digest-message-id="${reference.messageId}" data-digest-chat-id="${reference.chatId}" onclick="event.preventDefault()">${historyIcon}<span class="font-medium max-w-[160px] truncate">${shortTitle}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-3 py-2 rounded-lg" style="display:block"><span class="flex items-center gap-2"><span class="pill text-[10px] px-1.5 py-0.5">${escapeHtmlForBadge(t('messageRefs.olderConversation'))}</span>${dateLabel ? `<span class="text-[10px] txt-secondary">${dateLabel}</span>` : ''}</span><span class="text-xs txt-primary mt-1 leading-relaxed" style="display:block">${escapedTitle}</span><span class="text-[11px] txt-secondary mt-1" style="display:block">${escapeHtmlForBadge(t('messageRefs.clickToOpen'))}</span></span></span></span>`
+  return `<span class="memory-badge-wrapper inline relative group"><button type="button" aria-label="${openLabel}" class="memory-ref message-ref inline-flex items-center gap-1 px-2 py-0.5 rounded-xl bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-medium hover:bg-[var(--brand)] hover:text-white transition-all border border-[var(--brand)]/20 hover:border-[var(--brand)] cursor-pointer align-middle" data-digest-message-id="${reference.messageId}" data-digest-chat-id="${reference.chatId}" onclick="event.preventDefault()">${historyIcon}<span class="font-medium max-w-[160px] truncate">${shortTitle}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-3 py-2 rounded-lg" style="display:block"><span class="flex items-center gap-2"><span class="pill text-[10px] px-1.5 py-0.5">${escapeHtmlForBadge(t('messageRefs.olderConversation'))}</span>${dateLabel ? `<span class="text-[10px] txt-secondary">${dateLabel}</span>` : ''}</span><span class="text-xs txt-primary mt-1 leading-relaxed" style="display:block">${escapedTitle}</span><span class="text-[11px] txt-secondary mt-1" style="display:block">${escapeHtmlForBadge(t('messageRefs.clickToOpen'))}</span></span></span></span>`
 }
 
 // Process [Message:ID] digest badges in the content
@@ -556,7 +560,7 @@ function processMessageReferenceBadges(html: string): string {
     }
 
     // Invented / deleted / foreign id — muted, non-clickable badge.
-    return `<span class="memory-badge-wrapper inline relative group"><button type="button" class="memory-ref message-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700 cursor-not-allowed align-middle" data-disabled="true" onclick="event.preventDefault()"><span class="font-medium">${escapeHtmlForBadge(t('messageRefs.missing.badge'))}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg" style="display:block"><span class="text-xs txt-primary leading-relaxed" style="display:block">${escapeHtmlForBadge(t('messageRefs.missing.tooltip'))}</span></span></span></span>`
+    return `<span class="memory-badge-wrapper inline relative group"><button type="button" class="memory-ref message-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700 cursor-not-allowed align-middle" data-disabled="true" onclick="event.preventDefault()"><span class="font-medium">${escapeHtmlForBadge(t('messageRefs.missing.badge'))}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg" style="display:block"><span class="text-xs txt-primary leading-relaxed" style="display:block">${escapeHtmlForBadge(t('messageRefs.missing.tooltip'))}</span></span></span></span>`
   })
 }
 
@@ -616,7 +620,7 @@ function processMemoryBadges(html: string): string {
           }
         }
 
-        return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--disabled inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700 cursor-not-allowed align-middle" data-disabled="true"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2m1 15h-2v-2h2v2m0-4h-2V7h2v6z"/></svg><span class="font-medium">${escapeHtmlForBadge(t('memories.referencePending.badge'))}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg" style="display:block"><span class="text-xs font-bold txt-primary mb-1" style="display:block">${escapeHtmlForBadge(t('memories.referencePending.badge'))}</span><span class="text-xs txt-primary leading-relaxed" style="display:block">${escapeHtmlForBadge(t('memories.referencePending.tooltip'))}</span></span></span></span>`
+        return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--disabled inline-flex items-center gap-1 px-2 py-0.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700 cursor-not-allowed align-middle" data-disabled="true"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2m1 15h-2v-2h2v2m0-4h-2V7h2v6z"/></svg><span class="font-medium">${escapeHtmlForBadge(t('memories.referencePending.badge'))}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg" style="display:block"><span class="text-xs font-bold txt-primary mb-1" style="display:block">${escapeHtmlForBadge(t('memories.referencePending.badge'))}</span><span class="text-xs txt-primary leading-relaxed" style="display:block">${escapeHtmlForBadge(t('memories.referencePending.tooltip'))}</span></span></span></span>`
       }
 
       const memoryIdNum = numericMatch ? parseInt(numericMatch[1] || '0', 10) : -1
@@ -651,10 +655,10 @@ function processMemoryBadges(html: string): string {
         isMemoryServiceDefinitelyUnavailable.value ||
         (gaveUp.value && isFetchProbablyUnreachable.value)
       ) {
-        return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--disabled inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-all border border-red-200 dark:border-red-800/50 cursor-not-allowed align-middle" data-memory-id="${memoryId}" data-disabled="true"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span class="font-medium">[Memory:${memoryId}]</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg border border-red-200 dark:border-red-700 border-l-4 border-l-red-500" style="display:block"><span class="flex items-center gap-2 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-red-500 flex-shrink-0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span class="text-xs font-bold txt-primary">${t('memories.serviceDisabled.badge')}</span></span><span class="text-xs txt-primary leading-relaxed" style="display:block">${t('memories.serviceDisabled.tooltip')}</span></span></span></span>`
+        return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--disabled inline-flex items-center gap-1 px-2 py-0.5 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-xs font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-all border border-red-200 dark:border-red-800/50 cursor-not-allowed align-middle" data-memory-id="${memoryId}" data-disabled="true"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span class="font-medium">[Memory:${memoryId}]</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg border border-red-200 dark:border-red-700 border-l-4 border-l-red-500" style="display:block"><span class="flex items-center gap-2 mb-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-red-500 flex-shrink-0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span class="text-xs font-bold txt-primary">${t('memories.serviceDisabled.badge')}</span></span><span class="text-xs txt-primary leading-relaxed" style="display:block">${t('memories.serviceDisabled.tooltip')}</span></span></span></span>`
       }
 
-      return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-all border border-gray-200 dark:border-gray-700 cursor-pointer align-middle" data-memory-id="${memoryId}" onclick="event.preventDefault()"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2m1 15h-2v-2h2v2m0-4h-2V7h2v6z"/></svg><span class="font-medium">[Memory:${memoryId}]</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg" style="display:block"><span class="text-xs font-bold txt-primary mb-1" style="display:block">${t('memories.referenceMissing.badge')}</span><span class="text-xs txt-primary leading-relaxed" style="display:block">${t('memories.referenceMissing.tooltip')}</span></span></span></span>`
+      return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-all border border-gray-200 dark:border-gray-700 cursor-pointer align-middle" data-memory-id="${memoryId}" onclick="event.preventDefault()"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2m1 15h-2v-2h2v2m0-4h-2V7h2v6z"/></svg><span class="font-medium">[Memory:${memoryId}]</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg" style="display:block"><span class="text-xs font-bold txt-primary mb-1" style="display:block">${t('memories.referenceMissing.badge')}</span><span class="text-xs txt-primary leading-relaxed" style="display:block">${t('memories.referenceMissing.tooltip')}</span></span></span></span>`
     })
   }
 
@@ -717,7 +721,7 @@ function buildFeedbackBadgeHtml(
   const typeLabel = isPositive ? t('feedback.type.positive') : t('feedback.type.falsePositive')
 
   // Tooltip structure: surface-elevated > category pill + key > value
-  return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-medium hover:bg-[var(--brand)] hover:text-white transition-all border border-[var(--brand)]/20 hover:border-[var(--brand)] cursor-pointer align-middle" data-feedback-id="${feedbackId}" onclick="event.preventDefault()">${icon}<span class="font-medium max-w-[160px] truncate">${escapedShortLabel}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-nowrap" style="display:block"><span class="surface-elevated px-3 py-2 rounded-lg" style="display:block"><span class="flex items-center gap-2"><span class="pill text-[10px] px-1.5 py-0.5">${typeLabel}</span><span class="text-xs font-medium txt-primary">${escapedShortLabel}</span></span><span class="text-[11px] txt-secondary mt-1 max-w-[200px] truncate" style="display:block">${escapedFullValue}</span></span></span></span>`
+  return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref inline-flex items-center gap-1 px-2 py-0.5 rounded-xl bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-medium hover:bg-[var(--brand)] hover:text-white transition-all border border-[var(--brand)]/20 hover:border-[var(--brand)] cursor-pointer align-middle" data-feedback-id="${feedbackId}" onclick="event.preventDefault()">${icon}<span class="font-medium max-w-[160px] truncate">${escapedShortLabel}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-nowrap" style="display:block"><span class="surface-elevated px-3 py-2 rounded-lg" style="display:block"><span class="flex items-center gap-2"><span class="pill text-[10px] px-1.5 py-0.5">${typeLabel}</span><span class="text-xs font-medium txt-primary">${escapedShortLabel}</span></span><span class="text-[11px] txt-secondary mt-1 max-w-[200px] truncate" style="display:block">${escapedFullValue}</span></span></span></span>`
 }
 
 // Process feedback badges in the content [Feedback:ID]
@@ -739,7 +743,7 @@ function processFeedbackBadges(html: string): string {
     }
 
     // Show placeholder for unresolved feedbacks - same style as missing memory badges
-    return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-all border border-gray-200 dark:border-gray-700 cursor-pointer align-middle" data-feedback-id="${feedbackId}" onclick="event.preventDefault()"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span class="font-medium">${escapeHtmlForBadge(t('feedback.badge.loading'))}</span></button></span>`
+    return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref memory-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-all border border-gray-200 dark:border-gray-700 cursor-pointer align-middle" data-feedback-id="${feedbackId}" onclick="event.preventDefault()"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg><span class="font-medium">${escapeHtmlForBadge(t('feedback.badge.loading'))}</span></button></span>`
   })
 }
 
@@ -756,25 +760,32 @@ function normalizeInlineReferences(text: string): string {
 // Normalize special file markers + reference markers + apply badge / table
 // post-processing. Shared between the sync and async render paths so the
 // post-render HTML shape is identical regardless of which path produced it.
+function localizedMediaMarker(firstLine: string): string | null {
+  const line = firstLine.trim()
+  if (line.startsWith('__FILE_GENERATED__:')) {
+    return t('message.fileGenerated', {
+      filename: line.replace('__FILE_GENERATED__:', '').trim(),
+    })
+  }
+  if (line === '__FILE_GENERATION_FAILED__') return t('message.fileGenerationFailed')
+  if (line === '__AUDIO_GENERATED__') return t('message.audioGenerated')
+  if (line === '__IMAGE_GENERATED__') return t('message.imageGenerated')
+  if (line === '__VIDEO_GENERATED__') return t('message.videoGenerated')
+  if (line === '__VIDEO_GENERATING__') return t('message.mediaJob.title.video')
+  if (line === '__IMAGE_GENERATING__') return t('message.mediaJob.title.image')
+  if (line === '__AUDIO_GENERATING__') return t('message.mediaJob.title.audio')
+  return null
+}
+
 function normalizeContentForRender(input: string): string {
-  if (input.startsWith('__FILE_GENERATED__:')) {
-    const filename = input.replace('__FILE_GENERATED__:', '').trim()
-    return t('message.fileGenerated', { filename })
+  const newline = input.indexOf('\n')
+  const firstLine = newline === -1 ? input : input.slice(0, newline)
+  const localized = localizedMediaMarker(firstLine)
+  if (localized !== null) {
+    return newline === -1 ? localized : localized + input.slice(newline)
   }
-  if (input === '__FILE_GENERATION_FAILED__') {
-    return t('message.fileGenerationFailed')
-  }
-  if (input === '__AUDIO_GENERATED__') {
-    return t('message.audioGenerated')
-  }
-  if (input === '__VIDEO_GENERATING__') {
-    return t('message.mediaJob.title.video')
-  }
-  if (input === '__IMAGE_GENERATING__') {
-    return t('message.mediaJob.title.image')
-  }
-  if (input === '__AUDIO_GENERATING__') {
-    return t('message.mediaJob.title.audio')
+  if (input === TOOL_RESULT_MARKER) {
+    return t('message.toolStepHidden')
   }
   return input
 }
@@ -1054,12 +1065,11 @@ watch(
   }
 )
 
-// Resolve actual theme (system -> light/dark based on preference)
+// Resolve actual theme. OLED black uses the dark Mermaid palette.
 function getActualTheme(): 'light' | 'dark' {
-  if (theme.value === 'system') {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
-  return theme.value
+  if (theme.value === 'light') return 'light'
+  if (theme.value === 'dark' || theme.value === 'oled') return 'dark'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 // Render mermaid diagrams after content is mounted/updated (debounced).
@@ -1310,7 +1320,7 @@ watch(
   align-items: center;
   gap: 0.375rem;
   padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   font-weight: 500;
   border: 0;
   cursor: pointer;

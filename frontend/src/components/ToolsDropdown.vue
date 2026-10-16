@@ -74,6 +74,7 @@
       <div class="border-t border-light-border/20 dark:border-dark-border/20 my-1" />
 
       <button
+        v-if="!hasReasoningLevels"
         ref="itemRefs"
         :class="[
           'dropdown-item',
@@ -86,7 +87,7 @@
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
       >
-        <Icon icon="mdi:lightbulb-on-outline" class="w-5 h-5 flex-shrink-0" />
+        <LightBulbIcon class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
           <span class="text-sm font-medium">{{ $t('chatInput.thinking') }}</span>
           <div class="text-xs txt-secondary">
@@ -170,32 +171,41 @@
         </div>
       </button>
 
-      <!-- DS16: dispatch the typed instruction to a paired computer. Only shown
-           when the flag is on AND the user has ≥1 active device — otherwise the
-           row is meaningless (nothing could answer). -->
-      <button
-        v-if="showRunOnDevice"
-        ref="itemRefs"
-        class="dropdown-item"
-        type="button"
-        data-testid="btn-tool-run-on-device"
-        @click="handleRunOnDevice"
-        @keydown.down.prevent="focusNext"
-        @keydown.up.prevent="focusPrevious"
-      >
-        <Icon icon="mdi:monitor-arrow-down" class="w-5 h-5 flex-shrink-0" />
-        <div class="flex-1 min-w-0">
-          <span class="text-sm font-medium">{{ $t('config.desktop.run.action') }}</span>
-          <div class="text-xs txt-secondary truncate">{{ runOnDeviceSubtext }}</div>
-        </div>
-      </button>
+      <template v-if="showRunOnDevice">
+        <button
+          v-for="device in activeDevices"
+          :key="device.id"
+          ref="itemRefs"
+          class="dropdown-item"
+          type="button"
+          :data-testid="
+            activeDevices.length === 1
+              ? 'btn-tool-run-on-device'
+              : `btn-tool-run-on-device-${device.id}`
+          "
+          @click="chooseRunOnDevice(device)"
+          @keydown.down.prevent="focusNext"
+          @keydown.up.prevent="focusPrevious"
+        >
+          <Icon icon="mdi:monitor-arrow-down" class="w-5 h-5 flex-shrink-0" />
+          <div class="flex-1 min-w-0">
+            <span class="text-sm font-medium">{{ runOnDeviceLabel(device) }}</span>
+            <div class="text-xs txt-secondary truncate">{{ devicePresenceText(device) }}</div>
+          </div>
+        </button>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
-import { WrenchScrewdriverIcon, ChevronUpIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import {
+  WrenchScrewdriverIcon,
+  ChevronUpIcon,
+  CheckIcon,
+  LightBulbIcon,
+} from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { type Command, useCommandsStore } from '@/stores/commands'
@@ -205,11 +215,14 @@ import { useRouter } from 'vue-router'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
 import { useDesktopDevices } from '@/composables/useDesktopDevices'
+import { DESKTOP_CHECK_IN_MINUTES, desktopPresence } from '@/utils/desktopPresence'
 import { useConfigStore } from '@/stores/config'
 
 interface Props {
   activeCommand?: string | null
   thinkingEnabled?: boolean
+  /** The composer shows a level menu, so the on/off Thinking row stays hidden. */
+  hasReasoningLevels?: boolean
   voiceReply?: boolean
   supportsReasoning?: boolean
   enhanceEnabled?: boolean
@@ -226,7 +239,7 @@ const emit = defineEmits<{
   toggleVoiceReply: []
   toggleEnhance: []
   summarizeDocument: []
-  runOnDevice: [device: { id: number; name: string }]
+  runOnDevice: [device: { id: number; name: string; enabledSkills: string[] }]
 }>()
 
 const configStore = useConfigStore()
@@ -280,25 +293,58 @@ const router = useRouter()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const commandsStore = useCommandsStore()
-const { activeDevices, hasActiveDevices, ensureLoaded } = useDesktopDevices()
+const { activeDevices, hasActiveDevices, ensureLoaded, reload } = useDesktopDevices()
 
 // DS16: the composer action is only meaningful with a live target. Gated on the
 // feature flag AND at least one active device (revoking the last one hides it).
 const showRunOnDevice = computed(() => isDesktopAgentEnabled() && hasActiveDevices.value)
 
-const runOnDeviceSubtext = computed(() => {
-  const list = activeDevices.value
-  if (list.length === 1) return list[0].name
-  return t('config.desktop.run.multiple', { count: list.length })
-})
+// Date.now() inside a computed is cached until a dependency changes. A clock
+// the menu owns keeps "connected" from sticking after the check-in window.
+const nowSec = ref(Math.floor(Date.now() / 1000))
+let presenceTicker: number | null = null
 
-const handleRunOnDevice = () => {
-  const device = activeDevices.value[0]
-  if (!device) return
-  emit('runOnDevice', { id: device.id, name: device.name })
+const startPresenceClock = () => {
+  nowSec.value = Math.floor(Date.now() / 1000)
+  if (presenceTicker !== null) return
+  presenceTicker = window.setInterval(() => {
+    nowSec.value = Math.floor(Date.now() / 1000)
+  }, 1000)
+}
+
+const stopPresenceClock = () => {
+  if (presenceTicker === null) return
+  window.clearInterval(presenceTicker)
+  presenceTicker = null
+}
+
+const devicePresenceText = (device: { name: string; status: string; lastSeen: number }) => {
+  const presence = desktopPresence(device.status, device.lastSeen, nowSec.value)
+  if (presence === 'online') return t('config.desktop.run.online', { name: device.name })
+  if (presence === 'never') return t('config.desktop.run.never', { name: device.name })
+  return t('config.desktop.run.away', { name: device.name, minutes: DESKTOP_CHECK_IN_MINUTES })
+}
+
+const runOnDeviceLabel = (device: { name: string }) => {
+  if (activeDevices.value.length === 1) return t('config.desktop.run.action')
+  return t('config.desktop.run.runOn', { name: device.name })
+}
+
+const chooseRunOnDevice = (device: { id: number; name: string; enabledSkills?: string[] }) => {
   closeDropdown()
+  emit('runOnDevice', {
+    id: device.id,
+    name: device.name,
+    enabledSkills: (device.enabledSkills ?? []).filter((skill) => /^[a-z0-9-]{1,64}$/.test(skill)),
+  })
 }
 const isOpen = ref(false)
+watch(isOpen, (open) => {
+  if (open) {
+    startPresenceClock()
+    void reload()
+  } else stopPresenceClock()
+})
 const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
 const featuresStatus = ref<Record<string, Feature>>({})
@@ -310,7 +356,9 @@ const isMobileViewport = ref(mobileMq.matches)
 const onMobileMqChange = (e: MediaQueryListEvent) => (isMobileViewport.value = e.matches)
 
 const activeToggleCount = computed(
-  () => Number(props.thinkingEnabled ?? false) + Number(props.voiceReply ?? false)
+  () =>
+    Number((props.thinkingEnabled ?? false) && !props.hasReasoningLevels) +
+    Number(props.voiceReply ?? false)
 )
 
 const isToolActive = (commandName: string): boolean => {
@@ -435,6 +483,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
   mobileMq.removeEventListener('change', onMobileMqChange)
+  stopPresenceClock()
 })
 </script>
 

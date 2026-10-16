@@ -231,6 +231,20 @@ user's **SOUND2TEXT** catalogue (local whisper.cpp, Groq Whisper, OpenAI
 | `response_format` | string | No | `json` (default), `text`, or `verbose_json`. |
 | `stream` | boolean | No | If `true`, returns SSE (`transcript` then `done`). |
 
+Omit `model` to use the same SOUND2TEXT default as the chat recorder. On an
+install with no cloud speech key that default is local whisper.cpp
+(`WHISPER_DEFAULT_MODEL`, recommend `base`). This curl is the contract a
+meeting-notes client calls.
+
+```bash
+curl https://your-synaplan-instance.com/v1/audio/transcriptions \
+  -H "Authorization: Bearer sk-your-synaplan-api-key" \
+  -F file=@clip.wav
+```
+
+Pass `model` only to pin a catalogue id (local whisper, or a cloud row the
+account can actually use):
+
 ```bash
 curl https://your-synaplan-instance.com/v1/audio/transcriptions \
   -H "Authorization: Bearer sk-your-synaplan-api-key" \

@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\MessageDigestRepository;
 use App\Repository\UserRepository;
 use App\Service\Digest\MessageDigestService;
+use App\Service\VectorSearch\QdrantClientInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -23,6 +24,7 @@ final class DigestReindexCommandTest extends TestCase
     private MessageDigestRepository&MockObject $digestRepository;
     private UserRepository&MockObject $userRepository;
     private MessageDigestService&MockObject $digestService;
+    private QdrantClientInterface&MockObject $qdrantClient;
     private CommandTester $tester;
 
     protected function setUp(): void
@@ -30,11 +32,13 @@ final class DigestReindexCommandTest extends TestCase
         $this->digestRepository = $this->createMock(MessageDigestRepository::class);
         $this->userRepository = $this->createMock(UserRepository::class);
         $this->digestService = $this->createMock(MessageDigestService::class);
+        $this->qdrantClient = $this->createMock(QdrantClientInterface::class);
 
         $command = new DigestReindexCommand(
             $this->digestRepository,
             $this->userRepository,
             $this->digestService,
+            $this->qdrantClient,
             new LockFactory(new InMemoryStore()),
         );
 
@@ -104,7 +108,7 @@ final class DigestReindexCommandTest extends TestCase
 
     public function testAllUsersEnumeratesUsersWithActiveDigests(): void
     {
-        $this->digestRepository->method('findDistinctActiveUserIds')->willReturn([7, 9]);
+        $this->digestRepository->method('findDistinctUserIds')->willReturn([7, 9]);
         $this->userRepository->method('find')
             ->willReturnCallback(fn (mixed $id): ?User => 7 === $id ? $this->makeUser(7) : null);
 
@@ -118,6 +122,80 @@ final class DigestReindexCommandTest extends TestCase
         // User 9 no longer exists — warned and skipped, not fatal.
         self::assertStringContainsString('User 9 not found', $this->tester->getDisplay());
         self::assertStringContainsString('1 users, 1 points rebuilt', $this->tester->getDisplay());
+    }
+
+    public function testDeletesThePointOfAnInactiveRow(): void
+    {
+        $this->userRepository->method('find')->willReturn($this->makeUser(self::USER_ID));
+        $inactive = $this->digest(5);
+        $inactive->setActive(false);
+        $this->digestRepository->method('findInactiveForUserAfterId')
+            ->willReturnOnConsecutiveCalls([$inactive], []);
+
+        $this->qdrantClient->expects(self::once())
+            ->method('deleteDigest')
+            ->with(MessageDigestService::qdrantPointId(self::USER_ID, 5));
+
+        $exitCode = $this->tester->execute(['--user' => (string) self::USER_ID]);
+
+        self::assertSame(0, $exitCode);
+    }
+
+    public function testDeletesAnOrphanPointWhoseRowIsGone(): void
+    {
+        $this->userRepository->method('find')->willReturn($this->makeUser(self::USER_ID));
+        $this->qdrantClient->method('scrollDigests')->willReturn([
+            [
+                'id' => 'dig_7_404',
+                'payload' => [
+                    '_point_id' => 'dig_7_404',
+                    'user_id' => self::USER_ID,
+                    'message_id' => 88,
+                ],
+            ],
+        ]);
+        $this->digestRepository->method('findExistingIds')->willReturn([]);
+
+        $this->qdrantClient->expects(self::once())
+            ->method('deleteDigest')
+            ->with('dig_7_404');
+
+        $exitCode = $this->tester->execute(['--user' => (string) self::USER_ID]);
+
+        self::assertSame(0, $exitCode);
+    }
+
+    public function testDryRunDeletesNothing(): void
+    {
+        $this->userRepository->method('find')->willReturn($this->makeUser(self::USER_ID));
+        $inactive = $this->digest(5);
+        $inactive->setActive(false);
+        $this->digestRepository->method('findInactiveForUserAfterId')
+            ->willReturnOnConsecutiveCalls([$inactive], []);
+        $this->qdrantClient->method('scrollDigests')->willReturn([
+            [
+                'id' => 'dig_7_404',
+                'payload' => [
+                    '_point_id' => 'dig_7_404',
+                    'message_id' => 88,
+                ],
+            ],
+        ]);
+        $this->digestRepository->method('findExistingIds')->willReturn([]);
+
+        $this->qdrantClient->expects(self::never())->method('deleteDigest');
+        $this->digestService->expects(self::never())->method('mirrorToQdrant');
+
+        $exitCode = $this->tester->execute([
+            '--user' => (string) self::USER_ID,
+            '--dry-run' => true,
+        ]);
+
+        self::assertSame(0, $exitCode);
+        $display = preg_replace('/\s+/', ' ', $this->tester->getDisplay()) ?? '';
+        self::assertStringContainsString('dig_7_5', $display);
+        self::assertStringContainsString('dig_7_404', $display);
+        self::assertStringContainsString('Nothing was deleted', $display);
     }
 
     private function makeUser(int $id): User

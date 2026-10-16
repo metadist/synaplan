@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
-use App\Service\AiResponseSanitizer;
+use App\Service\Message\AiResponseSanitizer;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -92,5 +92,32 @@ class AiResponseSanitizerTest extends TestCase
         $input = "<think>plan</think>\n\n  Antwort.  \n";
 
         $this->assertSame('Antwort.', AiResponseSanitizer::stripForDisplay($input));
+    }
+
+    public function testStripForDisplayKeepsTheWidgetGreetingAfterTheScratchpad(): void
+    {
+        $hi = '<think>We have a conversation where the user is just saying "hi". The system instructions: respond in same language as user (English). The assistant should be helpful. The user says "hi". We should respond politely, ask how can I help. Probably "Hi! How can I assist you today?" Use concise.</think>Hi there! How can I help you today?';
+        $hello = '<think>User says "hellooooo". Likely English. Need to respond friendly, ask how can help.</think>Hello! How can I assist you today?';
+
+        $this->assertSame('Hi there! How can I help you today?', AiResponseSanitizer::stripForDisplay($hi));
+        $this->assertSame('Hello! How can I assist you today?', AiResponseSanitizer::stripForDisplay($hello));
+    }
+
+    public function testPreviewCutsTheVisibleAnswerNotTheScratchpad(): void
+    {
+        $hello = '<think>User says "hellooooo". Likely English. Need to respond friendly, ask how can help.</think>Hello! How can I assist you today?';
+
+        $this->assertSame('Hello! How can I assist you today?', AiResponseSanitizer::preview($hello));
+        $this->assertSame('Hello', AiResponseSanitizer::preview($hello, 5));
+    }
+
+    public function testPreviewLeavesVisitorAndOperatorThinkTagsInPlace(): void
+    {
+        $literal = '<think>example</think> keep me';
+
+        $this->assertSame($literal, AiResponseSanitizer::transcriptText($literal, 'IN', ''));
+        $this->assertSame($literal, AiResponseSanitizer::preview($literal, 100, 'IN', ''));
+        $this->assertSame($literal, AiResponseSanitizer::preview($literal, 100, 'OUT', 'HUMAN_OPERATOR'));
+        $this->assertSame($literal, AiResponseSanitizer::preview($literal, 100, 'OUT', 'SYSTEM'));
     }
 }

@@ -214,18 +214,15 @@ final readonly class AgentService
             if (!$agent instanceof Agent || $agent->isArchived() || $agent->getOwnerId() === $userId) {
                 continue;
             }
-            // Recipients see the published snapshot only; the draft is the
-            // owner's work in progress even for editors (they open it in the builder).
+            // A shared draft is visible so a reviewer can find it. The
+            // published snapshot is used once one exists.
             $published = $this->publishedVersion($agent);
-            if (null === $published) {
-                continue;
-            }
             $cards[] = $this->serializer->galleryCard(
                 $agent,
-                $published->getDefinition(),
+                $published?->getDefinition() ?? $agent->getDraft(),
                 $this->ownerDisplayName($agent->getOwnerId()),
                 'shared',
-                $published->getVersion(),
+                $published?->getVersion(),
                 $this->shareService->sharedViaFor($userId, AgentKind::KEY, (string) $id),
                 $row['permission'],
             );
@@ -305,6 +302,47 @@ final readonly class AgentService
         if (null !== $icon && '' !== $icon) {
             $this->assertIcon($icon);
             $agent->setIcon($icon);
+        }
+        $this->agents->save($agent);
+
+        return $agent;
+    }
+
+    /**
+     * Replace the draft of an assistant that already uses this slug.
+     * The published version and its shares stay as they are until publish.
+     *
+     * @param array<string, mixed> $draft
+     */
+    public function replaceImportedDraft(
+        User $owner,
+        string $slug,
+        string $name,
+        array $draft,
+        ?string $instruction,
+        ?string $description,
+        ?string $icon,
+    ): Agent {
+        $ownerId = (int) $owner->getId();
+        $agent = $this->agents->findOneBy(['ownerId' => $ownerId, 'slug' => $slug]);
+        if (!$agent instanceof Agent) {
+            throw new \InvalidArgumentException(sprintf('No assistant with slug "%s"', $slug));
+        }
+        $definition = $this->validator->validate($draft);
+        $agent->setDraft($definition->toArray());
+        if (null === $agent->getPublishedVersionId()) {
+            $agent->setName($name);
+            $agent->setDescription(null !== $description && '' !== trim($description) ? trim($description) : null);
+            $nextIcon = $icon ?? '';
+            if ('' !== $nextIcon) {
+                $this->assertIcon($nextIcon);
+            }
+            $agent->setIcon($nextIcon);
+        }
+        $prompt = $this->prompts->find($agent->getPromptId());
+        if ($prompt instanceof Prompt && null !== $instruction && '' !== trim($instruction)) {
+            $prompt->setPrompt(trim($instruction));
+            $this->em->persist($prompt);
         }
         $this->agents->save($agent);
 

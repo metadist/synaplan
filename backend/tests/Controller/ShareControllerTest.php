@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\Agent;
 use App\Entity\ApiKey;
 use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Group;
 use App\Entity\GroupMember;
+use App\Entity\Share;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Security\ApiKeyScope;
+use App\Service\Iam\AccessGate;
 use App\Service\Iam\IamConfig;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AgentKind;
+use App\Service\Iam\ShareService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -41,7 +47,7 @@ final class ShareControllerTest extends WebTestCase
 
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
 
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
     }
 
     public function testOwnerSharesConversationAndMemberCanRead(): void
@@ -63,11 +69,11 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $group->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $body = $this->json();
         self::assertSame('use', $body['chat']['access']);
         self::assertSame((int) $owner->getId(), $body['chat']['owner']['id']);
@@ -79,7 +85,7 @@ final class ShareControllerTest extends WebTestCase
         self::assertNull($body['chat']['shareToken'], 'A group share must not leak the public link token');
 
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertNotEmpty($this->json()['items']);
     }
 
@@ -98,7 +104,7 @@ final class ShareControllerTest extends WebTestCase
             'permission' => 'edit',
         ]);
 
-        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
     public function testAdminCannotReadForeignChatWithoutShare(): void
@@ -111,7 +117,7 @@ final class ShareControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $admin);
         $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
 
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     public function testAdminCannotDownloadForeignFileWithoutShare(): void
@@ -134,7 +140,7 @@ final class ShareControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $admin);
         $this->client->request('GET', '/api/v1/files/'.$file->getId().'/download');
 
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     public function testContinueCreatesOwnerCopy(): void
@@ -151,11 +157,11 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $member->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('POST', '/api/v1/chats/'.$chat->getId().'/continue');
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $copy = $this->json()['chat'];
         self::assertSame('owner', $copy['access']);
         self::assertNotSame($chat->getId(), $copy['id']);
@@ -174,7 +180,7 @@ final class ShareControllerTest extends WebTestCase
             server: ['HTTP_X_API_KEY' => $key],
         );
 
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
     }
 
     public function testIamReadKeyCannotGrantShare(): void
@@ -199,7 +205,7 @@ final class ShareControllerTest extends WebTestCase
             ], JSON_THROW_ON_ERROR),
         );
 
-        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
     }
 
     public function testSharingWithYourselfIs400(): void
@@ -217,7 +223,7 @@ final class ShareControllerTest extends WebTestCase
             'permission' => 'read',
         ]);
 
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
     }
 
     public function testSharedItemTellsHowItArrivedAndIsNewUntilSeen(): void
@@ -231,7 +237,7 @@ final class ShareControllerTest extends WebTestCase
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertSame(0, $this->json()['count']);
 
         $this->authenticateClient($this->client, $owner);
@@ -242,7 +248,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $group->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
@@ -259,7 +265,7 @@ final class ShareControllerTest extends WebTestCase
         self::assertGreaterThanOrEqual(1, $this->json()['count']);
 
         $this->postJson('/api/v1/me/shared/seen', ['kind' => 'conversation']);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertTrue($this->json()['success']);
 
         $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
@@ -271,6 +277,72 @@ final class ShareControllerTest extends WebTestCase
             static fn (array $item): bool => $item['id'] === (string) $chat->getId(),
         ));
         self::assertFalse($items[0]['isNew']);
+    }
+
+    public function testOpeningOneSharedChatLeavesTheOthersNew(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('opened-owner@synaplan.internal');
+        $member = $this->createUser('opened-member@synaplan.internal');
+        $group = $this->createGroup('Opened');
+        $this->addMember($group, (int) $member->getId());
+        $first = $this->createChat((int) $owner->getId(), 'First notes');
+        $second = $this->createChat((int) $owner->getId(), 'Second notes');
+
+        $this->authenticateClient($this->client, $owner);
+        foreach ([$first, $second] as $chat) {
+            $this->postJson('/api/v1/shares', [
+                'kind' => 'conversation',
+                'resource' => (string) $chat->getId(),
+                'subjectType' => 'group',
+                'subjectId' => (int) $group->getId(),
+                'permission' => 'use',
+            ]);
+            self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        }
+
+        $this->authenticateClient($this->client, $member);
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        $before = $this->json()['count'];
+        self::assertGreaterThanOrEqual(2, $before);
+
+        $this->postJson('/api/v1/me/shared/opened', [
+            'kind' => 'conversation',
+            'resourceId' => (string) $first->getId(),
+        ]);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        self::assertSame($before - 1, $this->json()['count']);
+
+        $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+        $byId = [];
+        foreach ($this->json()['items'] as $item) {
+            $byId[$item['id']] = $item['isNew'];
+        }
+        self::assertFalse($byId[(string) $first->getId()]);
+        self::assertTrue($byId[(string) $second->getId()]);
+
+        $this->postJson('/api/v1/me/shared/seen', ['kind' => 'conversation']);
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        self::assertSame(0, $this->json()['count']);
+
+        // sharedAt and the watermark are unix seconds. A share in the same
+        // second as "mark seen" is not after that visit.
+        sleep(1);
+        $third = $this->createChat((int) $owner->getId(), 'Third notes');
+        $this->authenticateClient($this->client, $owner);
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $third->getId(),
+            'subjectType' => 'group',
+            'subjectId' => (int) $group->getId(),
+            'permission' => 'use',
+        ]);
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        $this->authenticateClient($this->client, $member);
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        self::assertGreaterThanOrEqual(1, $this->json()['count']);
     }
 
     public function testGroupGrantNamesTheGroupEvenWhenEveryoneHasTheSamePermission(): void
@@ -290,7 +362,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $group->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $this->postJson('/api/v1/shares', [
             'kind' => 'conversation',
             'resource' => (string) $chat->getId(),
@@ -298,7 +370,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => 0,
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
@@ -311,7 +383,7 @@ final class ShareControllerTest extends WebTestCase
         self::assertSame('use', $items[0]['permission']);
 
         $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertSame(['type' => 'group', 'name' => 'Design'], $this->json()['chat']['sharedVia']);
     }
 
@@ -331,7 +403,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => (int) $member->getId(),
             'permission' => 'read',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $this->postJson('/api/v1/shares', [
             'kind' => 'conversation',
             'resource' => (string) $everyone->getId(),
@@ -339,7 +411,7 @@ final class ShareControllerTest extends WebTestCase
             'subjectId' => 0,
             'permission' => 'read',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->authenticateClient($this->client, $member);
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
@@ -360,10 +432,10 @@ final class ShareControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $member);
 
         $this->client->request('GET', '/api/v1/me/shared/unseen');
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
 
         $this->postJson('/api/v1/me/shared/seen', ['kind' => 'no-such-kind']);
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
     }
 
     public function testEveryoneIsNotOfferedWhenPolicyIsAdminsOnly(): void
@@ -377,7 +449,7 @@ final class ShareControllerTest extends WebTestCase
             $member = $this->createUser('share-no-everyone@synaplan.internal');
             $this->authenticateClient($this->client, $member);
             $this->client->request('GET', '/api/v1/iam/subjects');
-            self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+            self::assertResponseStatusCodeSame(Response::HTTP_OK);
             $types = array_column($this->json()['subjects'], 'type');
             self::assertNotContains('everyone', $types);
 
@@ -392,11 +464,190 @@ final class ShareControllerTest extends WebTestCase
         }
     }
 
+    public function testDisabledAudienceRefusesNewGrantsAndIgnoresExistingOnes(): void
+    {
+        $this->enableSharing();
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $owner = $this->createUser('share-disabled-owner@synaplan.internal');
+        $member = $this->createUser('share-disabled-member@synaplan.internal');
+        $chat = $this->createChat((int) $owner->getId(), 'For the whole instance');
+
+        $this->authenticateClient($this->client, $owner);
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $chat->getId(),
+            'subjectType' => 'everyone',
+            'subjectId' => 0,
+            'permission' => 'read',
+        ]);
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_DISABLED);
+        $this->em->flush();
+
+        try {
+            $this->authenticateClient($this->client, $owner);
+            $this->postJson('/api/v1/shares', [
+                'kind' => 'conversation',
+                'resource' => (string) $chat->getId(),
+                'subjectType' => 'everyone',
+                'subjectId' => 0,
+                'permission' => 'read',
+            ]);
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+            $error = (string) $this->json()['error'];
+            self::assertSame('Sharing with everyone is turned off.', $error);
+            self::assertStringNotContainsString('IAM', $error);
+            self::assertStringNotContainsString('EVERYONE_SHARES', $error);
+            self::assertStringNotContainsString('subjectType', $error);
+
+            $admin = $this->createAdmin('share-disabled-admin@synaplan.internal');
+            foreach ([$owner, $admin] as $actor) {
+                $this->authenticateClient($this->client, $actor);
+                $this->client->request('GET', '/api/v1/iam/subjects');
+                $types = array_column($this->json()['subjects'], 'type');
+                self::assertNotContains('everyone', $types);
+            }
+
+            $this->authenticateClient($this->client, $member);
+            $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+            $ids = array_column($this->json()['items'], 'id');
+            self::assertNotContains((string) $chat->getId(), $ids);
+            $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+
+            $stillThere = $this->em->getRepository(Share::class)->findOneBy([
+                'resourceKind' => 'conversation',
+                'resourceId' => (string) $chat->getId(),
+                'subjectType' => 'everyone',
+            ]);
+            self::assertInstanceOf(Share::class, $stillThere);
+
+            $this->authenticateClient($this->client, $owner);
+            $this->client->request('GET', '/api/v1/shares?kind=conversation&resource='.$chat->getId());
+            self::assertResponseStatusCodeSame(Response::HTTP_OK);
+            $rows = $this->json()['shares'];
+            self::assertCount(1, $rows);
+            self::assertSame('everyone', $rows[0]['subjectType']);
+            self::assertFalse($rows[0]['effective']);
+
+            $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
+            $this->em->flush();
+
+            $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+            $ids = array_column($this->json()['items'], 'id');
+            self::assertContains((string) $chat->getId(), $ids);
+        } finally {
+            $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
+            $this->em->flush();
+        }
+    }
+
+    public function testPlatformEveryoneGrantsStillReachUsersWhenAudienceIsDisabled(): void
+    {
+        $this->enableSharing();
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_DISABLED);
+        $this->em->flush();
+
+        $admin = $this->createAdmin('share-platform-admin@synaplan.internal');
+        $member = $this->createUser('share-platform-member@synaplan.internal');
+        $suffix = uniqid();
+
+        $system = new Agent(0, 1, 'system-'.$suffix, 'System helper', ['schema' => 'agent.v1']);
+        $system->setSource(Agent::SOURCE_SYSTEM);
+        $system->setPublishedVersionId(1);
+        $plugin = new Agent((int) $admin->getId(), 1, 'plugin-'.$suffix, 'Plugin helper', ['schema' => 'agent.v1']);
+        $plugin->setSource(Agent::sourceForPlugin('hello'));
+        $plugin->setPublishedVersionId(1);
+        $userPlugin = new Agent((int) $admin->getId(), 1, 'plugin-user-'.$suffix, 'User-shared plugin', ['schema' => 'agent.v1']);
+        $userPlugin->setSource(Agent::sourceForPlugin('hello'));
+        $userPlugin->setPublishedVersionId(1);
+        $manual = new Agent((int) $admin->getId(), 1, 'manual-'.$suffix, 'Personal helper', ['schema' => 'agent.v1']);
+        $manual->setPublishedVersionId(1);
+        $this->em->persist($system);
+        $this->em->persist($plugin);
+        $this->em->persist($userPlugin);
+        $this->em->persist($manual);
+        $this->em->flush();
+
+        try {
+            $shares = static::getContainer()->get(ShareService::class);
+            $shares->grantAsSystem(AgentKind::KEY, (string) $system->getId(), Share::SUBJECT_EVERYONE, 0, Permission::Use);
+            $platformShare = $shares->grantPlatformDistribution($admin, AgentKind::KEY, (string) $plugin->getId(), Permission::Use);
+            self::assertSame(0, $platformShare->getGrantedBy());
+
+            $userPluginShare = new Share();
+            $userPluginShare->setResourceKind(AgentKind::KEY);
+            $userPluginShare->setResourceId((string) $userPlugin->getId());
+            $userPluginShare->setSubjectType(Share::SUBJECT_EVERYONE);
+            $userPluginShare->setSubjectId(0);
+            $userPluginShare->setPermission(Permission::Use->value);
+            $userPluginShare->setGrantedBy((int) $admin->getId());
+            $this->em->persist($userPluginShare);
+
+            $manualShare = new Share();
+            $manualShare->setResourceKind(AgentKind::KEY);
+            $manualShare->setResourceId((string) $manual->getId());
+            $manualShare->setSubjectType(Share::SUBJECT_EVERYONE);
+            $manualShare->setSubjectId(0);
+            $manualShare->setPermission(Permission::Use->value);
+            $manualShare->setGrantedBy((int) $admin->getId());
+            $this->em->persist($manualShare);
+            $this->em->flush();
+
+            $gate = static::getContainer()->get(AccessGate::class);
+            self::assertSame(Permission::Use, $gate->highestGranted($member, AgentKind::KEY, (string) $system->getId()));
+            self::assertSame(Permission::Use, $gate->highestGranted($member, AgentKind::KEY, (string) $plugin->getId()));
+            self::assertNull($gate->highestGranted($member, AgentKind::KEY, (string) $userPlugin->getId()));
+            self::assertNull($gate->highestGranted($member, AgentKind::KEY, (string) $manual->getId()));
+
+            // The owner's Share dialog lists the platform row as effective and may
+            // still change its permission while the audience is off; the row stays
+            // the platform's instead of turning into a person's inert grant.
+            $this->authenticateClient($this->client, $admin);
+            $this->client->request('GET', '/api/v1/shares?kind=agent&resource='.$plugin->getId());
+            $rows = $this->json()['shares'];
+            self::assertCount(1, $rows);
+            self::assertTrue($rows[0]['effective']);
+
+            $this->postJson('/api/v1/shares', [
+                'kind' => 'agent',
+                'resource' => (string) $plugin->getId(),
+                'subjectType' => 'everyone',
+                'subjectId' => 0,
+                'permission' => 'read',
+            ]);
+            self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+            self::assertSame(0, $this->json()['share']['grantedBy']);
+            self::assertTrue($this->json()['share']['effective']);
+            $this->em->clear();
+            self::assertSame(Permission::Read, $gate->highestGranted($member, AgentKind::KEY, (string) $plugin->getId()));
+
+            // A new everyone grant on a person's assistant is still refused.
+            $this->postJson('/api/v1/shares', [
+                'kind' => 'agent',
+                'resource' => (string) $manual->getId(),
+                'subjectType' => 'everyone',
+                'subjectId' => 0,
+                'permission' => 'read',
+            ]);
+            self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        } finally {
+            $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
+            $this->em->flush();
+        }
+    }
+
     private function enableSharing(): void
     {
         $config = static::getContainer()->get(ConfigRepository::class);
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '1');
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_SHARING_ENABLED, '1');
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_USER_SEARCH_ENABLED, '1');
+        // The suite assumes an owner may share with every account. A public
+        // install stores `disabled`; these tests opt back into the company default.
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
         $this->em->flush();
     }
 

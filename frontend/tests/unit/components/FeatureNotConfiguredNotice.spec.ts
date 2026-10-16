@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 let isAdmin = false
 vi.mock('@/stores/auth', () => ({
@@ -14,7 +16,7 @@ vi.mock('@/stores/auth', () => ({
 
 import FeatureNotConfiguredNotice from '@/components/common/FeatureNotConfiguredNotice.vue'
 
-const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
 
 const RouterLinkStub = {
   props: ['to'],

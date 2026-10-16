@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution\Runner;
 
+use App\Entity\File;
 use App\Entity\Message;
+use App\Repository\FileRepository;
+use App\Service\File\ConversationFileCatalog;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -32,6 +36,9 @@ final readonly class FileAnalysisRunner implements TaskRunner
     public function __construct(
         private FileAnalysisHandler $handler,
         private LoggerInterface $logger,
+        private ?ConversationFileCatalog $conversationFiles = null,
+        private ?FileRepository $fileRepository = null,
+        private ?ChatErrorPresenter $errorPresenter = null,
     ) {
     }
 
@@ -46,7 +53,7 @@ final readonly class FileAnalysisRunner implements TaskRunner
     public function describe(): array
     {
         return [
-            new SkillDescriptor(Capability::FileAnalysis, 'Analyze/describe/OCR an image or document — either attached by the user or produced by a prior node ($nX.file) — and answer about it.'),
+            new SkillDescriptor(Capability::FileAnalysis, 'Analyze/describe/OCR an image or document — attached now, already present in this conversation, or produced by a prior node ($nX.file) — and answer about it. Plan this even when the current turn has no new attachment if the user asks about a file listed in the conversation.'),
         ];
     }
 
@@ -70,6 +77,10 @@ final readonly class FileAnalysisRunner implements TaskRunner
         }
 
         if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
+            $this->attachConversationFile($synthetic, $context);
+        }
+
+        if ($synthetic->getFiles()->isEmpty() && 0 === $synthetic->getFile()) {
             return NodeResult::failed('file_analysis: no file to analyze');
         }
 
@@ -90,7 +101,13 @@ final readonly class FileAnalysisRunner implements TaskRunner
                 'error' => $e->getMessage(),
             ]);
 
-            return NodeResult::failed('file_analysis failed: '.$e->getMessage());
+            // Never leak provider internals into the card: present the
+            // localized reason, keep the raw message in the log (#1074).
+            $copy = $this->errorPresenter instanceof ChatErrorPresenter
+                ? $this->errorPresenter->present($e, $language)->userText
+                : 'Something went wrong while answering this request. Please try again.';
+
+            return NodeResult::failed($copy);
         }
 
         $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];
@@ -114,6 +131,9 @@ final readonly class FileAnalysisRunner implements TaskRunner
 
         $m = new Message();
         $m->setUserId((int) $source->getUserId());
+        // Handler catalog fallback uses this message's chatId for
+        // findFilesByChatId when the history window dropped the upload.
+        $m->setChatId($source->getChatId());
         $m->setText(null !== $prompt && '' !== trim($prompt) ? $prompt : (string) $source->getText());
         $m->setLanguage($source->getLanguage() ?: 'en');
         $m->setDirection('IN');
@@ -172,6 +192,57 @@ final readonly class FileAnalysisRunner implements TaskRunner
 
         $this->logger->info('FileAnalysisRunner: analyzing upstream-generated file', [
             'path' => $path,
+        ]);
+    }
+
+    /**
+     * A follow-up ("what does the PDF say?") has no new attachment. The file
+     * is still in the conversation catalog — attach it so the handler can
+     * answer instead of failing with "no file to analyze".
+     */
+    private function attachConversationFile(Message $synthetic, NodeContext $context): void
+    {
+        if (null === $this->conversationFiles || null === $this->fileRepository) {
+            return;
+        }
+
+        $catalog = $this->conversationFiles->build($context->message, $context->thread, [], null, false);
+        $picks = $this->conversationFiles->analyzableForFollowUp($catalog);
+        if ([] === $picks) {
+            return;
+        }
+
+        $userId = (int) $synthetic->getUserId();
+        $attached = 0;
+
+        foreach ($picks as $pick) {
+            if (null === $pick->fileId) {
+                continue;
+            }
+            $file = $this->fileRepository->find($pick->fileId);
+            if ($file instanceof File && $file->getUserId() === $userId) {
+                $synthetic->addFile($file);
+                ++$attached;
+            }
+        }
+
+        if ($attached > 0) {
+            $this->logger->info('FileAnalysisRunner: analyzing conversation file(s)', [
+                'file_count' => $attached,
+            ]);
+
+            return;
+        }
+
+        $pick = $picks[0];
+        $synthetic->setFile(1);
+        $synthetic->setFilePath($pick->relativePath);
+        $extension = strtolower(pathinfo($pick->relativePath, PATHINFO_EXTENSION));
+        $synthetic->setFileType('' !== $extension ? $extension : $pick->category);
+        $synthetic->setFileText($pick->extractedText);
+
+        $this->logger->info('FileAnalysisRunner: analyzing conversation file by path', [
+            'path' => $pick->relativePath,
         ]);
     }
 

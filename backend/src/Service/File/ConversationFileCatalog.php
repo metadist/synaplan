@@ -38,6 +38,11 @@ final readonly class ConversationFileCatalog
     /** Inventory blocks ride inside an existing prompt budget — keep them short. */
     private const MAX_INVENTORY_ENTRIES = 8;
 
+    /** Re-injected document text for files the history window already dropped. */
+    private const MAX_REINJECTED_CHARS = 12000;
+
+    private const MAX_REINJECTED_PER_FILE = 8000;
+
     public function __construct(
         private FileRepository $fileRepository,
         private string $uploadDir,
@@ -52,12 +57,13 @@ final readonly class ConversationFileCatalog
      * turn, then the files of the conversation, newest first.
      *
      * @param array<int, Message|array{role: string, content: string}> $thread
-     * @param list<string>                                             $extraPaths upload-dir-relative paths produced in this turn (multitask upstream nodes)
-     * @param string|null                                              $category   restrict to one CATEGORY_* value
+     * @param list<string>                                             $extraPaths    upload-dir-relative paths produced in this turn (multitask upstream nodes)
+     * @param string|null                                              $category      restrict to one CATEGORY_* value
+     * @param bool                                                     $requireOnDisk when false, documents that still have extracted text are kept even if the bytes are gone (file analysis only needs the text)
      *
      * @return list<ConversationFile>
      */
-    public function build(Message $message, array $thread = [], array $extraPaths = [], ?string $category = null): array
+    public function build(Message $message, array $thread = [], array $extraPaths = [], ?string $category = null, bool $requireOnDisk = true): array
     {
         $userId = (int) $message->getUserId();
 
@@ -75,14 +81,15 @@ final readonly class ConversationFileCatalog
                 $message->getId(),
                 $message->getDirection(),
                 $index + 1,
+                $requireOnDisk,
             );
         }
 
         foreach ($this->filesForPaths($userId, $extraPaths) as $file) {
-            $this->collect($entries, $seenIds, $seenPaths, $file, ConversationFile::ORIGIN_GENERATED, $file->getMessageId(), 'OUT');
+            $this->collect($entries, $seenIds, $seenPaths, $file, ConversationFile::ORIGIN_GENERATED, $file->getMessageId(), 'OUT', null, $requireOnDisk);
         }
 
-        foreach ($this->threadFiles($userId, $thread) as $candidate) {
+        foreach ($this->threadFiles($userId, $thread, $message->getChatId()) as $candidate) {
             $this->collect(
                 $entries,
                 $seenIds,
@@ -91,6 +98,8 @@ final readonly class ConversationFileCatalog
                 $this->originOf($candidate['file']),
                 $candidate['message_id'],
                 $candidate['direction'],
+                null,
+                $requireOnDisk,
             );
         }
 
@@ -107,6 +116,75 @@ final readonly class ConversationFileCatalog
         }
 
         return $this->capPerCategory($entries);
+    }
+
+    /**
+     * Files of one chat, without a current turn. Used by the chat/API file
+     * history so a client can list every file the conversation still has.
+     *
+     * @return list<ConversationFile>
+     */
+    public function buildForChat(int $userId, int $chatId, bool $requireOnDisk = true): array
+    {
+        if ($userId <= 0 || $chatId <= 0) {
+            return [];
+        }
+
+        $probe = (new Message())->setUserId($userId)->setChatId($chatId);
+
+        return $this->build($probe, [], [], null, $requireOnDisk);
+    }
+
+    /**
+     * Files a follow-up analysis should read when this turn has no attachment.
+     *
+     * User-provided documents win (all of them — a contract plus its annex
+     * stay a set). Generated documents are next. Images/audio/video are last
+     * and only when no document is left. A newer generated picture must not
+     * hide the PDF the user is still asking about.
+     *
+     * @param list<ConversationFile> $catalog
+     *
+     * @return list<ConversationFile>
+     */
+    public function analyzableForFollowUp(array $catalog): array
+    {
+        $uploadedDocuments = [];
+        $otherDocuments = [];
+        $media = [];
+
+        foreach ($catalog as $file) {
+            if ($file->isDocument()) {
+                if (ConversationFile::ORIGIN_GENERATED === $file->origin) {
+                    $otherDocuments[] = $file;
+                } else {
+                    $uploadedDocuments[] = $file;
+                }
+                continue;
+            }
+
+            if ($file->isImage() && '' === $file->absolutePath) {
+                continue;
+            }
+
+            if (in_array($file->category, [
+                ConversationFile::CATEGORY_IMAGE,
+                ConversationFile::CATEGORY_AUDIO,
+                ConversationFile::CATEGORY_VIDEO,
+            ], true)) {
+                $media[] = $file;
+            }
+        }
+
+        if ([] !== $uploadedDocuments) {
+            return $uploadedDocuments;
+        }
+
+        if ([] !== $otherDocuments) {
+            return $otherDocuments;
+        }
+
+        return $media;
     }
 
     /**
@@ -245,6 +323,49 @@ final readonly class ConversationFileCatalog
     }
 
     /**
+     * Inventory plus extracted text for documents that are no longer in the
+     * history window (the upload turn was evicted, but the file still belongs
+     * to this chat). Files whose text is already on a message still in the
+     * thread are listed only — they already ride along as file text.
+     *
+     * @param list<ConversationFile> $catalog
+     * @param array<int, true>       $alreadyPresentFileIds
+     */
+    public function renderPromptContext(array $catalog, array $alreadyPresentFileIds = []): string
+    {
+        $inventory = $this->renderInventoryBlock($catalog);
+        if ('' === $inventory) {
+            return '';
+        }
+
+        $hint = 'These files stay available for the whole conversation. If the user asks about one of them, use it even when this turn has no new attachment. When you need more than the excerpt below, plan a file_analysis or rag_query step.'."\n";
+
+        $bodies = '';
+        $budget = self::MAX_REINJECTED_CHARS;
+        foreach ($catalog as $file) {
+            if (!$file->isDocument()) {
+                continue;
+            }
+            if (null !== $file->fileId && isset($alreadyPresentFileIds[$file->fileId])) {
+                continue;
+            }
+            $text = trim($file->extractedText);
+            if ('' === $text) {
+                continue;
+            }
+
+            $slice = mb_substr($text, 0, min(self::MAX_REINJECTED_PER_FILE, $budget));
+            $bodies .= "\n### ".$file->displayName.' (`'.$file->reference."`)\n\n".$slice."\n";
+            $budget -= mb_strlen($slice);
+            if ($budget <= 0) {
+                break;
+            }
+        }
+
+        return $inventory.$hint.$bodies;
+    }
+
+    /**
      * Image attachments of a message in marker order — `attached:1` is the
      * first entry. Shared with consumers so offered and accepted markers can
      * never drift apart.
@@ -293,6 +414,7 @@ final readonly class ConversationFileCatalog
         ?int $messageId,
         string $direction,
         ?int $attachmentIndex = null,
+        bool $requireOnDisk = true,
     ): void {
         $id = $file->getId();
         if (null !== $id && isset($seenIds[$id])) {
@@ -300,7 +422,16 @@ final readonly class ConversationFileCatalog
         }
 
         $path = $this->absolutePath($file);
-        if (null === $path || isset($seenPaths[$path])) {
+        $extracted = $file->getFileText();
+        if (null === $path) {
+            if ($requireOnDisk || '' === trim($extracted)) {
+                return;
+            }
+            $path = '';
+        }
+
+        $pathKey = '' !== $path ? $path : 'missing:'.($id ?? $file->getFilePath());
+        if (isset($seenPaths[$pathKey])) {
             return;
         }
 
@@ -311,7 +442,7 @@ final readonly class ConversationFileCatalog
         if (null !== $id) {
             $seenIds[$id] = true;
         }
-        $seenPaths[$path] = true;
+        $seenPaths[$pathKey] = true;
 
         $relative = $this->normalizeRelativePath($file->getFilePath());
 
@@ -325,18 +456,21 @@ final readonly class ConversationFileCatalog
             $id,
             $messageId ?? $file->getMessageId(),
             $direction,
+            $file->getFileText(),
         );
     }
 
     /**
      * Files of the conversation: attachments carried by the thread messages
-     * plus the BFILES rows generated media links to its originating message.
+     * plus the BFILES rows generated media links to its originating message,
+     * plus every file of this chat when the history window dropped the
+     * upload turn.
      *
      * @param array<int, Message|array{role: string, content: string}> $thread
      *
      * @return list<array{file: File, message_id: int|null, direction: string}>
      */
-    private function threadFiles(int $userId, array $thread): array
+    private function threadFiles(int $userId, array $thread, ?int $chatId): array
     {
         $attached = [];
         $messageIds = [];
@@ -363,6 +497,16 @@ final readonly class ConversationFileCatalog
         $all = $attached;
         foreach ($linked as $file) {
             $all[] = ['file' => $file, 'message_id' => $file->getMessageId(), 'direction' => 'OUT'];
+        }
+
+        if (null !== $chatId && $chatId > 0) {
+            foreach ($this->fileRepository->findFilesByChatId($userId, $chatId, self::THREAD_LOOKUP_LIMIT) as $file) {
+                $all[] = [
+                    'file' => $file,
+                    'message_id' => $file->getMessageId(),
+                    'direction' => 'generated' === $file->getSource() ? 'OUT' : 'IN',
+                ];
+            }
         }
 
         // Newest first: the file the user just talked about wins the budget.
@@ -419,6 +563,7 @@ final readonly class ConversationFileCatalog
                 null,
                 $entry->getId(),
                 $entry->getDirection(),
+                (string) ($entry->getFileText() ?: ''),
             );
         }
 

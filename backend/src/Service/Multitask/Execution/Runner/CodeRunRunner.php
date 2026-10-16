@@ -12,6 +12,7 @@ use App\Repository\ComputeRunRepository;
 use App\Repository\FileRepository;
 use App\Repository\UserRepository;
 use App\Service\Agent\Policy\AssistantSkillGate;
+use App\Service\Compute\ChatArtefactMountList;
 use App\Service\Compute\ComputeArtefactStore;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
@@ -32,6 +33,8 @@ use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\ToolExecutionGate;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\IOFactory as SpreadsheetIOFactory;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -46,6 +49,10 @@ final readonly class CodeRunRunner implements TaskRunner
     private const SCRIPT_PYTHON = '_synaplan_main.py';
     private const SCRIPT_NODE = '_synaplan_main.js';
     private const SIDECAR_CONCURRENT_CEILING = 8;
+    /** Max stdout characters surfaced in the chat reply (chatty scripts are clipped). */
+    private const STDOUT_REPLY_CAP = 4000;
+    /** Max stderr characters surfaced when a run fails (the tail carries the actual error). */
+    private const STDERR_REPLY_CAP = 1500;
 
     public function __construct(
         private ComputeConfig $computeConfig,
@@ -74,7 +81,7 @@ final readonly class CodeRunRunner implements TaskRunner
         return [
             new SkillDescriptor(
                 Capability::CodeRun,
-                'Run a short Python or Node script on the attached files and return result files',
+                'Run a short Python or Node script on the attached files — including to modify, edit, or replace text in them — and return result files',
                 dynamicNote: fn (?int $userId, array $context): ?string => $this->plannerNote($userId),
                 available: fn (): bool => $this->computeEnabled(),
             ),
@@ -91,7 +98,11 @@ final readonly class CodeRunRunner implements TaskRunner
         if (!$this->computeEnabled($userId)) {
             return null;
         }
-        $lines = [];
+        $lines = [
+            '  params.script (required): the COMPLETE program as multi-line text with real newlines. params.image: "python" (default) or "node". This turn\'s attached files are mounted automatically. To use a file this chat already saved, set params.inputFileNames to its display name from "Files available in this conversation". Never invent a numeric id. Do not set useWorkspace only because this chat already saved a file — that folder is shared across chats.',
+            '  Use this step when the user wants to modify, edit, or replace text in an attached file, including a PDF. The sandbox can read a PDF. It cannot change text inside a PDF in place. If the script cannot, it must print "cannot change text inside a PDF in place". Do not answer that the tools in this chat cannot edit files.',
+            '  NEVER join statements with semicolons and NEVER emit a one-liner: a compound statement (with/for/if/def/try) after ";" is a syntax error and fails the run. print() the answer (stdout is returned) and write any result files to /out/ (e.g. open("/out/result.csv","w")) — only files under /out are saved and offered for download; the working directory is discarded.',
+        ];
         if ($this->workspacesEnabled($userId)) {
             $lines[] = '  params.useWorkspace: true — keep this run\'s files in the user\'s persistent folder (mounted at /workspace and readable by later runs). Set it when the user wants to continue earlier file work or keep results for later; otherwise omit it.';
         }
@@ -102,7 +113,7 @@ final readonly class CodeRunRunner implements TaskRunner
             );
         }
 
-        return [] === $lines ? null : implode("\n", $lines);
+        return implode("\n", $lines);
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult
@@ -133,6 +144,62 @@ final readonly class CodeRunRunner implements TaskRunner
                 $inputIds[] = (int) $id;
             }
         }
+
+        // The planner references attachments as `$message.files` and cannot know
+        // their numeric ids, so an interactive "run code on the attached file"
+        // turn arrives with no inputFileIds — the script then can't find the
+        // file (FileNotFoundError). Fall back to the message's own attachments
+        // so the user-selected files are mounted into the sandbox by name. Uses
+        // findFilesByMessageIds so BOTH the ManyToMany attachments (web chat)
+        // and the legacy single-file column (channel messages, File.messageId)
+        // are covered.
+        if ([] === $inputIds) {
+            foreach ($context->message->getFiles() as $file) {
+                $fileId = $file->getId();
+                if (null !== $fileId) {
+                    $inputIds[] = (int) $fileId;
+                }
+            }
+            $messageId = $context->message->getId();
+            if ([] === $inputIds && $context->message->getFile() > 0 && null !== $messageId) {
+                foreach ($this->files->findFilesByMessageIds($userId, [$messageId], 20) as $file) {
+                    $fileId = $file->getId();
+                    if (null !== $fileId) {
+                        $inputIds[] = (int) $fileId;
+                    }
+                }
+            }
+        }
+
+        $requestedNames = [];
+        foreach ($node->params['inputFileNames'] ?? [] as $name) {
+            if (is_string($name) && '' !== trim($name)) {
+                $requestedNames[] = trim($name);
+            }
+        }
+        $chatFiles = [];
+        $chatId = $context->message->getChatId();
+        if (is_int($chatId) && $chatId > 0) {
+            foreach ($this->files->findFilesByChatId($userId, $chatId, 30) as $file) {
+                $fileId = $file->getId();
+                if (null !== $fileId) {
+                    $chatFiles[] = ['id' => (int) $fileId, 'name' => (string) $file->getFileName()];
+                }
+            }
+        }
+        $mounted = (new ChatArtefactMountList())->resolve(
+            $inputIds,
+            $chatFiles,
+            $requestedNames,
+            (string) $context->message->getText(),
+        );
+        if ([] !== $mounted['missing']) {
+            return NodeResult::failed(sprintf(
+                'The run could not find %s. Attach it, or use the file this chat just saved.',
+                $mounted['missing'][0],
+            ));
+        }
+        $inputIds = $mounted['ids'];
 
         $result = $this->executeDirect(
             $user,
@@ -328,6 +395,19 @@ final readonly class CodeRunRunner implements TaskRunner
             if ('succeeded' !== $status->status) {
                 $audit->markFinished(ComputeRun::STATUS_FAILED);
                 $this->runs->save($audit);
+
+                // The stderr tail is the actual cause (a stack trace / syntax
+                // error). Log it so a failed run is diagnosable even when the DAG
+                // falls back to the legacy router and discards the node message.
+                $stderrTail = trim((string) $logs['stderr']);
+                if ('' !== $stderrTail) {
+                    $this->logger->warning('CodeRunRunner: run failed', [
+                        'compute_run_id' => $runId,
+                        'exit_code' => $status->exitCode,
+                        'reason' => $status->reason,
+                        'stderr' => mb_substr($stderrTail, -self::STDERR_REPLY_CAP),
+                    ]);
+                }
 
                 return [
                     'outcome' => 'failed',
@@ -535,8 +615,21 @@ final readonly class CodeRunRunner implements TaskRunner
             ]);
         }
         if ('ok' !== $result['outcome']) {
-            return NodeResult::failed((string) $result['error'], [
+            // U8: one sentence a non-technical user understands — never a
+            // stack trace. The stderr tail stays in the server log (the
+            // 'CodeRunRunner: run failed' warning) so a failed run is still
+            // diagnosable; it must not reach user-facing copy (#2052).
+            $message = (string) $result['error'];
+            $diagnostic = trim($result['stdout'])."\n".trim($result['stderr']);
+            if (str_contains(mb_strtolower($diagnostic), 'cannot change text inside a pdf in place')) {
+                $message = 'This sandbox cannot change text inside a PDF in place. The file was not rewritten.';
+            }
+
+            return NodeResult::failed($message, [
                 'used_workspace' => true === ($result['used_workspace'] ?? false),
+                'exit_code' => $result['exit_code'],
+                'compute_run_id' => $result['compute_run_id'],
+                'trace_output' => mb_substr(trim($result['stderr']), 0, 8192),
             ]);
         }
 
@@ -549,8 +642,31 @@ final readonly class CodeRunRunner implements TaskRunner
             ];
         }
 
+        // The script's stdout is the answer the user asked for ("tell me the
+        // number of rows" → "3"). Surface it as the reply text — without it the
+        // run succeeds but the user only sees "File work finished" and never the
+        // result. Capped so a chatty script cannot flood the chat bubble.
+        $stdout = trim((string) $result['stdout']);
+        if ('' !== $stdout && mb_strlen($stdout) > self::STDOUT_REPLY_CAP) {
+            $stdout = mb_substr($stdout, 0, self::STDOUT_REPLY_CAP)."\n…";
+        }
+
+        if ([] === $descriptors) {
+            $text = '' !== $stdout ? $stdout : 'File work finished. No new files were saved.';
+        } else {
+            // The files are the deliverable here: drop a pure self-narration
+            // ("X erfolgreich erstellt") that carries no data of its own, so
+            // an unverified success claim never sits above the verified facts
+            // (#2048). Anything with substance (numbers, rows) stays.
+            if (self::isSelfNarration($stdout, $result['artefacts'])) {
+                $stdout = '';
+            }
+            $savedLine = 'Saved '.count($descriptors).' file(s): '.implode('; ', $this->artefactFacts($result['artefacts'])).'.';
+            $text = '' !== $stdout ? $stdout."\n\n".$savedLine : 'File work finished.'."\n\n".$savedLine;
+        }
+
         return NodeResult::ok(
-            [] === $descriptors ? 'File work finished. No new files were saved.' : 'File work finished.',
+            $text,
             $descriptors,
             [
                 'compute_run_id' => $result['compute_run_id'],
@@ -558,6 +674,198 @@ final readonly class CodeRunRunner implements TaskRunner
                 'used_workspace' => true === ($result['used_workspace'] ?? false),
             ],
         );
+    }
+
+    /**
+     * True when stdout is pure self-narration about a produced file rather
+     * than an answer: short, digit-free, carrying a completion verb and
+     * naming one of the artefacts. Fail-open by design — anything that
+     * could be the answer (numbers, longer prose) is kept.
+     *
+     * @param list<array{file_id: int, name: string, mime: string, size: int}> $artefacts
+     */
+    private static function isSelfNarration(string $stdout, array $artefacts): bool
+    {
+        if ('' === $stdout || mb_strlen($stdout) > 240 || 1 === preg_match('/\d/', $stdout)) {
+            return false;
+        }
+        if (1 !== preg_match('/\b(erfolgreich|successfully|erstellt|created|gespeichert|saved|fertig|done|completed|bereinigt|cleaned|finished)\b/i', $stdout)) {
+            return false;
+        }
+        foreach ($artefacts as $artefact) {
+            if ('' !== $artefact['name'] && str_contains($stdout, $artefact['name'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Verified one-liners per artefact, read back from the stored files:
+     * image dimensions, CSV headers/shape, spreadsheet sheets/shape, text
+     * line counts — name and size when nothing more specific applies.
+     *
+     * Best-effort by design: a readback failure degrades to the plain
+     * name-and-size line and must never fail the node.
+     *
+     * @param list<array{file_id: int, name: string, mime: string, size: int}> $artefacts
+     *
+     * @return list<string>
+     */
+    private function artefactFacts(array $artefacts): array
+    {
+        $facts = [];
+        foreach ($artefacts as $artefact) {
+            $facts[] = $this->artefactFact($artefact);
+        }
+
+        return $facts;
+    }
+
+    /**
+     * @param array{file_id: int, name: string, mime: string, size: int} $artefact
+     */
+    private function artefactFact(array $artefact): string
+    {
+        $name = $artefact['name'];
+        $size = $artefact['size'];
+        if ($size <= 0) {
+            return sprintf('%s (empty)', $name);
+        }
+
+        try {
+            $file = $this->files->find($artefact['file_id']);
+            $path = $file instanceof File
+                ? rtrim($this->uploadDir, '/').'/'.ltrim($file->getFilePath(), '/')
+                : null;
+            if (null === $path || !is_file($path)) {
+                return sprintf('%s (%s)', $name, $this->formatBytes($size));
+            }
+
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+            return match (true) {
+                in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true) => $this->imageFact($name, $path, $size),
+                'csv' === $ext => $this->csvFact($name, $path, $size),
+                in_array($ext, ['txt', 'md', 'json', 'log'], true) => $this->textFact($name, $path, $size),
+                in_array($ext, ['xlsx', 'xls', 'ods'], true) => $this->spreadsheetFact($name, $path, $size),
+                default => sprintf('%s (%s)', $name, $this->formatBytes($size)),
+            };
+        } catch (\Throwable) {
+            return sprintf('%s (%s)', $name, $this->formatBytes($size));
+        }
+    }
+
+    private function imageFact(string $name, string $path, int $size): string
+    {
+        $info = @getimagesize($path);
+        if (false === $info) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+        $kind = match ($info[2]) {
+            IMAGETYPE_JPEG => 'JPEG image',
+            IMAGETYPE_PNG => 'PNG image',
+            IMAGETYPE_GIF => 'GIF image',
+            IMAGETYPE_WEBP => 'WebP image',
+            default => 'image',
+        };
+
+        return sprintf('%s (%s, %dx%d, %s)', $name, $kind, $info[0], $info[1], $this->formatBytes($size));
+    }
+
+    private function csvFact(string $name, string $path, int $size): string
+    {
+        $sample = @file_get_contents($path, false, null, 0, 65536);
+        if (false === $sample || '' === trim($sample)) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+        $lines = array_values(array_filter(
+            preg_split('/\r\n|\n|\r/', $sample) ?: [],
+            static fn ($line): bool => '' !== trim((string) $line),
+        ));
+        if ([] === $lines) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+        $headers = str_getcsv($lines[0], escape: '\\');
+        $headerList = implode(', ', array_slice(array_map(static fn ($h): string => trim((string) $h), $headers), 0, 6));
+        if (count($headers) > 6) {
+            $headerList .= ', …';
+        }
+        $plus = (int) @filesize($path) > 65536 ? '+' : '';
+
+        return sprintf(
+            '%s (CSV, %d%s rows × %d columns; headers: %s)',
+            $name,
+            max(0, count($lines) - 1),
+            $plus,
+            count($headers),
+            $headerList,
+        );
+    }
+
+    private function textFact(string $name, string $path, int $size): string
+    {
+        $sample = @file_get_contents($path, false, null, 0, 65536);
+        if (false === $sample || '' === trim($sample)) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+        $lines = preg_split('/\r\n|\n|\r/', $sample) ?: [];
+        $plus = (int) @filesize($path) > 65536 ? '+' : '';
+
+        return sprintf('%s (text, %d%s lines, %s)', $name, count($lines), $plus, $this->formatBytes($size));
+    }
+
+    private function spreadsheetFact(string $name, string $path, int $size): string
+    {
+        try {
+            if ((int) @filesize($path) > 10 * 1024 * 1024) {
+                return sprintf('%s (%s)', $name, $this->formatBytes($size));
+            }
+            $reader = SpreadsheetIOFactory::createReaderForFile($path);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($path);
+            try {
+                $names = [];
+                foreach ($spreadsheet->getAllSheets() as $sheet) {
+                    $names[] = $sheet->getTitle();
+                }
+                $sheetList = implode(', ', array_slice($names, 0, 4));
+                if (count($names) > 4) {
+                    $sheetList .= ', …';
+                }
+                $first = $spreadsheet->getSheet(0);
+                $rows = $first->getHighestRow();
+                $cols = Coordinate::columnIndexFromString($first->getHighestColumn());
+
+                return sprintf(
+                    '%s (Excel, %d sheet%s: %s; %s %d rows × %d columns)',
+                    $name,
+                    count($names),
+                    1 === count($names) ? '' : 's',
+                    $sheetList,
+                    $names[0] ?? 'Sheet1',
+                    $rows,
+                    $cols,
+                );
+            } finally {
+                $spreadsheet->disconnectWorksheets();
+            }
+        } catch (\Throwable) {
+            return sprintf('%s (could not be read back, %s)', $name, $this->formatBytes($size));
+        }
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes.' B';
+        }
+        if ($bytes < 1024 * 1024) {
+            return rtrim(rtrim(number_format($bytes / 1024, 1), '0'), '.').' KB';
+        }
+
+        return rtrim(rtrim(number_format($bytes / 1024 / 1024, 1), '0'), '.').' MB';
     }
 
     /**
@@ -842,6 +1150,7 @@ final readonly class CodeRunRunner implements TaskRunner
                 ? 'File work hit a resource limit. Anything this run already wrote to your folder is still there — open Workspace to check.'
                 : 'File work hit a resource limit. Nothing new was saved.',
             'workspace_busy' => 'Another file-work run is still using your folder. Wait for it to finish, then try again. Nothing new was saved.',
+            'egress_unavailable' => 'File work could not reach the approved websites, so the run did not start. Nothing was sent or saved.',
             'workspace_quota_exceeded' => $ran
                 ? 'This run wrote more than your file-work folder allows. The new files it created were removed. Files that were already there stay, including any this run changed.'
                 : 'Your file-work folder is full. Delete files or the folder under Files → Workspace, then try again. Nothing new was saved.',

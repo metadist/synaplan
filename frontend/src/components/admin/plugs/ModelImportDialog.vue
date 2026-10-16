@@ -14,7 +14,7 @@
         </div>
         <button
           type="button"
-          class="p-1 rounded txt-muted hover:txt-primary transition-colors"
+          class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
           :aria-label="$t('common.close')"
           data-testid="model-import-close"
           @click="close"
@@ -37,7 +37,7 @@
           <p class="txt-secondary mt-3">{{ error || $t('aiInfra.modelImport.unreachable') }}</p>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
             @click="loadPreview"
           >
             {{ $t('common.retry') }}
@@ -49,6 +49,17 @@
         </div>
 
         <template v-else>
+          <label class="block mb-3">
+            <span class="sr-only">{{ $t('aiInfra.modelImport.filterLabel') }}</span>
+            <input
+              v-model="filterQuery"
+              type="search"
+              autocomplete="off"
+              class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              :placeholder="$t('aiInfra.modelImport.filterPlaceholder')"
+              data-testid="input-model-import-filter"
+            />
+          </label>
           <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
             <label class="inline-flex items-center gap-2 text-sm txt-primary">
               <input
@@ -82,13 +93,16 @@
                     {{ $t('aiInfra.modelImport.colTags') }}
                   </th>
                   <th class="py-2 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide">
+                    {{ $t('aiInfra.modelImport.colPrice') }}
+                  </th>
+                  <th class="py-2 px-2 txt-secondary text-xs font-semibold uppercase tracking-wide">
                     {{ $t('aiInfra.modelImport.colStatus') }}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 <tr
-                  v-for="row in rows"
+                  v-for="row in visibleRows"
                   :key="row.providerId"
                   class="border-b border-light-border/10 dark:border-dark-border/10"
                   :data-testid="`model-import-row-${row.providerId}`"
@@ -113,7 +127,7 @@
                     <input
                       v-model="row.tagsText"
                       type="text"
-                      class="w-full px-3 py-1.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      class="w-full px-3 py-1.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                       :data-testid="`model-import-tags-${row.providerId}`"
                     />
                     <div
@@ -123,6 +137,11 @@
                     >
                       chat: {{ row.probe.chat }} · embeddings: {{ row.probe.embeddings }}
                     </div>
+                  </td>
+                  <td
+                    class="py-2 px-2 align-top txt-secondary text-xs tabular-nums whitespace-nowrap"
+                  >
+                    {{ priceLabel(row) }}
                   </td>
                   <td class="py-2 px-2 align-top">
                     <span v-if="row.exists" class="pill text-[10px] px-1.5 py-0.5 txt-secondary">{{
@@ -149,14 +168,14 @@
       >
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           @click="close"
         >
           {{ $t('common.cancel') }}
         </button>
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="applying || selectedCount === 0"
           data-testid="model-import-apply"
           @click="apply"
@@ -182,7 +201,7 @@ import { useNotification } from '@/composables/useNotification'
 const props = defineProps<{ source: string; label: string }>()
 const emit = defineEmits<{ close: []; applied: [] }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { success, error: showError } = useNotification()
 
 // Kept in sync with ModelImportApplier::ALLOWED_TAGS on the backend.
@@ -210,10 +229,19 @@ const error = ref<string | null>(null)
 const probe = ref(false)
 const probeCostNote = ref<string | null>(null)
 const rows = ref<Row[]>([])
+const filterQuery = ref('')
+const visibleRows = computed(() => {
+  const query = filterQuery.value.trim().toLowerCase()
+  if (query === '') return rows.value
+  return rows.value.filter((row) => {
+    const haystack = `${row.name} ${row.providerId}`.toLowerCase()
+    return haystack.includes(query)
+  })
+})
 
 const selectedCount = computed(() => rows.value.filter((r) => r.selected).length)
 const allNewSelected = computed(() => {
-  const newRows = rows.value.filter((r) => !r.exists)
+  const newRows = visibleRows.value.filter((r) => !r.exists)
   return newRows.length > 0 && newRows.every((r) => r.selected)
 })
 
@@ -241,7 +269,7 @@ async function loadPreview(): Promise<void> {
 }
 
 function toggleAllNew(checked: boolean): void {
-  for (const row of rows.value) {
+  for (const row of visibleRows.value) {
     if (!row.exists) row.selected = checked
   }
 }
@@ -277,6 +305,22 @@ async function apply(): Promise<void> {
   } finally {
     applying.value = false
   }
+}
+
+function priceLabel(row: Row): string {
+  if (!row.priceKnown) return t('models.costTier.unknown')
+  const priceIn = row.priceInPerMillion ?? 0
+  const priceOut = row.priceOutPerMillion ?? 0
+  if (priceIn === 0 && priceOut === 0) return t('models.costTier.free')
+  const money = new Intl.NumberFormat(locale.value, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 4,
+  })
+  return t('aiInfra.modelImport.pricePair', {
+    in: money.format(priceIn),
+    out: money.format(priceOut),
+  })
 }
 
 function formatSize(bytes: number): string {

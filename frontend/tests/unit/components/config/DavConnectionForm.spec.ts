@@ -94,6 +94,35 @@ describe('DavConnectionForm', () => {
     )
   })
 
+  it('creates only a webdav connection from the OpenCloud preset', async () => {
+    const wrapper = mountForm()
+    await wrapper.find('[data-testid="btn-open-dav-form"]').trigger('click')
+    await wrapper.find('[data-testid="dav-kind-opencloud"]').setValue(true)
+    await wrapper.find('[data-testid="dav-server-url"]').setValue('https://opencloud.example.com/')
+    await wrapper.find('[data-testid="dav-username"]').setValue('ada')
+    await wrapper.find('[data-testid="dav-app-password"]').setValue('app-token')
+
+    expect(wrapper.find('[data-testid="dav-with-calendar"]').exists()).toBe(false)
+
+    await wrapper.find('[data-testid="dav-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(mockCreate).toHaveBeenCalledTimes(1)
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      type: 'webdav',
+      secret: 'app-token',
+      config: {
+        base_url: 'https://opencloud.example.com/remote.php/webdav',
+        username: 'ada',
+        folder: 'Synaplan',
+        on_conflict: 'rename',
+        channel: 'opencloud',
+      },
+    })
+    expect(mockTest).toHaveBeenCalledTimes(1)
+    expect(wrapper.emitted('created')).toHaveLength(1)
+  })
+
   it('surfaces the tester error when the live check fails', async () => {
     mockTest.mockResolvedValue({
       succeeded: false,

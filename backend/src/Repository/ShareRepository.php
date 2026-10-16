@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\Share;
+use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\Query\Expr\Composite;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -14,8 +17,10 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class ShareRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private IamConfig $iamConfig,
+    ) {
         parent::__construct($registry, Share::class);
     }
 
@@ -36,6 +41,40 @@ class ShareRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every share whose subject is this user, group, or everyone row.
+     *
+     * @return list<Share>
+     */
+    public function findBySubject(string $subjectType, int $subjectId): array
+    {
+        return $this->findBySubjectIds($subjectType, [$subjectId]);
+    }
+
+    /**
+     * @param list<int> $subjectIds
+     *
+     * @return list<Share>
+     */
+    public function findBySubjectIds(string $subjectType, array $subjectIds): array
+    {
+        if ([] === $subjectIds) {
+            return [];
+        }
+
+        /** @var list<Share> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->where('s.subjectType = :subjectType')
+            ->andWhere('s.subjectId IN (:subjectIds)')
+            ->setParameter('subjectType', $subjectType)
+            ->setParameter('subjectIds', $subjectIds)
+            ->orderBy('s.created', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
+
+    /**
      * @return list<Share>
      */
     public function findForResource(string $kind, string $resourceId): array
@@ -45,6 +84,29 @@ class ShareRepository extends ServiceEntityRepository
             ['resourceKind' => $kind, 'resourceId' => $resourceId],
             ['created' => 'ASC'],
         );
+
+        return $rows;
+    }
+
+    /**
+     * @param list<string> $resourceIds
+     *
+     * @return list<Share>
+     */
+    public function findForResources(string $kind, array $resourceIds): array
+    {
+        if ([] === $resourceIds) {
+            return [];
+        }
+
+        /** @var list<Share> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->where('s.resourceKind = :kind')
+            ->andWhere('s.resourceId IN (:ids)')
+            ->setParameter('kind', $kind)
+            ->setParameter('ids', $resourceIds)
+            ->getQuery()
+            ->getResult();
 
         return $rows;
     }
@@ -82,7 +144,7 @@ class ShareRepository extends ServiceEntityRepository
                 's.subjectType = :userType',
                 's.subjectId = :userId',
             ),
-            's.subjectType = :everyoneType',
+            $this->everyoneSubjectExpression($qb),
         );
         $qb->setParameter('userType', Share::SUBJECT_USER)
             ->setParameter('userId', $userId)
@@ -109,6 +171,30 @@ class ShareRepository extends ServiceEntityRepository
         $rows = $qb->orderBy('s.created', 'ASC')->getQuery()->getResult();
 
         return $rows;
+    }
+
+    /**
+     * DQL form of {@see IamConfig::everyoneShareReaches()}: everyone-shares
+     * reach every account unless the operator turned that audience off. Then
+     * only rows the platform wrote still match ({@see Share::PLATFORM_GRANTOR},
+     * written by grantAsSystem and grantPlatformDistribution). A grant a person
+     * wrote stays on the row and works again once the audience is back on (#2096).
+     *
+     * This is the one read seam for access: AccessGate, shared-with-me, RAG
+     * scopes, shared prompts and tools all come through findForSubjects.
+     */
+    private function everyoneSubjectExpression(QueryBuilder $qb): Composite|string
+    {
+        if ($this->iamConfig->isEveryoneAudienceEnabled()) {
+            return 's.subjectType = :everyoneType';
+        }
+
+        $qb->setParameter('platformGrantor', Share::PLATFORM_GRANTOR);
+
+        return $qb->expr()->andX(
+            's.subjectType = :everyoneType',
+            's.grantedBy = :platformGrantor',
+        );
     }
 
     /**
@@ -180,6 +266,41 @@ class ShareRepository extends ServiceEntityRepository
             ->setParameter('userId', $userId)
             ->getQuery()
             ->execute();
+    }
+
+    /**
+     * Shares this user granted to one group. Grants made by anyone else are not included.
+     *
+     * @return list<Share>
+     */
+    public function findGrantedByUserToGroup(int $userId, int $groupId): array
+    {
+        /** @var list<Share> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->where('s.grantedBy = :userId')
+            ->andWhere('s.subjectType = :type')
+            ->andWhere('s.subjectId = :groupId')
+            ->setParameter('userId', $userId)
+            ->setParameter('type', Share::SUBJECT_GROUP)
+            ->setParameter('groupId', $groupId)
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
+
+    public function countGrantedByUserToGroup(int $userId, int $groupId): int
+    {
+        return (int) $this->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->where('s.grantedBy = :userId')
+            ->andWhere('s.subjectType = :type')
+            ->andWhere('s.subjectId = :groupId')
+            ->setParameter('userId', $userId)
+            ->setParameter('type', Share::SUBJECT_GROUP)
+            ->setParameter('groupId', $groupId)
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     /**

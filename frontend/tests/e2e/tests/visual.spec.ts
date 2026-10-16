@@ -64,11 +64,11 @@ test.describe('@visual UI guard — capped snapshots', () => {
     await expect(uploadForm).toHaveScreenshot('files-upload-form.png', SNAPSHOT_OPTS)
   })
 
-  test('manage flyout', async ({ page }) => {
+  test('assistants panel', async ({ page }) => {
     await openApp(page)
-    await page.locator(NAV.sidebarV2Manage).click()
-    const flyout = page.locator(NAV.navDropdown)
-    await expect(flyout).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await expect(flyout).toHaveScreenshot('manage-flyout.png', SNAPSHOT_OPTS)
+    await page.locator(NAV.sidebarV2Assistants).click()
+    const panel = page.locator(NAV.sidebarPanel)
+    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expect(panel).toHaveScreenshot('assistants-panel.png', SNAPSHOT_OPTS)
   })
 })

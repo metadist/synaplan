@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Service\Microsoft\MicrosoftConnectionService;
+use App\Service\Microsoft\MicrosoftConsentErrorMapper;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\OAuth\OAuthException;
 use OpenApi\Attributes as OA;
@@ -31,6 +32,7 @@ final class MicrosoftConnectionController extends AbstractController
 {
     public function __construct(
         private readonly MicrosoftConnectionService $microsoft,
+        private readonly MicrosoftConsentErrorMapper $consentErrors,
         private readonly LoggerInterface $logger,
         private readonly string $frontendUrl,
     ) {
@@ -132,13 +134,15 @@ final class MicrosoftConnectionController extends AbstractController
         $error = $request->query->get('error');
         if (is_string($error) && '' !== $error) {
             $description = $request->query->get('error_description');
+            $descriptionText = is_string($description) ? $description : '';
+            $reason = $this->consentErrors->reason($error, $descriptionText);
 
             $this->logger->warning('Microsoft 365 consent was refused', [
                 'error' => $error,
-                'description' => is_string($description) ? $description : '',
+                'reason' => $reason,
             ]);
 
-            return $this->resultRedirect('error', $error);
+            return $this->resultRedirect('error', $reason);
         }
 
         $code = $request->query->get('code');
@@ -160,7 +164,7 @@ final class MicrosoftConnectionController extends AbstractController
 
     /**
      * The reason is a stable machine code, never a raw provider message: the
-     * frontend translates it into one of the four locales, and an upstream
+     * frontend translates it into one of the five locales, and an upstream
      * string could carry tenant details into a URL.
      */
     private function resultRedirect(string $result, ?string $reason = null): Response

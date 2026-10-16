@@ -166,6 +166,46 @@ class ApiKeyRepositoryTest extends KernelTestCase
         $this->em->flush();
     }
 
+    public function testTouchLastUsedIsVisibleOnTheNextRead(): void
+    {
+        if (!$this->testUser) {
+            $this->markTestSkipped('No test user available');
+        }
+
+        $key = 'sk_touch_'.bin2hex(random_bytes(16));
+        $apiKey = new ApiKey();
+        $apiKey->setOwner($this->testUser);
+        $apiKey->setKey($key);
+        $apiKey->setName('Touch last used');
+        $apiKey->setStatus('active');
+        $this->em->persist($apiKey);
+        $this->em->flush();
+
+        $id = $apiKey->getId();
+        $this->assertNotNull($id);
+        $this->assertSame(0, $apiKey->getLastUsed());
+
+        $before = time();
+        $this->repository->touchLastUsed($apiKey);
+        $this->em->clear();
+
+        $reloaded = $this->repository->find($id);
+        $this->assertInstanceOf(ApiKey::class, $reloaded);
+        $this->assertGreaterThanOrEqual($before, $reloaded->getLastUsed());
+        $this->assertLessThanOrEqual(time(), $reloaded->getLastUsed());
+
+        $seen = $reloaded->getLastUsed();
+        $this->repository->touchLastUsed($reloaded);
+        $this->em->clear();
+
+        $again = $this->repository->find($id);
+        $this->assertInstanceOf(ApiKey::class, $again);
+        $this->assertSame($seen, $again->getLastUsed());
+
+        $this->em->remove($again);
+        $this->em->flush();
+    }
+
     public function testFindActiveKeysByUser(): void
     {
         if (!$this->testUser) {

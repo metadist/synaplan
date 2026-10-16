@@ -16,9 +16,9 @@ namespace App\AI\StructuredOutput;
  * Every generic call site delegates here: {@see \App\Service\Message\MessageSorter},
  * {@see \App\Service\Multitask\TaskPlanner},
  * {@see \App\Service\Message\MediaPromptExtractor},
- * {@see \App\Service\FeedbackContradictionService},
+ * {@see \App\Service\Feedback\FeedbackContradictionService},
  * {@see \App\Service\Digest\MessageDigestService},
- * {@see \App\Service\MemoryExtractionService} and
+ * {@see \App\Service\Memory\MemoryExtractionService} and
  * {@see \App\Controller\UserMemoryController}. The one deliberate holdout is
  * {@see \App\Service\File\FileGenerationEnvelope}, whose key-anchored,
  * string-literal-aware brace walk is strictly more precise for the

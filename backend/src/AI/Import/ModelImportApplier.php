@@ -15,8 +15,8 @@ use Doctrine\ORM\EntityManagerInterface;
  * Idempotent by contract (C6): a row is created only when no
  * (service, tag, providerId) row exists, and existing rows are never
  * re-toggled or re-priced — only their `meta.import.lastSeenAt` is refreshed.
- * Operator decisions (BSELECTABLE / BACTIVE / BISDEFAULT) therefore survive a
- * re-import, exactly like the catalog seeder.
+ * Operator decisions (BSELECTABLE / BACTIVE / BISDEFAULT / BSHOWWHENFREE)
+ * therefore survive a re-import, exactly like the catalog seeder.
  */
 final readonly class ModelImportApplier
 {
@@ -42,7 +42,7 @@ final readonly class ModelImportApplier
     }
 
     /**
-     * @param list<array{providerId: string, name?: string, tags: list<string>}> $rows
+     * @param list<array{providerId: string, name?: string, tags: list<string>, priceKnown?: bool, priceIn?: float, priceOut?: float}> $rows
      *
      * @return array{created: int, skipped: int, rows: list<array{providerId: string, tag: string, status: string}>}
      */
@@ -76,7 +76,18 @@ final readonly class ModelImportApplier
                     continue;
                 }
 
-                $this->em->persist($this->newModel($service, $endpointName, $providerId, $name, $tag, $source, $now));
+                $this->em->persist($this->newModel(
+                    $service,
+                    $endpointName,
+                    $providerId,
+                    $name,
+                    $tag,
+                    $source,
+                    $now,
+                    array_key_exists('priceKnown', $row) ? (bool) $row['priceKnown'] : null,
+                    isset($row['priceIn']) ? (float) $row['priceIn'] : null,
+                    isset($row['priceOut']) ? (float) $row['priceOut'] : null,
+                ));
                 ++$created;
                 $applied[] = ['providerId' => $providerId, 'tag' => $tag, 'status' => 'created'];
             }
@@ -110,8 +121,18 @@ final readonly class ModelImportApplier
         throw new UnknownImportSourceException('Unknown import source: '.$source);
     }
 
-    private function newModel(string $service, ?string $endpointName, string $providerId, string $name, string $tag, string $source, int $now): Model
-    {
+    private function newModel(
+        string $service,
+        ?string $endpointName,
+        string $providerId,
+        string $name,
+        string $tag,
+        string $source,
+        int $now,
+        ?bool $priceKnown,
+        ?float $priceIn,
+        ?float $priceOut,
+    ): Model {
         $json = ['meta' => ['import' => ['source' => $source, 'importedAt' => $now, 'lastSeenAt' => $now]]];
         // OpenAICompatibleProvider::resolveForModel() reads BJSON.endpoint to
         // pick the gateway; without it a multi-endpoint install cannot route.
@@ -119,7 +140,7 @@ final readonly class ModelImportApplier
             $json['endpoint'] = $endpointName;
         }
 
-        return (new Model())
+        $model = (new Model())
             ->setService($service)
             ->setTag($tag)
             ->setProviderId($providerId)
@@ -127,7 +148,20 @@ final readonly class ModelImportApplier
             ->setSelectable(1)
             ->setActive(1)
             ->setIsDefault(0)
-            ->setJson($json);
+            // Keep the row in /config/models. A published price is stored below.
+            // A missing price is unknown, not a reason to hide the model (#2110).
+            // showWhenFree stays on: clearing it would drop Ollama and any
+            // priceless import from the chat menu.
+            ->setShowWhenFree(1);
+
+        if (true === $priceKnown && null !== $priceIn && null !== $priceOut) {
+            $model->setPriceIn($priceIn)->setPriceOut($priceOut);
+            $json['meta']['import']['priceKnown'] = true;
+        } elseif (false === $priceKnown) {
+            $json['meta']['import']['priceKnown'] = false;
+        }
+
+        return $model->setJson($json);
     }
 
     private function touchLastSeen(Model $model, string $source, int $now): void

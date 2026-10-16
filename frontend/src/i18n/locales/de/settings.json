@@ -1,0 +1,833 @@
+{
+  "marketingNews": {
+    "heading": "Neues von Synaplan",
+    "readMore": "Mehr lesen"
+  },
+  "usageTaximeter": {
+    "sessionLabel": "Tokens",
+    "todayTooltip": "{tokens} Tokens heute. Beträge sind US-Dollar.",
+    "todayLabel": "Verbrauch heute",
+    "todayAria": "Deine Ausgaben heute: {cost}",
+    "openStats": "Nutzungsstatistik anzeigen",
+    "usedModels": "Verwendete Modelle",
+    "promptsInSession": "Prompts in dieser Sitzung",
+    "modelChanges": "Modelländerungen: {count}",
+    "allStatistics": "Alle Statistiken",
+    "lessThanCent": "< 0,01 $"
+  },
+  "export": {
+    "title": "Export",
+    "format": "Format",
+    "recommended": "Empfohlen",
+    "dateRange": "Zeitraum",
+    "allTime": "Gesamter Zeitraum",
+    "today": "Heute",
+    "last7Days": "Letzte 7 Tage",
+    "last30Days": "Letzte 30 Tage",
+    "custom": "Benutzerdefiniert",
+    "sessionType": "Sitzungstyp",
+    "allSessions": "Alle Sitzungen",
+    "aiOnly": "Nur KI-Chats",
+    "humanOnly": "Nur Mensch-Chats",
+    "download": "Herunterladen",
+    "exporting": "Exportiere...",
+    "selectedChats": "{count} Chats ausgewählt",
+    "selectedChatsHint": "Nur diese ausgewählten Chats werden exportiert",
+    "timezoneLoading": "Zeitzone wird geladen…",
+    "timezoneProfile": "Die Uhrzeiten in dieser Datei gelten in {tz} aus Sprache & Darstellung.",
+    "timezoneBrowser": "Die Uhrzeiten in dieser Datei gelten in der Zeitzone dieses Computers ({tz}). Dein Profil wurde nicht geändert.",
+    "timezoneUnavailable": "Die Uhrzeiten in dieser Datei gelten in der Zeitzone dieses Computers ({tz}), weil die Zeitzone aus Sprache & Darstellung nicht geladen werden konnte."
+  },
+  "profile": {
+    "title": "Profil-Einstellungen",
+    "subtitle": "Verwalte deine persönlichen Daten und Kontoeinstellungen",
+    "personalInfo": {
+      "title": "Persönliche Informationen",
+      "firstName": "Vorname",
+      "firstNamePlaceholder": "Dein Vorname",
+      "lastName": "Nachname",
+      "lastNamePlaceholder": "Dein Nachname",
+      "email": "E-Mail",
+      "emailHint": "Das ist die E-Mail, mit der du dich anmeldest.",
+      "emailLockedHint": "Diese Anmelde-E-Mail kann hier nicht geändert werden.",
+      "emailPasswordLabel": "Aktuelles Passwort",
+      "emailPasswordPlaceholder": "Aktuelles Passwort",
+      "emailPasswordHint": "Gib dein aktuelles Passwort ein, um die Anmelde-E-Mail zu ändern. Es wird nichts gespeichert, solange das Passwort nicht stimmt.",
+      "emailPasswordRequired": "Gib dein aktuelles Passwort ein, um die Anmelde-E-Mail zu ändern. Es wurde nichts gespeichert.",
+      "emailPasswordRejected": "Dein Profil wurde nicht gespeichert. Die Anmelde-E-Mail wurde nicht geändert, weil das aktuelle Passwort falsch ist.",
+      "emailInvalid": "Gib eine gültige E-Mail-Adresse ein. Es wurde nichts gespeichert.",
+      "emailTaken": "Diese E-Mail-Adresse wird bereits von einem anderen Konto verwendet. Es wurde nichts gespeichert.",
+      "emailReserved": "Diese E-Mail-Adresse kann nicht verwendet werden. Es wurde nichts gespeichert.",
+      "emailManaged": "Diese Anmelde-E-Mail wird von deinem Anmelde-Anbieter verwaltet und kann hier nicht geändert werden. Es wurde nichts gespeichert.",
+      "emailSaved": "Deine Anmelde-E-Mail ist jetzt {email}. Verwende sie beim nächsten Anmelden.",
+      "phone": "Telefon",
+      "phonePlaceholder": "Optionale Telefonnummer",
+      "managedBy": "Dieses Konto wird von {provider} verwaltet"
+    },
+    "companyInfo": {
+      "title": "Firmeninformationen",
+      "subtitle": "Optional - Leer lassen wenn du eine Privatperson bist",
+      "companyName": "Firmenname",
+      "companyNamePlaceholder": "Deine Firma GmbH",
+      "vatId": "USt-IdNr.",
+      "vatIdPlaceholder": "Umsatzsteuer-Identifikationsnummer"
+    },
+    "billingAddress": {
+      "title": "Rechnungsadresse",
+      "street": "Straße & Hausnummer",
+      "streetPlaceholder": "Straßenname und Hausnummer",
+      "zipCode": "PLZ",
+      "zipCodePlaceholder": "Postleitzahl",
+      "city": "Stadt",
+      "cityPlaceholder": "Stadtname",
+      "country": "Land",
+      "countryHint": "Erforderlich für korrekte Steuerberechnung"
+    },
+    "accountSettings": {
+      "title": "Kontoeinstellungen",
+      "language": "Sprache",
+      "languageHint": "Sprache der Benutzeroberfläche",
+      "timezone": "Zeitzone",
+      "timezoneHint": "Gib eine Stadt oder eine Abweichung wie +02:00 ein. Passende Orte erscheinen darunter. Enter wählt den markierten Ort. Danach speichern, damit er bleibt.",
+      "timezoneSearch": "Nach Stadt oder Abweichung suchen",
+      "timezonePlaceholder": "Zeitzone wählen",
+      "timezoneCurrent": "Gewählt: {label}",
+      "timezoneMatchCount": "{count} Ort | {count} Orte",
+      "timezoneNoMatch": "Keine Zeitzone passt zu dieser Suche.",
+      "timezoneInvalid": "Wähle eine Zeitzone aus der Liste. Es wurde nichts gespeichert.",
+      "invoiceEmail": "Rechnungs-E-Mail",
+      "invoiceEmailPlaceholder": "Alternative E-Mail für Rechnungen (leer lassen um Haupt-E-Mail zu verwenden)"
+    },
+    "memories": {
+      "title": "Erinnerungen",
+      "subtitle": "Schalte Erinnerungen und das Langzeitgedächtnis ein oder aus. Die KI nutzt sie, um sich an deine Chats zu erinnern.",
+      "toggleLabel": "Erinnerungen und Langzeitgedächtnis für mein Konto aktivieren",
+      "enabledHint": "An. Die KI kann deine Erinnerungen und dein Langzeitgedächtnis nutzen und aus deinen Chats neue speichern.",
+      "disabledHint": "Aus. Die KI nutzt deine Erinnerungen und dein Langzeitgedächtnis nicht mehr und speichert keine neuen. Vorhandene Einträge im Langzeitgedächtnis bleiben. Du kannst sie unter Erinnerungen im Tab „Langzeitgedächtnis“ löschen."
+    },
+    "changePassword": {
+      "title": "Passwort ändern",
+      "subtitle": "Leer lassen um aktuelles Passwort zu behalten",
+      "currentPassword": "Aktuelles Passwort",
+      "currentPasswordPlaceholder": "Leer lassen um aktuelles Passwort zu behalten",
+      "newPassword": "Neues Passwort",
+      "newPasswordPlaceholder": "Neues Passwort eingeben",
+      "newPasswordHint": "Mindestens 8 Zeichen",
+      "confirmPassword": "Passwort bestätigen",
+      "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
+      "confirmPasswordHint": "Muss mit neuem Passwort übereinstimmen",
+      "externalAuth": "Sie melden sich mit {provider} an. Die Passwortverwaltung erfolgt dort.",
+      "mismatch": "Die Passwörter stimmen nicht überein",
+      "tooShort": "Das Passwort muss mindestens 8 Zeichen haben",
+      "profileSavedPasswordRejected": "Ihr Profil wurde gespeichert. Das Passwort wurde nicht geändert, weil das aktuelle Passwort falsch ist.",
+      "profileSavedPasswordFailed": "Ihr Profil wurde gespeichert. Das Passwort wurde nicht geändert."
+    },
+    "appSecurity": {
+      "title": "App-Sicherheit",
+      "subtitle": "Zusätzlicher Schutz für dieses Gerät",
+      "biometricLock": "Biometrische App-Sperre",
+      "biometricLockHint": "Face ID, Touch ID oder Fingerabdruck zum Öffnen der App verlangen.",
+      "verifyReason": "Biometrische Sperre aktivieren",
+      "enableFailed": "Die biometrische Sperre konnte nicht aktiviert werden. Bitte erneut versuchen."
+    },
+    "legal": {
+      "title": "Datenschutz & AGB",
+      "privacy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen",
+      "accountDeletion": "Konto löschen"
+    },
+    "dangerZone": {
+      "title": "Gefahrenzone",
+      "subtitle": "Irreversible Aktionen",
+      "deleteAccount": "Account löschen",
+      "deleteAccountDesc": "Lösche dein Konto dauerhaft. Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteButton": "Account dauerhaft löschen"
+    },
+    "deleteAccountModal": {
+      "title": "Account wirklich löschen?",
+      "warning": "Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden.",
+      "consequences": "Folgende Daten werden gelöscht:",
+      "consequence1": "Alle deine Nachrichten und Chats",
+      "consequence2": "Alle hochgeladenen Dateien",
+      "consequence3": "Deine persönlichen Daten und Einstellungen",
+      "consequence4": "API-Schlüssel und Zugangsdaten",
+      "confirmPassword": "Bestätige mit deinem Passwort:",
+      "confirmPasswordPlaceholder": "Dein aktuelles Passwort",
+      "externalAuthConfirm": "Gib 'DELETE' ein um zu bestätigen:",
+      "externalAuthPlaceholder": "DELETE eingeben",
+      "deleteButton": "Ja, Account löschen",
+      "cancelButton": "Abbrechen",
+      "deleting": "Wird gelöscht..."
+    },
+    "privacyNotice": "Alle Daten werden sicher gespeichert und nur für Abrechnungszwecke gemäß deutschem Recht (DSGVO) verwendet.",
+    "loading": "Das Profil wird geladen.",
+    "loadFailed": "Das Profil konnte nicht geladen werden. Es wurde nichts geändert.",
+    "saveFailed": "Das Profil konnte nicht gespeichert werden.",
+    "saveChanges": "Änderungen speichern",
+    "cancel": "Abbrechen"
+  },
+  "limitReached": {
+    "lifetime": {
+      "title": "Kostenloses Limit Erreicht",
+      "description": "Sie haben alle {limit} {action} in Ihrem kostenlosen Plan verbraucht. Upgraden Sie, um fortzufahren!"
+    },
+    "hourly": {
+      "title": "Stündliches Limit Erreicht",
+      "description": "Sie haben Ihr stündliches Limit von {limit} {action} erreicht. Ihr Limit wird bald zurückgesetzt."
+    },
+    "monthly": {
+      "title": "Monatliches Limit Erreicht",
+      "description": "Sie haben alle {limit} {action} diesen Monat verbraucht. Upgraden Sie für mehr!"
+    },
+    "currentUsage": "Aktuelle Nutzung",
+    "remaining": "Verbleibend",
+    "resetsIn": "Zurücksetzen in",
+    "noReset": "Keine automatische Zurücksetzung",
+    "upgradesBenefits": "Upgrade-Vorteile:",
+    "benefits": {
+      "unlimited": "Unbegrenzt oder höhere Limits",
+      "allFeatures": "Zugriff auf alle Funktionen",
+      "priority": "Priorisierte Verarbeitung",
+      "support": "Premium-Support"
+    },
+    "upgradeNow": "Jetzt Upgraden",
+    "topup": {
+      "button": "€{amount} Guthaben aufladen",
+      "amountLabel": "Aufladebetrag (€{step}-Schritte)",
+      "error": "Aufladung konnte nicht gestartet werden. Bitte versuche es erneut."
+    },
+    "verifyPhone": "Telefonnummer Verifizieren",
+    "footerNote": "Fragen? Kontaktieren Sie unser Support-Team.",
+    "messageBlocked": "Nachricht konnte nicht gesendet werden",
+    "messageBlockedDesc": "Du hast dein {action}-Limit erreicht. Upgrade deinen Plan oder warte bis das Limit zurückgesetzt wird.",
+    "retryLater": "Erneut versuchen"
+  },
+  "paywall": {
+    "title": {
+      "guest_limit": "Deine Gratis-Nachrichten sind aufgebraucht",
+      "free_limit": "Deine Gratis-Nachrichten sind aufgebraucht",
+      "quota_exhausted": "Dein Kontingent für diesen Monat ist aufgebraucht",
+      "reminder": "Hol mehr aus {brand} heraus"
+    },
+    "subtitle": {
+      "guest_limit": "Wähle einen Tarif und chatte weiter. Mit einem Account bekommst du ab dann eigenen Verlauf, Erinnerungen und Dateien.",
+      "free_limit": "Dein Gratis-Kontingent ist verbraucht. Wähle einen Tarif und chatte ohne Limit weiter.",
+      "quota_exhausted": "Wechsle in einen größeren Tarif und mach sofort weiter, oder warte bis dein Kontingent nächsten Monat zurückgesetzt wird.",
+      "reminder": "Mit einem Tarif bekommst du mehr Nachrichten, stärkere KI-Modelle und mehr Speicher."
+    },
+    "unavailable": "Hier kann gerade kein Tarif gekauft werden. Bitte versuche es später noch einmal.",
+    "recommended": "Empfohlen",
+    "choosePlan": "{plan} wählen",
+    "guestNote": "Erstelle zuerst ein kostenloses Konto – dein Tarif wird damit verknüpft.",
+    "login": "Ich habe schon ein Konto",
+    "maybeLater": "Vielleicht später",
+    "renewalNoteStore": "Abonnements verlängern sich automatisch, bis du sie kündigst. Verwalten und kündigen kannst du sie jederzeit in den Einstellungen deines Store-Kontos.",
+    "renewalNoteWeb": "Abonnements verlängern sich automatisch, bis du sie kündigst. Du kannst jederzeit kündigen.",
+    "plans": {
+      "pro": {
+        "tagline": "Für die tägliche Arbeit mit KI"
+      },
+      "team": {
+        "tagline": "Für kleine Teams, die zusammenarbeiten"
+      },
+      "business": {
+        "tagline": "Für Unternehmen mit höchsten Ansprüchen"
+      }
+    }
+  },
+  "subscription": {
+    "serviceNotAvailable": "Dienst nicht verfügbar",
+    "title": "Abonnements",
+    "subtitle": "Schalte mehr Funktionen und höhere Limits frei",
+    "chooseYourPlan": "Wähle deinen Plan",
+    "currentPlan": "Aktueller Plan",
+    "yourPlan": "Dein Plan",
+    "noActiveSubscription": "Kein aktives Abonnement",
+    "upgradePlan": "Plan upgraden",
+    "managePlan": "Plan verwalten",
+    "cancelPlan": "Abo kündigen",
+    "recommended": "Empfohlen",
+    "selectPlan": "Plan wählen",
+    "upgrade": "Upgraden",
+    "includedInCurrent": "In deinem Plan enthalten",
+    "highestPlan": "Du hast bereits den höchsten Plan!",
+    "processing": "Wird verarbeitet...",
+    "perMonth": "Monat",
+    "perYear": "Jahr",
+    "unavailable": "Abonnement-Service nicht verfügbar",
+    "unavailableDesc": "Der Abonnement-Service wird derzeit konfiguriert. Bitte versuche es später noch einmal oder kontaktiere den Support.",
+    "serviceNotConfigured": "Abonnement-Service ist derzeit nicht verfügbar. Bitte kontaktiere den Support.",
+    "checkoutFailed": "Checkout konnte nicht gestartet werden. Bitte versuche es erneut.",
+    "selfHosted": "Self-Hosted Edition — Alle Funktionen inklusive",
+    "manage": {
+      "title": "Dein Abonnement verwalten",
+      "subtitle": "Sieh und verwalte deine Abonnement-Details",
+      "currentPlanLabel": "Aktueller Plan",
+      "status": "Status",
+      "statusActive": "Aktiv",
+      "statusCanceled": "Gekündigt",
+      "statusPastDue": "Zahlung überfällig",
+      "statusIncomplete": "Unvollständig",
+      "statusIncompleteExpired": "Unvollständig (abgelaufen)",
+      "statusTrialing": "Testphase",
+      "statusUnpaid": "Unbezahlt",
+      "statusPaused": "Pausiert",
+      "paymentFailedTitle": "Zahlung fehlgeschlagen — bitte Karte aktualisieren",
+      "paymentFailedBody": "Wir konnten deine letzte Zahlung nicht verarbeiten. Stripe versucht es in den nächsten Wochen automatisch erneut, aber dein Abo wird pausiert, falls die Karte nicht aktualisiert wird. Öffne das Zahlungsportal, um das zu beheben.",
+      "paymentFailedCta": "Zahlungsmethode aktualisieren",
+      "nextBilling": "Nächstes Abrechnungsdatum",
+      "cancelDate": "Kündigung zum",
+      "billingPortal": "Rechnungsportal",
+      "billingPortalDesc": "Verwalte deine Zahlungsmethoden, sieh Rechnungen ein und aktualisiere Rechnungsinformationen",
+      "openPortal": "Rechnungsportal öffnen",
+      "cancelSubscription": "Abonnement kündigen",
+      "cancelWarning": "Bist du sicher, dass du dein Abonnement kündigen möchtest?",
+      "cancelWarningDesc": "Du behältst den Zugriff bis zum Ende des Abrechnungszeitraums.",
+      "confirmCancel": "Ja, Abonnement kündigen",
+      "keepSubscription": "Abonnement behalten",
+      "loadingPortal": "Rechnungsportal wird geöffnet..."
+    },
+    "native": {
+      "purchaseTitle": "In-App-Kauf",
+      "purchaseUnavailable": "In-App-Käufe sind auf diesem Server noch nicht verfügbar. Bitte versuche es später erneut.",
+      "purchaseSuccess": "Dein Abonnement ist jetzt aktiv. Vielen Dank!",
+      "purchasePending": "Dein Kauf wartet auf eine Genehmigung (z. B. „Kaufen anfragen“). Dein Abonnement wird nach der Genehmigung automatisch aktiviert.",
+      "purchaseConflict": "Dieser Kauf ist bereits mit einem anderen Konto oder einem bestehenden Abonnement verknüpft. Bitte prüfe dein Store-Konto oder kontaktiere den Support.",
+      "purchaseFailed": "Der Kauf konnte nicht abgeschlossen werden. Dir wurde nichts berechnet. Bitte versuche es erneut.",
+      "manageInStore": "Im Store verwalten",
+      "restoreButton": "Käufe wiederherstellen",
+      "restoreTitle": "Käufe wiederherstellen",
+      "restoreDone": "Käufe wiederhergestellt – dein Abonnement ist aktiv.",
+      "restoreNone": "Es wurde kein aktives Abonnement zum Wiederherstellen gefunden.",
+      "storeNoteIos": "Käufe und Abonnements werden über den App Store abgewickelt und verwaltet.",
+      "storeNoteAndroid": "Käufe und Abonnements werden über Google Play abgewickelt und verwaltet.",
+      "redeemBlockedExistingIos": "Dieses Konto hat bereits ein aktives Abo, daher wurde dein letzter Store-Kauf nicht verknüpft. Prüfe deine Abos in deiner Apple-ID und fordere dort bei Bedarf eine Erstattung an, um doppelte Zahlungen zu vermeiden.",
+      "redeemBlockedExistingAndroid": "Dieses Konto hat bereits ein aktives Abo, daher wurde dein letzter Store-Kauf nicht verknüpft. Google Play erstattet nicht bestätigte Käufe innerhalb weniger Tage automatisch."
+    },
+    "plans": {
+      "pro": "Pro",
+      "team": "Team",
+      "business": "Business"
+    },
+    "features": {
+      "usage": "{factor}× mehr Nutzung als im Free-Plan",
+      "advancedModels": "Erweiterte KI-Modelle",
+      "prioritySupport": "Priority Support",
+      "everythingInPro": "Alles aus Pro",
+      "everythingInTeam": "Alles aus Team",
+      "teamCollaboration": "Team-Zusammenarbeit",
+      "customPrompts": "Benutzerdefinierte Prompts",
+      "apiAccess": "API-Zugriff",
+      "whiteLabel": "White-label Widgets",
+      "dedicatedSupport": "Dedizierter Support",
+      "slaGuarantee": "SLA-Garantie"
+    },
+    "success": {
+      "title": "Zahlung erfolgreich!",
+      "description": "Dein Abonnement wurde aktiviert. Vielen Dank für das Upgrade!",
+      "newPlan": "Dein neuer Plan",
+      "startUsing": "Plan jetzt nutzen",
+      "activating": "Plan wird aktiviert...",
+      "activatingDesc": "Bitte warte, während wir dein Abonnement aktivieren.",
+      "almostDone": "Fast fertig!",
+      "processing": "Deine Zahlung war erfolgreich, aber wir verarbeiten noch dein Abonnement.",
+      "retry": "Erneut versuchen",
+      "continueAnyway": "Trotzdem fortfahren"
+    },
+    "cancel": {
+      "title": "Zahlung abgebrochen",
+      "description": "Deine Zahlung wurde abgebrochen. Es wurden keine Kosten berechnet.",
+      "tryAgain": "Erneut versuchen",
+      "backToPlans": "Zurück zu den Plänen"
+    }
+  },
+  "settings": {
+    "voice": {
+      "title": "Live-Gespräche",
+      "intro": "Wähle die Stimme für Live-Gespräche. Deine Stimme geht an {company}, solange du sprichst, und die Kosten nutzen dasselbe monatliche Nutzungsbudget wie der Chat.",
+      "model": "Sprachmodell",
+      "voice": "Stimme",
+      "captions": "Untertitel während des Gesprächs zeigen",
+      "save": "Speichern",
+      "saved": "Gespeichert.",
+      "saveFailed": "Die Spracheinstellungen konnten nicht gespeichert werden.",
+      "loadFailed": "Die Spracheinstellungen konnten nicht geladen werden.",
+      "loading": "Wird geladen…",
+      "noVoices": "Dieses Modell nutzt seine Standardstimme.",
+      "withdraw": "Live-Gespräche nicht mehr erlauben",
+      "withdrawHint": "Der Chat fragt vor dem nächsten Gespräch wieder. Bereits gespeicherte Gespräche bleiben im Chat.",
+      "withdrawn": "Live-Gespräche fragen wieder nach der Erlaubnis.",
+      "filterLabel": "Stimmen filtern",
+      "filterPlaceholder": "Stimmen filtern…",
+      "filterEmpty": "Keine Stimme passt zu „{query}“.",
+      "roster": {
+        "openai": {
+          "marin": {
+            "name": "Marin",
+            "tone": "Empfohlen für den besten Klang"
+          },
+          "quartz": {
+            "name": "Quartz",
+            "tone": "Australisches Englisch, feminin"
+          },
+          "ripple": {
+            "name": "Ripple",
+            "tone": "Australisches Englisch, maskulin"
+          },
+          "vesper": {
+            "name": "Vesper",
+            "tone": "Britisches Englisch, maskulin"
+          },
+          "willow": {
+            "name": "Willow",
+            "tone": "Irisches Englisch, feminin"
+          },
+          "stone": {
+            "name": "Stone",
+            "tone": "Irisches Englisch, maskulin"
+          },
+          "gleam": {
+            "name": "Gleam",
+            "tone": "Nordamerikanisches Englisch, feminin"
+          },
+          "meridian": {
+            "name": "Meridian",
+            "tone": "Nordamerikanisches Englisch, maskulin"
+          },
+          "bossa": {
+            "name": "Bossa",
+            "tone": "Brasilianisches Portugiesisch, feminin"
+          },
+          "tempo": {
+            "name": "Tempo",
+            "tone": "Brasilianisches Portugiesisch, maskulin"
+          },
+          "beacon": {
+            "name": "Beacon",
+            "tone": "Filipinisches Englisch, maskulin"
+          },
+          "delta": {
+            "name": "Delta",
+            "tone": "Südstaaten-Englisch, feminin"
+          },
+          "cinder": {
+            "name": "Cinder",
+            "tone": "Südstaaten-Englisch, maskulin"
+          },
+          "alloy": {
+            "name": "Alloy"
+          },
+          "ash": {
+            "name": "Ash"
+          },
+          "ballad": {
+            "name": "Ballad"
+          },
+          "coral": {
+            "name": "Coral"
+          },
+          "echo": {
+            "name": "Echo"
+          },
+          "sage": {
+            "name": "Sage"
+          },
+          "shimmer": {
+            "name": "Shimmer"
+          },
+          "verse": {
+            "name": "Verse"
+          },
+          "cedar": {
+            "name": "Cedar",
+            "tone": "Empfohlen für den besten Klang"
+          }
+        },
+        "google": {
+          "Puck": {
+            "name": "Puck",
+            "tone": "Lebhaft"
+          },
+          "Zephyr": {
+            "name": "Zephyr",
+            "tone": "Hell"
+          },
+          "Kore": {
+            "name": "Kore",
+            "tone": "Fest"
+          },
+          "Orus": {
+            "name": "Orus",
+            "tone": "Fest"
+          },
+          "Autonoe": {
+            "name": "Autonoe",
+            "tone": "Hell"
+          },
+          "Umbriel": {
+            "name": "Umbriel",
+            "tone": "Gelassen"
+          },
+          "Erinome": {
+            "name": "Erinome",
+            "tone": "Klar"
+          },
+          "Laomedeia": {
+            "name": "Laomedeia",
+            "tone": "Lebhaft"
+          },
+          "Schedar": {
+            "name": "Schedar",
+            "tone": "Gleichmäßig"
+          },
+          "Achird": {
+            "name": "Achird",
+            "tone": "Freundlich"
+          },
+          "Sadachbia": {
+            "name": "Sadachbia",
+            "tone": "Munter"
+          },
+          "Fenrir": {
+            "name": "Fenrir",
+            "tone": "Aufgedreht"
+          },
+          "Aoede": {
+            "name": "Aoede",
+            "tone": "Leicht"
+          },
+          "Enceladus": {
+            "name": "Enceladus",
+            "tone": "Hauchig"
+          },
+          "Algieba": {
+            "name": "Algieba",
+            "tone": "Geschmeidig"
+          },
+          "Algenib": {
+            "name": "Algenib",
+            "tone": "Rau"
+          },
+          "Achernar": {
+            "name": "Achernar",
+            "tone": "Sanft"
+          },
+          "Gacrux": {
+            "name": "Gacrux",
+            "tone": "Reif"
+          },
+          "Zubenelgenubi": {
+            "name": "Zubenelgenubi",
+            "tone": "Locker"
+          },
+          "Sadaltager": {
+            "name": "Sadaltager",
+            "tone": "Sachkundig"
+          },
+          "Charon": {
+            "name": "Charon",
+            "tone": "Informativ"
+          },
+          "Leda": {
+            "name": "Leda",
+            "tone": "Jugendlich"
+          },
+          "Callirrhoe": {
+            "name": "Callirrhoe",
+            "tone": "Gelassen"
+          },
+          "Iapetus": {
+            "name": "Iapetus",
+            "tone": "Klar"
+          },
+          "Despina": {
+            "name": "Despina",
+            "tone": "Geschmeidig"
+          },
+          "Rasalgethi": {
+            "name": "Rasalgethi",
+            "tone": "Informativ"
+          },
+          "Alnilam": {
+            "name": "Alnilam",
+            "tone": "Fest"
+          },
+          "Pulcherrima": {
+            "name": "Pulcherrima",
+            "tone": "Direkt"
+          },
+          "Vindemiatrix": {
+            "name": "Vindemiatrix",
+            "tone": "Zart"
+          },
+          "Sulafat": {
+            "name": "Sulafat",
+            "tone": "Warm"
+          }
+        },
+        "xai": {
+          "eve": {
+            "name": "Eve",
+            "tone": "Energisch und fröhlich, britischer Akzent"
+          },
+          "ara": {
+            "name": "Ara",
+            "tone": "Warm und freundlich"
+          },
+          "rex": {
+            "name": "Rex",
+            "tone": "Selbstbewusst und klar"
+          },
+          "sal": {
+            "name": "Sal",
+            "tone": "Weich und ausgeglichen"
+          },
+          "leo": {
+            "name": "Leo",
+            "tone": "Bestimmt und kräftig, britischer Akzent"
+          },
+          "carina": {
+            "name": "Carina",
+            "tone": "Sanft, einfühlsam und beruhigend"
+          },
+          "zagan": {
+            "name": "Zagan",
+            "tone": "Kraftvoll, dramatisch und unverwechselbar"
+          },
+          "helix": {
+            "name": "Helix",
+            "tone": "Kühn, dynamisch und mitreißend"
+          },
+          "orion": {
+            "name": "Orion",
+            "tone": "Voll, filmisch und klangvoll"
+          },
+          "luna": {
+            "name": "Luna",
+            "tone": "Behutsam, geduldig und fürsorglich"
+          },
+          "iris": {
+            "name": "Iris",
+            "tone": "Freundlich, lebhaft und charmant"
+          },
+          "altair": {
+            "name": "Altair",
+            "tone": "Elegant, fein und hochwertig"
+          },
+          "zenith": {
+            "name": "Zenith",
+            "tone": "Scharf, konzentriert und entschlossen"
+          },
+          "perseus": {
+            "name": "Perseus",
+            "tone": "Stark, selbstbewusst und vertrauenswürdig"
+          },
+          "helios": {
+            "name": "Helios",
+            "tone": "Lebhaft, energisch und vielseitig"
+          },
+          "lux": {
+            "name": "Lux",
+            "tone": "Geerdet, ruhig und weise"
+          },
+          "kepler": {
+            "name": "Kepler",
+            "tone": "Einfallsreich, vorausdenkend und charismatisch"
+          },
+          "rigel": {
+            "name": "Rigel",
+            "tone": "Präzise und ruhig selbstbewusst, australischer Akzent"
+          },
+          "cosmo": {
+            "name": "Cosmo",
+            "tone": "Hell, neugierig und leicht zu folgen"
+          },
+          "celeste": {
+            "name": "Celeste",
+            "tone": "Mitfühlend, selbstbewusst und beruhigend"
+          },
+          "ursa": {
+            "name": "Ursa",
+            "tone": "Freundlich, warm und beständig"
+          },
+          "sirius": {
+            "name": "Sirius",
+            "tone": "Schlagfertig, klug und verspielt"
+          },
+          "lumen": {
+            "name": "Lumen",
+            "tone": "Warm, deutlich und ansprechend"
+          },
+          "castor": {
+            "name": "Castor",
+            "tone": "Charismatisch, bodenständig und locker"
+          },
+          "naksh": {
+            "name": "Naksh",
+            "tone": "Warm, nachdenklich und weise, indischer Akzent"
+          },
+          "atlas": {
+            "name": "Atlas",
+            "tone": "Selbstbewusst, bestimmend und beruhigend"
+          },
+          "aurora": {
+            "name": "Aurora",
+            "tone": "Heiter, stetig und strahlend"
+          },
+          "liora": {
+            "name": "Liora",
+            "tone": "Ruhig, geerdet und leuchtend"
+          }
+        }
+      }
+    },
+    "title": "Einstellungen",
+    "subtitle": "Verwalten Sie Ihre Präferenzen und Konfiguration",
+    "sections": {
+      "indexLabel": "Auf dieser Seite",
+      "profile": "Profil",
+      "appearance": "Sprache & Darstellung",
+      "chat": "Chat & KI",
+      "data": "Daten & Datenschutz",
+      "billing": "Abrechnung",
+      "security": "Sicherheit",
+      "app": "App",
+      "legal": "Rechtliches",
+      "delete": "Konto löschen"
+    },
+    "tabs": {
+      "general": "Allgemein",
+      "features": "Features"
+    },
+    "appMode": {
+      "title": "App-Modus",
+      "description": "Wählen Sie zwischen vereinfachter oder vollständiger Funktionsumgebung",
+      "easy": "Easy Mode",
+      "easyDesc": "Vereinfachte Oberfläche mit wesentlichen Funktionen",
+      "advanced": "Advanced Mode",
+      "advancedDesc": "Voller Zugriff auf alle Funktionen und Tools",
+      "lockedTitle": "Funktion des erweiterten Modus",
+      "lockedMessage": "„{feature}“ gehört zum erweiterten Modus. Wechsle in den erweiterten Modus, um es zu nutzen — du kannst jederzeit in den Einstellungen zurückwechseln.",
+      "switchCta": "In den erweiterten Modus wechseln"
+    },
+    "theme": {
+      "title": "Design",
+      "description": "Wählen Sie Ihr Farbschema",
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System",
+      "oled": "OLED-Schwarz"
+    },
+    "language": {
+      "title": "Sprache",
+      "description": "Diese Sprache gilt in der App, in E-Mails und in Kanalnachrichten wie Telegram."
+    },
+    "webSearch": {
+      "title": "Websuche",
+      "description": "Nutzen Sie einen anderen Suchanbieter als den, den Ihre Administration für alle festgelegt hat.",
+      "useMyOwn": "Meine eigene Suche verwenden",
+      "saved": "Ihr Suchanbieter wurde gespeichert.",
+      "saveFailed": "Ihr Suchanbieter konnte nicht gespeichert werden"
+    },
+    "account": {
+      "title": "Konto",
+      "email": "E-Mail",
+      "userLevel": "Benutzerebene"
+    },
+    "logout": "Abmelden",
+    "features": {
+      "title": "System-Status",
+      "subtitle": "Überwache alle Services und Features",
+      "loading": "Lade Features...",
+      "requiredConfig": "Erforderliche Konfiguration:",
+      "set": "Gesetzt",
+      "notSet": "Nicht gesetzt",
+      "allOperational": "Alle Systeme betriebsbereit",
+      "issuesDetected": "Probleme erkannt",
+      "ready": "Bereit",
+      "healthSummary": "{healthy} von {total} Services gesund",
+      "model": "Modell",
+      "models": "Modelle",
+      "adminOnlyTitle": "Admin-Zugriff erforderlich",
+      "adminOnlyMessage": "Der System-Status ist nur für Administratoren verfügbar.",
+      "modulesTitle": "Feature-Module",
+      "modulesSubtitle": "Optionale Funktionen, die diese Installation deklariert. Jede wird über ihre Konfiguration eingeschaltet; die Liste zeigt die Schlüssel, nie deren Werte.",
+      "modulesConfigured": "{configured} von {total} konfiguriert",
+      "configuredBy": "Konfiguriert über:",
+      "docs": "Dokumentation",
+      "compute": {
+        "title": "Dateiarbeit (Compute)",
+        "tierDocker": "Standard",
+        "tierGvisor": "Starke Isolierung",
+        "tierMicrovm": "Virtuelle Maschine",
+        "tierUnknown": "Unbekannt",
+        "statusOn": "An",
+        "statusOff": "Aus",
+        "statusDown": "Gestört",
+        "stateRunning": "Dateiarbeit läuft.",
+        "stateDisabled": "Unter Systemkonfiguration › Werkzeuge & Automatisierung ausgeschaltet. Dateiarbeit bleibt verborgen.",
+        "stateUnreachable": "Eingeschaltet, aber der Sidecar antwortet nicht. Dateiarbeit ist nicht verfügbar.",
+        "postureWarning": "Dieser Dienst meldet {tier}; diese Instanz erfordert stärkere Isolierung.",
+        "capacity": "Kapazität",
+        "runningOf": "{running} von {max} aktiv",
+        "queued": "{count} wartend",
+        "images": "Abbilder",
+        "runs24": "{count} Läufe (24h)",
+        "failed24": "{count} fehlgeschlagen (24h)",
+        "openConfig": "Dateiarbeit-Einstellungen",
+        "stateTierBlocked": "Eingeschaltet, aber unter der erforderlichen Isolierung. Dateiarbeit bleibt verborgen."
+      },
+      "scheduler": {
+        "title": "Hintergrundjobs",
+        "loading": "Hintergrundjobs werden geprüft…",
+        "error": "Der Status der Hintergrundjobs konnte nicht geladen werden. Laden Sie die Seite neu.",
+        "never": "Auf diesem Server sind noch nie Hintergrundjobs gelaufen.",
+        "running": "Hintergrundjobs laufen. Letzter Lauf: {time}.",
+        "stale": "Hintergrundjobs sind stehen geblieben. Letzter Lauf: {time}. Geplante Aufgaben, Erinnerungen und Aufräumarbeiten laufen nicht. Starten Sie den Scheduler-Dienst neu.",
+        "howToStart": "So starten Sie den Scheduler",
+        "refresh": "Aktualisieren",
+        "notRunYet": "Noch nicht gelaufen",
+        "statusRunning": "Läuft",
+        "statusStopped": "Gestoppt",
+        "statusNever": "Nie gestartet",
+        "failures": "1 Job ist fehlgeschlagen: {names}. Details stehen im Scheduler-Protokoll. | {count} Jobs sind fehlgeschlagen: {names}. Details stehen im Scheduler-Protokoll.",
+        "unfinished": "Gestartet, aber noch nicht beendet: {names} (läuft noch oder wurde vom Zeitlimit gestoppt).",
+        "owner": "Diese Jobs laufen im Scheduler-Dienst dieses Servers und werden über seine Docker-Compose-Datei gestartet. Starten Sie ihn neu mit {command}.",
+        "lanes": {
+          "tick": "Jede Minute",
+          "tasks": "Gespeicherte Aufgaben",
+          "hourly": "Stündlich",
+          "daily": "Täglich",
+          "health": "Modellzustand"
+        },
+        "jobs": {
+          "mediaReap": "Aufräumen von Bild- und Videoaufträgen",
+          "chatReap": "Aufräumen hängender Chats",
+          "desktopReap": "Aufräumen von Desktop-Aufträgen",
+          "mailHandlers": "Verarbeitung eingehender E-Mails",
+          "processEmails": "Intelligentes Postfach",
+          "savedTasks": "Gespeicherte Aufgaben",
+          "ephemeralFiles": "Aufräumen temporärer Dateien",
+          "approvalsExpire": "Abgelaufene Freigaben",
+          "modelsDiscover": "Prüfung auf neue Modelle",
+          "updatesCheck": "Update-Prüfung",
+          "modelsAvailability": "Prüfung der Modellverfügbarkeit",
+          "digest": "Nachrichtenübersicht",
+          "syncDocs": "Dokumentation abgleichen",
+          "approvalsDigest": "E-Mail mit Freigabeübersicht",
+          "syncPrices": "Modellpreise abgleichen",
+          "modelHealth": "Prüfung der Modellgesundheit"
+        }
+      }
+    },
+    "notLoggedIn": "Nicht angemeldet"
+  },
+  "externalLink": {
+    "title": "Externe Website",
+    "subtitle": "Du verlässt jetzt Synaplan",
+    "disclaimer": "Du wirst auf eine externe Website weitergeleitet. Wir haben keinen Einfluss auf deren Inhalte und übernehmen keine Haftung für Datenschutz oder Sicherheit auf Drittanbieter-Seiten. Weiter auf eigene Verantwortung.",
+    "dontAskAgain": "Diese Warnung nicht mehr anzeigen",
+    "cancel": "Abbrechen",
+    "open": "Link öffnen"
+  }
+}

@@ -13,6 +13,7 @@ use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\Exception\ShareNotAllowedException;
 use App\Service\Iam\Exception\UnknownResourceKindException;
+use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ResourceKind\ResourceCard;
 use App\Service\Iam\ResourceKind\ResourceKindRegistry;
 use App\Service\Iam\ResourceKind\ShareableResourceKindInterface;
@@ -43,6 +44,32 @@ final readonly class ShareService
         string $permission,
         string $ip = '',
     ): Share {
+        return $this->grantResolved($actor, $kind, $resourceId, $subjectType, $subjectId, $permission, $ip, false);
+    }
+
+    /**
+     * Share a platform-distributed assistant with every account.
+     *
+     * Ignores the everyone-shares policy: system and plugin packs stay
+     * available when the user-facing audience is turned off (#2096). The HTTP
+     * grant path never calls this; it can only *edit* such a row (see
+     * grantResolved), never create one.
+     */
+    public function grantPlatformDistribution(User $actor, string $kind, string $resourceId, Permission $level, string $ip = ''): Share
+    {
+        return $this->grantResolved($actor, $kind, $resourceId, Share::SUBJECT_EVERYONE, 0, $level->value, $ip, true);
+    }
+
+    private function grantResolved(
+        User $actor,
+        string $kind,
+        string $resourceId,
+        string $subjectType,
+        int $subjectId,
+        string $permission,
+        string $ip,
+        bool $platformDistribution,
+    ): Share {
         $this->assertSharingOn($actor);
         if (!in_array($subjectType, Share::SUBJECT_TYPES, true)) {
             throw new \InvalidArgumentException('Subject must be a person, a group, or everyone.');
@@ -69,8 +96,17 @@ final readonly class ShareService
 
         if (Share::SUBJECT_EVERYONE === $subjectType) {
             $subjectId = 0;
-            if (!$this->iamConfig->canShareWithEveryone($actor)) {
-                throw new ShareNotAllowedException('Only an administrator can share with everyone on this instance.');
+            // Changing the permission of a share the platform wrote (system or
+            // plugin-pack assistant) keeps it the platform's: the audience
+            // already exists, so the people-policy is not the question, and the
+            // row must not turn into a person's grant that goes inert later.
+            $platformDistribution = $platformDistribution
+                || ($this->shareRepository->findOneForSubject($kindImpl->key(), $resourceId, $subjectType, 0)?->isPlatformGrant() ?? false);
+            if (!$platformDistribution && !$this->iamConfig->canShareWithEveryone($actor)) {
+                $message = IamConfig::EVERYONE_SHARES_DISABLED === $this->iamConfig->everyoneSharesPolicy((int) $actor->getId())
+                    ? 'Sharing with everyone is turned off.'
+                    : 'Only an administrator can share with everyone on this instance.';
+                throw new ShareNotAllowedException($message);
             }
         }
 
@@ -83,6 +119,13 @@ final readonly class ShareService
             throw new ShareNotAllowedException('Only the owner or someone who can manage this item may share it.');
         }
 
+        if (Share::SUBJECT_USER === $subjectType
+            && !$this->iamConfig->isUserSearchEnabled((int) $actor->getId())
+            && !in_array($subjectId, $this->groupMemberRepository->findCoMemberUserIds((int) $actor->getId()), true)
+        ) {
+            throw new ShareNotAllowedException('You can share with people in a group you share, or with a group.');
+        }
+
         // An administrator manages shares on the owner's behalf without holding
         // a grant of their own. That power must not become a way to read the
         // content: a subject that includes the actor (themselves, a group they
@@ -93,7 +136,18 @@ final readonly class ShareService
             throw new ShareNotAllowedException('Administrators can share on behalf of the owner, but not with themselves.');
         }
 
-        return $this->writeGrant((int) $actor->getId(), $kindImpl, $resourceId, $subjectType, $subjectId, $level, $ip);
+        // Platform distribution uses the same provenance as grantAsSystem
+        // (Share::PLATFORM_GRANTOR). A user grant keeps the actor id, so turning
+        // the audience off makes that row inert without deleting it.
+        return $this->writeGrant(
+            $platformDistribution ? Share::PLATFORM_GRANTOR : (int) $actor->getId(),
+            $kindImpl,
+            $resourceId,
+            $subjectType,
+            $subjectId,
+            $level,
+            $ip,
+        );
     }
 
     /**
@@ -121,7 +175,7 @@ final readonly class ShareService
             $this->assertSubjectExists($subjectType, $subjectId);
         }
 
-        return $this->writeGrant(0, $kindImpl, $resourceId, $subjectType, $subjectId, $level, '');
+        return $this->writeGrant(Share::PLATFORM_GRANTOR, $kindImpl, $resourceId, $subjectType, $subjectId, $level, '');
     }
 
     private function assertKindAllows(ShareableResourceKindInterface $kindImpl, string $resourceId, Permission $level): void
@@ -198,7 +252,227 @@ final readonly class ShareService
             ['subjectType' => $subjectType, 'subjectId' => $subjectId],
             $ip,
         );
-        $this->registry->get($kind)->onShareChanged($resourceId);
+        $this->registry->get($kind)->onShareChanged($resourceId, [
+            'subjectType' => $subjectType,
+            'subjectId' => $subjectId,
+        ]);
+    }
+
+    /**
+     * Metadata for everything shared with one group. Content is never included.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function describeGrantsToGroup(int $groupId): array
+    {
+        $out = [];
+        foreach ($this->shareRepository->findBySubject(Share::SUBJECT_GROUP, $groupId) as $share) {
+            try {
+                $kind = $this->registry->get($share->getResourceKind());
+            } catch (UnknownResourceKindException) {
+                $out[] = [
+                    'kind' => $share->getResourceKind(),
+                    'id' => $share->getResourceId(),
+                    'name' => $share->getResourceId(),
+                    'icon' => 'file',
+                    'meta' => [],
+                    'permission' => $share->getPermission(),
+                    'ownerId' => null,
+                    'ownerName' => null,
+                ];
+                continue;
+            }
+            $card = $kind->describe($share->getResourceId());
+            $row = $this->serializeSharedCard(
+                $card,
+                $share->getPermission(),
+                $kind->ownerId($share->getResourceId()),
+            );
+            $row['kind'] = $share->getResourceKind();
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Readable names of items shared with these groups, keyed by group id.
+     * One share query and one card lookup per kind, not one of each per group.
+     * Empty names and raw ids are left out.
+     *
+     * @param list<int> $groupIds
+     *
+     * @return array<int, list<array{name: string, kind: string}>>
+     */
+    public function sharedNamesForGroups(array $groupIds): array
+    {
+        $out = [];
+        foreach ($groupIds as $groupId) {
+            $out[$groupId] = [];
+        }
+        if ([] === $groupIds) {
+            return $out;
+        }
+
+        $shares = $this->shareRepository->findBySubjectIds(Share::SUBJECT_GROUP, $groupIds);
+        $idsByKind = [];
+        foreach ($shares as $share) {
+            $idsByKind[$share->getResourceKind()][] = $share->getResourceId();
+        }
+
+        $cards = [];
+        foreach ($idsByKind as $kind => $ids) {
+            try {
+                $cards[$kind] = $this->registry->get($kind)->describeMany(array_values(array_unique($ids)));
+            } catch (\Throwable) {
+                $cards[$kind] = [];
+            }
+        }
+
+        foreach ($shares as $share) {
+            $groupId = $share->getSubjectId();
+            if (!isset($out[$groupId])) {
+                continue;
+            }
+            $card = $cards[$share->getResourceKind()][$share->getResourceId()] ?? null;
+            $name = null !== $card ? trim($card->name) : '';
+            if ('' === $name || $name === $share->getResourceId() || str_starts_with($name, '#')) {
+                continue;
+            }
+            $out[$groupId][] = [
+                'name' => $name,
+                'kind' => $share->getResourceKind(),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Who an owned conversation is shared with, for the history row.
+     * Public links are a separate flag on the chat and are not included.
+     *
+     * @param list<int> $chatIds
+     *
+     * @return array<string, array{everyone: bool, people: int, groups: list<string>}>
+     */
+    public function summarizeConversations(array $chatIds): array
+    {
+        $ids = array_map(static fn (int $id): string => (string) $id, $chatIds);
+        $out = [];
+        foreach ($ids as $id) {
+            $out[$id] = ['everyone' => false, 'people' => 0, 'groups' => []];
+        }
+        if ([] === $ids) {
+            return $out;
+        }
+
+        $groupIds = [];
+        $shares = $this->shareRepository->findForResources(ConversationKind::KEY, $ids);
+        foreach ($shares as $share) {
+            if (Share::SUBJECT_GROUP === $share->getSubjectType()) {
+                $groupIds[] = $share->getSubjectId();
+            }
+        }
+        $groupNames = [];
+        foreach ($this->groupRepository->findByIds(array_values(array_unique($groupIds))) as $group) {
+            $groupNames[(int) $group->getId()] = $group->getName();
+        }
+
+        $reaches = $this->iamConfig->everyoneShareReachesFilter();
+        foreach ($shares as $share) {
+            $id = $share->getResourceId();
+            if (!isset($out[$id])) {
+                $out[$id] = ['everyone' => false, 'people' => 0, 'groups' => []];
+            }
+            if (Share::SUBJECT_EVERYONE === $share->getSubjectType() && $reaches($share)) {
+                $out[$id]['everyone'] = true;
+            } elseif (Share::SUBJECT_USER === $share->getSubjectType()) {
+                ++$out[$id]['people'];
+            } elseif (Share::SUBJECT_GROUP === $share->getSubjectType()) {
+                $name = $groupNames[$share->getSubjectId()] ?? null;
+                if (null !== $name && '' !== $name) {
+                    $out[$id]['groups'][] = $name;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * How many shares this user granted to one group.
+     */
+    public function countOwnGrantsToGroup(User $actor, int $groupId): int
+    {
+        return $this->shareRepository->countGrantedByUserToGroup((int) $actor->getId(), $groupId);
+    }
+
+    /**
+     * Deletes only the shares this user granted to one group.
+     *
+     * A plain leave must not call this. Remaining members keep what was shared
+     * with them unless the leaving person explicitly chooses to stop sharing.
+     *
+     * @return int number of share rows removed
+     */
+    public function withdrawOwnGrantsToGroup(User $actor, int $groupId, string $ip = ''): int
+    {
+        $revoked = $this->deleteOwnGrantsToGroup($actor, $groupId, $ip);
+        $this->notifyRevocations($revoked);
+
+        return \count($revoked);
+    }
+
+    /**
+     * Removes the rows and writes the audit. Does not notify resource kinds, so
+     * a surrounding transaction can still roll the delete back together with
+     * the membership change.
+     *
+     * @return list<array{kind: string, resourceId: string, subject: array{subjectType: string, subjectId: int}}>
+     */
+    public function deleteOwnGrantsToGroup(User $actor, int $groupId, string $ip = ''): array
+    {
+        $revoked = [];
+        $shares = $this->shareRepository->findGrantedByUserToGroup((int) $actor->getId(), $groupId);
+        foreach ($shares as $share) {
+            $kind = $share->getResourceKind();
+            $resourceId = $share->getResourceId();
+            $subject = [
+                'subjectType' => Share::SUBJECT_GROUP,
+                'subjectId' => $groupId,
+            ];
+            $this->shareRepository->remove($share);
+            $this->auditLogWriter->record(
+                (int) $actor->getId(),
+                'share.revoke',
+                $kind,
+                $resourceId,
+                $subject + ['reason' => 'leave_and_stop_sharing'],
+                $ip,
+            );
+            $revoked[] = [
+                'kind' => $kind,
+                'resourceId' => $resourceId,
+                'subject' => $subject,
+            ];
+        }
+
+        return $revoked;
+    }
+
+    /**
+     * @param list<array{kind: string, resourceId: string, subject: array{subjectType: string, subjectId: int}}> $revoked
+     */
+    public function notifyRevocations(array $revoked): void
+    {
+        foreach ($revoked as $row) {
+            try {
+                $this->registry->get($row['kind'])->onShareChanged($row['resourceId'], $row['subject']);
+            } catch (UnknownResourceKindException) {
+                // The row is already gone. An uninstalled kind has nothing left to clean up.
+            }
+        }
     }
 
     /**
@@ -288,8 +562,11 @@ final readonly class ShareService
     }
 
     /**
-     * People and groups the actor may share with. "Everyone" is pinned first
+     * Users and groups the actor may share with. "Everyone" is pinned first
      * only when {@see IamConfig::canShareWithEveryone()} allows this actor.
+     * With user search on, every account matches. With it off, only people
+     * who share a group with the actor match (#2106). Groups stay searchable
+     * either way.
      *
      * @return list<array<string, mixed>>
      */
@@ -307,9 +584,14 @@ final readonly class ShareService
             ];
         }
         $actorId = (int) $actor->getId();
+        $usersVisible = $this->iamConfig->isUserSearchEnabled($actorId);
 
         if ('' !== $query) {
-            foreach ($this->userRepository->searchByEmailOrName($query, $limit) as $user) {
+            $onlyUserIds = $usersVisible ? null : $this->groupMemberRepository->findCoMemberUserIds($actorId);
+            $matchedUsers = (null !== $onlyUserIds && [] === $onlyUserIds)
+                ? []
+                : $this->userRepository->searchByEmailOrName($query, $limit, $onlyUserIds);
+            foreach ($matchedUsers as $user) {
                 if ((int) $user->getId() === $actorId) {
                     continue;
                 }
@@ -350,11 +632,28 @@ final readonly class ShareService
     }
 
     /**
+     * The rows of one resource's Share dialog. One policy read for the list.
+     *
+     * @param list<Share> $shares
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function serializeShares(array $shares): array
+    {
+        $reaches = $this->iamConfig->everyoneShareReachesFilter();
+
+        return array_map(fn (Share $share): array => $this->serializeShare($share, $reaches), $shares);
+    }
+
+    /**
+     * @param (\Closure(Share): bool)|null $reaches shared policy read for a list, see {@see self::serializeShares()}
+     *
      * @return array<string, mixed>
      */
-    public function serializeShare(Share $share): array
+    public function serializeShare(Share $share, ?\Closure $reaches = null): array
     {
         $subject = $this->subjectNameAndEmail($share);
+        $reaches ??= $this->iamConfig->everyoneShareReachesFilter();
 
         return [
             'id' => $share->getId(),
@@ -367,18 +666,22 @@ final readonly class ShareService
             'email' => $subject['email'],
             'grantedBy' => $share->getGrantedBy(),
             'created' => $share->getCreated(),
+            // False only for an everyone row that grants nothing right now
+            // (audience off, grant written by a person). The row stays so the
+            // owner can still revoke it.
+            'effective' => $reaches($share),
         ];
     }
 
     /**
      * One "shared with me" list entry: the resource card plus how and when it
-     * reached the user, and whether it arrived after they last looked.
+     * reached the user, and whether it is still new for them.
      *
      * @param array{card: ResourceCard, permission: string, ownerId: int|null, share: Share, sharedAt: int} $row
      *
      * @return array<string, mixed>
      */
-    public function serializeSharedItem(array $row, int $viewerId, int $lastSeenAt): array
+    public function serializeSharedItem(array $row, bool $isNew): array
     {
         $share = $row['share'];
         $item = $this->serializeSharedCard($row['card'], $row['permission'], $row['ownerId']);
@@ -387,7 +690,7 @@ final readonly class ShareService
             'name' => $this->sharedViaName($share),
         ];
         $item['sharedAt'] = $row['sharedAt'];
-        $item['isNew'] = $share->getGrantedBy() !== $viewerId && $row['sharedAt'] > $lastSeenAt;
+        $item['isNew'] = $isNew;
 
         return $item;
     }
@@ -545,14 +848,6 @@ final readonly class ShareService
 
     private function displayName(User $user): string
     {
-        $details = $user->getUserDetails();
-        foreach (['full_name', 'first_name'] as $key) {
-            $value = $details[$key] ?? null;
-            if (is_string($value) && '' !== trim($value)) {
-                return trim($value);
-            }
-        }
-
-        return (string) $user->getMail();
+        return $user->getDisplayName();
     }
 }

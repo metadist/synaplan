@@ -46,6 +46,13 @@ final class MediaJob
     public const STATUS_TIMED_OUT = 'timed_out';
 
     /**
+     * Serialises advances of one job. A synchronous image/audio render holds it
+     * for the whole provider call, which is how the reaper tells a live worker
+     * from a dead one (#2308).
+     */
+    public const ADVANCE_LOCK_PREFIX = 'media-job-advance.';
+
+    /**
      * Non-terminal statuses the worker keeps advancing. Anything else is
      * terminal and must never be re-dispatched.
      *

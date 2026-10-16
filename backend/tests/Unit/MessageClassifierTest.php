@@ -22,6 +22,7 @@ use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -113,6 +114,92 @@ class MessageClassifierTest extends TestCase
         $this->assertEquals('tools:pic', $result['topic']);
         $this->assertEquals('tool_command', $result['source']);
         $this->assertTrue($result['skip_sorting']);
+    }
+
+    #[DataProvider('bareSlashCommands')]
+    public function testBareSlashCommandReturnsUsageHint(string $text, string $command): void
+    {
+        $message = $this->mutableTextMessage($text);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertTrue($result['slash_hint'] ?? false);
+        $this->assertSame($command, $result['slash_command'] ?? null);
+        $this->assertSame('general', $result['topic']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function bareSlashCommands(): iterable
+    {
+        yield 'pic' => ['/pic', 'pic'];
+        yield 'pic whitespace' => ['/pic   ', 'pic'];
+        yield 'pic at bot' => ['/pic@TestBot', 'pic'];
+        yield 'vid' => ['/vid', 'vid'];
+        yield 'tts' => ['/tts', 'tts'];
+        yield 'search' => ['/search', 'search'];
+        yield 'docs' => ['/docs', 'docs'];
+    }
+
+    public function testSearchCommandStripsAndForcesWebSearch(): void
+    {
+        $message = $this->mutableTextMessage('/search Wetter in Münster heute');
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+        ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('Wetter in Münster heute', $message->getText());
+        $this->assertTrue($result['force_web_search'] ?? false);
+        $this->assertSame('general', $result['topic']);
+        $this->assertArrayNotHasKey('slash_hint', $result);
+        $this->assertNotSame('tools:search', $result['topic']);
+    }
+
+    public function testDocsCommandRoutesToRagQuery(): void
+    {
+        $message = $this->mutableTextMessage('/docs Rechnung');
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('Rechnung', $message->getText());
+        $this->assertSame('rag_query', $result['intent']);
+        $this->assertSame('general', $result['topic']);
+        $this->assertTrue($result['slash_docs'] ?? false);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    private function mutableTextMessage(string $text): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(42);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getText')->willReturnCallback(static function () use (&$text): string {
+            return $text;
+        });
+        $message->method('setText')->willReturnCallback(static function (string $value) use (&$text, $message): Message {
+            $text = $value;
+
+            return $message;
+        });
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+        $message->method('getFile')->willReturn(0);
+
+        return $message;
     }
 
     public function testHelpCommandRoutesToSynaplan(): void
@@ -530,6 +617,51 @@ class MessageClassifierTest extends TestCase
     }
 
     /**
+     * Issue #2287: a voice note whose transcript is the message text is
+     * classified like the same words typed, not as a file task.
+     */
+    public function testSpokenVoiceNoteIsClassifiedLikeTypedText(): void
+    {
+        $text = 'Wie wird das Wetter heute in Münster?';
+        $sorterResult = ['topic' => 'general', 'language' => 'de', 'web_search' => true];
+        $this->messageSorter->method('classify')->willReturn($sorterResult);
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $typed = $this->createMock(Message::class);
+        $typed->method('getId')->willReturn(21);
+        $typed->method('getUserId')->willReturn(10);
+        $typed->method('getText')->willReturn($text);
+        $typed->method('getLanguage')->willReturn('de');
+        $typed->method('getFiles')->willReturn(new ArrayCollection());
+        $typed->method('getFile')->willReturn(0);
+
+        $file = $this->createMock(File::class);
+        $file->method('getFileType')->willReturn('ogg');
+        $file->method('getFileName')->willReturn('voice.ogg');
+        $file->method('getFileText')->willReturn($text);
+
+        $voice = $this->createMock(Message::class);
+        $voice->method('getId')->willReturn(22);
+        $voice->method('getUserId')->willReturn(10);
+        $voice->method('getText')->willReturn($text);
+        $voice->method('getLanguage')->willReturn('de');
+        $voice->method('getFile')->willReturn(0);
+        $voice->method('getFiles')->willReturn(new ArrayCollection([$file]));
+        $voice->method('getMeta')->willReturnCallback(
+            static fn (string $key, ?string $default = null): ?string => 'text_source' === $key ? 'transcript' : $default
+        );
+
+        $typedResult = $this->service->classify($typed);
+        $voiceResult = $this->service->classify($voice);
+
+        $this->assertSame($typedResult['topic'], $voiceResult['topic']);
+        $this->assertSame($typedResult['intent'], $voiceResult['intent']);
+        $this->assertSame('general', $voiceResult['topic']);
+        $this->assertNotSame('file_analysis', $voiceResult['intent']);
+        $this->assertNotSame('analyzefile', $voiceResult['topic']);
+    }
+
+    /**
      * Issue #983: a video attachment must take the same analyzefile route
      * as documents and audio (skip the AI sorter, use the ANALYZE model)
      * so the FileAnalysisHandler actually receives the clip.
@@ -846,7 +978,7 @@ class MessageClassifierTest extends TestCase
         yield 'tankstellen (no old trigger)' => ['günstigsten tankstellen in 10km umgebung von 48161'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('germanCostQueryFastPathProvider')]
+    #[DataProvider('germanCostQueryFastPathProvider')]
     public function testFastPathReturnsNullWebSearchHintForGermanCostQueries(string $text): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -925,7 +1057,7 @@ class MessageClassifierTest extends TestCase
         yield 'tr: resim' => ['bana bir kedi resmi verir misin', 'tr'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('declarativeImageRequestProvider')]
+    #[DataProvider('declarativeImageRequestProvider')]
     public function testFastPathYieldsToAiSorterOnDeclarativeImageRequests(string $text, string $lang): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -997,7 +1129,7 @@ class MessageClassifierTest extends TestCase
         yield 'tr: bilgi taban' => ['bilgi tabanımda platform hakkında ara', 'tr'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('dataSourceRequestProvider')]
+    #[DataProvider('dataSourceRequestProvider')]
     public function testFastPathYieldsToAiSorterOnDataSourceRequests(string $text, string $lang): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -1051,7 +1183,7 @@ class MessageClassifierTest extends TestCase
         $this->assertFalse($result['skip_sorting']);
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('germanMediaImperativeProvider')]
+    #[DataProvider('germanMediaImperativeProvider')]
     public function testFastPathYieldsToAiSorterOnGermanGenerateImperatives(string $text): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -1121,7 +1253,7 @@ class MessageClassifierTest extends TestCase
         yield 'csv' => ['exportiere das als csv'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('documentFormatProvider')]
+    #[DataProvider('documentFormatProvider')]
     public function testFastPathYieldsToAiSorterOnDocumentFormats(string $text): void
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -1824,7 +1956,7 @@ class MessageClassifierTest extends TestCase
      * capabilities and nothing else. Deferring such a question would answer it
      * from a plain chat turn that knows nothing about the product.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    #[DataProvider('selfAwareGuardUtterances')]
     public function testTheDeferralStepsAsideForSelfAwareMetaQuestions(string $text): void
     {
         $sorter = $this->createMock(MessageSorter::class);
@@ -1845,7 +1977,7 @@ class MessageClassifierTest extends TestCase
      * Same rule for the Phase 8 layer: a confident anchor match can only ever
      * be one of the four system topics, so `synaplan` would be unreachable.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    #[DataProvider('selfAwareGuardUtterances')]
     public function testTheEmbeddingRouterStepsAsideForSelfAwareMetaQuestions(string $text): void
     {
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -2010,7 +2142,7 @@ class MessageClassifierTest extends TestCase
         ];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    #[DataProvider('selfAwareGuardUtterances')]
     public function testFastPathDefersSelfAwareMetaQuestions(string $text): void
     {
         $sorter = $this->createMock(MessageSorter::class);
@@ -2156,6 +2288,501 @@ class MessageClassifierTest extends TestCase
         $message->method('getFiles')->willReturn(new ArrayCollection($files));
 
         return $message;
+    }
+
+    /**
+     * Execution demand on attached files must reach the planner even when the
+     * AI sorter votes single-step: running code has no legacy-router
+     * equivalent, so skipping the planner degrades into a chat answer
+     * claiming no interpreter exists.
+     */
+    public function testExecutionDemandWithAttachmentForcesPlanner(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Run Python code on the attached file right now.');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(5);
+        $message->method('getFileType')->willReturn('');
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter
+            ->expects($this->once())
+            ->method('classify')
+            ->willReturn([
+                'topic' => 'general',
+                'language' => 'en',
+                'multi_step' => false,
+                'sorting_model_id' => 5,
+                'sorting_provider' => 'ollama',
+                'sorting_model_name' => 'llama3',
+            ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testPlainQuestionWithAttachmentKeepsSorterVote(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('What is in this image?');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(5);
+        $message->method('getFileType')->willReturn('');
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter
+            ->expects($this->once())
+            ->method('classify')
+            ->willReturn([
+                'topic' => 'general',
+                'language' => 'en',
+                'multi_step' => false,
+                'sorting_model_id' => 5,
+                'sorting_provider' => 'ollama',
+                'sorting_model_name' => 'llama3',
+            ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testExecutionDemandWithoutAttachmentKeepsSorterVote(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Run Python code: compute the sum of range(10).');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFileType')->willReturn('');
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $this->messageSorter
+            ->method('classify')
+            ->willReturn([
+                'topic' => 'general',
+                'language' => 'en',
+                'multi_step' => false,
+                'sorting_model_id' => 5,
+                'sorting_provider' => 'ollama',
+                'sorting_model_name' => 'llama3',
+            ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    /**
+     * The production sorter filed both requests as plain chat, so the chat
+     * model answered that it cannot create audio.
+     */
+    #[DataProvider('spokenOutputRequests')]
+    public function testSpokenOutputRequestForcesPlanner(string $text): void
+    {
+        $result = $this->classifyText($text, ['topic' => 'general', 'multi_step' => false]);
+
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertTrue($result['multi_step']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function spokenOutputRequests(): iterable
+    {
+        yield 'de explain as audio' => ['Und nun erstelle eine Audio wo du kurz sagst, wie der 2. Weltkrieg entstanden ist'];
+        yield 'de quoted words' => ['Erstelle eine Audio wo du sagst: "Guten Abend meine lieben Freunde."'];
+        yield 'de read aloud' => ['Lies mir das bitte vor.'];
+        yield 'en voice message' => ['Make a voice message that explains photosynthesis.'];
+        yield 'en read aloud' => ['Write a poem and read it out loud.'];
+        yield 'fr' => ['Crée un audio qui explique la photosynthèse.'];
+        yield 'tr' => ['Bunu sesli oku.'];
+    }
+
+    public function testQuestionAboutAudioKeepsSorterVote(): void
+    {
+        $result = $this->classifyText('What is the difference between MP3 and WAV audio?', ['topic' => 'general', 'multi_step' => false]);
+
+        $this->assertFalse($result['multi_step']);
+    }
+
+    public function testSorterChoosingTheSpeechGeneratorIsKept(): void
+    {
+        $result = $this->classifyText('Lies mir vor: Guten Morgen zusammen', [
+            'topic' => 'mediamaker',
+            'media_type' => 'audio',
+            'multi_step' => false,
+        ]);
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertFalse($result['multi_step']);
+    }
+
+    public function testSpokenOutputRequestSkipsTheEmbeddingRouter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->expects($this->never())->method('findClosestAnchor');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'de']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(420, 'Erstelle eine Audio, in der du den Mond erklärst.'));
+
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertTrue($result['multi_step']);
+    }
+
+    /**
+     * Issues #2047/#2049: an attached table/image plus a produce-a-file verb
+     * must reach the planner even without script vocabulary — otherwise the
+     * sorter wobbles between file_analysis and the media generator.
+     */
+    public function testChartRequestOnAttachedTableForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Mach daraus ein Balkendiagramm nach Region.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testStampRequestOnAttachedImageForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Stempel unten rechts INTERNAL drauf. Das vorhandene Bild, keins neu malen.',
+            fileType: 'png',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testEnglishChartRequestOnFileEntityForcesPlanner(): void
+    {
+        $file = $this->createStub(File::class);
+        $file->method('getFileType')->willReturn('csv');
+        $file->method('getFileName')->willReturn('sales-q3.csv');
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('Make a bar chart from this table, grouped by region.');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection([$file]));
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        $result = $this->service->classify($message);
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testDiagramQuestionAboutImageKeepsSorterVote(): void
+    {
+        $result = $this->classifyWithFile(
+            'What does this diagram show?',
+            fileType: 'png',
+        );
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testSummaryRequestKeepsSorterVote(): void
+    {
+        $result = $this->classifyWithFile(
+            'Make me a summary of this document.',
+            fileType: 'pdf',
+        );
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testChartRequestOnAudioKeepsSorterVote(): void
+    {
+        $result = $this->classifyWithFile(
+            'Make a bar chart from this.',
+            fileType: 'mp3',
+        );
+
+        $this->assertFalse($result['multi_step'] ?? false);
+    }
+
+    public function testCleanCsvRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Clean up this CSV, semicolons and German decimals.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testSauberRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Mach diese Datei sauber.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testBereinigRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Bereinige die Tabelle und entferne Leerzeilen.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testResizeRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Resize this image to half.',
+            fileType: 'png',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testSpanishChartRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Haz un gráfico de barras con esta tabla.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testFrenchChartRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Crée un graphique à partir de ce tableau.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    public function testTurkishChartRequestForcesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Bu tablodan bir grafik oluştur.',
+            fileType: 'csv',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    /**
+     * German bare "Diagramm" fires by design (terse creation requests like
+     * "Balkendiagramm nach Region" carry no verb): a genuine question about
+     * a chart costs one planner call and still lands on file_analysis via
+     * planner rule 6. Locked so the tradeoff stays explicit.
+     */
+    public function testGermanDiagramQuestionStillReachesPlanner(): void
+    {
+        $result = $this->classifyWithFile(
+            'Was zeigt das Diagramm?',
+            fileType: 'png',
+        );
+
+        $this->assertTrue($result['multi_step']);
+    }
+
+    /**
+     * A produce-a-file turn must skip the embedding-router short-circuit
+     * even when enabled with a confident mediamaker match: the deterministic
+     * planner route wins over the model-driven topic vote.
+     */
+    public function testProduceTurnSkipsEmbeddingRouterShortCircuit(): void
+    {
+        $embedding = $this->createMock(EmbeddingRouterService::class);
+        $embedding->expects($this->never())->method('findClosestAnchor');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'language' => 'de',
+            'media_type' => 'image',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embedding, $sorter, true);
+        $result = $classifier->classify($this->attachedMessage(
+            'Stempel unten rechts INTERNAL drauf.',
+            fileType: 'png',
+        ));
+
+        $this->assertTrue($result['multi_step']);
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * Same for the native-tool deferral layer: a produce-a-file turn must
+     * reach the sorter (and the multi_step force), never the chat handoff.
+     */
+    public function testProduceTurnSkipsNativeDeferralShortCircuit(): void
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static function (int $owner, string $group, string $setting): ?string {
+                if ('NATIVE_TOOL_ROUTING' === $group && 'ENABLED' === $setting) {
+                    return '1';
+                }
+
+                return null;
+            }
+        );
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultProvider')->willReturn('anthropic');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        $classifier = new MessageClassifier(
+            $sorter,
+            $this->messageMetaRepository,
+            $modelConfig,
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            new NativeToolRoutingConfig($configRepo),
+            new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
+            new SelfAwareConfig($configRepo),
+        );
+        $result = $classifier->classify($this->attachedMessage(
+            'Mach daraus ein Balkendiagramm nach Region.',
+            fileType: 'csv',
+        ));
+
+        $this->assertTrue($result['multi_step']);
+        $this->assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    private function attachedMessage(string $text, string $fileType): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(5);
+        $message->method('getFileType')->willReturn($fileType);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        return $message;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function classifyWithFile(string $text, string $fileType): array
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(3);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(5);
+        $message->method('getFileType')->willReturn($fileType);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'multi_step' => false,
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'ollama',
+            'sorting_model_name' => 'llama3',
+        ]);
+
+        return $this->service->classify($message);
+    }
+
+    /**
+     * @param array<string, mixed> $sorterResult
+     *
+     * @return array<string, mixed>
+     */
+    private function classifyText(string $text, array $sorterResult): array
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn($sorterResult + [
+            'language' => 'de',
+            'sorting_model_id' => 5,
+            'sorting_provider' => 'groq',
+            'sorting_model_name' => 'gpt-oss-120b',
+        ]);
+
+        return $this->service->classify($this->plainMessage(3, $text));
     }
 
     private function plainMessage(int $id, string $text): Message&MockObject

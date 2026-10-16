@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Digest;
 
 use App\Entity\Message;
+use App\Repository\MessageDigestRepository;
 use App\Repository\MessageRepository;
 use App\Service\Digest\DigestSearchService;
 use App\Service\Digest\MessageDigestConfig;
@@ -20,13 +21,41 @@ final class DigestSearchServiceTest extends TestCase
 
     private QdrantClientInterface&MockObject $qdrantClient;
     private MessageRepository&MockObject $messageRepository;
+    private MessageDigestRepository&MockObject $digestRepository;
     private MessageDigestConfig&MockObject $config;
     private DigestSearchService $service;
+
+    /** @var list<int>|null null means every candidate id is an active row */
+    private ?array $confirmedIds = null;
 
     protected function setUp(): void
     {
         $this->qdrantClient = $this->createMock(QdrantClientInterface::class);
         $this->messageRepository = $this->createMock(MessageRepository::class);
+        $this->digestRepository = $this->createMock(MessageDigestRepository::class);
+        $this->digestRepository->method('findActiveMatches')->willReturnCallback(
+            function (int $userId, array $messageIds, array $digestIds): array {
+                if (null === $this->confirmedIds) {
+                    return [
+                        'message_ids' => array_values(array_map(intval(...), $messageIds)),
+                        'digest_ids' => array_values(array_map(intval(...), $digestIds)),
+                    ];
+                }
+
+                $allowed = array_fill_keys($this->confirmedIds, true);
+
+                return [
+                    'message_ids' => array_values(array_filter(
+                        array_map(intval(...), $messageIds),
+                        static fn (int $id): bool => isset($allowed[$id]),
+                    )),
+                    'digest_ids' => array_values(array_filter(
+                        array_map(intval(...), $digestIds),
+                        static fn (int $id): bool => isset($allowed[$id]),
+                    )),
+                ];
+            },
+        );
         $this->config = $this->createMock(MessageDigestConfig::class);
 
         $this->config->method('getTopK')->willReturn(5);
@@ -38,6 +67,7 @@ final class DigestSearchServiceTest extends TestCase
         $this->service = new DigestSearchService(
             $this->qdrantClient,
             $this->messageRepository,
+            $this->digestRepository,
             $this->config,
             new NullLogger(),
         );
@@ -84,17 +114,56 @@ final class DigestSearchServiceTest extends TestCase
         self::assertEqualsWithDelta(0.40, $hits[1]['effective_score'], 0.001);
     }
 
-    public function testExcludesDigestsFromTheCurrentChat(): void
+    public function testDropsHitsWhoseRowIsInactiveOrMissing(): void
     {
+        $this->confirmedIds = [2];
         $this->qdrantClient->method('searchDigests')->willReturn([
-            $this->qdrantHit(1, 99, 'from the current chat', 0.9, self::NOW),
-            $this->qdrantHit(2, 11, 'from an older chat', 0.8, self::NOW),
+            $this->qdrantHit(1, 10, 'row is inactive or missing', 0.9, self::NOW),
+            $this->qdrantHit(2, 11, 'row is active', 0.8, self::NOW),
         ]);
         $this->messageRepository->method('find')->willReturn(null);
 
-        $hits = $this->service->search(self::USER_ID, [0.1], excludeChatId: 99, now: self::NOW);
+        $hits = $this->service->search(self::USER_ID, [0.1], now: self::NOW);
 
         self::assertSame([2], array_column($hits, 'message_id'));
+    }
+
+    public function testReturnsOlderSameChatHitsAndDropsTheVerbatimWindow(): void
+    {
+        $this->qdrantClient->method('searchDigests')->willReturn([
+            $this->qdrantHit(1, 99, 'older key message in this chat', 0.95, self::NOW - 86400),
+            $this->qdrantHit(2, 99, 'already in the prompt window', 0.9, self::NOW),
+            $this->qdrantHit(3, 11, 'from another chat', 0.8, self::NOW),
+        ]);
+        $this->messageRepository->method('find')->willReturn(null);
+
+        $hits = $this->service->search(self::USER_ID, [0.1], excludeMessageIds: [2], now: self::NOW);
+
+        self::assertSame([1, 3], array_column($hits, 'message_id'));
+    }
+
+    public function testConfirmsAHitByDigestIdWhenTheMessageRowIsNotTheMatch(): void
+    {
+        $this->confirmedIds = [50];
+        $this->qdrantClient->method('searchDigests')->willReturn([
+            [
+                'id' => 'dig_7_50',
+                'score' => 0.9,
+                'payload' => [
+                    'message_id' => 9,
+                    'chat_id' => 3,
+                    'title' => 'confirmed via digest id',
+                    'channel' => 'web',
+                    'source_date' => self::NOW,
+                    'digest_id' => 50,
+                ],
+            ],
+        ]);
+        $this->messageRepository->method('find')->willReturn(null);
+
+        $hits = $this->service->search(self::USER_ID, [0.1], now: self::NOW);
+
+        self::assertSame([9], array_column($hits, 'message_id'));
     }
 
     public function testCapsResultsAtTopK(): void

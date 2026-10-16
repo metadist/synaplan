@@ -14,7 +14,7 @@ use App\Service\ModelConfigService;
 /**
  * Capability-grouped selectable models for machine clients (Synaplan Desktop).
  *
- * Tag → group mapping matches {@see \App\Controller\ConfigController::getModels()}
+ * Tag → group mapping follows the web pickers ({@see PickerCapabilities::forTag()})
  * but only the eight project-companion groups. {@see id} is the catalog key
  * `service:providerId:tag`, not the database BID.
  */
@@ -184,6 +184,9 @@ final readonly class CapabilityCatalog
             'VIDEO', 'TEXT2VID' => self::isImageToVideo($features) ? [] : ['TEXT2VID'],
             'AUDIO', 'SOUND2TEXT', 'TRANSCRIPTION' => ['SOUND2TEXT'],
             'TTS', 'TEXT2SOUND' => ['TEXT2SOUND'],
+            // Live speech-to-speech is not a desktop slot. An empty list keeps
+            // the row out of chat, dictation and TTS.
+            'VOICE2VOICE' => [],
             default => [],
         };
     }

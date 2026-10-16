@@ -81,6 +81,19 @@ func waitFor(t *testing.T, ts *httptest.Server, id string, pred func(contract.Ru
 	return st
 }
 
+// waitUntil polls cond until it holds; after ten seconds the test fails
+// naming what it waited for.
+func waitUntil(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 func readFixture(t *testing.T, name string) []byte {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -472,6 +485,9 @@ func TestDeleteQueuedRunNeverCreatesContainer(t *testing.T) {
 	_, ts := newTestServer(t, testOpts{runner: fr, cfg: func(c *config.Config) { c.MaxConcurrent = 1 }})
 	first := submitJSON(t, ts, validRun())
 	waitFor(t, ts, first, func(st contract.RunStatus) bool { return st.Status == contract.StatusRunning })
+	// A run reports "running" while it still prepares its scratch dir; a
+	// DELETE in that gap ends it before it has a container to count.
+	waitUntil(t, "the first run's container", func() bool { return fr.created.Load() == 1 })
 	second := submitJSON(t, ts, validRun())
 	if st, _ := getStatus(t, ts, second); st.Status != contract.StatusQueued {
 		t.Fatalf("%+v", st)
@@ -637,8 +653,8 @@ func TestLimitsErrorCarriesDetails(t *testing.T) {
 	}
 }
 
-func TestEgressAllowListRefusedFailClosed(t *testing.T) {
-	_, ts := newTestServer(t, testOpts{cfg: func(c *config.Config) { c.EgressEnabled = true }})
+func TestEgressAllowListRefusedWhenDisabled(t *testing.T) {
+	_, ts := newTestServer(t, testOpts{})
 	body := validRun()
 	body.Egress = contract.Egress{Allow: []contract.EgressHost{{Host: "api.example.com", Port: 443, IPs: []string{"93.184.216.34"}}}}
 	assertRunErrorOn(t, ts, body, http.StatusBadRequest, contract.ErrEgressNotAllowed)
@@ -647,7 +663,21 @@ func TestEgressAllowListRefusedFailClosed(t *testing.T) {
 	var h contract.Health
 	_ = json.NewDecoder(resp.Body).Decode(&h)
 	if h.Features.Egress {
-		t.Fatal("health must not advertise egress")
+		t.Fatal("health must not advertise egress when disabled")
+	}
+}
+
+func TestEgressAllowListAcceptedWhenEnabled(t *testing.T) {
+	_, ts := newTestServer(t, testOpts{cfg: func(c *config.Config) { c.EgressEnabled = true }})
+	body := validRun()
+	body.Egress = contract.Egress{Allow: []contract.EgressHost{{Host: "api.example.com", Port: 443, IPs: []string{"93.184.216.34"}}}}
+	submitJSON(t, ts, body)
+	resp := authed(t, http.MethodGet, ts.URL+"/v1/health", nil, "")
+	defer resp.Body.Close()
+	var h contract.Health
+	_ = json.NewDecoder(resp.Body).Decode(&h)
+	if !h.Features.Egress {
+		t.Fatal("health must advertise egress when enabled")
 	}
 }
 

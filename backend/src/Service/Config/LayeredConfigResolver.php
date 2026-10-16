@@ -143,6 +143,29 @@ final class LayeredConfigResolver implements ResetInterface
         return null;
     }
 
+    /**
+     * Which layer supplied a specific stored value, after a caller has
+     * skipped earlier candidates (for example an allow-list miss).
+     */
+    public function sourceForValue(?int $userId, string $group, string $setting, string $value): ?string
+    {
+        if ($this->isLocked($group, $setting, $userId)) {
+            return 'admin';
+        }
+        if (null !== $userId && $userId > 0 && $this->configRepository->getValue($userId, $group, $setting) === $value) {
+            return 'user';
+        }
+        if ($this->usesGroupLayer($userId, $group, $setting) && $this->mergedGroupValue($userId, $group, $setting) === $value) {
+            return 'group';
+        }
+        $global = $this->configRepository->findByOwnerGroupAndSetting(0, $group, $setting)?->getValue();
+        if ($global === $value) {
+            return 'admin';
+        }
+
+        return null;
+    }
+
     public function isLocked(string $group, string $setting, ?int $userId = null): bool
     {
         if (!$this->iamConfig->isGroupPoliciesEnabled($userId)) {
@@ -151,6 +174,29 @@ final class LayeredConfigResolver implements ResetInterface
         $globalRow = $this->configRepository->findByOwnerGroupAndSetting(0, $group, $setting);
 
         return $globalRow instanceof Config && $globalRow->isBlocked();
+    }
+
+    /**
+     * Groups whose allow-list actually drops models for this person.
+     * An empty list means "every model" and is not a restriction.
+     *
+     * @return list<int>
+     */
+    public function modelAllowListGroupIds(?int $userId): array
+    {
+        if (null === $userId || $userId <= 0 || !$this->usesGroupLayer($userId, 'MODELS', 'ALLOWED')) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($this->orderedGroupRows($userId, 'MODELS', 'ALLOWED') as $row) {
+            if ([] === PolicyAllowList::decodeList($row->getValue())) {
+                continue;
+            }
+            $ids[] = $row->getGroupId();
+        }
+
+        return array_values(array_unique($ids));
     }
 
     /**

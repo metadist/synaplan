@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\AI\Tool;
 
+use App\AI\Messages\AnthropicJsonSchemaNormalizer;
+
 /**
  * Validation, normalisation and wire-format mapping for OpenAI-shaped tools.
  *
@@ -201,7 +203,7 @@ final class OpenAiToolShapes
         foreach (self::normalizeDeclarations($tools) as $decl) {
             $schema = $decl['parameters'];
             if (!is_array($schema)) {
-                $schema = ['type' => 'object', 'properties' => []];
+                $schema = ['type' => 'object', 'properties' => new \stdClass()];
             }
             $out[] = [
                 'name' => self::sanitizeGeminiName($decl['name']),
@@ -309,6 +311,7 @@ final class OpenAiToolShapes
      */
     private static function normalizeDeclarations(array $tools): array
     {
+        $normalizer = new AnthropicJsonSchemaNormalizer();
         $out = [];
         foreach ($tools as $tool) {
             if (isset($tool['function']) && is_array($tool['function'])) {
@@ -316,7 +319,10 @@ final class OpenAiToolShapes
                 $out[] = [
                     'name' => (string) ($fn['name'] ?? 'tool'),
                     'description' => (string) ($fn['description'] ?? ''),
-                    'parameters' => $fn['parameters'] ?? ['type' => 'object', 'properties' => []],
+                    'parameters' => self::normalizeSchema(
+                        $normalizer,
+                        $fn['parameters'] ?? ['type' => 'object', 'properties' => []],
+                    ),
                 ];
                 continue;
             }
@@ -324,12 +330,28 @@ final class OpenAiToolShapes
                 $out[] = [
                     'name' => (string) $tool['name'],
                     'description' => (string) ($tool['description'] ?? ''),
-                    'parameters' => $tool['input_schema'] ?? $tool['parameters'] ?? ['type' => 'object', 'properties' => []],
+                    'parameters' => self::normalizeSchema(
+                        $normalizer,
+                        $tool['input_schema'] ?? $tool['parameters'] ?? ['type' => 'object', 'properties' => []],
+                    ),
                 ];
             }
         }
 
         return $out;
+    }
+
+    /**
+     * json_decode(true) turns `"properties":{}` into `[]`. Re-encoding that
+     * array makes Groq, OpenAI, and Gemini reject the tool schema.
+     */
+    private static function normalizeSchema(AnthropicJsonSchemaNormalizer $normalizer, mixed $schema): mixed
+    {
+        if (!is_array($schema)) {
+            return $schema;
+        }
+
+        return $normalizer->normalizeSchema($schema);
     }
 
     public static function sanitizeGeminiName(string $name): string

@@ -123,7 +123,14 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
         // with the user's VECTORIZE binding (see embedUserQuery), so filtering
         // against the global default would discard every hit for users whose
         // override differs from it.
-        $filtered = $this->embeddingMetadata->filterStaleHits($rawHits, userId: $query->userId);
+        // Document payloads record the collection width, not the model's
+        // catalog dimension. Ingest already coerced the vector to that
+        // width, so a 3072-dim catalog model is still fresh at 1024.
+        $filtered = $this->embeddingMetadata->filterStaleHits(
+            $rawHits,
+            userId: $query->userId,
+            storageVectorDim: EmbeddingMetadataService::DEFAULT_VECTOR_DIM,
+        );
         if ($filtered['stale_count'] > 0) {
             $this->logger->info('QdrantVectorStorage: Filtered stale RAG hits', [
                 'user_id' => $query->userId,
@@ -251,5 +258,27 @@ final readonly class QdrantVectorStorage implements VectorStorageInterface
     public function getProviderName(): string
     {
         return 'qdrant';
+    }
+
+    public function findChunk(int $userId, int|string $chunkId): ?SearchResult
+    {
+        $point = $this->qdrantClient->getDocument((string) $chunkId);
+        if (null === $point) {
+            return null;
+        }
+        $payload = is_array($point['payload'] ?? null) ? $point['payload'] : [];
+        $ownerId = (int) ($payload['user_id'] ?? 0);
+
+        return new SearchResult(
+            chunkId: (string) ($point['id'] ?? $chunkId),
+            fileId: (int) ($payload['file_id'] ?? 0),
+            groupKey: (string) ($payload['group_key'] ?? ''),
+            text: (string) ($payload['text'] ?? ''),
+            score: 0.0,
+            startLine: (int) ($payload['start_line'] ?? 0),
+            endLine: (int) ($payload['end_line'] ?? 0),
+            ownerId: $ownerId,
+            shared: false,
+        );
     }
 }

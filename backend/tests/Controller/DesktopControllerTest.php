@@ -90,6 +90,7 @@ final class DesktopControllerTest extends WebTestCase
         $body = $this->json();
         self::assertStringStartsWith('sk_', $body['key']);
         self::assertGreaterThan(0, $body['deviceId']);
+        self::assertSame('desktop-rest-pair@synaplan.internal', $body['account']);
 
         $device = $this->em->getRepository(DesktopDevice::class)->find($body['deviceId']);
         self::assertInstanceOf(DesktopDevice::class, $device);
@@ -181,6 +182,14 @@ final class DesktopControllerTest extends WebTestCase
         $devices = $this->json()['devices'];
         self::assertCount(1, $devices);
         self::assertSame((int) $device->getId(), $devices[0]['id']);
+        self::assertFalse($devices[0]['skillsReported']);
+
+        $device->setEnabledSkills([]);
+        $this->em->flush();
+        $this->client->request('GET', '/api/v1/desktop/devices');
+        $reported = $this->json()['devices'][0];
+        self::assertTrue($reported['skillsReported']);
+        self::assertSame([], $reported['enabledSkills']);
 
         $this->client->request('DELETE', '/api/v1/desktop/devices/'.$device->getId());
         self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());

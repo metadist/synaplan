@@ -53,12 +53,16 @@ export function placeOfficeActionsMenu(args: {
   innerHeight: number
   keyboardInsetPx: number
   visualViewport?: VisibleViewport | null
+  /** File-row menus open downward so they do not cover the page header. */
+  preferBelow?: boolean
 }): MenuPlacement {
   const visible = visibleViewportBounds(args)
   const spaceAbove = args.trigger.top - visible.top - MENU_GAP_PX
   const spaceBelow = visible.bottom - args.trigger.bottom - MENU_GAP_PX
   const menuHeight = Math.max(0, args.menuHeight)
-  const openAbove = !(spaceAbove < menuHeight && spaceBelow > spaceAbove)
+  const openAbove = args.preferBelow
+    ? spaceBelow < menuHeight && spaceAbove > spaceBelow
+    : !(spaceAbove < menuHeight && spaceBelow > spaceAbove)
   const maxHeight = Math.max(0, openAbove ? spaceAbove : spaceBelow)
   const maxLeft = args.innerWidth - MENU_WIDTH_PX - VIEWPORT_PAD_PX
   const left = Math.max(VIEWPORT_PAD_PX, Math.min(args.trigger.right - MENU_WIDTH_PX, maxLeft))

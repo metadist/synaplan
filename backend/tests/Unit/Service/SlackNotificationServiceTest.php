@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Service;
 
 use App\Entity\Widget;
 use App\Entity\WidgetSession;
-use App\Service\SlackNotificationService;
+use App\Service\Notification\SlackNotificationService;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

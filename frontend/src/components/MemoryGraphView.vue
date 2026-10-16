@@ -35,7 +35,7 @@
     <!-- Toggle Button - Compact & Elegant Top Left -->
     <div v-if="props.memories.length > 0" class="absolute top-4 left-4 z-20">
       <button
-        class="px-3 md:px-4 py-2 md:py-2.5 rounded-lg text-xs md:text-sm font-medium transition-all duration-200 flex items-center gap-2 nav-item"
+        class="px-3 md:px-4 py-2 md:py-2.5 rounded-xl text-xs md:text-sm font-medium transition-all duration-200 flex items-center gap-2 nav-item"
         :class="groupBy === 'category' ? 'nav-item--active' : ''"
         @click="toggleGroupBy"
       >
@@ -83,7 +83,7 @@
         <button
           v-for="keyItem in availableKeys"
           :key="keyItem.key"
-          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap nav-item"
+          class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 whitespace-nowrap nav-item"
           :class="selectedKeys.includes(keyItem.key) ? 'nav-item--active' : ''"
           @click="toggleKey(keyItem.key)"
         >
@@ -117,7 +117,7 @@
           }}
         </p>
         <button
-          class="px-4 py-2 rounded-lg btn-primary transition-colors text-sm"
+          class="px-4 py-2 rounded-xl btn-primary transition-colors text-sm"
           @click="clearFilters"
         >
           {{ $t('memories.graph.clearFilters', 'Filter zurücksetzen') }}
@@ -131,14 +131,14 @@
       class="absolute top-4 right-4 z-10 flex flex-row md:flex-col gap-2"
     >
       <button
-        class="p-2 md:p-2.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-sm"
+        class="p-2 md:p-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-sm"
         :title="$t('memories.graph.resetView')"
         @click="resetView"
       >
         <Icon icon="mdi:refresh" class="w-4 h-4 md:w-5 md:h-5" />
       </button>
       <button
-        class="p-2 md:p-2.5 rounded-lg transition-colors backdrop-blur-sm"
+        class="p-2 md:p-2.5 rounded-xl transition-colors backdrop-blur-sm"
         :class="
           physicsEnabled ? 'bg-brand-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'
         "
@@ -148,7 +148,7 @@
         <Icon icon="mdi:atom" class="w-4 h-4 md:w-5 md:h-5" />
       </button>
       <button
-        class="p-2 md:p-2.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-sm"
+        class="p-2 md:p-2.5 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-sm"
         :title="isFullscreen ? $t('memories.fullscreen.exit') : $t('memories.fullscreen.enter')"
         @click="toggleFullscreen"
       >

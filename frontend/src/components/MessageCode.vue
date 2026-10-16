@@ -13,7 +13,7 @@
         <span v-if="filename" class="text-xs txt-secondary">{{ filename }}</span>
       </div>
       <button
-        class="text-xs px-3 py-1.5 rounded-lg hover-surface transition-all txt-secondary font-medium flex items-center gap-1.5"
+        class="text-xs px-3 py-1.5 rounded-xl hover-surface transition-all txt-secondary font-medium flex items-center gap-1.5"
         :aria-label="$t('commands.copyCode')"
         data-testid="btn-copy-code"
         @click="copyCode"

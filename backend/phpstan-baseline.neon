@@ -139,18 +139,6 @@ parameters:
 			path: src/Controller/ChatController.php
 
 		-
-			message: '#^Result of && is always false\.$#'
-			identifier: booleanAnd.alwaysFalse
-			count: 1
-			path: src/Controller/ConfigController.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between ''dev'' and ''dev'' will always evaluate to false\.$#'
-			identifier: notIdentical.alwaysFalse
-			count: 1
-			path: src/Controller/ConfigController.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 2
@@ -229,12 +217,6 @@ parameters:
 			path: src/Controller/OidcController.php
 
 		-
-			message: '#^Parameter \#1 \$enable of function ob_implicit_flush expects bool, int given\.$#'
-			identifier: argument.type
-			count: 1
-			path: src/Controller/StreamController.php
-
-		-
 			message: '#^Property App\\Controller\\SubscriptionController\:\:\$userRepository is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -274,19 +256,13 @@ parameters:
 			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
 			identifier: arguments.count
 			count: 1
-			path: src/Service/InboundEmailHandlerService.php
+			path: src/Service/Email/InboundEmailHandlerService.php
 
 		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1
-			path: src/Service/Message/Handler/ChatHandler.php
-
-		-
-			message: '#^Method App\\Service\\Message\\Handler\\ChatHandler\:\:getSystemPrompt\(\) is unused\.$#'
-			identifier: method.unused
-			count: 1
-			path: src/Service/Message/Handler/ChatHandler.php
+			path: src/Service/Message/Chat/ChatMessageAssembler.php
 
 		-
 			message: '#^Offset ''prompt'' on array\{prompt\: string, media_type\: string\|null, raw\: string\} on left side of \?\? always exists and is not nullable\.$#'
@@ -295,28 +271,10 @@ parameters:
 			path: src/Service/Message/Handler/MediaGenerationHandler.php
 
 		-
-			message: '#^Property App\\Service\\Message\\MessageClassifier\:\:\$modelConfigService is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: src/Service/Message/MessageClassifier.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1
 			path: src/Service/Message/MessagePreProcessor.php
-
-		-
-			message: '#^Parameter \#2 \$trackingId of method App\\Repository\\MessageRepository\:\:findConversationHistory\(\) expects string, int given\.$#'
-			identifier: argument.type
-			count: 2
-			path: src/Service/Message/MessageProcessor.php
-
-		-
-			message: '#^Variable \$classification might not be defined\.$#'
-			identifier: variable.undefined
-			count: 2
-			path: src/Service/Message/MessageProcessor.php
 
 		-
 			message: '#^Method App\\Repository\\PromptRepository\:\:findByTopic\(\) invoked with 3 parameters, 1\-2 required\.$#'
@@ -331,52 +289,52 @@ parameters:
 			path: src/Service/ModelConfigService.php
 
 		-
-			message: '#^Property App\\Service\\OidcTokenService\:\:\$em is never read, only written\.$#'
+			message: '#^Property App\\Service\\Auth\\OidcTokenService\:\:\$em is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Service/OidcTokenService.php
+			path: src/Service/Auth/OidcTokenService.php
 
 		-
-			message: '#^Property App\\Service\\PromptService\:\:\$logger is never read, only written\.$#'
+			message: '#^Property App\\Service\\Prompt\\PromptService\:\:\$logger is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Service/PromptService.php
+			path: src/Service/Prompt/PromptService.php
 
 		-
-			message: '#^Property App\\Service\\StorageQuotaService\:\:\$em is never read, only written\.$#'
+			message: '#^Property App\\Service\\Usage\\StorageQuotaService\:\:\$em is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Service/StorageQuotaService.php
+			path: src/Service/Usage/StorageQuotaService.php
 
 		-
-			message: '#^Property App\\Service\\UsageStatsService\:\:\$configRepository is never read, only written\.$#'
+			message: '#^Property App\\Service\\Usage\\UsageStatsService\:\:\$configRepository is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
-			path: src/Service/UsageStatsService.php
+			path: src/Service/Usage/UsageStatsService.php
 
 		-
 			message: '#^Strict comparison using \=\=\= between '''' and lowercase\-string&non\-empty\-string will always evaluate to false\.$#'
 			identifier: identical.alwaysFalse
 			count: 1
-			path: src/Service/WhisperService.php
+			path: src/Service/Stt/WhisperService.php
 
 		-
 			message: '#^Variable \$processedAudio in isset\(\) always exists and is not nullable\.$#'
 			identifier: isset.variable
 			count: 1
-			path: src/Service/WhisperService.php
+			path: src/Service/Stt/WhisperService.php
 
 		-
 			message: '#^Call to function is_string\(\) with string will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
-			path: src/Service/WidgetService.php
+			path: src/Service/Widget/WidgetService.php
 
 		-
 			message: '#^Parameter \#1 \$array \(list\<non\-empty\-string\>\) of array_values is already a list, call has no effect\.$#'
 			identifier: arrayValues.list
 			count: 1
-			path: src/Service/WidgetService.php
+			path: src/Service/Widget/WidgetService.php
 
 		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
@@ -571,7 +529,7 @@ parameters:
 			path: tests/Unit/Service/MediaGenerationServiceTest.php
 
 		-
-			message: '#^Call to function method_exists\(\) with App\\Service\\WhisperService and ''translateToEnglish'' will always evaluate to true\.$#'
+			message: '#^Call to function method_exists\(\) with App\\Service\\Stt\\WhisperService and ''translateToEnglish'' will always evaluate to true\.$#'
 			identifier: function.alreadyNarrowedType
 			count: 1
 			path: tests/Unit/WhisperServiceTest.php

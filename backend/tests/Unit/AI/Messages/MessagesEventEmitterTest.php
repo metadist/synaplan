@@ -71,6 +71,28 @@ final class MessagesEventEmitterTest extends TestCase
         $this->assertSame(0, $events[2]['data']['index']);
     }
 
+    public function testEmitAssistantTextWhenTheUpstreamSentNothing(): void
+    {
+        $events = [];
+        $emitter = new MessagesEventEmitter(static function (array $chunk) use (&$events): void {
+            $events[] = $chunk;
+        });
+
+        $this->assertFalse($emitter->hasEmittedText());
+        $emitter->emitAssistantText('I looked this up but could not turn the results into an answer.');
+        $this->assertTrue($emitter->hasEmittedText());
+
+        $types = array_map(static fn (array $e): string => (string) ($e['data']['type'] ?? ''), $events);
+        $this->assertSame(
+            ['message_start', 'content_block_start', 'content_block_delta', 'content_block_stop'],
+            $types,
+        );
+        $this->assertSame(
+            'I looked this up but could not turn the results into an answer.',
+            $events[2]['data']['delta']['text'],
+        );
+    }
+
     public function testEmitPing(): void
     {
         $events = [];

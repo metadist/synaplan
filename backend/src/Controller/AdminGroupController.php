@@ -9,6 +9,7 @@ use App\Repository\UserRepository;
 use App\Service\Iam\Exception\DirectoryGroupReadOnlyException;
 use App\Service\Iam\GroupService;
 use App\Service\Iam\IamConfig;
+use App\Service\Iam\ShareService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,6 +26,7 @@ final class AdminGroupController extends AbstractController
         private readonly IamConfig $iamConfig,
         private readonly GroupService $groupService,
         private readonly UserRepository $userRepository,
+        private readonly ShareService $shareService,
     ) {
     }
 
@@ -303,10 +305,11 @@ final class AdminGroupController extends AbstractController
                             property: 'members',
                             type: 'array',
                             items: new OA\Items(
-                                required: ['userId', 'email', 'role', 'source', 'created'],
+                                required: ['userId', 'email', 'displayName', 'role', 'source', 'created'],
                                 properties: [
                                     new OA\Property(property: 'userId', type: 'integer', example: 4),
                                     new OA\Property(property: 'email', type: 'string', example: 'ada@example.com'),
+                                    new OA\Property(property: 'displayName', type: 'string', example: 'Ada Lovelace'),
                                     new OA\Property(property: 'role', type: 'string', enum: ['member', 'manager'], example: 'member'),
                                     new OA\Property(property: 'source', type: 'string', enum: ['manual', 'directory'], example: 'manual'),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64'),
@@ -380,10 +383,11 @@ final class AdminGroupController extends AbstractController
                     properties: [
                         new OA\Property(
                             property: 'member',
-                            required: ['userId', 'email', 'role', 'source', 'created'],
+                            required: ['userId', 'email', 'displayName', 'role', 'source', 'created'],
                             properties: [
                                 new OA\Property(property: 'userId', type: 'integer', example: 4),
                                 new OA\Property(property: 'email', type: 'string', example: 'ada@example.com'),
+                                new OA\Property(property: 'displayName', type: 'string', example: 'Ada Lovelace'),
                                 new OA\Property(property: 'role', type: 'string', enum: ['member', 'manager'], example: 'member'),
                                 new OA\Property(property: 'source', type: 'string', enum: ['manual', 'directory'], example: 'manual'),
                                 new OA\Property(property: 'created', type: 'integer', format: 'int64'),
@@ -482,6 +486,61 @@ final class AdminGroupController extends AbstractController
         }
 
         return $this->json(['success' => true]);
+    }
+
+    #[Route('/{id}/shares', name: 'shares', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/admin/groups/{id}/shares',
+        operationId: 'listAdminGroupShares',
+        summary: 'List items shared with a group',
+        description: 'Metadata only: kind, name, owner and permission. Resource content is never included.',
+        tags: ['IAM Groups'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Items shared with this group',
+                content: new OA\JsonContent(
+                    required: ['shares'],
+                    properties: [
+                        new OA\Property(
+                            property: 'shares',
+                            type: 'array',
+                            items: new OA\Items(
+                                required: ['kind', 'id', 'name', 'icon', 'permission'],
+                                properties: [
+                                    new OA\Property(property: 'kind', type: 'string', example: 'conversation'),
+                                    new OA\Property(property: 'id', type: 'string', example: '42'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'Q3 plan'),
+                                    new OA\Property(property: 'icon', type: 'string', example: 'chat'),
+                                    new OA\Property(property: 'permission', type: 'string', example: 'read'),
+                                    new OA\Property(property: 'ownerId', type: 'integer', nullable: true, example: 4),
+                                    new OA\Property(property: 'ownerName', type: 'string', nullable: true, example: 'Ada Lovelace'),
+                                ]
+                            ),
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Admin access required'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
+        ]
+    )]
+    public function shares(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        $group = $this->groupService->get($id);
+        if (null === $group) {
+            return $this->json(['error' => 'Group not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json([
+            'shares' => $this->shareService->describeGrantsToGroup((int) $group->getId()),
+        ]);
     }
 
     private function guard(?User $user): ?JsonResponse

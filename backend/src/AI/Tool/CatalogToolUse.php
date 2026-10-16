@@ -32,6 +32,8 @@ final class CatalogToolUse
         'huggingface',
         'trustedtokens',
         'a2agent',
+        'meta',
+        'cerebras',
     ];
 
     /**

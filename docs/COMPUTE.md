@@ -1,9 +1,9 @@
 # File work (secure compute)
 
 > **Status.** Short Python or Node work on copies of files the user chose.
-> Off by default. Needs the compute sidecar (`COMPUTE_URL` + `COMPUTE_TOKEN`)
-> **and** `COMPUTE.ENABLED`. Persistent folders and website fetches are
-> separate switches, also off. The contract stays frozen at `protocol: 1`.
+> Local `make up` starts the sidecar and turns file work +
+> workspaces on. Website fetches stay off. The contract stays frozen at
+> `protocol: 1`.
 
 ## What it is
 
@@ -23,9 +23,10 @@ the surface is absent: no chat card, no Files tab, no API tease (U11).
 
 | Flag | Env pin | Default | Effect |
 | ---- | ------- | ------- | ------ |
-| `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **off** | Sidecar + this switch must both be on. Every `/api/v1/compute/*` route answers **404** when off. |
-| `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **off** | Keep one folder per user between runs. Files → **Workspace**. The chat card shows **Open workspace** only when that run actually used the folder. |
+| `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **on** (local compose; new seed when URL+token set) | Sidecar + this switch must both be on. Every `/api/v1/compute/*` route answers **404** when off. |
+| `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **on** (same rule as ENABLED) | Keep one folder per user between runs. Files → **Workspace**. The chat card shows **Open workspace** only when that run actually used the folder. |
 | `COMPUTE.EGRESS_ENABLED` | `FEATURE_COMPUTE_EGRESS_ENABLED` | **off** | A run may fetch from a short list of public websites. Off = every run stays offline. Private or local addresses are always refused. |
+| `COMPUTE.REQUIRE_TIER` | — | `docker` | Minimum isolation the sidecar must report (`docker` < `gvisor` < `microvm`). Below it, file work stays off even when enabled; the admin UI refuses the switch with the reported tier. |
 
 Both extra flags sit **under** `COMPUTE.ENABLED`. Turning a child on while
 file work itself is off does nothing.
@@ -39,13 +40,15 @@ with `NetworkMode=none` and refuses any non-empty allow-list (`CP22`, the
 egress proxy, is not built yet). The PHP side (resolver, pinning, approval)
 is complete and waits for that sidecar release.
 
-Operators switch them under **Operate → System configuration → Processing →
-File work**. Seeders insert the rows as `0` when missing and never overwrite
-an existing value.
+Operators switch them under **Operate → System configuration → Tools &
+automation → File work**. Seeders insert missing rows and never overwrite an existing value.
 
 ```sql
 -- what ComputeConfigSeeder runs (BConfigSeeder::insertIfMissing): a no-op
--- when the row exists, so an operator's value is never reset
+-- when the row exists, so an operator's value is never reset.
+-- New installs start enabled only when COMPUTE_URL and COMPUTE_TOKEN are
+-- set at seed time (ComputeConfigSeeder::enabledSeedValue writes '1');
+-- otherwise the row is inserted as '0'. Existing rows are never touched.
 INSERT IGNORE INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
 VALUES (0, 'COMPUTE', 'ENABLED', '0');
 ```
@@ -53,22 +56,32 @@ VALUES (0, 'COMPUTE', 'ENABLED', '0');
 The runtime-config endpoint exposes `features.computeEnabled` and
 `features.computeWorkspacesEnabled` so the UI can hide the tab and the chip.
 
-## Compose profile (T1)
+## Local compose (T1)
 
-Dev and self-host use Compose profile `compute` on the same host. That is
-**T1**: a hardened Docker container, no host network, no Docker socket in
-PHP. Honest limits: one machine, one Docker daemon, no gVisor.
+`make up` starts file work on the same host. That is **T1**: a
+hardened Docker container, no host network, no Docker socket in PHP. Honest
+limits: one machine, one Docker daemon, no gVisor.
 
 ```bash
-make -C sidecars/synaplan-compute images
-COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
-  COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  docker compose --profile compute up -d
+make up
 ```
 
-Never publish port 8080. The sidecar process is distroless `nonroot`. The
-runner never pulls images: build Python/Node first or the first run fails
-with image-not-found. See [DEVELOPMENT.md](./DEVELOPMENT.md).
+Compose builds the sidecar and the Python/Node runtimes from this repo,
+creates `.compute-data/`, and injects the fixed demo token
+`synaplan-dev-compute-token-change-me-32b` when `COMPUTE_TOKEN` is unset.
+That default is part of the developer install — do not change it. A
+production host sets its own token. `deploy/` `prepare.sh` writes
+`data/compute.token` when `COMPOSE_PROFILES` includes `compute`, whether
+that profile is exported in the shell or only set in `deploy/.env`. The
+token is not printed and is not written into `.env` or `secrets.env`.
+Re-running the deploy keeps the same token. Never publish port 8080.
+Hide it with `COMPUTE_URL=disabled` or `FEATURE_COMPUTE_ENABLED=false`.
+
+A **new** install seeds `COMPUTE.ENABLED` and `COMPUTE.WORKSPACES_ENABLED`
+as `1` when `COMPUTE_URL` and `COMPUTE_TOKEN` are set at seed time (local
+compose always sets them). An existing row is never overwritten — local
+compose also pins `FEATURE_COMPUTE_ENABLED=true` so an older database still
+offers the feature. See [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 ## T2 on a separate node
 
@@ -77,6 +90,11 @@ compute node** (dedicated host or a separate Docker daemon). Synaplan Cloud
 must not enable file work on the shared web hosts at T1. The node layout
 lives in the private `synaplan-platform` repo; the sidecar deploy notes are
 in `sidecars/synaplan-compute`.
+
+Operational rule for Cloud: `COMPUTE_URL` must not resolve to a web host —
+the tier gate (`COMPUTE.REQUIRE_TIER = gvisor`) verifies the isolation, but
+only the separate node gives the blast-radius separation. The platform
+runbook records the check per deploy.
 
 ## Quotas
 
@@ -164,10 +182,29 @@ sidecar run id). When policy asks first, the pause is a row in `BAPPROVALS`;
 the two join on the approval id. The owner finds a pending ask under
 **Approvals**.
 
+## Rollback
+
+Turning file work off is two independent switches; either one alone
+disables it:
+
+1. **Flag off** (`COMPUTE.ENABLED = 0`, Operate → System configuration → Tools & automation): the
+   planner stops offering `code_run` on the next turn, gateways stop
+   offering `code_execution`, `/api/v1/compute/*` answers 404, and both
+   reaper commands exit idle. Run history (`BCOMPUTERUNS`) and artefacts
+   in Files stay readable; the Workspace browser shows the
+   not-available state instead of an error.
+2. **Sidecar down** (`docker compose stop compute`): the System
+   status card degrades to unreachable (counts kept), the page itself
+   stays up, and new runs fail honestly instead of hanging.
+
+Rehearsed locally 2026-09-19 (flag flip + profile down, assertions in the
+track STATUS). The ten-run staging rehearsal from the B4 plan stays an ops
+item for the compute v1.x release.
+
 ## Related
 
 - Desktop client (skills on the user’s computer): [DESKTOP.md](./DESKTOP.md)
 - Anthropic-compatible Messages gateway: [ANTHROPIC_COMPATIBLE_API.md](./ANTHROPIC_COMPATIBLE_API.md)
 - Feature flags: [FEATURE_FLAGS.md](./FEATURE_FLAGS.md)
 - User docs (when published): [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute)
-- Plan of record: `_devextras/planning/202609_secure_compute/`
+- Plan of record: `_devextras/planning/20260903_secure_compute/`

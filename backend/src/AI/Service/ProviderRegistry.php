@@ -292,12 +292,13 @@ class ProviderRegistry
     /**
      * Return available providers for a capability.
      *
-     * @param string $capability  Registry capability key (chat, vision, embedding, image_generation, video_generation, speech_to_text, text_to_speech, file_analysis)
-     * @param bool   $includeTest Whether to include the internal TestProvider in the results
+     * @param string       $capability  Registry capability key (chat, vision, embedding, image_generation, video_generation, speech_to_text, text_to_speech, file_analysis)
+     * @param bool         $includeTest Whether to include the internal TestProvider in the results
+     * @param list<string> $exclude     Lowercase provider names to skip before isAvailable(). Use this when that probe forks a process.
      *
      * @return string[] List of provider names (preserves provider casing)
      */
-    public function getAvailableProviders(string $capability, bool $includeTest = true, bool $requireCapability = true): array
+    public function getAvailableProviders(string $capability, bool $includeTest = true, bool $requireCapability = true, array $exclude = []): array
     {
         $available = [];
 
@@ -305,6 +306,10 @@ class ProviderRegistry
             $normalized = strtolower($provider->getName());
 
             if (!$includeTest && 'test' === $normalized) {
+                continue;
+            }
+
+            if (in_array($normalized, $exclude, true)) {
                 continue;
             }
 

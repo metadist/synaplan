@@ -181,6 +181,33 @@ describe('RealtimeClient', () => {
     expect(events).toEqual([])
   })
 
+  it('does not open the socket until the page has finished loading', async () => {
+    const previous = document.readyState
+    Object.defineProperty(document, 'readyState', {
+      configurable: true,
+      get: () => 'loading',
+    })
+
+    try {
+      const client = buildClient({})
+      await client.connect()
+      expect(instances[0].connect).not.toHaveBeenCalled()
+
+      Object.defineProperty(document, 'readyState', {
+        configurable: true,
+        get: () => 'complete',
+      })
+      window.dispatchEvent(new Event('load'))
+
+      expect(instances[0].connect).toHaveBeenCalledOnce()
+    } finally {
+      Object.defineProperty(document, 'readyState', {
+        configurable: true,
+        get: () => previous,
+      })
+    }
+  })
+
   it('mirrors the centrifuge connection lifecycle into ConnectionState', async () => {
     const sink: { state?: ConnectionState; error?: string } = {}
     const client = buildClient(sink)

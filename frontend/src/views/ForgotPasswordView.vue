@@ -12,17 +12,15 @@
       ></div>
     </div>
     <div class="absolute top-6 right-6 flex items-center gap-4" data-testid="section-controls">
-      <button class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium" @click="cycleLanguage">
+      <button class="h-10 px-4 rounded-xl icon-ghost text-sm font-medium" @click="cycleLanguage">
         {{ currentLanguage.toUpperCase() }}
       </button>
       <button
-        class="h-10 w-10 rounded-lg icon-ghost flex items-center justify-center"
-        :aria-label="
-          themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-        "
+        class="h-10 w-10 rounded-xl icon-ghost flex items-center justify-center"
+        :aria-label="$t('appearance.cycle')"
         @click="toggleTheme"
       >
-        <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-5 h-5" />
+        <SunIcon v-if="themeStore.isDark?.value" class="w-5 h-5" />
         <MoonIcon v-else class="w-5 h-5" />
       </button>
     </div>
@@ -52,7 +50,7 @@
                 v-model="email"
                 type="email"
                 required
-                class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
+                class="w-full px-4 py-3 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
                 :placeholder="emailPlaceholder"
                 data-testid="input-email"
               />
@@ -60,7 +58,7 @@
 
             <Button
               type="submit"
-              class="w-full btn-primary py-3 rounded-lg font-medium"
+              class="w-full btn-primary py-3 rounded-xl font-medium"
               :disabled="isLoading"
               data-testid="btn-send"
             >
@@ -144,7 +142,7 @@
           </p>
           <div class="pt-4 space-y-3">
             <Button
-              class="w-full btn-secondary py-3 rounded-lg font-medium"
+              class="w-full btn-secondary py-3 rounded-xl font-medium"
               data-testid="btn-resend"
               @click="emailSent = false"
             >
@@ -170,7 +168,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { supportedLanguages } from '@/i18n'
+import { cycleLocale } from '@/i18n'
 import { SunIcon, MoonIcon, ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '@/composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
@@ -197,20 +195,10 @@ const mailerConfigured = computed(() => isMailerConfigured())
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const currentIndex = supportedLanguages.indexOf(
-    locale.value as (typeof supportedLanguages)[number]
-  )
-  const next = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
-  locale.value = next
-  localStorage.setItem('language', next)
+  void cycleLocale()
 }
 
-const toggleTheme = () => {
-  const themes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system']
-  const currentIndex = themes.indexOf(themeStore.theme.value)
-  const nextTheme = themes[(currentIndex + 1) % themes.length]
-  themeStore.setTheme(nextTheme)
-}
+const toggleTheme = () => themeStore.cycleTheme()
 
 const handleResetPassword = async () => {
   if (!email.value) return

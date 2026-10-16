@@ -94,6 +94,22 @@ final readonly class MessagesModelResolver
     }
 
     /**
+     * Use this BMODELS row as-is. A second lookup by provider id is unsafe:
+     * chat and pic2text rows can share one provider id.
+     *
+     * @return ResolvedModel
+     */
+    public function resolveSelected(Model $model): array
+    {
+        $requested = $model->getProviderId();
+        if ('' === $requested) {
+            $requested = $model->getName();
+        }
+
+        return $this->toResolved($model, $requested, null);
+    }
+
+    /**
      * @return ResolvedModel
      */
     private function toResolved(Model $model, string $requested, ?string $aliasedFrom): array

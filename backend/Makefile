@@ -1,4 +1,4 @@
-.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures setup-reset schema-update schema-diff console cache-clear shell test plan-eval sort-eval sort-eval-cascade summary-eval digest-run digest-eval digest-reindex routing-anchors-sync
+.PHONY: help lint format phpstan phpstan-baseline deptrac deptrac-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures setup-reset schema-update schema-diff console cache-clear shell test plan-eval sort-eval sort-eval-cascade summary-eval digest-run digest-eval digest-reindex routing-anchors-sync
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -15,6 +15,15 @@ phpstan: ## Run static analysis
 
 phpstan-baseline: ## Regenerate PHPStan baseline
 	docker compose -f ../docker-compose.yml exec -T backend vendor/bin/phpstan analyse --generate-baseline
+
+deptrac: ## Check layer dependencies (deptrac.yaml); fails on violations not in deptrac.baseline.yaml
+	docker compose -f ../docker-compose.yml exec -T backend composer deptrac
+
+metrics: ## Size of src/ against the ratchet limits: files > 800 lines, constructors > 10 params, methods > 100 lines
+	docker compose -f ../docker-compose.yml exec -T backend php tests/Architecture/size-metrics.php
+
+deptrac-baseline: ## Regenerate deptrac baseline (review the diff — it may only shrink)
+	docker compose -f ../docker-compose.yml exec -T backend vendor/bin/deptrac analyse --formatter=baseline --output=deptrac.baseline.yaml --no-progress
 
 audit: ## Run security audit
 	docker compose -f ../docker-compose.yml exec -T backend composer audit

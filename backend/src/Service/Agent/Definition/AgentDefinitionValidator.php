@@ -32,7 +32,12 @@ final class AgentDefinitionValidator
 
     public const MODEL_KEYS = ['chat', 'vision', 'vectorize'];
 
-    public const KNOWLEDGE_KEYS = ['ownFolder', 'folders', 'includeUserFiles', 'ragLimit', 'ragMinScore'];
+    public const KNOWLEDGE_KEYS = ['ownFolder', 'folders', 'fileIds', 'includeUserFiles', 'ragLimit', 'ragMinScore'];
+
+    /** `BFILES.BGROUPKEY` is varchar(128). The owner id sits in front of the colon. */
+    private const FOLDER_KEY_MAX_LENGTH = 128;
+
+    private const KNOWLEDGE_FILE_LIMIT = 50;
 
     public const TOOL_KEYS = ['internet', 'files', 'mcpServers', 'allow', 'deny'];
 
@@ -71,9 +76,16 @@ final class AgentDefinitionValidator
 
     public const EVENT_KINDS = ['mail', 'whatsapp', 'widget', 'api', 'mcp', 'desktop', 'webhook'];
 
-    private const MODEL_KEY_PATTERN = '/^[a-z0-9._-]+:[a-z0-9._-]+(?::[a-z0-9._-]+)?$/i';
+    /**
+     * Catalog keys are `service:providerId:tag` as built by
+     * {@see \App\Service\Iam\Policy\GroupPolicyService::catalogKey()}:
+     * colons inside providerId become dashes, but `/` and `@` stay
+     * (`groq:openai/gpt-oss-120b:chat`, `cloudflare:@cf/baai/bge-m3:vectorize`).
+     */
+    private const MODEL_KEY_PATTERN = '/^[a-z0-9._-]+:[a-z0-9._\/@+-]+(?::[a-z0-9._-]+)?$/i';
 
-    private const FOLDER_PATTERN = '/^\d+:[A-Za-z0-9:_-]+$/';
+    /** Control characters, including newlines. Folder names may contain spaces and non-ASCII letters. */
+    private const FOLDER_KEY_CONTROL = '/[\x00-\x1F\x7F]/';
 
     /**
      * @param array<mixed> $json
@@ -171,7 +183,10 @@ final class AgentDefinitionValidator
             $out['ownFolder'] = $knowledge['ownFolder'];
         }
         if (array_key_exists('folders', $knowledge)) {
-            $out['folders'] = $this->stringList($knowledge['folders'], 'knowledge.folders', self::FOLDER_PATTERN);
+            $out['folders'] = $this->folderList($knowledge['folders']);
+        }
+        if (array_key_exists('fileIds', $knowledge)) {
+            $out['fileIds'] = $this->knowledgeFileIds($knowledge['fileIds']);
         }
         if (array_key_exists('includeUserFiles', $knowledge)) {
             if (!is_bool($knowledge['includeUserFiles'])) {
@@ -619,6 +634,76 @@ final class AgentDefinitionValidator
                 throw $this->fail($path, sprintf('Unknown key "%s" in agent.v1', $path));
             }
         }
+    }
+
+    /**
+     * `{ownerId}:{groupKey}`. The key may contain spaces and Unicode letters.
+     * Control characters and keys longer than the group-key column are rejected
+     * with the folder name in the message.
+     *
+     * @return list<string>
+     */
+    private function folderList(mixed $value): array
+    {
+        if (!is_array($value) || !array_is_list($value)) {
+            throw $this->fail('knowledge.folders', 'knowledge.folders must be an array');
+        }
+        $out = [];
+        foreach ($value as $i => $item) {
+            $path = 'knowledge.folders.'.$i;
+            if (!is_string($item)) {
+                throw $this->fail($path, 'knowledge.folders entries must be strings');
+            }
+            $pos = strpos($item, ':');
+            if (false === $pos || 0 === $pos || !ctype_digit(substr($item, 0, $pos))) {
+                throw $this->fail($path, $path.' must be ownerId:groupKey');
+            }
+            $key = substr($item, $pos + 1);
+            $label = mb_strlen($key) > 80 ? mb_substr($key, 0, 77).'...' : $key;
+            if ('' === $key) {
+                throw $this->fail($path, $path.' must name a folder');
+            }
+            if (mb_strlen($key) > self::FOLDER_KEY_MAX_LENGTH) {
+                throw $this->fail($path, $path.' "'.$label.'" is longer than '.self::FOLDER_KEY_MAX_LENGTH.' characters');
+            }
+            if (1 === preg_match(self::FOLDER_KEY_CONTROL, $key)) {
+                throw $this->fail($path, $path.' "'.$label.'" contains a control character');
+            }
+            $out[] = $item;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Library file ids the assistant searches without copying the file.
+     *
+     * @return list<int>
+     */
+    private function knowledgeFileIds(mixed $value): array
+    {
+        if (!is_array($value) || !array_is_list($value)) {
+            throw $this->fail('knowledge.fileIds', 'knowledge.fileIds must be an array');
+        }
+        if (count($value) > self::KNOWLEDGE_FILE_LIMIT) {
+            throw $this->fail('knowledge.fileIds', 'knowledge.fileIds accepts at most '.self::KNOWLEDGE_FILE_LIMIT.' files');
+        }
+        $out = [];
+        foreach ($value as $i => $item) {
+            $path = 'knowledge.fileIds.'.$i;
+            if (!is_int($item) && !(is_string($item) && ctype_digit($item))) {
+                throw $this->fail($path, 'knowledge.fileIds entries must be file ids');
+            }
+            $id = (int) $item;
+            if ($id < 1) {
+                throw $this->fail($path, 'knowledge.fileIds entries must be file ids');
+            }
+            if (!in_array($id, $out, true)) {
+                $out[] = $id;
+            }
+        }
+
+        return $out;
     }
 
     /**

@@ -80,6 +80,11 @@ class StripeWebhookControllerTest extends WebTestCase
         $this->em->flush();
     }
 
+    protected function assertPostConditions(): void
+    {
+        $this->stripeMock->assertParamsMatchSdk();
+    }
+
     protected function tearDown(): void
     {
         // Reset the Stripe SDK back to its default cURL client so an unrelated

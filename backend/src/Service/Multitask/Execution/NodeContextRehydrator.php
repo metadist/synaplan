@@ -35,6 +35,19 @@ final readonly class NodeContextRehydrator
             throw new \RuntimeException('This run has no saved step results to resume from.');
         }
 
+        return $this->fromMessage($message, $options);
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function fromMessage(Message $message, array $options = []): NodeContext
+    {
+        $messageId = $message->getId();
+        if (null === $messageId) {
+            throw new \RuntimeException('This message has no saved step results to resume from.');
+        }
+
         $context = new NodeContext(
             $message,
             [],

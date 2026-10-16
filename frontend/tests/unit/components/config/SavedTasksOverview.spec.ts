@@ -3,9 +3,16 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
 import type { SavedTask } from '@/services/api/savedTasksApi'
 
-const { mockList, mockAgentsEnabled } = vi.hoisted(() => ({
+const { mockList, mockAgentsEnabled, savedTasksOn, mockRoute } = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockAgentsEnabled: vi.fn(() => false),
+  savedTasksOn: { value: true },
+  mockRoute: { query: {} as Record<string, string> },
+}))
+
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
+  useRoute: () => mockRoute,
 }))
 
 vi.mock('@/services/api/savedTasksApi', () => ({
@@ -22,6 +29,10 @@ vi.mock('@/composables/useIamFeature', () => ({
 
 vi.mock('@/composables/useAgentsFeature', () => ({
   isAgentsEnabled: () => mockAgentsEnabled(),
+}))
+
+vi.mock('@/composables/useSavedTasksFeature', () => ({
+  isSavedTasksEnabled: () => savedTasksOn.value,
 }))
 
 vi.mock('@/services/api/iamApi', () => ({
@@ -72,6 +83,13 @@ const UrlWatchPanelStub = {
     '<div data-testid="url-watch-panel"><button type="button" data-testid="emit-unavailable" @click="$emit(\'unavailable\')" /><button type="button" data-testid="emit-count" @click="$emit(\'count\', 2)" /></div>',
 }
 
+const NewTaskDialogStub = {
+  name: 'NewTaskDialog',
+  props: ['open'],
+  emits: ['close', 'created'],
+  template: '<div data-testid="new-task-dialog-stub" />',
+}
+
 const mountPage = async () => {
   const wrapper = mount(SavedTasksOverview, {
     global: {
@@ -81,6 +99,7 @@ const mountPage = async () => {
         TabNav: TabNavStub,
         SavedTaskCard: { template: '<div data-testid="saved-task-card" />', props: ['task'] },
         UrlWatchPanel: UrlWatchPanelStub,
+        NewTaskDialog: NewTaskDialogStub,
       },
     },
   })
@@ -91,25 +110,43 @@ const mountPage = async () => {
 describe('SavedTasksOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-  })
-
-  it('shows the empty state when nothing is saved', async () => {
-    mockList.mockResolvedValue([])
-    const wrapper = await mountPage()
-    const empty = wrapper.get('[data-testid="saved-tasks-empty"]')
-    expect(empty.text()).toContain('Nothing scheduled')
-    expect(empty.text()).toContain('save a custom instruction')
-    expect(empty.get('a').attributes('to')).toBe('/ai/instructions')
-  })
-
-  it('points the empty state at Assistants while the Assistants flag is on', async () => {
-    mockAgentsEnabled.mockReturnValue(true)
-    mockList.mockResolvedValue([])
-    const wrapper = await mountPage()
-    const empty = wrapper.get('[data-testid="saved-tasks-empty"]')
-    expect(empty.text()).toContain('add a schedule to an assistant')
-    expect(empty.get('a').attributes('to')).toBe('/ai/assistants')
+    savedTasksOn.value = true
     mockAgentsEnabled.mockReturnValue(false)
+    mockRoute.query = {}
+  })
+
+  it('rings the task a search result points at', async () => {
+    mockRoute.query = { task: '7' }
+    mockList.mockResolvedValue([task, { ...task, id: 8, name: 'Other' }])
+    const wrapper = await mountPage()
+    const highlighted = wrapper.findAll('[data-testid="saved-task-highlighted"]')
+    expect(highlighted).toHaveLength(1)
+    expect(highlighted[0]!.attributes('data-task-id')).toBe('7')
+  })
+
+  it('is absent and does not load when saved tasks are off', async () => {
+    savedTasksOn.value = false
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="page-saved-tasks"]').exists()).toBe(false)
+    expect(mockList).not.toHaveBeenCalled()
+  })
+
+  it('shows one sentence and a New task action when nothing is saved', async () => {
+    mockList.mockResolvedValue([])
+    const wrapper = await mountPage()
+    const empty = wrapper.get('[data-testid="saved-tasks-empty"]')
+    expect(empty.text()).toContain('No tasks yet')
+    await empty.get('[data-testid="btn-new-task-empty"]').trigger('click')
+    expect(wrapper.findComponent({ name: 'NewTaskDialog' }).props('open')).toBe(true)
+  })
+
+  it('puts a task created in the dialog at the top of the list', async () => {
+    mockList.mockResolvedValue([task])
+    const wrapper = await mountPage()
+    await wrapper.get('[data-testid="btn-new-task"]').trigger('click')
+    wrapper.findComponent({ name: 'NewTaskDialog' }).vm.$emit('created', { ...task, id: 99 })
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="saved-task-card"]')).toHaveLength(2)
   })
 
   it('lists each saved task', async () => {

@@ -55,7 +55,11 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
 ```
 
 The production stack starts in Cloud-AI mode by default. Configure a provider
-after login under **Admin → AI Providers**.
+after login under **Admin → AI Providers**. Models of a key-based provider
+stay hidden from users, and greyed in the admin catalog, until that key is
+saved. Ollama depends on the model being pulled; Whisper and Piper depend on
+the local install, not a key. See
+[CONFIGURATION.md — Availability](CONFIGURATION.md#availability).
 
 To add Ollama and Whisper on a host with at least 16 GB RAM and sufficient disk,
 enable the optional profile and redeploy:
@@ -180,6 +184,52 @@ The same feed is available to the in-chat AI through the admin-only `recent_erro
 | Interval | 5 min |
 | Alert threshold | 2 consecutive failures |
 
+### Background jobs (scheduler)
+
+The `scheduler` service (`SYNAPLAN_ROLE=scheduler`) runs every periodic job.
+Jobs run in five lanes, so a slow job never holds up the others:
+
+| Lane | When | Jobs |
+|------|------|------|
+| Every minute | each tick | media reaper, stuck chats, desktop jobs, inbound mail handlers |
+| Saved Tasks | each tick | `app:saved-tasks:tick` |
+| Hourly | once an hour | expired temporary files, expired approvals, new-model discovery |
+| Daily | once a day at `SYNAPLAN_SCHEDULER_DAILY_AT` (UTC, default `03:30`) | update check, model availability, message digest, documentation sync, approval digest |
+| Model health | every 15 minutes | `app:model:health-check` |
+
+Every job has a time limit except Saved Tasks, whose runs must not be cut off
+halfway. The hourly, daily and model-health lanes claim their slot in the
+database before they run: a restart does not repeat them, and a slot that
+never ran (a fresh install) runs at once. Two daily runs are at least 12 hours
+apart, so a first start shortly before the daily time does not run them twice.
+Every-minute jobs hold a cross-node lock that outlasts their time limit, so
+one scheduler per web node is safe when the nodes share the database and
+Redis.
+
+A Saved Task does not start again while its previous run is still going; that
+occurrence is skipped. A run cut off by a restart is marked failed after 30
+minutes with a message telling the owner to use **Run now**, instead of
+showing "running" forever.
+
+Check that jobs run:
+
+```bash
+docker compose exec -T backend php bin/console app:scheduler:status
+```
+
+Exit code `0` means jobs are running, `2` that no every-minute job finished
+in the last 10 minutes (`--max-age=<seconds>` to change), `1` that the check
+itself failed. Point an external monitor at it.
+
+Optional jobs, off by default. Set them, and `SYNAPLAN_SCHEDULER_DAILY_AT`, in
+the scheduler service's `environment` (the self-host `deploy/compose.yaml` does
+not pass them through from `deploy/.env`):
+
+| Variable | Adds |
+|----------|------|
+| `SYNAPLAN_SCHEDULER_SMART_MAILBOX=1` | `app:process-emails` every minute: the operator smart mailbox (`GMAIL_USERNAME` / `GMAIL_PASSWORD`) |
+| `SYNAPLAN_SCHEDULER_PRICE_SYNC=1` | `app:sync-model-prices` daily: writes LiteLLM prices into the model table; read [Pricing maintenance](PRICING_MAINTENANCE.md) first |
+
 ---
 
 ## Backups
@@ -300,7 +350,7 @@ Rotate `APP_SECRET`:
 ### Sessions survive restarts
 
 There is no JWT keypair to generate. Sign-in uses two HttpOnly cookies minted
-by `App\Service\TokenService`:
+by `App\Service\Auth\TokenService`:
 
 | Cookie | Lifetime | Where it lives | What a restart does |
 | ------ | -------- | -------------- | ------------------- |
@@ -407,12 +457,44 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 
 ---
 
-## People and groups
+## The Operate area
 
-Groups, the People page under Operate, and the group API are gated by
+Operate is grouped by topic. Each entry answers one question; the tabs
+inside it are the sub-topics.
+
+| Entry | Path | What it holds |
+| ----- | ---- | ------------- |
+| **Overview** | `/admin` | Server info, users and sign-ups, **Usage (all users)**, subscription plans |
+| **System status** | `/admin/features` | Health of every service and optional module (badge: disabled services) |
+| **AI infrastructure** | `/admin/setup` | Everything the AI needs — see below (badge: models that need attention) |
+| **Users** | `/admin/people` | Users, groups, policies, platform instances, **Moderation**, audit log |
+| **System configuration** | `/admin/config` | Platform settings — see below |
+
+**AI infrastructure** tabs: **Providers & keys** (provider key cards, local
+AI with its Ollama address, self-hosted AI, speech output), **Model health**,
+**Document reading** (extraction chains plus the Tika, Docling, PDF rasterizer
+and Whisper services), **Knowledge search** (embeddings, vector database,
+search thresholds, reranking), **Chat behavior** (multi-step routing,
+conversation summary, deep memory, background media generation) and
+**System prompts**.
+
+**System configuration** topics: **Access** (sign-in & registration, sharing &
+audit), **Features & tools** (feature switches, web search, tools &
+automation — saved tasks, tool approval rules, file work), **Channels &
+apps** (email, channels & integrations, mobile app) and **Appearance**
+(branding, interface, guest landing page). A setting the page cannot sort
+into a topic appears under **More settings**.
+
+Old links keep working: `/admin/model-status`, `/admin?tab=prompts`,
+`/admin?tab=moderation`, `/admin/setup?tab=models|extraction|rerank|web-search`
+and `/admin/config?tab=ai|processing|vectordb|routing` land on the new home.
+
+## Users and groups
+
+Groups, the Users page under Operate, and the group API are gated by
 `IAM.GROUPS_ENABLED` (BCONFIG group `IAM`, owner `0`). The flag is **on by
 default** (seeded `1`; a migration turns it on for existing installs). Operators
-switch it in **Operate → System configuration → Features → People & sharing**
+switch it in **Operate → System configuration → Features → Users & sharing**
 (`/admin/config?tab=features`, field `FEATURE_IAM_GROUPS_ENABLED`) or pin it
 for automated deployments with the environment variable
 `FEATURE_IAM_GROUPS_ENABLED=false`. See [Feature flags](FEATURE_FLAGS.md) for
@@ -420,7 +502,7 @@ the full list.
 
 When the flag is off:
 
-- Operate **People** (`/admin/people`) is still the user list. The tab bar
+- Operate **Users** (`/admin/people`) is still the user list. The tab bar
   is hidden only when Users is the sole enabled section (Groups, Policies,
   Platform instances and Audit stay flag-gated). `/admin?tab=users` redirects
   there.
@@ -429,12 +511,12 @@ When the flag is off:
 
 When the flag is on:
 
-- Operate **People** (`/admin/people`) shows **Users**, **Groups**, and
+- Operate **Users** (`/admin/people`) shows **Users**, **Groups**, and
   **Audit**. **Policies** appears only when group policies are also on.
-- An admin can create a manual group, add people by email, and set the role
+- An admin can create a manual group, add users by email, and set the role
   to member or manager.
 - Groups that come from company login (`kind=directory`) can still receive
-  extra people by hand; memberships that came from login update at the next
+  extra users by hand; memberships that came from login update at the next
   sign-in.
 - Sharing a folder or conversation with a group is gated separately by
   `IAM.SHARING_ENABLED` (effective only when groups are also on).
@@ -442,38 +524,56 @@ When the flag is on:
 ## Sharing
 
 Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
-(both are on by default; **Features → People & sharing** or
+(both are on by default; **Features → Users & sharing** or
 `FEATURE_IAM_SHARING_ENABLED`). When they are on:
 
 - An owner can share a knowledge folder, a conversation, an **AI assistant**,
-  a **saved task**, or a **chat widget** with a person, a group, or everyone
+  a **saved task**, or a **chat widget** with a user, a group, or everyone
   on the instance.
 - Conversation permissions are **Can view** and **Can use**. **Can use** lets
   a member continue the chat as their own copy (file binaries stay with the
   owner).
-- RAG only includes another person's files when a share grants **Can use**
+- RAG only includes another user's files when a share grants **Can use**
   or higher. A query never runs without an owner scope.
-- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only`) is on the same Sharing
-  page. With `admins_only`, the share dialog does not offer
-  "Everyone on this instance" to non-admins.
-- **Can manage** on a folder lets that person re-share it; only the owner can
+- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only` | `disabled`) is on the
+  same Sharing page. It decides who may share with everyone who has an account.
+  On an instance where anyone can sign up, that is every registered account,
+  so a public instance runs `disabled`.
+  - `any_owner` — every owner may share with all accounts.
+  - `admins_only` — only administrators may create those shares. Shares that
+    already exist keep working.
+  - `disabled` — the share dialog does not offer "Everyone with an account",
+    new shares are refused, and shares users created earlier grant nothing
+    until you pick another value. The users they reached lose access without
+    being told. Nothing is deleted: the owner still sees the share in the
+    Share dialog, marked as not in effect, and can remove it; switching back
+    to `any_owner` or `admins_only` restores it. System assistants and
+    plugin-pack assistants are the platform's own shares and stay available
+    to every account on every value.
+  - Which value an install has: the upgrade sets `disabled` where sign-up is
+    open (no `REGISTRATION_ENABLED=false`, no stored "off" under Access) and
+    leaves invite-only and SSO-only installs at their stored value. A fresh
+    install seeds `disabled` unless `REGISTRATION_ENABLED=false` is set before
+    the first start. Turning sign-up off later does not change this setting —
+    an install that is one organization picks `any_owner` here.
+- **Can manage** on a folder lets that user re-share it; only the owner can
   delete it. Sharing an item with yourself is rejected.
 - A copy made with "continue as copy" keeps the conversation text, but the
   owner's files are readable and searchable only while the share exists.
   Revoking the share closes them again on the next request.
 - The public link token of a conversation is only returned to its owner; a
   group share never exposes it.
-- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `1`) puts people into groups from the
+- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `1`) puts users into groups from the
   company login (OIDC groups claim) at sign-in. Role mapping is unchanged.
-  Directory groups show **From your login** on People; you can still add extra
-  people by hand. Login-managed memberships update at the next sign-in.
+  Directory groups show **From your login** on Users; you can still add extra
+  users by hand. Login-managed memberships update at the next sign-in.
 
 ### Directory groups
 
 **Directory groups** is on by default; switch it under **Operate → System
-configuration → Features → People & sharing**
-(`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`). The claim settings stay under
-**Access → Sharing**. Optional settings:
+configuration → Features → Users & sharing**
+(`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`). The claim settings live under
+**Operate → System configuration → Access → Sharing & audit**. Optional settings:
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
@@ -485,7 +585,7 @@ token-exchange check: `_devextras/testing/iam/opencloud-regression.md`.
 
 ### Audit
 
-People → **Audit** lists who shared what, group changes, login-group updates,
+Users → **Audit** lists who shared what, group changes, login-group updates,
 impersonation, and when an admin opened another user's resource list. Rows
 never include content. `app:iam:reap-audit` deletes rows older than
 `IAM.AUDIT_RETENTION_DAYS` (default 365; `0` keeps them forever).
@@ -493,30 +593,30 @@ never include content. `app:iam:reap-audit` deletes rows older than
 ### Admin privacy and impersonation
 
 Administrators can share, unshare and delete (manage) but they cannot read
-another person's chats, files or assistants unless those items are shared with
-them. **Operate → People → Users** has **View as user** for audited
+another user's chats, files or assistants unless those items are shared with
+them. **Operate → Users** has **View as user** for audited
 impersonation (`IAM.ADMIN_IMPERSONATION` = `audited`). Set it to `disabled`
 to hide that action.
 
 ### Group policies and locked defaults
 
 **Group policies** is switched under **Operate → System configuration →
-Features → People & sharing** (`FEATURE_IAM_GROUP_POLICIES_ENABLED`). People &
+Features → Users & sharing** (`FEATURE_IAM_GROUP_POLICIES_ENABLED`). Users &
 groups must also be on. The seeder inserts the flag as `1`. Off means every
 resolver reads only `[user, global]` and never touches `BGROUPCONFIG`.
 
-When the flag is on, People shows a **Policies** tab. Pick one group at a
+When the flag is on, Users shows a **Policies** tab. Pick one group at a
 time and set:
 
 | Setting | What it does | Several groups |
 | ------- | ------------ | -------------- |
 | Default models (`DEFAULTMODEL.*`) | Suggested model per capability | First group by id |
 | Allowed models (`MODELS.ALLOWED`) | Empty = every model; a list hides the rest | Union |
-| Features (saved tasks, desktop agent, document tools, multi-step) | Inherit (no group row) uses the instance default. **On for this group** turns it on. **Off for this group** stores `0`, which sits ahead of the instance default, so members lose the feature even when the instance is on. Across a person's groups, any **on** wins | OR among group rows; merged group value precedes the instance default |
+| Features (saved tasks, desktop agent, document tools, multi-step) | Inherit (no group row) uses the instance default. **On for this group** turns it on. **Off for this group** stores `0`, which sits ahead of the instance default, so members lose the feature even when the instance is on. Across a user's groups, any **on** wins | OR among group rows; merged group value precedes the instance default |
 | Rate-limit tier (`RATELIMITS.TIER`) | Which limit table `checkLimit()` uses | Highest of NEW / PRO / TEAM / BUSINESS |
 
 A personal setting still wins unless you lock the **instance** default.
-Locked defaults live in **People → Policies** in the **Locked instance
+Locked defaults live in **Users → Policies** in the **Locked instance
 defaults** panel (always visible; not tied to the selected group). They flip
 `BCONFIG.BLOCKED` on the global row, so the lock applies to every group and
 every user. While a lock is on, the group value configured on the same page is
@@ -535,9 +635,9 @@ row.
 
 Acceptance script: `_devextras/testing/iam/policy-demo.sh`.
 
-The People, sharing, and policy switches live under
-**Operate → System configuration → Features → People & sharing**. The page
-reloads the runtime config so People, Share, and Policies appear without a
+The Users, sharing, and policy switches live under
+**Operate → System configuration → Features → Users & sharing**. The page
+reloads the runtime config so Users, Share, and Policies appear without a
 restart. For automated deployments pin a flag with its `FEATURE_*` environment
 variable (the toggle then shows as locked); SQL remains available too:
 
@@ -556,7 +656,7 @@ ON DUPLICATE KEY UPDATE BVALUE = '1';
 3. Open **Share** and grant **Can use** to the group (for example Sales).
 4. Members of that group see the assistant in their list and the classifier
    may pick it. Its knowledge folder `TASKPROMPT:{topic}` rides with the
-   share. People outside the group get **403** on `GET /api/v1/prompts/{id}`.
+   share. Users outside the group get **403** on `GET /api/v1/prompts/{id}`.
 5. A shared **saved task** is run as the member's own copy
    (`POST /api/v1/saved-tasks/{id}/copy`) — trigger resets to manual. The
    assistant on that task must also be usable (owned, system, or shared
@@ -590,17 +690,17 @@ A plugin `manifest.json` may declare shareable rows in `plugin_data`:
 the field. Shared rows are loaded with
 `PluginDataRepository::findSharedWith($userId, $pluginId, $dataType)`.
 
-Public token links are unchanged. Admins do not see other people's chats,
+Public token links are unchanged. Admins do not see other users' chats,
 files, assistants, tasks, or widget transcripts unless those items are shared
 with them.
 
-**People & groups** is on by default (`FEATURE_IAM_GROUPS_ENABLED` on the
+**Users & groups** is on by default (`FEATURE_IAM_GROUPS_ENABLED` on the
 Features tab). Members see **Account → My groups**. Rollback is the same toggle
 (or SQL with `'0'`, or `FEATURE_IAM_GROUPS_ENABLED=false`). Group rows stay in
 the database.
 
 API keys: empty or legacy webhook-only scopes keep full access. A key that
-opts into `iam:read` or `iam:manage` is limited to those People routes.
+opts into `iam:read` or `iam:manage` is limited to those Users routes.
 
 ---
 
@@ -699,7 +799,7 @@ Rollback is the same statement with `'0'`. Rows in `BPLATFORMINSTANCES` and
 **Approving instances.** A partner instance registered by a signed-in
 administrator is `active` immediately. One registered anonymously or by a
 regular user is `pending` and cannot issue link codes until an administrator
-approves it under **Operate → People → Linked platforms** (host, client,
+approves it under **Operate → Users → Platform instances** (host, client,
 status, last seen; *Approve* / *Revoke*). Anonymous registration is limited to
 10 per hour per address. Revoking an instance also revokes every key it
 issued.
@@ -714,7 +814,7 @@ a user may issue at most 20 per hour.
 instance registered (HTTPS only outside dev, same host, same port, no
 wildcard hosts). A rejected redirect is audited as
 `platform_link.redirect_rejected`; every register, approve, revoke, link and
-disconnect writes a People → Audit row. Re-linking an external id that already
+disconnect writes a Users → Audit row. Re-linking an external id that already
 belonged to another Synaplan account revokes the old key and moves the link to
 the new account (`platform_link.reassigned`, audited under both) — one external
 user is never two Synaplan accounts at once.
@@ -733,21 +833,21 @@ through if they fail, so a down sidecar never blocks an upload.
 
 Web search defaults to Brave (`WEB_SEARCH.PROVIDER=brave`). An admin
 picks Brave, SearXNG, Tavily, Exa, Firecrawl or Perplexity on
-**Operate → AI infrastructure → Web search**, plus an optional
-fallback. The next chat search uses the new provider with no restart.
+**Operate → System configuration → Web search**, plus an optional
+fallback. The Brave API key and result count sit on the same tab. The next chat search uses the new provider with no restart.
 **Test query** shows up to five titles. Per-user override is
 **Settings → Use my own search**, only when
 `WEB_SEARCH.USER_OVERRIDE_ALLOWED=1`.
 
 Rerank stays **off** by default (`RERANK.ENABLED=0`) until a live eval
 shows recall@5 up and p95 latency inside the budget. An admin turns it
-on under **Operate → AI infrastructure → Reranking**: pick a catalog
+on under **Operate → AI infrastructure → Knowledge search → Reranking**: pick a catalog
 rerank model (TEI / Jina / Cohere / Voyage), set how many extra
 snippets to fetch and the millisecond budget, optionally allow the
 summary model as a costly fallback, and run **Test order** on sample
 snippets. Chat search is unchanged while rerank is off.
 
-Importing models saves typing each row by hand. On **Models & keys**,
+Importing models saves typing each row by hand. On **Providers & keys**,
 an OpenAI-compatible endpoint card has **Import models** and the local
 AI card has **Import pulled models**. The preview lists what the
 endpoint offers with a guessed capability tag you can edit, and an
@@ -763,15 +863,24 @@ switched off; it recovers by itself when the endpoint lists it again.
 An **unreachable** endpoint marks nothing, so a brief outage never
 retires a model. Native Ollama is not capability-probed this way.
 
+Image generation on the same endpoint uses the OpenAI Images API
+(`POST {base}/images/generations`), not the Responses API. Tick
+**text2pic** on the endpoint, import or add a model whose id the
+gateway already serves (for a local box, LocalAI's `flux.1-schnell`),
+and set that model as the image default under Settings. `/pic` then
+draws with that model. The endpoint does not edit an attached picture;
+remove the attachment or pick another image model for edits.
+
 The Operate page is **AI infrastructure** (`/admin/setup`). The
-**Extraction** tab shows adapter health, lets an admin reorder a family
-chain, and offers **Test with a file**. Tika and Docling have the same
-sidecar controls: a connection test on that tab, and URL / timeout
-(plus Docling max file size) under **System configuration →
-Processing**. Models & keys is the previous provider-key UI and now
-includes Perplexity as an optional chat provider. The **Web search**
-tab is the provider picker. The **Reranking** tab is the rerank
-settings and test.
+**Document reading** tab shows adapter health, lets an admin reorder a
+family chain, and offers **Test with a file**; below it, **Reading
+services** holds the URL, timeout and a connection test for Tika and
+Docling (plus Docling max file size), the PDF rasterizer and Whisper.
+**Providers & keys** holds the provider key cards (Perplexity included as
+an optional chat provider). **Knowledge search** holds embeddings, the
+vector database, the search thresholds and the rerank settings and test.
+The web search picker is a platform setting on **System configuration →
+Web search**.
 
 Settings table: [CONFIGURATION.md — AI plugs](CONFIGURATION.md#ai-plugs-plugs).
 
@@ -801,7 +910,7 @@ The following command **permanently destroys all data** including the database, 
 
 ```bash
 docker compose down -v
-docker compose up -d
+make up
 ```
 
 **Do not run `docker compose down -v` on production systems.**

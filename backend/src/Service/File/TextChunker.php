@@ -36,54 +36,49 @@ final readonly class TextChunker
         // Expand any line that is larger than a whole chunk into smaller
         // segments (sentence → word → character boundaries). Without this a
         // long text that contains no newlines would collapse into a single
-        // oversized chunk. Each segment keeps its original line number so the
-        // overlap bookkeeping below still works.
-        $segments = [];
-        foreach ($lines as $lineNum => $line) {
-            foreach ($this->splitLongLine($line) as $segment) {
-                $segments[] = ['text' => $segment, 'line' => $lineNum];
-            }
-        }
-
+        // oversized chunk. Segments are consumed as they are produced: a CSV
+        // with millions of lines must not allocate a second copy of every
+        // line before chunking starts.
         $chunks = [];
         $currentChunk = '';
         $chunkStartLine = 0;
         $chunkEndLine = 0;
 
-        foreach ($segments as $segment) {
-            $line = $segment['text'];
-            $lineNum = $segment['line'];
-            $lineLength = strlen($line);
+        foreach ($lines as $lineNum => $line) {
+            foreach ($this->splitLongLine($line) as $segmentText) {
+                $line = $segmentText;
+                $lineLength = strlen($line);
 
-            // If current chunk + new line would exceed max size
-            if (strlen($currentChunk) + $lineLength + 1 > $this->maxChunkSize && strlen($currentChunk) > 0) {
-                // Save current chunk if it meets minimum size
-                if (strlen($currentChunk) >= $this->minChunkSize) {
-                    $chunks[] = [
-                        'content' => trim($currentChunk),
-                        'start_line' => $chunkStartLine,
-                        'end_line' => $chunkEndLine,
-                    ];
+                // If current chunk + new line would exceed max size
+                if (strlen($currentChunk) + $lineLength + 1 > $this->maxChunkSize && strlen($currentChunk) > 0) {
+                    // Save current chunk if it meets minimum size
+                    if (strlen($currentChunk) >= $this->minChunkSize) {
+                        $chunks[] = [
+                            'content' => trim($currentChunk),
+                            'start_line' => $chunkStartLine,
+                            'end_line' => $chunkEndLine,
+                        ];
 
-                    // Start new chunk with overlap
-                    $overlapText = $this->getOverlapText($currentChunk);
-                    $currentChunk = $overlapText."\n".$line;
-                    $chunkStartLine = max(0, $lineNum - $this->getOverlapLines($lines, $lineNum));
+                        // Start new chunk with overlap
+                        $overlapText = $this->getOverlapText($currentChunk);
+                        $currentChunk = $overlapText."\n".$line;
+                        $chunkStartLine = max(0, $lineNum - $this->getOverlapLines($lines, $lineNum));
+                    } else {
+                        // Chunk too small, just add line
+                        $currentChunk .= "\n".$line;
+                    }
                 } else {
-                    // Chunk too small, just add line
-                    $currentChunk .= "\n".$line;
+                    // Add line to current chunk
+                    if (empty($currentChunk)) {
+                        $currentChunk = $line;
+                        $chunkStartLine = $lineNum;
+                    } else {
+                        $currentChunk .= "\n".$line;
+                    }
                 }
-            } else {
-                // Add line to current chunk
-                if (empty($currentChunk)) {
-                    $currentChunk = $line;
-                    $chunkStartLine = $lineNum;
-                } else {
-                    $currentChunk .= "\n".$line;
-                }
+
+                $chunkEndLine = $lineNum;
             }
-
-            $chunkEndLine = $lineNum;
         }
 
         // Add remaining chunk

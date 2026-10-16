@@ -31,7 +31,7 @@
               </div>
             </div>
             <button
-              class="ml-4 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
+              class="ml-4 p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
               aria-label="Close"
               data-testid="btn-file-content-close"
               @click="close"
@@ -130,7 +130,7 @@
           >
             <button
               :disabled="!fileData?.extracted_text"
-              class="px-4 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5"
+              class="px-4 py-2 rounded-xl flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-black/5 dark:hover:bg-white/5"
               data-testid="btn-file-content-copy"
               @click="copyToClipboard"
             >
@@ -145,7 +145,7 @@
               Copy Text
             </button>
             <button
-              class="btn-primary px-6 py-2 rounded-lg"
+              class="btn-primary px-6 py-2 rounded-xl"
               data-testid="btn-file-content-dismiss"
               @click="close"
             >

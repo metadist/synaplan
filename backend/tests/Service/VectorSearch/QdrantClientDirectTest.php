@@ -9,6 +9,8 @@ use App\Service\VectorSearch\QdrantPointId;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\HttpClient\Exception\TimeoutException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -614,6 +616,75 @@ final class QdrantClientDirectTest extends TestCase
         $this->assertFalse($client->isAvailable());
     }
 
+    public function testHealthCheckCachesARealOutage(): void
+    {
+        $attempts = 0;
+        $client = new QdrantClientDirect(
+            httpClient: new MockHttpClient(function () use (&$attempts): MockResponse {
+                ++$attempts;
+
+                return new MockResponse('nope', ['http_code' => 503]);
+            }),
+            qdrantUrl: self::QDRANT_URL,
+            logger: new NullLogger(),
+            cache: new ArrayAdapter(),
+        );
+
+        $this->assertFalse($client->healthCheck());
+        $this->assertFalse($client->healthCheck());
+        $this->assertSame(1, $attempts);
+    }
+
+    public function testHealthCheckTimeoutSkipsQdrantOnlyBriefly(): void
+    {
+        $attempts = 0;
+        $cache = new ArrayAdapter();
+        $client = new QdrantClientDirect(
+            httpClient: new MockHttpClient(function () use (&$attempts): MockResponse {
+                ++$attempts;
+                if (1 === $attempts) {
+                    throw new TimeoutException('Idle timeout reached for "http://localhost:6333/healthz".');
+                }
+
+                return new MockResponse('', ['http_code' => 200]);
+            }),
+            qdrantUrl: self::QDRANT_URL,
+            logger: new NullLogger(),
+            cache: $cache,
+        );
+
+        $this->assertFalse($client->healthCheck(), 'a hung Qdrant must not be called for this request');
+        $this->assertFalse($client->healthCheck(), 'nor for the next few seconds');
+        $this->assertSame(1, $attempts);
+
+        $expiries = (new \ReflectionProperty(ArrayAdapter::class, 'expiries'))->getValue($cache);
+        $expiry = $expiries['qdrant.health.'.sha1(self::QDRANT_URL)] ?? null;
+        $this->assertIsFloat($expiry);
+        $this->assertLessThanOrEqual(5.5, $expiry - microtime(true), 'a timeout must not be cached like an outage');
+    }
+
+    public function testRefreshHealthReplacesACachedNegative(): void
+    {
+        $attempts = 0;
+        $client = new QdrantClientDirect(
+            httpClient: new MockHttpClient(function () use (&$attempts): MockResponse {
+                ++$attempts;
+
+                return 1 === $attempts
+                    ? new MockResponse('busy', ['http_code' => 503])
+                    : new MockResponse('', ['http_code' => 200]);
+            }),
+            qdrantUrl: self::QDRANT_URL,
+            logger: new NullLogger(),
+            cache: new ArrayAdapter(),
+        );
+
+        $this->assertFalse($client->isAvailable());
+        $this->assertTrue($client->refreshHealth());
+        $this->assertTrue($client->isAvailable(), 'the fresh result replaces the cached negative');
+        $this->assertSame(2, $attempts);
+    }
+
     public function testCollectionNameGettersExposeConfiguredNames(): void
     {
         $client = new QdrantClientDirect(
@@ -631,5 +702,146 @@ final class QdrantClientDirectTest extends TestCase
         $this->assertSame('custom_dig', $client->getDigestsCollection());
         $this->assertSame('custom_anchors', $client->getRoutingAnchorsCollection());
         $this->assertSame('http://x', $client->getQdrantUrl());
+    }
+
+    public function testScrollDigestsPagesWithAUserFilter(): void
+    {
+        $calls = [];
+        $page = 0;
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/scroll' => function () use (&$page): MockResponse {
+                ++$page;
+                if (1 === $page) {
+                    return new MockResponse(
+                        (string) json_encode([
+                            'result' => [
+                                'points' => [[
+                                    'id' => 'uuid-1',
+                                    'payload' => [
+                                        '_point_id' => 'dig_7_11',
+                                        'user_id' => 7,
+                                        'message_id' => 100,
+                                    ],
+                                ]],
+                                'next_page_offset' => 'offset-2',
+                            ],
+                        ]),
+                        ['http_code' => 200],
+                    );
+                }
+
+                return new MockResponse(
+                    (string) json_encode([
+                        'result' => [
+                            'points' => [[
+                                'id' => 'uuid-2',
+                                'payload' => [
+                                    '_point_id' => 'dig_7_22',
+                                    'user_id' => 7,
+                                    'message_id' => 200,
+                                ],
+                            ]],
+                            'next_page_offset' => null,
+                        ],
+                    ]),
+                    ['http_code' => 200],
+                );
+            },
+        ], $calls);
+
+        $points = $client->scrollDigests(7);
+
+        $this->assertSame(['dig_7_11', 'dig_7_22'], array_column($points, 'id'));
+        $this->assertCount(2, $calls);
+
+        $first = json_decode((string) $calls[0]['body'], true);
+        $this->assertIsArray($first);
+        $this->assertSame('user_id', $first['filter']['must'][0]['key']);
+        $this->assertSame(7, $first['filter']['must'][0]['match']['value']);
+        $this->assertArrayNotHasKey('offset', $first);
+        $this->assertFalse($first['with_vector']);
+
+        $second = json_decode((string) $calls[1]['body'], true);
+        $this->assertIsArray($second);
+        $this->assertSame('offset-2', $second['offset']);
+    }
+
+    public function testScrollDigestsReturnsEmptyWhenTheCollectionIsMissing(): void
+    {
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/scroll' => fn () => new MockResponse(
+                (string) json_encode(['status' => ['error' => "Collection `user_message_digests` doesn't exist"]]),
+                ['http_code' => 404],
+            ),
+        ]);
+
+        $this->assertSame([], $client->scrollDigests(7));
+    }
+
+    public function testDeleteDigestsMatchesLogicalIdsInBatches(): void
+    {
+        $calls = [];
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/delete' => fn () => $this->okEmpty(),
+        ], $calls);
+
+        $pointIds = [];
+        for ($i = 1; $i <= 101; ++$i) {
+            $pointIds[] = 'dig_7_'.$i;
+        }
+        $client->deleteDigests($pointIds);
+
+        $deleteCalls = array_values(array_filter(
+            $calls,
+            static fn (array $call): bool => str_ends_with($call['path'], '/points/delete'),
+        ));
+        $this->assertCount(2, $deleteCalls, '101 ids must be two batches of the client limit, not one call per point');
+        $this->assertStringContainsString('wait=true', $deleteCalls[0]['query']);
+
+        $first = json_decode((string) $deleteCalls[0]['body'], true);
+        $second = json_decode((string) $deleteCalls[1]['body'], true);
+        $this->assertIsArray($first);
+        $this->assertIsArray($second);
+        $this->assertArrayNotHasKey('points', $first);
+        $this->assertSame('_point_id', $first['filter']['must'][0]['key']);
+        $this->assertCount(100, $first['filter']['must'][0]['match']['any']);
+        $this->assertSame('dig_7_1', $first['filter']['must'][0]['match']['any'][0]);
+        $this->assertSame('dig_7_100', $first['filter']['must'][0]['match']['any'][99]);
+        $this->assertSame(['dig_7_101'], $second['filter']['must'][0]['match']['any']);
+    }
+
+    public function testDeleteDigestsSkipsEmptyInput(): void
+    {
+        $calls = [];
+        $client = $this->buildClient([], $calls);
+
+        $client->deleteDigests([]);
+        $client->deleteDigests(['']);
+
+        $this->assertSame([], $calls);
+    }
+
+    public function testDeleteDigestsTreatsAMissingCollectionAsSuccess(): void
+    {
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/delete' => fn () => new MockResponse(
+                (string) json_encode(['status' => ['error' => "Collection `user_message_digests` doesn't exist"]]),
+                ['http_code' => 404],
+            ),
+        ]);
+
+        $client->deleteDigests(['dig_7_1', 'dig_7_2']);
+        $this->addToAssertionCount(1);
+    }
+
+    public function testDeleteDigestsThrowsWhenQdrantRejectsTheBatch(): void
+    {
+        $client = $this->buildClient([
+            '/collections/user_message_digests/points/delete' => fn () => new MockResponse('nope', ['http_code' => 500]),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Failed to delete digest points');
+        $client->deleteDigests(['dig_7_1']);
     }
 }

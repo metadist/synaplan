@@ -18,23 +18,32 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
-use App\Service\FeedbackConfigService;
+use App\Service\Feedback\FeedbackConfigService;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
+use App\Service\File\GeneratedImageVisionFlag;
+use App\Service\File\UnreadSourceGuard;
 use App\Service\File\UserUploadPathBuilder;
-use App\Service\MemoryExtractionDispatcher;
+use App\Service\Memory\MemoryExtractionDispatcher;
+use App\Service\Memory\PendingMemoryExtraction;
+use App\Service\Memory\UserMemoryService;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Chat\ChatMessageAssembler;
+use App\Service\Message\Chat\ConversationHistoryRenderer;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\PerfPipelineFlag;
 use App\Service\Message\Routing\RoutingDirective;
 use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
-use App\Service\PerfPipelineFlag;
+use App\Service\Prompt\ChatPromptBlocks;
+use App\Service\Prompt\PromptService;
 use App\Service\Prompt\TimeContextBuilder;
-use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
-use App\Service\UserMemoryService;
+use App\Service\Vision\VisionAttachmentEncoder;
+use App\Tests\Support\ChatHandlerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -88,7 +97,7 @@ class ChatHandlerTest extends TestCase
             ->method('resolveUsableModelId')
             ->willReturnCallback(static fn (?int $modelId): ?int => $modelId);
 
-        $this->handler = new ChatHandler(
+        $this->handler = ChatHandlerFactory::create(
             $this->aiFacade,
             $this->promptRepository,
             $this->promptService,
@@ -112,8 +121,8 @@ class ChatHandlerTest extends TestCase
             $this->visionModelResolver,
             $this->digestSearchService,
             $this->digestConfig,
-            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
-            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(ConversationFileCatalog::class),
+            $this->createMock(GeneratedImageVisionFlag::class),
             $this->alwaysOnStructuredOutputConfig(),
             new ToolCallingTranslator(new ToolCallingCapability()),
             new ToolCallParser(),
@@ -310,7 +319,7 @@ class ChatHandlerTest extends TestCase
 
     public function testHumanizeFileMarkersReplacesGeneratedMarker(): void
     {
-        $result = $this->handler->humanizeFileMarkersForModel('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
+        $result = $this->history()->humanizeFileMarkers('__FILE_GENERATED__:Zweiter_Weltkrieg.docx');
 
         $this->assertStringNotContainsString('__FILE_GENERATED__', $result);
         $this->assertStringNotContainsString('FILE_GENERATED', $result);
@@ -319,22 +328,32 @@ class ChatHandlerTest extends TestCase
 
     public function testHumanizeFileMarkersReplacesFailedMarker(): void
     {
-        $result = $this->handler->humanizeFileMarkersForModel('__FILE_GENERATION_FAILED__');
+        $result = $this->history()->humanizeFileMarkers('__FILE_GENERATION_FAILED__');
 
         $this->assertStringNotContainsString('__FILE_GENERATION_FAILED__', $result);
         $this->assertStringContainsString('could not be generated', $result);
+    }
+
+    public function testHumanizeFileMarkersReplacesImageVideoAndAudioMarkers(): void
+    {
+        foreach (['__IMAGE_GENERATED__', '__VIDEO_GENERATED__', '__AUDIO_GENERATED__'] as $marker) {
+            $result = $this->history()->humanizeFileMarkers($marker);
+            $this->assertStringNotContainsString('__', $result, $marker);
+            $this->assertStringNotContainsString('Generated ', $result, $marker);
+            $this->assertNotSame('', trim($result), $marker);
+        }
     }
 
     public function testHumanizeFileMarkersLeavesRegularContentUntouched(): void
     {
         $text = 'Here is a normal assistant reply with no markers.';
 
-        $this->assertSame($text, $this->handler->humanizeFileMarkersForModel($text));
+        $this->assertSame($text, $this->history()->humanizeFileMarkers($text));
     }
 
     public function testHumanizeFileMarkersHandlesNull(): void
     {
-        $this->assertSame('', $this->handler->humanizeFileMarkersForModel(null));
+        $this->assertSame('', $this->history()->humanizeFileMarkers(null));
     }
 
     public function testHandleUsesUserSelectedModel(): void
@@ -518,7 +537,7 @@ class ChatHandlerTest extends TestCase
         // the model does not follow the trailing English wrap-up into English.
         $systemContent = $capturedMessages[0]['content'];
         $searchPos = strpos($systemContent, 'Web Search Results');
-        $languagePos = strrpos($systemContent, 'Respond in German');
+        $languagePos = strrpos($systemContent, 'looks like German');
         $this->assertNotFalse($searchPos);
         $this->assertNotFalse($languagePos);
         $this->assertGreaterThan($searchPos, $languagePos);
@@ -574,6 +593,159 @@ class ChatHandlerTest extends TestCase
             ]);
 
         $this->handler->handle($message, $thread, $classification);
+    }
+
+    public function testHeartbeatOptionUsesChatStreamAndKeepsTheContent(): void
+    {
+        $message = $this->plainMessage('Hello');
+        $beats = 0;
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(function (array|string $messages, callable $callback): array {
+                $callback('Hel');
+                $callback(['type' => 'content', 'content' => 'lo']);
+                $callback(['type' => 'reasoning', 'content' => 'hidden']);
+
+                return [
+                    'provider' => 'test',
+                    'model' => 'test-model',
+                    'usage' => ['prompt_tokens' => 2],
+                    'response_id' => 'resp-1',
+                    'tool_calls' => [],
+                ];
+            });
+
+        $result = $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en'], null, [
+            'heartbeat' => function () use (&$beats): void {
+                ++$beats;
+            },
+        ]);
+
+        $this->assertSame('Hello', $result['content']);
+        $this->assertSame('test', $result['metadata']['provider']);
+        $this->assertSame(3, $beats);
+    }
+
+    public function testHandleHistoryHasNoTimestampStamp(): void
+    {
+        $message = $this->plainMessage('What next?');
+        $previous = $this->createMock(Message::class);
+        $previous->method('getDirection')->willReturn('OUT');
+        $previous->method('getText')->willReturn('I created the document.');
+        $previous->method('getDateTime')->willReturn('20260930062622');
+        $previous->method('getId')->willReturn(9);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $seen = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$seen): array {
+                $seen = $messages;
+
+                return ['content' => 'Next.', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle($message, [$previous], ['topic' => 'CHAT', 'language' => 'en']);
+
+        $this->assertIsArray($seen);
+        $encoded = (string) json_encode($seen);
+        $this->assertStringNotContainsString('[20260930062622]', $encoded);
+        $this->assertStringContainsString('I created the document.', $encoded);
+    }
+
+    public function testASpokenQuestionGetsAShortSpokenAnswer(): void
+    {
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $calls = [];
+        $this->aiFacade
+            ->expects($this->exactly(2))
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$calls): array {
+                $calls[] = ['messages' => $messages, 'options' => $options];
+
+                return ['content' => 'Fine.', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $classification = ['topic' => 'CHAT', 'language' => 'de'];
+        $this->handler->handle($this->plainMessage('Wie spät ist es?'), [], $classification, null, ['source' => 'live_voice']);
+        $this->handler->handle($this->plainMessage('Wie spät ist es?'), [], $classification);
+
+        $this->assertSame(600, $calls[0]['options']['max_tokens'] ?? null);
+        $this->assertStringContainsString('spoken aloud', (string) $calls[0]['messages'][0]['content']);
+        $this->assertArrayNotHasKey('max_tokens', $calls[1]['options']);
+        $this->assertStringNotContainsString('spoken aloud', (string) json_encode($calls[1]['messages']));
+    }
+
+    public function testASpokenDocumentRequestKeepsTheFullDocumentLength(): void
+    {
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $seen = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$seen): array {
+                $seen = ['messages' => $messages, 'options' => $options];
+
+                return ['content' => 'Fine.', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle(
+            $this->plainMessage('Schreib mir einen Bericht über Füchse.'),
+            [],
+            ['topic' => 'officemaker', 'language' => 'de'],
+            null,
+            ['source' => 'live_voice'],
+        );
+
+        $this->assertIsArray($seen);
+        $this->assertNotSame(600, $seen['options']['max_tokens'] ?? null);
+        $this->assertStringNotContainsString('spoken aloud', (string) json_encode($seen['messages']));
+    }
+
+    public function testHandleStripsALeadingEchoedTimestamp(): void
+    {
+        $message = $this->plainMessage('Make an audio of that.');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '[20260930062622]: I can make an audio of the document.',
+            'provider' => 'test',
+            'model' => 'test',
+        ]);
+
+        $result = $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
+
+        $this->assertSame('I can make an audio of the document.', $result['content']);
+    }
+
+    private function plainMessage(string $text): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn($text);
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260930062700');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        return $message;
     }
 
     public function testHandleCallsProgressCallback(): void
@@ -710,6 +882,84 @@ class ChatHandlerTest extends TestCase
                 'ChatHandler: Provider returned no visible streaming content',
                 $this->arrayHasKey('provider'),
             );
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('The AI model returned an empty response');
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+        );
+    }
+
+    /**
+     * #2264: a thinking model that spends the whole completion budget inside
+     * `<think>` must not be stored as a finished empty reply.
+     */
+    public function testHandleStreamRejectsThinkBlockCutOffByTokenLimit(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('What is in Confluence?');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(static function ($messages, $cb, $userId, $options): array {
+                $cb('<think>I should query confluence');
+                $cb(['type' => 'finish', 'finish_reason' => 'length']);
+
+                return ['provider' => 'openaicompatible', 'model' => 'qwen3.8:27b', 'finish_reason' => 'length'];
+            });
+
+        $this->logger
+            ->expects($this->once())
+            ->method('warning')
+            ->with('ChatHandler: model output was cut off before a readable answer', $this->anything());
+
+        try {
+            $this->handler->handleStream(
+                $message,
+                [],
+                ['topic' => 'CHAT', 'language' => 'en'],
+                static function (): void {},
+            );
+            self::fail('A cut-off thinking block must not be stored as an answer');
+        } catch (ProviderException $e) {
+            self::assertSame('max_tokens', $e->getContext()['error_code'] ?? null);
+        }
+    }
+
+    /**
+     * A stream of structured reasoning with no answer text must not finish as
+     * a successful empty reply. Reasoning sets the first-token flag while the
+     * visible buffer stays blank.
+     */
+    public function testHandleStreamRejectsReasoningOnlyOutput(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('What is in Confluence?');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(static function ($messages, $cb): array {
+                $cb(['type' => 'reasoning', 'content' => 'still thinking']);
+                $cb(['type' => 'finish', 'finish_reason' => 'stop']);
+
+                return ['provider' => 'openaicompatible', 'model' => 'qwen3.8:27b', 'finish_reason' => 'stop'];
+            });
 
         $this->expectException(ProviderException::class);
         $this->expectExceptionMessage('The AI model returned an empty response');
@@ -1023,7 +1273,7 @@ class ChatHandlerTest extends TestCase
         $this->digestSearchService
             ->expects($this->once())
             ->method('search')
-            ->with(7, [0.1, 0.2, 0.3], excludeChatId: 55)
+            ->with(7, [0.1, 0.2, 0.3], excludeMessageIds: [9000])
             ->willReturn([$digest]);
 
         $this->promptRepository->method('findOneBy')->willReturn(null);
@@ -1630,7 +1880,7 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
-     * The public {@see ChatHandler::dispatchPendingMemoryExtraction()} is
+     * The public {@see PendingMemoryExtraction::dispatch()} is
      * now a thin proxy onto {@see MemoryExtractionDispatcher::dispatch()}
      * (Copilot review of PR #939: keep the dispatch + log + swallow
      * contract in one service so this path and the
@@ -1639,7 +1889,7 @@ class ChatHandlerTest extends TestCase
      * {@see Service\MemoryExtractionDispatcherTest} —
      * and this test only pins that the wrapper forwards a null payload
      * unchanged so callers can blindly hand the result of
-     * `buildPendingMemoryExtraction()` over without conditionals.
+     * `PendingMemoryExtraction::build()` over without conditionals.
      */
     public function testDispatchPendingMemoryExtractionForwardsNullToDispatcher(): void
     {
@@ -1648,7 +1898,7 @@ class ChatHandlerTest extends TestCase
             ->method('dispatch')
             ->with($this->isNull());
 
-        $this->handler->dispatchPendingMemoryExtraction(null);
+        $this->pendingMemory()->dispatch(null);
     }
 
     /**
@@ -1671,7 +1921,7 @@ class ChatHandlerTest extends TestCase
             ->method('dispatch')
             ->with($this->identicalTo($command));
 
-        $this->handler->dispatchPendingMemoryExtraction($command);
+        $this->pendingMemory()->dispatch($command);
     }
 
     public function testHandleSuppressesMalformedOfficemakerEnvelope(): void
@@ -1804,7 +2054,7 @@ class ChatHandlerTest extends TestCase
         $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
         $structuredOutputConfig->method('isEnabled')->willReturn(false);
 
-        $handler = new ChatHandler(
+        $handler = ChatHandlerFactory::create(
             $this->aiFacade,
             $this->promptRepository,
             $this->promptService,
@@ -1828,8 +2078,8 @@ class ChatHandlerTest extends TestCase
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
             $this->digestSearchService,
             $this->digestConfig,
-            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
-            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(ConversationFileCatalog::class),
+            $this->createMock(GeneratedImageVisionFlag::class),
             $structuredOutputConfig,
             new ToolCallingTranslator(new ToolCallingCapability()),
             new ToolCallParser(),
@@ -1844,6 +2094,83 @@ class ChatHandlerTest extends TestCase
 
         self::assertIsArray($capturedOptions);
         self::assertArrayNotHasKey('structured_output', $capturedOptions);
+    }
+
+    /**
+     * Issue #2050: single-node document plans bypass the DAG runner via the
+     * legacy router, so the unread-source guard must also hold here — an
+     * envelope answer on top of an unread source becomes the refusal text
+     * and no file is stored.
+     */
+    public function testHandleRefusesEnvelopeWhenSourceWentUnread(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260804083000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('officemaker');
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $this->aiFacade
+            ->method('chat')
+            ->willReturn(['content' => '{"BFILEPATH":"chart.xlsx","BFILETEXT":"A,10"}', 'provider' => 'openai', 'model' => 'gpt-5.5-pro']);
+
+        $guard = $this->createMock(UnreadSourceGuard::class);
+        $guard->method('refusalFor')->willReturn('REFUSAL');
+
+        $handler = ChatHandlerFactory::create(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->promptService,
+            $this->modelConfigService,
+            $this->modelRepository,
+            $this->logger,
+            $this->vectorSearchService,
+            $this->em,
+            '/tmp/uploads',
+            $this->userUploadPathBuilder,
+            $this->userMemoryService,
+            $this->feedbackConfigService,
+            $this->rateLimitService,
+            $this->memoryExtractionDispatcher,
+            $this->perfPipelineFlag,
+            $this->createMock(DocumentGeneratorService::class),
+            $this->createMock(DocumentImageReferenceResolver::class),
+            $this->createMock(DocumentImageCatalog::class),
+            new TimeContextBuilder(),
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->digestSearchService,
+            $this->digestConfig,
+            $this->createMock(ConversationFileCatalog::class),
+            $this->createMock(GeneratedImageVisionFlag::class),
+            $this->alwaysOnStructuredOutputConfig(),
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
+            unreadSourceGuard: $guard,
+        );
+
+        $result = $handler->handle(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'de', 'model_id' => 206, 'url_pages_read' => 0],
+        );
+
+        self::assertSame('REFUSAL', $result['content']);
+        self::assertFalse($result['metadata']['document_generation']['created'] ?? true);
     }
 
     /**
@@ -2169,12 +2496,8 @@ class ChatHandlerTest extends TestCase
         $goodAssistant->setUnixTimestamp(time() - 5);
         $goodAssistant->setDateTime(date('YmdHis', time() - 5));
 
-        $method = new \ReflectionMethod(ChatHandler::class, 'buildStreamingMessages');
-        $method->setAccessible(true);
-
         /** @var list<array{role: string, content: mixed}> $messages */
-        $messages = $method->invoke(
-            $this->handler,
+        $messages = $this->messageAssembler()->streaming(
             null,
             [$priorUser, $emptyAssistant, $goodAssistant],
             $current,
@@ -2191,17 +2514,50 @@ class ChatHandlerTest extends TestCase
         $this->assertSame(['prior answer'], $assistantContents);
     }
 
+    public function testASpokenQuestionReachesTheModelAsPlainTextOnce(): void
+    {
+        $current = new Message();
+        $current->setDirection('IN');
+        $current->setText('Wie ist der Verkehr auf der A3?');
+        $current->setUnixTimestamp(time());
+        $current->setDateTime(date('YmdHis'));
+
+        /** @var list<array{role: string, content: mixed}> $voice */
+        $voice = $this->messageAssembler()->buffered('system', [$current], $current, ['plain_user_turn' => true]);
+        $this->assertSame(['system', 'user'], array_column($voice, 'role'));
+        $this->assertSame('Wie ist der Verkehr auf der A3?', $voice[1]['content']);
+
+        /** @var list<array{role: string, content: mixed}> $channel */
+        $channel = $this->messageAssembler()->buffered('system', [], $current, []);
+        $this->assertStringContainsString('"BTEXT"', (string) $channel[1]['content']);
+    }
+
     /**
      * @param array<string, mixed> $options
      */
     private function invokeFormatQuotedReference(array $options): string
     {
-        $method = new \ReflectionMethod(ChatHandler::class, 'formatQuotedReferenceForPrompt');
-        $method->setAccessible(true);
+        return ChatPromptBlocks::quotedReference($options);
+    }
 
-        /** @var string $result */
-        $result = $method->invoke($this->handler, $options);
+    private function history(): ConversationHistoryRenderer
+    {
+        return new ConversationHistoryRenderer($this->createStub(ConversationFileCatalog::class));
+    }
 
-        return $result;
+    private function pendingMemory(): PendingMemoryExtraction
+    {
+        return new PendingMemoryExtraction($this->memoryExtractionDispatcher, $this->perfPipelineFlag, $this->logger);
+    }
+
+    private function messageAssembler(): ChatMessageAssembler
+    {
+        $catalog = $this->createStub(ConversationFileCatalog::class);
+
+        return new ChatMessageAssembler(
+            new VisionAttachmentEncoder('/tmp/uploads', $catalog, $this->createStub(GeneratedImageVisionFlag::class), $this->modelRepository, $this->visionModelResolver, $this->logger),
+            new ConversationHistoryRenderer($catalog),
+            $this->logger,
+        );
     }
 }

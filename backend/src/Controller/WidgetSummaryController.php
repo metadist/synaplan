@@ -9,7 +9,7 @@ use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
-use App\Service\WidgetSummaryService;
+use App\Service\Widget\WidgetSummaryService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;

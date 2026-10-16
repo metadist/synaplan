@@ -48,10 +48,17 @@ export const profileApi = {
     })
   },
 
-  async updateProfile(profileData: Partial<Profile>): Promise<unknown> {
+  async updateProfile(
+    profileData: Partial<Profile>,
+    currentPassword?: string
+  ): Promise<{ success?: boolean; message?: string; email?: string }> {
+    const payload: Record<string, unknown> = { ...profileData }
+    if (currentPassword) {
+      payload.currentPassword = currentPassword
+    }
     return httpClient('/api/v1/profile', {
       method: 'PUT',
-      body: JSON.stringify(profileData),
+      body: JSON.stringify(payload),
     })
   },
 

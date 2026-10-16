@@ -7,6 +7,8 @@ use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
+use App\Service\Mcp\ConfluenceLinkedPageRead;
+use App\Service\Mcp\ConfluenceLinkedPageReader;
 use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\ConversationSummaryService;
 use App\Service\Message\Handler\MessageHandlerInterface;
@@ -14,6 +16,7 @@ use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
+use App\Service\Message\Processing\TurnHistoryLoader;
 use App\Service\Message\RollingSummaryResult;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
@@ -21,12 +24,14 @@ use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanStore;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\Research\ReadPagesResult;
+use App\Service\Research\UrlContentResult;
+use App\Service\Research\UrlContentService;
 use App\Service\Research\WebResearchService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Search\BraveSearchService;
-use App\Service\UrlContentResult;
-use App\Service\UrlContentService;
+use App\Tests\Support\MessageProcessorFactory;
 use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -61,7 +66,7 @@ class MessageProcessorTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->conversationSummaryService = $this->createMock(ConversationSummaryService::class);
 
-        $this->processor = new MessageProcessor(
+        $this->processor = MessageProcessorFactory::create(
             $this->messageRepository,
             $this->searchResultRepository,
             $this->preProcessor,
@@ -413,7 +418,7 @@ class MessageProcessorTest extends TestCase
                         }
                     }
 
-                    return $passedOptions['perf_timer'] instanceof \App\Service\PerfTimer;
+                    return $passedOptions['perf_timer'] instanceof \App\Service\Infrastructure\PerfTimer;
                 })
             )
             ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
@@ -560,43 +565,31 @@ class MessageProcessorTest extends TestCase
     }
 
     /**
-     * Regression test for the silent "Internet Search" toggle bug.
-     *
-     * Setup: a German message that would otherwise NOT trigger the
-     * classifier's web_search hint (no keyword from WEB_SEARCH_KEYWORDS).
-     * The task prompt has `tool_internet=true` set in the user's UI.
-     *
-     * Before the fix `processStream()` had no positive trigger for the
-     * prompt flag — only a negative gate that read the wrong key
-     * (`tool_internet_search`). The user toggle was therefore ignored.
-     *
-     * After the fix the streaming pipeline must mirror the non-streaming
-     * `process()` path and call `BraveSearchService::search()` exactly
-     * once when the prompt opts in via `tool_internet`.
+     * A prompt with `tool_internet=true` only ALLOWS web search: when the
+     * classifier says the message needs no fresh information, nothing is
+     * searched. Older installs stored `true` from a pre-selected checkbox,
+     * which turned every "Hi" into a web search.
      */
-    public function testProcessStreamTriggersWebSearchFromPromptToolInternetFlag(): void
+    public function testProcessStreamDoesNotForceWebSearchFromPromptToolInternetFlag(): void
     {
         $message = $this->createMock(Message::class);
         $message->method('getUserId')->willReturn(1);
         $message->method('getTrackingId')->willReturn(123);
         $message->method('getFile')->willReturn(0);
         $message->method('getId')->willReturn(99);
-        $message->method('getText')->willReturn('Erzähl mir etwas über Eigentumswohnungen in München');
+        $message->method('getText')->willReturn('Hi, wie gehts?');
 
         $this->preProcessor->method('process')->willReturn($message);
         $this->messageRepository->method('findConversationHistory')->willReturn([]);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
 
-        // Classifier picks a non-search-worthy topic and does NOT set
-        // web_search — so the only way search can fire is the prompt flag.
         $this->classifier->method('classify')->willReturn([
-            'topic' => 'company',
+            'topic' => 'general',
             'language' => 'de',
             'source' => 'ai_sorting',
             'web_search' => false,
         ]);
 
-        // Prompt metadata has internet search opted-in by the user's UI.
         $this->promptService
             ->method('getPromptWithMetadata')
             ->willReturn([
@@ -604,28 +597,53 @@ class MessageProcessorTest extends TestCase
             ]);
 
         $this->braveSearchService->method('isEnabled')->willReturn(true);
-        $this->searchQueryGenerator->method('generate')->willReturn('Eigentumswohnungen München Preise');
-
-        $braveSearchCalled = false;
-        $this->braveSearchService
-            ->expects($this->once())
-            ->method('search')
-            ->willReturnCallback(function (string $query) use (&$braveSearchCalled): array {
-                $braveSearchCalled = true;
-
-                return ['results' => [], 'query' => $query];
-            });
+        $this->braveSearchService->expects($this->never())->method('search');
 
         $this->router
             ->method('routeStream')
             ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
 
         $this->processor->processStream($message, function (): void {});
+    }
 
-        $this->assertTrue(
-            $braveSearchCalled,
-            'BraveSearchService::search() must be called when the resolved task prompt has tool_internet=true',
-        );
+    /**
+     * A plain-language request in the message ("Such im Internet …") forces
+     * a search like the chat toggle, even when the classifier voted no.
+     */
+    public function testProcessStreamSearchesOnExplicitRequestInMessageText(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(99);
+        $message->method('getText')->willReturn('Such im Internet nach Eigentumswohnungen in München');
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('Eigentumswohnungen München');
+        $this->braveSearchService
+            ->expects($this->once())
+            ->method('search')
+            ->willReturnCallback(static fn (string $query): array => ['results' => [], 'query' => $query]);
+
+        $this->router
+            ->method('routeStream')
+            ->willReturn(['metadata' => ['provider' => 'test', 'model' => 'test']]);
+
+        $this->processor->processStream($message, function (): void {});
     }
 
     /**
@@ -838,7 +856,7 @@ class MessageProcessorTest extends TestCase
         $this->preProcessor->method('process')->willReturn($message);
         $this->messageRepository->expects($this->once())
             ->method('findChatHistory')
-            ->with(1, 500, MessageProcessor::HISTORY_MAX_MESSAGES, MessageProcessor::HISTORY_MAX_CHARS, 99)
+            ->with(1, 500, TurnHistoryLoader::HISTORY_MAX_MESSAGES * 8, TurnHistoryLoader::HISTORY_MAX_CHARS * 8, 99)
             ->willReturn([]);
         $this->messageRepository->method('countByChatId')->willReturn(40);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
@@ -1003,6 +1021,57 @@ class MessageProcessorTest extends TestCase
     }
 
     /**
+     * Issue #2050: when reading the linked pages throws, the failure must be
+     * recorded as an explicit zero — generator guards treat a missing value
+     * as "no read ran" and would otherwise invent content for the unread URL.
+     */
+    public function testFailedUrlReadRecordsExplicitZero(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(79);
+        $message->method('getText')->willReturn('Lad https://example.com/data.csv und mach ein Diagramm.');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn(['https://example.com/data.csv']);
+        $urlContent->expects($this->never())->method('fetchMultiple');
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(true);
+        $research->method('isDeepSearchEnabled')->willReturn(true);
+        $research->method('readMentionedUrls')->willThrowException(new \RuntimeException('reader down'));
+
+        $processor = $this->processorWith($urlContent, $research);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+        $this->braveSearchService->method('isEnabled')->willReturn(false);
+
+        $this->router
+            ->expects($this->once())
+            ->method('routeStream')
+            ->willReturnCallback(function ($msg, $history, $classification) {
+                $this->assertSame(0, $classification['url_pages_read']);
+                $this->assertArrayNotHasKey('url_content', $classification);
+
+                return ['metadata' => ['provider' => 'test', 'model' => 'test']];
+            });
+
+        $processor->processStream($message, static function (): void {}, static function (array $event): void {});
+    }
+
+    /**
      * A research question: the search runs, and its results are deepened
      * with the read pages before the answer model sees them. The sources
      * are streamed first (fast), the pages-read update follows.
@@ -1139,9 +1208,141 @@ class MessageProcessorTest extends TestCase
         $this->assertNotContains('pages_read', $events);
     }
 
-    private function processorWith(UrlContentService $urlContent, WebResearchService $research): MessageProcessor
+    /**
+     * Non-streaming parity: a pasted Confluence page that the connection
+     * already handled (including a failed read) must not fall through to a
+     * public web search. The topic allowlist is passed through, and the
+     * "Reading…" status is emitted when the reader says it is about to call.
+     */
+    public function testProcessSkipsPublicSearchWhenConfluenceConnectionHandledThePage(): void
     {
-        return new MessageProcessor(
+        $page = 'https://deskfiler.atlassian.net/wiki/spaces/TEAM/pages/42/Notes';
+        $message = $this->confluenceMessage($page);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn([$page]);
+        $urlContent->expects($this->never())->method('fetchMultiple');
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->expects($this->never())->method('readMentionedUrls');
+
+        $reader = $this->createMock(ConfluenceLinkedPageReader::class);
+        $reader->expects($this->once())
+            ->method('read')
+            ->with(
+                [$page],
+                1,
+                [9],
+                $this->callback(static fn (mixed $ready): bool => is_callable($ready)),
+            )
+            ->willReturnCallback(function (array $urls, int $userId, ?array $allowlist, ?callable $onReady) use ($page): ConfluenceLinkedPageRead {
+                if (null !== $onReady) {
+                    $onReady();
+                }
+
+                return new ConfluenceLinkedPageRead([[
+                    'url' => $page,
+                    'success' => false,
+                    'serverName' => 'Jira & Confluence',
+                    'text' => 'Could not open the page.',
+                ]]);
+            });
+
+        $processor = $this->processorWith($urlContent, $research, $reader);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+            'runtime_profile' => new RuntimeProfile(
+                promptId: 1,
+                promptTopic: 'general',
+                systemPrompt: null,
+                modelIds: [],
+                ragScopes: [],
+                toolFlags: ['tool_mcp' => true, 'mcp_servers' => [9]],
+                skillAllow: null,
+                skillDeny: null,
+                parameters: [],
+            ),
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_mcp' => true, 'mcp_servers' => '1'],
+        ]);
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->braveSearchService->expects($this->never())->method('search');
+        $this->router->method('route')->willReturn([
+            'content' => 'Response',
+            'metadata' => ['provider' => 'test', 'model' => 'test'],
+        ]);
+
+        $statuses = [];
+        $processor->process($message, [], static function (array $event) use (&$statuses): void {
+            $statuses[] = $event['status'];
+        });
+
+        $this->assertContains('fetching_urls', $statuses);
+        $this->assertNotContains('searching', $statuses);
+    }
+
+    public function testProcessDoesNotCallConfluenceWhenTheTopicOptsOutOfMcp(): void
+    {
+        $page = 'https://deskfiler.atlassian.net/wiki/spaces/TEAM/pages/42/Notes';
+        $message = $this->confluenceMessage($page);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn([$page]);
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(false);
+        $research->expects($this->never())->method('readMentionedUrls');
+
+        $reader = $this->createMock(ConfluenceLinkedPageReader::class);
+        $reader->expects($this->never())->method('read');
+
+        $processor = $this->processorWith($urlContent, $research, $reader);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'metadata' => ['tool_mcp' => false],
+        ]);
+        $this->braveSearchService->method('isEnabled')->willReturn(false);
+        $this->router->method('route')->willReturn([
+            'content' => 'Response',
+            'metadata' => ['provider' => 'test', 'model' => 'test'],
+        ]);
+
+        $processor->process($message);
+    }
+
+    private function confluenceMessage(string $page): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(88);
+        $message->method('getText')->willReturn($page);
+        $message->method('hasFiles')->willReturn(false);
+
+        return $message;
+    }
+
+    private function processorWith(UrlContentService $urlContent, ?WebResearchService $research = null, ?ConfluenceLinkedPageReader $confluence = null): MessageProcessor
+    {
+        return MessageProcessorFactory::create(
             $this->messageRepository,
             $this->searchResultRepository,
             $this->preProcessor,
@@ -1161,6 +1362,7 @@ class MessageProcessorTest extends TestCase
             $this->conversationSummaryService,
             $this->createMock(AgentConfig::class),
             $research,
+            $confluence,
         );
     }
 
@@ -1184,7 +1386,7 @@ class MessageProcessorTest extends TestCase
             ->willReturn([]);
         $urlContent->expects($this->never())->method('formatForPrompt');
 
-        $processor = new MessageProcessor(
+        $processor = MessageProcessorFactory::create(
             $this->messageRepository,
             $this->searchResultRepository,
             $this->preProcessor,
@@ -1275,5 +1477,64 @@ class MessageProcessorTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame(42, $result['classification']['saved_task_id'] ?? null);
+    }
+
+    public function testSlashHintSkipsShadowPlanning(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(55);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getText')->willReturn('/pic');
+        $message->method('hasFiles')->willReturn(false);
+
+        $multitaskConfig = $this->createMock(MultitaskRoutingConfig::class);
+        $multitaskConfig->method('isShadowMode')->willReturn(true);
+        $multitaskConfig->method('isRoutingEnabled')->willReturn(false);
+
+        $taskPlanner = $this->createMock(TaskPlanner::class);
+        $taskPlanner->expects($this->never())->method('plan');
+
+        $processor = MessageProcessorFactory::create(
+            $this->messageRepository,
+            $this->searchResultRepository,
+            $this->preProcessor,
+            $this->classifier,
+            $this->router,
+            $this->modelConfigService,
+            $this->promptService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
+            $this->searchQueryGenerator,
+            $this->createMock(AttachmentSearchContextResolver::class),
+            $this->createMock(UrlContentService::class),
+            $this->logger,
+            $multitaskConfig,
+            $taskPlanner,
+            $this->createMock(TaskPlanStore::class),
+            $this->createMock(TaskPlanExecutor::class),
+            $this->conversationSummaryService,
+            $this->createMock(AgentConfig::class),
+        );
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'tool_command',
+            'skip_sorting' => true,
+            'slash_hint' => true,
+            'slash_command' => 'pic',
+        ]);
+        $this->router->method('route')->willReturn([
+            'content' => 'Write what to create after the command, for example: /pic a dog on the beach',
+            'metadata' => ['slash_hint' => true, 'provider' => 'none', 'model' => 'none'],
+        ]);
+
+        $result = $processor->process($message);
+
+        $this->assertTrue($result['success']);
     }
 }

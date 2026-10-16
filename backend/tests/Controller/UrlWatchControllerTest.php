@@ -32,11 +32,11 @@ final class UrlWatchControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $owner);
 
         $this->client->request('GET', '/api/v1/url-watches');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertSame([], $this->json()['watches'] ?? null);
 
         $this->postJson('/api/v1/url-watches', ['url' => 'https://example.com/news']);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $created = $this->json()['watch'] ?? [];
         self::assertIsArray($created);
         self::assertSame('https://example.com/news', $created['url'] ?? null);
@@ -44,14 +44,14 @@ final class UrlWatchControllerTest extends WebTestCase
         self::assertGreaterThan(0, $id);
 
         $this->client->request('GET', '/api/v1/url-watches/'.$id);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertArrayHasKey('body', $this->json()['watch'] ?? []);
 
         $this->client->request('GET', '/api/v1/url-watches');
         self::assertCount(1, $this->json()['watches'] ?? []);
 
         $this->client->request('DELETE', '/api/v1/url-watches/'.$id);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $this->em->clear();
         self::assertNull($this->em->find(UrlWatch::class, $id));
     }
@@ -63,7 +63,7 @@ final class UrlWatchControllerTest extends WebTestCase
 
         $this->postJson('/api/v1/url-watches', ['url' => 'not-a-url']);
 
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
         self::assertSame('invalid_url', $this->json()['error'] ?? null);
     }
 
@@ -77,9 +77,9 @@ final class UrlWatchControllerTest extends WebTestCase
 
         $this->authenticateClient($this->client, $other);
         $this->client->request('GET', '/api/v1/url-watches/'.$id);
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
         $this->client->request('DELETE', '/api/v1/url-watches/'.$id);
-        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
         $this->em->clear();
         self::assertInstanceOf(UrlWatch::class, $this->em->find(UrlWatch::class, $id));
     }
@@ -107,7 +107,7 @@ final class UrlWatchControllerTest extends WebTestCase
 
         $this->postJson('/api/v1/url-watches', ['url' => 'http://127.0.0.1/page.html']);
 
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
         $body = $this->json();
         self::assertSame('blocked_url', $body['error'] ?? null);
         self::assertSame('URL points to a private/blocked address', $body['message'] ?? null);

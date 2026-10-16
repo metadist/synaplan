@@ -22,7 +22,7 @@ use App\Service\File\PdfRasterizer;
 use App\Service\File\TextCleaner;
 use App\Service\File\TikaClient;
 use App\Service\File\VideoAnalysisService;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -220,6 +220,37 @@ final class FileProcessorConfiguredChainTest extends TestCase
 
         self::assertSame('hello from local whisper', $text);
         self::assertSame('whisper_local', $meta['strategy'] ?? null);
+        @unlink($dir.'/'.$relative);
+    }
+
+    public function testAudioChainWithoutCloudDoesNotCallCloudWhenWhisperIsMissing(): void
+    {
+        $dir = sys_get_temp_dir();
+        $relative = 'chain-audio-missing-'.uniqid('', true).'.wav';
+        // A real WAV header so the file is detected as audio, not plain text.
+        file_put_contents($dir.'/'.$relative, 'RIFF'.pack('V', 36).'WAVEfmt '.pack('V', 16).pack('v', 1).pack('v', 1).pack('V', 16000).pack('V', 32000).pack('v', 2).pack('v', 16).'data'.pack('V', 0));
+
+        $ai = $this->createMock(AiFacade::class);
+        $ai->method('hasConfiguredSttProvider')->willReturn(false);
+        $ai->expects($this->never())->method('transcribe');
+
+        $whisper = $this->createMock(WhisperService::class);
+        $whisper->method('isAvailable')->willReturn(false);
+        $whisper->method('unavailableReason')->willReturn('speech_off');
+
+        $processor = $this->processor(
+            $dir,
+            ['whisper_local', 'stt_cloud'],
+            ai: $ai,
+            whisper: $whisper,
+        );
+
+        [$text, $meta] = $processor->extractText($relative, 'wav', 4);
+
+        self::assertSame('', $text);
+        self::assertSame('chain_exhausted', $meta['strategy'] ?? null);
+        self::assertSame('speech_off', $meta['speech_failure'] ?? null);
+        self::assertArrayNotHasKey('error', $meta);
         @unlink($dir.'/'.$relative);
     }
 

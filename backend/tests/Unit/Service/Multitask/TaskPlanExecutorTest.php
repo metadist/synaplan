@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Repository\ConfigRepository;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
+use App\Service\Infrastructure\PerfTimer;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\ClassificationPlanMapper;
@@ -19,7 +20,6 @@ use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanResult;
 use App\Service\Multitask\TaskPlanStore;
-use App\Service\PerfTimer;
 use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
 use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
 use App\Service\SavedTask\SavedTaskConfig;
@@ -251,6 +251,81 @@ final class TaskPlanExecutorTest extends TestCase
         // The UI must be told to retract the failed task cards before the clean
         // fallback answer streams.
         self::assertContains('plan_discarded', $statuses);
+    }
+
+    public function testFailedCodeRunDoesNotFallBackToLegacyRouter(): void
+    {
+        // A code-run turn that fails must NOT be handed to the legacy chat router:
+        // that router cannot execute code and answers "I can't execute code or
+        // write files…", denying a capability the product has and hiding the real
+        // error. The node's own failure is surfaced instead (U8).
+        $codePlan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'code_run'],
+            ],
+        ]);
+        $this->planner->method('plan')->willReturn(new TaskPlanResult($codePlan, fallback: false, modelId: 76));
+        $this->dagExecutor->method('execute')->willReturn($this->assembled([
+            'content' => 'File work could not finish. SyntaxError: bad token',
+            'all_failed' => true,
+            'node_statuses' => ['n1' => 'failed'],
+        ]));
+
+        $this->router->expects(self::never())->method('routeStream');
+
+        $streamed = [];
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
+            function (string $text) use (&$streamed): void { $streamed[] = $text; },
+        );
+
+        self::assertStringContainsString('File work could not finish', (string) ($result['content'] ?? ''));
+        self::assertContains('File work could not finish. SyntaxError: bad token', $streamed);
+    }
+
+    public function testFailedMcpFetchDoesNotFallBackToLegacyRouter(): void
+    {
+        $this->assertFailedCapabilityDoesNotFallBack('mcp_fetch', 'Backblaze reported an error: NotFound');
+    }
+
+    public function testFailedMcpActionDoesNotFallBackToLegacyRouter(): void
+    {
+        $this->assertFailedCapabilityDoesNotFallBack('mcp_action', 'Confluence reported an error: space not found');
+    }
+
+    private function assertFailedCapabilityDoesNotFallBack(string $capability, string $error): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => $capability],
+            ],
+        ]);
+        $this->planner->method('plan')->willReturn(new TaskPlanResult($plan, fallback: false, modelId: 76));
+        $this->dagExecutor->method('execute')->willReturn($this->assembled([
+            'content' => $error,
+            'all_failed' => true,
+            'node_statuses' => ['n1' => 'failed'],
+        ]));
+
+        $this->router->expects(self::never())->method('routeStream');
+
+        $statuses = [];
+        $streamed = [];
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'language' => 'en', 'source' => 'ai_sorting'],
+            function (string $text) use (&$streamed): void { $streamed[] = $text; },
+            function (array $event) use (&$statuses): void { $statuses[] = $event['status'] ?? null; },
+        );
+
+        self::assertSame($error, $result['content'] ?? null);
+        self::assertContains($error, $streamed);
+        self::assertNotContains('plan_discarded', $statuses);
     }
 
     public function testSingleNodePlanFromPlannerUsesLegacyPath(): void
@@ -812,6 +887,78 @@ final class TaskPlanExecutorTest extends TestCase
         );
 
         self::assertSame('router answer', $result['content']);
+    }
+
+    public function testPinnedAssistantPlansAndSavesTheFile(): void
+    {
+        // A chat pinned to an assistant skips the sorter and stays intent=chat.
+        // Planning must still run, and a file step must stay on the DAG —
+        // the legacy router would only talk about the file.
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'web_search', 'inputs' => ['query' => 'synaplan']],
+                ['id' => 'n2', 'capability' => 'document_generation', 'depends_on' => ['n1'], 'inputs' => ['prompt' => 'Save the count to counter_weekday.txt. $n1.text']],
+            ],
+        ]);
+        $this->planner->expects(self::once())->method('plan')->willReturn(new TaskPlanResult($plan, fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Document created: counter_weekday.txt',
+            'files' => [['path' => '/api/v1/files/uploads/counter_weekday.txt', 'type' => 'document']],
+            'node_statuses' => ['n1' => 'done', 'n2' => 'done'],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $this->executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'agent:new-assistant', 'language' => 'en', 'source' => 'agent'],
+        );
+
+        self::assertSame('Document created: counter_weekday.txt', $result['content']);
+        self::assertSame('document', $result['metadata']['file']['type']);
+    }
+
+    public function testPinnedAssistantSingleDocumentNodeRunsDagNotChat(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [[
+                'id' => 'n1',
+                'capability' => 'document_generation',
+                'inputs' => ['prompt' => 'Friday 2026-10-16: 10'],
+            ]],
+        ]);
+        $this->planner->expects(self::once())->method('plan')->willReturn(new TaskPlanResult($plan, fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Document created: counter_weekday.txt',
+            'files' => [['path' => '/api/v1/files/uploads/counter_weekday.txt', 'type' => 'document']],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $this->executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'agent:new-assistant', 'language' => 'en', 'source' => 'agent'],
+        );
+
+        self::assertSame('Document created: counter_weekday.txt', $result['content']);
+    }
+
+    public function testPinnedAssistantSmallTalkStillUsesTheChatRouter(): void
+    {
+        $this->planner->expects(self::once())->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::never())->method('execute');
+        $this->router->expects(self::once())->method('route')->willReturn(['content' => 'Hello.']);
+
+        $result = $this->executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'agent:new-assistant', 'language' => 'en', 'source' => 'agent'],
+        );
+
+        self::assertSame('Hello.', $result['content']);
     }
 
     public function testSavedTaskRunExecutesItsAuthoredStepsRegardlessOfTriggerType(): void

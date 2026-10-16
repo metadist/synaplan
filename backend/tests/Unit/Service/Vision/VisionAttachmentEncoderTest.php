@@ -1,0 +1,239 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Service\Vision;
+
+use App\Repository\ModelRepository;
+use App\Service\File\ConversationFileCatalog;
+use App\Service\File\GeneratedImageVisionFlag;
+use App\Service\Message\Chat\ChatMessageAssembler;
+use App\Service\Message\Chat\ConversationHistoryRenderer;
+use App\Service\Vision\VisionAttachmentEncoder;
+use App\Service\Vision\VisionModelResolver;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+
+/**
+ * Issue #1238 — a re-attached generated PNG was embedded into the Anthropic
+ * messages API full-size as a base64 data URL, blowing the prompt to ~1.9M
+ * tokens (HTTP 400). The vision embedder must downscale oversized images so
+ * the inline payload stays within budget, and skip the image entirely if it
+ * still cannot be reduced enough — never send a payload that 400s.
+ */
+final class VisionAttachmentEncoderTest extends TestCase
+{
+    /** Mirrors VisionAttachmentEncoder::MAX_VISION_BASE64_LENGTH. */
+    private const MAX_VISION_BASE64_LENGTH = 450000;
+
+    private VisionAttachmentEncoder $encoder;
+    private string $uploadDir;
+
+    protected function setUp(): void
+    {
+        $this->uploadDir = sys_get_temp_dir().'/synaplan-chat-vision-'.bin2hex(random_bytes(8));
+        mkdir($this->uploadDir, 0o775, true);
+
+        $catalog = $this->createStub(ConversationFileCatalog::class);
+        $this->encoder = new VisionAttachmentEncoder(
+            $this->uploadDir,
+            $catalog,
+            $this->createStub(GeneratedImageVisionFlag::class),
+            $this->createStub(ModelRepository::class),
+            $this->createStub(VisionModelResolver::class),
+            new NullLogger(),
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        if (is_dir($this->uploadDir)) {
+            $this->removeDirectoryRecursive($this->uploadDir);
+        }
+    }
+
+    /**
+     * A small image comfortably under budget must be embedded verbatim,
+     * preserving its original PNG mime type.
+     */
+    public function testSmallImageIsEmbeddedUnchanged(): void
+    {
+        // 1x1 transparent PNG.
+        $png = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        );
+        file_put_contents($this->uploadDir.'/tiny.png', $png);
+
+        $result = $this->invokeImageToBase64DataUrl('tiny.png');
+
+        $this->assertNotNull($result);
+        $dataUrl = (string) $result;
+        $this->assertStringStartsWith('data:image/png;base64,', $dataUrl);
+        $this->assertLessThanOrEqual(self::MAX_VISION_BASE64_LENGTH, strlen($this->base64Payload($dataUrl)));
+    }
+
+    /**
+     * The core #1238 regression: an oversized image must be downscaled and
+     * re-encoded (as JPEG) so its base64 payload lands within budget instead
+     * of being sent full-size and triggering an HTTP 400.
+     */
+    public function testOversizedImageIsDownscaledUnderBudget(): void
+    {
+        if (!extension_loaded('imagick') || !class_exists(\Imagick::class)) {
+            $this->markTestSkipped('imagick is required to downscale oversized vision images');
+        }
+
+        $bigPng = $this->makeLargePng(1500, 1500);
+        $originalBase64Length = intdiv(strlen($bigPng) + 2, 3) * 4;
+
+        // The fixture must land in the testable window: large enough to exceed
+        // the inline budget (so the downscale path runs), but under the 50 MB
+        // file-size sanity cap that short-circuits before downscaling.
+        // ImageMagick builds compress plasma differently, so skip rather than
+        // fail if this environment produced an out-of-range fixture.
+        if ($originalBase64Length <= self::MAX_VISION_BASE64_LENGTH) {
+            $this->markTestSkipped('Generated fixture compressed below the inline budget on this ImageMagick build');
+        }
+        if (strlen($bigPng) > 50 * 1024 * 1024) {
+            $this->markTestSkipped('Generated fixture exceeded the 50 MB pre-downscale size cap on this ImageMagick build');
+        }
+
+        file_put_contents($this->uploadDir.'/big.png', $bigPng);
+
+        $result = $this->invokeImageToBase64DataUrl('big.png');
+
+        $this->assertNotNull($result, 'Oversized image should be downscaled, not skipped');
+        $dataUrl = (string) $result;
+        $this->assertStringStartsWith('data:image/jpeg;base64,', $dataUrl);
+        $this->assertLessThanOrEqual(
+            self::MAX_VISION_BASE64_LENGTH,
+            strlen($this->base64Payload($dataUrl)),
+            'Downscaled payload must fit within the inline vision budget',
+        );
+    }
+
+    /**
+     * When the image cannot be decoded/downscaled (corrupt bytes that still
+     * exceed the budget), the embedder must skip it (return null) rather than
+     * forward an oversized payload that 400s the provider request.
+     */
+    public function testOversizedUndecodableImageIsSkipped(): void
+    {
+        // > budget worth of bytes that are not a valid image. Imagick cannot
+        // decode this, so no downscaled result can be produced.
+        $garbage = str_repeat("\x00\x11\x22\x33", 400000);
+        file_put_contents($this->uploadDir.'/broken.png', $garbage);
+
+        $result = $this->invokeImageToBase64DataUrl('broken.png');
+
+        $this->assertNull($result);
+    }
+
+    /**
+     * The stored path is normalized (serve URL → upload-dir-relative) before
+     * the upload dir is prefixed, so it must resolve either way (#1596).
+     */
+    public function testServePrefixResolvesToTheSameFileAsTheRelativePath(): void
+    {
+        $png = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        );
+        file_put_contents($this->uploadDir.'/tiny.png', $png);
+
+        $this->assertSame(
+            $this->invokeImageToBase64DataUrl('tiny.png'),
+            $this->invokeImageToBase64DataUrl('/api/v1/files/uploads/tiny.png'),
+        );
+    }
+
+    /**
+     * Normalization strips the serve prefix but deliberately leaves `..` in
+     * place; the upload-root check must still refuse to read outside the dir.
+     * BFILEPATH is DB content, and generated-image vision now reads it by
+     * default, so this stays pinned.
+     */
+    public function testTraversalOutsideTheUploadDirIsRefused(): void
+    {
+        file_put_contents(dirname($this->uploadDir).'/outside.png', 'secret');
+
+        try {
+            $this->assertNull($this->invokeImageToBase64DataUrl('../outside.png'));
+            $this->assertNull($this->invokeImageToBase64DataUrl('/api/v1/files/uploads/../outside.png'));
+            $this->assertNull($this->invokeImageToBase64DataUrl('https://evil.example.com/api/v1/files/uploads/../outside.png'));
+        } finally {
+            @unlink(dirname($this->uploadDir).'/outside.png');
+        }
+    }
+
+    /**
+     * When the CURRENT message carries images but none survives conversion,
+     * the handler must fail loudly instead of sending a text-only request the
+     * model would answer with "I don't see an image".
+     */
+    public function testThrowsWhenAllCurrentMessageImagesFailConversion(): void
+    {
+        // Over-budget bytes that are not a decodable image → conversion fails.
+        $garbage = str_repeat("\x00\x11\x22\x33", 400000);
+        file_put_contents($this->uploadDir.'/photo.jpg', $garbage);
+
+        $message = (new \App\Entity\Message())
+            ->setUserId(7)
+            ->setText('what is this?')
+            ->setFilePath('photo.jpg');
+
+        $messages = new ChatMessageAssembler($this->encoder, new ConversationHistoryRenderer($this->createStub(ConversationFileCatalog::class)), new NullLogger());
+
+        $this->expectException(\App\Service\Exception\VisionImageUnprocessableException::class);
+
+        $messages->streaming(null, [], $message, ['include_images' => true]);
+    }
+
+    private function invokeImageToBase64DataUrl(string $relativePath): ?string
+    {
+        return $this->encoder->toBase64DataUrl($relativePath);
+    }
+
+    private function base64Payload(string $dataUrl): string
+    {
+        $commaPos = strpos($dataUrl, ',');
+
+        return false === $commaPos ? '' : substr($dataUrl, $commaPos + 1);
+    }
+
+    /**
+     * Build a large, poorly-compressible PNG so its base64 payload exceeds the
+     * inline vision budget.
+     */
+    private function makeLargePng(int $width, int $height): string
+    {
+        $imagick = new \Imagick();
+        // A fractal plasma render is high-frequency/high-entropy, so it stays
+        // large even as PNG without ballooning past the 10 MB size guard.
+        $imagick->newPseudoImage($width, $height, 'plasma:fractal');
+        $imagick->setImageFormat('png');
+        $blob = $imagick->getImageBlob();
+        $imagick->clear();
+        $imagick->destroy();
+
+        return $blob;
+    }
+
+    private function removeDirectoryRecursive(string $path): void
+    {
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($iterator as $item) {
+            /** @var \SplFileInfo $item */
+            if ($item->isDir()) {
+                rmdir($item->getPathname());
+            } else {
+                unlink($item->getPathname());
+            }
+        }
+
+        rmdir($path);
+    }
+}

@@ -2,13 +2,17 @@
 
 namespace App\Controller;
 
+use App\AI\Messages\AnthropicContentText;
 use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Service\Chat\ChatActionPolicy;
 use App\Service\Chat\ChatDeletionService;
+use App\Service\Chat\PastedContentText;
 use App\Service\Chat\Run\ChatRunService;
+use App\Service\File\ConversationFileHistory;
 use App\Service\File\OgImageService;
 use App\Service\Iam\AccessGate;
 use App\Service\Iam\ConversationCopyService;
@@ -18,8 +22,8 @@ use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ShareService;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
-use App\Service\PastedContentText;
-use App\Service\WidgetSessionService;
+use App\Service\RAG\VectorSearchService;
+use App\Service\Widget\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -49,6 +53,9 @@ class ChatController extends AbstractController
         private ConversationCopyService $conversationCopyService,
         private ShareService $shareService,
         private UserRepository $userRepository,
+        private ConversationFileHistory $conversationFileHistory,
+        private ChatActionPolicy $chatActionPolicy,
+        private VectorSearchService $vectorSearchService,
     ) {
     }
 
@@ -81,9 +88,22 @@ class ChatController extends AbstractController
                                     new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                     new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
                                     new OA\Property(property: 'messageCount', type: 'integer', example: 5),
-                                    new OA\Property(property: 'isShared', type: 'boolean', example: false),
+                                    new OA\Property(property: 'isShared', type: 'boolean', example: false, description: 'A public link is on. This is not an IAM grant.'),
+                                    new OA\Property(
+                                        property: 'shareSummary',
+                                        description: 'IAM grants on this owned chat. Empty groups and people 0 mean nobody else has a grant.',
+                                        required: ['everyone', 'people', 'groups'],
+                                        properties: [
+                                            new OA\Property(property: 'everyone', type: 'boolean', example: false),
+                                            new OA\Property(property: 'people', type: 'integer', example: 0),
+                                            new OA\Property(property: 'groups', type: 'array', items: new OA\Items(type: 'string')),
+                                        ],
+                                        type: 'object',
+                                    ),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, example: 'web'),
                                     new OA\Property(property: 'firstMessagePreview', type: 'string', nullable: true, example: 'How do I reset my password?'),
+                                    new OA\Property(property: 'pinned', type: 'boolean', example: false, description: 'When true, the chat is listed in the Pinned category.'),
+                                    new OA\Property(property: 'pinnedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the chat was last pinned. Null when it is not pinned.'),
                                     new OA\Property(
                                         property: 'widgetSession',
                                         type: 'object',
@@ -124,25 +144,36 @@ class ChatController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Pagination is opt-in so existing callers (desktop rail, chat switching)
-        // keep receiving the full list. The mobile history drawer passes `limit`
-        // to page through the chats with infinite scroll.
+        // Pagination is opt-in. Chat switching still omits `limit` and receives
+        // the full list. The desktop chat menu and the mobile history drawer
+        // pass `limit` and `offset` and append the next page.
         $paginate = $request->query->has('limit');
         $limit = max(1, min((int) $request->query->get('limit', 20), 100));
         $offset = max(0, (int) $request->query->get('offset', 0));
+        $archivedParam = (string) $request->query->get('archived', '0');
+        $archived = match ($archivedParam) {
+            '1', 'true' => true,
+            'all' => null,
+            default => false,
+        };
 
         if ($paginate) {
-            $chats = $this->chatRepository->findByUserPaginated($user->getId(), $limit, $offset);
-            $total = $this->chatRepository->countByUser($user->getId());
+            $chats = $this->chatRepository->findByUserPaginated($user->getId(), $limit, $offset, $archived);
+            $total = $this->chatRepository->countByUser($user->getId(), $archived);
         } else {
-            $chats = $this->chatRepository->findByUser($user->getId());
+            $chats = $this->chatRepository->findByUser($user->getId(), $archived);
             $total = count($chats);
         }
 
         $chatIds = array_map(static fn (Chat $chat) => $chat->getId(), $chats);
         $sessionMap = $this->widgetSessionService->getSessionMapForChats($chatIds);
+        $shareSummaries = $this->iamConfig->isSharingEnabled((int) $user->getId())
+            ? $this->shareService->summarizeConversations(array_values(array_filter(
+                array_map(static fn (Chat $chat): int => (int) $chat->getId(), $chats),
+            )))
+            : [];
 
-        $result = array_map(function (Chat $chat) use ($sessionMap) {
+        $result = array_map(function (Chat $chat) use ($sessionMap, $shareSummaries) {
             // Get first user message preview (first 30 chars)
             // Direction 'IN' = user message, 'OUT' = assistant message
             $firstMessagePreview = null;
@@ -152,9 +183,12 @@ class ChatController extends AbstractController
                     // Tool commands (/pic, /vid, …) are kept in the stored message
                     // text for backend routing, but the raw prefix must never leak
                     // into the chat list preview — only the user's actual query.
-                    $content = PastedContentText::strip(
+                    $content = AnthropicContentText::humanText(PastedContentText::strip(
                         $this->stripToolCommandPrefix($message->getText() ?? ''),
-                    );
+                    ));
+                    if ('' === trim($content)) {
+                        continue;
+                    }
                     $firstMessagePreview = mb_strlen($content) > 30
                         ? mb_substr($content, 0, 30).'…'
                         : $content;
@@ -169,9 +203,18 @@ class ChatController extends AbstractController
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
                 'messageCount' => $sessionMap[$chat->getId()]['messageCount'] ?? $chat->getMessages()->count(),
                 'isShared' => $chat->isPublic(),
+                'shareSummary' => $shareSummaries[(string) $chat->getId()] ?? [
+                    'everyone' => false,
+                    'people' => 0,
+                    'groups' => [],
+                ],
                 'source' => $chat->getSource(),
                 'widgetSession' => $sessionMap[$chat->getId()] ?? null,
                 'firstMessagePreview' => $firstMessagePreview,
+                'pinned' => $chat->isPinned(),
+                'pinnedAt' => $chat->getPinnedAt()?->format('c'),
+                'archived' => $chat->isArchived(),
+                'tags' => $chat->getTags(),
             ];
         }, $chats);
 
@@ -323,6 +366,24 @@ class ChatController extends AbstractController
                                         new OA\Property(property: 'name', type: 'string', example: 'Sales', description: 'Group name, or empty for "everyone" / a direct share'),
                                     ]
                                 ),
+                                new OA\Property(
+                                    property: 'conversationFiles',
+                                    type: 'array',
+                                    description: 'Files this chat can still use on later turns, including uploads whose original message has scrolled out of the history window.',
+                                    items: new OA\Items(
+                                        required: ['id', 'reference', 'name', 'category', 'origin', 'fileType', 'messageId', 'hasText'],
+                                        properties: [
+                                            new OA\Property(property: 'id', type: 'integer', nullable: true, example: 77),
+                                            new OA\Property(property: 'reference', type: 'string', example: 'file:77'),
+                                            new OA\Property(property: 'name', type: 'string', example: 'contract.pdf'),
+                                            new OA\Property(property: 'category', type: 'string', enum: ['image', 'document', 'audio', 'video', 'other'], example: 'document'),
+                                            new OA\Property(property: 'origin', type: 'string', enum: ['attached', 'uploaded', 'generated'], example: 'uploaded'),
+                                            new OA\Property(property: 'fileType', type: 'string', example: 'pdf'),
+                                            new OA\Property(property: 'messageId', type: 'integer', nullable: true, example: 100),
+                                            new OA\Property(property: 'hasText', type: 'boolean', example: true),
+                                        ]
+                                    )
+                                ),
                             ]
                         ),
                     ]
@@ -372,18 +433,89 @@ class ChatController extends AbstractController
                     ConversationKind::KEY,
                     (string) $chat->getId(),
                 ),
+                'conversationFiles' => $this->conversationFileHistory->forChat(
+                    $chat->getUserId(),
+                    (int) $chat->getId(),
+                ),
             ],
+        ]);
+    }
+
+    #[Route('/{id}/files', name: 'files', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/chats/{id}/files',
+        summary: 'List files this chat can still use',
+        description: 'Returns every file that belongs to this conversation — uploads and generated artefacts — so a follow-up can name or reuse them without re-attaching. The same list is also on GET /api/v1/chats/{id} as `conversationFiles`.',
+        tags: ['Chats', 'Files'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Conversation file history',
+                content: new OA\JsonContent(
+                    required: ['success', 'files'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'files',
+                            type: 'array',
+                            items: new OA\Items(
+                                required: ['id', 'reference', 'name', 'category', 'origin', 'fileType', 'messageId', 'hasText'],
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', nullable: true, example: 77),
+                                    new OA\Property(property: 'reference', type: 'string', example: 'file:77'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'contract.pdf'),
+                                    new OA\Property(property: 'category', type: 'string', enum: ['image', 'document', 'audio', 'video', 'other'], example: 'document'),
+                                    new OA\Property(property: 'origin', type: 'string', enum: ['attached', 'uploaded', 'generated'], example: 'uploaded'),
+                                    new OA\Property(property: 'fileType', type: 'string', example: 'pdf'),
+                                    new OA\Property(property: 'messageId', type: 'integer', nullable: true, example: 100),
+                                    new OA\Property(property: 'hasText', type: 'boolean', example: true),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Shared chat does not reach this user'),
+            new OA\Response(response: 404, description: 'Chat not found'),
+        ]
+    )]
+    public function files(
+        int $id,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $chat = $this->chatRepository->find($id);
+        $denied = $this->denyConversation($user, $chat);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($chat instanceof Chat);
+
+        return $this->json([
+            'success' => true,
+            'files' => $this->conversationFileHistory->forChat(
+                $chat->getUserId(),
+                (int) $chat->getId(),
+            ),
         ]);
     }
 
     #[Route('/{id}', name: 'update', methods: ['PATCH'])]
     #[OA\Patch(
         path: '/api/v1/chats/{id}',
-        summary: 'Update chat title',
+        summary: 'Update chat title or pin',
         requestBody: new OA\RequestBody(
             content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'title', type: 'string', example: 'Updated Title'),
+                    new OA\Property(property: 'pinned', type: 'boolean', example: true, description: 'Pin or unpin this chat. Only the owner may change it.'),
                 ]
             )
         ),
@@ -393,6 +525,7 @@ class ChatController extends AbstractController
         ],
         responses: [
             new OA\Response(response: 200, description: 'Chat updated successfully'),
+            new OA\Response(response: 400, description: 'title is not a string or pinned is not a boolean'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Chat not found'),
         ]
@@ -413,12 +546,30 @@ class ChatController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-
-        if (isset($data['title'])) {
-            $chat->setTitle($data['title']);
+        if (!\is_array($data)) {
+            $data = [];
         }
 
-        $chat->updateTimestamp();
+        if (isset($data['title'])) {
+            if (!\is_string($data['title'])) {
+                return $this->json(['error' => 'title must be a string'], Response::HTTP_BAD_REQUEST);
+            }
+            $chat->setTitle($data['title']);
+            $chat->updateTimestamp();
+        }
+
+        if (\array_key_exists('pinned', $data)) {
+            if (!\is_bool($data['pinned'])) {
+                return $this->json(['error' => 'pinned must be a boolean'], Response::HTTP_BAD_REQUEST);
+            }
+            // Pinning is list placement, not activity: updatedAt stays, so an
+            // unpinned chat returns to where it was in the history.
+            if ($data['pinned'] !== $chat->isPinned()) {
+                $chat->setPinned($data['pinned']);
+                $chat->setPinnedAt($data['pinned'] ? new \DateTime() : null);
+            }
+        }
+
         $this->em->flush();
 
         return $this->json([
@@ -427,6 +578,8 @@ class ChatController extends AbstractController
                 'id' => $chat->getId(),
                 'title' => $chat->getTitle(),
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
+                'pinned' => $chat->isPinned(),
+                'pinnedAt' => $chat->getPinnedAt()?->format('c'),
             ],
         ]);
     }
@@ -518,6 +671,9 @@ class ChatController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
         $enable = $data['enable'] ?? true;
+        if ($enable && !$this->chatActionPolicy->canShare($user->getId())) {
+            return $this->json(['error' => 'Sharing chats is turned off for your account'], Response::HTTP_FORBIDDEN);
+        }
 
         if ($enable) {
             if (!$chat->getShareToken()) {
@@ -574,6 +730,7 @@ class ChatController extends AbstractController
                                     new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
                                     new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
                                     new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
+                                    new OA\Property(property: 'voiceReplyFailed', type: 'string', nullable: true, description: 'Voice-reply failure reason when TTS was requested but no audio was stored (provider_error, empty_text, rate_limited)'),
                                 ]
                             )
                         ),
@@ -666,10 +823,7 @@ class ChatController extends AbstractController
 
         // Issue #1070: serialization lives in MessageApiFormatter so this
         // endpoint and GET /api/v1/messages/{id} can never diverge.
-        $messageData = array_map(
-            fn ($m) => $this->messageApiFormatter->format($m),
-            $messages
-        );
+        $messageData = $this->messageApiFormatter->formatMany($messages);
 
         $totalCount = $this->messageRepository->createQueryBuilder('m')
             ->select('COUNT(m.id)')
@@ -719,7 +873,9 @@ class ChatController extends AbstractController
     #[Route('/shared/{token}', name: 'shared', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/chats/shared/{token}',
+        operationId: 'getSharedChat',
         summary: 'Get a publicly shared chat by token',
+        description: 'Returns the chat title and its messages. Knowledge sources are ids and labels only; the passage is loaded separately.',
         security: [],
         tags: ['Chats'],
         parameters: [
@@ -730,26 +886,83 @@ class ChatController extends AbstractController
                 response: 200,
                 description: 'Shared chat with messages',
                 content: new OA\JsonContent(
+                    required: ['success', 'chat', 'messages'],
                     properties: [
-                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(
                             property: 'chat',
-                            type: 'object',
+                            required: ['title', 'createdAt'],
                             properties: [
                                 new OA\Property(property: 'title', type: 'string'),
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
-                            ]
+                            ],
+                            type: 'object',
                         ),
                         new OA\Property(
                             property: 'messages',
                             type: 'array',
                             items: new OA\Items(
-                                type: 'object',
+                                required: ['id', 'text', 'direction', 'timestamp'],
                                 properties: [
+                                    new OA\Property(property: 'id', type: 'integer'),
+                                    new OA\Property(property: 'text', type: 'string'),
+                                    new OA\Property(property: 'direction', type: 'string', enum: ['IN', 'OUT']),
+                                    new OA\Property(property: 'timestamp', type: 'integer'),
+                                    new OA\Property(property: 'topic', type: 'string'),
+                                    new OA\Property(property: 'language', type: 'string'),
+                                    new OA\Property(property: 'provider', type: 'string'),
+                                    new OA\Property(
+                                        property: 'file',
+                                        nullable: true,
+                                        required: ['path', 'type'],
+                                        properties: [
+                                            new OA\Property(property: 'path', type: 'string'),
+                                            new OA\Property(property: 'type', type: 'string'),
+                                        ],
+                                        type: 'object',
+                                    ),
+                                    new OA\Property(
+                                        property: 'files',
+                                        type: 'array',
+                                        items: new OA\Items(
+                                            required: ['id', 'filename', 'fileType', 'filePath'],
+                                            properties: [
+                                                new OA\Property(property: 'id', type: 'integer'),
+                                                new OA\Property(property: 'filename', type: 'string'),
+                                                new OA\Property(property: 'fileType', type: 'string'),
+                                                new OA\Property(property: 'filePath', type: 'string'),
+                                                new OA\Property(property: 'fileSize', type: 'integer', nullable: true),
+                                                new OA\Property(property: 'fileMime', type: 'string', nullable: true),
+                                            ],
+                                            type: 'object',
+                                        ),
+                                    ),
+                                    new OA\Property(
+                                        property: 'ragSources',
+                                        type: 'array',
+                                        nullable: true,
+                                        description: 'Sources cited by this answer. Passage text is not included.',
+                                        items: new OA\Items(
+                                            required: ['n', 'chunkId', 'fileId', 'fileName', 'groupKey', 'startLine', 'endLine'],
+                                            properties: [
+                                                new OA\Property(property: 'n', type: 'integer'),
+                                                new OA\Property(property: 'chunkId', type: 'string'),
+                                                new OA\Property(property: 'fileId', type: 'integer'),
+                                                new OA\Property(property: 'fileName', type: 'string'),
+                                                new OA\Property(property: 'groupKey', type: 'string'),
+                                                new OA\Property(property: 'score', type: 'number', nullable: true),
+                                                new OA\Property(property: 'startLine', type: 'integer'),
+                                                new OA\Property(property: 'endLine', type: 'integer'),
+                                            ],
+                                            type: 'object',
+                                        ),
+                                    ),
                                     new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
                                     new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
                                     new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
-                                ]
+                                    new OA\Property(property: 'voiceReplyFailed', type: 'string', nullable: true, description: 'Voice-reply failure reason when TTS was requested but no audio was stored (provider_error, empty_text, rate_limited)'),
+                                ],
+                                type: 'object',
                             )
                         ),
                     ]
@@ -777,10 +990,7 @@ class ChatController extends AbstractController
         // exposed as `files[]`) are visible to viewers — the previous inline
         // serializer only emitted the legacy single `file` field, so uploads
         // silently disappeared in the shared view.
-        $messageData = array_map(
-            fn ($m) => $this->messageApiFormatter->format($m),
-            $messages
-        );
+        $messageData = $this->messageApiFormatter->formatMany($messages);
 
         return $this->json([
             'success' => true,
@@ -790,6 +1000,62 @@ class ChatController extends AbstractController
             ],
             'messages' => $messageData,
         ]);
+    }
+
+    /**
+     * Passage for a source this shared chat already cited.
+     * An unknown token and an uncited chunk id are the same not-found.
+     */
+    #[Route('/shared/{token}/rag/chunks/{chunkId}', name: 'shared_rag_chunk', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/chats/shared/{token}/rag/chunks/{chunkId}',
+        operationId: 'getSharedChatRagChunk',
+        summary: 'Load a cited knowledge passage for a shared chat',
+        description: 'Returns the passage only when this share token is public and a message of that chat cites the chunk id. The chat list stores ids only.',
+        security: [],
+        tags: ['Chats'],
+        parameters: [
+            new OA\Parameter(name: 'token', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'chunkId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Passage text',
+                content: new OA\JsonContent(
+                    required: ['success', 'chunkId', 'fileId', 'text', 'startLine', 'endLine'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'chunkId', type: 'string'),
+                        new OA\Property(property: 'fileId', type: 'integer'),
+                        new OA\Property(property: 'fileName', type: 'string', nullable: true),
+                        new OA\Property(property: 'groupKey', type: 'string'),
+                        new OA\Property(property: 'text', type: 'string'),
+                        new OA\Property(property: 'startLine', type: 'integer'),
+                        new OA\Property(property: 'endLine', type: 'integer'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: 'Share token or cited passage not found'),
+        ]
+    )]
+    public function sharedRagChunk(string $token, string $chunkId): JsonResponse
+    {
+        $chat = $this->chatRepository->findPublicByShareToken($token);
+        if (!$chat instanceof Chat) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+        $chatId = $chat->getId();
+        if (null === $chatId || !$this->messageRepository->chatCitesChunk($chatId, $chunkId)) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $passage = $this->vectorSearchService->passage($chat->getUserId(), $chunkId);
+        if (null === $passage) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json(['success' => true] + $passage);
     }
 
     #[Route('/{id}/continue', name: 'continue', methods: ['POST'])]

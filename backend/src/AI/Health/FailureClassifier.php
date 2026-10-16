@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Health;
 
+use App\AI\Exception\NoImageException;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\StructuredOutputViolationException;
@@ -56,6 +57,11 @@ final readonly class FailureClassifier
         'is sunset',
         'sunsetting',
         'not_found_error',
+        // Provider plan: THIS model is off the current key. Bare
+        // "subscription / higher plan" wording is account-wide → Credential.
+        'model is not available in your subscription',
+        'model is not included in your plan',
+        'model requires a higher plan',
     ];
 
     /** Credential, entitlement and billing problems — every model of the provider is affected. */
@@ -80,6 +86,9 @@ final readonly class FailureClassifier
         'payment required',
         'quota exceeded',
         'exceeded your current quota',
+        'subscription tier',
+        'not included in your plan',
+        'requires a higher plan',
     ];
 
     /** The request was at fault, not the model. */
@@ -131,6 +140,14 @@ final readonly class FailureClassifier
         // model health — counting it would let a burst of echoed input fields
         // switch off the routing model for everyone.
         if ($error instanceof StructuredOutputViolationException) {
+            return FailureKind::UserError;
+        }
+
+        // The image model finished normally and wrote a sentence instead of
+        // pixels. That is the request, not an outage: the message has no
+        // recognised pattern and no HTTP status, so it would otherwise be
+        // filed as transient and start counting against the model.
+        if ($error instanceof NoImageException) {
             return FailureKind::UserError;
         }
 

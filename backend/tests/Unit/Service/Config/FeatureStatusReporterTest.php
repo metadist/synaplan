@@ -4,28 +4,38 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Config;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Module\Contract\FeatureModuleInterface;
+use App\Module\Federation\FederationModule;
 use App\Module\ModuleRegistry;
 use App\Module\ModuleStatusPresenter;
 use App\Module\Sidecar\DoclingModule;
+use App\Module\Sidecar\LiveVoiceModule;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Module\Sidecar\TikaModule;
 use App\Plug\WebSearch\WebSearchGateway;
+use App\Repository\ComputeRunRepository;
 use App\Repository\ModelRepository;
+use App\Service\Compute\ComputeClient;
+use App\Service\Compute\ComputeConfig;
+use App\Service\Compute\ComputeFeatureStatusBuilder;
+use App\Service\Compute\Contract\ComputeHealth;
 use App\Service\Config\FeatureStatusReporter;
 use App\Service\Infrastructure\RedisService;
-use App\Service\UserMemoryService;
+use App\Service\Memory\UserMemoryService;
+use App\Service\Stt\WhisperService;
 use App\Service\VectorSearch\QdrantClientInterface;
-use App\Service\WhisperService;
 use App\Tests\Unit\Module\Fixture\BuildsAllModules;
 use App\Tests\Unit\Module\Fixture\FakeSidecarHealthProbe;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 
 /**
@@ -186,7 +196,7 @@ final class FeatureStatusReporterTest extends TestCase
         $probe = new FakeSidecarHealthProbe();
         $registry = $this->registry($probe, tikaUrl: 'http://tika:9998', doclingUrl: '', officeUrl: 'disabled');
 
-        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry));
+        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry), $this->computeStatus(false));
     }
 
     private function fullReporter(): FeatureStatusReporter
@@ -257,24 +267,66 @@ final class FeatureStatusReporterTest extends TestCase
                 'http://docling:5001/health' => true,
                 'http://collabora:9980/hosting/capabilities' => true,
                 'http://centrifugo:8000/health' => true,
+                'http://voice:8096/health' => true,
             ],
             bodies: ['http://tika:9998/version' => "Apache Tika 2.9.2\n"],
         );
-        $registry = $this->registry($probe, tikaUrl: 'http://tika:9998', doclingUrl: ' http://docling:5001/ ', officeUrl: ' http://collabora:9980 ', tikaUser: 'tika', tikaPass: 'secret');
+        $registry = $this->registry($probe, tikaUrl: 'http://tika:9998', doclingUrl: ' http://docling:5001/ ', officeUrl: ' http://collabora:9980 ', tikaUser: 'tika', tikaPass: 'secret', federationAppUrl: 'https://partners.example.com', voiceUrl: 'http://voice:8096');
 
-        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry));
+        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry), $this->computeStatus(true));
+    }
+
+    private function computeStatus(bool $healthy): ComputeFeatureStatusBuilder
+    {
+        $config = $this->createStub(ComputeConfig::class);
+        $config->method('isSwitchedOn')->willReturn($healthy);
+        $config->method('requireTier')->willReturn('docker');
+        $client = $this->createMock(ComputeClient::class);
+        if ($healthy) {
+            $client->expects($this->once())->method('health')->willReturn(ComputeHealth::fromJson((string) json_encode([
+                'protocol' => 1,
+                'tier' => 'gvisor',
+                'images' => [
+                    ['key' => 'python', 'ref' => 'ghcr.io/metadist/synaplan-compute-python@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6'],
+                ],
+                'capacity' => ['maxConcurrent' => 4, 'running' => 1, 'queued' => 0],
+                'caps' => ['timeoutSec' => 300, 'memoryMb' => 2048, 'cpu' => 2.0, 'pids' => 256, 'outputMb' => 200],
+                'features' => ['workspaces' => true, 'egress' => false],
+            ], \JSON_THROW_ON_ERROR)));
+        } else {
+            $client->method('health')->willThrowException(new \RuntimeException('Connection refused'));
+        }
+        $runs = $this->createStub(ComputeRunRepository::class);
+        $runs->method('countSince')->willReturn($healthy ? 12 : 0);
+        $runs->method('countFailedSince')->willReturn($healthy ? 1 : 0);
+
+        return new ComputeFeatureStatusBuilder($config, $client, $runs, new ArrayAdapter(), new NullLogger());
     }
 
     /**
-     * All thirteen descriptors (unconfigured stubs), with the three sidecars the
+     * All descriptors (unconfigured stubs), with the three sidecars the
      * page renders replaced by instances that see the scenario's URLs.
      */
-    private function registry(FakeSidecarHealthProbe $probe, string $tikaUrl, string $doclingUrl, string $officeUrl, ?string $tikaUser = null, ?string $tikaPass = null): ModuleRegistry
+    private function registry(FakeSidecarHealthProbe $probe, string $tikaUrl, string $doclingUrl, string $officeUrl, ?string $tikaUser = null, ?string $tikaPass = null, string $federationAppUrl = 'http://localhost:8000', string $voiceUrl = ''): ModuleRegistry
     {
         $modules = $this->allModules();
         $modules[TikaModule::ID] = new TikaModule($probe, $tikaUrl, $tikaUser, $tikaPass);
         $modules[DoclingModule::ID] = new DoclingModule($probe, $doclingUrl);
         $modules[OfficeConvertModule::ID] = new OfficeConvertModule($probe, $officeUrl);
+        $modules[FederationModule::ID] = new FederationModule($federationAppUrl, false);
+        if ('' !== $voiceUrl) {
+            $voiceModels = $this->createStub(ModelRepository::class);
+            $voiceModels->method('findActiveByTag')->willReturn([(new Model())->setService('OpenAI')]);
+            $voiceKeys = $this->createStub(ProviderKeyStore::class);
+            $voiceKeys->method('getStatus')->willReturn([
+                'configured' => true,
+                'source' => 'env',
+                'origin' => null,
+                'maskedKey' => 'sk-secret',
+                'hasSecret' => false,
+            ]);
+            $modules[LiveVoiceModule::ID] = new LiveVoiceModule($probe, $voiceUrl, 'secret', $voiceModels, $voiceKeys);
+        }
 
         $factories = [];
         foreach ($modules as $id => $module) {

@@ -2,10 +2,13 @@
 Description=Synaplan first-boot setup (data disk, configuration, TLS)
 Documentation=https://github.com/metadist/synaplan/blob/main/deploy/azure/README.md
 # The script reads instance metadata and may write to Key Vault, so it needs the
-# network; it also mounts the data disk every other unit uses. walinuxagent is
-# what applies the deployment's own configuration, including the SSH key, and
-# what surfaces the provisioning state to Azure.
-After=network-online.target cloud-init.target walinuxagent.service docker.service
+# network; it also mounts the data disk every other unit uses.
+#
+# It must NOT order itself after cloud-init.target: that target sits after
+# multi-user.target, while this unit's WantedBy pulls it before it — a cycle
+# systemd resolves by silently never starting this unit, Caddy or the stack.
+# User data and tags come straight from IMDS as soon as the network is up.
+After=network-online.target walinuxagent.service docker.service
 Wants=network-online.target
 Requires=docker.service
 Before=synaplan.service caddy.service

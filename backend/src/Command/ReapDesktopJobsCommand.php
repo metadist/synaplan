@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Desktop\DesktopJobResultNotifier;
 use App\Service\Desktop\DesktopJobStore;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -37,6 +38,7 @@ final class ReapDesktopJobsCommand extends Command
         private readonly DesktopJobStore $jobStore,
         private readonly DesktopAgentConfig $desktopAgentConfig,
         private readonly LockFactory $lockFactory,
+        private readonly DesktopJobResultNotifier $resultNotifier,
     ) {
         parent::__construct();
     }
@@ -48,12 +50,14 @@ final class ReapDesktopJobsCommand extends Command
         // Flag off means idle, not broken (C8): shipping this to main before any
         // device exists must be a no-op on every production install.
         if (!$this->desktopAgentConfig->isEnabled(null)) {
-            $io->writeln('Desktop agent feature is disabled. Nothing to reap.');
+            $io->writeln('Synaplan Desktop is turned off. Nothing to reap.');
 
             return Command::SUCCESS;
         }
 
-        $lock = $this->lockFactory->createLock('desktop-job-reaper', 120);
+        // Outlasts the scheduler's 300 s cap plus its 30 s kill grace, so runs on two
+        // nodes never overlap.
+        $lock = $this->lockFactory->createLock('desktop-job-reaper', 600);
         if (!$lock->acquire()) {
             $io->note('Previous desktop reaper run is still active. Skipping.');
 
@@ -64,6 +68,9 @@ final class ReapDesktopJobsCommand extends Command
             $result = $this->jobStore->requeueExpiredLeases();
             $requeued = $result['requeued'];
             $failed = $result['failed'];
+            foreach ($result['failedJobs'] as $job) {
+                $this->resultNotifier->notify($job);
+            }
 
             if ($requeued > 0 || $failed > 0) {
                 $io->success(sprintf('Requeued %d and failed %d expired desktop job(s).', $requeued, $failed));

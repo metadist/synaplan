@@ -3,7 +3,7 @@
     <button
       ref="trigger"
       type="button"
-      class="icon-ghost w-7 h-7 flex items-center justify-center rounded-lg shrink-0"
+      class="icon-ghost w-7 h-7 flex items-center justify-center rounded-xl shrink-0"
       :aria-label="$t('providerHelp.openAria')"
       :data-testid="`provider-help-${helpId}`"
       @click="openDialog"
@@ -48,7 +48,7 @@
               </div>
               <button
                 type="button"
-                class="icon-ghost w-7 h-7 flex items-center justify-center rounded-lg shrink-0"
+                class="icon-ghost w-7 h-7 flex items-center justify-center rounded-xl shrink-0"
                 :aria-label="$t('common.close')"
                 data-testid="provider-help-close"
                 @click="close"

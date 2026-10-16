@@ -69,6 +69,72 @@ describe('Memories Store', () => {
     expect(store.error).toBeTruthy()
   })
 
+  it('waits out a slow list instead of committing the outage screen', async () => {
+    let resolveFetch: (rows: UserMemory[]) => void = () => {}
+    vi.mocked(userMemoriesApi.getMemories).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve
+        })
+    )
+
+    const store = useMemoriesStore()
+    const pending = store.fetchMemories()
+    expect(store.loading).toBe(true)
+    expect(store.error).toBeNull()
+
+    resolveFetch([
+      {
+        id: 1,
+        category: 'preferences',
+        key: 'k',
+        value: 'v',
+        source: 'user_created',
+        messageId: null,
+        created: 1705234567,
+        updated: 1705234567,
+      },
+    ])
+    await pending
+
+    expect(store.error).toBeNull()
+    expect(store.memories).toHaveLength(1)
+    expect(store.loading).toBe(false)
+  })
+
+  it('does not let an older list response replace a newer one', async () => {
+    const resolvers: Array<(rows: UserMemory[]) => void> = []
+    vi.mocked(userMemoriesApi.getMemories).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve)
+        })
+    )
+
+    const row = (id: number): UserMemory => ({
+      id,
+      category: 'preferences',
+      key: 'k',
+      value: 'v',
+      source: 'user_created',
+      messageId: null,
+      created: 1705234567,
+      updated: 1705234567,
+    })
+
+    const store = useMemoriesStore()
+    const first = store.fetchMemories()
+    const second = store.fetchMemories()
+    resolvers[1]([row(2)])
+    await second
+    resolvers[0]([row(1)])
+    await first
+
+    expect(store.memories.map((memory) => memory.id)).toEqual([2])
+    expect(store.error).toBeNull()
+    expect(store.loading).toBe(false)
+  })
+
   it('should create memory successfully', async () => {
     const newMemory: UserMemory = {
       id: 1,

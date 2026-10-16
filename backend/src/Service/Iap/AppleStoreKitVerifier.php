@@ -22,7 +22,7 @@ use AppStoreServerLibrary\SignedDataVerifier\VerificationException;
  *
  * NOTE: the verification path is intentionally NOT unit tested — it needs real
  * Apple root certificates + bundle id and produces values only Apple can sign.
- * The business logic that consumes it ({@see \App\Service\MobilePurchaseService})
+ * The business logic that consumes it ({@see MobilePurchaseService})
  * is tested against {@see AppleReceiptVerifierInterface} fakes instead. The
  * configuration guards below run before any Apple data is touched and ARE
  * covered, because a misconfigured deployment fails silently in production.

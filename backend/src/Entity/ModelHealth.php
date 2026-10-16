@@ -88,6 +88,22 @@ class ModelHealth
     #[ORM\Column(name: 'BUPDATED', type: 'bigint', options: ['default' => 0])]
     private int $updated = 0;
 
+    /**
+     * Unix time of the last incident message that named this model.
+     * Zero means it has never been reported. Recovery does not clear it:
+     * the same model stays quiet for the configured period either way.
+     */
+    #[ORM\Column(name: 'BLASTALERTED', type: 'bigint', options: ['default' => 0])]
+    private int $lastAlerted = 0;
+
+    /**
+     * {@see \App\AI\Health\ModelHealthAlert} kind of that last message. A more
+     * severe kind (a rejected key after a flaky hour) is reported inside the
+     * quiet period; the same or a milder one is not.
+     */
+    #[ORM\Column(name: 'BLASTALERTEDKIND', length: 16, nullable: true)]
+    private ?string $lastAlertedKind = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -201,6 +217,17 @@ class ModelHealth
         return $this;
     }
 
+    /**
+     * BACTIVE = 0 set by a person, not by the automation. Such a row stays in
+     * the check so a recovery is visible, but it is a decision already taken:
+     * it never needs attention and never pages. A row the automation switched
+     * off is still a problem somebody has to look at.
+     */
+    public static function isSwitchedOffByOperator(Model $model, ?self $health): bool
+    {
+        return 0 === $model->getActive() && !($health?->isAutoDisabled() ?? false);
+    }
+
     public function getAutoDisabledAt(): int
     {
         return $this->autoDisabledAt;
@@ -238,6 +265,30 @@ class ModelHealth
     public function setUpdated(int $updated): self
     {
         $this->updated = $updated;
+
+        return $this;
+    }
+
+    public function getLastAlerted(): int
+    {
+        return $this->lastAlerted;
+    }
+
+    public function setLastAlerted(int $lastAlerted): self
+    {
+        $this->lastAlerted = max(0, $lastAlerted);
+
+        return $this;
+    }
+
+    public function getLastAlertedKind(): ?string
+    {
+        return $this->lastAlertedKind;
+    }
+
+    public function setLastAlertedKind(?string $lastAlertedKind): self
+    {
+        $this->lastAlertedKind = $lastAlertedKind;
 
         return $this;
     }

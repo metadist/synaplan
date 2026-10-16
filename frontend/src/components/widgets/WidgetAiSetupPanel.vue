@@ -37,7 +37,7 @@
       </div>
       <button
         v-if="messages.length > 1"
-        class="p-1.5 rounded-lg txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+        class="p-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
         :title="$t('widgets.detail.aiPanel.restart')"
         @click="restartChat"
       >
@@ -63,7 +63,7 @@
             'rounded-2xl',
             fullscreen ? 'max-w-[75%] px-5 py-3 text-[15px]' : 'max-w-[85%] px-4 py-2.5 text-sm',
             msg.role === 'user'
-              ? 'bg-[var(--brand)] text-white rounded-br-md'
+              ? 'bg-[var(--brand-fill)] text-white rounded-br-md'
               : 'bg-gray-100 dark:bg-white/5 txt-primary rounded-bl-md',
           ]"
         >
@@ -239,7 +239,7 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
-const md = getMarkdownRenderer()
+const md = getMarkdownRenderer((key, params) => String(t(key, params ?? {})))
 
 function renderMarkdown(text: string): string {
   return md.render(text)

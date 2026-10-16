@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
+import { showWidgetPromo } from '@/composables/useChatWelcome'
 
 export interface PromoTip {
   id: string
@@ -117,7 +118,7 @@ export function usePromoTips() {
 
       switch (tip.id) {
         case 'chat-widget':
-          return true
+          return showWidgetPromo()
         case 'ai-config':
           return true
         case 'doc-summary':

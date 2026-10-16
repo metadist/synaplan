@@ -8,7 +8,7 @@ use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -472,5 +472,27 @@ final class ProviderKeyStoreTest extends TestCase
 
         self::assertFalse($meta['freeTier']);
         self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
+    }
+
+    public function testMetaCatalogPointsAtTheModelApiDashboard(): void
+    {
+        $meta = ProviderKeyCatalog::get('meta');
+
+        self::assertSame('META_API_KEY', $meta['envVar']);
+        self::assertSame('https://dev.meta.ai/', $meta['consoleUrl']);
+        self::assertSame('https://api.meta.ai/v1/models', $meta['validation']['url']);
+        self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
+    }
+
+    public function testCerebrasCatalogUsesTheCanonicalEnvVarAndModelListing(): void
+    {
+        $meta = ProviderKeyCatalog::get('cerebras');
+
+        self::assertSame('CEREBRAS_API_KEY', $meta['envVar']);
+        self::assertSame('https://cloud.cerebras.ai/', $meta['consoleUrl']);
+        self::assertSame('https://api.cerebras.ai/v1/models', $meta['validation']['url']);
+        self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
+        self::assertTrue(ProviderKeyCatalog::listsModels('cerebras'));
+        self::assertContains('cerebras', ProviderKeyStore::SUPPORTED_PROVIDERS);
     }
 }

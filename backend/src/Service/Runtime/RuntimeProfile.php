@@ -18,15 +18,15 @@ use App\Service\RAG\RagScopeResolver;
 final readonly class RuntimeProfile
 {
     /**
-     * @param array<string, int|null>                     $modelIds         capability → BMODELS BID
-     * @param list<array{ownerId: int, groupKey: string}> $ragScopes
-     * @param array<string, mixed>                        $toolFlags
-     * @param list<string>|null                           $skillAllow       null = unrestricted
-     * @param list<string>|null                           $skillDeny
-     * @param array<string, mixed>                        $parameters
-     * @param list<string>                                $notes            resolver diagnostics (model_fallback:chat, …)
-     * @param int|null                                    $viewerId         the user this profile was resolved for
-     * @param bool                                        $includeUserFiles whether the viewer's own files are searched alongside the assistant's folders
+     * @param array<string, int|null>                                          $modelIds         capability → BMODELS BID
+     * @param list<array{ownerId: int, groupKey: string, fileIds?: list<int>}> $ragScopes
+     * @param array<string, mixed>                                             $toolFlags
+     * @param list<string>|null                                                $skillAllow       null = unrestricted
+     * @param list<string>|null                                                $skillDeny
+     * @param array<string, mixed>                                             $parameters
+     * @param list<string>                                                     $notes            resolver diagnostics (model_fallback:chat, …)
+     * @param int|null                                                         $viewerId         the user this profile was resolved for
+     * @param bool                                                             $includeUserFiles whether the viewer's own files are searched alongside the assistant's folders
      */
     public function __construct(
         public ?int $promptId,

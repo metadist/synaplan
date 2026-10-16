@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\AI\Messages\Translator;
 
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
+use App\AI\Image\PngJpegInlineImages;
+use App\AI\Image\UnsupportedImageInputException;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnthropicServerTools;
+use App\AI\Provider\OpenAiReasoningEffort;
 use App\AI\Tool\OpenAiToolShapes;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -15,21 +18,34 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
- * Anthropic Messages ↔ OpenAI Chat Completions translator.
+ * Anthropic Messages ↔ OpenAI Chat Completions / Responses translator.
  *
  * Strips Anthropic-only fields (`thinking`, beta body keys) that Claude Code
- * sends to gateway aliases. Tool schemas map `input_schema` → `parameters`;
- * image blocks map to `image_url` parts so vision survives the alias route.
+ * sends to gateway aliases; on the Responses route the client's `thinking` /
+ * `output_config.effort` request is first mapped onto `reasoning.effort`.
+ * Tool schemas map `input_schema` → `parameters`;
+ * image blocks map to `image_url` / `input_image` parts so vision survives
+ * the alias route.
  *
- * Hosts: OpenAI plus every other catalog chat provider that already speaks
- * Chat Completions (Groq, Mistral, xAI, HuggingFace, TrustedTokens,
- * A2Agent, Perplexity, Ollama, admin-registered OpenAI-compatible endpoints).
+ * First-party OpenAI reasoning models (o-series, gpt-5+, gpt-6) go to
+ * `/v1/responses` — Chat Completions rejects their function tools. Every
+ * other Chat Completions host (Groq, Mistral, xAI, …) stays on that API.
  */
 #[AutoconfigureTag('app.messages.translator')]
 final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInterface
 {
     private const DEFAULT_UPSTREAM = 'https://api.openai.com';
     private const DEFAULT_TIMEOUT = 600;
+
+    /**
+     * Exclusive upper `thinking.budget_tokens` bound per effort tier; larger
+     * budgets map to `xhigh`.
+     */
+    private const THINKING_BUDGET_TIERS = [
+        4096 => 'low',
+        16384 => 'medium',
+        32768 => 'high',
+    ];
 
     /** Anthropic-only top-level keys that OpenAI rejects. */
     private const STRIP_KEYS = [
@@ -41,6 +57,9 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         'anthropic_beta',
         'anthropic_version',
     ];
+
+    /** Upstream that accepts images only as inline base64 PNG or JPEG. */
+    private const INLINE_PNG_JPEG_ONLY = 'cerebras';
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -57,8 +76,8 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
 
     public function complete(array $requestBody, array $context): array
     {
-        $url = $this->resolveCompletionsUrl($context);
-        if (null === $url) {
+        $route = $this->resolveUpstream($requestBody, $context, stream: false);
+        if (null === $route) {
             return [
                 'status' => 502,
                 'headers' => [],
@@ -67,8 +86,16 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             ];
         }
 
-        $payload = $this->toOpenAiRequest($requestBody, stream: false, imageDetail: $this->imageDetail($context));
-        $response = $this->request($payload, $context, $url, stream: false);
+        if (null !== ($route['input_error'] ?? null)) {
+            return [
+                'status' => 400,
+                'headers' => [],
+                'body' => self::invalidRequestError($route['input_error']),
+                'usage' => new MessagesUsage(),
+            ];
+        }
+
+        $response = $this->request($route['payload'], $context, $route['url'], stream: false);
         $status = $response->getStatusCode();
         $headers = $response->getHeaders(false);
         $raw = $response->getContent(false);
@@ -92,7 +119,9 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             ];
         }
 
-        $anthropic = $this->fromOpenAiResponse($decoded, $requestBody);
+        $anthropic = $route['responses']
+            ? $this->fromResponsesResponse($decoded, $requestBody)
+            : $this->fromOpenAiResponse($decoded, $requestBody);
 
         return [
             'status' => 200,
@@ -107,8 +136,8 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
 
     public function stream(array $requestBody, array $context, callable $emit): MessagesUsage
     {
-        $url = $this->resolveCompletionsUrl($context);
-        if (null === $url) {
+        $route = $this->resolveUpstream($requestBody, $context, stream: true);
+        if (null === $route) {
             $emit([
                 'event' => 'error',
                 'data' => $this->toAnthropicError(null, $this->unresolvedUpstreamMessage($context), 502),
@@ -117,8 +146,16 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             return new MessagesUsage();
         }
 
-        $payload = $this->toOpenAiRequest($requestBody, stream: true, imageDetail: $this->imageDetail($context));
-        $response = $this->request($payload, $context, $url, stream: true);
+        if (null !== ($route['input_error'] ?? null)) {
+            $emit([
+                'event' => 'error',
+                'data' => self::invalidRequestError($route['input_error']),
+            ]);
+
+            return new MessagesUsage();
+        }
+
+        $response = $this->request($route['payload'], $context, $route['url'], stream: true);
         $status = $response->getStatusCode();
 
         if ($status >= 400) {
@@ -132,7 +169,9 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             return new MessagesUsage();
         }
 
-        return $this->streamOpenAiToAnthropic($response, $requestBody, $emit);
+        return $route['responses']
+            ? $this->streamResponsesToAnthropic($response, $requestBody, $emit)
+            : $this->streamOpenAiToAnthropic($response, $requestBody, $emit);
     }
 
     /**
@@ -173,7 +212,16 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         ];
 
         if (isset($requestBody['max_tokens'])) {
-            $payload['max_tokens'] = (int) $requestBody['max_tokens'];
+            $max = (int) $requestBody['max_tokens'];
+            $model = (string) $payload['model'];
+            // Anthropic clients always send `max_tokens`. Reasoning models on
+            // Chat Completions reject that name (GPT-6 Astra: "Use
+            // max_completion_tokens instead").
+            if (self::usesCompletionTokens($model)) {
+                $payload['max_completion_tokens'] = $max;
+            } else {
+                $payload['max_tokens'] = $max;
+            }
         }
         if (isset($requestBody['temperature'])) {
             $payload['temperature'] = $requestBody['temperature'];
@@ -212,6 +260,384 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         }
 
         return $payload;
+    }
+
+    /**
+     * Reasoning models (o-series, gpt-5+, gpt-6) reject `max_tokens` on
+     * Chat Completions. Accepts a bare model id or a catalog key
+     * (`openai:gpt-6-astra:chat`).
+     */
+    public static function usesCompletionTokens(string $model): bool
+    {
+        $model = strtolower($model);
+        if (str_contains($model, ':')) {
+            $parts = explode(':', $model);
+            $model = $parts[1] ?? $model;
+        }
+
+        return str_starts_with($model, 'o1')
+            || str_starts_with($model, 'o3')
+            || str_starts_with($model, 'o4')
+            || str_starts_with($model, 'gpt-5')
+            || str_starts_with($model, 'gpt-6');
+    }
+
+    /**
+     * First-party OpenAI reasoning models cannot take function tools on
+     * Chat Completions. Groq / xAI / custom completions hosts stay put.
+     *
+     * @param array<string, mixed> $requestBody
+     * @param array<string, mixed> $context
+     */
+    public function shouldUseResponses(array $requestBody, array $context): bool
+    {
+        $provider = strtolower((string) ($context['provider'] ?? 'openai'));
+        if ('openai' !== $provider) {
+            return false;
+        }
+        if (isset($context['openai_completions_url']) && \is_string($context['openai_completions_url']) && '' !== $context['openai_completions_url']) {
+            return false;
+        }
+
+        return self::usesCompletionTokens((string) ($requestBody['model'] ?? ''));
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     * @param array<string, mixed> $context
+     *
+     * @return array{url: string, payload: array<string, mixed>, responses: bool, input_error?: string|null}|null
+     */
+    private function resolveUpstream(array $requestBody, array $context, bool $stream): ?array
+    {
+        $imageDetail = $this->imageDetail($context);
+        if ($this->shouldUseResponses($requestBody, $context)) {
+            return [
+                'url' => $this->resolveResponsesUrl($context),
+                'payload' => $this->toResponsesRequest($requestBody, $stream, $imageDetail),
+                'responses' => true,
+            ];
+        }
+
+        $url = $this->resolveCompletionsUrl($context);
+        if (null === $url) {
+            return null;
+        }
+
+        $payload = $this->toOpenAiRequest($requestBody, $stream, $imageDetail);
+        $inputError = null;
+        if (self::INLINE_PNG_JPEG_ONLY === strtolower((string) ($context['provider'] ?? ''))) {
+            try {
+                $payload['messages'] = PngJpegInlineImages::normalizeMessages($payload['messages'], 'Cerebras');
+            } catch (UnsupportedImageInputException $e) {
+                $inputError = $e->getMessage();
+            }
+        }
+
+        return [
+            'url' => $url,
+            'payload' => $payload,
+            'responses' => false,
+            'input_error' => $inputError,
+        ];
+    }
+
+    /**
+     * @return array{type: string, error: array{type: string, message: string}}
+     */
+    private static function invalidRequestError(string $message): array
+    {
+        return [
+            'type' => 'error',
+            'error' => [
+                'type' => 'invalid_request_error',
+                'message' => $message,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    public function resolveResponsesUrl(array $context): string
+    {
+        if (isset($context['openai_responses_url']) && \is_string($context['openai_responses_url']) && '' !== $context['openai_responses_url']) {
+            return rtrim($context['openai_responses_url'], '/');
+        }
+        if (isset($context['openai_upstream_url']) && \is_string($context['openai_upstream_url']) && '' !== $context['openai_upstream_url']) {
+            return rtrim($context['openai_upstream_url'], '/').'/v1/responses';
+        }
+
+        return self::DEFAULT_UPSTREAM.'/v1/responses';
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    public function toResponsesRequest(array $requestBody, bool $stream, ?string $imageDetail = null): array
+    {
+        $effort = self::responsesEffort((string) ($requestBody['model'] ?? ''), $requestBody);
+
+        foreach (self::STRIP_KEYS as $key) {
+            unset($requestBody[$key]);
+        }
+
+        $instructions = null;
+        $system = $requestBody['system'] ?? null;
+        if (\is_string($system) && '' !== $system) {
+            $instructions = $system;
+        } elseif (\is_array($system)) {
+            $sysText = $this->flattenTextBlocks($system);
+            $instructions = '' !== $sysText ? $sysText : null;
+        }
+
+        $chatMessages = [];
+        foreach ($requestBody['messages'] ?? [] as $msg) {
+            if (!\is_array($msg)) {
+                continue;
+            }
+            foreach ($this->mapAnthropicMessage($msg, $imageDetail) as $mapped) {
+                $chatMessages[] = $mapped;
+            }
+        }
+
+        $model = (string) ($requestBody['model'] ?? '');
+        $payload = [
+            'model' => $model,
+            'input' => $this->chatMessagesToResponsesInput($chatMessages),
+            'store' => false,
+        ];
+        if (null !== $instructions) {
+            $payload['instructions'] = $instructions;
+        }
+        if (isset($requestBody['max_tokens'])) {
+            $payload['max_output_tokens'] = (int) $requestBody['max_tokens'];
+        }
+
+        if (null !== $effort) {
+            $payload['reasoning'] = ['effort' => $effort];
+        }
+
+        if (isset($requestBody['tools']) && \is_array($requestBody['tools'])) {
+            $clientTools = [];
+            foreach ($requestBody['tools'] as $tool) {
+                if (!\is_array($tool) || AnthropicServerTools::isServerToolDeclaration($tool)) {
+                    continue;
+                }
+                $clientTools[] = $tool;
+            }
+            $tools = OpenAiToolShapes::toResponsesTools($clientTools);
+            if ([] !== $tools) {
+                $payload['tools'] = $tools;
+            }
+        }
+        if (isset($requestBody['tool_choice'])) {
+            $mappedChoice = OpenAiToolShapes::toResponsesToolChoice($requestBody['tool_choice']);
+            if (null !== $mappedChoice) {
+                $payload['tool_choice'] = $mappedChoice;
+            }
+        }
+
+        if ($stream) {
+            $payload['stream'] = true;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Responses `reasoning.effort` for an Anthropic Messages body: the
+     * client's thinking request clamped to the family's tiers, or the
+     * cheapest tier when the client asked for no thinking. Non-reasoning
+     * models return null (no `reasoning` block).
+     *
+     * @param array<string, mixed> $requestBody Messages body before STRIP_KEYS
+     */
+    public static function responsesEffort(string $model, array $requestBody): ?string
+    {
+        $lowest = self::lowestResponsesEffort($model);
+        if (null === $lowest) {
+            return null;
+        }
+
+        $requested = self::requestedThinkingEffort($requestBody);
+
+        return null === $requested ? $lowest : OpenAiReasoningEffort::clamp(self::bareModelId($model), $requested);
+    }
+
+    /**
+     * Cheapest Responses `reasoning.effort` the family accepts.
+     * Non-reasoning models return null (no `reasoning` block).
+     */
+    public static function lowestResponsesEffort(string $model): ?string
+    {
+        $model = self::bareModelId($model);
+        if (!self::usesCompletionTokens($model)) {
+            return null;
+        }
+
+        return OpenAiReasoningEffort::lowest($model);
+    }
+
+    /**
+     * Effort tier the client asked for, or null for "no thinking".
+     *
+     * `thinking.type: disabled` always wins. An explicit `output_config.effort`
+     * comes next, then the `thinking.budget_tokens` size; thinking without
+     * either maps to OpenAI's default `medium`.
+     *
+     * @param array<string, mixed> $requestBody
+     */
+    private static function requestedThinkingEffort(array $requestBody): ?string
+    {
+        $thinking = \is_array($requestBody['thinking'] ?? null) ? $requestBody['thinking'] : [];
+        $type = $thinking['type'] ?? null;
+        if ('disabled' === $type) {
+            return null;
+        }
+
+        $outputConfig = \is_array($requestBody['output_config'] ?? null) ? $requestBody['output_config'] : [];
+        $effort = $outputConfig['effort'] ?? null;
+        if (\is_string($effort) && '' !== $effort) {
+            return strtolower($effort);
+        }
+
+        if ('enabled' !== $type && 'adaptive' !== $type) {
+            return null;
+        }
+
+        $budget = $thinking['budget_tokens'] ?? null;
+        if (!\is_int($budget) || $budget <= 0) {
+            return 'medium';
+        }
+        foreach (self::THINKING_BUDGET_TIERS as $limit => $tier) {
+            if ($budget < $limit) {
+                return $tier;
+            }
+        }
+
+        return 'xhigh';
+    }
+
+    /**
+     * Lowercased bare model id; accepts a catalog key (`openai:gpt-6-sol:chat`).
+     */
+    private static function bareModelId(string $model): string
+    {
+        $model = strtolower($model);
+        if (str_contains($model, ':')) {
+            $parts = explode(':', $model);
+            $model = $parts[1] ?? $model;
+        }
+
+        return $model;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function chatMessagesToResponsesInput(array $messages): array
+    {
+        $items = [];
+        foreach ($messages as $message) {
+            $role = (string) ($message['role'] ?? 'user');
+            if ('tool' === $role) {
+                $output = $message['content'] ?? '';
+                if (!\is_string($output)) {
+                    $output = json_encode($output, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES) ?: '';
+                }
+                $items[] = [
+                    'type' => 'function_call_output',
+                    'call_id' => (string) ($message['tool_call_id'] ?? ''),
+                    'output' => $output,
+                ];
+                continue;
+            }
+
+            $isAssistant = 'assistant' === $role;
+            $textType = $isAssistant ? 'output_text' : 'input_text';
+            $toolCalls = \is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
+            $contentParts = $this->responsesContentParts($message['content'] ?? '', $textType, [] !== $toolCalls);
+            if ([] !== $contentParts) {
+                $items[] = [
+                    'role' => $role,
+                    'content' => $contentParts,
+                ];
+            }
+            foreach ($toolCalls as $call) {
+                if (!\is_array($call)) {
+                    continue;
+                }
+                $fn = \is_array($call['function'] ?? null) ? $call['function'] : [];
+                $args = $fn['arguments'] ?? '{}';
+                if (!\is_string($args) || '' === $args) {
+                    $args = '{}';
+                }
+                $items[] = [
+                    'type' => 'function_call',
+                    'call_id' => (string) ($call['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
+                    'name' => (string) ($fn['name'] ?? 'tool'),
+                    'arguments' => $args,
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function responsesContentParts(mixed $content, string $textType, bool $hasToolCalls): array
+    {
+        if (!\is_array($content)) {
+            $text = \is_string($content) ? $content : '';
+            if ('' === $text && $hasToolCalls) {
+                return [];
+            }
+
+            return [['type' => $textType, 'text' => $text]];
+        }
+
+        $converted = [];
+        foreach ($content as $part) {
+            if (!\is_array($part)) {
+                continue;
+            }
+            $type = (string) ($part['type'] ?? '');
+            if ('text' === $type) {
+                $converted[] = [
+                    'type' => $textType,
+                    'text' => (string) ($part['text'] ?? ''),
+                ];
+            } elseif ('image_url' === $type) {
+                $imageUrl = $part['image_url'] ?? null;
+                $url = '';
+                $detail = null;
+                if (\is_array($imageUrl)) {
+                    $url = \is_string($imageUrl['url'] ?? null) ? $imageUrl['url'] : '';
+                    $detail = $imageUrl['detail'] ?? null;
+                } elseif (\is_string($imageUrl)) {
+                    $url = $imageUrl;
+                }
+                if ('' !== $url) {
+                    $image = [
+                        'type' => 'input_image',
+                        'image_url' => $url,
+                    ];
+                    if (\is_string($detail) && '' !== $detail && 'auto' !== $detail) {
+                        $image['detail'] = $detail;
+                    }
+                    $converted[] = $image;
+                }
+            }
+        }
+
+        return $converted;
     }
 
     /**
@@ -269,6 +695,73 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
                 'output_tokens' => (int) ($usageIn['completion_tokens'] ?? 0),
                 'cache_creation_input_tokens' => 0,
                 'cache_read_input_tokens' => (int) ($usageIn['prompt_tokens_details']['cached_tokens'] ?? 0),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $responses
+     * @param array<string, mixed> $originalRequest
+     *
+     * @return array<string, mixed>
+     */
+    public function fromResponsesResponse(array $responses, array $originalRequest): array
+    {
+        $content = [];
+        $hasTool = false;
+        foreach ($responses['output'] ?? [] as $item) {
+            if (!\is_array($item)) {
+                continue;
+            }
+            $type = (string) ($item['type'] ?? '');
+            if ('function_call' === $type) {
+                $hasTool = true;
+                $argsRaw = $item['arguments'] ?? '{}';
+                $args = \is_string($argsRaw) ? json_decode($argsRaw, true) : $argsRaw;
+                $content[] = [
+                    'type' => 'tool_use',
+                    'id' => (string) ($item['call_id'] ?? $item['id'] ?? uniqid('toolu_', true)),
+                    'name' => (string) ($item['name'] ?? 'tool'),
+                    'input' => \is_array($args) ? $args : [],
+                ];
+                continue;
+            }
+            if ('message' !== $type) {
+                continue;
+            }
+            foreach ($item['content'] ?? [] as $part) {
+                if (!\is_array($part)) {
+                    continue;
+                }
+                if ('output_text' === ($part['type'] ?? '') && isset($part['text']) && '' !== (string) $part['text']) {
+                    $content[] = ['type' => 'text', 'text' => (string) $part['text']];
+                }
+            }
+        }
+
+        $status = (string) ($responses['status'] ?? 'completed');
+        $incompleteReason = (string) ($responses['incomplete_details']['reason'] ?? '');
+        $stopReason = match (true) {
+            $hasTool => 'tool_use',
+            'incomplete' === $status, 'max_output_tokens' === $incompleteReason => 'max_tokens',
+            default => 'end_turn',
+        };
+
+        $usageIn = \is_array($responses['usage'] ?? null) ? $responses['usage'] : [];
+
+        return [
+            'id' => (string) ($responses['id'] ?? ('msg_'.bin2hex(random_bytes(8)))),
+            'type' => 'message',
+            'role' => 'assistant',
+            'model' => (string) ($originalRequest['model'] ?? $responses['model'] ?? ''),
+            'content' => $content,
+            'stop_reason' => $stopReason,
+            'stop_sequence' => null,
+            'usage' => [
+                'input_tokens' => (int) ($usageIn['input_tokens'] ?? 0),
+                'output_tokens' => (int) ($usageIn['output_tokens'] ?? 0),
+                'cache_creation_input_tokens' => 0,
+                'cache_read_input_tokens' => (int) ($usageIn['input_tokens_details']['cached_tokens'] ?? 0),
             ],
         ];
     }
@@ -766,5 +1259,241 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
             cacheReadTokens: $cacheRead,
             stopReason: $stopReason,
         );
+    }
+
+    /**
+     * @param array<string, mixed>                                                    $requestBody
+     * @param callable(string|array{event: string, data: array<string, mixed>}): void $emit
+     */
+    private function streamResponsesToAnthropic(ResponseInterface $response, array $requestBody, callable $emit): MessagesUsage
+    {
+        $msgId = 'msg_'.bin2hex(random_bytes(8));
+        $model = (string) ($requestBody['model'] ?? '');
+        $emit([
+            'event' => 'message_start',
+            'data' => [
+                'type' => 'message_start',
+                'message' => [
+                    'id' => $msgId,
+                    'type' => 'message',
+                    'role' => 'assistant',
+                    'model' => $model,
+                    'content' => [],
+                    'stop_reason' => null,
+                    'stop_sequence' => null,
+                    'usage' => ['input_tokens' => 0, 'output_tokens' => 0],
+                ],
+            ],
+        ]);
+
+        $textStarted = false;
+        $textIndex = 0;
+        /** @var array<int, array{id: string, name: string, arguments: string, index: int}> $toolState */
+        $toolState = [];
+        $nextIndex = 0;
+        $stopReason = 'end_turn';
+        $inputTokens = 0;
+        $outputTokens = 0;
+        $cacheRead = 0;
+        $buffer = '';
+        $eventName = '';
+
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            set_time_limit(0);
+            if ($chunk->isTimeout()) {
+                continue;
+            }
+            $buffer .= $chunk->getContent();
+            while (false !== ($pos = strpos($buffer, "\n"))) {
+                $line = rtrim(substr($buffer, 0, $pos), "\r");
+                $buffer = substr($buffer, $pos + 1);
+                if ('' === $line) {
+                    $eventName = '';
+                    continue;
+                }
+                if (str_starts_with($line, 'event:')) {
+                    $eventName = trim(substr($line, 6));
+                    continue;
+                }
+                if (!str_starts_with($line, 'data:')) {
+                    continue;
+                }
+                $payload = trim(substr($line, 5));
+                if ('' === $payload || '[DONE]' === $payload) {
+                    continue;
+                }
+                $decoded = json_decode($payload, true);
+                if (!\is_array($decoded)) {
+                    continue;
+                }
+                $type = '' !== $eventName ? $eventName : (string) ($decoded['type'] ?? '');
+                $eventName = '';
+
+                if ('response.failed' === $type) {
+                    $message = (string) ($decoded['response']['error']['message'] ?? $decoded['error']['message'] ?? 'OpenAI Responses API failed');
+                    $emit([
+                        'event' => 'error',
+                        'data' => $this->toAnthropicError(null, $message, 502),
+                    ]);
+
+                    return new MessagesUsage();
+                }
+
+                if ('response.output_text.delta' === $type) {
+                    $delta = (string) ($decoded['delta'] ?? '');
+                    if ('' === $delta) {
+                        continue;
+                    }
+                    if (!$textStarted) {
+                        $textIndex = $nextIndex++;
+                        $emit([
+                            'event' => 'content_block_start',
+                            'data' => [
+                                'type' => 'content_block_start',
+                                'index' => $textIndex,
+                                'content_block' => ['type' => 'text', 'text' => ''],
+                            ],
+                        ]);
+                        $textStarted = true;
+                    }
+                    $emit([
+                        'event' => 'content_block_delta',
+                        'data' => [
+                            'type' => 'content_block_delta',
+                            'index' => $textIndex,
+                            'delta' => ['type' => 'text_delta', 'text' => $delta],
+                        ],
+                    ]);
+                    continue;
+                }
+
+                if ('response.output_item.added' === $type) {
+                    $item = \is_array($decoded['item'] ?? null) ? $decoded['item'] : [];
+                    if ('function_call' !== ($item['type'] ?? '')) {
+                        continue;
+                    }
+                    $tcIndex = (int) ($decoded['output_index'] ?? $nextIndex);
+                    $blockIndex = $nextIndex++;
+                    $id = (string) ($item['call_id'] ?? $item['id'] ?? ('toolu_'.$tcIndex));
+                    $name = (string) ($item['name'] ?? 'tool');
+                    $toolState[$tcIndex] = [
+                        'id' => $id,
+                        'name' => $name,
+                        'arguments' => '',
+                        'index' => $blockIndex,
+                    ];
+                    $emit([
+                        'event' => 'content_block_start',
+                        'data' => [
+                            'type' => 'content_block_start',
+                            'index' => $blockIndex,
+                            'content_block' => [
+                                'type' => 'tool_use',
+                                'id' => $id,
+                                'name' => $name,
+                                'input' => [],
+                            ],
+                        ],
+                    ]);
+                    $args = (string) ($item['arguments'] ?? '');
+                    if ('' !== $args) {
+                        $toolState[$tcIndex]['arguments'] = $args;
+                        $emit([
+                            'event' => 'content_block_delta',
+                            'data' => [
+                                'type' => 'content_block_delta',
+                                'index' => $blockIndex,
+                                'delta' => ['type' => 'input_json_delta', 'partial_json' => $args],
+                            ],
+                        ]);
+                    }
+                    continue;
+                }
+
+                if ('response.function_call_arguments.delta' === $type) {
+                    $tcIndex = (int) ($decoded['output_index'] ?? 0);
+                    if (!isset($toolState[$tcIndex])) {
+                        continue;
+                    }
+                    $argDelta = (string) ($decoded['delta'] ?? '');
+                    if ('' === $argDelta) {
+                        continue;
+                    }
+                    $toolState[$tcIndex]['arguments'] .= $argDelta;
+                    $emit([
+                        'event' => 'content_block_delta',
+                        'data' => [
+                            'type' => 'content_block_delta',
+                            'index' => $toolState[$tcIndex]['index'],
+                            'delta' => ['type' => 'input_json_delta', 'partial_json' => $argDelta],
+                        ],
+                    ]);
+                    continue;
+                }
+
+                if ('response.completed' === $type || 'response.incomplete' === $type) {
+                    $resp = \is_array($decoded['response'] ?? null) ? $decoded['response'] : $decoded;
+                    $usage = \is_array($resp['usage'] ?? null) ? $resp['usage'] : [];
+                    $inputTokens = (int) ($usage['input_tokens'] ?? $inputTokens);
+                    $outputTokens = (int) ($usage['output_tokens'] ?? $outputTokens);
+                    $cacheRead = (int) ($usage['input_tokens_details']['cached_tokens'] ?? $cacheRead);
+                    if ([] !== $toolState || $this->responsesOutputHasFunctionCall($resp['output'] ?? [])) {
+                        $stopReason = 'tool_use';
+                    } elseif ('response.incomplete' === $type || 'incomplete' === ($resp['status'] ?? '')) {
+                        $stopReason = 'max_tokens';
+                    } else {
+                        $stopReason = 'end_turn';
+                    }
+                }
+            }
+        }
+
+        if ($textStarted) {
+            $emit([
+                'event' => 'content_block_stop',
+                'data' => ['type' => 'content_block_stop', 'index' => $textIndex],
+            ]);
+        }
+        foreach ($toolState as $state) {
+            $emit([
+                'event' => 'content_block_stop',
+                'data' => ['type' => 'content_block_stop', 'index' => $state['index']],
+            ]);
+        }
+
+        $emit([
+            'event' => 'message_delta',
+            'data' => [
+                'type' => 'message_delta',
+                'delta' => ['stop_reason' => $stopReason, 'stop_sequence' => null],
+                'usage' => ['output_tokens' => $outputTokens],
+            ],
+        ]);
+        $emit([
+            'event' => 'message_stop',
+            'data' => ['type' => 'message_stop'],
+        ]);
+
+        return new MessagesUsage(
+            inputTokens: $inputTokens,
+            outputTokens: $outputTokens,
+            cacheCreationTokens: 0,
+            cacheReadTokens: $cacheRead,
+            stopReason: $stopReason,
+        );
+    }
+
+    private function responsesOutputHasFunctionCall(mixed $output): bool
+    {
+        if (!\is_array($output)) {
+            return false;
+        }
+        foreach ($output as $item) {
+            if (\is_array($item) && 'function_call' === ($item['type'] ?? '')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

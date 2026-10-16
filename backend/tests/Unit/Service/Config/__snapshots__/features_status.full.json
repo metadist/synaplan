@@ -191,6 +191,28 @@
     },
     "modules": [
         {
+            "id": "chat_artifacts",
+            "label_key": "modules.chat_artifacts.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "Chat artifact preview is turned off",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "CHAT_ARTIFACTS_ENABLED"
+                ],
+                "bconfig": [
+                    "CHAT_ARTIFACTS.ENABLED"
+                ],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/chat-artifacts",
+            "mobile_class": "ota-candidate"
+        },
+        {
             "id": "compute",
             "label_key": "modules.compute.label",
             "state": "absent",
@@ -240,6 +262,26 @@
             "mobile_class": "backend-only"
         },
         {
+            "id": "federation",
+            "label_key": "modules.federation.label",
+            "state": "available",
+            "configured": true,
+            "healthy": true,
+            "message": "Partners can be opened by an admin",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "FEDERATION_ALLOW_LOCAL"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/federation",
+            "mobile_class": "ota-candidate"
+        },
+        {
             "id": "google_ai",
             "label_key": "modules.google_ai.label",
             "state": "absent",
@@ -273,7 +315,7 @@
             "state": "absent",
             "configured": false,
             "healthy": false,
-            "message": "No Higgsfield key + secret pair — add it under AI infrastructure › Models & keys or set HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET",
+            "message": "No Higgsfield key + secret pair — add it under AI infrastructure › Providers & keys or set HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET",
             "details": [],
             "configured_by": {
                 "env": [
@@ -291,6 +333,31 @@
             "capabilities": [],
             "docs_anchor": "modules/higgsfield",
             "mobile_class": "ota-candidate"
+        },
+        {
+            "id": "live_voice",
+            "label_key": "modules.live_voice.label",
+            "state": "available",
+            "configured": true,
+            "healthy": true,
+            "message": "Live voice is running",
+            "details": {
+                "url": "http://voice:8096"
+            },
+            "configured_by": {
+                "env": [
+                    "LIVE_VOICE_GATEWAY_URL",
+                    "LIVE_VOICE_GATEWAY_SECRET",
+                    "LIVE_VOICE_PUBLIC_WS_PATH",
+                    "LIVE_VOICE_COMPATIBLE_WS_URL"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/live-voice",
+            "mobile_class": "backend-only"
         },
         {
             "id": "local_ai",
@@ -372,6 +439,29 @@
             "mobile_class": "ota-candidate"
         },
         {
+            "id": "opendesk_stt",
+            "label_key": "modules.opendesk_stt.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "OPENDESK_STT_URL is unset or disabled",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "OPENDESK_STT_URL",
+                    "OPENDESK_STT_PUBLIC_URL",
+                    "OPENDESK_STT_LANGUAGE",
+                    "OPENDESK_STT_MODE"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/opendesk-stt",
+            "mobile_class": "backend-only"
+        },
+        {
             "id": "piper_tts",
             "label_key": "modules.piper_tts.label",
             "state": "absent",
@@ -450,12 +540,41 @@
             "mobile_class": "backend-only"
         },
         {
+            "id": "telegram",
+            "label_key": "modules.telegram.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "Missing: TELEGRAM_ENABLED",
+            "details": {
+                "missing": [
+                    "TELEGRAM_ENABLED"
+                ]
+            },
+            "configured_by": {
+                "env": [
+                    "TELEGRAM_ENABLED",
+                    "TELEGRAM_API_BASE_URL",
+                    "TELEGRAM_WEBHOOK_BASE_URL",
+                    "TELEGRAM_ALLOW_LOCAL_WEBHOOK"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [
+                "channel_telegram"
+            ],
+            "docs_anchor": "modules/telegram",
+            "mobile_class": "ota-candidate"
+        },
+        {
             "id": "thehive",
             "label_key": "modules.thehive.label",
             "state": "absent",
             "configured": false,
             "healthy": false,
-            "message": "No TheHive API key — add one under AI infrastructure › Models & keys or set THEHIVE_API_KEY",
+            "message": "No TheHive API key — add one under AI infrastructure › Providers & keys or set THEHIVE_API_KEY",
             "details": [],
             "configured_by": {
                 "env": [
@@ -534,5 +653,25 @@
             "docs_anchor": "modules/whatsapp",
             "mobile_class": "ota-candidate"
         }
-    ]
+    ],
+    "compute": {
+        "enabled": true,
+        "reachable": true,
+        "protocol": 1,
+        "tier": "gvisor",
+        "tierMeetsRequirement": true,
+        "capacity": {
+            "maxConcurrent": 4,
+            "running": 1,
+            "queued": 0
+        },
+        "images": [
+            {
+                "key": "python",
+                "digest": "a1b2c3d4e5f6"
+            }
+        ],
+        "runsLast24h": 12,
+        "failedLast24h": 1
+    }
 }

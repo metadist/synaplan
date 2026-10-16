@@ -3,8 +3,9 @@
 namespace App\Security;
 
 use App\Repository\UserRepository;
-use App\Service\OidcTokenService;
-use App\Service\TokenService;
+use App\Service\Auth\OidcAccessDeniedException;
+use App\Service\Auth\OidcTokenService;
+use App\Service\Auth\TokenService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -45,6 +46,21 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
         '/api/v1/auth/logout',
         '/api/v1/auth/revoke-all',
         '/api/v1/auth/token',
+    ];
+
+    /**
+     * Public routes the SPA needs before anyone can sign in. A cookie that no
+     * longer validates (user deleted, `APP_SECRET` rotated by a reinstall) is
+     * treated as "not signed in" here instead of a 401, otherwise the browser
+     * never learns that the setup wizard is open and ends on a login that
+     * answers 503 SETUP_REQUIRED.
+     *
+     * @var list<string>
+     */
+    private const ANONYMOUS_ON_FAILURE_PATHS = [
+        '/api/v1/config/runtime',
+        '/api/v1/setup/state',
+        '/api/v1/setup/admin',
     ];
 
     public function __construct(
@@ -106,8 +122,13 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
         if ($request->cookies->has(OidcTokenService::OIDC_ACCESS_COOKIE)) {
             $oidcProvider = $request->cookies->get(OidcTokenService::OIDC_PROVIDER_COOKIE, 'keycloak');
 
-            // Try OIDC token validation
-            $user = $this->oidcTokenService->getUserFromOidcToken($token, $oidcProvider);
+            // Try OIDC token validation. A policy refusal is not an expired
+            // token: falling back to the app cookie would keep the session.
+            try {
+                $user = $this->oidcTokenService->getUserFromOidcToken($token, $oidcProvider);
+            } catch (OidcAccessDeniedException) {
+                throw new CustomUserMessageAuthenticationException('Authentication failed');
+            }
 
             if ($user) {
                 $this->logger->debug('OIDC token authenticated successfully', [
@@ -164,6 +185,10 @@ class CookieTokenAuthenticator extends AbstractAuthenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
     {
+        if (\in_array($request->getPathInfo(), self::ANONYMOUS_ON_FAILURE_PATHS, true)) {
+            return null;
+        }
+
         // Return 401 with info about the error
         return new JsonResponse([
             'error' => 'Authentication failed',

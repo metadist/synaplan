@@ -592,7 +592,7 @@ watch(
         <div class="flex items-center gap-2 pointer-events-auto">
           <!-- Fullscreen -->
           <button
-            class="surface-card px-3 py-2 rounded-lg hover-surface transition-colors"
+            class="surface-card px-3 py-2 rounded-xl hover-surface transition-colors"
             :title="isFullscreen ? $t('memories.fullscreen.exit') : $t('memories.fullscreen.enter')"
             @click="toggleFullscreen"
           >

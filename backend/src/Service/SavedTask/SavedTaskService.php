@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Service\SavedTask;
 
+use App\Entity\Agent;
 use App\Entity\Prompt;
 use App\Entity\SavedTask;
 use App\Entity\User;
+use App\Repository\AgentRepository;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Service\Iam\AccessGate;
 use App\Service\Iam\Exception\AssistantNotSharedException;
 use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AgentKind;
 use App\Service\Iam\ResourceKind\AssistantKind;
 use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\Multitask\Plan\Capability;
@@ -38,6 +41,7 @@ final readonly class SavedTaskService
         private ?WorkflowsConfig $workflowsConfig = null,
         private ?ToolRegistry $toolRegistry = null,
         private ?SavedTaskGraphPortability $portability = null,
+        private ?AgentRepository $agents = null,
     ) {
     }
 
@@ -78,25 +82,19 @@ final readonly class SavedTaskService
 
         $prompt = $this->prompts->find($source->getPromptId());
         $userId = (int) $user->getId();
-        $assistantOk = $prompt instanceof Prompt
-            && $prompt->isEnabled()
-            && (
-                0 === $prompt->getOwnerId()
-                || $prompt->getOwnerId() === $userId
-                || $this->accessGate->decide(
-                    $user,
-                    AssistantKind::KEY,
-                    (string) $prompt->getId(),
-                    Permission::Use,
-                )
-            );
+        $sharedAgent = $this->sharedAgentForPrompt($prompt);
+        $assistantOk = $this->recipientMayUsePrompt($user, $userId, $prompt, $sharedAgent);
 
         $checklist = [];
         $promptId = $source->getPromptId();
+        $agentPrompt = $prompt instanceof Prompt && str_starts_with($prompt->getTopic(), Agent::TOPIC_PREFIX);
+        if (!$assistantOk && ($agentPrompt || $sharedAgent instanceof Agent) && $prompt instanceof Prompt) {
+            throw new AssistantNotSharedException($this->assistantLabel($sharedAgent, $prompt));
+        }
         if (!$assistantOk) {
             $fallback = $this->prompts->findFirstUsableForUser($userId);
             if (!$fallback instanceof Prompt) {
-                throw new AssistantNotSharedException();
+                throw new AssistantNotSharedException($prompt instanceof Prompt ? $this->assistantLabel(null, $prompt) : null);
             }
             $promptId = (int) $fallback->getId();
             $topic = $prompt instanceof Prompt ? $prompt->getTopic() : (string) $source->getPromptId();
@@ -115,11 +113,22 @@ final readonly class SavedTaskService
         } else {
             $config = $source->getTriggerConfig();
             if (is_array($config)) {
-                unset($config['token'], $config['hmacSecret'], $config['hmacConfigured'], $config['accountId']);
+                unset(
+                    $config['token'],
+                    $config['hmacSecret'],
+                    $config['hmacConfigured'],
+                    $config['accountId'],
+                    $config['agentId'],
+                    $config['agentTrigger'],
+                );
             }
             if (SavedTask::TRIGGER_INBOUND_EMAIL === $triggerType) {
                 $checklist[] = ['code' => 'needsMailbox', 'itemKey' => 'inbound_email', 'detail' => 'inbound_email'];
             }
+        }
+        if ($assistantOk && $sharedAgent instanceof Agent && null !== $sharedAgent->getId()) {
+            $config = is_array($config) ? $config : [];
+            $config['agentId'] = (int) $sharedAgent->getId();
         }
         if (SavedTask::TRIGGER_WEBHOOK === $triggerType) {
             $config = is_array($config) ? $config : [];
@@ -153,6 +162,57 @@ final readonly class SavedTaskService
         $this->tasks->save($copy);
 
         return new SavedTaskCopyResult($copy, $checklist);
+    }
+
+    private function sharedAgentForPrompt(?Prompt $prompt): ?Agent
+    {
+        if (!$prompt instanceof Prompt || !str_starts_with($prompt->getTopic(), Agent::TOPIC_PREFIX)) {
+            return null;
+        }
+        $promptId = $prompt->getId();
+        if (null === $promptId || null === $this->agents) {
+            return null;
+        }
+
+        return $this->agents->findByPromptIdAndOwner((int) $promptId, $prompt->getOwnerId());
+    }
+
+    private function recipientMayUsePrompt(User $user, int $userId, ?Prompt $prompt, ?Agent $sharedAgent): bool
+    {
+        if (!$prompt instanceof Prompt || !$prompt->isEnabled()) {
+            return false;
+        }
+        if (0 === $prompt->getOwnerId() || $prompt->getOwnerId() === $userId) {
+            return true;
+        }
+        if (str_starts_with($prompt->getTopic(), Agent::TOPIC_PREFIX)) {
+            $agentId = $sharedAgent?->getId();
+
+            return null !== $agentId && $this->accessGate->decide(
+                $user,
+                AgentKind::KEY,
+                (string) $agentId,
+                Permission::Use,
+            );
+        }
+
+        return $this->accessGate->decide(
+            $user,
+            AssistantKind::KEY,
+            (string) $prompt->getId(),
+            Permission::Use,
+        );
+    }
+
+    private function assistantLabel(?Agent $agent, Prompt $prompt): string
+    {
+        $name = $agent?->getName() ?? '';
+        if ('' !== trim($name)) {
+            return $name;
+        }
+        $description = trim($prompt->getShortDescription());
+
+        return '' !== $description ? $description : $prompt->getTopic();
     }
 
     public function findForPrompt(int $promptId, int $ownerId): ?SavedTask

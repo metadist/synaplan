@@ -7,7 +7,7 @@ namespace App\AI\StructuredOutput\Schema;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 
 /**
- * JSON schema for {@see \App\Service\FeedbackContradictionService}'s
+ * JSON schema for {@see \App\Service\Feedback\FeedbackContradictionService}'s
  * contradiction-detection call (both the single-statement and the batch
  * variant share this response shape).
  */

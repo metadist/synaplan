@@ -3,19 +3,24 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
+import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import { useApprovalsStore } from '@/stores/approvals'
 import { useNotification } from '@/composables/useNotification'
 import { approvalsApi, type Approval } from '@/services/api/approvalsApi'
+import { useDateFormat } from '@/composables/useDateFormat'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 
 const { t, te } = useI18n()
+const { formatDateTime } = useDateFormat()
 const route = useRoute()
 const router = useRouter()
 const store = useApprovalsStore()
 const { success, error: showError } = useNotification()
 const tab = ref<'pending' | 'decided'>('pending')
 const notifyMode = ref<'instant' | 'digest'>('instant')
+const mailConfigured = ref(true)
 
 onMounted(async () => {
   if (!isApprovalsEnabled()) {
@@ -23,7 +28,9 @@ onMounted(async () => {
   }
   await store.load('pending')
   try {
-    notifyMode.value = await approvalsApi.getNotifyMode()
+    const setting = await approvalsApi.getNotifyMode()
+    notifyMode.value = setting.mode
+    mailConfigured.value = setting.mailConfigured
   } catch {
     // Setting is optional; inbox still works.
   }
@@ -60,7 +67,7 @@ const openContext = (approval: Approval) => {
   }
   if (ref.kind === 'task_run' && ref.taskId) {
     void router.push({
-      path: '/channels/tasks',
+      path: '/tasks',
       query: { task: String(ref.taskId), run: String(ref.runId ?? '') },
     })
   }
@@ -92,6 +99,16 @@ const onNotifyChange = async () => {
     showError(t('approvals.decideFailed'))
   }
 }
+
+const decidedLine = (row: Approval): string => {
+  const when = row.decidedAt ? formatDateTime(new Date(row.decidedAt * 1000)) : ''
+  if (!row.decidedByName && !when) return ''
+  return t('approvals.decidedLine', {
+    status: statusLabel(row.status),
+    name: row.decidedByName ?? '',
+    time: when,
+  })
+}
 </script>
 
 <template>
@@ -100,13 +117,14 @@ const onNotifyChange = async () => {
       :title="$t('approvals.title')"
       :subtitle="$t('approvals.subtitle')"
       icon="heroicons:check-badge"
+      tour-id="approvals"
     />
 
     <label class="block text-sm txt-primary max-w-md">
       {{ $t('approvals.notify') }}
       <select
         v-model="notifyMode"
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         data-testid="approvals-notify-mode"
         @change="onNotifyChange"
       >
@@ -114,11 +132,18 @@ const onNotifyChange = async () => {
         <option value="digest">{{ $t('approvals.notifyDigest') }}</option>
       </select>
     </label>
+    <p
+      v-if="!mailConfigured"
+      class="text-sm txt-secondary"
+      data-testid="approvals-mail-unconfigured"
+    >
+      {{ $t('approvals.mailNotConfigured') }}
+    </p>
 
     <div class="flex gap-2">
       <button
         type="button"
-        class="px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="px-4 py-2.5 rounded-xl text-sm font-medium"
         :class="tab === 'pending' ? 'btn-primary' : 'btn-secondary'"
         data-testid="approvals-tab-pending"
         @click="switchTab('pending')"
@@ -127,7 +152,7 @@ const onNotifyChange = async () => {
       </button>
       <button
         type="button"
-        class="px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="px-4 py-2.5 rounded-xl text-sm font-medium"
         :class="tab === 'decided' ? 'btn-primary' : 'btn-secondary'"
         data-testid="approvals-tab-decided"
         @click="switchTab('decided')"
@@ -136,13 +161,14 @@ const onNotifyChange = async () => {
       </button>
     </div>
 
-    <p
+    <EmptyState
       v-if="tab === 'pending' && rows.length === 0 && !store.loading"
-      class="txt-secondary text-sm"
-      data-testid="approvals-empty"
-    >
-      {{ $t('approvals.emptyPending') }}
-    </p>
+      :title="$t('approvals.emptyPending')"
+      :action-label="isSavedTasksEnabled() ? $t('approvals.openTasks') : undefined"
+      to="/tasks"
+      test-id="approvals-empty"
+      action-test-id="btn-approvals-open-tasks"
+    />
     <p
       v-else-if="tab === 'decided' && rows.length === 0 && !store.loading"
       class="txt-secondary text-sm"
@@ -164,10 +190,12 @@ const onNotifyChange = async () => {
         />
         <div v-else class="surface-card p-4 space-y-2">
           <p class="txt-primary font-medium">{{ row.preview || row.tool }}</p>
-          <p class="text-xs txt-secondary">{{ statusLabel(row.status) }}</p>
+          <p class="text-xs txt-secondary" data-testid="approval-decided-line">
+            {{ decidedLine(row) || statusLabel(row.status) }}
+          </p>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="approval-open-context"
             @click="openContext(row)"
           >

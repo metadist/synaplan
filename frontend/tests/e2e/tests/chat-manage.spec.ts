@@ -1,8 +1,7 @@
-import type { Page } from '@playwright/test'
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { openApp } from '../helpers/auth'
-import { ChatHelper } from '../helpers/chat'
+import { ChatHelper, openChatManager } from '../helpers/chat'
 import { TIMEOUTS } from '../config/config'
 
 /**
@@ -11,15 +10,6 @@ import { TIMEOUTS } from '../config/config'
  * action (Share) through the same menu.
  */
 
-async function openChatManager(page: Page): Promise<void> {
-  await page.locator(selectors.nav.sidebarV2ChatNav).click()
-  const modal = page.locator(selectors.nav.modalChatManager)
-  await modal.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-  await modal
-    .locator(selectors.nav.chatManagerListRows)
-    .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-}
-
 test.describe('@ci Chat Management', () => {
   test('user can rename a chat and delete it via the chat manager', async ({ page }) => {
     const renamedTitle = `Renamed chat ${Date.now()}`
@@ -27,15 +17,17 @@ test.describe('@ci Chat Management', () => {
 
     await test.step('Arrange: open app and start a fresh chat', async () => {
       await openApp(page)
-      // The fresh chat is the newest entry → guaranteed first row in the
-      // manager (sorted by activity, newest first).
+      // An untouched New Chat stays out of the sidebar until the user has
+      // written. One sent message puts this chat in the list as the newest
+      // row (sorted by activity), without waiting for the answer.
       await chat.startNewChat()
+      await chat.sendMessage('Rename this chat')
     })
 
     await test.step('Act: rename the newest chat via the row menu', async () => {
       await openChatManager(page)
-      const modal = page.locator(selectors.nav.modalChatManager)
-      const newestRow = modal.locator(selectors.nav.chatV2Row).first()
+      const list = page.locator(selectors.nav.sidebarChats)
+      const newestRow = list.locator(selectors.nav.chatV2Row).first()
       await newestRow.hover()
       await newestRow.locator(selectors.nav.chatV2RowMenu).click({ force: true })
       await page.locator(selectors.nav.chatV2Rename).click()
@@ -47,24 +39,24 @@ test.describe('@ci Chat Management', () => {
     })
 
     await test.step('Assert: the row shows the new title', async () => {
-      const modal = page.locator(selectors.nav.modalChatManager)
+      const list = page.locator(selectors.nav.sidebarChats)
       await expect(
-        modal.locator(selectors.nav.chatV2Row).filter({ hasText: renamedTitle })
+        list.locator(selectors.nav.chatV2Row).filter({ hasText: renamedTitle })
       ).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
     })
 
     await test.step('Assert: the new title survives a reload', async () => {
       await openApp(page)
       await openChatManager(page)
-      const modal = page.locator(selectors.nav.modalChatManager)
+      const list = page.locator(selectors.nav.sidebarChats)
       await expect(
-        modal.locator(selectors.nav.chatV2Row).filter({ hasText: renamedTitle })
+        list.locator(selectors.nav.chatV2Row).filter({ hasText: renamedTitle })
       ).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
     })
 
     await test.step('Act: delete the renamed chat with confirmation', async () => {
-      const modal = page.locator(selectors.nav.modalChatManager)
-      const row = modal.locator(selectors.nav.chatV2Row).filter({ hasText: renamedTitle })
+      const list = page.locator(selectors.nav.sidebarChats)
+      const row = list.locator(selectors.nav.chatV2Row).filter({ hasText: renamedTitle })
       await row.hover()
       await row.locator(selectors.nav.chatV2RowMenu).click({ force: true })
       await page.locator(selectors.nav.chatV2Delete).click()
@@ -75,15 +67,12 @@ test.describe('@ci Chat Management', () => {
     })
 
     await test.step('Assert: the chat is gone and the surface stays usable', async () => {
-      const modal = page.locator(selectors.nav.modalChatManager)
+      const list = page.locator(selectors.nav.sidebarChats)
       await expect(
-        modal.locator(selectors.nav.chatV2Row).filter({ hasText: renamedTitle })
+        list.locator(selectors.nav.chatV2Row).filter({ hasText: renamedTitle })
       ).toHaveCount(0, { timeout: TIMEOUTS.STANDARD })
 
-      // Close the modal via the backdrop and verify the chat surface still works
-      // (deleting the active chat must fall back to another/new chat).
-      await page.locator(selectors.nav.modalChatManagerBackdrop).click({ position: { x: 8, y: 8 } })
-      await modal.waitFor({ state: 'hidden', timeout: TIMEOUTS.SHORT })
+      // Deleting the active chat must fall back to another chat; the composer stays usable.
       await expect(page.locator(selectors.chat.textInput)).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })

@@ -19,6 +19,19 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'expiresAt', type: 'integer'),
         new OA\Property(property: 'created', type: 'integer'),
         new OA\Property(property: 'decidedAt', type: 'integer', nullable: true),
+        new OA\Property(property: 'decidedBy', type: 'integer', nullable: true),
+        new OA\Property(property: 'decidedByName', type: 'string', nullable: true),
+        new OA\Property(
+            property: 'resolvedRequest',
+            type: 'object',
+            nullable: true,
+            properties: [
+                new OA\Property(property: 'method', type: 'string'),
+                new OA\Property(property: 'url', type: 'string'),
+                new OA\Property(property: 'headers', type: 'object', additionalProperties: new OA\AdditionalProperties(type: 'string')),
+                new OA\Property(property: 'body', type: 'string', nullable: true),
+            ]
+        ),
         new OA\Property(property: 'canAlwaysAllow', type: 'boolean'),
         new OA\Property(property: 'requestedBy', ref: new Model(type: ApprovalRequestedBy::class)),
     ]

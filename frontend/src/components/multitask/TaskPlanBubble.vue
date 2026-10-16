@@ -32,6 +32,7 @@ const emit = defineEmits<{
   cancelTask: [nodeId: string]
   /** Re-run file work with the user's notes as a new turn. */
   followupTask: [prompt: string]
+  askUser: [payload: { nodeId: string; answer: string; skip: boolean }]
 }>()
 
 const { t, locale } = useI18n()
@@ -81,7 +82,7 @@ const onSchedule = async () => {
     })
     await savedTasksApi.create(prompt.id, name.trim(), props.sourceMessageId)
     success(t('config.savedTasks.scheduledFromChat'))
-    await router.push('/channels/tasks')
+    await router.push('/tasks')
   } catch {
     showError(t('config.savedTasks.createFailed'))
   } finally {
@@ -99,7 +100,7 @@ const onSchedule = async () => {
       <button
         v-if="canSchedule"
         type="button"
-        class="icon-ghost inline-flex items-center p-1 rounded-lg"
+        class="icon-ghost inline-flex items-center p-1 rounded-xl"
         :disabled="saving"
         data-testid="btn-schedule-plan"
         :aria-label="$t('taskPlan.scheduleThis')"
@@ -118,6 +119,7 @@ const onSchedule = async () => {
       @retry="emit('retryTask', $event)"
       @cancel="emit('cancelTask', $event)"
       @followup="emit('followupTask', $event)"
+      @ask-user="emit('askUser', $event)"
     />
 
     <button

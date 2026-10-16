@@ -29,6 +29,7 @@ frontend/tests/e2e/
 ├── tests/                 # All *.spec.ts files
 ├── playwright.config.ts   # Global Playwright config
 ├── global-setup.ts        # Runs once before all tests (admin login, TestProvider defaults)
+├── global-teardown.ts     # Runs once after all tests (restores the previous defaults locally)
 └── test-setup.ts          # Worker fixtures: per-worker user + pre-authenticated storageState
 ```
 
@@ -60,6 +61,27 @@ If the dev stack's Ollama already occupies host port 11434, remap the stub
 (`OLLAMA_STUB_URL=http://localhost:11435` plus a compose port override) — the
 backend reaches it container-to-container either way.
 
+### Known local-only failures
+
+These fail on the local dev stack and pass in CI. Confirm the failure matches
+an entry, then move on — do not "fix" product code for them. A new
+environment-only failure (fails the same on `main`) is added here with its
+cause; a cause that can be fixed (a test depending on the local env or on
+fixtures) is fixed instead.
+
+- **Specs that need the test stack** (`docker-compose.test.yml`) fail under `make test-e2e` on the dev stack:
+  - Mail specs (`email`, `registration`, `guest-registration`, `admin-panel`, `account-language`): the runner defaults to MailHog `:8026` (test stack); run with `MAILHOG_URL=http://localhost:8025`.
+  - Guest specs (`guest-chat`, `guest-registration`): the dev stack allows 5 guest sessions per IP (`GUEST_MAX_SESSIONS_PER_IP`, test stack: 100), so after a few runs the API answers `Too many guest sessions` and the guest banner never renders.
+  - `@whatsapp` specs: the WhatsApp stub on `:3999` only runs in the test stack.
+  - `@telegram` specs: the dev stack keeps the channel off and talks to the real Bot API. Start the stub and recreate backend and worker with `TELEGRAM_ENABLED=true TELEGRAM_API_BASE_URL=http://telegram-stub:3998 TELEGRAM_WEBHOOK_BASE_URL=https://e2e.synaplan.test docker compose --profile telegram-stub up -d telegram-stub backend worker` to run them there.
+  - `subscription*.spec.ts`: need the fake Stripe secret and price IDs from `backend/.env.test`; real Stripe values in `backend/.env` fail the webhook signature or the level mapping.
+  - `workspace-tab.spec.ts` "flag off": compute is on in the dev stack.
+  - `admin-panel.spec.ts` "users: server-side search": once the dev database holds more than 50 users (guest sessions and E2E workers pile up), the admin row is no longer on the first page of the unfiltered list.
+- **Tests that reset mid-test after a file under `frontend/` was saved** during the run: Vite HMR reloaded the page (the trace shows module requests with `?t=<timestamp>`). Never save frontend files while Playwright runs against `:5173`; rerun the affected specs.
+- **`widget.spec.ts`: `Widget load error: Failed to fetch dynamically imported module: http://localhost:8000/widget.js`.** The `frontend-widgets` watcher was rebuilding `dist-widget/` after a change under `frontend/src/` (a rebuild takes over a minute; `docker compose logs frontend-widgets` ends with `built in …ms` when done). Rerun once the build has finished.
+- **`Generated API schemas do not match the backend OpenAPI spec`** from `globalSetup`: the backend spec changed since the frontend generated `src/generated/api-schemas.ts`. Run `make -C frontend generate-schemas`. The Vite dev server also regenerates them on a page load (at most every 30 s).
+- **`layout.spec.ts` "login page has no overflow and reachable submit" (chromium-mobile): `login submit: clipped bottom`.** The local login page shows the fresh-demo card above the form, which pushes Sign In below a ~664 px viewport. CI does not render that card. The same page's axe checks still pass.
+
 ---
 
 ## 0. Tags & CI Matrix
@@ -82,6 +104,15 @@ without `@ci` in its title chain does not run in CI, period. Other tags:
 
 When adding a test, decide explicitly: `@ci` (stable, deterministic, runs on
 every PR) or `@noci` (needs real providers/keys or is nightly-grade).
+
+### Navigation journeys
+
+`tests/nav-journeys.spec.ts` (`@ci Navigation journeys`) walks J-NV-1…5 from
+the navigation consolidation plan — click, type, find, undo — without sending
+a summarize turn. A moved route adds a redirect row in `redirects.spec.ts` in
+the **same PR** that retires the old path. Bookmarks that only arm a chat tool
+(`/?tool=summarize`) are dedicated tests: the query is stripped after the tool
+is ready, so they cannot live in the path-equality loop.
 
 ### Cross-browser (firefox) — opt-in via `@crossbrowser`
 
@@ -184,6 +215,15 @@ Import from `config/config.ts`:
 | `TIMEOUTS.VERY_LONG` | 30 s | Full AI stream, heavy processing |
 | `TIMEOUTS.EXTREME` | 60 s | Only with explicit justification |
 
+`playwright.config.ts` sets global budgets: an action without its own timeout
+fails after `TIMEOUTS.LONG`, a navigation after `TIMEOUTS.VERY_LONG`, and the
+error names the element. A genuinely long wait (AI answer, job, upload) gets
+its own timeout on that wait — never raise the global values.
+
+Service workers are blocked (`serviceWorkers: 'block'`) so `page.route()` sees
+every request. A test that needs the service worker opts in with
+`test.use({ serviceWorkers: 'allow' })` and cannot rely on `page.route()`.
+
 ### DO
 
 * Default to `SHORT` / `STANDARD` (fail fast).
@@ -247,6 +287,9 @@ Assert the **stable terminal DOM**, never an intermediate signal the app discard
 * **Keep-alive against stub control APIs.** A `beforeAll` Playwright `APIRequestContext` reused against `ollama-stub` `/__requests` after the chat (~6s idle) hits Node's default `keepAliveTimeout` (5s) → `socket hang up`. The chat UI had already succeeded. Retry once on that error in the stub helper; keep the stub's `keepAliveTimeout` above the longest chat wait. Do not treat a long-lived context as a live connection to a Node stub.
 * **No global model-default mutations from a parallel `@ci` spec.** `POST /api/v1/config/models/defaults` with `global: true` is process-wide. `afterAll` restore is not isolation — other workers already raced. Pin defaults in `globalSetup` only (TestProvider). Per-spec provider switches must be user-scoped or a dedicated serial job.
 * **Impersonation exit: banner hidden ≠ admin page mounted.** `refreshUser()` clears `impersonator` (banner hides) before `onExit` can `router.push({ name: 'admin' })`. Awaiting config reload / realtime inside `stopImpersonation` delayed that push; CI then sat on `/` for 15s waiting for `view-admin`. Return from stop as soon as the session is restored, and wait for `selectors.pages.admin`, not a pause after the banner.
+* **Two loads of the same chat history.** `ChatView`'s mount and its `activeChatId` watcher both loaded the selected chat's messages. The stale-response guard dropped the first answer, so "Loading messages…" stayed up until the slower request returned and `state-empty` missed its wait. A selection triggers one load; the mount joins the watcher's load instead of starting its own.
+* **A loading flag held by an unrelated request.** The sidebar's `data-chats-loading` waited for the incoming-shares lookup as well as the chat list. A loading marker covers only the data its section shows.
+* **Upgrade reminder over a UI login.** `LOGGED_OUT` contexts used to start with empty `localStorage`, so the daily paywall reminder (`synaplan.paywallLastShownAt`) was due. When `auth.spec.ts` logged in as a worker account that earlier tests had filled with chats, the paywall covered the page and swallowed the user-menu click. Both storage states in `test-setup.ts` now carry the throttle; a spec that tests the reminder clears it itself.
 
 ---
 
@@ -365,6 +408,7 @@ for (let i = 0; i < optionCount; i++) {
 * E2E tests only for critical user flows. Prefer component/unit tests for UI details.
 * Fewer stable smoke tests > many fragile ones.
 * **Tests must be independent** — never rely on execution order or state from a previous test.
+* The CI test stack has no `centrifugo` (realtime push) and no `collabora` (office conversion). A spec must not depend on either; check that something arrived via reload or navigation.
 * Use `test.describe.configure({ mode: 'serial' })` only when tests share expensive setup (e.g. login + data creation) and document why.
 
 ---
@@ -407,6 +451,12 @@ These are already configured in `playwright.config.ts` — do not duplicate or o
 | `screenshot` | `'only-on-failure'` | Do not add `page.screenshot()` unless debugging (remove before merge). |
 | `retries` | `1` (CI) / `0` (local) | Safety net, not a fix for flaky tests. |
 | `timeout` | `60_000` | Do not use `test.setTimeout()` unless genuinely needed (document why). |
+
+The CI stack (`docker-compose.test.ci.yml`) runs the test environment with
+`APP_DEBUG=0` and without OPcache timestamp checks, like prod. Debug mode and
+per-request revalidation doubled every test's duration on the shared 4-vCPU
+runner. PHP warnings still fail the request (`framework.php_errors.throw`
+under `when@test`).
 
 ---
 

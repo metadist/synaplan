@@ -6,7 +6,6 @@ namespace App\Service\OAuth;
 
 use App\Entity\Connection;
 use App\Repository\ConnectionRepository;
-use App\Service\OAuthStateService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 

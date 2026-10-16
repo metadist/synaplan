@@ -18,6 +18,7 @@
  * imports resolve to harmless web fallbacks there anyway.
  */
 import { App as CapacitorApp } from '@capacitor/app'
+import { i18n } from '@/i18n'
 import { Browser } from '@capacitor/browser'
 import { getNativeApiBaseUrl } from '@/services/api/nativeRuntime'
 import { setNativeTokens } from '@/services/api/nativeAuth'
@@ -121,7 +122,11 @@ export async function startNativeOAuth(provider: string): Promise<NativeOAuthRes
       }
     })
 
-    const authUrl = `${getNativeApiBaseUrl()}/api/v1/auth/${provider}/login?native=1`
+    const params = new URLSearchParams({
+      native: '1',
+      language: String(i18n.global.locale.value),
+    })
+    const authUrl = `${getNativeApiBaseUrl()}/api/v1/auth/${provider}/login?${params}`
     Browser.open({ url: authUrl }).catch(() => {
       void finish({ success: false, error: 'Could not open the browser' })
     })

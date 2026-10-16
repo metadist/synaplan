@@ -30,6 +30,29 @@ describe('History Store', () => {
     expect(store.messages).toHaveLength(1)
     expect(store.messages[0].role).toBe('user')
     expect(store.messages[0].parts[0].content).toBe('Hello')
+    expect(store.messages[0].agentId).toBeNull()
+  })
+
+  it('stamps a positive assistant id on the outgoing message', () => {
+    const store = useHistoryStore()
+
+    store.addMessage(
+      'user',
+      [{ type: 'text', content: 'Who are you?' }],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      null,
+      null,
+      null,
+      null,
+      2
+    )
+
+    expect(store.messages[0].agentId).toBe(2)
   })
 
   it('should clear all messages', () => {
@@ -126,6 +149,18 @@ describe('History Store', () => {
     expect(store.messages[0].isSuperseded).toBe(true)
   })
 
+  it('replaces an edited question and drops the previous answer', () => {
+    const store = useHistoryStore()
+    store.addMessage('user', [{ type: 'text', content: 'old sentence' }])
+    store.addMessage('assistant', [{ type: 'text', content: 'old answer' }])
+    const questionId = store.messages[0].id
+
+    store.applySavedEdit(questionId, 'new sentence')
+
+    expect(store.messages).toHaveLength(1)
+    expect(store.messages[0].parts[0].content).toBe('new sentence')
+  })
+
   it('does not replace a newer live stream with a stale foreground load', async () => {
     let resolveLoad!: (value: {
       success: boolean
@@ -218,6 +253,99 @@ describe('History Store', () => {
       ])
       expect(store.messages.at(-1)?.id).toBe(assistantId)
       expect(store.messages.at(-1)?.isStreaming).toBe(true)
+    })
+
+    /**
+     * Impersonation cold-starts the chat: the history GET is issued while the
+     * answer is already streaming (ChatView waits for the model catalog first)
+     * and returns after TestProvider has finished. The snapshot only has the
+     * user row. Guarding only `isStreaming` at apply time deletes the reply.
+     */
+    it('keeps a finished answer when the history load started during the stream', async () => {
+      vi.resetModules()
+      let resolveLoad!: (value: unknown) => void
+      const getChatMessages = vi.fn(
+        () =>
+          new Promise<unknown>((resolve) => {
+            resolveLoad = resolve
+          })
+      )
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+      const assistantId = store.addStreamingMessage('assistant')
+      store.updateStreamingMessage(assistantId, 'Stub reply')
+
+      const loading = store.loadMessages(42)
+      await vi.waitFor(() => expect(getChatMessages).toHaveBeenCalledOnce())
+
+      const assistant = store.messages.find((message) => message.id === assistantId)
+      expect(assistant).toBeTruthy()
+      assistant!.backendMessageId = 9
+      store.finishStreamingMessage(assistantId)
+
+      resolveLoad({
+        success: true,
+        messages: [{ id: 3, direction: 'IN', text: 'Hello', timestamp: 1700000002 }],
+        pagination: { hasMore: false },
+      })
+      await loading
+
+      expect(store.messages.map((message) => message.parts[0].content)).toEqual([
+        'Hello',
+        'Stub reply',
+      ])
+      expect(store.messages.at(-1)?.id).toBe(assistantId)
+      expect(store.messages.at(-1)?.isStreaming).toBe(false)
+    })
+
+    it('keeps an answer that finished while a history load was already in flight', async () => {
+      const { store, loading, resolve } = await startDeferredLoad()
+
+      store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+      const assistantId = store.addStreamingMessage('assistant')
+      store.updateStreamingMessage(assistantId, 'Stub reply')
+      store.finishStreamingMessage(assistantId)
+
+      resolve({
+        success: true,
+        messages: [{ id: 3, direction: 'IN', text: 'Hello', timestamp: 1700000002 }],
+        pagination: { hasMore: false },
+      })
+      await loading
+
+      expect(store.messages.map((message) => message.parts[0].content)).toEqual([
+        'Hello',
+        'Stub reply',
+      ])
+      expect(store.messages.at(-1)?.id).toBe(assistantId)
+      expect(store.messages.at(-1)?.isStreaming).toBe(false)
+    })
+
+    it('adopts the server snapshot when the load starts after the turn finished', async () => {
+      vi.resetModules()
+      const getChatMessages = vi.fn().mockResolvedValue({
+        success: true,
+        messages: [
+          { id: 3, direction: 'IN', text: 'Hello', timestamp: 1700000002 },
+          { id: 9, direction: 'OUT', text: 'Stub reply', timestamp: 1700000003 },
+        ],
+        pagination: { hasMore: false },
+      })
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      store.addMessage('user', [{ type: 'text', content: 'Hello' }])
+      const assistantId = store.addStreamingMessage('assistant')
+      store.updateStreamingMessage(assistantId, 'Stub reply')
+      store.finishStreamingMessage(assistantId)
+
+      await store.loadMessages(42)
+
+      expect(store.messages.map((message) => message.id)).toEqual(['backend-3', 'backend-9'])
     })
 
     it('does not duplicate the just-sent user message already persisted in the snapshot', async () => {
@@ -929,6 +1057,61 @@ describe('History Store', () => {
       store.clear()
 
       expect(store.activeRun).toBeNull()
+    })
+
+    it('ignores a message load that finishes after the transcript is cleared', async () => {
+      vi.resetModules()
+      let release: (value: unknown) => void = () => {}
+      const getChatMessages = vi.fn(
+        () =>
+          new Promise((resolve) => {
+            release = resolve
+          })
+      )
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      const pending = store.loadMessages(7)
+      await vi.waitFor(() => {
+        expect(getChatMessages).toHaveBeenCalled()
+      })
+      store.clear()
+      release({
+        success: true,
+        messages: [{ id: 1, text: 'shared', direction: 'IN' }],
+        pagination: { hasMore: false },
+      })
+      await pending
+
+      expect(store.messages).toEqual([])
+    })
+
+    it('does not leave a cleared transcript in the loading state', async () => {
+      vi.resetModules()
+      let release: (value: unknown) => void = () => {}
+      const getChatMessages = vi.fn(
+        () =>
+          new Promise((resolve) => {
+            release = resolve
+          })
+      )
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      const pending = store.loadMessages(7)
+      await vi.waitFor(() => {
+        expect(getChatMessages).toHaveBeenCalled()
+      })
+      expect(store.isLoadingMessages).toBe(true)
+
+      store.clear()
+      expect(store.isLoadingMessages).toBe(false)
+
+      release({ success: true, messages: [], pagination: { hasMore: false } })
+      await pending
+      expect(store.isLoadingMessages).toBe(false)
     })
   })
 })

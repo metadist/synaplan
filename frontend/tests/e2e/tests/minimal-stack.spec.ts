@@ -73,7 +73,11 @@ test.describe('@minimal @ci Minimal stack', () => {
     const modules = await runtimeModules(request)
     const expectedIds = Object.keys(modules).sort()
     expect(expectedIds).toContain('compute')
-    expect(expectedIds).toHaveLength(13)
+    expect(expectedIds).toContain('opendesk_stt')
+    expect(expectedIds).toContain('telegram')
+    expect(expectedIds).toContain('federation')
+    expect(expectedIds).toContain('live_voice')
+    expect(expectedIds).toHaveLength(18)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -91,6 +95,30 @@ test.describe('@minimal @ci Minimal stack', () => {
     }
   })
 
+  test('Telegram webhook answers the uniform 404 and the card is absent', async ({
+    page,
+    request,
+  }) => {
+    const res = await request.post(`${getApiUrl()}/api/v1/webhooks/telegram/missing`, {
+      data: { update_id: 1 },
+    })
+    expect(res.status()).toBe(404)
+    expect(await res.json()).toEqual({
+      error: 'feature_not_configured',
+      module: 'telegram',
+      docs: 'modules/telegram',
+    })
+
+    await openApp(page)
+    await page.goto('/apps')
+    await expect(page.locator(selectors.apps.card('email'))).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.apps.card('telegram'))).toHaveCount(0)
+    await page.goto('/apps/telegram')
+    await expect(page.locator(selectors.inboundConfig.telegramSection)).toHaveCount(0)
+  })
+
   test('WhatsApp webhook answers the uniform 404', async ({ request }) => {
     const res = await request.post(`${getApiUrl()}/api/v1/webhooks/whatsapp`, {
       data: { entry: [] },
@@ -103,26 +131,37 @@ test.describe('@minimal @ci Minimal stack', () => {
     })
   })
 
-  test('Channels shows the WhatsApp notice and hides the card', async ({ page }) => {
+  test('Apps hides WhatsApp while the email address stays available', async ({ page }) => {
     await openApp(page)
-    await page.goto('/channels')
-    await expect(page.locator(selectors.inboundConfig.page)).toBeVisible({
+    await page.goto('/apps')
+    await expect(page.locator(selectors.apps.card('email'))).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
-    await expect(page.locator(selectors.inboundConfig.whatsappNotice)).toBeVisible()
+    await expect(page.locator(selectors.apps.card('whatsapp'))).toHaveCount(0)
+    await page.goto('/apps/whatsapp')
     await expect(page.locator(selectors.inboundConfig.whatsappSection)).toHaveCount(0)
-    await expect(page.locator(selectors.inboundConfig.emailSection)).toBeVisible()
+    await page.goto('/apps/email')
+    await expect(page.locator(selectors.inboundConfig.emailSection)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
   })
 
   test('runtime config reports every module unconfigured and gated', async ({ request }) => {
     const modules = await runtimeModules(request)
     const ids = Object.keys(modules).sort()
     expect(ids).toContain('compute')
-    expect(ids).toHaveLength(13)
+    expect(ids).toContain('opendesk_stt')
+    expect(ids).toContain('telegram')
+    expect(ids).toContain('federation')
+    expect(ids).toContain('live_voice')
+    expect(ids).toHaveLength(18)
     expect(modules.tika?.configured).toBe(false)
+    expect(modules.opendesk_stt?.configured).toBe(false)
     expect(modules.higgsfield?.configured).toBe(false)
     expect(modules.whatsapp?.configured).toBe(false)
     expect(modules.compute?.configured).toBe(false)
+    expect(modules.federation?.configured).toBe(false)
+    expect(modules.live_voice?.configured).toBe(false)
     for (const id of ids) {
       expect(modules[id]?.configured, `${id} configured`).toBe(false)
       expect(modules[id]?.gated, `${id} gated`).toBe(true)

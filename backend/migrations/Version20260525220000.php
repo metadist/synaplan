@@ -34,7 +34,7 @@ final class Version20260525220000 extends AbstractMigration
 {
     /**
      * Map of legacy key → canonical key. Keep in sync with
-     * {@see \App\Service\PromptService::METADATA_KEY_ALIASES}.
+     * {@see \App\Service\Prompt\PromptService::METADATA_KEY_ALIASES}.
      *
      * @var array<string, string>
      */

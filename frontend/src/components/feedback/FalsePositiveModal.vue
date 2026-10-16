@@ -395,7 +395,7 @@ const isMemory = computed(() => props.classification === 'memory')
               </div>
             </div>
             <button
-              class="w-8 h-8 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
+              class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center transition-colors shrink-0"
               @click="emit('close')"
             >
               <Icon icon="mdi:close" class="w-5 h-5 txt-secondary" />
@@ -409,14 +409,14 @@ const isMemory = computed(() => props.classification === 'memory')
               <div class="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  class="px-3 py-1.5 rounded-lg text-xs font-medium surface-chip txt-secondary hover:txt-primary transition-colors"
+                  class="px-3 py-1.5 rounded-xl text-xs font-medium surface-chip txt-secondary hover:txt-primary transition-colors"
                   @click="selectAll"
                 >
                   {{ t('feedback.falsePositive.selectAll') }}
                 </button>
                 <button
                   type="button"
-                  class="px-3 py-1.5 rounded-lg text-xs font-medium surface-chip txt-secondary hover:txt-primary transition-colors"
+                  class="px-3 py-1.5 rounded-xl text-xs font-medium surface-chip txt-secondary hover:txt-primary transition-colors"
                   @click="clearAll"
                 >
                   {{ t('feedback.falsePositive.clear') }}
@@ -615,13 +615,13 @@ const isMemory = computed(() => props.classification === 'memory')
                           <textarea
                             v-model="customSummary"
                             rows="2"
-                            class="w-full px-3 py-2 pr-24 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-red-500/30 resize-none text-sm"
+                            class="w-full px-3 py-2 pr-24 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-red-500/30 resize-none text-sm"
                             :placeholder="t('feedback.falsePositive.summaryPlaceholder')"
                             @input="onCustomSummaryInput"
                           />
                           <button
                             type="button"
-                            class="absolute right-1.5 bottom-1.5 flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+                            class="absolute right-1.5 bottom-1.5 flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all"
                             :class="
                               enhancingSummary
                                 ? 'bg-brand/20 text-brand cursor-wait'
@@ -804,7 +804,7 @@ const isMemory = computed(() => props.classification === 'memory')
                           <button
                             v-if="!kbDone"
                             type="button"
-                            class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 transition-colors"
+                            class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 transition-colors"
                             :disabled="researchLoading || !activeSummary.trim()"
                             @click="startKbSearch"
                           >
@@ -902,7 +902,7 @@ const isMemory = computed(() => props.classification === 'memory')
                               </div>
                               <button
                                 type="button"
-                                class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-blue-500 hover:bg-blue-500/10 transition-colors"
+                                class="flex items-center gap-1.5 px-2 py-1 rounded-xl text-[11px] font-medium text-blue-500 hover:bg-blue-500/10 transition-colors"
                                 :disabled="researchLoading"
                                 @click="kbDone = false"
                               >
@@ -918,7 +918,7 @@ const isMemory = computed(() => props.classification === 'memory')
                           <button
                             v-if="!webDone"
                             type="button"
-                            class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 transition-colors"
+                            class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 transition-colors"
                             :disabled="researchLoading || !activeSummary.trim()"
                             @click="startWebSearch"
                           >
@@ -995,7 +995,7 @@ const isMemory = computed(() => props.classification === 'memory')
                               </div>
                               <button
                                 type="button"
-                                class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-blue-500 hover:bg-blue-500/10 transition-colors"
+                                class="flex items-center gap-1.5 px-2 py-1 rounded-xl text-[11px] font-medium text-blue-500 hover:bg-blue-500/10 transition-colors"
                                 :disabled="researchLoading"
                                 @click="webDone = false"
                               >
@@ -1044,13 +1044,13 @@ const isMemory = computed(() => props.classification === 'memory')
                           <textarea
                             v-model="customCorrection"
                             rows="2"
-                            class="w-full px-3 py-2 pr-24 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-green-500/30 resize-none text-sm"
+                            class="w-full px-3 py-2 pr-24 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-green-500/30 resize-none text-sm"
                             :placeholder="t('feedback.falsePositive.correctionPlaceholder')"
                             @input="onCustomCorrectionInput"
                           />
                           <button
                             type="button"
-                            class="absolute right-1.5 bottom-1.5 flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all"
+                            class="absolute right-1.5 bottom-1.5 flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all"
                             :class="
                               enhancingCorrection
                                 ? 'bg-brand/20 text-brand cursor-wait'

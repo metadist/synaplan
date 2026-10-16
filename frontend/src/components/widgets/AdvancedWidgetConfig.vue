@@ -32,7 +32,7 @@
             </p>
           </div>
           <button
-            class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg hover-surface transition-colors flex items-center justify-center flex-shrink-0"
+            class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover-surface transition-colors flex items-center justify-center flex-shrink-0"
             :aria-label="$t('common.close')"
             data-testid="btn-close"
             @click="handleClose"
@@ -74,7 +74,7 @@
               <!-- Dropdown menu -->
               <div
                 v-if="openGroup === group.id"
-                class="absolute left-0 top-full mt-1 z-20 min-w-[12rem] surface-card rounded-lg shadow-xl border border-light-border/30 dark:border-dark-border/20 py-1"
+                class="absolute left-0 top-full mt-1 z-20 min-w-[12rem] surface-card !rounded-xl shadow-xl border border-light-border/30 dark:border-dark-border/20 py-1"
                 :data-testid="`menu-tab-group-${group.id}`"
               >
                 <button
@@ -117,7 +117,7 @@
                 </label>
                 <select
                   v-model="config.position"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-position"
                 >
                   <option value="bottom-right">{{ $t('widgets.bottomRight') }}</option>
@@ -133,7 +133,7 @@
                 </label>
                 <select
                   v-model="config.defaultTheme"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-theme"
                 >
                   <option value="light">{{ $t('widgets.light') }}</option>
@@ -149,13 +149,13 @@
                   <input
                     v-model="config.primaryColor"
                     type="color"
-                    class="w-12 h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+                    class="w-12 h-12 rounded-xl border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
                     data-testid="input-primary-color"
                   />
                   <input
                     v-model="config.primaryColor"
                     type="text"
-                    class="flex-1 px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono text-sm"
+                    class="flex-1 px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono text-sm"
                   />
                 </div>
               </div>
@@ -168,13 +168,13 @@
                   <input
                     v-model="config.iconColor"
                     type="color"
-                    class="w-12 h-12 rounded-lg border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
+                    class="w-12 h-12 rounded-xl border border-light-border/30 dark:border-dark-border/20 cursor-pointer"
                     data-testid="input-icon-color"
                   />
                   <input
                     v-model="config.iconColor"
                     type="text"
-                    class="flex-1 px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono text-sm"
+                    class="flex-1 px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono text-sm"
                   />
                 </div>
               </div>
@@ -194,7 +194,7 @@
                   :key="icon.value"
                   type="button"
                   :class="[
-                    'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
+                    'p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2',
                     config.buttonIcon === icon.value
                       ? 'border-[var(--brand)] bg-[var(--brand)]/10'
                       : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
@@ -218,7 +218,7 @@
                   v-if="config.buttonIconUrl"
                   type="button"
                   :class="[
-                    'p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2',
+                    'p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2',
                     config.buttonIcon === 'custom'
                       ? 'border-[var(--brand)] bg-[var(--brand)]/10'
                       : 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
@@ -254,7 +254,7 @@
                   <button
                     type="button"
                     :disabled="uploadingIcon"
-                    class="flex-1 px-4 py-2 border-2 border-dashed border-light-border/30 dark:border-dark-border/20 rounded-lg hover:border-[var(--brand)]/50 transition-colors txt-secondary hover:txt-primary flex items-center justify-center gap-2 disabled:opacity-50"
+                    class="flex-1 px-4 py-2 border-2 border-dashed border-light-border/30 dark:border-dark-border/20 rounded-xl hover:border-[var(--brand)]/50 transition-colors txt-secondary hover:txt-primary flex items-center justify-center gap-2 disabled:opacity-50"
                     data-testid="btn-upload-icon"
                     @click="triggerIconUpload"
                   >
@@ -269,7 +269,7 @@
                   <button
                     v-if="config.buttonIconUrl"
                     type="button"
-                    class="px-4 py-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/20 transition-colors"
+                    class="px-4 py-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl hover:bg-red-500/20 transition-colors"
                     data-testid="btn-remove-icon"
                     @click="removeCustomIcon"
                   >
@@ -320,7 +320,7 @@
                 type="text"
                 maxlength="50"
                 :placeholder="$t('widgets.advancedConfig.aiAssistantNamePlaceholder')"
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-ai-assistant-name"
                 @input="
                   config.aiAssistantName =
@@ -382,7 +382,7 @@
                   type="text"
                   maxlength="200"
                   :placeholder="$t('widgets.advancedConfig.subtitlePlaceholder')"
-                  class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-subtitle-text"
                 />
               </div>
@@ -458,7 +458,7 @@
               <textarea
                 v-model="config.autoMessage"
                 rows="3"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
+                class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none"
                 data-testid="input-auto-message"
               ></textarea>
             </div>
@@ -472,7 +472,7 @@
                 type="number"
                 min="1"
                 max="100"
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-message-limit"
               />
               <p class="text-xs txt-secondary mt-1">
@@ -518,7 +518,7 @@
                       type="number"
                       min="0"
                       max="20"
-                      class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                       data-testid="input-file-limit"
                     />
                   </div>
@@ -531,7 +531,7 @@
                       type="number"
                       min="1"
                       max="50"
-                      class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                       data-testid="input-max-file-size"
                       @input="handleMaxFileSizeInput"
                     />
@@ -588,7 +588,7 @@
                     v-model="config.slackWebhookUrl"
                     type="url"
                     placeholder="https://hooks.slack.com/services/..."
-                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                     data-testid="input-slack-webhook"
                   />
                   <p
@@ -659,7 +659,7 @@
                       type="text"
                       maxlength="100"
                       :placeholder="$t('widgets.advancedConfig.handoff.triggerPlaceholder')"
-                      class="flex-1 px-4 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                      class="flex-1 px-4 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                       data-testid="input-new-trigger"
                       @keyup.enter="addHandoffTrigger"
                     />
@@ -669,7 +669,7 @@
                         !newHandoffTrigger.trim() ||
                         (config.humanHandoffTriggers?.length ?? 0) >= 20
                       "
-                      class="btn-primary px-4 py-2 rounded-lg text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                      class="btn-primary px-4 py-2 rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                       data-testid="btn-add-trigger"
                       @click="addHandoffTrigger"
                     >
@@ -687,7 +687,7 @@
                   <button
                     type="button"
                     :disabled="!config.slackWebhookUrl || handoffTestSubmitting"
-                    class="px-4 py-2 rounded-lg border border-[var(--brand)]/50 text-[var(--brand)] hover:bg-[var(--brand)]/10 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="px-4 py-2 rounded-xl border border-[var(--brand)]/50 text-[var(--brand)] hover:bg-[var(--brand)]/10 text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     data-testid="btn-handoff-test"
                     @click="testHandoffWebhook"
                   >
@@ -744,12 +744,12 @@
                   v-model="newDomain"
                   type="text"
                   placeholder="example.com"
-                  class="flex-1 px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="flex-1 px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-domain"
                   @keydown.enter.prevent="addDomain"
                 />
                 <button
-                  class="btn-primary px-4 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 w-full sm:w-auto"
+                  class="btn-primary px-4 py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 w-full sm:w-auto"
                   data-testid="btn-add-domain"
                   @click="addDomain"
                 >
@@ -840,7 +840,7 @@
                       type="text"
                       :disabled="!auth.isPro"
                       placeholder="api.example.com/users/{externalUserId}/profile"
-                      class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+                      class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed font-mono"
                       data-testid="input-external-api-url"
                       @blur="normalizeApiUrl"
                     />
@@ -867,7 +867,7 @@
                       autocomplete="new-password"
                       :disabled="!auth.isPro"
                       :placeholder="$t('widgets.advancedConfig.externalApiTokenPlaceholder')"
-                      class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
                       data-testid="input-external-api-token"
                     />
                   </div>
@@ -945,7 +945,7 @@ SynaplanWidget.init({
                   <select
                     v-model="config.sessionMode"
                     :disabled="!auth.isPro"
-                    class="px-3 py-1.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="px-3 py-1.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
                     data-testid="select-session-mode"
                   >
                     <option value="browser">
@@ -993,7 +993,7 @@ SynaplanWidget.init({
                     type="text"
                     :disabled="!auth.isPro || apiTestLoading"
                     :placeholder="$t('widgets.advancedConfig.userDataIntegration.testPlaceholder')"
-                    class="flex-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+                    class="flex-1 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed font-mono"
                     data-testid="input-api-test-user-id"
                     @keydown.enter="testApiConnection"
                   />
@@ -1001,7 +1001,7 @@ SynaplanWidget.init({
                     :disabled="
                       !auth.isPro || apiTestLoading || !config.externalApiUrl || apiTestCooldown > 0
                     "
-                    class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-[var(--brand)] hover:bg-[var(--brand-dark)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 flex-shrink-0"
+                    class="px-4 py-2 rounded-xl text-sm font-medium text-white bg-[var(--brand)] hover:bg-[var(--brand-dark)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5 flex-shrink-0"
                     data-testid="btn-test-api"
                     @click="testApiConnection"
                   >
@@ -1122,7 +1122,7 @@ SynaplanWidget.init({
                     {{ customFieldTypeLabel(field.type) }}
                   </span>
                   <button
-                    class="p-1 rounded hover:bg-red-500/10 transition-colors"
+                    class="p-1 rounded-xl hover:bg-red-500/10 transition-colors"
                     :title="$t('common.delete')"
                     @click="removeCustomField(index)"
                   >
@@ -1161,7 +1161,7 @@ SynaplanWidget.init({
                   <input
                     v-model="newFieldName"
                     type="text"
-                    class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    class="w-full px-3 py-2 text-sm rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                     :placeholder="$t('widgets.customFields.fieldName')"
                     maxlength="100"
                     @keydown.enter="newFieldType !== 'dropdown' && addCustomField()"
@@ -1173,7 +1173,7 @@ SynaplanWidget.init({
                   </label>
                   <select
                     v-model="newFieldType"
-                    class="w-full px-3 py-2 text-sm rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    class="w-full px-3 py-2 text-sm rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   >
                     <option value="text">{{ $t('widgets.customFields.typeText') }}</option>
                     <option value="boolean">{{ $t('widgets.customFields.typeBoolean') }}</option>
@@ -1182,7 +1182,7 @@ SynaplanWidget.init({
                 </div>
                 <button
                   v-if="newFieldType !== 'dropdown'"
-                  class="btn-primary px-4 py-2 text-sm flex-shrink-0 rounded-lg"
+                  class="btn-primary px-4 py-2 text-sm flex-shrink-0 rounded-xl"
                   :disabled="!newFieldName.trim() || !canAddField"
                   @click="addCustomField"
                 >
@@ -1207,7 +1207,7 @@ SynaplanWidget.init({
                   <input
                     v-model="opt.value"
                     type="text"
-                    class="flex-1 px-3 py-1.5 text-sm rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    class="flex-1 px-3 py-1.5 text-sm rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                     :placeholder="
                       $t('widgets.customFields.dropdownOptionPlaceholder', { n: idx + 1 })
                     "
@@ -1216,7 +1216,7 @@ SynaplanWidget.init({
                   />
                   <button
                     v-if="newDropdownOptions.length > 1"
-                    class="p-1 rounded hover:bg-red-500/10 transition-colors"
+                    class="p-1 rounded-xl hover:bg-red-500/10 transition-colors"
                     @click="removeDropdownOption(opt.id)"
                   >
                     <Icon icon="heroicons:x-mark" class="w-4 h-4 text-red-500" />
@@ -1236,7 +1236,7 @@ SynaplanWidget.init({
                   </span>
                 </div>
                 <button
-                  class="btn-primary px-4 py-2 text-sm rounded-lg w-full"
+                  class="btn-primary px-4 py-2 text-sm rounded-xl w-full"
                   :disabled="
                     !newFieldName.trim() || !canAddField || validDropdownOptions.length === 0
                   "
@@ -1435,7 +1435,7 @@ SynaplanWidget.init({
                 v-model="config.privacyPolicyUrl"
                 type="url"
                 :placeholder="$t('widgets.advancedConfig.privacyPolicyUrlPlaceholder')"
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-privacy-url"
               />
             </div>
@@ -1494,7 +1494,7 @@ SynaplanWidget.init({
               <div class="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  class="btn-primary px-6 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+                  class="btn-primary px-6 py-3 rounded-xl font-medium flex items-center justify-center gap-2"
                   data-testid="btn-start-ai-setup"
                   @click="emit('startAiSetup')"
                 >
@@ -1503,7 +1503,7 @@ SynaplanWidget.init({
                 </button>
                 <button
                   type="button"
-                  class="px-6 py-3 rounded-lg font-medium flex items-center justify-center gap-2 border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  class="px-6 py-3 rounded-xl font-medium flex items-center justify-center gap-2 border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   data-testid="btn-manual-create"
                   @click="handleManualCreate"
                 >
@@ -1558,7 +1558,7 @@ SynaplanWidget.init({
                       </p>
                       <button
                         type="button"
-                        class="mt-3 px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-2"
+                        class="mt-3 px-4 py-2 rounded-xl bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-2"
                         data-testid="btn-customize-prompt"
                         @click="emit('startAiSetup')"
                       >
@@ -1591,7 +1591,7 @@ SynaplanWidget.init({
                     </div>
                     <button
                       type="button"
-                      class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-2"
+                      class="px-4 py-2 rounded-xl bg-[var(--brand)] text-white text-sm font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-2"
                       data-testid="btn-restart-ai-setup"
                       @click="emit('startAiSetup')"
                     >
@@ -1610,7 +1610,7 @@ SynaplanWidget.init({
                   <input
                     v-model="widgetName"
                     type="text"
-                    class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                     data-testid="input-widget-name"
                     :placeholder="$t('widgets.widgetNamePlaceholder')"
                   />
@@ -1644,7 +1644,7 @@ SynaplanWidget.init({
                     v-model="promptLanguage"
                     :disabled="isSystemPrompt"
                     :class="[
-                      'w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]',
+                      'w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]',
                       isSystemPrompt ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : '',
                     ]"
                     data-testid="input-prompt-language"
@@ -1676,7 +1676,7 @@ SynaplanWidget.init({
                     rows="12"
                     :readonly="isSystemPrompt"
                     :class="[
-                      'w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono text-sm',
+                      'w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono text-sm',
                       isSystemPrompt ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : '',
                     ]"
                     :placeholder="$t('widgets.advancedConfig.promptContentPlaceholder')"
@@ -1730,7 +1730,7 @@ SynaplanWidget.init({
                     <!-- Select from File Manager Button -->
                     <button
                       type="button"
-                      class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-lg border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
+                      class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl border-light-border/50 dark:border-dark-border/30 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/5 transition-colors"
                       @click="showFilePicker = true"
                     >
                       <Icon icon="heroicons:folder-open" class="w-5 h-5 txt-secondary" />
@@ -1766,7 +1766,7 @@ SynaplanWidget.init({
                           <button
                             v-if="!fileSummaries.has(file.id) && !loadingSummary.has(file.id)"
                             type="button"
-                            class="p-2 rounded-lg hover:bg-[var(--brand)]/10 transition-colors"
+                            class="p-2 rounded-xl hover:bg-[var(--brand)]/10 transition-colors"
                             :title="$t('widgets.advancedConfig.generateSummary')"
                             @click="generateFileSummary(file.id)"
                           >
@@ -1782,7 +1782,7 @@ SynaplanWidget.init({
                           <!-- Delete Button -->
                           <button
                             type="button"
-                            class="p-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                            class="p-2 rounded-xl hover:bg-red-500/10 transition-colors"
                             :title="$t('widgets.advancedConfig.deleteFile')"
                             :disabled="deletingFileId === file.id"
                             @click="handleDeleteFile(file.id)"
@@ -1845,7 +1845,7 @@ SynaplanWidget.init({
           class="px-4 sm:px-6 py-3 sm:py-4 border-t border-light-border/30 dark:border-dark-border/20 flex items-center justify-end gap-2 sm:gap-3 flex-shrink-0"
         >
           <button
-            class="px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg hover-surface transition-colors txt-secondary font-medium text-sm sm:text-base"
+            class="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl hover-surface transition-colors txt-secondary font-medium text-sm sm:text-base"
             data-testid="btn-cancel"
             @click="handleClose"
           >
@@ -1853,7 +1853,7 @@ SynaplanWidget.init({
           </button>
           <button
             :disabled="saving"
-            class="btn-primary px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm sm:text-base"
+            class="btn-primary px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm sm:text-base"
             data-testid="btn-save"
             @click="handleSave"
           >

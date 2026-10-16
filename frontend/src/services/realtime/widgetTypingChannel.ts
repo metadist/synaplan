@@ -28,6 +28,7 @@
  */
 
 import { z } from 'zod'
+import { createUuid } from '@/utils/uuid'
 import type { ChannelHandle, RealtimeClient } from './RealtimeClient'
 
 /**
@@ -92,16 +93,8 @@ function buildChannelName(widgetId: string, sessionId: string): string {
 }
 
 function newClientId(): string {
-  // Cryptographically-strong when available (modern browsers, JSDOM via
-  // `globalThis.crypto`); falls back to Math.random in the unlikely case
-  // crypto is unavailable. We only need uniqueness within a single tab,
-  // not unguessability — the server never trusts this id.
-  const c =
-    typeof globalThis !== 'undefined' && 'crypto' in globalThis
-      ? (globalThis.crypto as Crypto | undefined)
-      : undefined
-  if (c?.randomUUID) return c.randomUUID()
-  return `cid_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  // Only uniqueness within a single tab matters — the server never trusts this id.
+  return createUuid()
 }
 
 /**

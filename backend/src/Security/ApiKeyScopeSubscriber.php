@@ -75,7 +75,7 @@ final class ApiKeyScopeSubscriber implements EventSubscriberInterface
             return;
         }
 
-        if (ApiKeyScope::allows($scopes, $path)) {
+        if (ApiKeyScope::allows($scopes, $path, $request->getMethod())) {
             return;
         }
 

@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace App\AI\Credential;
 
+use App\AI\Import\ListedModelPrice;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
+use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Install-wide registry of "OpenAI Compatible" upstream endpoints (LocalAI,
  * vLLM, LiteLLM, Ollama's /v1, any gateway that speaks the OpenAI Chat
- * Completions + Embeddings API).
+ * Completions, Embeddings, or Images API).
  *
  * An endpoint is a named tuple {base_url, api_key, headers, label,
- * capabilities}. It is stored globally (ownerId = 0) in BCONFIG under the
+ * capabilities}. `text2pic` means the endpoint speaks
+ * `POST /images/generations` (LocalAI and other OpenAI-compatible image
+ * servers). It is stored globally (ownerId = 0) in BCONFIG under the
  * group {@see self::CONFIG_GROUP}, one row per endpoint (setting =
  * "endpoint.<name>"), with the whole JSON payload encrypted at rest via
  * {@see EncryptionService} (which derives its key from APP_SECRET) — the same
@@ -26,6 +31,15 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * name in BJSON ("endpoint": "<name>"); the model's providerId stays the
  * upstream model id sent in the request body. This lets one Synaplan install
  * expose several models across several self-hosted gateways.
+ *
+ * Every base URL an administrator saves or probes passes {@see SsrfGuard}
+ * (GHSA-26f3-684h-hpjh, part b): http(s) only, no redirects, and the probe
+ * connects to the address the guard resolved so a hostname cannot point
+ * somewhere else between the check and the request. Because self-hosted
+ * gateways live on the operator's own network, RFC 1918, loopback, ULA and
+ * overlay-VPN ranges are accepted by default; link-local (cloud metadata)
+ * and the other reserved ranges never are. {@see self::ENV_PUBLIC_ONLY}
+ * switches to the public-only policy every user-supplied URL gets.
  */
 final class OpenAiCompatibleEndpointRegistry
 {
@@ -37,12 +51,17 @@ final class OpenAiCompatibleEndpointRegistry
 
     public const CONFIG_GROUP = 'openai_compatible';
 
+    /** Env flag: refuse upstreams on private networks (hosted / multi-tenant installs). */
+    public const ENV_PUBLIC_ONLY = 'OPENAI_COMPATIBLE_PUBLIC_UPSTREAMS_ONLY';
+
     private const SETTING_PREFIX = 'endpoint.';
 
     private const NAME_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,62}$/';
 
+    private const ALLOWED_SCHEMES = ['http', 'https'];
+
     /** Capabilities an endpoint may advertise (maps to BMODELS.BTAG values). */
-    public const CAPABILITIES = ['chat', 'vectorize', 'pic2text', 'rerank'];
+    public const CAPABILITIES = ['chat', 'vectorize', 'pic2text', 'text2pic', 'rerank'];
 
     public function __construct(
         private readonly ConfigRepository $configRepository,
@@ -50,6 +69,9 @@ final class OpenAiCompatibleEndpointRegistry
         private readonly EncryptionService $encryption,
         private readonly LoggerInterface $logger,
         private readonly HttpClientInterface $httpClient,
+        private readonly SsrfGuard $ssrfGuard,
+        #[Autowire(env: 'default::bool:'.self::ENV_PUBLIC_ONLY)]
+        private readonly bool $publicUpstreamsOnly = false,
     ) {
     }
 
@@ -78,12 +100,7 @@ final class OpenAiCompatibleEndpointRegistry
             }
         }
 
-        $baseUrl = rtrim((string) $baseUrl, '/');
-        if ('' === $baseUrl || !filter_var($baseUrl, FILTER_VALIDATE_URL)) {
-            return ['ok' => false, 'error' => 'base_url must be a valid absolute URL'];
-        }
-
-        $result = $this->fetchModelIds($baseUrl, $apiKey, $this->normalizeHeaders($headers));
+        $result = $this->fetchModelCatalog($baseUrl, $apiKey, $this->normalizeHeaders($headers));
         if (!$result['ok']) {
             $out = ['ok' => false, 'error' => $result['error'] ?? 'Upstream did not answer'];
             if (isset($result['status'])) {
@@ -93,11 +110,16 @@ final class OpenAiCompatibleEndpointRegistry
             return $out;
         }
 
+        $ids = [];
+        foreach ($result['models'] as $model) {
+            $ids[] = $model['id'];
+        }
+
         return [
             'ok' => true,
             'status' => $result['status'] ?? 200,
-            'model_count' => count($result['ids']),
-            'sample' => array_slice($result['ids'], 0, 10),
+            'model_count' => count($ids),
+            'sample' => array_slice($ids, 0, 10),
         ];
     }
 
@@ -107,29 +129,67 @@ final class OpenAiCompatibleEndpointRegistry
      * Returns a result rather than throwing so callers can tell an unreachable
      * endpoint (`ok = false`) apart from one that lists nothing (`ok = true`,
      * empty `ids`) — the distinction the import re-check (S5) relies on.
+     * Ids only: pricing lives on {@see listModelCatalog()} so existing callers
+     * keep this shape.
      *
      * @return array{ok: bool, ids: list<string>, status?: int, error?: string}
      */
     public function listModelIds(string $name): array
     {
-        $endpoint = $this->getEndpoint($name);
-        if (null === $endpoint) {
-            return ['ok' => false, 'ids' => [], 'error' => 'Unknown endpoint: '.$name];
+        $catalog = $this->listModelCatalog($name);
+        $ids = [];
+        foreach ($catalog['models'] as $model) {
+            $ids[] = $model['id'];
         }
 
-        return $this->fetchModelIds($endpoint['base_url'], $endpoint['api_key'], $endpoint['headers']);
+        $out = ['ok' => $catalog['ok'], 'ids' => $ids];
+        if (isset($catalog['status'])) {
+            $out['status'] = $catalog['status'];
+        }
+        if (isset($catalog['error'])) {
+            $out['error'] = $catalog['error'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Same listing as {@see listModelIds()}, plus the display name and the
+     * published per-1M price when the gateway sends one.
+     *
+     * @return array{
+     *     ok: bool,
+     *     models: list<array{id: string, name: string|null, priceInPerMillion: float|null, priceOutPerMillion: float|null, priceKnown: bool}>,
+     *     status?: int,
+     *     error?: string
+     * }
+     */
+    public function listModelCatalog(string $name): array
+    {
+        $endpoint = $this->getEndpoint($name);
+        if (null === $endpoint) {
+            return ['ok' => false, 'models' => [], 'error' => 'Unknown endpoint: '.$name];
+        }
+
+        return $this->fetchModelCatalog($endpoint['base_url'], $endpoint['api_key'], $endpoint['headers']);
     }
 
     /**
      * @param array<string, string> $headers
      *
-     * @return array{ok: bool, ids: list<string>, status?: int, error?: string}
+     * @return array{
+     *     ok: bool,
+     *     models: list<array{id: string, name: string|null, priceInPerMillion: float|null, priceOutPerMillion: float|null, priceKnown: bool}>,
+     *     status?: int,
+     *     error?: string
+     * }
      */
-    private function fetchModelIds(?string $baseUrl, ?string $apiKey, array $headers): array
+    private function fetchModelCatalog(?string $baseUrl, ?string $apiKey, array $headers): array
     {
-        $baseUrl = rtrim((string) $baseUrl, '/');
-        if ('' === $baseUrl || !filter_var($baseUrl, FILTER_VALIDATE_URL)) {
-            return ['ok' => false, 'ids' => [], 'error' => 'base_url must be a valid absolute URL'];
+        try {
+            $upstream = $this->resolveUpstream((string) $baseUrl);
+        } catch (\InvalidArgumentException $e) {
+            return ['ok' => false, 'models' => [], 'error' => $e->getMessage()];
         }
 
         $requestHeaders = $headers;
@@ -137,27 +197,48 @@ final class OpenAiCompatibleEndpointRegistry
             $requestHeaders['Authorization'] = 'Bearer '.$apiKey;
         }
 
+        $options = [
+            'headers' => $requestHeaders,
+            'timeout' => 10,
+            // A redirect could lead off the address that was just validated.
+            'max_redirects' => 0,
+        ];
+        if (null !== $upstream['pin']) {
+            $options['resolve'] = [$upstream['host'] => $upstream['pin']];
+        }
+
         try {
-            $response = $this->httpClient->request('GET', $baseUrl.'/models', [
-                'headers' => $requestHeaders,
-                'timeout' => 10,
-            ]);
+            $response = $this->httpClient->request('GET', $upstream['url'].'/models', $options);
             $status = $response->getStatusCode();
+            if ($status >= 300 && $status < 400) {
+                $response->cancel();
+
+                return ['ok' => false, 'models' => [], 'status' => $status, 'error' => 'Upstream redirected the request. Enter the final base URL instead.'];
+            }
             if ($status >= 400) {
-                return ['ok' => false, 'ids' => [], 'status' => $status, 'error' => 'Upstream returned HTTP '.$status];
+                return ['ok' => false, 'models' => [], 'status' => $status, 'error' => 'Upstream returned HTTP '.$status];
             }
 
             $body = $response->toArray(false);
-            $ids = [];
+            $models = [];
             foreach ($body['data'] ?? [] as $item) {
-                if (isset($item['id']) && is_string($item['id']) && '' !== $item['id']) {
-                    $ids[] = $item['id'];
+                if (!is_array($item) || !isset($item['id']) || !is_string($item['id']) || '' === $item['id']) {
+                    continue;
                 }
+                $price = ListedModelPrice::fromListingItem($item);
+                $name = isset($item['name']) && is_string($item['name']) ? trim($item['name']) : '';
+                $models[] = [
+                    'id' => $item['id'],
+                    'name' => '' !== $name ? $name : null,
+                    'priceInPerMillion' => $price->priceInPerMillion,
+                    'priceOutPerMillion' => $price->priceOutPerMillion,
+                    'priceKnown' => $price->known,
+                ];
             }
 
-            return ['ok' => true, 'ids' => $ids, 'status' => $status];
+            return ['ok' => true, 'models' => $models, 'status' => $status];
         } catch (\Throwable $e) {
-            return ['ok' => false, 'ids' => [], 'error' => $e->getMessage()];
+            return ['ok' => false, 'models' => [], 'error' => $e->getMessage()];
         }
     }
 
@@ -275,17 +356,14 @@ final class OpenAiCompatibleEndpointRegistry
             throw new \InvalidArgumentException('Invalid endpoint name. Use lowercase letters, digits, "-" and "_" (max 63 chars).');
         }
 
-        $baseUrl = trim($baseUrl);
-        if ('' === $baseUrl || !filter_var($baseUrl, FILTER_VALIDATE_URL)) {
-            throw new \InvalidArgumentException('base_url must be a valid absolute URL (e.g. https://localai.example.com/v1).');
-        }
+        $upstream = $this->resolveUpstream($baseUrl);
 
         $existing = $this->rawRows()[$name] ?? null;
         $resolvedKey = null === $apiKey ? (string) ($existing['api_key'] ?? '') : $apiKey;
 
         $payload = [
             'label' => null !== $label && '' !== trim($label) ? trim($label) : $name,
-            'base_url' => rtrim($baseUrl, '/'),
+            'base_url' => $upstream['url'],
             'api_key' => $resolvedKey,
             'headers' => $this->normalizeHeaders($headers),
             'capabilities' => $this->normalizeCapabilities($capabilities ?: self::CAPABILITIES),
@@ -306,6 +384,53 @@ final class OpenAiCompatibleEndpointRegistry
         $name = strtolower(trim($name));
 
         return $this->configRepository->deleteValue(0, self::CONFIG_GROUP, self::SETTING_PREFIX.$name);
+    }
+
+    /**
+     * Validate a base URL against the upstream policy and resolve the address
+     * the probe must connect to.
+     *
+     * `pin` is the address to connect to when the host is a name (null for a
+     * literal IP, which needs no pinning). The message of the exception is
+     * shown to the administrator as-is, so it names what to do next.
+     *
+     * @return array{url: string, host: string, pin: ?string}
+     *
+     * @throws \InvalidArgumentException when the URL is malformed or refused
+     */
+    private function resolveUpstream(string $baseUrl): array
+    {
+        $baseUrl = rtrim(trim($baseUrl), '/');
+        $parts = '' !== $baseUrl ? parse_url($baseUrl) : false;
+        $scheme = is_array($parts) ? strtolower((string) ($parts['scheme'] ?? '')) : '';
+        $host = is_array($parts) ? trim((string) ($parts['host'] ?? ''), '[]') : '';
+        if ('' === $host || !in_array($scheme, self::ALLOWED_SCHEMES, true) || !filter_var($baseUrl, FILTER_VALIDATE_URL)) {
+            throw new \InvalidArgumentException('base_url must be an absolute http:// or https:// URL (e.g. https://localai.example.com/v1).');
+        }
+
+        $isLiteralIp = false !== filter_var($host, \FILTER_VALIDATE_IP);
+
+        if ($this->publicUpstreamsOnly) {
+            if ($this->ssrfGuard->isBlockedUrl($baseUrl)) {
+                throw new \InvalidArgumentException(sprintf('base_url points at a private or reserved network. This installation only accepts public upstreams (%s is set).', self::ENV_PUBLIC_ONLY));
+            }
+            $pinned = $this->ssrfGuard->pinnedIps($host);
+        } else {
+            $pinned = $this->ssrfGuard->pinnedIps($host, allowOperatorNetwork: true);
+        }
+
+        if ([] === $pinned && $isLiteralIp) {
+            throw new \InvalidArgumentException('base_url points at a reserved address (link-local, metadata or unroutable) and was refused.');
+        }
+        if ([] === $pinned) {
+            throw new \InvalidArgumentException('base_url host could not be resolved to an address this installation may connect to. Check the hostname, or use the gateway\'s IP address.');
+        }
+
+        return [
+            'url' => $baseUrl,
+            'host' => $host,
+            'pin' => $isLiteralIp ? null : $pinned[0],
+        ];
     }
 
     /**

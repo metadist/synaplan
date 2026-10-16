@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Service;
 
-use App\Service\UserMemoryService;
+use App\Service\Memory\UserMemoryService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 

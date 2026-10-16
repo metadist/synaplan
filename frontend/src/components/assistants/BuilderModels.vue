@@ -4,7 +4,7 @@
     <label v-for="slot in slots" :key="slot.key" class="block">
       <span class="txt-secondary text-sm">{{ slot.label }}</span>
       <select
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :value="modelKey(slot.key) ?? ''"
         :data-testid="`select-model-${slot.key}`"
         @change="patch(slot.key, ($event.target as HTMLSelectElement).value)"
@@ -29,7 +29,7 @@
           min="0"
           max="2"
           step="0.1"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="input-temperature"
           @input="patchParam('temperature', Number(($event.target as HTMLInputElement).value))"
         />
@@ -40,7 +40,7 @@
           :value="parameters.maxTokens"
           type="number"
           min="1"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="input-max-tokens"
           @input="patchParam('maxTokens', Number(($event.target as HTMLInputElement).value))"
         />
@@ -48,7 +48,7 @@
       <label class="block">
         <span class="txt-secondary text-sm">{{ $t('assistants.language') }}</span>
         <select
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :value="parameters.language"
           data-testid="select-language"
           @change="patchParam('language', ($event.target as HTMLSelectElement).value)"
@@ -64,7 +64,7 @@
         <textarea
           :value="responseSchemaText"
           rows="4"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
           :placeholder="$t('assistants.responseFormatPlaceholder')"
           data-testid="input-response-schema"
           @input="onSchemaInput(($event.target as HTMLTextAreaElement).value)"

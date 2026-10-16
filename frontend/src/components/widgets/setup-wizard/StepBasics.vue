@@ -9,7 +9,7 @@
         v-model="name"
         type="text"
         :placeholder="$t('widgets.createWizard.basics.namePlaceholder')"
-        class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+        class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
         data-testid="input-widget-name"
         required
       />
@@ -29,7 +29,7 @@
           v-model="websiteUrl"
           type="text"
           :placeholder="$t('widgets.createWizard.basics.websitePlaceholder')"
-          class="w-full pl-12 pr-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
+          class="w-full pl-12 pr-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all"
           data-testid="input-website-url"
           required
         />

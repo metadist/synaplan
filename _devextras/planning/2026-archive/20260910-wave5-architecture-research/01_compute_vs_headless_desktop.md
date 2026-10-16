@@ -12,7 +12,7 @@ execution"* function of a **headless Synaplan Desktop** installed on other
 servers? Strong marketing angle.
 
 **Inputs read:** roadmap (`20260903_roadmap.md`), the ticked compute master
-plan and A0 sprint (`202609_secure_compute/`), the desktop master plan
+plan and A0 sprint (`20260903_secure_compute/`), the desktop master plan
 (`20260829-desktop-agent-client/00_master_plan.md`, rows 1–32, §5, §12),
 `docs/DESKTOP.md`, and the public `metadist/synaplan-desktop` repository
 (`README.md`, `AGENTS.md`, `docs/LOCAL_TOOLS.md`, `src-tauri/synaplan-core/src/*`,
@@ -213,7 +213,7 @@ it does not block Tools S5 or Compute A3 + B1.
 
 ## 8. Evidence (verified 2026-09-10)
 
-- `202609_secure_compute/00_master_plan.md` §0 rows 1, 2, 3, 4, 5, 8, 14 and
+- `20260903_secure_compute/00_master_plan.md` §0 rows 1, 2, 3, 4, 5, 8, 14 and
   the "Related" note on Desktop; `STATUS.md`: all A/B steps "planned".
 - `20260829-desktop-agent-client/00_master_plan.md` rows C9/C12, §5, §12.
 - `metadist/synaplan-desktop`: `README.md` ("pull, not push"; device input

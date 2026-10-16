@@ -39,3 +39,7 @@ email:
     help: 'Yardıma mı ihtiyacınız var? Belgelerimize göz atın veya destekle iletişime geçin.'
     company: 'Synaplan'
     rights: 'Tüm hakları saklıdır'
+
+  workspace_expiry:
+    subject: 'Dosya çalışma alanınız yakında silinecek'
+    body: "Synaplan dosya çalışma alanınız bir süredir kullanılmadı ve %days% gün içinde, AI'ın sizin için oluşturduğu dosyalarla birlikte silinecek. Saklamak için o tarihten önce açın:\n\n%url%\n\nBir şey yapmazsanız dosyalar kalıcı olarak kaldırılır."

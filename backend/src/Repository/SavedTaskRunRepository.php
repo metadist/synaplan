@@ -58,6 +58,44 @@ class SavedTaskRunRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    public function hasActiveRunForTask(int $savedTaskId): bool
+    {
+        $count = (int) $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('r.savedTaskId = :taskId')
+            ->andWhere('r.status IN (:statuses)')
+            ->setParameter('taskId', $savedTaskId)
+            ->setParameter('statuses', [SavedTaskRun::STATUS_QUEUED, SavedTaskRun::STATUS_RUNNING])
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $count > 0;
+    }
+
+    /**
+     * A run still queued or running since before $cutoff has lost the process
+     * that owned it (restart, crash, kill); it gets a terminal state instead
+     * of showing "running" forever.
+     */
+    public function failAbandoned(\DateTimeImmutable $cutoff, string $error): int
+    {
+        $utc = new \DateTimeZone('UTC');
+
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            'UPDATE BSAVEDTASK_RUNS SET BSTATUS = :failed, BERROR = :error, BFINISHED = :finished
+             WHERE (BSTATUS = :running AND BSTARTED < :cutoff) OR (BSTATUS = :queued AND BCREATED < :cutoffTimestamp)',
+            [
+                'failed' => SavedTaskRun::STATUS_FAILED,
+                'error' => $error,
+                'finished' => (new \DateTimeImmutable('now', $utc))->format('Y-m-d H:i:s'),
+                'running' => SavedTaskRun::STATUS_RUNNING,
+                'cutoff' => $cutoff->setTimezone($utc)->format('Y-m-d H:i:s'),
+                'queued' => SavedTaskRun::STATUS_QUEUED,
+                'cutoffTimestamp' => $cutoff->getTimestamp(),
+            ]
+        );
+    }
+
     public function deleteForTask(int $savedTaskId): void
     {
         $this->createQueryBuilder('r')

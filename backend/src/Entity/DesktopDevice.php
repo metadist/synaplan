@@ -45,6 +45,10 @@ class DesktopDevice
     #[ORM\Column(name: 'BCAPABILITIES', type: 'json', nullable: true)]
     private ?array $capabilities = null;
 
+    /** @var list<string>|null Skills the computer last reported as installed. */
+    #[ORM\Column(name: 'BENABLEDSKILLS', type: 'json', nullable: true)]
+    private ?array $enabledSkills = null;
+
     #[ORM\Column(name: 'BLASTSEEN', type: 'bigint', options: ['default' => 0])]
     private int $lastSeen = 0;
 
@@ -128,6 +132,33 @@ class DesktopDevice
     public function setCapabilities(?array $capabilities): self
     {
         $this->capabilities = $capabilities;
+
+        return $this;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getEnabledSkills(): array
+    {
+        return $this->enabledSkills ?? [];
+    }
+
+    /**
+     * True once the computer has sent an enabledSkills list, including an empty one.
+     * Null means it has never reported skills.
+     */
+    public function hasReportedSkills(): bool
+    {
+        return null !== $this->enabledSkills;
+    }
+
+    /**
+     * @param list<string>|null $enabledSkills
+     */
+    public function setEnabledSkills(?array $enabledSkills): self
+    {
+        $this->enabledSkills = $enabledSkills;
 
         return $this;
     }

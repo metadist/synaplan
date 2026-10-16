@@ -109,6 +109,73 @@ final class AgentDefinitionValidatorTest extends TestCase
         }
     }
 
+    public function testFolderNamesWithSpacesAndNonAsciiAreAccepted(): void
+    {
+        $validated = $this->validator->validate([
+            'schema' => 'agent.v1',
+            'knowledge' => [
+                'folders' => ['4:Test KB files', '9:Rechnungen 2026 — Müller'],
+                'fileIds' => [12, 12, 40],
+            ],
+        ]);
+
+        self::assertSame(
+            ['4:Test KB files', '9:Rechnungen 2026 — Müller'],
+            $validated->toArray()['knowledge']['folders'],
+        );
+        self::assertSame([12, 40], $validated->knowledgeFileIds());
+    }
+
+    public function testFolderKeyRejectsControlCharactersAndOverlongNames(): void
+    {
+        try {
+            $this->validator->validate([
+                'schema' => 'agent.v1',
+                'knowledge' => ['folders' => ["4:bad\nname"]],
+            ]);
+            self::fail('A newline in a folder name must be rejected');
+        } catch (AgentDefinitionException $e) {
+            self::assertSame('knowledge.folders.0', $e->path);
+            self::assertStringContainsString('control character', $e->getMessage());
+        }
+
+        try {
+            $this->validator->validate([
+                'schema' => 'agent.v1',
+                'knowledge' => ['folders' => ['4:'.str_repeat('a', 129)]],
+            ]);
+            self::fail('A folder key longer than 128 characters must be rejected');
+        } catch (AgentDefinitionException $e) {
+            self::assertSame('knowledge.folders.0', $e->path);
+            self::assertStringContainsString('longer than 128', $e->getMessage());
+        }
+    }
+
+    public function testRealCatalogKeysAndContactFoldersAreAccepted(): void
+    {
+        $validated = $this->validator->validate([
+            'schema' => 'agent.v1',
+            'models' => [
+                'chat' => 'groq:openai/gpt-oss-120b:chat',
+                'vision' => 'huggingface:moonshotai/kimi-k3-deepinfra:pic2text',
+                'vectorize' => 'cloudflare:@cf/baai/bge-m3:vectorize',
+            ],
+            'knowledge' => [
+                'folders' => ['1:contact:alice@example.com', '12:legal-contracts'],
+            ],
+        ]);
+
+        self::assertSame('groq:openai/gpt-oss-120b:chat', $validated->models()['chat']);
+        self::assertSame(
+            'cloudflare:@cf/baai/bge-m3:vectorize',
+            $validated->models()['vectorize'],
+        );
+        self::assertSame(
+            ['1:contact:alice@example.com', '12:legal-contracts'],
+            $validated->toArray()['knowledge']['folders'],
+        );
+    }
+
     public function testScheduleWithoutInstructionIsRejected(): void
     {
         $this->expectException(AgentDefinitionException::class);

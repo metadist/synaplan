@@ -31,6 +31,7 @@ final readonly class AgentDefinition
             'knowledge' => [
                 'ownFolder' => true,
                 'folders' => [],
+                'fileIds' => [],
                 'includeUserFiles' => false,
                 'ragLimit' => 8,
                 'ragMinScore' => 0.6,
@@ -93,6 +94,28 @@ final readonly class AgentDefinition
         }
 
         return array_values(array_filter($folders, static fn ($f): bool => is_string($f) && '' !== $f));
+    }
+
+    /**
+     * Library files this assistant searches by id, without copying them.
+     *
+     * @return list<int>
+     */
+    public function knowledgeFileIds(): array
+    {
+        $knowledge = $this->data['knowledge'] ?? [];
+        $ids = is_array($knowledge) ? ($knowledge['fileIds'] ?? []) : [];
+        if (!is_array($ids)) {
+            return [];
+        }
+        $out = [];
+        foreach ($ids as $id) {
+            if (is_int($id) && $id > 0 && !in_array($id, $out, true)) {
+                $out[] = $id;
+            }
+        }
+
+        return $out;
     }
 
     /**

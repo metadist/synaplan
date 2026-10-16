@@ -54,11 +54,14 @@ class RagController extends AbstractController
                     type: 'array',
                     items: new OA\Items(
                         properties: [
-                            new OA\Property(property: 'id', type: 'integer'),
+                            new OA\Property(property: 'chunk_id', type: 'string', example: '1842'),
+                            new OA\Property(property: 'message_id', type: 'integer', description: 'Legacy alias of file_id', example: 42),
                             new OA\Property(property: 'text', type: 'string'),
                             new OA\Property(property: 'score', type: 'number', format: 'float'),
-                            new OA\Property(property: 'file_id', type: 'integer'),
-                            new OA\Property(property: 'file_name', type: 'string'),
+                            new OA\Property(property: 'start_line', type: 'integer', nullable: true),
+                            new OA\Property(property: 'end_line', type: 'integer', nullable: true),
+                            new OA\Property(property: 'file_id', type: 'integer', example: 42),
+                            new OA\Property(property: 'file_name', type: 'string', nullable: true, example: 'Invoice March.pdf'),
                             new OA\Property(property: 'group_key', type: 'string', nullable: true),
                         ]
                     )
@@ -120,6 +123,9 @@ class RagController extends AbstractController
                     'score' => $r['distance'], // Note: VectorSearchService maps score to distance key for compatibility
                     'start_line' => $r['start_line'] ?? null,
                     'end_line' => $r['end_line'] ?? null,
+                    'file_id' => $r['file_id'] ?? $r['message_id'],
+                    'file_name' => $r['file_name'] ?? null,
+                    'group_key' => $r['group_key'] ?? null,
                 ], $results),
                 'total_results' => count($results),
                 'search_time_ms' => $searchTime,
@@ -191,6 +197,46 @@ class RagController extends AbstractController
                 'error' => 'Search failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    #[Route('/chunks/{chunkId}', name: 'chunk', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/rag/chunks/{chunkId}',
+        summary: 'Load one knowledge passage',
+        description: 'Returns the matched passage for a source the caller is allowed to read. The chat stores only the chunk id.',
+        security: [['Bearer' => []]],
+        tags: ['RAG (Retrieval-Augmented Generation)']
+    )]
+    #[OA\Parameter(name: 'chunkId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Response(
+        response: 200,
+        description: 'Passage text',
+        content: new OA\JsonContent(
+            required: ['success', 'chunkId', 'fileId', 'text', 'startLine', 'endLine'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'chunkId', type: 'string'),
+                new OA\Property(property: 'fileId', type: 'integer'),
+                new OA\Property(property: 'fileName', type: 'string', nullable: true),
+                new OA\Property(property: 'groupKey', type: 'string'),
+                new OA\Property(property: 'text', type: 'string'),
+                new OA\Property(property: 'startLine', type: 'integer'),
+                new OA\Property(property: 'endLine', type: 'integer'),
+            ]
+        )
+    )]
+    #[OA\Response(response: 404, description: 'Chunk not found')]
+    public function chunk(string $chunkId, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $passage = $this->vectorSearchService->passage($user->getId(), $chunkId);
+        if (null === $passage) {
+            return $this->json(['success' => false, 'error' => 'Passage not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json(['success' => true] + $passage);
     }
 
     /**

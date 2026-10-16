@@ -20,7 +20,9 @@ set -Eeuo pipefail
 APP_DIR=/opt/synaplan
 DEPLOY_DIR="$APP_DIR/deploy"
 DATA_MOUNT=/var/lib/synaplan
-DATA_LABEL=synaplan-data
+# XFS labels are at most 12 characters. synaplan-data is 13, and mkfs.xfs
+# rejects it with "Invalid value synaplan-data for -L option".
+DATA_LABEL=synaplan
 # Azure exposes every attached data disk under a stable, LUN-addressed path.
 # Unlike AWS there is no NVMe renaming to guess around: the template attaches
 # the data disk at LUN 0, so this is the disk and nothing else is.
@@ -182,6 +184,8 @@ prepare_data_disk() {
     elif [[ -b "$DATA_DISK" ]] && data_disk_is_blank "$DATA_DISK"; then
         log "Formatting the data disk at LUN 0 for Synaplan"
         mkfs.xfs -L "$DATA_LABEL" "$DATA_DISK"
+        # Wait for udev so blkid sees the new UUID right after mkfs.
+        command -v udevadm >/dev/null && udevadm settle --timeout=30 || true
         device="$DATA_DISK"
     else
         # No separate disk. Not the recommended layout — the ARM template always
@@ -194,15 +198,17 @@ prepare_data_disk() {
 
     install -d -m 0755 "$DATA_MOUNT"
 
-    # By UUID, not by the LUN path: Azure documents that a data disk can come
-    # back on a different controller path after a resize or a redeploy, and an
-    # fstab entry naming a path that moved leaves the VM unable to boot.
+    # By UUID in fstab, not by the LUN path: Azure documents that a data disk
+    # can come back on a different controller path after a resize or a redeploy,
+    # and an fstab entry naming a path that moved leaves the VM unable to boot.
     local uuid
     uuid="$(blkid --output value --match-tag UUID "$device")"
     if [[ -n "$uuid" ]] && ! grep -q "UUID=$uuid" /etc/fstab; then
         printf 'UUID=%s %s xfs defaults,nofail 0 2\n' "$uuid" "$DATA_MOUNT" >> /etc/fstab
     fi
-    mount "$DATA_MOUNT"
+    # Mount the device we just identified directly rather than via fstab lookup,
+    # so a slow udev UUID cache cannot fail the first mount.
+    mount "$device" "$DATA_MOUNT"
     log "Mounted the data disk at $DATA_MOUNT"
 }
 

@@ -5,7 +5,7 @@
 
 This document explains the channel-aware billing model, the ≈30 % store-commission assumption,
 and the product mapping that powers it. It is the human-readable companion to
-`App\Service\BillingService`, `App\Service\IapPricingService`, and the subscription `source` field.
+`App\Service\Billing\BillingService`, `App\Service\Iap\IapPricingService`, and the subscription `source` field.
 
 ## The three channels
 

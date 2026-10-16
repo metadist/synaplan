@@ -140,6 +140,37 @@ func TestHostConfigHardening(t *testing.T) {
 	}
 }
 
+func TestHardenedEgressShapePassesValidation(t *testing.T) {
+	t.Parallel()
+	policy, spec := liveLayout(t)
+	spec.Egress = &EgressAttachment{Network: "compute-egress-01hx7", ProxyURL: "http://10.9.0.4:3128"}
+	cfg, hc := Hardened(spec)
+	if got := string(hc.NetworkMode); got != "compute-egress-01hx7" {
+		t.Fatalf("NetworkMode = %q", got)
+	}
+	if len(hc.DNS) != 1 || hc.DNS[0] != "127.0.0.1" {
+		t.Fatalf("Dns = %v, want dead resolver", hc.DNS)
+	}
+	wantEnv := []string{
+		"HTTP_PROXY=http://10.9.0.4:3128",
+		"HTTPS_PROXY=http://10.9.0.4:3128",
+		"NO_PROXY=localhost,127.0.0.1",
+	}
+	if strings.Join(cfg.Env, "\n") != strings.Join(wantEnv, "\n") {
+		t.Fatalf("Env = %v", cfg.Env)
+	}
+	if err := ValidateHardened(cfg, hc, policy); err != nil {
+		t.Fatalf("valid egress shape rejected: %v", err)
+	}
+}
+
+func TestEgressNetworkNameIsLowercase(t *testing.T) {
+	t.Parallel()
+	if got := EgressNetworkName("01HX7ABC"); got != "compute-egress-01hx7abc" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestHardenedNeverPrivilegedEvenIfRuntimeSet(t *testing.T) {
 	t.Parallel()
 	spec := Spec{
@@ -214,6 +245,26 @@ func TestValidateHardenedRejectsWeakenedConfig(t *testing.T) {
 		{"bridge network", func(_ *container.Config, h *container.HostConfig) { h.NetworkMode = "bridge" }, policy},
 		{"container network", func(_ *container.Config, h *container.HostConfig) { h.NetworkMode = "container:abc" }, policy},
 		{"custom network", func(_ *container.Config, h *container.HostConfig) { h.NetworkMode = "compute-egress" }, policy},
+		{"egress network without DNS", func(c *container.Config, h *container.HostConfig) {
+			h.NetworkMode = "compute-egress-01hx"
+			c.Env = ProxyEnv("http://10.9.0.4:3128")
+		}, policy},
+		{"egress network with live DNS", func(c *container.Config, h *container.HostConfig) {
+			h.NetworkMode = "compute-egress-01hx"
+			h.DNS = []string{"8.8.8.8"}
+			c.Env = ProxyEnv("http://10.9.0.4:3128")
+		}, policy},
+		{"egress network with extra env", func(c *container.Config, h *container.HostConfig) {
+			h.NetworkMode = "compute-egress-01hx"
+			h.DNS = []string{"127.0.0.1"}
+			c.Env = append(ProxyEnv("http://10.9.0.4:3128"), "EVIL=1")
+		}, policy},
+		{"egress network with wrong NO_PROXY", func(c *container.Config, h *container.HostConfig) {
+			h.NetworkMode = "compute-egress-01hx"
+			h.DNS = []string{"127.0.0.1"}
+			c.Env = []string{"HTTP_PROXY=http://10.9.0.4:3128", "HTTPS_PROXY=http://10.9.0.4:3128", "NO_PROXY=x"}
+		}, policy},
+		{"offline with DNS override", func(_ *container.Config, h *container.HostConfig) { h.DNS = []string{"127.0.0.1"} }, policy},
 		{"host pid", func(_ *container.Config, h *container.HostConfig) { h.PidMode = "host" }, policy},
 		{"host ipc", func(_ *container.Config, h *container.HostConfig) { h.IpcMode = "host" }, policy},
 		{"host uts", func(_ *container.Config, h *container.HostConfig) { h.UTSMode = "host" }, policy},

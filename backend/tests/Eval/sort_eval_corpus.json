@@ -193,5 +193,25 @@
     "text": "Write a formal complaint letter about a delayed delivery and email it to me.",
     "language": "en",
     "expect": { "topic": "general", "lang": "en", "multi_step": true }
-  }
+  },
+  { "id": "websearch_no_greeting_de", "text": "Hi, wie gehts?", "language": "de", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_greeting_today_de", "text": "Hallo, wie geht es dir heute?", "language": "de", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_great_wall_de", "text": "Wie lang ist die Chinesische Mauer?", "language": "de", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_capital_en", "text": "What is the capital of Australia?", "language": "en", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_history_de", "text": "Wer war der erste Bundeskanzler?", "language": "de", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_science_de", "text": "Erkläre mir kurz die Photosynthese", "language": "de", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_code_en", "text": "Write a python function that reverses a string", "language": "en", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_joke_de", "text": "Erzähl mir einen Witz", "language": "de", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_translate_en", "text": "Translate 'good morning, how are you' into Spanish", "language": "en", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_recipe_en", "text": "I don't know what to cook tonight, any ideas?", "language": "en", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_math_de", "text": "Was ist 17 mal 23?", "language": "de", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_no_everest_en", "text": "How tall is Mount Everest?", "language": "en", "expect": { "topic": "general", "web_search": false } },
+  { "id": "websearch_yes_weather_de", "text": "Wie ist das Wetter aktuell in Frankfurt?", "language": "de", "expect": { "topic": "general", "web_search": true } },
+  { "id": "websearch_yes_fx_de", "text": "Wie steht der Dollar zum Euro?", "language": "de", "expect": { "topic": "general", "web_search": true } },
+  { "id": "websearch_yes_news_en", "text": "What happened in the news today?", "language": "en", "expect": { "topic": "general", "web_search": true } },
+  { "id": "websearch_yes_chancellor_de", "text": "Wer ist aktuell Bundeskanzler?", "language": "de", "expect": { "topic": "general", "web_search": true } },
+  { "id": "websearch_yes_opening_hours_de", "text": "Wann hat das Städel Museum heute geöffnet?", "language": "de", "expect": { "topic": "general", "web_search": true } },
+  { "id": "websearch_yes_bitcoin_en", "text": "What's the Bitcoin price right now?", "language": "en", "expect": { "topic": "general", "web_search": true } },
+  { "id": "websearch_yes_football_de", "text": "Wie hat Eintracht Frankfurt gestern gespielt?", "language": "de", "expect": { "topic": "general", "web_search": true } },
+  { "id": "websearch_yes_explicit_de", "text": "Such im Internet nach den besten Laptops unter 1000 Euro", "language": "de", "expect": { "topic": "general", "web_search": true } }
 ]

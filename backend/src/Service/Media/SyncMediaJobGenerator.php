@@ -62,16 +62,19 @@ final readonly class SyncMediaJobGenerator
     {
         $options = $job->getOptions();
         $language = is_string($options['lang'] ?? null)
-            ? (string) $options['lang']
-            : (is_string($options['language'] ?? null) ? (string) $options['language'] : 'en');
+            ? trim((string) $options['lang'])
+            : (is_string($options['language'] ?? null) ? trim((string) $options['language']) : '');
+
+        if ('' === $language) {
+            throw new \RuntimeException(sprintf('Audio job "%s" is missing language (options.lang). Refusing silent English default (#2283).', $job->getJobKey()));
+        }
 
         // synthesize() already writes the file to the user-scoped upload path and
         // returns the relative path — no extra save step needed for audio.
-        $result = $this->aiFacade->synthesize($job->getPrompt() ?? '', $job->getUserId(), [
+        $result = $this->aiFacade->synthesize($job->getPrompt() ?? '', $language, $job->getUserId(), [
             'provider' => $job->getProvider(),
             'model' => $job->getModel(),
             'format' => 'mp3',
-            'language' => $language,
         ]);
 
         $relativePath = $result['relativePath'] ?? '';
@@ -115,6 +118,9 @@ final readonly class SyncMediaJobGenerator
             throw new \RuntimeException('Failed to save generated image to disk');
         }
 
+        $renderedSize = $images[0]['size'] ?? null;
+        $this->billRenderedSize($job, is_string($renderedSize) ? $renderedSize : null);
+
         return [
             'file' => [
                 'url' => '/api/v1/files/uploads/'.$relativePath,
@@ -124,6 +130,23 @@ final readonly class SyncMediaJobGenerator
             'provider' => is_string($result['provider'] ?? null) ? $result['provider'] : $job->getProvider(),
             'model' => is_string($result['model'] ?? null) ? $result['model'] : $job->getModel(),
         ];
+    }
+
+    /**
+     * The usage payload was stashed when the job was detached, before the
+     * model chose the output size of an edit. Bill the size it rendered; the
+     * job is saved with its result when it is marked completed.
+     */
+    private function billRenderedSize(MediaJob $job, ?string $renderedSize): void
+    {
+        $billedSize = RenderedImageSize::billingKey($renderedSize);
+        $options = $job->getOptions();
+        if (null === $billedSize || !is_array($options['media_usage'] ?? null)) {
+            return;
+        }
+
+        $options['media_usage']['size'] = $billedSize;
+        $job->setOptions($options);
     }
 
     /**

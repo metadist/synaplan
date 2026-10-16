@@ -7,19 +7,89 @@
             v-model="userSearch"
             type="text"
             :placeholder="$t('admin.users.searchPlaceholder')"
-            class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+            class="w-full px-4 py-2.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
             data-testid="input-user-search"
             @input="debouncedSearchUsers"
           />
         </div>
         <button
-          class="btn-secondary px-6 py-2.5 rounded-lg font-medium"
+          type="button"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
+          data-testid="btn-add-user"
+          @click="showAddUser = !showAddUser"
+        >
+          {{ $t('admin.users.addUser') }}
+        </button>
+        <button
+          class="btn-secondary px-6 py-2.5 rounded-xl font-medium"
           data-testid="btn-refresh-users"
           @click="loadUsers()"
         >
           <Icon icon="mdi:refresh" class="w-5 h-5" />
         </button>
       </div>
+      <form
+        v-if="showAddUser"
+        class="mt-4 grid gap-3 sm:grid-cols-2"
+        data-testid="form-add-user"
+        @submit.prevent="submitAddUser"
+      >
+        <label class="block text-sm txt-secondary">
+          {{ $t('admin.users.email') }}
+          <input
+            v-model="newUser.email"
+            type="email"
+            required
+            autocomplete="off"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-add-user-email"
+          />
+        </label>
+        <label class="block text-sm txt-secondary">
+          {{ $t('admin.users.displayName') }}
+          <input
+            v-model="newUser.displayName"
+            type="text"
+            autocomplete="off"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-add-user-name"
+          />
+        </label>
+        <label class="block text-sm txt-secondary">
+          {{ $t('admin.users.password') }}
+          <input
+            v-model="newUser.password"
+            type="password"
+            required
+            minlength="8"
+            maxlength="64"
+            autocomplete="new-password"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-add-user-password"
+          />
+        </label>
+        <label class="block text-sm txt-secondary">
+          {{ $t('admin.users.level') }}
+          <select
+            v-model="newUser.level"
+            class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-add-user-level"
+          >
+            <option value="NEW">NEW</option>
+            <option value="PRO">PRO</option>
+            <option value="TEAM">TEAM</option>
+            <option value="BUSINESS">BUSINESS</option>
+          </select>
+        </label>
+        <button
+          type="submit"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium sm:col-span-2"
+          :disabled="addingUser"
+          data-testid="btn-submit-add-user"
+        >
+          {{ $t('admin.users.createUser') }}
+        </button>
+      </form>
     </div>
 
     <div class="surface-card rounded-lg p-6">
@@ -87,15 +157,24 @@
                       class="w-4 h-4 text-success"
                       :title="$t('admin.users.verified')"
                     />
+                    <span
+                      v-else
+                      class="text-xs txt-secondary"
+                      :title="$t('admin.users.notVerifiedHint')"
+                    >
+                      {{ $t('admin.users.notVerified') }}
+                    </span>
                   </div>
                 </td>
                 <td class="py-3 px-4">
                   <select
                     :value="user.level"
-                    class="px-3 py-1.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+                    class="px-3 py-1.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
                     :disabled="user.id === currentUserId"
                     :data-testid="`select-user-level-${user.id}`"
-                    @change="updateUserLevel(user.id, ($event.target as HTMLSelectElement).value)"
+                    @change="
+                      updateUserLevel(user.id, ($event.target as HTMLSelectElement).value, $event)
+                    "
                   >
                     <option value="ANONYMOUS">ANONYMOUS</option>
                     <option value="NEW">NEW</option>
@@ -135,7 +214,7 @@
                 <td class="py-3 px-4 text-right">
                   <div v-if="user.id !== currentUserId" class="flex items-center justify-end gap-1">
                     <button
-                      class="icon-ghost p-2 rounded-lg text-warning disabled:opacity-50"
+                      class="icon-ghost p-2 rounded-xl text-warning disabled:opacity-50"
                       :title="
                         impersonationDisabled
                           ? $t('admin.impersonate.disabledTitle')
@@ -148,7 +227,25 @@
                       <Icon icon="mdi:incognito" class="w-5 h-5" />
                     </button>
                     <button
-                      class="icon-ghost icon-ghost--danger p-2 rounded-lg"
+                      v-if="!user.emailVerified"
+                      type="button"
+                      class="btn-secondary px-3 py-2 rounded-xl text-xs font-medium"
+                      :data-testid="`btn-verify-user-${user.id}`"
+                      @click="confirmVerify(user)"
+                    >
+                      {{ $t('admin.users.markVerified') }}
+                    </button>
+                    <button
+                      v-if="!user.emailVerified && mailerConfigured"
+                      type="button"
+                      class="btn-secondary px-3 py-2 rounded-xl text-xs font-medium"
+                      :data-testid="`btn-resend-verification-${user.id}`"
+                      @click="resendVerification(user)"
+                    >
+                      {{ $t('admin.users.resendVerification') }}
+                    </button>
+                    <button
+                      class="icon-ghost icon-ghost--danger p-2 rounded-xl"
                       :title="$t('admin.users.delete')"
                       :data-testid="`btn-delete-user-${user.id}`"
                       @click="confirmDeleteUser(user)"
@@ -168,7 +265,7 @@
         <div v-if="totalPages > 1" class="flex justify-center gap-2 mt-6">
           <button
             :disabled="currentPage === 1"
-            class="btn-secondary px-4 py-2 rounded-lg disabled:opacity-50"
+            class="btn-secondary px-4 py-2 rounded-xl disabled:opacity-50"
             data-testid="btn-prev-page"
             @click="currentPage = Math.max(1, currentPage - 1)"
           >
@@ -177,7 +274,7 @@
           <span class="px-4 py-2 txt-primary">{{ currentPage }} / {{ totalPages }}</span>
           <button
             :disabled="currentPage === totalPages"
-            class="btn-secondary px-4 py-2 rounded-lg disabled:opacity-50"
+            class="btn-secondary px-4 py-2 rounded-xl disabled:opacity-50"
             data-testid="btn-next-page"
             @click="currentPage = Math.min(totalPages, currentPage + 1)"
           >
@@ -224,7 +321,7 @@
             </label>
             <div class="flex justify-end gap-3">
               <button
-                class="btn-secondary py-2 px-4 rounded-lg"
+                class="btn-secondary py-2 px-4 rounded-xl"
                 data-testid="btn-cancel-delete-user"
                 @click="closeDeleteModal()"
               >
@@ -232,7 +329,7 @@
               </button>
               <button
                 :disabled="!deleteConfirmed"
-                class="btn-danger py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-danger py-2 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-confirm-delete-user"
                 @click="deleteUser()"
               >
@@ -258,6 +355,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useEscapeKey } from '@/composables/useEscapeKey'
 import { isIamImpersonationDisabled } from '@/composables/useIamFeature'
+import { isMailerConfigured } from '@/utils/mailerConfigured'
 
 withDefaults(
   defineProps<{
@@ -272,6 +370,10 @@ const authStore = useAuthStore()
 const { success, error: showError } = useNotification()
 const { confirm } = useDialog()
 const router = useRouter()
+const mailerConfigured = computed(() => isMailerConfigured())
+const showAddUser = ref(false)
+const addingUser = ref(false)
+const newUser = ref({ email: '', displayName: '', password: '', level: 'NEW' })
 
 const users = ref<AdminUser[]>([])
 const usersLoading = ref(false)
@@ -324,15 +426,86 @@ function debouncedSearchUsers() {
   }, 300)
 }
 
-async function updateUserLevel(userId: number, newLevel: string) {
+async function submitAddUser(): Promise<void> {
+  addingUser.value = true
+  try {
+    await adminApi.createUserAccount({
+      email: newUser.value.email,
+      displayName: newUser.value.displayName,
+      level: newUser.value.level,
+      password: newUser.value.password,
+    })
+    newUser.value = { email: '', displayName: '', password: '', level: 'NEW' }
+    showAddUser.value = false
+    success(t('admin.users.accountCreated'))
+    await loadUsers()
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('admin.users.createFailed'))
+  } finally {
+    addingUser.value = false
+  }
+}
+
+async function confirmVerify(user: AdminUser): Promise<void> {
+  const ok = await confirm({
+    title: t('admin.users.markVerified'),
+    message: t('admin.users.markVerifiedConfirm', { email: user.email ?? '' }),
+  })
+  if (!ok) return
+  try {
+    await adminApi.markUserVerified(user.id)
+    success(t('admin.users.verifiedNow'))
+    await loadUsers()
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('admin.users.verifyFailed'))
+  }
+}
+
+async function resendVerification(user: AdminUser): Promise<void> {
+  const ok = await confirm({
+    title: t('admin.users.resendVerification'),
+    message: t('admin.users.resendVerificationConfirm', { email: user.email ?? '' }),
+  })
+  if (!ok) return
+  try {
+    await adminApi.resendUserVerification(user.id)
+    success(t('admin.users.resent'))
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('admin.users.resendFailed'))
+  }
+}
+
+async function updateUserLevel(userId: number, newLevel: string, event?: Event) {
+  const user = users.value.find((u: AdminUser) => u.id === userId)
+  const oldLevel = user?.level
+  const revertSelect = () => {
+    const select = event?.target as HTMLSelectElement | undefined
+    if (select && oldLevel) select.value = oldLevel
+  }
+  const email = user?.email ?? `#${userId}`
+
+  const confirmed = await confirm({
+    title: t('admin.users.levelConfirmTitle', { email }),
+    message:
+      newLevel === 'ADMIN'
+        ? t('admin.users.levelConfirmAdmin', { email })
+        : t('admin.users.levelConfirmMessage', { email, oldLevel, newLevel }),
+    confirmText: t('admin.users.levelConfirmAction'),
+    danger: newLevel === 'ADMIN',
+  })
+  if (!confirmed) {
+    revertSelect()
+    return
+  }
+
   try {
     await adminApi.updateUserLevel(userId, newLevel)
-    const user = users.value.find((u: AdminUser) => u.id === userId)
     if (user) {
       user.level = newLevel as 'NEW' | 'PRO' | 'TEAM' | 'BUSINESS' | 'ADMIN'
     }
     success(t('admin.users.levelUpdated', { level: newLevel }))
   } catch (error) {
+    revertSelect()
     showError(error instanceof Error ? error.message : t('admin.users.levelUpdateFailed'))
   }
 }

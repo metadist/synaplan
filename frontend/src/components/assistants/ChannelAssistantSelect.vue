@@ -2,7 +2,7 @@
   <label v-if="visible" class="block" :data-testid="testId">
     <span class="txt-secondary text-sm">{{ label }}</span>
     <select
-      class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+      class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
       :disabled="disabled"
       :value="modelValue == null ? '' : String(modelValue)"
       @change="onChange"

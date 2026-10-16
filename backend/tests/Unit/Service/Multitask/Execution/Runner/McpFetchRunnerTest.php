@@ -12,7 +12,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
-use App\Service\EncryptionService;
+use App\Service\Mcp\AtlassianToolArguments;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpToolRegistry;
@@ -21,11 +21,13 @@ use App\Service\Multitask\Execution\Runner\McpFetchRunner;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
+use App\Service\Security\EncryptionService;
 use App\Service\Security\SsrfGuard;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -39,6 +41,9 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 final class McpFetchRunnerTest extends TestCase
 {
     private const USER_ID = 7;
+
+    /** @var array<string, mixed>|null */
+    private ?array $lastCallArguments = null;
 
     /** @var list<array<string, mixed>> */
     private array $serverTools = [
@@ -64,25 +69,32 @@ final class McpFetchRunnerTest extends TestCase
         array $topicMetaRows = ['tool_mcp' => '1'],
         ?McpServerConfig $server = null,
         string $callToolResultText = 'Customer: Acme GmbH, last order #42.',
+        bool $toolIsError = false,
+        ?LoggerInterface $logger = null,
+        int $httpStatus = 200,
     ): McpFetchRunner {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
             static fn (int $owner, string $group, string $setting): ?string => $flags["{$group}.{$setting}"] ?? null,
         );
 
-        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText): MockResponse {
+        $httpFactory = function (string $method, string $url, array $options) use ($callToolResultText, $toolIsError, $httpStatus): MockResponse {
             $body = json_decode((string) ($options['body'] ?? ''), true);
             $rpcMethod = is_array($body) ? ($body['method'] ?? '') : '';
 
+            if ('tools/call' === $rpcMethod && is_array($body['params']['arguments'] ?? null)) {
+                $this->lastCallArguments = $body['params']['arguments'];
+            }
+
             $result = match ($rpcMethod) {
                 'tools/list' => ['tools' => $this->serverTools],
-                'tools/call' => ['content' => [['type' => 'text', 'text' => $callToolResultText]], 'isError' => false],
+                'tools/call' => ['content' => [['type' => 'text', 'text' => $callToolResultText]], 'isError' => $toolIsError],
                 default => [],
             };
 
             return new MockResponse(
                 (string) json_encode(['jsonrpc' => '2.0', 'id' => 1, 'result' => $result]),
-                ['http_code' => 200, 'response_headers' => ['content-type' => 'application/json']],
+                ['http_code' => 'tools/call' === $rpcMethod ? $httpStatus : 200, 'response_headers' => ['content-type' => 'application/json']],
             );
         };
 
@@ -109,7 +121,8 @@ final class McpFetchRunnerTest extends TestCase
             $clientConfig,
             new MultitaskRoutingConfig($configRepo),
             $this->promptService($topicMetaRows),
-            new NullLogger(),
+            $logger ?? new NullLogger(),
+            new AtlassianToolArguments($client, new NullLogger()),
         );
     }
 
@@ -136,10 +149,10 @@ final class McpFetchRunnerTest extends TestCase
         return new PromptService($prompts, $metaRepo, $this->createMock(EntityManagerInterface::class), new NullLogger());
     }
 
-    private function context(): NodeContext
+    private function context(string $text = 'Look up Acme GmbH in our CRM'): NodeContext
     {
         $message = $this->createMock(Message::class);
-        $message->method('getText')->willReturn('Look up Acme GmbH in our CRM');
+        $message->method('getText')->willReturn($text);
         $message->method('getUserId')->willReturn(self::USER_ID);
         $message->method('getFiles')->willReturn(new ArrayCollection([]));
         $message->method('getFileText')->willReturn('');
@@ -170,6 +183,7 @@ final class McpFetchRunnerTest extends TestCase
         $result = $this->runner(flags: [])->run($this->node(), $this->context());
 
         self::assertFalse($result->isSuccessful());
+        self::assertFalse($result->isReportableFailure());
         self::assertStringContainsString('disabled', (string) $result->error);
     }
 
@@ -195,6 +209,7 @@ final class McpFetchRunnerTest extends TestCase
         $result = $this->runner()->run($this->node(tool: 'made_up_tool'), $this->context());
 
         self::assertFalse($result->isSuccessful());
+        self::assertFalse($result->isReportableFailure());
         self::assertStringContainsString('does not exist', (string) $result->error);
     }
 
@@ -233,5 +248,101 @@ final class McpFetchRunnerTest extends TestCase
 
         // Allowlist excluding this server → invisible.
         self::assertNull(($descriptor->dynamicNote)(self::USER_ID, ['topic' => 'general', 'topic_metadata' => ['tool_mcp' => true, 'mcp_servers' => '55']]));
+    }
+
+    public function testToolErrorIsAReportableFailureAndIsLogged(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'McpFetchRunner: tool reported an error',
+            self::callback(static function (array $context): bool {
+                return 3 === $context['server_id']
+                    && 'search_customers' === $context['tool']
+                    && str_contains((string) $context['error'], 'NotFound');
+            }),
+        );
+
+        $result = $this->runner(
+            callToolResultText: 'NotFound: bucket does-not-exist-123',
+            toolIsError: true,
+            logger: $logger,
+        )->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('NotFound: bucket does-not-exist-123', (string) $result->error);
+        self::assertStringContainsString('Company CRM', (string) $result->error);
+        self::assertSame('Company CRM · search_customers', $result->metadata['query']);
+        self::assertSame(3, $result->metadata['mcp']['server_id']);
+        self::assertSame('search_customers', $result->metadata['mcp']['tool']);
+    }
+
+    public function testEmptyToolErrorStillNamesTheServer(): void
+    {
+        $result = $this->runner(callToolResultText: '   ', toolIsError: true)
+            ->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertSame('Company CRM reported an error and gave no details.', $result->error);
+    }
+
+    public function testRequestFailureDoesNotClaimTheServerReportedAnError(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'McpFetchRunner: tool request failed',
+            self::callback(static function (array $context): bool {
+                return 3 === $context['server_id']
+                    && 'search_customers' === $context['tool']
+                    && 503 === $context['status'];
+            }),
+        );
+
+        $result = $this->runner(httpStatus: 503, logger: $logger)->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertStringContainsString('could not be reached', (string) $result->error);
+        self::assertStringNotContainsString('reported an error', (string) $result->error);
+    }
+
+    public function testJiraIssueCallReceivesTheSiteFromThePastedLink(): void
+    {
+        $server = $this->server();
+        $server->setUrl('https://mcp.atlassian.com/v2/mcp');
+        $this->serverTools = [[
+            'name' => 'getJiraIssue',
+            'description' => 'Get one issue',
+            'inputSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'cloudId' => ['type' => 'string'],
+                    'issueIdOrKey' => ['type' => 'string'],
+                    'view' => ['type' => 'string', 'enum' => ['compact', 'evidence', 'full']],
+                ],
+                'required' => ['cloudId', 'issueIdOrKey'],
+            ],
+            'annotations' => ['readOnlyHint' => true],
+        ]];
+
+        $result = $this->runner(server: $server)->run(
+            new TaskNode('n1', Capability::McpFetch, [], ['arguments' => ['issueIdOrKey' => 'IN1-1']], [
+                'server_id' => 3,
+                'tool' => 'getJiraIssue',
+            ]),
+            $this->context('Was steht hier? https://deskfiler.atlassian.net/browse/IN1-1?atlOrigin=ignored'),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('https://deskfiler.atlassian.net', $this->lastCallArguments['cloudId'] ?? null);
+        self::assertSame('IN1-1', $this->lastCallArguments['issueIdOrKey'] ?? null);
+        self::assertSame('full', $this->lastCallArguments['view'] ?? null);
+    }
+
+    public function testEmptyContentStillReachesTheAnswer(): void
+    {
+        $result = $this->runner(callToolResultText: '   ')->run($this->node(), $this->context());
+
+        self::assertTrue($result->isReportableFailure());
+        self::assertStringContainsString('returned no content', (string) $result->error);
     }
 }

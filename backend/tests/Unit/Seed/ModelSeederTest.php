@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Seed;
 
+use App\Model\CatalogPriceOwnership;
 use App\Model\ModelCatalog;
 use App\Seed\ModelSeeder;
 use Doctrine\DBAL\Connection;
@@ -113,6 +114,119 @@ final class ModelSeederTest extends TestCase
         $this->assertSame(count($catalog) - 1, $result->skipped);
     }
 
+    public function testKeepsLiteLlmPriceWhenCatalogPriceHasNotMoved(): void
+    {
+        $catalog = ModelCatalog::all();
+        $target = $this->pricedCatalogRow($catalog);
+        $synced = $target;
+        $synced['priceIn'] = 123.456;
+        $synced['priceOut'] = 654.321;
+        $synced['json'][CatalogPriceOwnership::PRICE_OWNER_KEY] = CatalogPriceOwnership::PRICE_OWNER_LITELLM;
+        $synced['json'][CatalogPriceOwnership::CATALOG_PRICE_AT_SYNC_KEY] = CatalogPriceOwnership::snapshot($target);
+        $synced = $this->stampFingerprint($synced);
+
+        $existing = [];
+        foreach ($catalog as $row) {
+            $existing[] = ((int) $row['id'] === (int) $target['id'])
+                ? $synced
+                : $this->stampFingerprint($row);
+        }
+
+        $connection = $this->buildConnection(existing: $existing, expectedWrites: 0);
+        $result = (new ModelSeeder($connection, 'prod'))->seed();
+
+        $this->assertSame(0, $result->updated);
+        $this->assertSame(0, $result->preserved);
+        $this->assertSame(count($catalog), $result->skipped);
+    }
+
+    public function testAppliesCatalogPriceWhenItMovedSinceTheSync(): void
+    {
+        $catalog = ModelCatalog::all();
+        $target = $this->pricedCatalogRow($catalog);
+        $synced = $target;
+        $synced['priceIn'] = 123.456;
+        $synced['priceOut'] = 654.321;
+        $snapshot = CatalogPriceOwnership::snapshot($target);
+        $snapshot['priceIn'] = 0.01;
+        $synced['json'][CatalogPriceOwnership::PRICE_OWNER_KEY] = CatalogPriceOwnership::PRICE_OWNER_LITELLM;
+        $synced['json'][CatalogPriceOwnership::CATALOG_PRICE_AT_SYNC_KEY] = $snapshot;
+        $synced = $this->stampFingerprint($synced);
+
+        $existing = [];
+        foreach ($catalog as $row) {
+            $existing[] = ((int) $row['id'] === (int) $target['id'])
+                ? $synced
+                : $this->stampFingerprint($row);
+        }
+
+        $writtenPrice = null;
+        $connection = $this->buildConnection(
+            existing: $existing,
+            expectedWrites: 1,
+            onWrite: function (array $params) use (&$writtenPrice): void {
+                $writtenPrice = $params[7];
+            },
+        );
+        $result = (new ModelSeeder($connection, 'prod'))->seed();
+
+        $this->assertSame(1, $result->updated);
+        $this->assertSame(0, $result->preserved);
+        $this->assertEqualsWithDelta((float) $target['priceIn'], (float) $writtenPrice, 0.000001);
+    }
+
+    public function testAppliesNonPriceCatalogChangeWithoutClobberingLiteLlmPrice(): void
+    {
+        $catalog = ModelCatalog::all();
+        $target = $this->pricedCatalogRow($catalog);
+        $synced = $target;
+        $synced['name'] = 'Stale display name';
+        $synced['priceIn'] = 123.456;
+        $synced['priceOut'] = 654.321;
+        $synced['json'][CatalogPriceOwnership::PRICE_OWNER_KEY] = CatalogPriceOwnership::PRICE_OWNER_LITELLM;
+        $synced['json'][CatalogPriceOwnership::CATALOG_PRICE_AT_SYNC_KEY] = CatalogPriceOwnership::snapshot($target);
+        $synced = $this->stampFingerprint($synced);
+
+        $existing = [];
+        foreach ($catalog as $row) {
+            $existing[] = ((int) $row['id'] === (int) $target['id'])
+                ? $synced
+                : $this->stampFingerprint($row);
+        }
+
+        $written = null;
+        $connection = $this->buildConnection(
+            existing: $existing,
+            expectedWrites: 1,
+            onWrite: function (array $params) use (&$written): void {
+                $written = $params;
+            },
+        );
+        $result = (new ModelSeeder($connection, 'prod'))->seed();
+
+        $this->assertSame(1, $result->updated);
+        $this->assertSame(0, $result->preserved);
+        self::assertIsArray($written);
+        $this->assertSame($target['name'], $written[2]);
+        $this->assertEqualsWithDelta(123.456, (float) $written[7], 0.000001);
+        $this->assertEqualsWithDelta(654.321, (float) $written[9], 0.000001);
+    }
+
+    public function testPinnedCatalogPriceWinsOverAPriceOnlyDrift(): void
+    {
+        $seeder = new ModelSeeder($this->createStub(Connection::class), 'prod');
+        $decide = new \ReflectionMethod(ModelSeeder::class, 'decideAction');
+        $catalog = $this->pricedCatalogRow(ModelCatalog::all());
+        $existing = $this->stampFingerprint($catalog);
+        $existing['priceIn'] = 42.0;
+        $catalog['json'][CatalogPriceOwnership::PRICE_PINNED_KEY] = true;
+
+        $this->assertSame('update', $decide->invoke($seeder, $catalog, $existing));
+
+        $existing['name'] = 'Operator renamed this model';
+        $this->assertSame('preserve', $decide->invoke($seeder, $catalog, $existing));
+    }
+
     public function testAdoptsLegacyRowThatMatchesCatalogExactly(): void
     {
         // Legacy row predating the fingerprint: same values as the catalog,
@@ -158,9 +272,10 @@ final class ModelSeederTest extends TestCase
      * Build a Connection mock that returns the given rows for the seeder's
      * SELECT and asserts the expected number of write calls.
      *
-     * @param list<array<string, mixed>> $existing rows in catalog shape
+     * @param list<array<string, mixed>>               $existing rows in catalog shape
+     * @param (callable(array<int, mixed>): void)|null $onWrite
      */
-    private function buildConnection(array $existing, int $expectedWrites): Connection
+    private function buildConnection(array $existing, int $expectedWrites, ?callable $onWrite = null): Connection
     {
         $mock = $this->createMock(Connection::class);
 
@@ -170,11 +285,34 @@ final class ModelSeederTest extends TestCase
         $mock->method('fetchAllAssociative')->willReturn($rows);
 
         // @phpstan-ignore-next-line method.notFound
-        $mock->expects($this->exactly($expectedWrites))
-            ->method('executeStatement')
-            ->willReturn(1);
+        $expectation = $mock->expects($this->exactly($expectedWrites))->method('executeStatement');
+        if (null === $onWrite) {
+            $expectation->willReturn(1);
+        } else {
+            $expectation->willReturnCallback(function (string $sql, array $params = []) use ($onWrite): int {
+                $onWrite($params);
+
+                return 1;
+            });
+        }
 
         return $mock;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $catalog
+     *
+     * @return array<string, mixed>
+     */
+    private function pricedCatalogRow(array $catalog): array
+    {
+        foreach ($catalog as $row) {
+            if ((float) ($row['priceIn'] ?? 0) > 0) {
+                return $row;
+            }
+        }
+
+        self::fail('Catalog has no positively priced row');
     }
 
     /**

@@ -5,17 +5,24 @@
 # verified by anyone. It is still the right default — the alternative is sending
 # the administrator password over plain HTTP.
 #
+# The certificate pair below is minted by configure-tls.sh on the instance,
+# with the instance's own addresses in the SANs. NOT `tls internal`: this site
+# has no host name and a client connecting by bare IP sends no SNI, so Caddy's
+# internal issuer has no name to mint a certificate for and aborts every
+# handshake with "tlsv1 alert internal error" — behind which an entire healthy
+# stack once sat unreachable for a full verification window.
+#
 # Give the instance a domain and re-run `sudo synaplan-tls <domain>` to replace
 # this with a publicly trusted certificate.
 
 {
-	# Caddy's internal CA. No ACME request is attempted, so this works in a VPC
-	# with no outbound internet access at all.
+	# No ACME request is attempted, so this works in a VPC with no outbound
+	# internet access at all.
 	auto_https disable_redirects
 }
 
 :443 {
-	tls internal
+	tls /etc/caddy/selfsigned/cert.pem /etc/caddy/selfsigned/key.pem
 
 	encode zstd gzip
 

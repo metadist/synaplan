@@ -10,6 +10,8 @@ use App\Repository\RevectorizeRunRepository;
 use App\Service\Embedding\EmbeddingReindexService;
 use App\Service\Embedding\VectorizeBindingService;
 use App\Service\ModelConfigService;
+use App\Service\SmartSearch\Index\SearchIndexReembedder;
+use App\Service\SmartSearch\SearchModelConfigService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -60,6 +62,7 @@ final readonly class ReVectorizeMessageHandler
         RevectorizeRun::SCOPE_DOCUMENTS,
         RevectorizeRun::SCOPE_MEMORIES,
         RevectorizeRun::SCOPE_ALL,
+        RevectorizeRun::SCOPE_SEARCH,
     ];
 
     public function __construct(
@@ -70,6 +73,8 @@ final readonly class ReVectorizeMessageHandler
         private ModelConfigService $modelConfigService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private SearchIndexReembedder $searchReembedder,
+        private SearchModelConfigService $searchModels,
     ) {
     }
 
@@ -113,7 +118,11 @@ final readonly class ReVectorizeMessageHandler
         $this->em->flush();
 
         try {
-            $this->reindexService->execute($run);
+            if (RevectorizeRun::SCOPE_SEARCH === $run->getScope()) {
+                $this->searchReembedder->execute($run);
+            } else {
+                $this->reindexService->execute($run);
+            }
         } catch (\Throwable $e) {
             $run->setStatus(RevectorizeRun::STATUS_FAILED);
             $run->setError($e->getMessage());
@@ -201,6 +210,8 @@ final readonly class ReVectorizeMessageHandler
         try {
             if (in_array($scope, self::VECTORIZE_BOUND_SCOPES, true)) {
                 $this->bindingService->setVectorizeModel($fromModelId);
+            } elseif (RevectorizeRun::SCOPE_SEARCH === $scope) {
+                $this->searchModels->restoreEmbedModel($fromModelId);
             } else {
                 return;
             }

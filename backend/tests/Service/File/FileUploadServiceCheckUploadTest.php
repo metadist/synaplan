@@ -13,7 +13,7 @@ use App\Service\File\FileUploadService;
 use App\Service\File\VectorizationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
-use App\Service\StorageQuotaService;
+use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

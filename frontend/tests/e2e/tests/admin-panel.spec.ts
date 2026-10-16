@@ -29,9 +29,9 @@ test.describe('@ci Admin panel', () => {
     await login(page, CREDENTIALS.getAdminCredentials())
 
     await page.locator(selectors.nav.sidebarV2Admin).click()
-    const dropdown = page.locator(selectors.nav.navDropdown)
-    await expect(dropdown).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await dropdown.locator(selectors.nav.flyoutLinkAdminDashboard).click()
+    const panel = page.locator(selectors.nav.sidebarPanel)
+    await expect(panel).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await panel.locator(selectors.nav.flyoutLinkAdminDashboard).click()
 
     await page.locator(selectors.pages.admin).waitFor({
       state: 'visible',
@@ -137,7 +137,9 @@ test.describe('@ci Admin panel', () => {
     }
 
     await page.goto('/admin?tab=users')
-    await expect(page).toHaveURL(/\/admin\/people/)
+    // Full reload: the address bar stays on the legacy URL until the client
+    // router redirects. That is a navigation, not a 5s UI reaction.
+    await expect(page).toHaveURL(/\/admin\/people/, { timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(selectors.pages.people)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })

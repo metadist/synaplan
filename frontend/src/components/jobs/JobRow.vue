@@ -63,7 +63,7 @@ const percent = computed(() => {
         <button
           v-if="job.chatId != null"
           type="button"
-          class="rounded-md px-2 py-1 text-xs text-brand hover:bg-black/5 dark:hover:bg-white/5"
+          class="rounded-xl px-2 py-1 text-xs text-brand hover:bg-black/5 dark:hover:bg-white/5"
           data-testid="job-row-open"
           @click="emit('open', job.chatId)"
         >
@@ -71,7 +71,7 @@ const percent = computed(() => {
         </button>
         <button
           type="button"
-          class="rounded-md px-2 py-1 text-xs text-danger hover:bg-black/5 dark:hover:bg-white/5"
+          class="rounded-xl px-2 py-1 text-xs text-danger hover:bg-black/5 dark:hover:bg-white/5"
           data-testid="job-row-stop"
           @click="emit('cancel', job.jobId)"
         >

@@ -1,14 +1,29 @@
 <template>
   <MainLayout>
-    <div class="min-h-screen bg-chat p-2 md:p-4 lg:p-8 relative overflow-x-hidden">
-      <div class="max-w-7xl mx-auto h-full flex flex-col">
+    <div
+      class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 relative overflow-x-hidden"
+      data-testid="page-memories"
+    >
+      <div class="max-w-[100rem] mx-auto h-full flex flex-col">
         <!-- Header -->
         <PageHeader :title="$t('pageTitles.memories')" icon="heroicons:light-bulb">
           <template #actions>
+            <button
+              v-if="canGoBack"
+              type="button"
+              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
+              data-testid="btn-memories-back"
+              @click="router.back()"
+            >
+              <Icon icon="mdi:arrow-left" class="w-4 h-4" />
+              {{ $t('memories.backToChat') }}
+            </button>
             <!-- View Toggle -->
-            <div class="flex items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto">
+            <div
+              class="flex flex-wrap items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto"
+            >
               <button
-                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item"
                 :class="viewMode === 'list' ? 'nav-item--active' : ''"
                 @click="viewMode = 'list'"
               >
@@ -17,7 +32,17 @@
                 <span class="sm:hidden">{{ $t('memories.listView.shortTitle') }}</span>
               </button>
               <button
-                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+                v-if="longTermAvailable"
+                type="button"
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item whitespace-normal leading-tight"
+                :class="viewMode === 'longterm' ? 'nav-item--active' : ''"
+                data-testid="btn-memories-view-long-term"
+                @click="viewMode = 'longterm'"
+              >
+                {{ $t('memories.longTerm.tab') }}
+              </button>
+              <button
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item"
                 :class="viewMode === 'graph' ? 'nav-item--active' : ''"
                 @click="viewMode = 'graph'"
               >
@@ -27,7 +52,7 @@
               </button>
               <button
                 v-if="is3dSupported"
-                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item"
                 :class="viewMode === 'graph3d' ? 'nav-item--active' : ''"
                 @click="viewMode = 'graph3d'"
               >
@@ -42,15 +67,23 @@
         <!-- Views -->
         <div
           class="flex-1 surface-card rounded-xl p-3 md:p-6"
-          :class="viewMode === 'list' ? 'overflow-visible' : 'overflow-hidden'"
+          :class="
+            viewMode === 'list' || viewMode === 'longterm' ? 'overflow-visible' : 'overflow-hidden'
+          "
           :style="{
             minHeight: '500px',
-            maxHeight: viewMode === 'list' ? 'none' : 'calc(100vh - 200px)',
+            maxHeight:
+              viewMode === 'list' || viewMode === 'longterm' ? 'none' : 'calc(100vh - 200px)',
           }"
         >
+          <LongTermMemoryTab
+            v-show="viewMode === 'longterm'"
+            @availability="onLongTermAvailability"
+          />
+
           <!-- Loading State -->
           <div
-            v-if="memoriesStore.loading"
+            v-if="viewMode !== 'longterm' && memoriesStore.loading"
             class="flex flex-col items-center justify-center h-full"
           >
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-500 mb-4"></div>
@@ -59,7 +92,7 @@
 
           <!-- Error State -->
           <div
-            v-else-if="memoriesStore.error || isServiceUnavailable"
+            v-else-if="viewMode !== 'longterm' && (memoriesStore.error || isServiceUnavailable)"
             class="flex flex-col items-center justify-center h-full max-w-lg mx-auto text-center"
           >
             <Icon icon="mdi:database-alert" class="w-20 h-20 text-orange-500 mb-4" />
@@ -80,7 +113,7 @@
               </ul>
             </div>
             <button
-              class="btn-primary inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg disabled:opacity-60"
+              class="btn-primary inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl disabled:opacity-60"
               :disabled="retryingConnection"
               data-testid="memories-retry"
               @click="retryConnection"
@@ -95,11 +128,12 @@
           </div>
 
           <!-- Content Views -->
-          <template v-else>
+          <template v-else-if="viewMode !== 'longterm'">
             <MemoryListView
               v-if="viewMode === 'list'"
               :memories="memoriesStore.memories"
               :available-categories="availableCategories"
+              :highlighted-memory-id="highlightedMemoryId"
               @edit="handleEdit"
               @delete="handleDelete"
               @bulk-delete="handleBulkDelete"
@@ -144,12 +178,12 @@
         </div>
       </div>
 
-      <!-- Fullscreen Overlay wenn Memories für User deaktiviert sind -->
+      <!-- Full-screen overlay while memories are turned off for this user -->
       <Teleport to="#app">
         <div
-          v-if="!memoriesEnabledForUser"
+          v-if="!memoriesEnabledForUser && viewMode !== 'longterm'"
           class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md"
-          @click.self="router.push('/profile')"
+          @click.self="router.push(CHAT_SETTINGS_MEMORIES)"
         >
           <div
             class="surface-elevated max-w-md w-full p-8 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-300"
@@ -184,12 +218,22 @@
                 {{ $t('memories.userDisabled.enable') }}
               </button>
               <button
-                class="w-full surface-chip py-3 rounded-xl font-medium txt-secondary hover:txt-primary transition-colors flex items-center justify-center gap-2"
-                @click="router.push('/profile?highlight=memories')"
+                v-if="longTermAvailable"
+                type="button"
+                class="w-full btn-secondary px-4 py-2.5 text-sm font-medium"
+                data-testid="btn-long-term-from-overlay"
+                @click="viewMode = 'longterm'"
+              >
+                {{ $t('memories.longTerm.tab') }}
+              </button>
+              <RouterLink
+                :to="CHAT_SETTINGS_MEMORIES"
+                class="w-full btn-secondary px-4 py-2.5 text-sm font-medium inline-flex items-center justify-center gap-2"
+                data-testid="link-memories-chat-settings"
               >
                 <Icon icon="mdi:cog" class="w-5 h-5" />
-                {{ $t('pageTitles.profile') }}
-              </button>
+                {{ $t('memories.userDisabled.openSettings') }}
+              </RouterLink>
             </div>
           </div>
         </div>
@@ -210,7 +254,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
@@ -221,6 +265,7 @@ import MemoryGraphView from '@/components/MemoryGraphView.vue'
 import MemoryGraph3DView from '@/components/MemoryGraph3DView.vue'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
 import MemorySelectionCard from '@/components/memories/MemorySelectionCard.vue'
+import LongTermMemoryTab from '@/components/memories/LongTermMemoryTab.vue'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
@@ -236,12 +281,21 @@ import type {
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const CHAT_SETTINGS_MEMORIES = { path: '/settings/chat', query: { highlight: 'memories' } }
 const authStore = useAuthStore()
 const memoriesStore = useMemoriesStore()
 const { success, error, warning } = useNotification()
 const { confirm } = useDialog()
 
-const viewMode = ref<'list' | 'graph' | 'graph3d'>('list')
+const viewMode = ref<'list' | 'graph' | 'graph3d' | 'longterm'>('list')
+const longTermAvailable = ref(true)
+
+function onLongTermAvailability(available: boolean) {
+  longTermAvailable.value = available
+  if (!available && viewMode.value === 'longterm') {
+    viewMode.value = 'list'
+  }
+}
 const is3dSupported = ref(true)
 let viewportMql: MediaQueryList | null = null
 const handleViewportChange = () => {
@@ -259,11 +313,17 @@ const selectedGraphMemory = ref<UserMemory | null>(null)
 
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
 
-// The dedicated memories page must tolerate a slow first Qdrant read (e.g.
-// cold collection / CI load) instead of the store's 1500ms fast-fail default,
-// which would otherwise render the "service unavailable" branch on a healthy
-// service. See useMemoriesStore.init().
-const PAGE_MEMORY_FETCH_TIMEOUT_MS = 15000
+const canGoBack = computed(() => typeof window !== 'undefined' && window.history.length > 1)
+
+const highlightedMemoryId = computed(() => {
+  const raw = route.query.highlight
+  const value = Array.isArray(raw) ? raw[0] : raw
+  if (typeof value !== 'string' || value === '') {
+    return null
+  }
+  const memoryId = Number.parseInt(value, 10)
+  return Number.isFinite(memoryId) && memoryId > 0 ? memoryId : null
+})
 
 const graphCategoryColors: Record<string, string> = {
   preferences: '#3b82f6',
@@ -289,7 +349,7 @@ onMounted(async () => {
   update3dSupport()
 
   try {
-    await memoriesStore.init({ timeoutMs: PAGE_MEMORY_FETCH_TIMEOUT_MS })
+    await memoriesStore.init()
     availableCategories.value = await getCategories()
     isServiceUnavailable.value = false
 
@@ -300,23 +360,6 @@ onMounted(async () => {
       if (memory) {
         handleEdit(memory)
       }
-    }
-
-    // Check if we should highlight a memory from query params
-    if (route.query.highlight) {
-      const memoryId = parseInt(route.query.highlight as string)
-      // Wait a bit for the view to render
-      setTimeout(() => {
-        const memoryElement = document.querySelector(`[data-memory-id="${memoryId}"]`)
-        if (memoryElement) {
-          memoryElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          // Add temporary highlight class
-          memoryElement.classList.add('ring-2', 'ring-brand', 'bg-brand-alpha-light')
-          setTimeout(() => {
-            memoryElement.classList.remove('ring-2', 'ring-brand', 'bg-brand-alpha-light')
-          }, 2000)
-        }
-      }, 300)
     }
   } catch (err) {
     // Check if it's a service unavailable error
@@ -348,6 +391,15 @@ watch(
   }
 )
 
+watch([() => memoriesStore.memories, highlightedMemoryId], async ([list, memoryId]) => {
+  if (memoryId === null || !list.some((memory) => memory.id === memoryId)) {
+    return
+  }
+  await nextTick()
+  const memoryElement = document.querySelector(`[data-memory-id="${memoryId}"]`)
+  memoryElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+})
+
 const retryingConnection = ref(false)
 
 async function retryConnection() {
@@ -355,7 +407,7 @@ async function retryConnection() {
   retryingConnection.value = true
   isServiceUnavailable.value = false
   try {
-    await memoriesStore.init({ timeoutMs: PAGE_MEMORY_FETCH_TIMEOUT_MS })
+    await memoriesStore.init()
     availableCategories.value = await getCategories()
     isServiceUnavailable.value = false
   } catch (err) {
@@ -547,7 +599,7 @@ function handleFormDialogClose() {
 }
 
 async function loadMemories() {
-  await memoriesStore.fetchMemories(undefined, { timeoutMs: PAGE_MEMORY_FETCH_TIMEOUT_MS })
+  await memoriesStore.fetchMemories()
   availableCategories.value = await getCategories()
 }
 

@@ -1,10 +1,10 @@
 <template>
   <MainLayout>
     <div
-      class="min-h-screen bg-chat p-4 md:p-8 overflow-y-auto scroll-thin"
+      class="min-h-screen bg-chat px-3 py-4 sm:p-4 md:p-8 overflow-y-auto scroll-thin"
       data-testid="page-feature-status"
     >
-      <div class="max-w-6xl mx-auto space-y-6">
+      <div class="max-w-[100rem] mx-auto space-y-6">
         <!-- Header -->
         <PageHeader
           :title="$t('settings.features.title')"
@@ -12,6 +12,8 @@
           icon="mdi:server-network"
           data-testid="section-header"
         />
+
+        <SchedulerStatusCard />
 
         <!-- Loading State -->
         <div
@@ -44,7 +46,7 @@
         >
           <div class="txt-secondary mb-4">{{ $t('common.error') }}</div>
           <button
-            class="btn-primary px-6 py-2.5 rounded-lg"
+            class="btn-primary px-6 py-2.5 rounded-xl"
             data-testid="btn-retry-features"
             @click="loadFeatures"
           >
@@ -111,111 +113,126 @@
             :modules="featuresStatus.modules"
           />
 
-          <!-- Group features by category -->
-          <div
-            v-for="(category, categoryName) in featuresByCategory"
-            :key="categoryName"
-            class="space-y-3"
-            data-testid="section-feature-category"
-          >
-            <!-- Category Header -->
-            <div class="flex items-center gap-3 px-2 mb-4">
-              <h2 class="text-xl font-semibold txt-primary">{{ categoryName }}</h2>
-              <div class="h-px flex-1 bg-[var(--divider)]"></div>
-            </div>
+          <!-- File-work compute sidecar (absent on a backend without the compute entry) -->
+          <ComputeStatusCard
+            v-if="featuresStatus.compute"
+            :compute="featuresStatus.compute"
+            @retry="loadFeatures"
+          />
 
-            <!-- Features in this category -->
-            <div
-              v-for="feature in category"
-              :key="feature.id"
-              class="surface-card p-5 hover:shadow-md transition-shadow"
-              data-testid="item-feature"
+          <div v-if="featureCategoryIds.length > 1" class="flex justify-end">
+            <button
+              type="button"
+              class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
+              data-testid="btn-features-accordion-toggle-all"
+              @click="
+                allFeatureCategoriesOpen
+                  ? collapseAllFeatureCategories()
+                  : expandAllFeatureCategories()
+              "
             >
-              <!-- Feature Header -->
-              <div class="flex items-start justify-between gap-4 mb-3">
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap mb-2">
-                    <h3 class="text-base font-semibold txt-primary">{{ feature.name }}</h3>
+              {{
+                allFeatureCategoriesOpen
+                  ? $t('admin.config.accordion.collapseAll')
+                  : $t('admin.config.accordion.expandAll')
+              }}
+            </button>
+          </div>
 
-                    <!-- Version Badge -->
-                    <span
-                      v-if="feature.version"
-                      class="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-[var(--status-info)] text-white shadow-sm"
-                    >
-                      v{{ feature.version }}
-                    </span>
-
-                    <!-- Models Count Badge -->
-                    <span
-                      v-if="feature.models_available !== undefined && feature.models_available > 0"
-                      class="px-2.5 py-1 rounded-md text-xs font-semibold bg-[var(--brand)] text-white shadow-sm"
-                    >
-                      {{ feature.models_available }}
-                      {{
-                        feature.models_available !== 1
-                          ? $t('settings.features.models')
-                          : $t('settings.features.model')
-                      }}
-                    </span>
-                  </div>
-
-                  <!-- Feature Description -->
-                  <p class="txt-secondary text-sm">{{ feature.message }}</p>
-
-                  <!-- URL if available -->
-                  <code
-                    v-if="feature.url"
-                    class="text-xs txt-secondary font-mono opacity-60 mt-1 inline-block"
-                    >{{ feature.url }}</code
-                  >
-                </div>
-
-                <!-- Status Badge -->
-                <span
-                  :class="[
-                    'px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide whitespace-nowrap flex-shrink-0',
-                    getStatusClass(feature.status),
-                  ]"
-                >
-                  {{ feature.status }}
-                </span>
-              </div>
-
-              <!-- Setup Instructions (nur wenn Setup erforderlich) -->
-              <div v-if="feature.setup_required && feature.env_vars" class="mt-4 space-y-3">
-                <div class="flex items-center gap-2 mb-3">
-                  <div class="text-sm font-medium txt-primary">
-                    {{ $t('settings.features.requiredConfig') }}
-                  </div>
-                </div>
-
-                <!-- ENV Variables -->
+          <!-- Group features by category -->
+          <AccordionStack testid="features-accordion">
+            <AccordionSection
+              v-for="(category, categoryName) in featuresByCategory"
+              :key="categoryName"
+              :panel-id="`feature-category-${categorySlug(String(categoryName))}`"
+              :title="String(categoryName)"
+              :open="isFeatureCategoryOpen(String(categoryName))"
+              :header-testid="`btn-feature-category-${categorySlug(String(categoryName))}`"
+              @toggle="toggleFeatureCategory(String(categoryName))"
+            >
+              <div class="space-y-3" data-testid="section-feature-category">
                 <div
-                  v-for="(envVar, key) in feature.env_vars"
-                  :key="key"
-                  class="surface-elevated p-4 space-y-2"
-                  data-testid="item-env-var"
+                  v-for="feature in category"
+                  :key="feature.id"
+                  class="surface-card p-5 hover:shadow-md transition-shadow"
+                  data-testid="item-feature"
                 >
-                  <div class="flex items-center justify-between gap-3">
-                    <code class="text-sm font-mono txt-primary">{{ key }}</code>
+                  <div class="flex items-start justify-between gap-4 mb-3">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 flex-wrap mb-2">
+                        <h4 class="text-base font-semibold txt-primary">{{ feature.name }}</h4>
+                        <span
+                          v-if="feature.version"
+                          class="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-[var(--status-info)] text-white shadow-sm"
+                        >
+                          v{{ feature.version }}
+                        </span>
+                        <span
+                          v-if="
+                            feature.models_available !== undefined && feature.models_available > 0
+                          "
+                          class="px-2.5 py-1 rounded-md text-xs font-semibold bg-[var(--brand)] text-white shadow-sm"
+                        >
+                          {{ feature.models_available }}
+                          {{
+                            feature.models_available !== 1
+                              ? $t('settings.features.models')
+                              : $t('settings.features.model')
+                          }}
+                        </span>
+                      </div>
+                      <p class="txt-secondary text-sm">{{ feature.message }}</p>
+                      <code
+                        v-if="feature.url"
+                        class="text-xs txt-secondary font-mono opacity-60 mt-1 inline-block"
+                        >{{ feature.url }}</code
+                      >
+                    </div>
                     <span
                       :class="[
-                        'px-2 py-1 rounded-full text-xs font-medium',
-                        envVar.set
-                          ? 'bg-[var(--brand-alpha-light)] text-[var(--brand)]'
-                          : 'surface-chip txt-secondary',
+                        'px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide whitespace-nowrap flex-shrink-0',
+                        getStatusClass(feature.status),
                       ]"
                     >
-                      {{
-                        envVar.set ? $t('settings.features.set') : $t('settings.features.notSet')
-                      }}
+                      {{ feature.status }}
                     </span>
                   </div>
-                  <p class="text-xs txt-secondary">{{ envVar.hint }}</p>
+                  <div v-if="feature.setup_required && feature.env_vars" class="mt-4 space-y-3">
+                    <div class="flex items-center gap-2 mb-3">
+                      <div class="text-sm font-medium txt-primary">
+                        {{ $t('settings.features.requiredConfig') }}
+                      </div>
+                    </div>
+                    <div
+                      v-for="(envVar, key) in feature.env_vars"
+                      :key="key"
+                      class="surface-elevated p-4 space-y-2"
+                      data-testid="item-env-var"
+                    >
+                      <div class="flex items-center justify-between gap-3">
+                        <code class="text-sm font-mono txt-primary">{{ key }}</code>
+                        <span
+                          :class="[
+                            'px-2 py-1 rounded-full text-xs font-medium',
+                            envVar.set
+                              ? 'bg-[var(--brand-alpha-light)] text-[var(--brand)]'
+                              : 'surface-chip txt-secondary',
+                          ]"
+                        >
+                          {{
+                            envVar.set
+                              ? $t('settings.features.set')
+                              : $t('settings.features.notSet')
+                          }}
+                        </span>
+                      </div>
+                      <p class="text-xs txt-secondary">{{ envVar.hint }}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </AccordionSection>
+          </AccordionStack>
         </template>
       </div>
     </div>
@@ -227,7 +244,12 @@ import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AccordionSection from '@/components/AccordionSection.vue'
+import AccordionStack from '@/components/AccordionStack.vue'
 import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
+import ComputeStatusCard from '@/components/admin/ComputeStatusCard.vue'
+import SchedulerStatusCard from '@/components/admin/SchedulerStatusCard.vue'
+import { useAccordion } from '@/composables/useAccordion'
 import {
   getFeaturesStatus,
   FeatureStatusForbiddenError,
@@ -278,6 +300,22 @@ const featuresByCategory = computed(() => {
 
   return sorted
 })
+
+function categorySlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+const featureCategoryIds = computed(() => Object.keys(featuresByCategory.value))
+const {
+  isOpen: isFeatureCategoryOpen,
+  toggle: toggleFeatureCategory,
+  expandAll: expandAllFeatureCategories,
+  collapseAll: collapseAllFeatureCategories,
+  allOpen: allFeatureCategoriesOpen,
+} = useAccordion(featureCategoryIds)
 
 const getStatusClass = (status: string) => {
   switch (status) {

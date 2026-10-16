@@ -2,7 +2,8 @@
 
 namespace App\Controller;
 
-use App\Service\WordPressIntegrationService;
+use App\Service\Widget\WordPressIntegrationService;
+use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,6 +21,7 @@ class WordPressIntegrationController extends AbstractController
     }
 
     #[Route('/step1', name: 'step1', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step1', summary: 'WordPress setup: verify the site and create the user', tags: ['WordPress'])]
     public function step1(Request $request): JsonResponse
     {
         return $this->handle(function () use ($request) {
@@ -30,6 +32,7 @@ class WordPressIntegrationController extends AbstractController
     }
 
     #[Route('/step2', name: 'step2', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step2', summary: 'WordPress setup: create an API key', tags: ['WordPress'])]
     public function step2(Request $request): JsonResponse
     {
         return $this->handle(function () use ($request) {
@@ -45,6 +48,7 @@ class WordPressIntegrationController extends AbstractController
     }
 
     #[Route('/step3', name: 'step3', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step3', summary: 'WordPress setup: upload a file', tags: ['WordPress'])]
     public function step3(Request $request): JsonResponse
     {
         return $this->handle(function () use ($request) {
@@ -65,6 +69,7 @@ class WordPressIntegrationController extends AbstractController
     }
 
     #[Route('/step4', name: 'step4', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step4', summary: 'WordPress setup: turn on file search', tags: ['WordPress'])]
     public function step4(Request $request): JsonResponse
     {
         return $this->handle(function () use ($request) {
@@ -80,6 +85,7 @@ class WordPressIntegrationController extends AbstractController
     }
 
     #[Route('/step5', name: 'step5', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/step5', summary: 'WordPress setup: save the chat widget', tags: ['WordPress'])]
     public function step5(Request $request): JsonResponse
     {
         return $this->handle(function () use ($request) {
@@ -95,6 +101,7 @@ class WordPressIntegrationController extends AbstractController
     }
 
     #[Route('/complete', name: 'complete', methods: ['POST'])]
+    #[OA\Post(path: '/api/v1/integrations/wordpress/complete', summary: 'WordPress setup: finish the wizard', tags: ['WordPress'])]
     public function complete(Request $request): JsonResponse
     {
         return $this->handle(function () use ($request) {

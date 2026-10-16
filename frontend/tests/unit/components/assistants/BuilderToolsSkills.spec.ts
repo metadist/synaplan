@@ -5,7 +5,9 @@ import { createI18n } from 'vue-i18n'
 import BuilderToolsSkills from '@/components/assistants/BuilderToolsSkills.vue'
 import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 vi.mock('@/services/api/mcpServersApi', () => ({
   mcpServersApi: { list: vi.fn().mockResolvedValue({ servers: [] }) },
@@ -30,7 +32,7 @@ function mountTools() {
     createdAt: 1,
     updatedAt: 1,
   }
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   const wrapper = mount(BuilderToolsSkills, { global: { plugins: [i18n] } })
   return { wrapper, store }
 }

@@ -22,6 +22,19 @@ use Doctrine\DBAL\Connection;
  */
 class ModelCatalog
 {
+    /**
+     * Image models tried when the bound TEXT2PIC or PIC2PIC model cannot run (#2407).
+     * Shipped defaults are the first key. PIC2PIC still skips a row that lacks the pic2pic feature.
+     *
+     * @var list<string>
+     */
+    public const IMAGE_FALLBACK_KEYS = [
+        'openai:gpt-image-2.5-flare:text2pic',
+        'openai:gpt-image-2.5-sunburst:text2pic',
+        'google:gemini-3.1-flash-image:text2pic',
+        'google:gemini-3-pro-image:text2pic',
+    ];
+
     /** Maps DEFAULTMODEL capabilities to the model tag they require. */
     public const CAPABILITY_TAGS = [
         'CHAT' => 'chat',
@@ -44,6 +57,9 @@ class ModelCatalog
         'TEXT2SOUND' => 'text2sound',
         'PIC2TEXT' => 'pic2text',
         'SOUND2TEXT' => 'sound2text',
+        // Live speech-to-speech. Not a dictation or TTS model: the row is only
+        // offered in the VOICE_LIVE picker, never in SOUND2TEXT / TEXT2SOUND.
+        'VOICE_LIVE' => 'voice2voice',
         'VECTORIZE' => 'vectorize',
         'RERANK' => 'rerank',
     ];
@@ -70,6 +86,11 @@ class ModelCatalog
      * stored BID dead, and what replaced it?" long after the row itself stopped
      * being interesting, and what lets ModelCatalogRetirementTest fail a release
      * that drops a model without recording one.
+     *
+     * An entry here is the entire retirement. A row kept in the catalog does not
+     * repeat the fact: {@see rows()} derives its `active`/`selectable` from this
+     * registry, and RetiredModelReferenceTest fails the build if any class still
+     * falls back to the retired id.
      *
      * Fields:
      *   providerId — the upstream API model id the BID stood for. Required, and
@@ -295,40 +316,108 @@ class ModelCatalog
         // Google deprecated all Imagen 4 IDs on 2026-06-15 and hard-shut them
         // down on 2026-08-17; direct GET now answers 404, so the availability
         // check confirms them Gone. Nano Banana is the vendor-named successor;
-        // gemini-3.1-flash-image-preview (BID 190) is already the TEXT2PIC
-        // default, so all three tiers point at it rather than at the flat/ultra
-        // Gemini image variants we do not carry.
+        // The stable Nano Banana 2 id is BID 371 (gemini-3.1-flash-image).
+        // The preview id (BID 190) was itself shut down on 2026-06-25.
         115 => [
             'providerId' => 'imagen-4.0-generate-001',
             'retiredOn' => '2026-08-17',
-            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
-            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+            'successor' => 'google:gemini-3.1-flash-image:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana 2 (gemini-3.1-flash-image).',
         ],
         230 => [
             'providerId' => 'imagen-4.0-fast-generate-001',
             'retiredOn' => '2026-08-17',
-            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
-            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+            'successor' => 'google:gemini-3.1-flash-image:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana 2 (gemini-3.1-flash-image).',
         ],
         231 => [
             'providerId' => 'imagen-4.0-ultra-generate-001',
             'retiredOn' => '2026-08-17',
-            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
-            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+            'successor' => 'google:gemini-3.1-flash-image:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana 2 (gemini-3.1-flash-image).',
+        ],
+        190 => [
+            'providerId' => 'gemini-3.1-flash-image-preview',
+            'retiredOn' => '2026-06-25',
+            'successor' => 'google:gemini-3.1-flash-image:text2pic',
+            'reason' => 'Preview shut down by Google on 2026-06-25; the stable id is gemini-3.1-flash-image.',
+        ],
+        228 => [
+            'providerId' => 'nano-banana-pro-preview',
+            'retiredOn' => '2026-06-25',
+            'successor' => 'google:gemini-3-pro-image:text2pic',
+            'reason' => 'Preview id replaced by the stable Gemini 3 Pro Image model (gemini-3-pro-image).',
         ],
 
         // --- 2026-09-08 (TrustedTokens dropped the undated V4 Flash id) ---
         // Confirmed gone against https://trustedtokens.eu/api/billing/models
-        // on 2026-09-08. The dated Flash-0731 snapshot (BID 336) is still
-        // served at the same price and is the same-family successor; V4 Pro
-        // is still live but is a different (and much more expensive) tier.
+        // on 2026-09-08. The dated Flash-0731 snapshot (BID 336) was the
+        // same-family successor at the time; TrustedTokens dropped that id
+        // too on 2026-09-17, so this now points at GLM-5.3-Flash (same
+        // price, same provider) rather than at another dead model.
         335 => [
             'providerId' => 'deepseek-ai/DeepSeek-V4-Flash',
             'retiredOn' => '2026-09-08',
-            'successor' => 'trustedtokens:deepseek-ai/DeepSeek-V4-Flash-0731:chat',
-            'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Flash; migrate to DeepSeek V4 Flash 0731.',
+            'successor' => 'trustedtokens:zai-org/GLM-5.3-Flash:chat',
+            'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Flash; the dated Flash-0731 successor was itself dropped on 2026-09-17. Migrate to GLM-5.3-Flash.',
+        ],
+
+        // --- 2026-09-17 (TrustedTokens dropped remaining DeepSeek V4 ids) ---
+        // Hourly health check confirmed Gone (provider catalog 404/400) at
+        // 2026-09-17 12:16 UTC for Flash-0731 and V4 Pro. No same-family
+        // DeepSeek V4 replacement remains; GLM-5.3-Flash matches the Flash
+        // price ($0.15/$0.30), GLM-5.3 is the remaining TrustedTokens flagship.
+        336 => [
+            'providerId' => 'deepseek-ai/DeepSeek-V4-Flash-0731',
+            'retiredOn' => '2026-09-17',
+            'successor' => 'trustedtokens:zai-org/GLM-5.3-Flash:chat',
+            'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Flash-0731; migrate to GLM-5.3-Flash.',
+        ],
+        337 => [
+            'providerId' => 'deepseek-ai/DeepSeek-V4-Pro-0813',
+            'retiredOn' => '2026-09-17',
+            'successor' => 'trustedtokens:zai-org/GLM-5.3:chat',
+            'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Pro-0813; migrate to GLM-5.3.',
+        ],
+
+        // --- 2026-10-02 (OpenAI deprecation notice, shutdown 2027-04-01) ---
+        // Retired ahead of the shutdown: the model is still served, so the
+        // availability check cannot see it until 2027-04-01, when it would
+        // already fail for users. GPT-5.6 Luna is the same price tier
+        // ($0.20 vs $0.20 in, $1.20 vs $1.25 out) on the same Responses API.
+        234 => [
+            'providerId' => 'gpt-5.4-nano',
+            'retiredOn' => '2026-10-02',
+            'successor' => 'openai:gpt-5.6-luna:chat',
+            'reason' => 'Deprecated by OpenAI; access ends on 2027-04-01. Migrate to GPT-5.6 Luna.',
+        ],
+
+        // --- 2026-10-08 (OpenAI image model shutdowns, 2026-10-23 and 2026-12-01) ---
+        // Retired ahead of the shutdown, like BID 234: OpenAI still serves both
+        // ids, so the availability check would only see them once every binding
+        // already fails. GPT Image 2.5 Flare is the same provider and key on the
+        // same Responses API edit path, ranks above both on the public image-edit
+        // boards and costs less per image (high 1024²: $0.05268 vs $0.133/$0.167).
+        29 => [
+            'providerId' => 'gpt-image-1',
+            'retiredOn' => '2026-10-08',
+            'successor' => 'openai:gpt-image-2.5-flare:text2pic',
+            'reason' => 'Deprecated by OpenAI; access ends on 2026-10-23. Migrate to GPT Image 2.5 Flare.',
+        ],
+        151 => [
+            'providerId' => 'gpt-image-1.5',
+            'retiredOn' => '2026-10-08',
+            'successor' => 'openai:gpt-image-2.5-flare:text2pic',
+            'reason' => 'Deprecated by OpenAI; access ends on 2026-12-01. Migrate to GPT Image 2.5 Flare.',
         ],
     ];
+
+    /**
+     * Memoised {@see rows()} result — MODELS with RETIREMENTS applied.
+     *
+     * @var array[]|null
+     */
+    private static ?array $rows = null;
 
     /**
      * Number of decimals used to normalise float fields before fingerprinting.
@@ -336,7 +425,12 @@ class ModelCatalog
      * comfortable headroom and shields the hash from float-string round-trips
      * via Doctrine DBAL.
      */
-    private const FINGERPRINT_FLOAT_PRECISION = 6;
+    /**
+     * Decimal places kept in the catalog fingerprint. Shared with
+     * {@see CatalogPriceOwnership} so a synced price and a seeded price
+     * compare the same rounded value.
+     */
+    public const FINGERPRINT_FLOAT_PRECISION = 6;
 
     /**
      * Long-context pricing tiers, keyed by providerId.
@@ -374,10 +468,22 @@ class ModelCatalog
         // Official OpenAI pricing 2026-09-04: base $10/$50, >272k is 2x input
         // and 1.5x output for the full request (https://developers.openai.com/api/docs/models/gpt-6-astra).
         'gpt-6-astra' => ['threshold_tokens' => 272000, 'price_in_above' => 20.0, 'price_out_above' => 75.0, 'cache_price_in_above' => 2.00],
+        // Official OpenAI pricing 2026-09-24: base $2/$10, >272k is 2x input
+        // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-sol).
+        'gpt-6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.40],
+        // Official OpenAI pricing 2026-09-30: base $2/$10, cache $0.10; >272k is
+        // 2x input and cache, 1.5x output (https://developers.openai.com/api/docs/models/gpt-6.1-sol).
+        'gpt-6.1-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.20],
+        // Official OpenAI pricing 2026-09-24: base $0.10/$0.50, >272k is 2x input
+        // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-luna).
+        'gpt-6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.20, 'price_out_above' => 0.75, 'cache_price_in_above' => 0.02],
         'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.25],
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 0.60],
         'grok-4.6' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 1.00],
+        // Official xAI Text API pricing 2026-09-24: >=200k is 2x input/output
+        // and cached input ($4/$12, cache $1.00) — https://docs.x.ai/docs/models.
+        'grok-4.7' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 1.00],
     ];
 
     /**
@@ -404,16 +510,19 @@ class ModelCatalog
      * drift.
      *
      * The entry pins the LiteLLM VALUE we disagree with — not the row. It
-     * therefore silences exactly the pair a human verified and nothing else:
-     * when LiteLLM moves to the catalog rate the sync reports the entry as
-     * obsolete (delete it), when LiteLLM moves to a third value the row drifts
-     * again like any other. No date-based expiry — that would only re-create
-     * the noise the entry removes; LiteLLM's own movement is the expiry.
+     * therefore silences exactly the pair (or single cache/tier dimension) a
+     * human verified and nothing else: when LiteLLM moves to the catalog rate
+     * the sync reports the entry as obsolete (delete it), when LiteLLM moves
+     * to a third value the row drifts again like any other. No date-based
+     * expiry — that would only re-create the noise the entry removes; LiteLLM's
+     * own movement is the expiry.
      *
      * Prices are in the unit the sync compares in: USD per 1M tokens for
      * per_token rows, USD per billable unit (second / image / character) for
-     * media rows. Both sides are always pinned; a row with resolution tiers is
-     * not covered (tiers are compared individually and cannot be pinned here).
+     * media rows. In/out pins cover both sides when present; optional cache and
+     * long-context keys (`litellm_cache_read`, …) silence one dimension each.
+     * A row with resolution tiers is not covered (tiers are compared
+     * individually and cannot be pinned here).
      *
      * Adding an entry is the LAST step of a verification, never a shortcut past
      * one: the official page must show the catalog value, the source must be a
@@ -422,17 +531,36 @@ class ModelCatalog
      * can retire — every entry here is a fork of the source of truth we chose.
      *
      * Fields:
-     *   litellm_in / litellm_out — LiteLLM's current (wrong) values.
+     *   litellm_in / litellm_out — LiteLLM's current (wrong) in/out values (optional
+     *                             when only a cache/tier dimension is pinned).
+     *   litellm_cache_read / litellm_cache_write / litellm_cache_write_1h /
+     *   litellm_in_above / litellm_out_above / litellm_cache_read_above
+     *                             — optional pins for a single cache or long-context
+     *                             dimension; silence exactly that LiteLLM value.
      *   source                    — official page or API the catalog value was read from.
      *   verifiedOn                — date of that verification (YYYY-MM-DD).
      *   reason                    — what LiteLLM got wrong, plus the upstream fix if filed.
      *
-     * @var array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
+     * @var array<string, array{
+     *     litellm_in?: float,
+     *     litellm_out?: float,
+     *     litellm_cache_read?: float,
+     *     litellm_cache_write?: float,
+     *     litellm_cache_write_1h?: float,
+     *     litellm_in_above?: float,
+     *     litellm_out_above?: float,
+     *     litellm_cache_read_above?: float,
+     *     source: string,
+     *     verifiedOn: string,
+     *     reason: string
+     * }>
      */
     private const LITELLM_DEVIATIONS = [
         // Empty: LiteLLM currently agrees with every catalog price. The Jina
         // reranker entry (LiteLLM 0.018 against our verified 0.05) retired on
         // 2026-09-14 — the upstream fix landed and LiteLLM now lists 0.05.
+        // Per-dimension cache and long-context pins follow the same rule: only
+        // after the official page proved LiteLLM wrong (PRICING_MAINTENANCE.md).
     ];
 
     /**
@@ -448,7 +576,19 @@ class ModelCatalog
     /**
      * Every recorded LiteLLM deviation, keyed by {@see litellmDeviationKey()}.
      *
-     * @return array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
+     * @return array<string, array{
+     *     litellm_in?: float,
+     *     litellm_out?: float,
+     *     litellm_cache_read?: float,
+     *     litellm_cache_write?: float,
+     *     litellm_cache_write_1h?: float,
+     *     litellm_in_above?: float,
+     *     litellm_out_above?: float,
+     *     litellm_cache_read_above?: float,
+     *     source: string,
+     *     verifiedOn: string,
+     *     reason: string
+     * }>
      */
     public static function litellmDeviations(): array
     {
@@ -672,7 +812,7 @@ class ModelCatalog
         $key = strtolower($key);
         $results = [];
 
-        foreach (self::MODELS as $model) {
+        foreach (self::rows() as $model) {
             $modelKey = self::modelKey($model);
             $modelKeyWithTag = $modelKey.':'.strtolower($model['tag']);
 
@@ -692,7 +832,7 @@ class ModelCatalog
     public static function keys(): array
     {
         $keys = [];
-        foreach (self::MODELS as $model) {
+        foreach (self::rows() as $model) {
             $key = self::modelKey($model);
             if (!in_array($key, $keys, true)) {
                 $keys[] = $key;
@@ -710,7 +850,53 @@ class ModelCatalog
      */
     public static function all(): array
     {
-        return self::MODELS;
+        return self::rows();
+    }
+
+    /**
+     * The catalog rows with {@see RETIREMENTS} applied.
+     *
+     * A retired model cannot serve a request, so `active` and `selectable` are
+     * derived from the registry instead of being repeated on the row. Recording
+     * the retirement is therefore the whole edit: forgetting the flags used to
+     * ship a fresh install a row it would offer, select and bill for a model the
+     * provider had switched off.
+     *
+     * The values are memoised because both inputs are compile-time constants,
+     * so the derivation can never go stale within a process.
+     *
+     * @return array[]
+     */
+    private static function rows(): array
+    {
+        return self::$rows ??= self::withRetirementsApplied(self::MODELS);
+    }
+
+    /**
+     * Force every retired row off, whatever the catalog row itself says.
+     *
+     * Kept separate from {@see rows()} so the derivation is testable against a
+     * row that still claims to be active — the case the registry exists to make
+     * impossible.
+     *
+     * @param array[] $rows
+     *
+     * @return array[]
+     *
+     * @internal
+     */
+    public static function withRetirementsApplied(array $rows): array
+    {
+        foreach ($rows as $index => $row) {
+            if (!isset(self::RETIREMENTS[(int) ($row['id'] ?? 0)])) {
+                continue;
+            }
+
+            $rows[$index]['active'] = 0;
+            $rows[$index]['selectable'] = 0;
+        }
+
+        return $rows;
     }
 
     /**
@@ -755,6 +941,70 @@ class ModelCatalog
     }
 
     /**
+     * The closest live sibling of a model, as a catalog key a RETIREMENTS entry
+     * can carry — a starting point for a retirement, never a decision.
+     *
+     * "Closest" is the same service and the same capability tag at the nearest
+     * output price, because that is what past retirements actually chose: the
+     * shut-down TrustedTokens DeepSeek V4 Flash went to GLM-5.3-Flash at the
+     * identical $0.15/$0.30, and V4 Pro to the remaining flagship. Price, not
+     * name, is what an operator notices after the substitution.
+     *
+     * Null means the catalog offers no sibling — a real answer for an embedding
+     * model or a provider that shipped no replacement, where `successor => null`
+     * is the correct entry. The suggestion still has to be verified against the
+     * provider: a same-price row can lack a capability the retired one had.
+     */
+    public static function suggestSuccessorKey(int $bid): ?string
+    {
+        $retired = null;
+        foreach (self::rows() as $row) {
+            if ($bid === (int) $row['id']) {
+                $retired = $row;
+                break;
+            }
+        }
+
+        if (null === $retired) {
+            return null;
+        }
+
+        $service = self::normalizeProvider($retired['service']);
+        $best = null;
+
+        foreach (self::rows() as $row) {
+            if ($bid === (int) $row['id'] || 1 !== (int) ($row['active'] ?? 0)) {
+                continue;
+            }
+            if ($row['tag'] !== $retired['tag'] || self::normalizeProvider($row['service']) !== $service) {
+                continue;
+            }
+
+            $distance = abs((float) ($row['priceOut'] ?? 0.0) - (float) ($retired['priceOut'] ?? 0.0));
+            $quality = (float) ($row['quality'] ?? 0.0);
+
+            if (null === $best || $distance < $best['distance'] || ($distance === $best['distance'] && $quality > $best['quality'])) {
+                $best = ['row' => $row, 'distance' => $distance, 'quality' => $quality];
+            }
+        }
+
+        if (null === $best) {
+            return null;
+        }
+
+        $key = sprintf(
+            '%s:%s:%s',
+            strtolower((string) $best['row']['service']),
+            (string) $best['row']['providerId'],
+            (string) $best['row']['tag'],
+        );
+
+        // A key that does not resolve back to exactly one row would fail
+        // ModelCatalogRetirementTest the moment someone pasted it.
+        return null === self::findBidByKey($key) ? null : $key;
+    }
+
+    /**
      * All catalog models of a provider/service, matched via
      * {@see normalizeProvider()} (case-insensitive, aliases collapsed —
      * e.g. "groq", "Ollama", "Hugging Face").
@@ -766,7 +1016,7 @@ class ModelCatalog
         $service = self::normalizeProvider($service);
         $results = [];
 
-        foreach (self::MODELS as $model) {
+        foreach (self::rows() as $model) {
             if (self::normalizeProvider($model['service']) === $service) {
                 $results[] = $model;
             }
@@ -785,7 +1035,7 @@ class ModelCatalog
     public static function serviceNames(): array
     {
         $names = [];
-        foreach (self::MODELS as $model) {
+        foreach (self::rows() as $model) {
             $names[self::normalizeProvider($model['service'])] ??= $model['service'];
         }
 
@@ -1117,6 +1367,7 @@ class ModelCatalog
         //   - 220: Groq gpt-oss-120b      (~200 ms TTFT, $0.15/$0.60 per 1M tokens)
         //   - 221: Local Ollama gpt-oss:120b (free, latency depends on the GPU box)
         //   - 222: Anthropic Claude Sonnet 5 (highest quality, slowest)
+        //   - 386: Cerebras GPT OSS 120B  (~3,000 t/s, $0.35/$0.75 per 1M tokens)
         [
             'id' => 220,
             'service' => 'Groq',
@@ -1212,6 +1463,8 @@ class ModelCatalog
         ],
         // ==================== OPENAI MODELS ====================
         [
+            // Retired 2026-10-08 ahead of OpenAI's 2026-10-23 shutdown; see
+            // RETIREMENTS[29] (successor GPT Image 2.5 Flare).
             'id' => 29,
             'service' => 'OpenAI',
             'name' => 'gpt-image-1',
@@ -1826,7 +2079,225 @@ class ModelCatalog
                 ],
             ],
         ],
+        // ----------------------------------------------------------------
+        // GPT-6 Sol — released 2026-09-22. Sibling of GPT-6 Astra for complex
+        // coding and agentic workflows. Responses API; image input;
+        // reasoning.effort supports none / low / medium / high / xhigh / max
+        // (Chat Completions function calling requires none; prefer Responses).
+        // Pricing per 1M tokens from
+        // https://developers.openai.com/api/docs/models/gpt-6-sol
+        // (verified 2026-09-24): $2 in / $10 out, cached input $0.20,
+        // cache writes $2.50. Long-context (>272k) in CONTEXT_PRICING.
+        // ----------------------------------------------------------------
         [
+            'id' => 375,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Sol',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Sol - built for complex coding and agentic workflows. Fast, with a very large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6-sol'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $0.20/1M (0.1x); without it the
+                // non-Anthropic CostCalculationService fallback bills 50%.
+                'cache_read_price_per_1M' => 0.20,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-20',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 376,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Sol (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Sol for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6-sol'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.20,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-20',
+                ],
+            ],
+        ],
+        // ----------------------------------------------------------------
+        // GPT-6.1 Sol — released 2026-09-29. Near-Astra quality for complex
+        // coding, computer use and professional work. Responses API (Chat
+        // Completions has no tool calling); image input; reasoning.effort
+        // supports low / medium / high / xhigh / max — no `none`, unlike
+        // GPT-6 Sol. Pricing per 1M tokens from
+        // https://developers.openai.com/api/docs/models/gpt-6.1-sol
+        // (verified 2026-09-30): $2 in / $10 out, cached input $0.10,
+        // cache writes $2.50. Long-context (>272k) in CONTEXT_PRICING.
+        // ----------------------------------------------------------------
+        [
+            'id' => 381,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.1 Sol',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.1-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.1 Sol - near-Astra quality for complex coding, computer use and professional work at a fraction of the cost. Very large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6.1-sol'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $0.10/1M (0.05x); without it the
+                // non-Anthropic CostCalculationService fallback bills 50%.
+                'cache_read_price_per_1M' => 0.10,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-30',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 382,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.1 Sol (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.1-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.1 Sol for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6.1-sol'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.10,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-30',
+                ],
+            ],
+        ],
+        // ----------------------------------------------------------------
+        // GPT-6 Luna — released 2026-09-22. Efficient GPT-6 sibling for
+        // focused, high-volume tasks. Responses API; image input;
+        // reasoning.effort supports none / low / medium / high / xhigh / max
+        // (Chat Completions function calling requires none; prefer Responses).
+        // Pricing per 1M tokens from
+        // https://developers.openai.com/api/docs/models/gpt-6-luna
+        // (verified 2026-09-24): $0.10 in / $0.50 out, cached input $0.01,
+        // cache writes $0.125. Long-context (>272k) in CONTEXT_PRICING.
+        // ----------------------------------------------------------------
+        [
+            'id' => 377,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Luna',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-luna',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Luna - OpenAI\'s most efficient GPT-6 model for focused, high-volume tasks. Large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6-luna'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $0.01/1M (0.1x); without it the
+                // non-Anthropic CostCalculationService fallback bills 50%.
+                'cache_read_price_per_1M' => 0.01,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-05-18',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 378,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Luna (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-luna',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Luna for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6-luna'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.01,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-05-18',
+                ],
+            ],
+        ],
+        [
+            // Retired 2026-10-08 ahead of OpenAI's 2026-12-01 shutdown; see
+            // RETIREMENTS[151] (successor GPT Image 2.5 Flare).
             'id' => 151,
             'service' => 'OpenAI',
             'name' => 'gpt-image-1.5',
@@ -2257,6 +2728,120 @@ class ModelCatalog
             ],
         ],
         [
+            // Snapshot 2026-09-24 (https://platform.claude.com/docs/en/models/opus-5-5/overview
+            // and https://platform.claude.com/docs/en/about-claude/pricing).
+            // Claude Opus 5.5 — released 2026-09-22. Successor-tier to Opus 5
+            // for long-running agentic coding and knowledge work. Adaptive
+            // thinking always on (cannot be disabled), `effort` defaults to
+            // medium, no `temperature`. Cache reads are 0.05x base input
+            // ($0.20/1M), NOT the Anthropic-wide 0.1x — overridden below via
+            // `cache_read_price_per_1M`. Rejects forced tool_choice
+            // ({"type": "any"} / {"type": "tool", ...}) like Fable 5.1 —
+            // see AnthropicProvider / StructuredOutputCapability.
+            'id' => 373,
+            'service' => 'Anthropic',
+            'name' => 'Claude Opus 5.5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-opus-5-5',
+            'priceIn' => 4,
+            'inUnit' => 'per1M',
+            'priceOut' => 20,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Opus 5.5 - Anthropic\'s model for long-running agentic coding and knowledge work. Adaptive thinking (always on). 1M context, 128K max output.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-opus-5-5'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30'],
+                'cache_read_price_per_1M' => 0.20,
+            ],
+        ],
+        [
+            'id' => 374,
+            'service' => 'Anthropic',
+            'name' => 'Claude Opus 5.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-opus-5-5',
+            'priceIn' => 4,
+            'inUnit' => 'per1M',
+            'priceOut' => 20,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Opus 5.5 for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-opus-5-5'],
+                'features' => ['vision'],
+                'meta' => ['supports_images' => true],
+                'cache_read_price_per_1M' => 0.20,
+            ],
+        ],
+        [
+            // Snapshot 2026-09-29 (https://platform.claude.com/docs/en/models/sonnet-5-5/overview
+            // and https://platform.claude.com/docs/en/models/sonnet-5-5/migration-guide).
+            // Claude Sonnet 5.5 — released 2026-09-28. Faster, lower-cost
+            // complement to Opus 5.5 for everyday tasks. Same $2/$10 rate as
+            // Sonnet 5. Cache reads are 0.05x base input ($0.10/1M), NOT the
+            // Anthropic-wide 0.1x — overridden below via
+            // `cache_read_price_per_1M` (pricing page, verified 2026-10-08:
+            // https://platform.claude.com/docs/en/about-claude/pricing).
+            // Adaptive thinking is on when the field is omitted; the lowest
+            // setting is thinking.type between_tools (low/medium/high only).
+            // Effort also accepts xhigh and max. No temperature. Rejects forced
+            // tool_choice — see AnthropicProvider / StructuredOutputCapability.
+            'id' => 379,
+            'service' => 'Anthropic',
+            'name' => 'Claude Sonnet 5.5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-sonnet-5-5',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Sonnet 5.5 - faster Sonnet for everyday tasks, bug fixes, and polished documents. Adaptive thinking. 1M context, 128K max output.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-sonnet-5-5'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30', 'reasoning_effort_default' => 'high'],
+                'cache_read_price_per_1M' => 0.10,
+            ],
+        ],
+        [
+            'id' => 380,
+            'service' => 'Anthropic',
+            'name' => 'Claude Sonnet 5.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-sonnet-5-5',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Sonnet 5.5 for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-sonnet-5-5'],
+                'features' => ['vision'],
+                'meta' => ['supports_images' => true],
+                'cache_read_price_per_1M' => 0.10,
+            ],
+        ],
+        [
             // Snapshot 2026-05-27 (https://platform.claude.com/docs/en/about-claude/models/overview).
             'id' => 235,
             'service' => 'Anthropic',
@@ -2499,8 +3084,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Nano Banana 2 (3.1 Flash Image)',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: Google shut the preview id down on 2026-06-25.
+            // See ModelCatalog::RETIREMENTS[190]. Stable id is BID 371.
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.1-flash-image-preview',
             'priceIn' => 0,
             'inUnit' => 'perImage',
@@ -2519,6 +3106,52 @@ class ModelCatalog
                 'mode_prices' => ['output_cost_per_image' => 0.067],
                 'params' => ['model' => 'gemini-3.1-flash-image-preview'],
                 'features' => ['image', 'pic2pic'],
+                'meta' => ['max_reference_images' => 14],
+            ],
+        ],
+        [
+            'id' => 371,
+            'service' => 'Google',
+            'name' => 'Nano Banana 2',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.1-flash-image',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.067,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Nano Banana 2 (gemini-3.1-flash-image) - image generation and editing. 1K image is $0.067. Successor to the shut-down preview id.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.067],
+                'params' => ['model' => 'gemini-3.1-flash-image'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => ['max_reference_images' => 14],
+            ],
+        ],
+        [
+            'id' => 372,
+            'service' => 'Google',
+            'name' => 'Nano Banana Pro',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3-pro-image',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.134,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Nano Banana Pro (gemini-3-pro-image) - higher-fidelity image generation and editing. 1K and 2K images are $0.134; 4K is $0.24.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.134],
+                'params' => ['model' => 'gemini-3-pro-image'],
+                'features' => ['image', 'pic2pic', 'text_rendering'],
                 'meta' => ['max_reference_images' => 14],
             ],
         ],
@@ -2545,6 +3178,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-2.5-flash'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.03,
                 'meta' => ['context_window' => '1000000', 'max_output' => '65536'],
             ],
         ],
@@ -2569,6 +3205,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-2.5-flash'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.03,
             ],
         ],
         [
@@ -2639,6 +3278,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-3.1-flash-lite'],
                 'features' => ['vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.025,
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
@@ -2661,6 +3303,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-3.1-flash-lite'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.025,
                 'meta' => ['supports_images' => true, 'supports_video' => true],
             ],
         ],
@@ -2695,6 +3340,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-3.5-flash'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
                 'meta' => ['context_window' => '1000000', 'max_output' => '65536'],
             ],
         ],
@@ -2717,6 +3365,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-3.5-flash'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
                 'meta' => ['supports_images' => true, 'supports_video' => true],
             ],
         ],
@@ -2739,6 +3390,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-3-flash-preview'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.05,
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
@@ -2761,6 +3415,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-3-flash-preview'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.05,
                 'meta' => ['supports_images' => true, 'supports_video' => true],
             ],
         ],
@@ -2783,6 +3440,9 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-2.5-flash-lite'],
                 'features' => ['vision', 'audio', 'tool_use'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.01,
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
@@ -2805,6 +3465,9 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-2.5-flash-lite'],
                 'features' => ['vision'],
+                // Context caching (text/image/video), Standard paid tier —
+                // https://ai.google.dev/gemini-api/docs/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.01,
                 'meta' => ['supports_images' => true, 'supports_video' => true],
             ],
         ],
@@ -2813,8 +3476,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Nano Banana Pro',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: the preview nickname is not the stable API id.
+            // See ModelCatalog::RETIREMENTS[228]. Stable id is BID 372.
+            'selectable' => 0,
+            'active' => 0,
             // Gemini-native image model — GoogleProvider routes anything
             // matching /^gemini-.*-image/ via generateImageWithGemini(); for
             // nano-banana-pro-preview the routing lookup uses the catalog's
@@ -3838,6 +4503,9 @@ class ModelCatalog
                 'description' => 'Mistral Medium 3.5 - frontier-class multimodal model optimised for agentic and coding use cases. OpenAI-compatible chat endpoint.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'mistral-medium-latest'],
+                // Cached input, Standard tier —
+                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
                 'meta' => ['context_window' => '262144', 'max_output' => '8192'],
                 'features' => ['tool_use'],
             ],
@@ -3860,8 +4528,69 @@ class ModelCatalog
                 'description' => 'Mistral Large 3 - state-of-the-art, open-weight, general-purpose multimodal model. OpenAI-compatible chat endpoint.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'mistral-large-latest'],
+                // Cached input, Standard tier —
+                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.05,
                 'meta' => ['context_window' => '262144', 'max_output' => '8192'],
                 'features' => ['tool_use'],
+            ],
+        ],
+        [
+            // Public preview, pinned id (not mistral-large-latest, which still
+            // resolves to Large 3 / mistral-large-2512). Alias: mistral-large-4-0.
+            // Prices are the launch-discount rate the API bills
+            // (billing_model_name mistral-large-4-0-launch-discount), not the
+            // struck-through list ($1.36 / $0.14 cached / $4.18). Re-check
+            // when that discount ends.
+            // https://docs.mistral.ai/inference/pricing (2026-10-07).
+            // Cached input bills at exactly 10% of input ($0.068); the
+            // pricing page rounds it to $0.07.
+            // Context is the live /v1/models max_context_length. The model card
+            // says "1M"; the API enforces 524288.
+            'id' => 387,
+            'service' => 'Mistral',
+            'name' => 'Mistral Large 4',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'mistral-large-4',
+            'priceIn' => 0.68,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.09,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 3,
+            'json' => [
+                'description' => 'Mistral Large 4 - open-weight multimodal flagship with reasoning and tool use. 512K context. OpenAI-compatible chat endpoint. Public preview, launch pricing.',
+                'max_tokens' => 131072,
+                'params' => ['model' => 'mistral-large-4'],
+                'cache_read_price_per_1M' => 0.068,
+                'meta' => ['context_window' => '524288', 'max_output' => '131072'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+            ],
+        ],
+        [
+            'id' => 388,
+            'service' => 'Mistral',
+            'name' => 'Mistral Large 4 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'mistral-large-4',
+            'priceIn' => 0.68,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.09,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 2,
+            'json' => [
+                'description' => 'Mistral Large 4 vision - describe images and extract text via the chat endpoint. Same model as the chat row. Public preview, launch pricing.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'max_tokens' => 8192,
+                'params' => ['model' => 'mistral-large-4'],
+                'cache_read_price_per_1M' => 0.068,
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'meta' => ['supports_images' => true],
             ],
         ],
         [
@@ -3933,6 +4662,9 @@ class ModelCatalog
                 'max_tokens' => 2048,
                 'params' => ['model' => 'mistral-medium-latest'],
                 'features' => ['vision', 'ocr', 'multilingual'],
+                // Cached input, Standard tier —
+                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'cache_read_price_per_1M' => 0.15,
             ],
         ],
         // ==================== TRUSTEDTOKENS (TNG, Germany) ====================
@@ -3942,8 +4674,8 @@ class ModelCatalog
         // Not covered by LiteLLM sync — verify manually against that endpoint.
         // GLM-5.3 / GLM-5.3-Flash / DeepSeek V4 + Chimera added 2026-08-29
         // (BIDs 331–337). Existing 309–312 prices unchanged vs the 07-27 snapshot.
-        // BID 335 (DeepSeek-V4-Flash) dropped by TrustedTokens on 2026-09-08;
-        // see ModelCatalog::RETIREMENTS[335]. Flash-0731 and V4 Pro remain.
+        // BID 335 retired 2026-09-08; BIDs 336 and 337 retired 2026-09-17.
+        // See ModelCatalog::RETIREMENTS[335], [336], [337].
         [
             'id' => 309,
             'service' => 'TrustedTokens',
@@ -4202,8 +4934,11 @@ class ModelCatalog
             'service' => 'TrustedTokens',
             'name' => 'DeepSeek V4 Flash 0731',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: TrustedTokens dropped the dated V4 Flash-0731 id on
+            // 2026-09-17 (hourly health check confirmed Gone). See
+            // ModelCatalog::RETIREMENTS[336].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'deepseek-ai/DeepSeek-V4-Flash-0731',
             'priceIn' => 0.15,
             'inUnit' => 'per1M',
@@ -4230,8 +4965,11 @@ class ModelCatalog
             'service' => 'TrustedTokens',
             'name' => 'DeepSeek V4 Pro',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: TrustedTokens dropped V4 Pro-0813 on 2026-09-17
+            // (hourly health check confirmed Gone). See
+            // ModelCatalog::RETIREMENTS[337].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'deepseek-ai/DeepSeek-V4-Pro-0813',
             'priceIn' => 2.25,
             'inUnit' => 'per1M',
@@ -4431,10 +5169,70 @@ class ModelCatalog
         // ==================== xAI (GROK) ====================
         // Snapshot 2026-07-29 from https://docs.x.ai/developers/pricing;
         // Grok 4.6 rows added from the 2026-08-20 snapshot.
+        // Grok 4.7 rows added 2026-09-23; Text API pricing (incl. cached input
+        // and >200k tier) verified 2026-09-24 from https://docs.x.ai/docs/models.
         // Chat rows are covered by the LiteLLM sync (keys `xai/<providerId>`);
         // the Grok Imagine rows are not and must be verified manually.
         // Above 200K prompt tokens xAI bills the whole request at 2x — encoded
         // in self::CONTEXT_PRICING, not here.
+        [
+            'id' => 367,
+            'service' => 'xAI',
+            'name' => 'Grok 4.7',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.7',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.7 - flagship model for coding, agents and professional work with a 500K context window. Text and image input. Reasoning depth is configurable (low, medium, high, xhigh).',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'grok-4.7'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                // Official Text API pricing (<200k): cached input $0.50/1M —
+                // https://docs.x.ai/docs/models (2026-09-24).
+                'cache_read_price_per_1M' => 0.50,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '500000',
+                    'max_output' => '32768',
+                    'regions' => 'us-east-1, us-west-2',
+                ],
+            ],
+        ],
+        [
+            'id' => 368,
+            'service' => 'xAI',
+            'name' => 'Grok 4.7 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.7',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.7 image understanding - describe images and extract text (OCR-style) via the chat endpoint. Max 20 MiB per image, JPEG/PNG only.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'grok-4.7'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                // Official Text API pricing (<200k): cached input $0.50/1M —
+                // https://docs.x.ai/docs/models (2026-09-24).
+                'cache_read_price_per_1M' => 0.50,
+                'meta' => [
+                    'supports_images' => true,
+                    'max_image_bytes' => '20971520',
+                ],
+            ],
+        ],
         [
             'id' => 326,
             'service' => 'xAI',
@@ -4747,6 +5545,316 @@ class ModelCatalog
                 'features' => ['timestamps', 'diarization', 'multilingual'],
             ],
         ],
+        // ==================== META (Muse Spark and Muse Wonder) ====================
+        // OpenAI-compatible Chat Completions at https://api.meta.ai/v1 (USD per 1M).
+        // Standard tier only: prompts are not used to train Meta's models.
+        // Spark snapshot 2026-09-23 from https://developer.meta.com/ai/models/muse-spark/.
+        // The contributor id (muse-spark-1.3-contributor) is cheaper and is
+        // excluded on purpose.
+        // Wonder snapshot 2026-10-13 from https://dev.meta.ai/docs/models and
+        // https://dev.meta.ai/docs/pricing-rate-limits. Pay-as-you-go is
+        // muse-wonder-1.0 only: Contributor mode is not sold on Model API, and
+        // Muse Wonder Full exists only inside Muse Code. Meta publishes a
+        // 1,048,576-token context and no separate output cap, so the request
+        // cap matches Muse Spark (32,768). Reasoning tokens count against it.
+        [
+            'id' => 369,
+            'service' => 'Meta',
+            'name' => 'Muse Spark 1.3',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-spark-1.3',
+            'priceIn' => 1.25,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Spark 1.3 — long-horizon coding and agentic work with a 1M context window. Text, image and document input. Reasoning depth is configurable. Prompts are processed by Meta.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'muse-spark-1.3'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.15,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '1000000',
+                    'max_output' => '32768',
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 370,
+            'service' => 'Meta',
+            'name' => 'Muse Spark 1.3 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-spark-1.3',
+            'priceIn' => 1.25,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Spark 1.3 image understanding — describe images and extract text (OCR-style) via the chat endpoint. Prompts are processed by Meta.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'muse-spark-1.3'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.15,
+                'meta' => [
+                    'supports_images' => true,
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 396,
+            'service' => 'Meta',
+            'name' => 'Muse Wonder',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-wonder-1.0',
+            'priceIn' => 4.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 20.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Wonder — Meta\'s most capable model for complex coding and long-running agents. 1,048,576-token context. Text and image input. Reasoning depth is configurable. Preview. Prompts are processed by Meta.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'muse-wonder-1.0'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.20,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '1048576',
+                    'max_output' => '32768',
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 397,
+            'service' => 'Meta',
+            'name' => 'Muse Wonder (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-wonder-1.0',
+            'priceIn' => 4.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 20.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Wonder image understanding — describe images and extract text (OCR-style) via the chat endpoint. Preview. Prompts are processed by Meta.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'muse-wonder-1.0'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.20,
+                'meta' => [
+                    'supports_images' => true,
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        // Muse Image snapshot 2026-10-13 from https://dev.meta.ai/docs/image-generation
+        // and https://dev.meta.ai/docs/pricing-rate-limits. Flat $0.01 per image
+        // the API returns, including built-in search. priceIn stays 0 so the
+        // per_image path does not bill the prompt a second time.
+        [
+            'id' => 398,
+            'service' => 'Meta',
+            'name' => 'Muse Image',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-image-1.0',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.01,
+            'outUnit' => 'perImage',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Image — generate a picture from a description, or attach a picture and describe the change. $0.01 per image returned, including built-in web search. Preview. Prompts are processed by Meta.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.01],
+                'params' => ['model' => 'muse-image-1.0'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => [
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        // Muse Voice Transcribe snapshot 2026-10-13 from
+        // https://dev.meta.ai/docs/speech-to-text and
+        // https://dev.meta.ai/docs/pricing-rate-limits. $0.18 per hour, billed
+        // on whole seconds. The file endpoint only; the live WebSocket is not
+        // wired. Recordings are converted to 16 kHz mono WAV and capped at 10 minutes.
+        [
+            'id' => 399,
+            'service' => 'Meta',
+            'name' => 'Muse Voice Transcribe',
+            'tag' => 'sound2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'muse-voice-transcribe-1.0',
+            'priceIn' => 0.18,
+            'inUnit' => 'perhour',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Meta Muse Voice Transcribe — turn a recording into text. Up to 10 minutes per file. $0.18 per hour of audio. Preview. Audio is processed by Meta.',
+                'pricing_mode' => 'per_second',
+                'params' => ['model' => 'muse-voice-transcribe-1.0'],
+                'features' => ['multilingual'],
+                'meta' => [
+                    'max_audio_seconds' => 600,
+                    'host' => 'api.meta.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        // ==================== CEREBRAS (Shared Inference) ====================
+        // Snapshot 2026-10-03 from https://inference-docs.cerebras.ai/models/overview
+        // (USD per 1M, pay-as-you-go). OpenAI-compatible API at
+        // https://api.cerebras.ai/v1. Cached input is billed at the full input
+        // rate (no cache discount), so `cache_read_price_per_1M` equals priceIn —
+        // without it billing would assume the 0.5x default. Context and output
+        // limits are the paid-tier values; the free trial halves the context
+        // (65K) and caps output at 32K, which `max_tokens` stays under.
+        [
+            'id' => 383,
+            'service' => 'Cerebras',
+            'name' => 'Qwen 3.8 27B',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'qwen-3.8-27b',
+            'priceIn' => 0.99,
+            'inUnit' => 'per1M',
+            'priceOut' => 1.49,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Qwen 3.8 27B on Cerebras — dense multimodal model for agentic coding, tool use and research at ~1,850 tokens per second. Text and image input, configurable reasoning (the Thinking toggle turns it off). Prompts are processed by Cerebras (US).',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'qwen-3.8-27b'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.99,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '131072',
+                    'max_output' => '40960',
+                    'host' => 'api.cerebras.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 384,
+            'service' => 'Cerebras',
+            'name' => 'Qwen 3.8 27B (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'qwen-3.8-27b',
+            'priceIn' => 0.99,
+            'inUnit' => 'per1M',
+            'priceOut' => 1.49,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Qwen 3.8 27B on Cerebras — image understanding and OCR-style text extraction (PNG and JPEG). Reasoning is switched off for image requests. Prompts are processed by Cerebras (US).',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'qwen-3.8-27b'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.99,
+                'meta' => [
+                    'supports_images' => true,
+                    'host' => 'api.cerebras.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            'id' => 385,
+            'service' => 'Cerebras',
+            'name' => 'GPT OSS 120B',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-oss-120b',
+            'priceIn' => 0.35,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.75,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT OSS 120B on Cerebras — reasoning model for coding, document Q&A and agentic research at ~3,000 tokens per second. Text only. Reasoning cannot be switched off; the Thinking toggle lowers it to low. Prompts are processed by Cerebras (US).',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'gpt-oss-120b'],
+                'features' => ['reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.35,
+                'reasoning_effort_default' => 'high',
+                'meta' => [
+                    'context_window' => '131072',
+                    'max_output' => '40960',
+                    'license' => 'Apache-2.0',
+                    'host' => 'api.cerebras.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
+        [
+            // MEM twin of BID 385, same contract as Groq's BID 220: hidden from
+            // the chat picker, offered only in the memory-extraction dropdown.
+            'id' => 386,
+            'service' => 'Cerebras',
+            'name' => 'GPT OSS 120B',
+            'tag' => 'mem',
+            'selectable' => 0,
+            'active' => 1,
+            'providerId' => 'gpt-oss-120b',
+            'priceIn' => 0.35,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.75,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 4,
+            'json' => [
+                'description' => 'Cerebras-hosted GPT OSS 120B for memory extraction. ~3,000 tokens per second keeps the post-stream memory pipeline short. Prompts are processed by Cerebras (US).',
+                'max_tokens' => 4096,
+                'is_system' => true,
+                'params' => ['model' => 'gpt-oss-120b'],
+                'cache_read_price_per_1M' => 0.35,
+                'meta' => [
+                    'context_window' => '131072',
+                    'max_output' => '40960',
+                    'license' => 'Apache-2.0',
+                    'host' => 'api.cerebras.ai',
+                    'jurisdiction' => 'US',
+                ],
+            ],
+        ],
         [
             // Snapshot 2026-09-02 (https://platform.claude.com/docs/en/about-claude/models/whats-new-fable-5-1).
             // Claude Fable 5.1 — successor to Claude Fable 5 at the same input/
@@ -4817,7 +5925,7 @@ class ModelCatalog
             'quality' => 8,
             'rating' => 1,
             'json' => [
-                'description' => 'Perplexity Sonar — lightweight web-grounded chat. Seeded unselectable; enable it on Models & keys after adding a Perplexity key.',
+                'description' => 'Perplexity Sonar — lightweight web-grounded chat. Seeded unselectable; add a Perplexity key under AI infrastructure › Providers & keys, then enable it in the model catalog.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'sonar'],
                 'features' => ['web_search'],
@@ -4839,7 +5947,7 @@ class ModelCatalog
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'Perplexity Sonar Pro — deeper web-grounded chat. Seeded unselectable; enable it on Models & keys after adding a Perplexity key.',
+                'description' => 'Perplexity Sonar Pro — deeper web-grounded chat. Seeded unselectable; add a Perplexity key under AI infrastructure › Providers & keys, then enable it in the model catalog.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'sonar-pro'],
                 'features' => ['web_search'],
@@ -4930,6 +6038,176 @@ class ModelCatalog
                 'description' => 'Voyage AI rerank API. Seeded unselectable; enable after adding a Voyage key on the Reranking tab.',
                 'params' => ['model' => 'rerank-2'],
                 'features' => ['rerank'],
+            ],
+        ],
+        // ==================== LIVE VOICE (speech-to-speech) ====================
+        // Prices verified 2026-10-12. Voice cost shares the user's monthly
+        // budget; there is no minutes quota. See the live-voice plan.
+        [
+            'id' => 389,
+            'service' => 'OpenAI',
+            'name' => 'GPT-Live',
+            'tag' => 'voice2voice',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-live-1',
+            'priceIn' => 0.05,
+            'inUnit' => 'permin',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-Live. Full-duplex speech-to-speech. Billed per second of the session ($0.05/min). Answers still come from the user\'s chat model.',
+                'pricing_mode' => 'per_second',
+                'params' => ['model' => 'gpt-live-1'],
+                'voices' => LiveVoiceRosters::GPT_LIVE,
+                'features' => ['live_voice'],
+            ],
+        ],
+        [
+            'id' => 390,
+            'service' => 'Google',
+            'name' => 'Gemini 3.8 Live',
+            'tag' => 'voice2voice',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.8-live',
+            'priceIn' => 0.75,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Gemini 3.8 Live. Speech-to-speech. Audio is billed per token (about $0.005/min in, $0.018/min out); text uses the prices above. Answers still come from the user\'s chat model.',
+                'pricing_mode' => 'per_audio_token',
+                'audio_price_in_per_1M' => 3.0,
+                'audio_price_out_per_1M' => 12.0,
+                'params' => ['model' => 'gemini-3.8-live'],
+                'voices' => LiveVoiceRosters::GEMINI,
+                'features' => ['live_voice'],
+            ],
+        ],
+        [
+            'id' => 391,
+            'service' => 'OpenAI',
+            'name' => 'GPT Realtime 2.1',
+            'tag' => 'voice2voice',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-realtime-2.1',
+            'priceIn' => 4.0,
+            'inUnit' => 'per1M',
+            'priceOut' => 24.0,
+            'outUnit' => 'per1M',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI Realtime 2.1. Turn-based speech-to-speech. Audio is billed per token ($32 / $64 per 1M, cached audio $0.40); text uses the prices above. Answers still come from the user\'s chat model.',
+                'pricing_mode' => 'per_audio_token',
+                'audio_price_in_per_1M' => 32.0,
+                'audio_cache_in_per_1M' => 0.40,
+                'audio_price_out_per_1M' => 64.0,
+                'params' => ['model' => 'gpt-realtime-2.1'],
+                'voices' => LiveVoiceRosters::REALTIME,
+                'features' => ['live_voice'],
+            ],
+        ],
+        [
+            'id' => 392,
+            'service' => 'OpenAI',
+            'name' => 'GPT Realtime 2.1 mini',
+            'tag' => 'voice2voice',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-realtime-2.1-mini',
+            'priceIn' => 0.60,
+            'inUnit' => 'per1M',
+            'priceOut' => 2.40,
+            'outUnit' => 'per1M',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI Realtime 2.1 mini. Turn-based speech-to-speech. Audio is billed per token ($10 / $20 per 1M, cached audio $0.30); text uses the prices above. Answers still come from the user\'s chat model.',
+                'pricing_mode' => 'per_audio_token',
+                'audio_price_in_per_1M' => 10.0,
+                'audio_cache_in_per_1M' => 0.30,
+                'audio_price_out_per_1M' => 20.0,
+                'params' => ['model' => 'gpt-realtime-2.1-mini'],
+                'voices' => LiveVoiceRosters::REALTIME,
+                'features' => ['live_voice'],
+            ],
+        ],
+        [
+            'id' => 393,
+            'service' => 'Google',
+            'name' => 'Gemini 3.8 Live extended thinking',
+            'tag' => 'voice2voice',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.8-live-extended-thinking',
+            'priceIn' => 0.75,
+            'inUnit' => 'per1M',
+            'priceOut' => 4.50,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Gemini 3.8 Live with extended thinking. Same audio prices as Gemini 3.8 Live (about $0.005/min in, $0.018/min out); text uses the prices above. Answers still come from the user\'s chat model.',
+                'pricing_mode' => 'per_audio_token',
+                'audio_price_in_per_1M' => 3.0,
+                'audio_price_out_per_1M' => 12.0,
+                'params' => ['model' => 'gemini-3.8-live-extended-thinking'],
+                'voices' => LiveVoiceRosters::GEMINI,
+                'features' => ['live_voice'],
+            ],
+        ],
+        [
+            'id' => 394,
+            'service' => 'xAI',
+            'name' => 'Grok Voice 3',
+            'tag' => 'voice2voice',
+            'selectable' => 1,
+            'active' => 1,
+            // Pin the version. grok-voice-latest currently aliases this id and
+            // moves when xAI ships the next one. Verified 2026-10-15:
+            // https://docs.x.ai/developers/model-capabilities/audio/speech-to-speech
+            'providerId' => 'grok-voice-3.0',
+            'priceIn' => 0.08,
+            'inUnit' => 'permin',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok Voice 3.0. Speech-to-speech, same API and price as Grok Voice 2.0: $0.08/min plus $0.004 per text item. Function outputs are free. Answers still come from the user\'s chat model. EU data handling for this model is not confirmed.',
+                'pricing_mode' => 'per_second',
+                'text_item_price' => 0.004,
+                'params' => ['model' => 'grok-voice-3.0'],
+                'voices' => LiveVoiceRosters::GROK,
+                'features' => ['live_voice'],
+            ],
+        ],
+        [
+            'id' => 395,
+            'service' => 'Compatible',
+            'name' => 'Compatible realtime',
+            'tag' => 'voice2voice',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'qwen3-omni',
+            'priceIn' => 0,
+            'inUnit' => 'permin',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 7,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI-Realtime-compatible speech-to-speech on an endpoint you run or rent (vLLM-Omni, Azure Realtime, or Qwen Cloud). Off until LIVE_VOICE_COMPATIBLE_WS_URL is set. Synaplan does not add a per-minute price; duration is still recorded. Answers still come from the user\'s chat model.',
+                'pricing_mode' => 'per_second',
+                'params' => ['model' => 'qwen3-omni'],
+                'features' => ['live_voice'],
             ],
         ],
     ];

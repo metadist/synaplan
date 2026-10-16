@@ -22,7 +22,7 @@
                 v-model="password"
                 type="password"
                 required
-                class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
+                class="w-full px-4 py-3 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
                 :class="{ 'ring-2 ring-red-500': passwordErrors.length > 0 }"
                 placeholder="Enter new password"
                 data-testid="input-new-password"
@@ -47,7 +47,7 @@
                 v-model="confirmPassword"
                 type="password"
                 required
-                class="w-full px-4 py-3 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
+                class="w-full px-4 py-3 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
                 placeholder="Confirm new password"
                 data-testid="input-confirm-password"
               />
@@ -66,7 +66,7 @@
 
             <Button
               type="submit"
-              class="w-full btn-primary py-3 rounded-lg font-medium"
+              class="w-full btn-primary py-3 rounded-xl font-medium"
               :disabled="loading || password !== confirmPassword"
               data-testid="btn-reset-password"
             >
@@ -98,7 +98,7 @@
           <p class="txt-secondary mb-6">Your password has been successfully reset.</p>
           <router-link
             to="/login"
-            class="btn-primary px-6 py-3 rounded-lg inline-block"
+            class="btn-primary px-6 py-3 rounded-xl inline-block"
             data-testid="link-reset-login"
           >
             Go to Login

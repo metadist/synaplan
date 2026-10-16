@@ -13,6 +13,8 @@ use App\Service\Iam\Permission;
  */
 final readonly class PluginResourceKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     /**
      * @param list<Permission> $permissions
      */
@@ -68,7 +70,7 @@ final readonly class PluginResourceKind implements ShareableResourceKindInterfac
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
     }
 

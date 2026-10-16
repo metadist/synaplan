@@ -36,6 +36,29 @@ final class OpenApiImporterTest extends TestCase
         $this->assertSame(0, $result['dropped']);
     }
 
+    public function testDescriptionWinsAndAMarkedPostCanStayReadOnly(): void
+    {
+        $importer = new OpenApiImporter($this->createMock(HttpClientInterface::class), new SsrfGuard());
+        $result = $importer->previewFromDocument(json_encode([
+            'openapi' => '3.0.3',
+            'paths' => [
+                '/search' => [
+                    'post' => [
+                        'operationId' => 'search',
+                        'summary' => 'Search',
+                        'description' => 'Search the catalog and return matches. Does not change anything.',
+                        'x-synaplan-side-effect' => 'read',
+                    ],
+                ],
+            ],
+        ], \JSON_THROW_ON_ERROR));
+
+        $op = $result['operations'][0];
+        $this->assertSame('Search', $op['summary']);
+        $this->assertSame('Search the catalog and return matches. Does not change anything.', $op['description']);
+        $this->assertSame('read', $op['sideEffect']);
+    }
+
     public function testRemoteRefIsRejected(): void
     {
         $importer = new OpenApiImporter($this->createMock(HttpClientInterface::class), new SsrfGuard());

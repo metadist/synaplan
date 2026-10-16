@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\Persistence\ManagerRegistry;
 
 class UserRepository extends ServiceEntityRepository
@@ -13,9 +14,54 @@ class UserRepository extends ServiceEntityRepository
         parent::__construct($registry, User::class);
     }
 
+    /**
+     * Next page of numeric ids, ordered, for an everyone-share fan-out.
+     * A short page means there are no further users.
+     *
+     * @return list<int>
+     */
+    public function findIdsAfter(int $afterId, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        $ids = $this->createQueryBuilder('u')
+            ->select('u.id')
+            ->andWhere('u.id > :afterId')
+            ->setParameter('afterId', $afterId)
+            ->orderBy('u.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return array_map(static fn (mixed $id): int => (int) $id, $ids);
+    }
+
     public function findByEmail(string $email): ?User
     {
         return $this->findOneBy(['mail' => $email]);
+    }
+
+    /**
+     * Another account that already uses this sign-in email, ignoring case.
+     * The signed-in user's own row is excluded so an unchanged address is free.
+     */
+    public function findOtherByNormalizedEmail(string $email, int $userId): ?User
+    {
+        $normalized = mb_strtolower(trim($email));
+        if ('' === $normalized) {
+            return null;
+        }
+
+        return $this->createQueryBuilder('u')
+            ->where('LOWER(u.mail) = :email')
+            ->andWhere('u.id != :userId')
+            ->setParameter('email', $normalized)
+            ->setParameter('userId', $userId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**
@@ -33,14 +79,20 @@ class UserRepository extends ServiceEntityRepository
     private const SEARCHABLE_NAME_KEYS = ['full_name', 'first_name', 'last_name', 'firstName', 'lastName', 'display_name'];
 
     /**
-     * People picker: match the email address or one of the name fields.
+     * User picker: match the email address or one of the name fields.
+     *
+     * @param list<int>|null $onlyUserIds when set, only these accounts can match.
+     *                                    An empty list matches nobody.
      *
      * @return list<User>
      */
-    public function searchByEmailOrName(string $query, int $limit = 20): array
+    public function searchByEmailOrName(string $query, int $limit = 20, ?array $onlyUserIds = null): array
     {
         $query = trim($query);
         if (mb_strlen($query) < self::SEARCH_MIN_LENGTH) {
+            return [];
+        }
+        if (null !== $onlyUserIds && [] === $onlyUserIds) {
             return [];
         }
 
@@ -49,9 +101,14 @@ class UserRepository extends ServiceEntityRepository
         foreach (self::SEARCHABLE_NAME_KEYS as $key) {
             $nameMatches[] = sprintf("JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.%s')) LIKE :q ESCAPE '!'", $key);
         }
+        $idClause = '';
+        if (null !== $onlyUserIds) {
+            $idClause = ' AND BID IN ('.implode(',', array_map(static fn (int $id): string => (string) $id, $onlyUserIds)).')';
+        }
         $sql = sprintf(
-            "SELECT BID FROM BUSER WHERE BMAIL LIKE :q ESCAPE '!' OR %s ORDER BY BMAIL ASC LIMIT %d",
+            "SELECT BID FROM BUSER WHERE (BMAIL LIKE :q ESCAPE '!' OR %s)%s ORDER BY BMAIL ASC LIMIT %d",
             implode(' OR ', $nameMatches),
+            $idClause,
             max(1, $limit),
         );
 
@@ -94,6 +151,25 @@ class UserRepository extends ServiceEntityRepository
     public function countAll(): int
     {
         return $this->count([]);
+    }
+
+    /**
+     * Number of administrators, locking every admin row for update.
+     *
+     * MUST be called inside a transaction — the PESSIMISTIC_WRITE lock is what
+     * stops two concurrent demotions from both observing a count of 2 and
+     * together removing the last administrator (a second demotion blocks,
+     * then sees the committed count and is refused).
+     */
+    public function countAdminsForUpdate(): int
+    {
+        return (int) $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('u.userLevel = :level')
+            ->setParameter('level', 'ADMIN')
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getSingleScalarResult();
     }
 
     /**

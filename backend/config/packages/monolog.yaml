@@ -57,6 +57,6 @@ when@test:
             main:
                 type: stream
                 path: php://stderr
-                level: error
+                level: '%env(default:log_level_test:LOG_LEVEL)%'
                 formatter: app.monolog_formatter
                 process_psr_3_messages: false

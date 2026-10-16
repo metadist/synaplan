@@ -17,7 +17,7 @@ const i18n = createI18n({
           owner: 'from {name}',
           sourceGroup: 'This chat belongs to {owner}. It reached you through the group "{name}".',
           sourceEveryone:
-            'This chat belongs to {owner}. It was shared with everyone in this organization.',
+            'This chat belongs to {owner}. It was shared with everyone who has an account.',
           sourceDirect: 'This chat belongs to {owner}. It was shared with you personally.',
           pill: {
             group: 'Group',
@@ -66,7 +66,7 @@ describe('SharedConversationBanner', () => {
       mountBanner({ sharedVia: { type: 'everyone', name: '' } })
         .get('[data-testid="text-shared-conversation-source"]')
         .text()
-    ).toContain('everyone in this organization')
+    ).toContain('everyone who has an account')
     expect(
       mountBanner({ sharedVia: { type: 'user', name: 'Alice' } })
         .get('[data-testid="text-shared-conversation-source"]')
@@ -81,7 +81,7 @@ describe('SharedConversationBanner', () => {
     const wrapper = mountBanner({ canContinue: true, access: 'use' })
     const button = wrapper.get('[data-testid="btn-continue-as-copy"]')
     expect(button.classes()).toEqual(
-      expect.arrayContaining(['btn-primary', 'px-4', 'py-2.5', 'rounded-lg'])
+      expect.arrayContaining(['btn-primary', 'px-4', 'py-2.5', 'rounded-xl'])
     )
     await button.trigger('click')
     expect(wrapper.emitted('continue')).toHaveLength(1)

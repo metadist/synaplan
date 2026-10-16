@@ -41,6 +41,65 @@ fail() {
 command -v jq >/dev/null 2>&1 || fail 'jq is required to run this suite; the image installs it in provision.sh'
 
 # --------------------------------------------------------------------------
+# Static invariants on the Azure image, units, and shared host TLS layer
+# --------------------------------------------------------------------------
+
+# mkfs.xfs -L rejects anything longer than 12 characters.
+data_label="$(sed -n 's/^DATA_LABEL=//p' "$FIRSTBOOT" | head -n1)"
+[[ -n "$data_label" ]] || fail "firstboot.sh no longer defines DATA_LABEL on its own line; update this test"
+if (( ${#data_label} > 12 )); then
+    fail "DATA_LABEL is ${#data_label} characters ($data_label); XFS labels are at most 12, and mkfs.xfs -L will refuse to format the data disk"
+fi
+
+# A unit that is WantedBy=multi-user.target must not order itself after
+# cloud-init.target or cloud-final.service: both sit after multi-user.target,
+# which closes an ordering cycle that systemd resolves by deleting the unit's
+# start job.
+for unit in "$DEPLOY_ROOT/azure/systemd/"*.service; do
+    grep -Eq '^WantedBy=.*multi-user\.target' "$unit" || continue
+    if grep -Eq '^(After|Wants|Requires)=.*cloud-(init\.target|final\.service)' "$unit"; then
+        fail "$(basename "$unit") is WantedBy=multi-user.target and orders itself after cloud-init — that is an ordering cycle"
+    fi
+done
+
+# Wrappers, never symlinks: every published script locates lib.sh relative to
+# its own path, and through a symlink that path is /usr/local/bin.
+if grep -E '^[[:space:]]*ln\b' "$AZURE_SCRIPTS_DIR/provision.sh" | grep -q '/usr/local/bin/'; then
+    fail "provision.sh symlinks a command into /usr/local/bin; publish an exec wrapper instead, or the command cannot find lib.sh next to its real path"
+fi
+
+# Caddy log ownership and LogsDirectory=caddy under ProtectSystem=strict.
+grep -Fq 'LogsDirectory=caddy' "$AZURE_SCRIPTS_DIR/provision.sh" ||
+    fail "provision.sh does not set LogsDirectory=caddy; Caddy cannot write /var/log/caddy/synaplan.log under ProtectSystem=strict"
+grep -Fq 'LogsDirectory=caddy' "$DEPLOY_ROOT/host/configure-tls.sh" ||
+    fail "deploy/host/configure-tls.sh does not set LogsDirectory=caddy"
+for script in "$AZURE_SCRIPTS_DIR/provision.sh" "$DEPLOY_ROOT/host/configure-tls.sh"; do
+    awk '
+        { line = $0; sub(/^[[:space:]]*/, "", line) }
+        index(line, "#") == 1 { next }
+        /caddy validate/ { validate = NR }
+        /chown -R caddy:caddy \/var\/log\/caddy/ { restored = NR }
+        END { exit !(validate && restored > validate) }
+    ' "$script" || fail "$(basename "$script") runs caddy validate without a chown -R caddy:caddy /var/log/caddy afterwards"
+done
+
+# Self-signed certificate for bare IP connections (no SNI).
+selfsigned_caddyfile="$DEPLOY_ROOT/host/caddy/Caddyfile.selfsigned"
+if grep -Eq '^[[:space:]]*tls[[:space:]]+internal([[:space:]]|$)' "$selfsigned_caddyfile"; then
+    fail "deploy/host/caddy/Caddyfile.selfsigned uses tls internal, which cannot answer a client connecting by bare IP"
+fi
+grep -Fq '/etc/caddy/selfsigned/cert.pem' "$selfsigned_caddyfile" ||
+    fail "deploy/host/caddy/Caddyfile.selfsigned does not serve the minted pair under /etc/caddy/selfsigned/"
+grep -Fq 'openssl req' "$DEPLOY_ROOT/host/configure-tls.sh" ||
+    fail "deploy/host/configure-tls.sh does not mint the self-signed certificate"
+
+# Centrifugo config bind-mount must be staged into the Azure image.
+grep -Fq '_docker/centrifugo' "$DEPLOY_ROOT/azure/packer/synaplan.pkr.hcl" ||
+    fail "deploy/azure/packer/synaplan.pkr.hcl does not copy _docker/centrifugo into the image"
+grep -Fq '_docker/' "$AZURE_SCRIPTS_DIR/provision.sh" ||
+    fail "deploy/azure/scripts/provision.sh does not install _docker/ under /opt/synaplan/_docker"
+
+# --------------------------------------------------------------------------
 # The VM, as far as firstboot.sh can tell
 # --------------------------------------------------------------------------
 

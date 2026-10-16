@@ -607,5 +607,41 @@
         "image_generation"
       ]
     }
+  },
+  {
+    "id": "script_headline_on_attached_image",
+    "text": "Write a python script and apply a white \"synaplan\" headline across the attached image.",
+    "language": "en",
+    "attach": {
+      "type": "jpg",
+      "path": "st60-hq720.jpg"
+    },
+    "expect": {
+      "capabilities": [
+        "code_run"
+      ],
+      "forbid": [
+        "image_generation",
+        "chat"
+      ]
+    }
+  },
+  {
+    "id": "script_csv_totals",
+    "text": "Run a python script on the attached CSV that prints the column totals.",
+    "language": "en",
+    "attach": {
+      "type": "csv",
+      "path": "sales.csv"
+    },
+    "expect": {
+      "capabilities": [
+        "code_run"
+      ],
+      "forbid": [
+        "chat",
+        "file_analysis"
+      ]
+    }
   }
 ]

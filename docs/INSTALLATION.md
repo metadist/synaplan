@@ -9,6 +9,12 @@ Synaplan has separate development and production deployment contracts:
 - **Local development:** use the root `docker-compose.yml` or
   `docker-compose-minimal.yml`. These files build from source and include
   development tooling. They are not the supported production contract.
+- **Quickstart from the published image:** download
+  `deploy/quickstart/compose.yaml` into an empty folder and run
+  `docker compose up -d`, or paste it into a Docker GUI (Portainer, Dockge,
+  Synology). No git checkout and no `.env` are required; the optional settings
+  are in `deploy/quickstart/.env.example`. See the root README section
+  "Published image, no git checkout".
 - **Production self-hosting:** use `deploy/compose.yaml` with a pinned Synaplan
   image version and secrets supplied through `deploy/.env`.
 - **Elestio evaluation:** import the repository as a custom Docker Compose
@@ -28,11 +34,16 @@ Synaplan has been accepted into Elestio's Fully Managed Catalog.
 
 - Docker Engine and Docker Compose v2
 - A Linux server with at least 4 vCPU, 8 GB RAM, and sufficient persistent disk
-- A DNS name and HTTPS-capable reverse proxy or managed platform
+- HTTPS for anyone off this machine. A public name uses your own reverse proxy.
+  A network with no public route uses the opt-in local-network certificate
+  ([Local network](../README.md#local-network)): any IPv4 address that network
+  uses, including `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
+  `100.64.0.0/10`, `169.254.0.0/16`, and any other block you do not announce.
 - A released Synaplan version to pin instead of `latest`
 
-The production stack exposes only the web service. MariaDB, Redis, Centrifugo,
-Tika, and Qdrant remain on its internal network.
+By default the production stack exposes only the web service, on
+`127.0.0.1:8000`. The opt-in `local-tls` profile also publishes ports 80 and
+443. MariaDB, Redis, Centrifugo, Tika, and Qdrant remain on its internal network.
 
 ### Start the Cloud-AI Stack
 
@@ -47,6 +58,7 @@ deploy/scripts/prepare.sh
 docker compose --env-file deploy/.env -f deploy/compose.yaml pull
 deploy/scripts/validate-release.sh
 docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+deploy/scripts/smoke-test.sh
 ```
 
 Keep `deploy/.env` outside version control, restrict its permissions,
@@ -214,6 +226,14 @@ COMPOSE_PROFILES=office \
 The deploy entrypoint sets `OFFICE_CONVERT_URL=http://collabora:9980` when
 `office` is in `COMPOSE_PROFILES`. See [Development Guide](DEVELOPMENT.md#office-conversion-optional).
 
+### File work (secure compute)
+
+The development stack starts the compute sidecar with a plain
+`make up`. Production `deploy/compose.yaml` adds it when
+`COMPOSE_PROFILES` includes `compute` — `prepare.sh` writes `COMPUTE_TOKEN`.
+See the [root README](../README.md#file-work) and [COMPUTE.md](COMPUTE.md).
+Never publish port `8080`.
+
 ### Evaluate on Elestio
 
 Use Elestio's custom Docker Compose import for evaluation:
@@ -291,14 +311,14 @@ deployment contract.
 ### Prerequisites
 
 - **Docker** & **Docker Compose** (v2.0+)
-- **Git**
+- **Git** (the one-line installer also works with `curl` + `tar` when git is missing)
 - 8GB RAM minimum (16GB recommended once you add the `local-ai` profile)
-- ~3GB disk space. Add ~1GB for the `local-ai` profile, and ~14GB more if you
+- ~4GB disk space (includes file work + spoken answers). Add ~1GB for the `local-ai` profile, and ~14GB more if you
   also enable the local chat model (`ENABLE_LOCAL_GPT_OSS=true`, see
   [Local AI Profile](#local-ai-profile))
 
 > **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The
-> Quick Start below already does: `docker compose up -d` builds the backend and
+> Quick Start below already does: `make up` builds the backend and
 > worker locally from a multi-arch base, so PHP runs natively on `arm64` with no
 > emulation tax. That is the fastest setup and needs no extra steps. Released
 > production images support both `linux/amd64` and `linux/arm64`. See
@@ -309,12 +329,18 @@ deployment contract.
 ```bash
 git clone <repository-url>
 cd synaplan
-docker compose up -d
+make up
 ```
 
-That's it! Visit http://localhost:5173 after ~2 minutes, log in as
+`make up` starts the status page on `:5173` first, then pulls and starts the
+rest — open <http://localhost:5173> immediately and it walks you through the
+boot. (A plain `docker compose up -d` starts the same stack but `:5173` stays
+silent until every image is pulled.)
+
+That's it! The first start takes 5–15 minutes on a cold cache (backend image
+build + `npm ci` + migrations; ~2 minutes warm, seconds on restart). Log in as
 `admin@synaplan.com` / `admin123`, and connect a provider under
-**Admin → AI Providers** (see [Connect an AI Provider](#connect-an-ai-provider)).
+**Operate → AI infrastructure → Providers & keys** (see [Connect an AI Provider](#connect-an-ai-provider)).
 
 ---
 
@@ -326,12 +352,12 @@ Full-featured installation on cloud AI — no model weights are downloaded.
 
 | Component | Size | Description |
 |-----------|------|-------------|
-| Base services | ~3 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika, Qdrant |
+| Base services | ~4 GB | Backend, frontend, worker, scheduler, database, Redis, Centrifugo, Tika, Qdrant, file work, spoken answers |
 | Whisper `tiny` | ~75 MB | Local audio transcription, no key needed |
-| **Total** | **~3 GB** | Chat works as soon as you add one provider key |
+| **Total** | **~4 GB** | Chat works as soon as you add one provider key |
 
 ```bash
-docker compose up -d
+make up
 ```
 
 **What's included:**
@@ -341,6 +367,9 @@ docker compose up -d
 - Redis (cache, sessions, locks, message queues, realtime engine)
 - Centrifugo WebSocket gateway (live chat takeover, realtime events)
 - Background worker (Symfony Messenger consumer for async AI/indexing jobs)
+- Scheduler (saved tasks, media reaping, periodic cleanup — same role as production)
+- File-work sidecar (short Python/Node runs on copies of files you pick)
+- Spoken answers (Piper TTS, five baked voices)
 - Whisper audio transcription
 - Cloud AI support (Groq, OpenAI, Anthropic, Gemini, xAI, …)
 - Qdrant vector database (AI memories, RAG, feedback)
@@ -356,19 +385,19 @@ search run on your own hardware with no provider key.
 | Ollama + `bge-m3` | ~1 GB | Embeddings for RAG / semantic search |
 
 ```bash
-COMPOSE_PROFILES=local-ai docker compose up -d
+COMPOSE_PROFILES=local-ai make up
 ```
 
 `COMPOSE_PROFILES` is the same switch a self-hosted install uses in
 `deploy/.env`, so the development stack and production behave identically.
-Combine profiles with a comma (`local-ai,office`).
+Combine profiles with a comma (`local-ai,office` or `local-ai,office,compute` on `deploy/`).
 
 **Local chat model is opt-in on top of that.** A local chat model
 (`gpt-oss:20b`, another ~14 GB, needs a GPU or a strong CPU box) is pulled only
 when you ask for it:
 
 ```bash
-COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true docker compose up -d
+COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true make up
 ```
 
 Until then — or while the download runs — chat needs a cloud provider key
@@ -382,8 +411,8 @@ Until then — or while the download runs — chat needs a cloud provider key
 
 ## Connect an AI Provider
 
-After `docker compose up -d`, log in as `admin@synaplan.com` / `admin123` and open
-**Admin → AI Providers** (`http://localhost:5173/admin/setup`).
+After `make up`, log in as `admin@synaplan.com` / `admin123` and open
+**Operate → AI infrastructure → Providers & keys** (`http://localhost:5173/admin/setup`).
 
 - Paste a cloud key (free tier: [console.groq.com](https://console.groq.com)) — it is
   tested live, stored encrypted in the database, and works immediately (no restart).
@@ -410,7 +439,7 @@ docker compose restart backend worker
 
 On first start, the system:
 
-1. Creates `backend/.env` from template
+1. Touches an empty `backend/.env` if missing (compose provides the defaults; the file only overrides them)
 2. Installs dependencies (Composer, npm)
 3. Signs session cookies with `APP_SECRET` from `backend/.env` — no keypair to generate; keep the value stable so sessions survive restarts ([details](ADMIN.md#sessions-survive-restarts))
 4. Creates database schema
@@ -420,8 +449,8 @@ On first start, the system:
 7. Points chat at a provider that has a usable key, if the default one has none
 8. Starts all services
 
-**First startup:** ~1-2 minutes  
-**Subsequent restarts:** ~15-30 seconds
+**First startup:** 5–15 minutes on a cold cache (image build + `npm ci` + migrations), ~2 minutes warm
+**Subsequent restarts:** seconds
 
 ## Development Login Credentials
 
@@ -459,7 +488,7 @@ docker compose logs -f
 
 # Restart everything
 docker compose down
-docker compose up -d
+make up
 ```
 
 ### Database connection issues
@@ -469,7 +498,7 @@ docker compose logs db
 
 # Reset database completely
 docker compose down -v
-docker compose up -d
+make up
 ```
 
 ### Model download stuck
@@ -497,22 +526,22 @@ docker compose exec backend uname -m   # expect: aarch64
 
 - `x86_64` means the local development container is running under emulation.
   Rebuild with `docker compose build --pull backend worker`, then run
-  `docker compose up -d`.
+  `make up`.
 - The optional `phpmyadmin` and `mailhog` services use amd64-only upstream images
   and stay emulated. Enable **Docker Desktop → Settings → General → "Use Rosetta
   for x86/amd64 emulation on Apple Silicon"** (macOS 13+) — much faster than the
   default QEMU — or drop those two services if you don't need them. The
   `requested image's platform (linux/amd64) does not match ...` warning refers to
   them and is safe to ignore.
-- The first `docker compose up -d` is slower because the image is built; every
+- The first `make up` is slower because the image is built; every
   later start is a cache hit.
 
 ### Port conflicts
-Default host ports: 5173 (frontend), 8000 (backend), 3307 (database), 8082 (phpMyAdmin), 8025/1025 (MailHog), 6333 (Qdrant), 11435 (Ollama), 9999 (Tika)
+Default host ports: 5173 (frontend), 8000 (backend), 3307 (database), 8082 (phpMyAdmin), 8025/1025 (MailHog), 6333 (Qdrant), 11435 (Ollama, `local-ai` profile only), 9999 (Tika), 10200 (TTS, localhost-only), 8080/8443 (Keycloak, `oidc` profile only). Each one is a `SYNAPLAN_*_PORT` value in `.env` (see `.env.example`). Spoken answers use `SYNAPLAN_TTS_PORT` and stay bound to 127.0.0.1.
 
-Redis, Centrifugo, and the worker are internal-only services — they expose no host ports and cannot conflict.
+Redis, Centrifugo, the worker, and the scheduler are internal-only services — they expose no host ports and cannot conflict.
 
-Edit `docker-compose.yml` to change ports if needed.
+Change a host port in `.env`. Do not edit the port mappings in `docker-compose.yml`.
 
 ### Worker / queue issues
 Async jobs (AI processing, document indexing) run in the `worker` container:

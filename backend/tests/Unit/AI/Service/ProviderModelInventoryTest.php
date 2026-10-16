@@ -9,7 +9,7 @@ use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderModelInventory;
 use App\AI\Service\ProviderModelListing;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -130,6 +130,149 @@ final class ProviderModelInventoryTest extends TestCase
             $requested,
             'A slash inside a model id is part of the path and must survive unescaped.',
         );
+    }
+
+    public function testGooglePaginationMergesPages(): void
+    {
+        $requested = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = $url;
+            if (!str_contains($url, 'pageToken=')) {
+                return new MockResponse(json_encode([
+                    'models' => [['name' => 'models/gemini-a']],
+                    'nextPageToken' => 'page2',
+                ], \JSON_THROW_ON_ERROR));
+            }
+
+            return new MockResponse(json_encode([
+                'models' => [['name' => 'models/gemini-b']],
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $listing = $this->inventoryWithClient($client, 'google')->fetch('google');
+
+        $this->assertTrue($listing->isConclusive());
+        $this->assertTrue($listing->serves('gemini-a'));
+        $this->assertTrue($listing->serves('gemini-b'));
+        $this->assertCount(2, $requested);
+        $this->assertStringContainsString('pageToken=page2', $requested[1]);
+    }
+
+    public function testAnthropicPaginationMergesPagesAndUsesAfterId(): void
+    {
+        $requested = [];
+        $client = new MockHttpClient(function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = $url;
+            if (!str_contains($url, 'after_id=')) {
+                return new MockResponse(json_encode([
+                    'data' => [['id' => 'claude-a']],
+                    'has_more' => true,
+                    'last_id' => 'claude-a',
+                ], \JSON_THROW_ON_ERROR));
+            }
+
+            return new MockResponse(json_encode([
+                'data' => [['id' => 'claude-b']],
+                'has_more' => false,
+                'last_id' => 'claude-b',
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $listing = $this->inventoryWithClient($client, 'anthropic')->fetch('anthropic');
+
+        $this->assertTrue($listing->isConclusive());
+        $this->assertTrue($listing->serves('claude-a'));
+        $this->assertTrue($listing->serves('claude-b'));
+        $this->assertCount(2, $requested);
+        $this->assertStringContainsString('after_id=claude-a', $requested[1]);
+    }
+
+    public function testReadsUnixCreatedAsReleaseDate(): void
+    {
+        $listing = $this->inventory(new MockResponse(json_encode([
+            'data' => [
+                ['id' => 'gpt-4o', 'created' => 1715558400],
+                ['id' => 'GPT-6.1-Sol', 'created' => 1790186400],
+                ['id' => 'undated'],
+            ],
+        ], \JSON_THROW_ON_ERROR)), 'openai')->fetch('openai');
+
+        $this->assertSame(['gpt-4o' => 1715558400, 'gpt-6.1-sol' => 1790186400], $listing->releasedAt);
+        $this->assertSame(['gpt-6.1-sol'], $listing->releasedSince(new \DateTimeImmutable('2026-09-10 00:00:00 UTC')));
+    }
+
+    public function testReadsRfc3339CreatedAtAcrossPages(): void
+    {
+        $client = new MockHttpClient([
+            new MockResponse(json_encode([
+                'data' => [['id' => 'claude-a', 'created_at' => '2025-02-24T00:00:00Z']],
+                'has_more' => true,
+                'last_id' => 'claude-a',
+            ], \JSON_THROW_ON_ERROR)),
+            new MockResponse(json_encode([
+                'data' => [['id' => 'claude-b', 'created_at' => '2026-09-22T00:00:00Z']],
+                'has_more' => false,
+                'last_id' => 'claude-b',
+            ], \JSON_THROW_ON_ERROR)),
+        ]);
+
+        $listing = $this->inventoryWithClient($client, 'anthropic')->fetch('anthropic');
+
+        $this->assertSame(['claude-b'], $listing->releasedSince(new \DateTimeImmutable('2026-09-10 00:00:00 UTC')));
+    }
+
+    /**
+     * Mistral stamps every row with the request time and Meta with 0; neither
+     * is a release date, so no id may look freshly released.
+     */
+    public function testPlaceholderStampsAreNotReleaseDates(): void
+    {
+        $now = time();
+        $mistral = $this->inventory(new MockResponse(json_encode([
+            'data' => [['id' => 'mistral-large', 'created' => $now], ['id' => 'mistral-small', 'created' => $now]],
+        ], \JSON_THROW_ON_ERROR)), 'mistral')->fetch('mistral');
+        $meta = $this->inventory(new MockResponse(json_encode([
+            'data' => [['id' => 'llama-a', 'created' => 0], ['id' => 'llama-b', 'created' => 0]],
+        ], \JSON_THROW_ON_ERROR)))->fetch('groq');
+
+        $since = new \DateTimeImmutable('-14 days');
+        $this->assertSame([], $mistral->releasedSince($since));
+        $this->assertSame([], $meta->releasedAt);
+        $this->assertSame([], $meta->releasedSince($since));
+    }
+
+    public function testSecondPageHttpErrorIsUnreachableWithoutPartialList(): void
+    {
+        $client = new MockHttpClient([
+            new MockResponse(json_encode([
+                'models' => [['name' => 'models/gemini-a']],
+                'nextPageToken' => 'page2',
+            ], \JSON_THROW_ON_ERROR)),
+            new MockResponse('{"error":"nope"}', ['http_code' => 500]),
+        ]);
+
+        $listing = $this->inventoryWithClient($client, 'google')->fetch('google');
+
+        $this->assertFalse($listing->isConclusive());
+        $this->assertSame(ProviderModelListing::STATUS_UNREACHABLE, $listing->status);
+        $this->assertSame([], $listing->modelIds);
+    }
+
+    public function testPaginationSafetyStopIsUnreachable(): void
+    {
+        $client = new MockHttpClient(static function (): MockResponse {
+            return new MockResponse(json_encode([
+                'models' => [['name' => 'models/gemini-a']],
+                'nextPageToken' => 'forever',
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $listing = $this->inventoryWithClient($client, 'google')->fetch('google');
+
+        $this->assertFalse($listing->isConclusive());
+        $this->assertSame(ProviderModelListing::STATUS_UNREACHABLE, $listing->status);
+        $this->assertStringContainsString('more pages', (string) $listing->detail);
+        $this->assertSame([], $listing->modelIds);
     }
 
     private function inventory(MockResponse $response, string $provider = 'groq'): ProviderModelInventory

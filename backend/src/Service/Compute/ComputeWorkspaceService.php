@@ -107,13 +107,25 @@ final readonly class ComputeWorkspaceService
 
     /**
      * Active, unexpired row — or null after a successful expire/delete.
-     * An expired folder that a run is still using stays visible until idle.
+     * An expiring row the owner opens inside the grace period is renewed
+     * (the warning mail promises "open it to keep it"); past the grace it
+     * is dropped like any expired row. An expired folder that a run is
+     * still using stays visible until idle.
      */
     private function activeRow(int $userId): ?ComputeWorkspace
     {
-        $row = $this->workspaces->findActiveForUser($userId);
+        $row = $this->workspaces->findAccessibleForUser($userId);
         if (!$row instanceof ComputeWorkspace) {
             return null;
+        }
+        if (ComputeWorkspace::STATUS_EXPIRING === $row->getStatus()) {
+            if ($row->isExpired()) {
+                return $this->forgetIfIdle($row) ? null : $row;
+            }
+            $row->renew((new \DateTimeImmutable())->modify(sprintf('+%d days', $this->config->workspaceTtlDays())));
+            $this->workspaces->save($row);
+
+            return $row;
         }
         if (!$row->isExpired()) {
             return $row;

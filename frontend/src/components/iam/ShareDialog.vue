@@ -37,7 +37,13 @@
           </div>
 
           <div class="mt-4 flex flex-col sm:flex-row gap-2" data-testid="iam-share-add-row">
-            <SubjectPicker ref="picker" v-model="subject" class="sm:flex-1" :active="isOpen" />
+            <SubjectPicker
+              ref="picker"
+              v-model="subject"
+              class="sm:flex-1"
+              :active="isOpen"
+              @open="suggestionsOpen = $event"
+            />
             <PermissionSelect
               v-model="permission"
               class="sm:w-44 shrink-0"
@@ -46,7 +52,7 @@
             />
             <button
               type="button"
-              class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium w-full sm:w-auto shrink-0"
+              class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium w-full sm:w-auto shrink-0"
               :disabled="!subject || saving"
               data-testid="btn-iam-share-confirm"
               @click="grant"
@@ -55,10 +61,19 @@
             </button>
           </div>
 
-          <p class="mt-3 text-sm txt-primary" data-testid="iam-share-consequence">
+          <!--
+            The suggestion list is only as wide as the search field and paints
+            over these lines. Hide them while it is open so no half-sentence
+            stays visible beside the list.
+          -->
+          <p
+            v-show="!suggestionsOpen"
+            class="mt-3 text-sm txt-primary"
+            data-testid="iam-share-consequence"
+          >
             {{ $t(shareConsequenceKey(kind, permission)) }}
           </p>
-          <p class="text-sm txt-secondary" data-testid="iam-share-find">
+          <p v-show="!suggestionsOpen" class="text-sm txt-secondary" data-testid="iam-share-find">
             {{ $t(shareFindKey(kind)) }}
           </p>
 
@@ -68,7 +83,7 @@
               <p>{{ $t('iam.dialog.loadFailed') }}</p>
               <button
                 type="button"
-                class="btn-secondary mt-2 px-4 py-2.5 rounded-lg text-sm font-medium"
+                class="btn-secondary mt-2 px-4 py-2.5 rounded-xl text-sm font-medium"
                 data-testid="btn-iam-share-retry"
                 @click="load"
               >
@@ -94,15 +109,27 @@
               >
                 <div class="min-w-0 flex-1">
                   <p class="txt-primary truncate font-medium">{{ rowLabel(row) }}</p>
-                  <p v-if="row.subjectType !== 'everyone'" class="text-xs txt-secondary">
+                  <p
+                    v-if="row.subjectType === 'everyone' && row.effective === false"
+                    class="text-xs txt-secondary"
+                  >
+                    {{ $t('iam.dialog.everyoneInactive') }}
+                  </p>
+                  <p v-else-if="row.subjectType !== 'everyone'" class="text-xs txt-secondary">
                     {{ $t(`iam.dialog.subjectType.${row.subjectType}`) }}
                   </p>
                 </div>
+                <!--
+                  An everyone share that grants nothing right now cannot be
+                  re-granted (the backend refuses while the audience is off),
+                  so the only offered action is Remove.
+                -->
                 <PermissionSelect
                   class="sm:w-40 shrink-0"
                   :model-value="row.permission"
                   :allowed="allowedPermissions"
                   :kind="kind"
+                  :disabled="row.effective === false"
                   @update:model-value="changePermission(row, $event)"
                 />
                 <button
@@ -125,7 +152,7 @@
             <p class="text-sm txt-secondary mb-3">{{ $t('iam.dialog.publicLinkHint') }}</p>
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
               data-testid="btn-iam-public-link"
               @click="emit('publicLink')"
             >
@@ -149,6 +176,7 @@ import {
   SHARE_PERMISSIONS,
   shareConsequenceKey,
   shareFindKey,
+  shareRemoveConfirmKey,
   type ShareKind,
 } from '@/utils/shareCopy'
 import PermissionSelect from './PermissionSelect.vue'
@@ -174,6 +202,7 @@ const { t } = useI18n()
 const { confirm } = useDialog()
 const { error: showError, success: showSuccess } = useNotification()
 const subject = ref<IamSubject | null>(null)
+const suggestionsOpen = ref(false)
 const permission = ref(defaultSharePermission(props.kind))
 const shares = ref<IamShare[]>([])
 const saving = ref(false)
@@ -211,12 +240,14 @@ const load = async () => {
 watch(
   () => [props.isOpen, props.kind, props.resourceId],
   () => {
-    if (props.isOpen) {
-      subject.value = null
-      permission.value = defaultSharePermission(props.kind)
-      picker.value?.resetQuery()
-      void load()
-    }
+    // The picker unmounts with the dialog and cannot emit open:false.
+    // Clear the flag here so a later open does not keep the explanations hidden.
+    suggestionsOpen.value = false
+    if (!props.isOpen) return
+    subject.value = null
+    permission.value = defaultSharePermission(props.kind)
+    picker.value?.resetQuery()
+    void load()
   },
   { immediate: true }
 )
@@ -279,7 +310,7 @@ const changePermission = async (row: IamShare, next: string) => {
 const remove = async (row: IamShare) => {
   const ok = await confirm({
     title: t('iam.dialog.removeTitle'),
-    message: t('iam.dialog.removeConfirm', { name: rowLabel(row) }),
+    message: t(shareRemoveConfirmKey(props.kind), { name: rowLabel(row) }),
     danger: true,
   })
   if (!ok) return

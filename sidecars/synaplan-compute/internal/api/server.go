@@ -129,9 +129,12 @@ func New(opt Options) (*Server, error) {
 	}
 	imgs := opt.Images
 	if imgs == nil {
-		imgs = images.Default()
-	}
-	if err := imgs.RequireDigests(); err != nil {
+		loaded, loadErr := images.Load()
+		if loadErr != nil {
+			return nil, loadErr
+		}
+		imgs = loaded
+	} else if err := imgs.RequireDigests(); err != nil {
 		return nil, err
 	}
 	ws := opt.Store
@@ -221,8 +224,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		},
 		Features: contract.HealthFeatures{
 			Workspaces: true,
-			// Egress has no proxy in A0–A2; Validate refuses every allow-list.
-			Egress: false,
+			Egress:     s.egress.Enabled,
 		},
 	})
 }

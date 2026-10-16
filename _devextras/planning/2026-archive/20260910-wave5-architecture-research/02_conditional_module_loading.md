@@ -214,4 +214,4 @@ would trade a non-existent runtime cost for real contract and CI variance.
 - `frontend/src/views/ConfigView.vue` line 20 (`<HiggsfieldConnection />` unconditional).
 - `_docker/backend/Dockerfile` 108–118; `backend/config/preload.php`; `Caddyfile`; `backend/src/Runtime/FrankenPhpRunner.php`.
 - `.github/workflows/ci.yml`: `frontend-build` generates the OpenAPI spec from the backend container and Zod schemas from it; backend job runs PHPStan whole project, migrations, `schema:validate`, fixtures, seed, PHPUnit; E2E matrix on `docker-compose.test.yml`.
-- Planning: `20260907-config-pyramid/00_master_plan.md` (L0–L4, "empty URL = capability absent", `app:config:doctor`), `20260822-open-plugin-platform/README.md` (manifest v2 `provides.*`), `202609_ai_plugs/06_sprint_6_plugin_adapters.md` (`PlugDeclarationCheckPass` pattern).
+- Planning: `20260907-config-pyramid/00_master_plan.md` (L0–L4, "empty URL = capability absent", `app:config:doctor`), `20260822-open-plugin-platform/README.md` (manifest v2 `provides.*`), `20260903_ai_plugs/06_sprint_6_plugin_adapters.md` (`PlugDeclarationCheckPass` pattern).

@@ -30,6 +30,16 @@ parameters:
 
     # OIDC scopes requested during login (space-separated)
     env(OIDC_SCOPES): 'openid email profile offline_access'
+    env(OIDC_PROVIDER_LABEL): ''
+
+    # OIDC instance access policy — all optional, empty = admit every
+    # authenticated identity (see .env.example "OIDC access restrictions").
+    env(OIDC_ORG_CODE): ''
+    env(OIDC_ORG_CLAIM): 'org_code'
+    env(OIDC_REQUIRED_ROLE): ''
+    env(OIDC_REQUIRED_PERMISSIONS): ''
+    env(OIDC_PERMISSIONS_CLAIM): 'permissions'
+    env(OIDC_ALLOW_USER_PROVISIONING): 'true'
 
     # Native mobile deep-link scheme used for the OAuth handoff (Epic 3).
     # Must match the custom URL scheme registered by the Capacitor app
@@ -62,6 +72,7 @@ parameters:
     default_log_format: 'json'
     log_level_default: 'info'     # Production: less verbose
     log_level_dev: 'debug'        # Development: show everything
+    log_level_test: 'error'       # Tests: errors only (the CI E2E stack raises it)
 
     # Optional API keys — empty string default means "not configured"
     env(ANTHROPIC_API_KEY): ''
@@ -82,6 +93,10 @@ parameters:
     env(A2AGENT_API_KEY): ''
     # xAI (Grok chat/vision, Grok Imagine image/video, Grok voice TTS/STT).
     env(XAI_API_KEY): ''
+    # Meta Model API (Muse Spark). Meta's SDK calls this MODEL_API_KEY.
+    env(META_API_KEY): ''
+    # Cerebras Inference (GPT OSS 120B, Qwen 3.8 27B).
+    env(CEREBRAS_API_KEY): ''
     env(PERPLEXITY_API_KEY): ''
     env(TAVILY_API_KEY): ''
     env(EXA_API_KEY): ''
@@ -91,6 +106,9 @@ parameters:
     env(VOYAGE_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
     env(DISCORD_WEBHOOK_URL): ''
+    # Ops-only new-model detection (app:models:discover). Default off so
+    # self-hosted installs never contact providers or Discord for this.
+    env(MODEL_DISCOVERY_ENABLED): 'false'
     env(GMAIL_USERNAME): ''
     env(GMAIL_PASSWORD): ''
     env(TIKA_HTTP_USER): ''
@@ -135,6 +153,11 @@ parameters:
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
     env(WHATSAPP_ENABLED): 'false'
+    env(TELEGRAM_ENABLED): 'false'
+    env(TELEGRAM_API_BASE_URL): 'https://api.telegram.org'
+    env(TELEGRAM_WEBHOOK_BASE_URL): ''
+    env(TELEGRAM_ALLOW_LOCAL_WEBHOOK): 'false'
+    env(FEDERATION_ALLOW_LOCAL): 'false'
     env(CLOUDFLARE_ACCOUNT_ID): ''
     env(CLOUDFLARE_API_TOKEN): ''
     env(EMBEDDING_FALLBACK_PROVIDER): ''
@@ -157,6 +180,8 @@ parameters:
     env(DOCLING_MAX_BYTES): '52428800'
     # SearXNG sidecar. Empty = off (OSS / fresh-install default).
     env(SEARXNG_BASE_URL): ''
+    # HTML/SVG chat preview. Empty = off. The dev compose defaults this to 1.
+    env(CHAT_ARTIFACTS_ENABLED): ''
     # Office convert (Collabora CODE). Empty = disabled (OSS default).
     env(OFFICE_CONVERT_URL): ''
     env(OFFICE_CONVERT_TIMEOUT_MS): '60000'
@@ -210,6 +235,18 @@ parameters:
     # per-instance password set this to true.
     env(BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE): 'false'
 
+    # Live voice stays off until an operator points at the sidecar and sets a secret.
+    env(LIVE_VOICE_GATEWAY_URL): ''
+    env(LIVE_VOICE_GATEWAY_SECRET): ''
+    env(LIVE_VOICE_PUBLIC_WS_PATH): '/voice/ws'
+    env(LIVE_VOICE_COMPATIBLE_WS_URL): ''
+
+    # Meeting notes stay off until an operator points at the sidecar.
+    env(OPENDESK_STT_URL): ''
+    env(OPENDESK_STT_PUBLIC_URL): ''
+    env(OPENDESK_STT_LANGUAGE): 'auto'
+    env(OPENDESK_STT_MODE): 'opendesk'
+
 services:
     _defaults:
         autowire: true
@@ -252,6 +289,7 @@ services:
         exclude:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
+            - '../src/Attribute/'
             - '../src/Kernel.php'
             - '../src/Test/'
             # Feature-module value objects and the compiler pass are not services.
@@ -260,6 +298,8 @@ services:
             - '../src/Module/Exception/'
             # Factory product of PluginResourceKindCatalog — never a singleton.
             - '../src/Service/Iam/ResourceKind/PluginResourceKind.php'
+            # One pulse per Telegram turn. Its callbacks are not services.
+            - '../src/Service/Telegram/TelegramTypingPulse.php'
 
     # Multi-task parallel media offload (Sprint 4): subprocess dispatcher needs
     # the project dir for Symfony Process cwd. Alias binds the interface.
@@ -340,6 +380,8 @@ services:
                 a2agent: '%env(A2AGENT_API_KEY)%'
                 huggingface: '%env(HUGGINGFACE_API_KEY)%'
                 xai: '%env(XAI_API_KEY)%'
+                meta: '%env(META_API_KEY)%'
+                cerebras: '%env(CEREBRAS_API_KEY)%'
                 perplexity: '%env(PERPLEXITY_API_KEY)%'
                 # Media and speech providers share the store so Models & keys
                 # is the one editor for every instance key.
@@ -436,6 +478,24 @@ services:
         tags:
             - { name: 'app.ai.chat', key: 'a2agent' }
             - { name: 'app.ai.vision', key: 'a2agent' }
+
+    App\AI\Provider\MetaProvider:
+        arguments:
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat', key: 'meta' }
+            - { name: 'app.ai.vision', key: 'meta' }
+            - { name: 'app.ai.image_generation', key: 'meta' }
+            - { name: 'app.ai.speech_to_text', key: 'meta' }
+
+    App\AI\Provider\CerebrasProvider:
+        arguments:
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat', key: 'cerebras' }
+            - { name: 'app.ai.vision', key: 'cerebras' }
 
     App\AI\Provider\XaiProvider:
         arguments:
@@ -552,6 +612,7 @@ services:
             - { name: 'app.ai.chat', key: 'openaicompatible' }
             - { name: 'app.ai.embedding', key: 'openaicompatible' }
             - { name: 'app.ai.vision', key: 'openaicompatible' }
+            - { name: 'app.ai.image_generation', key: 'openaicompatible' }
 
     # AI Facade
     App\AI\Service\AiFacade:
@@ -629,7 +690,7 @@ services:
             $ttlSeconds: 7200
 
     # Whisper Service for Audio Transcription
-    App\Service\WhisperService:
+    App\Service\Stt\WhisperService:
         arguments:
             $whisperBinary: '%env(WHISPER_BINARY)%'
             $whisperModelsPath: '%env(WHISPER_MODELS_PATH)%'
@@ -653,13 +714,18 @@ services:
             $override: null
 
     # Discord Webhook Notification Service
-    App\Service\DiscordNotificationService:
+    App\Service\Notification\DiscordNotificationService:
         arguments:
             $webhookUrl: '%env(DISCORD_WEBHOOK_URL)%'
 
+    # New-model discovery (opt-in; default off — not a FeatureModule)
+    App\Service\ModelDiscovery\ModelDiscoveryService:
+        arguments:
+            $enabled: '%env(bool:MODEL_DISCOVERY_ENABLED)%'
+
     # WhatsApp Business API Service - Fully Dynamic Multi-Number Support
     # Uses cache + lock for atomic duplicate message detection (WhatsApp webhook retries)
-    App\Service\WhatsAppService:
+    App\Service\WhatsApp\WhatsAppService:
         arguments:
             $cache: '@cache.app'
             $lockFactory: '@lock.factory'
@@ -709,9 +775,6 @@ services:
 
     # Message Handlers
     App\Service\Message\Handler\ChatHandler:
-        arguments:
-            $uploadDir: '%kernel.project_dir%/var/uploads'
-            $pluginContextProviders: !tagged_iterator app.plugin.context_provider
         tags:
             - { name: 'app.message.handler' }
 
@@ -726,21 +789,23 @@ services:
             - { name: 'app.message.handler' }
 
     App\Service\Message\Handler\FileAnalysisHandler:
-        arguments:
-            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.message.handler' }
 
-    # Circuit Breaker
-    App\Service\CircuitBreaker: ~
-
-    # Media Generation Service (synchronous endpoint for external integrations)
-    App\Service\MediaGenerationService:
+    App\Service\Message\FileAnalysis\ImageAnalysis:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
-    App\Service\MediaGenerationServiceInterface:
-        alias: App\Service\MediaGenerationService
+    # Circuit Breaker
+    App\Service\Infrastructure\CircuitBreaker: ~
+
+    # Media Generation Service (synchronous endpoint for external integrations)
+    App\Service\Media\MediaGenerationService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Media\MediaGenerationServiceInterface:
+        alias: App\Service\Media\MediaGenerationService
 
     App\Service\Desktop\DesktopGeneratedMediaService:
         arguments:
@@ -785,10 +850,10 @@ services:
             $cache: '@cache.model_config'
 
     # Internal Email Service (system emails - uses SMTP from ENV)
-    App\Service\InternalEmailService: ~
+    App\Service\Email\InternalEmailService: ~
 
     # Inbound Email Service (fetches emails from Gmail IMAP or Mailhog)
-    App\Service\InboundEmailService:
+    App\Service\Email\InboundEmailService:
         arguments:
             $mailhogApiUrl: 'http://mailhog:8025/api/v2'
             $gmailUsername: '%env(GMAIL_USERNAME)%'
@@ -814,7 +879,7 @@ services:
             $environment: '%kernel.environment%'
 
     # Encryption Service (for sensitive data like IMAP passwords)
-    App\Service\EncryptionService:
+    App\Service\Security\EncryptionService:
         arguments:
             $secretKey: '%env(APP_SECRET)%'
 
@@ -899,8 +964,24 @@ services:
         arguments:
             $oidcAutoRedirect: '%env(string:default::OIDC_AUTO_REDIRECT)%'
 
+    # OIDC instance access policy (organization / role / permission / provisioning)
+    App\Service\Auth\OidcAccessPolicy:
+        arguments:
+            $orgCode: '%env(string:OIDC_ORG_CODE)%'
+            $orgClaim: '%env(string:OIDC_ORG_CLAIM)%'
+            $requiredRoles: '%env(string:OIDC_REQUIRED_ROLE)%'
+            $roleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
+            $requiredPermissions: '%env(string:OIDC_REQUIRED_PERMISSIONS)%'
+            $permissionsClaim: '%env(string:OIDC_PERMISSIONS_CLAIM)%'
+            $clientId: '%env(OIDC_CLIENT_ID)%'
+            $allowUserProvisioning: '%env(string:OIDC_ALLOW_USER_PROVISIONING)%'
+
+    App\Service\Auth\OidcAuthorizeParams:
+        arguments:
+            $bearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
+
     # OIDC Token Service for Keycloak integration
-    App\Service\OidcTokenService:
+    App\Service\Auth\OidcTokenService:
         arguments:
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
@@ -931,13 +1012,13 @@ services:
             $frontendUrl: '%env(FRONTEND_URL)%'
 
     # Billing Service (checks if Stripe is configured)
-    App\Service\BillingService:
+    App\Service\Billing\BillingService:
         arguments:
             $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
             $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
 
     # Native IAP product ↔ tier mapping (Epic 5.5)
-    App\Service\IapPricingService:
+    App\Service\Iap\IapPricingService:
         arguments:
             $iapProductPro: '%env(IAP_PRODUCT_PRO)%'
             $iapProductTeam: '%env(IAP_PRODUCT_TEAM)%'
@@ -1009,14 +1090,15 @@ services:
             $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
             $oidcAutoRedirect: '%env(string:default::OIDC_AUTO_REDIRECT)%'
             $appleClientId: '%env(string:default::APPLE_CLIENT_ID)%'
+            $oidcProviderLabel: '%env(string:OIDC_PROVIDER_LABEL)%'
 
     # OAuth State Service (signed tokens for CSRF protection)
-    App\Service\OAuthStateService:
+    App\Service\OAuth\OAuthStateService:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
 
     # Native OAuth handoff token (signed, short-lived) for the mobile deep-link flow
-    App\Service\NativeAuthHandoffService:
+    App\Service\Auth\NativeAuthHandoffService:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
 
@@ -1027,7 +1109,7 @@ services:
             $appSecret: '%env(APP_SECRET)%'
 
     # OAuth login responder (web cookies vs native deep-link handoff)
-    App\Service\OAuthLoginResponder:
+    App\Service\Auth\OAuthLoginResponder:
         arguments:
             $frontendUrl: '%env(FRONTEND_URL)%'
             $nativeDeepLinkScheme: '%env(NATIVE_DEEPLINK_SCHEME)%'
@@ -1049,7 +1131,7 @@ services:
     # they need is autowired.
 
     # reCAPTCHA Service
-    App\Service\RecaptchaService:
+    App\Service\Auth\RecaptchaService:
         arguments:
             $secretKey: '%env(RECAPTCHA_SECRET_KEY)%'
             $enabled: '%env(string:default:recaptcha_enabled_default:RECAPTCHA_ENABLED)%'
@@ -1058,7 +1140,7 @@ services:
     App\Service\Message\AgainHandler: ~
 
     # Guest trial chat session service (per-IP cap configurable for E2E)
-    App\Service\GuestSessionService:
+    App\Service\Chat\GuestSessionService:
         arguments:
             $maxSessionsPerIp: '%env(int:GUEST_MAX_SESSIONS_PER_IP)%'
 
@@ -1116,6 +1198,45 @@ services:
             $baseUrl: '%env(COMPUTE_URL)%'
             $token: '%env(COMPUTE_TOKEN)%'
 
+    App\Module\Sidecar\LiveVoiceModule:
+        arguments:
+            $gatewayUrl: '%env(LIVE_VOICE_GATEWAY_URL)%'
+            $gatewaySecret: '%env(LIVE_VOICE_GATEWAY_SECRET)%'
+
+    App\Service\Voice\VoiceLiveTicketService:
+        arguments:
+            $secret: '%env(LIVE_VOICE_GATEWAY_SECRET)%'
+
+    App\Service\Voice\VoiceLiveInternalAuth:
+        arguments:
+            $secret: '%env(LIVE_VOICE_GATEWAY_SECRET)%'
+
+    App\Service\Voice\VoiceLiveSessionService:
+        arguments:
+            $publicWsPath: '%env(LIVE_VOICE_PUBLIC_WS_PATH)%'
+
+    App\Service\Voice\VoiceLiveCompatibleEndpoint:
+        arguments:
+            $wsUrl: '%env(LIVE_VOICE_COMPATIBLE_WS_URL)%'
+
+    App\Module\Sidecar\OpendeskSttModule:
+        arguments:
+            $baseUrl: '%env(OPENDESK_STT_URL)%'
+            $publicUrl: '%env(OPENDESK_STT_PUBLIC_URL)%'
+            $language: '%env(OPENDESK_STT_LANGUAGE)%'
+            $mode: '%env(OPENDESK_STT_MODE)%'
+
+    App\Service\Opendesk\MeetingNoteStore:
+        arguments:
+            $directory: '%kernel.project_dir%/var/meeting-notes'
+
+    App\Service\Opendesk\OpendeskConnectSnippet:
+        arguments:
+            $publicUrl: '%env(OPENDESK_STT_PUBLIC_URL)%'
+            $internalUrl: '%env(OPENDESK_STT_URL)%'
+            $language: '%env(OPENDESK_STT_LANGUAGE)%'
+            $mode: '%env(OPENDESK_STT_MODE)%'
+
     App\Service\Compute\ComputeConfig:
         arguments:
             $computeUrl: '%env(COMPUTE_URL)%'
@@ -1132,6 +1253,10 @@ services:
     App\Module\Sidecar\SearxngModule:
         arguments:
             $baseUrl: '%env(SEARXNG_BASE_URL)%'
+
+    App\Service\Chat\ChatArtifactsConfig:
+        arguments:
+            $envValue: '%env(CHAT_ARTIFACTS_ENABLED)%'
 
     App\Module\Sidecar\PiperTtsModule:
         arguments:
@@ -1155,6 +1280,53 @@ services:
             $enabled: '%env(bool:WHATSAPP_ENABLED)%'
             $accessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
             $webhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+
+    App\Module\Channel\TelegramModule:
+        arguments:
+            $enabled: '%env(bool:TELEGRAM_ENABLED)%'
+            $appUrl: '%env(APP_URL)%'
+            $webhookBaseUrl: '%env(TELEGRAM_WEBHOOK_BASE_URL)%'
+            $allowLocalWebhook: '%env(bool:TELEGRAM_ALLOW_LOCAL_WEBHOOK)%'
+
+    App\Module\Federation\FederationModule:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+            $allowLocal: '%env(bool:FEDERATION_ALLOW_LOCAL)%'
+
+    App\Service\Federation\FederationUrlGuard:
+        arguments:
+            $allowLocal: '%env(bool:FEDERATION_ALLOW_LOCAL)%'
+
+    App\Service\Federation\FederationLinkService:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+            $frontendUrl: '%env(FRONTEND_URL)%'
+
+    App\Service\Telegram\TelegramBotApi:
+        arguments:
+            $baseUrl: '%env(TELEGRAM_API_BASE_URL)%'
+
+    App\Service\Telegram\PublicWebhookUrlValidator:
+        arguments:
+            $allowLocal: '%env(bool:TELEGRAM_ALLOW_LOCAL_WEBHOOK)%'
+
+    App\Service\Telegram\TelegramConnectionService:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+            $webhookBaseUrl: '%env(TELEGRAM_WEBHOOK_BASE_URL)%'
+
+    App\Service\Telegram\TelegramMediaSender:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Telegram\TelegramVoiceConverter:
+        arguments:
+            $ffmpegBinary: '%env(FFMPEG_BINARY)%'
+
+    App\Service\Telegram\TelegramConversation:
+        arguments:
+            # Workers often run without FRONTEND_URL; a missing value must not stop replies.
+            $frontendUrl: '%env(default:synaplan_url:FRONTEND_URL)%'
 
     App\Service\File\Office\StructuredTextExtractor:
         arguments:
@@ -1195,10 +1367,6 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
     App\Controller\FileController:
-        arguments:
-            $uploadDir: '%kernel.project_dir%/var/uploads'
-
-    App\Controller\StreamController:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
@@ -1296,14 +1464,14 @@ services:
             $qdrantUrl: '%env(QDRANT_URL)%'
 
     # Monolog Formatter Factory (for env-based log format switching)
-    App\Service\MonologFormatterFactory:
+    App\Monolog\MonologFormatterFactory:
         arguments:
             $logFormat: '%env(default:default_log_format:LOG_FORMAT)%'
 
     # Monolog formatter service created by factory
     app.monolog_formatter:
         class: Monolog\Formatter\FormatterInterface
-        factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']
+        factory: ['@App\Monolog\MonologFormatterFactory', 'createFormatter']
 
     # Stamps the request correlation id onto every log record (see RequestIdSubscriber).
     App\Monolog\RequestIdProcessor:
@@ -1368,8 +1536,8 @@ services:
     # Widget real-time event store (SSE backing).
     # DB-backed (Galera-replicated) so events are visible cluster-wide; swap this
     # alias to a Redis implementation when introduced.
-    App\Service\WidgetEventStoreInterface:
-        alias: App\Service\DatabaseWidgetEventStore
+    App\Service\Widget\WidgetEventStoreInterface:
+        alias: App\Service\Widget\DatabaseWidgetEventStore
 
 # TestProvider: mock AI for dev/test only. Not registered in prod.
 # Duplicated because Symfony when@ blocks don't support when@dev,test.

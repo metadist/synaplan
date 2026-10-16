@@ -11,6 +11,7 @@ import {
   preAnswerSteps,
   stepDurationMs,
   timelineFromStatus,
+  timelineFromStoredCards,
   type TimelineState,
 } from '@/utils/processingTimeline'
 import { describeStep, intentSentence, type Translate } from '@/utils/processingStepCopy'
@@ -422,6 +423,22 @@ describe('consumeVisibleAnswer', () => {
     const third = consumeVisibleAnswer('The answer', second.insideThink)
     expect(third.text.trim()).toBe('The answer')
   })
+
+  it('holds a think tag that arrives split across chunks', () => {
+    const first = consumeVisibleAnswer('Before <thi', false, '')
+    expect(first.text).toBe('Before ')
+    expect(first.insideThink).toBe(false)
+    expect(first.pending).toBe('<thi')
+
+    const second = consumeVisibleAnswer('nk>secret</thi', first.insideThink, first.pending)
+    expect(second.text).toBe('')
+    expect(second.insideThink).toBe(true)
+
+    const third = consumeVisibleAnswer('nk>After', second.insideThink, second.pending)
+    expect(third.text).toBe('After')
+    expect(third.insideThink).toBe(false)
+    expect(third.pending).toBe('')
+  })
 })
 
 describe('formatDurationSeconds', () => {
@@ -453,5 +470,22 @@ describe('cloneTimelineSteps', () => {
       name: 'M',
       provider: 'groq',
     })
+  })
+})
+
+describe('timelineFromStoredCards', () => {
+  it('rebuilds done steps with their duration after a reload', () => {
+    const steps = timelineFromStoredCards(
+      [
+        { capability: 'web_search', state: 'done', durationMs: 2400 },
+        { capability: 'chat', state: 'running' },
+      ],
+      10_000
+    )
+    expect(steps).toHaveLength(1)
+    expect(steps[0]?.key).toBe('web')
+    expect(steps[0]?.state).toBe('done')
+    expect(steps[0]?.startedAt).toBe(7600)
+    expect(steps[0]?.endedAt).toBe(10_000)
   })
 })

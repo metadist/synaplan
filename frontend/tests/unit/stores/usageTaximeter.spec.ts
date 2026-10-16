@@ -64,6 +64,15 @@ describe('usageTaximeter store', () => {
 
       expect(total?.totalTokens).toBe(130)
       expect(total?.cost).toBeCloseTo(0.026, 6)
+      expect(total?.priceKnown).toBe(true)
+    })
+
+    it('marks the whole turn unknown when any step has no published price', () => {
+      const total = aggregateTurnUsage(usage('openai:gpt-4o', '0.02', 80), [
+        { ...usage('openrouter:router', '0', 20), priceKnown: false },
+      ])
+      expect(total?.cost).toBeCloseTo(0.02, 6)
+      expect(total?.priceKnown).toBe(false)
     })
   })
 

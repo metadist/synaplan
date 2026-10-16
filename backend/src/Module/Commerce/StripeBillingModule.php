@@ -8,7 +8,7 @@ use App\Module\Contract\ConfiguredBy;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Contract\MobileClass;
 use App\Module\Contract\ModuleStatus;
-use App\Service\BillingService;
+use App\Service\Billing\BillingService;
 
 /**
  * Stripe billing — web checkout, top-ups, billing portal and the Stripe
@@ -106,10 +106,10 @@ final class StripeBillingModule implements FeatureModuleInterface
     public function serviceIds(): array
     {
         return [
-            'App\Service\BillingService',
+            'App\Service\Billing\BillingService',
             'App\Controller\SubscriptionController',
             'App\Controller\StripeWebhookController',
-            'App\Service\PremiumFeatureGate',
+            'App\Service\Billing\PremiumFeatureGate',
         ];
     }
 

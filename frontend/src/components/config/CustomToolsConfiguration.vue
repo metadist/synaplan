@@ -89,7 +89,7 @@ const onImportApplied = (): void => {
       <template #actions>
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="custom-tools-import"
           @click="importing = true"
         >
@@ -97,7 +97,7 @@ const onImportApplied = (): void => {
         </button>
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="custom-tools-add"
           @click="creating = true"
         >
@@ -127,14 +127,14 @@ const onImportApplied = (): void => {
         <div class="flex flex-wrap gap-2">
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             @click="editing = tool"
           >
             {{ $t('customTools.edit') }}
           </button>
           <button
             type="button"
-            class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
             @click="onDelete(tool)"
           >
             {{ $t('customTools.delete') }}

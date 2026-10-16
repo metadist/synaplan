@@ -80,6 +80,31 @@ final class VectorizationServiceEmbedResilienceTest extends TestCase
         $this->assertSame(10, $result['usage']['prompt_tokens']);
     }
 
+    public function testLargeBatchIsSplitIntoWindowsOf8(): void
+    {
+        $chunks = [];
+        for ($i = 0; $i < 40; ++$i) {
+            $chunks[] = 'chunk-'.$i;
+        }
+
+        $this->aiFacade->expects($this->exactly(5))
+            ->method('embedBatch')
+            ->willReturnCallback(static function (array $texts): array {
+                return [
+                    'embeddings' => array_map(static fn (): array => [0.1, 0.2], $texts),
+                    'usage' => ['prompt_tokens' => \count($texts), 'total_tokens' => \count($texts)],
+                ];
+            });
+        $this->aiFacade->expects($this->never())->method('embed');
+
+        $result = $this->invokeEmbedChunksResilient($chunks);
+
+        $this->assertSame(0, $result['failed']);
+        $this->assertCount(40, $result['embeddings']);
+        $this->assertSame(40, $result['usage']['prompt_tokens']);
+        $this->assertSame([0.1, 0.2], $result['embeddings'][32]);
+    }
+
     // ------------------------------------------------------------------
     // embedChunksResilient — fallback: batch throws
     // ------------------------------------------------------------------

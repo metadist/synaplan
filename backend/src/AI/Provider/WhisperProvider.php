@@ -6,7 +6,7 @@ namespace App\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\SpeechToTextProviderInterface;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 
 /**
  * Local whisper.cpp speech-to-text. No API key — availability is the
@@ -58,7 +58,11 @@ final readonly class WhisperProvider implements SpeechToTextProviderInterface
 
     public function isAvailable(): bool
     {
-        return $this->whisperService->isAvailable();
+        // On-disk only. ChatReadinessService asks every provider from the
+        // runtime-config request, and WhisperService::isAvailable() forks
+        // `whisper --help` (up to 5s). Transcription and the status probe
+        // still use that check.
+        return $this->whisperService->isInstalled();
     }
 
     public function getRequiredEnvVars(): array

@@ -14,16 +14,12 @@
       <div
         class="absolute -bottom-24 right-1/4 w-[28rem] h-[28rem] bg-brand/4 dark:bg-brand/8 rounded-full blur-3xl animate-float-delayed"
       ></div>
-      <img
-        :src="iconSrc"
-        alt=""
-        class="absolute top-[8%] right-[5%] w-[280px] opacity-[0.035] dark:opacity-[0.06] rotate-12 pointer-events-none select-none"
-      />
+      <!-- The bird watermark moved to the global AmbientBackground in App.vue. -->
     </div>
 
     <button
       v-if="isNativeApp()"
-      class="absolute left-6 h-9 w-9 rounded-lg icon-ghost flex items-center justify-center z-20"
+      class="absolute left-6 h-9 w-9 rounded-xl icon-ghost flex items-center justify-center z-20"
       style="top: calc(env(safe-area-inset-top, 0px) + 1.5rem)"
       :aria-label="$t('common.back')"
       data-testid="btn-back"
@@ -39,7 +35,7 @@
     >
       <button
         v-if="isNativeServerControlAvailable()"
-        class="h-9 w-9 rounded-lg icon-ghost flex items-center justify-center"
+        class="h-9 w-9 rounded-xl icon-ghost flex items-center justify-center"
         :aria-label="$t('nativeServer.changeServer')"
         :title="$t('nativeServer.changeServer')"
         data-testid="btn-change-server"
@@ -47,17 +43,15 @@
       >
         <ServerIcon class="w-4 h-4" />
       </button>
-      <button class="h-9 px-3 rounded-lg icon-ghost text-xs font-medium" @click="cycleLanguage">
+      <button class="h-9 px-3 rounded-xl icon-ghost text-xs font-medium" @click="cycleLanguage">
         {{ currentLanguage.toUpperCase() }}
       </button>
       <button
-        class="h-9 w-9 rounded-lg icon-ghost flex items-center justify-center"
-        :aria-label="
-          themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-        "
+        class="h-9 w-9 rounded-xl icon-ghost flex items-center justify-center"
+        :aria-label="$t('appearance.cycle')"
         @click="toggleTheme"
       >
-        <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-4 h-4" />
+        <SunIcon v-if="themeStore.isDark?.value" class="w-4 h-4" />
         <MoonIcon v-else class="w-4 h-4" />
       </button>
     </div>
@@ -106,7 +100,7 @@
             @click="handleSocialLogin('keycloak')"
           >
             <Icon icon="mdi:key-variant" class="w-4 h-4 mr-2" />
-            {{ $t('auth.loginWithSso') }}
+            {{ enterpriseSsoLabel }}
           </button>
         </div>
 
@@ -132,7 +126,7 @@
             @click="handleSocialLogin('keycloak')"
           >
             <Icon icon="mdi:key-variant" class="w-4 h-4 mr-2" />
-            {{ $t('auth.loginWithSso') }}
+            {{ enterpriseSsoLabel }}
           </button>
         </div>
 
@@ -229,7 +223,7 @@
                   class="w-4.5 h-4.5"
                 />
                 <span class="group-hover:translate-x-0.5 transition-transform duration-200">{{
-                  provider.name
+                  socialProviderLabel(provider, t)
                 }}</span>
               </button>
             </div>
@@ -299,7 +293,7 @@
                 />
                 <button
                   type="button"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-xl txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
                   :aria-label="showPassword ? $t('auth.hidePassword') : $t('auth.showPassword')"
                   data-testid="btn-toggle-password"
                   @click="showPassword = !showPassword"
@@ -410,7 +404,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { supportedLanguages } from '@/i18n'
+import { socialProviderLabel } from '@/utils/socialProviderLabel'
+import { cycleLocale } from '@/i18n'
 import {
   SunIcon,
   MoonIcon,
@@ -449,19 +444,15 @@ import {
 
 const router = useRouter()
 const route = useRoute()
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 const themeStore = useTheme()
 const { getToken: getReCaptchaToken } = useRecaptcha()
 const config = useConfigStore()
 const authStore = useAuthStore()
 
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
+const isDark = themeStore.isDark
 
-const { logoSrc, iconSrc } = useBrandLogo(isDark)
+const { logoSrc } = useBrandLogo(isDark)
 
 const email = ref('')
 const password = ref('')
@@ -471,18 +462,10 @@ const loginSuccess = ref(false)
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const currentIndex = supportedLanguages.indexOf(
-    locale.value as (typeof supportedLanguages)[number]
-  )
-  locale.value = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
-  localStorage.setItem('language', locale.value)
+  void cycleLocale()
 }
 
-const toggleTheme = () => {
-  const themes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system']
-  const currentIndex = themes.indexOf(themeStore.theme.value)
-  themeStore.setTheme(themes[(currentIndex + 1) % themes.length])
-}
+const toggleTheme = () => themeStore.cycleTheme()
 
 // The native shell has no browser back button, so auth pages would otherwise be a
 // dead end for guests. Go back in history when possible, else fall back to the
@@ -512,9 +495,15 @@ interface SocialProvider {
   enabled: boolean
   icon: string
   auto_redirect?: boolean
+  custom_label?: boolean
 }
 
 const socialProviders = ref<SocialProvider[]>([])
+const enterpriseSsoLabel = computed(() => {
+  const provider = socialProviders.value.find((item) => item.id === 'keycloak')
+  if (!provider) return t('auth.enterpriseSso')
+  return socialProviderLabel(provider, t)
+})
 const oidcAutoRedirect = ref(false)
 const sessionExpired = ref(false)
 const justRegistered = ref(false)
@@ -665,7 +654,8 @@ const handleSocialLogin = async (provider: string) => {
     return
   }
 
-  window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login`
+  const params = new URLSearchParams({ language: String(locale.value) })
+  window.location.href = `${config.appBaseUrl}/api/v1/auth/${provider}/login?${params}`
 }
 </script>
 

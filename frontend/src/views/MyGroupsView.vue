@@ -1,81 +1,127 @@
 <template>
   <MainLayout data-testid="view-my-groups">
-    <div class="container mx-auto px-6 py-8 max-w-3xl overflow-x-hidden">
-      <PageHeader
-        :title="$t('nav.myGroups')"
-        :subtitle="$t('people.myGroups.subtitle')"
-        icon="mdi:account-group"
-      >
-        <router-link
-          v-if="authStore.isAdmin"
-          to="/admin/people"
-          class="btn-primary px-4 py-2.5 rounded-lg inline-flex items-center gap-2"
-          data-testid="link-my-groups-people"
+    <div class="min-h-screen overflow-x-hidden bg-chat px-3 py-4 sm:p-4 md:p-8">
+      <div class="mx-auto w-full max-w-[100rem]">
+        <PageHeader
+          :title="$t('nav.myGroups')"
+          :subtitle="$t('people.myGroups.subtitle')"
+          icon="mdi:account-group"
         >
-          {{ $t('people.openPeople') }}
-        </router-link>
-      </PageHeader>
+          <router-link
+            v-if="authStore.isAdmin"
+            to="/admin/people"
+            class="btn-primary px-4 py-2.5 rounded-xl inline-flex items-center gap-2"
+            data-testid="link-my-groups-people"
+          >
+            {{ $t('people.openPeople') }}
+          </router-link>
+        </PageHeader>
 
-      <div v-if="loading" class="surface-card rounded-lg p-12 text-center">
-        <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
-      </div>
-      <div
-        v-else-if="groups.length === 0"
-        class="surface-card rounded-lg p-12 text-center txt-secondary"
-        data-testid="my-groups-empty"
-      >
-        {{
-          authStore.isAdmin ? $t('people.myGroups.emptyAdmin') : $t('people.myGroups.emptyMember')
-        }}
-      </div>
-      <ul v-else class="space-y-3" data-testid="list-my-groups">
-        <li
-          v-for="group in groups"
-          :key="group.id"
-          class="surface-card rounded-lg p-5 flex flex-wrap items-center gap-3"
-          :data-testid="`card-my-group-${group.id}`"
+        <div v-if="loading" class="surface-card rounded-lg p-12 text-center">
+          <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
+        </div>
+        <div
+          v-else-if="groups.length === 0"
+          class="surface-card rounded-lg p-12 text-center txt-secondary"
+          data-testid="my-groups-empty"
         >
-          <div class="min-w-0 flex-1">
-            <p class="txt-primary font-medium truncate">{{ group.name }}</p>
-            <p v-if="group.description" class="txt-secondary text-sm mt-0.5">
-              {{ group.description }}
-            </p>
-          </div>
-          <span class="pill text-xs">
-            {{
-              group.kind === 'directory'
-                ? $t('people.groups.fromLogin')
-                : $t('people.groups.manual')
-            }}
-          </span>
-          <span v-if="group.role" class="pill text-xs">
-            {{
-              group.role === 'manager'
-                ? $t('people.groups.roleManager')
-                : $t('people.groups.roleMember')
-            }}
-          </span>
-          <span class="txt-secondary text-sm">
-            {{ $t('people.groups.memberCount', { count: group.memberCount ?? 0 }) }}
-          </span>
-          <button
-            v-if="canLeave(group)"
-            type="button"
-            class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
-            :data-testid="`btn-leave-group-${group.id}`"
-            @click="leaveGroup(group)"
+          {{
+            authStore.isAdmin ? $t('people.myGroups.emptyAdmin') : $t('people.myGroups.emptyMember')
+          }}
+        </div>
+        <ul v-else class="space-y-3" data-testid="list-my-groups">
+          <li
+            v-for="group in groups"
+            :key="group.id"
+            class="surface-card rounded-lg p-5 flex flex-wrap items-center gap-3"
+            :data-testid="`card-my-group-${group.id}`"
           >
-            {{ $t('people.myGroups.leave') }}
-          </button>
-          <span
-            v-else-if="group.membershipSource === 'directory' || group.kind === 'directory'"
-            class="text-xs txt-secondary"
-            :data-testid="`hint-leave-directory-${group.id}`"
-          >
-            {{ $t('people.myGroups.leaveDirectory') }}
-          </span>
-        </li>
-      </ul>
+            <div class="min-w-0 flex-1 basis-full sm:basis-auto">
+              <p class="txt-primary font-medium truncate">{{ group.name }}</p>
+              <p v-if="group.description" class="txt-secondary text-sm mt-0.5">
+                {{ group.description }}
+              </p>
+              <p
+                class="txt-secondary text-sm mt-1"
+                :data-testid="`text-my-group-leader-${group.id}`"
+              >
+                {{
+                  group.leaderName
+                    ? $t('people.myGroups.ledBy', { name: group.leaderName })
+                    : $t('people.myGroups.noLeader')
+                }}
+              </p>
+              <p
+                class="txt-secondary text-sm mt-0.5"
+                :data-testid="`text-my-group-members-${group.id}`"
+              >
+                {{
+                  (group.memberNames?.length ?? 0) > 0
+                    ? $t('people.myGroups.alsoIn', { names: group.memberNames?.join(', ') })
+                    : $t('people.myGroups.onlyYou')
+                }}
+              </p>
+              <p
+                class="txt-secondary text-sm mt-0.5"
+                :data-testid="`text-my-group-shares-${group.id}`"
+              >
+                {{
+                  (group.shares?.length ?? 0) > 0
+                    ? $t('people.myGroups.sharedLine', {
+                        items: group.shares?.map((item) => item.name).join(', '),
+                      })
+                    : $t('people.groups.sharedEmpty')
+                }}
+              </p>
+              <p v-if="canLeave(group)" class="txt-secondary text-sm mt-0.5">
+                {{
+                  group.role === 'manager'
+                    ? $t('people.myGroups.youLead')
+                    : $t('people.myGroups.youCanLeave')
+                }}
+              </p>
+            </div>
+            <span
+              class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium txt-secondary border border-light-border/30 dark:border-dark-border/20"
+            >
+              {{
+                group.kind === 'directory'
+                  ? $t('people.groups.fromLogin')
+                  : $t('people.groups.manual')
+              }}
+            </span>
+            <span
+              v-if="group.role"
+              class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium txt-secondary border border-light-border/30 dark:border-dark-border/20"
+            >
+              {{
+                group.role === 'manager'
+                  ? $t('people.groups.roleManager')
+                  : $t('people.groups.roleMember')
+              }}
+            </span>
+            <span class="txt-secondary text-sm">
+              {{ $t('people.groups.memberCount', { count: group.memberCount ?? 0 }) }}
+            </span>
+            <button
+              v-if="canLeave(group)"
+              type="button"
+              class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
+              :data-testid="`btn-leave-group-${group.id}`"
+              @click="leaveGroup(group)"
+            >
+              {{ $t('people.myGroups.leave') }}
+            </button>
+            <span
+              v-else-if="group.membershipSource === 'directory' || group.kind === 'directory'"
+              class="text-xs txt-secondary"
+              :data-testid="`hint-leave-directory-${group.id}`"
+            >
+              {{ $t('people.myGroups.leaveDirectory') }}
+            </span>
+          </li>
+        </ul>
+      </div>
     </div>
   </MainLayout>
 </template>
@@ -93,7 +139,7 @@ import { useNotification } from '@/composables/useNotification'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
-const { confirm } = useDialog()
+const { choose } = useDialog()
 const { error, success } = useNotification()
 const loading = ref(true)
 const groups = ref<IamMyGroup[]>([])
@@ -116,15 +162,27 @@ async function loadGroups(): Promise<void> {
 }
 
 async function leaveGroup(group: IamMyGroup): Promise<void> {
-  const ok = await confirm({
-    title: t('people.myGroups.leave'),
-    message: t('people.myGroups.leaveConfirm', { name: group.name }),
-    danger: true,
-  })
-  if (!ok) return
+  let sharedCount = 0
   try {
-    await iamApi.leaveGroup(group.id)
-    success(t('people.myGroups.left'))
+    sharedCount = await iamApi.countMyGrantsToGroup(group.id)
+  } catch {
+    // Leave still works. Without a count we do not offer to delete shares.
+  }
+  const choice = await choose({
+    title: t('people.myGroups.leave'),
+    message:
+      sharedCount > 0
+        ? t('people.myGroups.leaveConfirmWithShares', { name: group.name, count: sharedCount })
+        : t('people.myGroups.leaveConfirm', { name: group.name }),
+    confirmText: t('people.myGroups.leave'),
+    cancelText: t('common.cancel'),
+    extraText: sharedCount > 0 ? t('people.myGroups.leaveAndStopSharing') : undefined,
+  })
+  if (choice === null) return
+  const withdrawShares = choice === 'extra'
+  try {
+    await iamApi.leaveGroup(group.id, withdrawShares)
+    success(t(withdrawShares ? 'people.myGroups.leftAndStopped' : 'people.myGroups.left'))
     groups.value = groups.value.filter((row) => row.id !== group.id)
   } catch {
     error(t('people.myGroups.leaveFailed'))

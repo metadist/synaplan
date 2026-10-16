@@ -19,13 +19,14 @@ final class ApprovalExpiryServiceTest extends TestCase
 {
     public function testExpiredTaskRunFailsWithReadableReason(): void
     {
-        $approval = new Approval(7, 'task_run:44:n2', 'mcp:1:create', 'write', time() - 10);
+        $approval = $this->approvalWithId(3);
         $run = new SavedTaskRun(9, 'schedule');
         $run->markWaitingApproval('n2');
         $task = new SavedTask(7, 1, 'Weekly digest');
 
         $approvals = $this->createMock(ApprovalRepository::class);
         $approvals->method('findExpiredPending')->willReturn([$approval]);
+        $approvals->expects($this->once())->method('expireIfPending')->with(3, $this->anything())->willReturn(true);
         $approvals->expects($this->once())->method('flush');
 
         $runs = $this->createMock(SavedTaskRunRepository::class);
@@ -40,7 +41,7 @@ final class ApprovalExpiryServiceTest extends TestCase
             $approvals,
             $runs,
             $tasks,
-            $this->createMock(UserRepository::class),
+            $this->createStub(UserRepository::class),
             new NullLogger(),
         );
 
@@ -52,5 +53,43 @@ final class ApprovalExpiryServiceTest extends TestCase
         $this->assertSame('Nobody approved in time', $run->getError());
         $this->assertNull($run->getWaitingNode());
         $this->assertSame(1, $task->getConsecutiveFailures());
+    }
+
+    public function testApprovalExpiredByAnotherSweepIsNotCountedTwice(): void
+    {
+        $approval = $this->approvalWithId(3);
+        $run = new SavedTaskRun(9, 'schedule');
+        $run->markWaitingApproval('n2');
+
+        $approvals = $this->createStub(ApprovalRepository::class);
+        $approvals->method('findExpiredPending')->willReturn([$approval]);
+        $approvals->method('expireIfPending')->willReturn(false);
+
+        $runs = $this->createMock(SavedTaskRunRepository::class);
+        $runs->method('find')->willReturn($run);
+        $runs->expects($this->never())->method('save');
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->expects($this->never())->method('save');
+
+        $service = new ApprovalExpiryService(
+            $approvals,
+            $runs,
+            $tasks,
+            $this->createStub(UserRepository::class),
+            new NullLogger(),
+        );
+
+        $this->assertSame(0, $service->sweep(new \DateTimeImmutable('now', new \DateTimeZone('UTC'))));
+        $this->assertSame(Approval::STATUS_PENDING, $approval->getStatus());
+        $this->assertSame(SavedTaskRun::STATUS_WAITING_APPROVAL, $run->getStatus());
+    }
+
+    private function approvalWithId(int $id): Approval
+    {
+        $approval = new Approval(7, 'task_run:44:n2', 'mcp:1:create', 'write', time() - 10);
+        (new \ReflectionProperty(Approval::class, 'id'))->setValue($approval, $id);
+
+        return $approval;
     }
 }

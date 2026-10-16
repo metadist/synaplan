@@ -7,9 +7,10 @@ test.describe('@ci All chats archive', () => {
   test('History Show all opens All chats', async ({ page }) => {
     await openApp(page)
     await page.locator(selectors.nav.sidebarV2ChatNav).click()
-    await expect(page.locator(selectors.nav.modalChatManager)).toBeVisible({
+    await expect(page.locator(selectors.nav.sidebarChats)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
+    await page.locator('[data-testid="btn-sidebar-v2-chats-toggle"]').hover()
     await page.locator(selectors.nav.chatV2ShowAll).click()
     await expect(page).toHaveURL(/\/chats$/, { timeout: TIMEOUTS.STANDARD })
     await expect(page.locator(selectors.pages.chats)).toBeVisible({

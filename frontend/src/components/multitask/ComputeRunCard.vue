@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import type { TaskCard } from '@/stores/history'
 import { getConfigSync } from '@/services/api/httpClient'
+import TaskCardMedia from '@/components/multitask/TaskCardMedia.vue'
 
 const props = defineProps<{
   card: TaskCard
@@ -38,6 +39,13 @@ const showWorkspace = computed(
     getConfigSync().features?.computeWorkspacesEnabled === true &&
     ['done', 'failed'].includes(props.card.state)
 )
+const previewKind = computed(() => {
+  const type = (props.card.mediaType ?? '').toLowerCase()
+  if (type.startsWith('image/') || type === 'image') return 'image'
+  if (type.startsWith('video/') || type === 'video') return 'video'
+  if (type.startsWith('audio/') || type === 'audio') return 'audio'
+  return 'document'
+})
 const notesId = computed(() => `compute-run-notes-${props.card.nodeId}`)
 const notesHelpId = computed(() => `${notesId.value}-help`)
 
@@ -62,15 +70,18 @@ const submitRerun = () => {
     </p>
     <p v-else-if="card.text" class="text-sm txt-primary break-words">{{ card.text }}</p>
     <div v-if="card.state === 'done' || showWorkspace" class="flex flex-wrap gap-2">
-      <a
-        v-if="card.state === 'done' && card.url"
-        :href="card.url"
+      <div v-if="card.state === 'done' && card.url" data-testid="compute-run-preview">
+        <TaskCardMedia :kind="previewKind" :url="card.url" />
+      </div>
+      <router-link
+        v-if="card.state === 'done'"
+        to="/files/generated"
         class="inline-flex items-center gap-1 pill text-xs"
-        data-testid="compute-run-preview"
+        data-testid="compute-run-generated"
       >
-        <Icon icon="mdi:file-outline" class="w-4 h-4" />
-        {{ $t('compute.preview') }}
-      </a>
+        <Icon icon="mdi:folder-outline" class="w-4 h-4" />
+        {{ $t('compute.findInFiles') }}
+      </router-link>
       <router-link
         v-if="showWorkspace"
         to="/files/workspace"
@@ -84,7 +95,7 @@ const submitRerun = () => {
     <div v-if="canRerun" class="space-y-2">
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="compute-run-rerun"
         @click="showRerun = !showRerun"
       >
@@ -97,13 +108,13 @@ const submitRerun = () => {
           :id="notesId"
           v-model="notes"
           rows="3"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="compute-run-notes"
           :aria-describedby="notesHelpId"
         />
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="!notes.trim()"
           data-testid="compute-run-rerun-submit"
           @click="submitRerun"

@@ -65,6 +65,22 @@ class ModelRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every BMODELS row on this install, including inactive / unselectable /
+     * retired. Used by new-model discovery: a deliberate retirement is a known
+     * decision and must not reappear as "pending".
+     *
+     * @return Model[]
+     */
+    public function findAllForDiscovery(): array
+    {
+        return $this->createQueryBuilder('m')
+            ->orderBy('m.service', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Get model by service and provider ID.
      *
      * @param string $service    Service name (e.g., 'Ollama', 'OpenAI')

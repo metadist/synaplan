@@ -22,7 +22,7 @@
         >
           <button
             ref="closeButton"
-            class="absolute top-3 right-3 z-10 p-1.5 rounded-lg icon-ghost"
+            class="absolute top-3 right-3 z-10 p-1.5 rounded-xl icon-ghost"
             :aria-label="$t('common.close')"
             data-testid="btn-announcement-close"
             @click="close"

@@ -1,0 +1,5 @@
+image_generated: "Voici l’image que vous avez demandée."
+video_generated: "Voici la vidéo que vous avez demandée."
+audio_generated: "Voici l’audio que vous avez demandé."
+file_generated: "J’ai créé le fichier « {filename} » pour vous. Vous pouvez le télécharger maintenant."
+file_generation_failed: "Le fichier n’a pas pu être créé. Veuillez réessayer."

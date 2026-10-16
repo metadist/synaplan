@@ -17,10 +17,15 @@ use App\Service\ModelConfigService;
  *      indexers (write path) and searchers (read path) so query and
  *      stored vectors are always cosine-comparable.
  *   2. "Is this stored hit stale?" — a hit is stale iff its
- *      `embedding_model_id` payload differs from the active model id
- *      (or its `vector_dim` differs from the active vector dim). Stale
- *      hits must be filtered out of search responses because cross-
- *      model cosine scores are physically meaningless.
+ *      `embedding_model_id` payload differs from the active model id,
+ *      or its `vector_dim` is not the width the query will search
+ *      with. Memories store the model's native width. Document chunks
+ *      store the collection width (1024): ingest already slices or
+ *      pads the vector to that size, so comparing the payload against
+ *      the catalog dimension marks every non-1024 model permanently
+ *      stale (#2064). Stale hits must be filtered out of search
+ *      responses because cross-model cosine scores are physically
+ *      meaningless.
  *   3. "How many stale hits exist per scope?" — used by the admin UI
  *      to surface a "Re-vectorize required" banner after a model swap.
  *
@@ -132,6 +137,13 @@ final class EmbeddingMetadataService
      * model's dim while matching a pinned/user model id would re-open
      * the cross-model gap for any non-1024-dim setup.
      *
+     * Document search passes `$storageVectorDim` (the collection width
+     * the indexer wrote into `vector_dim`). Chunks already on disk
+     * carry 1024 even when the catalog says 1536 or 3072, because
+     * ingest coerced the vector before upsert. Comparing those
+     * payloads to the catalog dimension drops every hit (#2064). The
+     * model-id check still rejects a real embedding-model change.
+     *
      * Treats legacy hits (no `embedding_model_id` AND no `vector_dim`
      * in payload) as fresh for backwards compatibility — they'll be
      * re-indexed lazily when content changes or the operator forces a
@@ -139,7 +151,7 @@ final class EmbeddingMetadataService
      *
      * @param array<string, mixed> $payload
      */
-    public function isStale(array $payload, ?int $currentModelId = null, ?int $userId = null): bool
+    public function isStale(array $payload, ?int $currentModelId = null, ?int $userId = null, ?int $storageVectorDim = null): bool
     {
         $modelId = $currentModelId ?? $this->getCurrentModelId($userId);
         if (null === $modelId) {
@@ -158,7 +170,8 @@ final class EmbeddingMetadataService
             return true;
         }
 
-        if (null !== $indexedVectorDim && (int) $indexedVectorDim !== $this->getVectorDimFor($modelId)) {
+        $expectedDim = $storageVectorDim ?? $this->getVectorDimFor($modelId);
+        if (null !== $indexedVectorDim && (int) $indexedVectorDim !== $expectedDim) {
             return true;
         }
 
@@ -175,11 +188,13 @@ final class EmbeddingMetadataService
      *
      * @template T of array<string, mixed>
      *
+     * Pass `$storageVectorDim` for document search. See {@see isStale()}.
+     *
      * @param list<T> $hits
      *
      * @return array{fresh: list<T>, stale_count: int}
      */
-    public function filterStaleHits(array $hits, string $payloadKey = 'payload', ?int $currentModelId = null, ?int $userId = null): array
+    public function filterStaleHits(array $hits, string $payloadKey = 'payload', ?int $currentModelId = null, ?int $userId = null, ?int $storageVectorDim = null): array
     {
         $modelId = $currentModelId ?? $this->getCurrentModelId($userId);
         $fresh = [];
@@ -188,7 +203,7 @@ final class EmbeddingMetadataService
         foreach ($hits as $hit) {
             /** @var array<string, mixed> $payload */
             $payload = $hit[$payloadKey] ?? [];
-            if ($this->isStale($payload, $modelId)) {
+            if ($this->isStale($payload, $modelId, storageVectorDim: $storageVectorDim)) {
                 ++$stale;
                 continue;
             }

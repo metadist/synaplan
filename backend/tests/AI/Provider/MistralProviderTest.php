@@ -151,6 +151,139 @@ class MistralProviderTest extends TestCase
         $this->assertArrayNotHasKey('response_format', $request);
     }
 
+    public function testReasoningEffortIsSentOnlyWhenLarge4ThinkingIsOff(): void
+    {
+        $off = $this->buildChatOptions([], ['model' => 'mistral-large-4', 'reasoning' => false], false);
+        $on = $this->buildChatOptions([], ['model' => 'mistral-large-4', 'reasoning' => true], false);
+        $large3 = $this->buildChatOptions([], ['model' => 'mistral-large-latest', 'reasoning' => false], false);
+
+        $this->assertSame('none', $off['reasoning_effort']);
+        $this->assertArrayNotHasKey('reasoning_effort', $on);
+        $this->assertArrayNotHasKey('reasoning_effort', $large3);
+    }
+
+    public function testChatPassesStringContentThrough(): void
+    {
+        $client = new MockHttpClient(static fn () => new MockResponse(json_encode([
+            'choices' => [[
+                'finish_reason' => 'stop',
+                'message' => ['role' => 'assistant', 'content' => 'hello'],
+            ]],
+            'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+        ], \JSON_THROW_ON_ERROR), ['response_headers' => ['content-type' => 'application/json']]));
+
+        $result = $this->makeProvider(httpClient: $client)->chat(
+            [['role' => 'user', 'content' => 'hi']],
+            ['model' => 'mistral-large-latest'],
+        );
+
+        $this->assertSame('hello', $result['content']);
+    }
+
+    public function testChatKeepsOnlyTheVisibleTextFromThinkingParts(): void
+    {
+        $client = new MockHttpClient(static fn () => new MockResponse(json_encode([
+            'choices' => [[
+                'finish_reason' => 'stop',
+                'message' => [
+                    'role' => 'assistant',
+                    'content' => [
+                        ['type' => 'thinking', 'thinking' => [['type' => 'text', 'text' => 'draft']]],
+                        ['type' => 'text', 'text' => 'ok'],
+                    ],
+                ],
+            ]],
+            'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 4, 'total_tokens' => 14],
+        ], \JSON_THROW_ON_ERROR), ['response_headers' => ['content-type' => 'application/json']]));
+
+        $result = $this->makeProvider(httpClient: $client)->chat(
+            [['role' => 'user', 'content' => 'hi']],
+            ['model' => 'mistral-large-4'],
+        );
+
+        $this->assertSame('ok', $result['content']);
+        $this->assertSame(10, $result['usage']['prompt_tokens']);
+    }
+
+    public function testChatHttpErrorKeepsTheUpstreamStatusForClassification(): void
+    {
+        $client = new MockHttpClient(static fn () => new MockResponse(json_encode([
+            'object' => 'error',
+            'message' => 'Rate limit exceeded',
+            'type' => 'rate_limited',
+            'code' => '1300',
+        ], \JSON_THROW_ON_ERROR), [
+            'http_code' => 429,
+            'response_headers' => ['content-type' => 'application/json'],
+        ]));
+
+        try {
+            $this->makeProvider(httpClient: $client)->chat(
+                [['role' => 'user', 'content' => 'hi']],
+                ['model' => 'mistral-large-4'],
+            );
+            $this->fail('Expected a ProviderException');
+        } catch (ProviderException $e) {
+            $this->assertSame(429, $e->getContext()['status_code'] ?? null);
+            $this->assertSame('rate_limited', $e->getContext()['error_type'] ?? null);
+            $this->assertSame('chat', $e->getContext()['stage'] ?? null);
+        }
+    }
+
+    public function testChatStreamErrorFrameFailsInsteadOfEndingEmpty(): void
+    {
+        $chunks = [
+            'data: {"object":"error","message":"Internal error","type":"internal_error","code":"3000","raw_status_code":500}'."\n",
+        ];
+        $client = new MockHttpClient(static fn () => new MockResponse($chunks, [
+            'response_headers' => ['content-type' => 'text/event-stream'],
+        ]));
+
+        $events = [];
+        try {
+            $this->makeProvider(httpClient: $client)->chatStream(
+                [['role' => 'user', 'content' => 'hi']],
+                static function (string|array $chunk) use (&$events): void {
+                    $events[] = $chunk;
+                },
+                ['model' => 'mistral-large-4'],
+            );
+            $this->fail('Expected a ProviderException');
+        } catch (ProviderException $e) {
+            $this->assertSame(500, $e->getContext()['status_code'] ?? null);
+            $this->assertSame('chat_stream', $e->getContext()['stage'] ?? null);
+            $this->assertSame([], $events);
+        }
+    }
+
+    public function testChatStreamSplitsThinkingPartsFromTheAnswer(): void
+    {
+        $chunks = [
+            'data: {"choices":[{"delta":{"content":[{"type":"thinking","thinking":[{"type":"text","text":"draft"}]}]},"finish_reason":null}]}'."\n",
+            'data: {"choices":[{"delta":{"content":[{"type":"text","text":"ok"}]},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}'."\n"
+                .'data: [DONE]'."\n",
+        ];
+        $client = new MockHttpClient(static fn () => new MockResponse($chunks, [
+            'response_headers' => ['content-type' => 'text/event-stream'],
+        ]));
+
+        $events = [];
+        $result = $this->makeProvider(httpClient: $client)->chatStream(
+            [['role' => 'user', 'content' => 'hi']],
+            static function (string|array $chunk) use (&$events): void {
+                $events[] = $chunk;
+            },
+            ['model' => 'mistral-large-4'],
+        );
+
+        $this->assertSame([
+            ['type' => 'reasoning', 'content' => 'draft'],
+            'ok',
+            ['type' => 'finish', 'finish_reason' => 'stop'],
+        ], $events);
+        $this->assertSame(3, $result['usage']['prompt_tokens']);
+    }
+
     public function testTranslateAudioIsNotSupported(): void
     {
         $this->expectExceptionMessageContains('does not support audio translation');

@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -9,7 +10,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'BUSER')]
-#[ORM\Index(columns: ['BMAIL'], name: 'BMAIL')]
+#[ORM\UniqueConstraint(name: 'UNIQ_BUSER_BMAIL', columns: ['BMAIL'])]
 #[ORM\Index(columns: ['BINTYPE'], name: 'BINTYPE')]
 #[ORM\Index(columns: ['BPROVIDERID'], name: 'BPROVIDERID')]
 #[ORM\Index(columns: ['BUSERLEVEL'], name: 'BUSERLEVEL')]
@@ -194,6 +195,41 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getUserDetails(): array
     {
         return $this->userDetails;
+    }
+
+    /**
+     * Name shown next to this account. Falls back to the email when no name is stored.
+     *
+     * Profile saves camelCase (`firstName`); directory login saves snake_case (`first_name`).
+     */
+    public function getDisplayName(): string
+    {
+        $full = $this->detailString(['full_name', 'fullName', 'display_name']);
+        if ('' !== $full) {
+            return $full;
+        }
+
+        $combined = trim($this->detailString(['first_name', 'firstName']).' '.$this->detailString(['last_name', 'lastName']));
+        if ('' !== $combined) {
+            return $combined;
+        }
+
+        return $this->mail;
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    private function detailString(array $keys): string
+    {
+        foreach ($keys as $key) {
+            $value = $this->userDetails[$key] ?? null;
+            if (\is_string($value) && '' !== trim($value)) {
+                return trim($value);
+            }
+        }
+
+        return '';
     }
 
     public function setUserDetails(array $userDetails): self
@@ -533,15 +569,39 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
-     * Get user's preferred language/locale
-     * Returns 'de', 'en', etc. for email translations.
+     * Stored account language, or null when the account has none yet.
+     * Callers that must always have a locale use {@see getLocale()}.
+     */
+    public function getPreferredLanguage(): ?string
+    {
+        return AccountLanguage::normalize($this->getUserDetails()['language'] ?? null);
+    }
+
+    /**
+     * Store a signup language only when the account does not have one yet.
+     */
+    public function applySignupLanguage(?string $language): void
+    {
+        if (null !== $this->getPreferredLanguage()) {
+            return;
+        }
+
+        $normalized = AccountLanguage::normalize($language);
+        if (null === $normalized) {
+            return;
+        }
+
+        $details = $this->getUserDetails();
+        $details['language'] = $normalized;
+        $this->setUserDetails($details);
+    }
+
+    /**
+     * Get user's preferred language/locale.
+     * Returns 'de', 'en', etc. for email translations. Falls back to English.
      */
     public function getLocale(): string
     {
-        $details = $this->getUserDetails();
-        $language = $details['language'] ?? 'en';
-
-        // Ensure we return a valid locale code (matches SPA supportedLanguages)
-        return in_array($language, ['de', 'en', 'es', 'tr', 'fr'], true) ? $language : 'en';
+        return $this->getPreferredLanguage() ?? 'en';
     }
 }

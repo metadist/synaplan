@@ -13,7 +13,7 @@
         autocomplete="username"
         required
         :placeholder="$t('setup.admin.emailPlaceholder')"
-        class="w-full px-3 py-2.5 surface-chip txt-primary placeholder:txt-secondary text-sm"
+        class="w-full px-3 py-2.5 rounded-xl surface-chip txt-primary placeholder:txt-secondary text-sm"
         data-testid="setup-admin-email"
       />
     </label>
@@ -26,12 +26,12 @@
           :type="showPassword ? 'text' : 'password'"
           autocomplete="new-password"
           required
-          class="w-full px-3 py-2.5 pr-11 surface-chip txt-primary text-sm"
+          class="w-full px-3 py-2.5 pr-11 rounded-xl surface-chip txt-primary text-sm"
           data-testid="setup-admin-password"
         />
         <button
           type="button"
-          class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg icon-ghost flex items-center justify-center"
+          class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-xl icon-ghost flex items-center justify-center"
           :aria-label="$t('setup.admin.togglePassword')"
           @click="showPassword = !showPassword"
         >
@@ -49,7 +49,7 @@
         :type="showPassword ? 'text' : 'password'"
         autocomplete="new-password"
         required
-        class="w-full px-3 py-2.5 surface-chip txt-primary text-sm"
+        class="w-full px-3 py-2.5 rounded-xl surface-chip txt-primary text-sm"
         data-testid="setup-admin-confirm"
       />
     </label>
@@ -64,7 +64,7 @@
 
     <button
       type="submit"
-      class="btn-primary w-full py-2.5 rounded-lg text-sm font-semibold"
+      class="btn-primary w-full py-2.5 rounded-xl text-sm font-semibold"
       :disabled="busy"
       data-testid="setup-admin-submit"
     >

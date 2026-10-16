@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { TrashIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
 import { providerHelpByEnvVar } from '@/utils/providerHelp'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
+const route = useRoute()
 
 interface Props {
   fieldKey: string
@@ -61,12 +64,34 @@ const inputType = computed(() => {
  * look like?" is the question an admin actually has. Fields without an example
  * keep the previous behaviour.
  */
+const descriptionKey = computed(() => `admin.config.fields.${props.fieldKey}`)
+
+const description = computed(() =>
+  te(descriptionKey.value) ? t(descriptionKey.value) : props.schema.description
+)
+
+/**
+ * Feature switches are stored as FEATURE_* env names. People already have a
+ * short name for each one under group policies; use that as the heading and
+ * keep the env name beside it so an admin can still match a pin.
+ */
+const featureTitle = computed(() => {
+  if (!props.fieldKey.startsWith('FEATURE_')) return ''
+  const key = `people.policies.feature.${props.fieldKey.slice('FEATURE_'.length)}`
+  return te(key) ? t(key) : ''
+})
+
 const placeholder = computed(() => {
   if (props.value.isMasked && !isDirty.value && props.value.isSet) {
     return '••••••••'
   }
-  return props.schema.placeholder || props.schema.description
+  return props.schema.placeholder || description.value
 })
+
+function optionLabel(opt: string): string {
+  const key = `admin.config.fieldOptions.${props.fieldKey}.${opt}`
+  return te(key) ? t(key) : opt
+}
 
 // Handle input change
 function handleInput(event: Event) {
@@ -82,12 +107,17 @@ function handleToggle() {
   emit('update', props.fieldKey, newValue)
 }
 
-// Save changes
+// Save changes. An emptied field that already had a value is a clear.
 function saveChanges() {
-  if (isDirty.value && localValue.value !== '') {
-    emit('update', props.fieldKey, localValue.value)
-    isDirty.value = false
-  }
+  if (!isDirty.value) return
+  if (localValue.value === '' && !props.value.isSet) return
+  emit('update', props.fieldKey, localValue.value)
+  isDirty.value = false
+}
+
+function clearValue() {
+  isDirty.value = false
+  emit('update', props.fieldKey, '')
 }
 
 // Reset to original
@@ -127,6 +157,19 @@ const showDbOverrideHint = computed(
 const isPinnedByEnv = computed(() => props.value.envOverride === true)
 
 /**
+ * Booleans and selects always have a value. Every other field can be emptied:
+ * an empty save deletes the stored row and the default applies again.
+ */
+const canClear = computed(
+  () =>
+    props.schema.type !== 'boolean' &&
+    props.schema.type !== 'select' &&
+    props.value.isSet &&
+    !props.disabled &&
+    !isPinnedByEnv.value
+)
+
+/**
  * What the instance actually does, which is what the toggle has to show while an
  * environment variable pins the field. The stored row usually still holds the
  * shipped default, so rendering `localValue` here would put an "Enabled" switch
@@ -141,23 +184,45 @@ const effectiveValueLabel = computed(() =>
 )
 
 const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
+
+/** `?highlight=KEY` from a search result rings the field it points at. */
+const isHighlighted = computed(() => route.query.highlight === props.fieldKey)
 </script>
 
 <template>
   <!--
     A field with another editor (managedBy: instance provider keys live under
-    AI infrastructure › Models & keys) is never rendered as an input here —
+    AI infrastructure › Providers & keys) is never rendered as an input here —
     the parent shows ManagedKeysStatusCard instead. This guard keeps that
     true for any caller.
   -->
-  <div v-if="!schema.managedBy" class="config-field">
+  <div
+    v-if="!schema.managedBy"
+    :data-config-field="fieldKey"
+    :class="[
+      'config-field',
+      isHighlighted &&
+        'rounded-lg ring-2 ring-[var(--brand)] ring-offset-4 ring-offset-transparent',
+    ]"
+    :data-testid="isHighlighted ? 'config-field-highlighted' : undefined"
+  >
     <div class="flex items-center justify-between mb-1.5">
       <div class="flex items-center gap-1.5 min-w-0">
-        <label :for="fieldKey" class="flex items-center gap-2 text-sm font-medium txt-primary">
-          <code class="text-xs bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">{{
+        <label
+          :for="fieldKey"
+          class="flex items-center gap-2 text-sm font-medium txt-primary min-w-0"
+        >
+          <span v-if="featureTitle" class="truncate" data-testid="config-field-title">{{
+            featureTitle
+          }}</span>
+          <code class="text-xs bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded shrink-0">{{
             fieldKey
           }}</code>
-          <Icon :icon="statusIcon" :class="['w-4 h-4', statusColor]" />
+          <Icon
+            :icon="statusIcon"
+            :class="['w-4 h-4 shrink-0', statusColor]"
+            :title="value.isSet ? $t('admin.config.valueSet') : $t('admin.config.valueEmpty')"
+          />
         </label>
         <ProviderHelpHint
           v-if="helpMeta"
@@ -171,7 +236,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
       </span>
     </div>
 
-    <p class="text-xs txt-secondary mb-2">{{ schema.description }}</p>
+    <p class="text-xs txt-secondary mb-2">{{ description }}</p>
 
     <!-- Boolean Toggle -->
     <div v-if="schema.type === 'boolean'" class="flex items-center gap-3">
@@ -216,17 +281,17 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
         :id="fieldKey"
         :value="localValue"
         :disabled="disabled"
-        class="flex-1 px-3 py-2 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+        class="flex-1 px-3 py-2 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
         @change="handleInput"
       >
         <option v-for="opt in schema.options" :key="opt" :value="opt">
-          {{ opt }}
+          {{ optionLabel(opt) }}
         </option>
       </select>
       <button
         v-if="isDirty"
         type="button"
-        class="btn-primary px-4 py-2 rounded-lg"
+        class="btn-primary inline-flex items-center px-4 py-2 min-h-10 rounded-xl"
         @click="saveChanges"
       >
         {{ $t('common.save') }}
@@ -234,6 +299,14 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
     </div>
 
     <!-- Text/Password/URL/Email/Number Input -->
+    <!--
+      A settings page full of password inputs looks like a sign-in form to the
+      browser's password manager: it fills the saved account password into the
+      first secret field (and the e-mail into the text field before it), and
+      handleInput would then offer that password for saving as, say, a WhatsApp
+      token. `new-password` is the one value Chrome honours for "do not fill a
+      saved credential here"; `off` covers the other types and Firefox/Safari.
+    -->
     <div v-else class="flex gap-2">
       <div class="relative flex-1">
         <input
@@ -242,8 +315,12 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
           :value="localValue"
           :placeholder="placeholder"
           :disabled="disabled"
+          :autocomplete="schema.type === 'password' ? 'new-password' : 'off'"
+          data-1p-ignore
+          data-lpignore="true"
+          data-bwignore
           :class="[
-            'w-full px-3 py-2 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none',
+            'w-full px-3 py-2 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none',
             schema.type === 'password' && 'pr-10',
             disabled && 'opacity-50 cursor-not-allowed',
           ]"
@@ -264,9 +341,20 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 
       <!-- Action buttons -->
       <button
+        v-if="canClear"
+        type="button"
+        class="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 min-h-10 rounded-xl font-medium"
+        :title="$t('admin.config.clearHint')"
+        data-testid="config-field-clear"
+        @click="clearValue"
+      >
+        <TrashIcon class="w-5 h-5" />
+        {{ $t('admin.config.clear') }}
+      </button>
+      <button
         v-if="isDirty"
         type="button"
-        class="btn-secondary px-3 py-2 rounded-lg"
+        class="btn-secondary inline-flex items-center justify-center px-3 py-2 min-h-10 rounded-xl"
         :title="$t('common.reset')"
         @click="resetValue"
       >
@@ -275,7 +363,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
       <button
         v-if="isDirty"
         type="button"
-        class="btn-primary px-4 py-2 rounded-lg"
+        class="btn-primary inline-flex items-center px-4 py-2 min-h-10 rounded-xl"
         @click="saveChanges"
       >
         {{ $t('common.save') }}

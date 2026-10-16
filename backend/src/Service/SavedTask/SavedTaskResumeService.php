@@ -176,7 +176,7 @@ final readonly class SavedTaskResumeService
         $rawInputs = is_array($node->params['inputs'] ?? null) ? $node->params['inputs'] : $node->inputs;
         $args = $this->inputs->resolveAll($rawInputs, $context);
         // Stored approval arguments are redacted; compare like with like.
-        if ($this->argsDiffer($this->redactor->redact($args), $approval->getArgs() ?? [])) {
+        if ($this->argsDiffer($this->redactor->redact($args), \App\Service\Tool\ApprovalService::executionArgs($approval))) {
             return 'This approval no longer matches the step.';
         }
         $descriptor = $this->registry->get($task->getOwnerId(), $toolName);

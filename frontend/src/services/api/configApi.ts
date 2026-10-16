@@ -1,3 +1,7 @@
+import {
+  GetApiConfigModelsListResponseSchema,
+  PostApiConfigModelsDefaultsSaveResponseSchema,
+} from '@/generated/api-schemas'
 import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
 import { httpClient } from './httpClient'
 import { z } from 'zod'
@@ -7,6 +11,10 @@ export interface ModelsResponse {
   models: Partial<Record<Capability, AIModel[]>>
   /** Provider-level availability of this installation (key/URL configured). */
   providers: ProviderAvailability[]
+  /** Capabilities a group allow-list limits for this member. */
+  restricted?: string[]
+  /** Groups whose model lists were combined for this member. */
+  groupLimits?: { names: string[]; combined: boolean }
 }
 
 export interface DefaultsResponse {
@@ -17,8 +25,13 @@ export interface DefaultsResponse {
 }
 
 export interface SaveDefaultsRequest {
-  defaults: Partial<Record<Capability, number>>
+  defaults: Partial<Record<Capability, number>> & { VOICE_LIVE?: number }
+  /** Admin only: save the instance defaults guests and members without their own choice use. */
+  global?: boolean
 }
+
+/** `user`: the signed-in person's defaults. `instance` (admin only): everyone else's. */
+export type DefaultsScope = 'user' | 'instance'
 
 export interface ModelCheckResponse {
   available: boolean
@@ -36,25 +49,38 @@ export interface ModelCheckResponse {
  * Get all available models grouped by capability
  */
 export const getModels = async (): Promise<ModelsResponse> => {
-  return httpClient<ModelsResponse>('/api/v1/config/models')
+  // The OpenAPI model object names the chat fields and passes the rest through.
+  // Runtime validation keeps priceKnown; the app still uses ModelsResponse
+  // because the other capability lists are not spelled out on the schema.
+  const data = await httpClient('/api/v1/config/models', {
+    schema: GetApiConfigModelsListResponseSchema,
+  })
+  return data as ModelsResponse
 }
 
 /**
  * Get current default model configuration
  */
-export const getDefaultModels = async (): Promise<DefaultsResponse> => {
-  return httpClient<DefaultsResponse>('/api/v1/config/models/defaults')
+export const getDefaultModels = async (
+  scope: DefaultsScope = 'user'
+): Promise<DefaultsResponse> => {
+  const query = scope === 'instance' ? '?scope=instance' : ''
+  return httpClient<DefaultsResponse>(`/api/v1/config/models/defaults${query}`)
 }
 
+export type SaveDefaultsResponse = z.infer<typeof PostApiConfigModelsDefaultsSaveResponseSchema>
+
 /**
- * Save default model configuration
+ * Save default model configuration. `replaced` lists capabilities whose saved
+ * model does not apply, mapped to the model that applies instead.
  */
 export const saveDefaultModels = async (
   defaults: SaveDefaultsRequest
-): Promise<{ success: boolean; message: string }> => {
-  return httpClient<{ success: boolean; message: string }>('/api/v1/config/models/defaults', {
+): Promise<SaveDefaultsResponse> => {
+  return httpClient('/api/v1/config/models/defaults', {
     method: 'POST',
     body: JSON.stringify(defaults),
+    schema: PostApiConfigModelsDefaultsSaveResponseSchema,
   })
 }
 

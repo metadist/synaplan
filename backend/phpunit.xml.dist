@@ -18,25 +18,34 @@
         <server name="SHELL_VERBOSITY" value="-1" />
         <server name="KERNEL_CLASS" value="App\Kernel" force="true" />
         <env name="SYMFONY_DEPRECATIONS_HELPER" value="weak" />
-        <env name="MAILER_DSN" value="null://null" />
-        <env name="AI_DEFAULT_PROVIDER" value="test" />
+        <!-- force="true" wherever the dev container's environment differs from CI:
+             real env vars beat values without it, so the local suite would send
+             mail, call paid AI APIs with the developer's keys and see live sidecars. -->
+        <env name="MAILER_DSN" value="null://null" force="true" />
+        <env name="AI_DEFAULT_PROVIDER" value="test" force="true" />
+        <env name="LOG_LEVEL" value="error" force="true" />
         <!-- Docker/backend/.env may set flock:///var/www/uploads (not writable for www-data under bind mounts). -->
         <env name="LOCK_DSN" value="flock:///tmp" force="true" />
         <!-- AI Provider API Keys (defaults for testing) -->
-        <env name="ANTHROPIC_API_KEY" value="" />
-        <env name="OPENAI_API_KEY" value="" />
-        <env name="GROQ_API_KEY" value="" />
-        <env name="GOOGLE_GEMINI_API_KEY" value="" />
-        <env name="XAI_API_KEY" value="" />
+        <env name="ANTHROPIC_API_KEY" value="" force="true" />
+        <env name="OPENAI_API_KEY" value="" force="true" />
+        <env name="GROQ_API_KEY" value="" force="true" />
+        <env name="GOOGLE_GEMINI_API_KEY" value="" force="true" />
+        <env name="XAI_API_KEY" value="" force="true" />
         <!-- Brave Search API (defaults for testing) -->
-        <env name="BRAVE_SEARCH_API_KEY" value="" />
+        <env name="BRAVE_SEARCH_API_KEY" value="" force="true" />
         <env name="BRAVE_SEARCH_API_URL" value="https://api.search.brave.com/res/v1" />
-        <env name="BRAVE_SEARCH_ENABLED" value="false" />
+        <env name="BRAVE_SEARCH_ENABLED" value="false" force="true" />
         <env name="BRAVE_SEARCH_COUNT" value="10" />
         <env name="BRAVE_SEARCH_COUNTRY" value="us" />
         <env name="BRAVE_SEARCH_SEARCH_LANG" value="en" />
         <!-- Qdrant (defaults for testing — empty = disabled) -->
-        <env name="QDRANT_URL" value="" />
+        <env name="QDRANT_URL" value="" force="true" />
+        <!-- Compose wires the compute sidecar and pins the feature on; CI has neither.
+             Empty FEATURE_* means "not pinned", so BCONFIG decides as in CI. -->
+        <env name="COMPUTE_URL" value="" force="true" />
+        <env name="FEATURE_COMPUTE_ENABLED" value="" force="true" />
+        <env name="FEATURE_COMPUTE_WORKSPACES_ENABLED" value="" force="true" />
         <!-- Stripe / Billing (force valid-looking keys so BillingService::isEnabled()=true in tests) -->
         <env name="STRIPE_SECRET_KEY" value="sk_test_fakeKeyForTestSuite000000000000" force="true" />
         <!-- Must match StripeWebhookControllerTest + StripeSignatureHelper; Docker/backend/.env must not win -->
@@ -50,9 +59,9 @@
         <env name="WHISPER_BINARY" value="/usr/local/bin/whisper" />
         <env name="WHISPER_MODELS_PATH" value="/tmp/whisper-models" />
         <env name="WHISPER_DEFAULT_MODEL" value="base" />
-        <env name="WHISPER_ENABLED" value="false" />
+        <env name="WHISPER_ENABLED" value="false" force="true" />
         <env name="FFMPEG_BINARY" value="/usr/bin/ffmpeg" />
-        <env name="SYNAPLAN_TTS_URL" value="" />
+        <env name="SYNAPLAN_TTS_URL" value="" force="true" />
         <!-- Office engine off in tests. Docker compose sets OFFICE_CONVERT_URL
              when the Collabora sidecar is up; without force=true, kernel tests
              (runtime config, sorter snapshots) would see the live engine. -->

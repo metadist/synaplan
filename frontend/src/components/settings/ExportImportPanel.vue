@@ -19,12 +19,15 @@
         {{ sectionLabel(section.kind) }}
         <span class="txt-secondary">({{ section.itemCount }})</span>
       </label>
+      <p v-if="selectedKinds.includes('agents')" class="txt-secondary text-sm">
+        {{ $t('bundle.publishedOnly') }}
+      </p>
     </fieldset>
 
     <div class="flex flex-wrap gap-2">
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="selectedKinds.length === 0 || busy"
         data-testid="btn-bundle-export"
         @click="exportBundle"
@@ -33,7 +36,7 @@
       </button>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         data-testid="btn-bundle-file"
         @click="bundleFileInput?.click()"
       >
@@ -76,7 +79,7 @@
       </label>
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="busy"
         data-testid="btn-bundle-import"
         @click="importBundle"
@@ -99,6 +102,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { BUNDLE_PANEL_I18N_NAMESPACES, useI18nNamespaces } from '@/i18n'
 import { isBundleEnabled } from '@/composables/useBundleFeature'
 import { useNotification } from '@/composables/useNotification'
 import {
@@ -118,6 +122,7 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
+useI18nNamespaces(BUNDLE_PANEL_I18N_NAMESPACES)
 const { success, error: showError } = useNotification()
 
 const visible = computed(() => isBundleEnabled())

@@ -8,6 +8,7 @@ use App\Model\ModelCatalog;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Applies {@see ModelCatalog}::RETIREMENTS to BMODELS on every deploy.
@@ -39,12 +40,23 @@ use Psr\Log\LoggerInterface;
  *   - Rows absent from BMODELS are skipped, not inserted: a retired model that
  *     an install never had is nothing to record.
  */
-final readonly class ModelRetirementSeeder
+#[AsTaggedItem(priority: 340)]
+final readonly class ModelRetirementSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
         private LoggerInterface $logger,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'model-retirements';
+    }
+
+    public function description(): string
+    {
+        return 'BMODELS — deactivate models retired upstream';
     }
 
     public function seed(): SeedResult

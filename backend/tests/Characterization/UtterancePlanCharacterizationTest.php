@@ -226,6 +226,34 @@ final class UtterancePlanCharacterizationTest extends TestCase
                     'reply_node' => 'n3',
                 ],
             ],
+
+            // An attached PDF edit is file work. The sandbox still cannot change
+            // PDF text in place; the step exists so the reply can say that.
+            'pdf_edit_attached_file' => [
+                'utterance' => "Change 'Dummy PDF file' to 'PDF File' in the attached PDF",
+                'plan' => [
+                    'version' => 1,
+                    'language' => 'en',
+                    'tasks' => [
+                        [
+                            'id' => 'n1',
+                            'capability' => 'code_run',
+                            'depends_on' => [],
+                            'params' => [
+                                'image' => 'python',
+                                'script' => "print('cannot change text inside a PDF in place')",
+                            ],
+                        ],
+                        [
+                            'id' => 'n2',
+                            'capability' => 'compose_reply',
+                            'depends_on' => ['n1'],
+                            'inputs' => ['text' => '$n1.text'],
+                        ],
+                    ],
+                    'reply_node' => 'n2',
+                ],
+            ],
         ];
     }
 }

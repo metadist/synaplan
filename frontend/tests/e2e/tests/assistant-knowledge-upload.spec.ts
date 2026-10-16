@@ -3,15 +3,13 @@ import { isAgentsEnabled } from '../helpers/features'
 import { TIMEOUTS } from '../config/config'
 
 test.describe('@ci Assistants knowledge upload', () => {
-  test('V1 Add a file does not scroll the app shell', async ({ page, request, credentials }) => {
+  test('Add a file does not scroll the app shell', async ({ page, request, credentials }) => {
     test.skip(
       !(await isAgentsEnabled(request, credentials)),
       'Assistants are off; the builder is not reachable'
     )
 
-    // Apply V1 before the first paint so useDesignVariant reads it on init.
     // This spec does not need the chat composer (openApp would wait for it).
-    await page.addInitScript(() => localStorage.setItem('design-variant', 'v1'))
     await page.goto('/ai/assistants')
     await expect(page.locator('[data-testid="view-assistants"]')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,

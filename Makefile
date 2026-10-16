@@ -1,4 +1,7 @@
-.PHONY: help lint format test build deps audit test-stack-build ci-local test-e2e-minimal
+.PHONY: help up lint format test build deps audit test-stack-build ci-local test-e2e-minimal
+
+up: ## Start the stack (status page first, then remaining images)
+	./scripts/compose-up.sh
 
 help: ## Show this help
 	@echo "Common commands (runs in backend and/or frontend as appropriate):"
@@ -20,23 +23,27 @@ test: ## Run all tests (backend + frontend unit tests)
 	$(MAKE) -C backend test
 	$(MAKE) -C frontend test
 
-ci-local: ## Unit/static CI mirror (lint, phpstan, tests, vue-tsc). Not E2E — run make test-e2e before push.
+ci-local: ## Unit/static CI mirror (lint, phpstan, deptrac, tests, vue-tsc). Not E2E — run make test-e2e before push.
 	$(MAKE) lint
 	$(MAKE) -C backend phpstan
+	$(MAKE) -C backend deptrac
 	$(MAKE) test
 	docker compose exec -T frontend npm run check:types
 
 # Restart Vite first so a stale optimize-deps cache can't serve 504s (blank app
 # -> openApp timeout), then wait until it actually re-serves a core module —
 # without the wait the first run races the optimize-deps rebuild and hits the
-# very blank-app it was meant to prevent. Costs a few seconds; skip both with
+# very blank-app it was meant to prevent. Until Vite starts, the container's
+# boot-status page answers every path with 200 and an X-Synaplan-Boot header,
+# so a bare 200 is not "ready". Costs a few seconds; skip both with
 # SKIP_FRONTEND_RESTART=1 when targeting a non-dev BASE_URL (e.g. :8001 stack).
 test-e2e: ## Run e2e tests headless (fast loop, dev stack :5173 or BASE_URL). HEADED=1 to watch.
 	@[ -n "$(SKIP_FRONTEND_RESTART)" ] || { \
 		docker compose restart frontend; \
-		echo "Waiting for Vite to re-optimize deps on :5173 ..."; \
-		i=0; until curl -fsS -o /dev/null http://localhost:5173/src/main.ts 2>/dev/null; do \
-			i=$$((i+1)); [ $$i -ge 60 ] && { echo "frontend :5173 not ready after 60s" >&2; exit 1; }; \
+		echo "Waiting for the Vite dev server on :5173 ..."; \
+		i=0; until headers=$$(curl -fsS -D - -o /dev/null http://localhost:5173/src/main.ts 2>/dev/null) \
+			&& ! printf '%s' "$$headers" | grep -qi '^x-synaplan-boot:'; do \
+			i=$$((i+1)); [ $$i -ge 120 ] && { echo "frontend :5173 not ready after 120s" >&2; exit 1; }; \
 			sleep 1; done; }
 	$(MAKE) -C frontend test-e2e
 

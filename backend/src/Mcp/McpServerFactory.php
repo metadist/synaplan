@@ -16,7 +16,7 @@ use App\Repository\DesktopDeviceRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptRepository;
 use App\Service\Agent\AssistantAliasResolver;
-use App\Service\ConversationSummaryRefreshDispatcher;
+use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Desktop\DesktopJobContract;
 use App\Service\Desktop\DesktopJobResultNotifier;
@@ -26,11 +26,12 @@ use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\File\FileHelper;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\Memory\UserMemoryService;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MessageProcessor;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
-use App\Service\StorageQuotaService;
-use App\Service\UserMemoryService;
+use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Mcp\Exception\ResourceNotFoundException;
 use Mcp\Exception\ToolCallException;
@@ -93,6 +94,7 @@ final class McpServerFactory
         private readonly LoggerInterface $logger,
         private readonly EventRingStore $eventRing,
         private readonly ?AssistantAliasResolver $assistantAliases = null,
+        private readonly ?GeneratedMediaTextRenderer $mediaTextRenderer = null,
     ) {
     }
 
@@ -299,11 +301,11 @@ final class McpServerFactory
     }
 
     /**
-     * @return \Closure(int, list<mixed>, list<mixed>, string, string): array<string, mixed>
+     * @return \Closure(int, list<mixed>, ?list<mixed>, string, string): array<string, mixed>
      */
     private function agentCheckinHandler(DesktopDevice $device): \Closure
     {
-        return function (int $protocol = DesktopJobContract::PROTOCOL_VERSION, array $capabilities = [], array $enabledSkills = [], string $agentKind = 'synaplan-desktop', string $status = 'idle') use ($device): array {
+        return function (int $protocol = DesktopJobContract::PROTOCOL_VERSION, array $capabilities = [], ?array $enabledSkills = null, string $agentKind = 'synaplan-desktop', string $status = 'idle') use ($device): array {
             $now = time();
 
             $device->touchLastSeen();
@@ -312,6 +314,11 @@ final class McpServerFactory
                     $capabilities,
                     static fn ($c): bool => \is_string($c),
                 )));
+            }
+            // null means the field was omitted: older clients keep the stored list.
+            // An array, including an empty one, replaces it.
+            if (null !== $enabledSkills) {
+                $device->setEnabledSkills(self::normalizeSkillNames($enabledSkills));
             }
             $this->desktopDeviceRepository->save($device);
 
@@ -384,6 +391,31 @@ final class McpServerFactory
     }
 
     /**
+     * Skill names the computer may be offered. Invalid entries are dropped.
+     * The caller decides whether an omitted field keeps the stored list.
+     *
+     * @param list<mixed> $enabledSkills
+     *
+     * @return list<string>
+     */
+    private static function normalizeSkillNames(array $enabledSkills): array
+    {
+        $skills = [];
+        foreach ($enabledSkills as $skill) {
+            if (!\is_string($skill)) {
+                continue;
+            }
+            $skill = trim($skill);
+            if (1 !== preg_match('/^[a-z0-9-]{1,64}$/', $skill)) {
+                continue;
+            }
+            $skills[$skill] = $skill;
+        }
+
+        return array_values($skills);
+    }
+
+    /**
      * The frozen `agent_checkin` argument schema (protocol 1, DS18). Public so
      * the contract-fixture test can assert the committed fixtures against the
      * live schema (invariant C9).
@@ -408,7 +440,7 @@ final class McpServerFactory
                 'enabledSkills' => [
                     'type' => 'array',
                     'items' => ['type' => 'string'],
-                    'description' => 'Names of skills currently installed/enabled on the device. A hint so the server can skip jobs the device would refuse — an optimization, not a security boundary.',
+                    'description' => 'Names of skills that may run while the user is away. Omit the field to keep the last report. Send an empty list when none may run. A hint so the server can skip jobs the device would refuse — an optimization, not a security boundary.',
                 ],
                 'agentKind' => [
                     'type' => 'string',
@@ -632,10 +664,12 @@ final class McpServerFactory
                 'success' => true,
                 'chat_id' => $chat->getId(),
                 'title' => $chat->getTitle() ?? 'New Chat',
-                'messages' => array_map(static fn (Message $m): array => [
+                'messages' => array_map(fn (Message $m): array => [
                     'id' => $m->getId(),
                     'role' => 'IN' === $m->getDirection() ? 'user' : 'assistant',
-                    'text' => $m->getText(),
+                    'text' => null !== $this->mediaTextRenderer
+                        ? $this->mediaTextRenderer->forUser($m->getText(), $m->getLanguage(), $user->getLocale())
+                        : GeneratedMediaTextRenderer::renderModel((string) $m->getText()),
                     'topic' => $m->getTopic(),
                     'timestamp' => $m->getUnixTimestamp(),
                 ], $messages),
@@ -825,7 +859,13 @@ final class McpServerFactory
 
             return [
                 'success' => true,
-                'answer' => $answer,
+                'answer' => null !== $this->mediaTextRenderer
+                    ? $this->mediaTextRenderer->forUser(
+                        $answer,
+                        (string) ($classification['language'] ?? 'en'),
+                        $user->getLocale(),
+                    )
+                    : GeneratedMediaTextRenderer::renderModel($answer),
                 'chat_id' => $chat->getId(),
                 'topic' => $classification['topic'] ?? null,
                 'intent' => $classification['intent'] ?? null,

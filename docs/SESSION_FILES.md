@@ -29,9 +29,26 @@ a stable reference (`file:123`, `attached:1`, `path:…`). Budgets are **per
 category**, so a burst of generated documents can never push the picture the
 user is talking about out of the catalog.
 
-**Add no fourth resolver.** `DocumentImageCatalog` (document embedding) and
-`MediaGenerationHandler` (image edits) both delegate here; new consumers should
-too.
+**Add no fourth resolver.** `DocumentImageCatalog` (document embedding),
+`MediaGenerationHandler` (image edits), `FileAnalysisHandler` (document
+follow-ups) and `GET /api/v1/chats/{id}/files` all delegate here; new
+consumers should too.
+
+## Document follow-ups ("No file was provided")
+
+A later turn such as *"check the whole contract"* has no new attachment.
+`FileAnalysisHandler` used to look only at the current message and answer
+that no file was provided. It now asks the catalog for
+`analyzableForFollowUp()` — uploaded documents first, then generated
+documents, then other media — and analyses those. The same fallback sits
+in the multitask `file_analysis` runner.
+
+The chat window lists the catalog above the composer (**Files in this
+chat**). `GET /api/v1/chats/{id}` includes `conversationFiles`; API
+clients can also call `GET /api/v1/chats/{id}/files`. The list is the
+session file history: every file id the conversation still has in hand.
+Clicking a chip attaches that id to the next message; the backend keeps
+using the files even when the client does not re-send them.
 
 ## How a follow-up edit is routed
 

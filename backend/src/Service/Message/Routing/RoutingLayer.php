@@ -13,7 +13,7 @@ namespace App\Service\Message\Routing;
  * {@see RoutingDecision::toClassificationSource()} never changes the
  * `$classification['source']` contract that
  * {@see \App\Service\Multitask\TaskPlanExecutor} gates on
- * (`in_array($source, ['ai_sorting', 'attachment_document_or_audio', 'saved_task'])`).
+ * ({@see \App\Service\Multitask\Plan\PlanEligibility::SOURCES}).
  * This enum documents the cascade order, it does not change it.
  */
 enum RoutingLayer: string

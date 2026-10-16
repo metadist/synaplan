@@ -6,7 +6,7 @@ namespace App\Command;
 
 use App\Entity\UserMemory;
 use App\Repository\UserMemoryRepository;
-use App\Service\FeedbackConstants;
+use App\Service\Feedback\FeedbackConstants;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

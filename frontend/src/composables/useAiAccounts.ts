@@ -1,4 +1,3 @@
-import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
 import { ref } from 'vue'
 import { getMessagesGatewayStatus } from '@/services/api/messagesGatewayApi'
 import { isModuleConfigured } from './useModuleFeature'
@@ -22,6 +21,18 @@ export function isAnthropicAccountsEnabled(): boolean {
   return anthropicEnabled.value
 }
 
+/**
+ * Store a gateway status this screen already loaded.
+ * Availability checks then read that result instead of sending a second
+ * GET /messages-gateway that could fail and hide a page the first response
+ * already proved is available.
+ */
+export function rememberGatewayEnabled(enabled: boolean): void {
+  loadGeneration += 1
+  anthropicEnabled.value = enabled
+  gatewayStatusPromise = Promise.resolve(enabled)
+}
+
 export function loadGatewayEnabled(): Promise<boolean> {
   if (gatewayStatusPromise) {
     return gatewayStatusPromise
@@ -43,30 +54,6 @@ export function loadGatewayEnabled(): Promise<boolean> {
       return false
     })
   return gatewayStatusPromise
-}
-
-export function isAiAccountsEnabled(): boolean {
-  return isHiggsfieldAccountsEnabled() || isAnthropicAccountsEnabled()
-}
-
-/**
- * Both provider sections off: the page is treated as unknown (U11).
- * Kept synchronous so a client-side redirect (legacy /higgsfield) can
- * confirm immediately — an async beforeEnter leaves the old URL in place
- * until GET /messages-gateway returns.
- *
- * `?section=` is the legacy bookmark: allow the hop even when the matching
- * module is not configured; the view hides the empty section.
- */
-export function aiAccountsRouteGuard(to?: RouteLocationNormalized): true | RouteLocationRaw {
-  const section = to?.query.section
-  if (section === 'higgsfield' || section === 'anthropic') {
-    return true
-  }
-  if (isHiggsfieldAccountsEnabled() || isAnthropicAccountsEnabled()) {
-    return true
-  }
-  return { name: 'not-found' }
 }
 
 /** Test helper — clears the in-memory gateway status cache. */

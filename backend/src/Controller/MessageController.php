@@ -7,19 +7,21 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
+use App\Service\Message\EnhanceChangeSummary;
 use App\Service\Message\EnhanceOutputGuard;
 use App\Service\Message\MessageApiFormatter;
+use App\Service\Message\MessageEnqueueService;
 use App\Service\Message\MessagePreProcessor;
-use App\Service\MessageEnqueueService;
 use App\Service\ModelConfigService;
-use App\Service\PremiumFeatureGate;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Stt\SpeechFailure;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -283,7 +285,7 @@ class MessageController extends AbstractController
                 'response_text' => $responseText,
                 'source' => 'WEB',
             ]);
-            $outgoingMessage->setMeta('ai_chat_cost', $recordedChatUsage->chargedCost);
+            $recordedChatUsage->attachChatCost($outgoingMessage);
 
             // NOTE: MessageController doesn't use MessageProcessor, so there's no sorting model info here
             // Only StreamController (which uses MessageProcessor) has sorting model metadata
@@ -338,6 +340,7 @@ class MessageController extends AbstractController
     }
 
     #[Route('/history', name: 'history', methods: ['GET'])]
+    #[OA\Get(path: '/api/v1/messages/history', summary: 'List recent messages for the signed-in user', tags: ['Messages'])]
     public function getHistory(
         Request $request,
         #[CurrentUser] ?User $user,
@@ -430,6 +433,7 @@ class MessageController extends AbstractController
                                 new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
                                 new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
                                 new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
+                                new OA\Property(property: 'voiceReplyFailed', type: 'string', nullable: true, description: 'Voice-reply failure reason when TTS was requested but no audio was stored (provider_error, empty_text, rate_limited)'),
                                 new OA\Property(property: 'language', type: 'string', nullable: true),
                                 new OA\Property(property: 'createdAt', type: 'string', nullable: true),
                                 new OA\Property(
@@ -448,7 +452,7 @@ class MessageController extends AbstractController
                                         type: 'object'
                                     )
                                 ),
-                                new OA\Property(property: 'aiModels', type: 'object', nullable: true, description: 'AI model metadata (chat/sorting/audio)'),
+                                new OA\Property(property: 'aiModels', type: 'object', nullable: true, description: 'AI model metadata (chat/sorting/audio/voice)'),
                                 new OA\Property(property: 'webSearch', type: 'object', nullable: true),
                                 new OA\Property(property: 'searchResults', type: 'array', nullable: true, items: new OA\Items(type: 'object')),
                                 new OA\Property(property: 'multitask', type: 'boolean'),
@@ -608,6 +612,7 @@ class MessageController extends AbstractController
                 'success' => true,
                 'original' => $inputText,
                 'enhanced' => $enhancedText,
+                'summary' => EnhanceChangeSummary::code($inputText, $enhancedText),
             ]);
         } catch (\App\AI\Exception\ProviderException $e) {
             $this->logger->warning('Enhancement provider error', [
@@ -675,6 +680,9 @@ class MessageController extends AbstractController
      * Form-Data: file (single file)
      *
      * Response: { "success": true, "file_id": 123, "filename": "...", "size": 1024, "mime": "...", "file_type": "pdf" }
+     * Audio that could not be transcribed also includes "extraction_error": "audio_transcription_failed"
+     * and "speech_failure": one of speech_off, binary_missing, model_missing, transcription_failed.
+     * speech_failure is a stable code. The provider's error text is not returned.
      */
     #[Route('/upload-file', name: 'upload_file', methods: ['POST'])]
     public function uploadFileForChat(
@@ -861,6 +869,11 @@ class MessageController extends AbstractController
                     ? 'audio_transcription_failed'
                     : 'document_extraction_failed';
                 $response['extraction_strategy'] = $extractMeta['strategy'] ?? 'unknown';
+                if ($isAudio) {
+                    $response['speech_failure'] = SpeechFailure::normalize(
+                        isset($extractMeta['speech_failure']) ? (string) $extractMeta['speech_failure'] : null,
+                    );
+                }
             }
 
             // Include transcribed text for audio files (for microphone input)

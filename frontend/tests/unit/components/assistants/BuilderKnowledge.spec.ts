@@ -5,7 +5,9 @@ import { createI18n } from 'vue-i18n'
 import BuilderKnowledge from '@/components/assistants/BuilderKnowledge.vue'
 import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 vi.mock('@/services/api/promptsApi', () => ({
   promptsApi: {
@@ -17,6 +19,9 @@ vi.mock('@/services/api/promptsApi', () => ({
 
 vi.mock('@/services/filesService', () => ({
   getFileGroups: vi.fn().mockResolvedValue([{ name: 'legal', count: 2 }]),
+  listFiles: vi.fn().mockResolvedValue({
+    files: [{ id: 15, filename: 'invoice.pdf', display_name: 'Invoice', status: 'vectorized' }],
+  }),
 }))
 
 vi.mock('@/services/api/iamApi', () => ({
@@ -59,7 +64,7 @@ function mountKnowledge() {
     createdAt: 1,
     updatedAt: 1,
   }
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   const wrapper = mount(BuilderKnowledge, { global: { plugins: [i18n] } })
   return { wrapper, store }
 }
@@ -83,6 +88,18 @@ describe('BuilderKnowledge', () => {
     await wrapper.get('[data-testid="chk-include-user-files"]').setValue(true)
     expect(store.current?.draft?.knowledge.includeUserFiles).toBe(true)
     expect(store.dirty).toBe(true)
+  })
+
+  it('adds and removes a Library file on the draft without copying it', async () => {
+    const { wrapper, store } = mountKnowledge()
+    await wrapper.vm.$nextTick()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    const select = wrapper.get('[data-testid="select-library-file"]')
+    await select.setValue('15')
+    expect(store.current?.draft?.knowledge.fileIds).toEqual([15])
+    await wrapper.get('[data-testid="btn-remove-library-file-15"]').trigger('click')
+    expect(store.current?.draft?.knowledge.fileIds).toEqual([])
   })
 
   it('hides the file input and keeps a keyboard-focusable upload button', () => {

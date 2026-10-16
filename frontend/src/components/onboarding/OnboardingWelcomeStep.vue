@@ -160,11 +160,7 @@ const aiProviders = computed(() => {
   })
 })
 
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
+const isDark = themeStore.isDark
 
 const { logoSrc } = useBrandLogo(isDark)
 

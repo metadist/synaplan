@@ -7,10 +7,13 @@ namespace App\Tests\Unit;
 use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
+use App\Service\Auth\OidcAccessDenialReason;
+use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcClaimResolver;
 use App\Service\Iam\DirectoryGroupSync;
 use App\Service\ModelConfigService;
 use App\Service\OidcUserService;
+use App\Tests\Support\OidcAccessPolicyFixture;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
@@ -51,6 +54,7 @@ class OidcUserServiceTest extends TestCase
         string $oidcAdminRoles = 'admin,realm-admin,synaplan-admin,administrator',
         string $oidcRoleClaims = 'realm_access.roles,resource_access.{client_id}.roles,groups',
         string $oidcClientId = 'test-client-id',
+        bool $allowUserProvisioning = true,
     ): OidcUserService {
         $sync = $this->createMock(DirectoryGroupSync::class);
         $sync->method('shouldRun')->willReturn(false);
@@ -63,6 +67,7 @@ class OidcUserServiceTest extends TestCase
             $this->externalIdentities,
             new OidcClaimResolver(),
             $sync,
+            OidcAccessPolicyFixture::with(allowUserProvisioning: $allowUserProvisioning),
             $oidcAdminRoles,
             $oidcRoleClaims,
             $oidcClientId,
@@ -402,5 +407,51 @@ class OidcUserServiceTest extends TestCase
             'sub' => 'oidc-sub-xyz',
             'email' => 'overlap@example.com',
         ]);
+    }
+
+    // ========== findOrCreateFromClaims: provisioning switch ==========
+
+    public function testNoAccountIsCreatedWhenProvisioningIsOff(): void
+    {
+        $service = $this->createService(allowUserProvisioning: false);
+        $this->userRepository->method('findOneBy')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+        $this->em->expects($this->never())->method('flush');
+        $this->modelConfigService->expects($this->never())->method('initializeNewUserDefaults');
+
+        try {
+            $service->findOrCreateFromClaims(['sub' => 'new-sub', 'email' => 'new@example.com']);
+            self::fail('A new identity must not be provisioned when provisioning is off');
+        } catch (OidcAccessDeniedException $e) {
+            self::assertSame(OidcAccessDenialReason::ProvisioningDisabled, $e->reason);
+        }
+    }
+
+    public function testExistingAccountStillSignsInWhenProvisioningIsOff(): void
+    {
+        $service = $this->createService(allowUserProvisioning: false);
+        $user = $this->makeKeycloakUser('known@example.com', 'NEW');
+        $this->userRepository->method('findOneBy')->willReturn($user);
+
+        $result = $service->findOrCreateFromClaims(['sub' => 'known-sub', 'email' => 'known@example.com']);
+
+        self::assertSame($user, $result);
+    }
+
+    public function testKindeRoleObjectsArePickedUpForAdminPromotion(): void
+    {
+        $service = $this->createService('admin', 'roles');
+        $user = $this->makeKeycloakUser('ada@example.com', 'NEW');
+        $this->userRepository->method('findOneBy')->willReturn($user);
+
+        $result = $service->findOrCreateFromClaims([
+            'sub' => 'kinde-sub',
+            'email' => 'ada@example.com',
+            'roles' => [['id' => 'r1', 'key' => 'admin', 'name' => 'Admin']],
+        ]);
+
+        self::assertSame('ADMIN', $result->getUserLevel());
+        self::assertSame(['admin'], $result->getUserDetails()['oidc_roles']);
     }
 }

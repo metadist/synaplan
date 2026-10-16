@@ -1,0 +1,66 @@
+{
+  "runs": [
+    {
+      "name": "csv_chart",
+      "weight": 60,
+      "image": "python",
+      "program": "python",
+      "args": ["main.py"],
+      "files": {
+        "main.py": "import csv\nimport matplotlib\nmatplotlib.use(\"Agg\")\nimport matplotlib.pyplot as plt\n\nrows = list(csv.DictReader(open(\"/work/data.csv\")))\nxs = [r[\"x\"] for r in rows]\nys = [float(r[\"y\"]) for r in rows]\nplt.figure()\nplt.plot(xs, ys)\nplt.savefig(\"/out/chart.png\")\nprint(f\"charted {len(rows)} rows\")\n",
+        "data.csv": "x,y\n1,2\n2,4\n3,1\n4,5\n5,3\n6,6\n7,4\n8,7\n9,5\n10,8\n11,6\n12,9\n13,7\n14,10\n15,8\n16,11\n17,9\n18,12\n19,10\n20,13\n"
+      },
+      "timeoutSec": 120,
+      "memoryMb": 512,
+      "cpu": 1.0,
+      "pids": 128,
+      "outputMb": 50
+    },
+    {
+      "name": "xlsx_recalc",
+      "weight": 20,
+      "image": "python",
+      "program": "python",
+      "args": ["main.py"],
+      "files": {
+        "main.py": "from openpyxl import Workbook\n\nwb = Workbook()\nws = wb.active\nfor r in range(1, 101):\n    for c in range(1, 11):\n        ws.cell(row=r, column=c, value=r * c)\nfor row in ws.iter_rows():\n    for cell in row:\n        if isinstance(cell.value, (int, float)):\n            cell.value = round(cell.value * 1.05, 2)\nwb.save(\"/out/recalculated.xlsx\")\nprint(\"recalculated 100x10\")\n"
+      },
+      "timeoutSec": 120,
+      "memoryMb": 512,
+      "cpu": 1.0,
+      "pids": 128,
+      "outputMb": 50
+    },
+    {
+      "name": "long_sleep",
+      "weight": 10,
+      "image": "python",
+      "program": "python",
+      "args": ["main.py"],
+      "files": {
+        "main.py": "import time\n\ntime.sleep(45)\nprint(\"should never print\")\n"
+      },
+      "timeoutSec": 30,
+      "memoryMb": 512,
+      "cpu": 1.0,
+      "pids": 128,
+      "outputMb": 50,
+      "expectTimeout": true
+    },
+    {
+      "name": "huge_stdout",
+      "weight": 10,
+      "image": "python",
+      "program": "python",
+      "args": ["main.py"],
+      "files": {
+        "main.py": "import sys\n\nchunk = (\"SYNAPLAN_LOAD_MARKER\\n\" * 64)\nfor _ in range(1024):\n    sys.stdout.write(chunk)\nsys.stdout.flush()\nprint(\"done\")\n"
+      },
+      "timeoutSec": 120,
+      "memoryMb": 512,
+      "cpu": 1.0,
+      "pids": 128,
+      "outputMb": 50
+    }
+  ]
+}

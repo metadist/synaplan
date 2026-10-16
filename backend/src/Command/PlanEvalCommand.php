@@ -8,7 +8,7 @@ use App\Entity\Message;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Multitask\TaskPlanner;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

@@ -6,7 +6,7 @@ namespace App\Plug;
 
 use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
 
 /**

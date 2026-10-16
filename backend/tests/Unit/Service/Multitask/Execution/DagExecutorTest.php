@@ -832,4 +832,133 @@ final class DagExecutorTest extends TestCase
             array_map(static fn ($f) => $f['type'], $par['files']),
         );
     }
+
+    public function testAnswerNodeRunsWhenDataNodeReportsAnError(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_fetch'],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+        $ran = [];
+        $runner = $this->runner(function (TaskNode $node) use (&$ran): NodeResult {
+            $ran[] = $node->id;
+
+            return match ($node->capability) {
+                Capability::McpFetch => NodeResult::reportableFailure(
+                    'Company CRM reported an error: NotFound',
+                    ['query' => 'Company CRM · search_customers'],
+                ),
+                Capability::Chat => NodeResult::ok('The bucket was not found.'),
+                default => NodeResult::failed('unexpected '.$node->capability->value),
+            };
+        });
+
+        $result = $this->executor($runner)->execute($plan, $this->context());
+
+        self::assertSame(['n1', 'n2'], $ran);
+        self::assertFalse($result['all_failed']);
+        self::assertSame('failed', $result['node_statuses']['n1']);
+        self::assertSame('done', $result['node_statuses']['n2']);
+        self::assertSame('The bucket was not found.', $result['content']);
+    }
+
+    public function testParallelAnswerNodeRunsWhenDataNodeReportsAnError(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_fetch'],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+        $runner = $this->runner(function (TaskNode $node): NodeResult {
+            return match ($node->capability) {
+                Capability::McpFetch => NodeResult::reportableFailure('NotFound', ['query' => 'Backblaze · s3_head_bucket']),
+                Capability::Chat => NodeResult::ok('Not found.'),
+                default => NodeResult::failed('unexpected'),
+            };
+        });
+
+        $result = $this->executor($runner, parallel: true)->execute($plan, $this->context());
+
+        self::assertFalse($result['all_failed']);
+        self::assertSame('done', $result['node_statuses']['n2']);
+        self::assertSame('Not found.', $result['content']);
+    }
+
+    public function testActionNodeStillSkipsOnReportableFailure(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_fetch'],
+                ['id' => 'n2', 'capability' => 'email_me', 'depends_on' => ['n1']],
+            ],
+        ]);
+        $ran = [];
+        $runner = $this->runner(function (TaskNode $node) use (&$ran): NodeResult {
+            $ran[] = $node->id;
+
+            return NodeResult::reportableFailure('NotFound');
+        });
+
+        $result = $this->executor($runner)->execute($plan, $this->context());
+
+        self::assertSame(['n1'], $ran);
+        self::assertSame('skipped', $result['node_statuses']['n2']);
+        self::assertTrue($result['all_failed']);
+    }
+
+    public function testMixedLookupStillRunsTheAnswer(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_fetch'],
+                ['id' => 'n2', 'capability' => 'mcp_fetch'],
+                ['id' => 'n3', 'capability' => 'chat', 'depends_on' => ['n1', 'n2']],
+            ],
+        ]);
+        $runner = $this->runner(function (TaskNode $node): NodeResult {
+            return match ($node->id) {
+                'n1' => NodeResult::ok('real-bucket exists'),
+                'n2' => NodeResult::reportableFailure('NotFound: does-not-exist-123'),
+                'n3' => NodeResult::ok('real-bucket exists. does-not-exist-123 was not found.'),
+                default => NodeResult::failed('unexpected'),
+            };
+        });
+
+        $result = $this->executor($runner)->execute($plan, $this->context());
+
+        self::assertFalse($result['all_failed']);
+        self::assertSame('done', $result['node_statuses']['n1']);
+        self::assertSame('failed', $result['node_statuses']['n2']);
+        self::assertSame('done', $result['node_statuses']['n3']);
+        self::assertSame('real-bucket exists. does-not-exist-123 was not found.', $result['content']);
+    }
+
+    public function testStoppedDependencyStillSkipsTheAnswer(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'condition'],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1']],
+            ],
+        ]);
+        $ran = [];
+        $runner = $this->runner(function (TaskNode $node) use (&$ran): NodeResult {
+            $ran[] = $node->id;
+
+            return NodeResult::stopped('Condition was not met');
+        });
+
+        $result = $this->executor($runner)->execute($plan, $this->context());
+
+        self::assertSame(['n1'], $ran);
+        self::assertSame('skipped', $result['node_statuses']['n2']);
+    }
 }

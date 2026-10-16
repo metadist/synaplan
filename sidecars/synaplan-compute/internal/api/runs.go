@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -349,6 +350,31 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 	if rec.ctx.Err() != nil {
 		return
 	}
+	// Egress runs get a private network plus a throwaway proxy carrying
+	// this run's pin map (CP22). Setup failure fails the run before any
+	// container exists; teardown runs after the run container is gone.
+	var attach *runner.EgressAttachment
+	if len(rec.Req.Egress.Allow) > 0 {
+		egressNet, err := s.docker.SetupEgress(cctx, runner.EgressConfig{Image: s.cfg.ProxyImage}, rec.ID, rec.Req.Egress.Allow)
+		if err != nil {
+			if rec.ctx.Err() != nil {
+				return
+			}
+			log.Printf("egress setup failed for run %s: %v", rec.ID, err)
+			s.audit.Log(audit.Event{Event: audit.RunRefused, RunID: rec.ID, Owner: rec.Owner, Image: rec.Req.Image, Reason: contract.ReasonEgressUnavailable, EgressHosts: hostNames(rec.Req.Egress)})
+			s.finish(rec, contract.StatusFailed, -1, contract.ReasonEgressUnavailable)
+			return
+		}
+		attach = &runner.EgressAttachment{Network: egressNet.Network, ProxyURL: egressNet.ProxyURL}
+		defer func() {
+			// Best-effort and bounded: a hung daemon call must never
+			// stall the semaphore slot in exitExecute. Leftovers carry
+			// the run label for SweepOrphans.
+			tctx, tcancel := context.WithTimeout(context.Background(), cleanupTimeout)
+			defer tcancel()
+			_ = s.docker.TeardownEgress(tctx, egressNet)
+		}()
+	}
 	id, err := s.docker.Create(cctx, runner.Spec{
 		ImageRef:      img.Ref,
 		Cmd:           append([]string{rec.Req.Entry.Program}, rec.Req.Entry.Args...),
@@ -358,6 +384,7 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 		Limits:        rec.Req.Limits,
 		Runtime:       s.tier.Runtime,
 		User:          s.sandboxUser(),
+		Egress:        attach,
 	})
 	if err != nil {
 		if rec.ctx.Err() != nil {
@@ -443,7 +470,53 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 	case code != 0:
 		s.finish(rec, contract.StatusFailed, code, contract.ReasonProgramError)
 	default:
+		// Promote files the script created in its working directory (/work) into
+		// /out so they are harvested as artefacts even when the script did not
+		// write to /out explicitly. The injected script and the mounted input
+		// files are reserved so inputs are never re-surfaced as results.
+		reserved := make(map[string]bool, len(rec.Req.Files))
+		for _, f := range rec.Req.Files {
+			reserved[f.Name] = true
+		}
+		s.promoteWorkOutputs(layout, reserved)
+		// Promotion adds files to /out, so the bytesOut computed above (before
+		// promotion) now understates what is actually served. Recompute it from
+		// /out so usage.bytesOut matches the harvested artefacts. Promoted files
+		// were already counted toward the output-limit check via /work, so this
+		// can never exceed the limit the switch already enforced.
+		promotedOut := artefact.TotalBytes(layout.Out)
+		s.mu.Lock()
+		rec.BytesOut = promotedOut
+		s.mu.Unlock()
 		s.finish(rec, contract.StatusSucceeded, code, "")
+	}
+}
+
+// promoteWorkOutputs copies regular files the script left in /work into /out
+// (unless already present there), so a script that writes result files to its
+// working directory still surfaces them for download. Reserved names (script +
+// inputs) and non-regular entries (symlinks, dirs) are skipped. Best-effort:
+// any per-file error is ignored so it never turns a successful run into a
+// failure.
+func (s *Server) promoteWorkOutputs(layout runner.ScratchLayout, reserved map[string]bool) {
+	entries, err := os.ReadDir(layout.Work)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if reserved[name] || !e.Type().IsRegular() || !names.FileName(name) {
+			continue
+		}
+		outPath := filepath.Join(layout.Out, name)
+		if _, statErr := os.Stat(outPath); statErr == nil {
+			continue
+		}
+		body, readErr := os.ReadFile(filepath.Join(layout.Work, name))
+		if readErr != nil {
+			continue
+		}
+		_ = s.owner.WriteFile(outPath, body)
 	}
 }
 

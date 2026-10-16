@@ -64,4 +64,43 @@ final readonly class ChatActivityNotifier
             ]);
         }
     }
+
+    /**
+     * One event for many viewers. The payload is only the chat id: a watcher
+     * reloads the thread, and a person whose access was just revoked must not
+     * receive message text in the push.
+     *
+     * @param list<int> $userIds
+     */
+    public function publishToUsers(Chat $chat, array $userIds, string $direction): void
+    {
+        $chatId = $chat->getId();
+        if (null === $chatId) {
+            return;
+        }
+
+        $channels = [];
+        foreach (array_unique($userIds) as $userId) {
+            if ($userId > 0) {
+                $channels[] = new UserChannel($userId);
+            }
+        }
+        if ([] === $channels) {
+            return;
+        }
+
+        try {
+            $this->publisher->publishMany($channels, self::EVENT, [
+                'chat_id' => $chatId,
+                'direction' => $direction,
+                'updated_at' => $chat->getUpdatedAt()->format(\DateTimeInterface::ATOM),
+                'preview' => null,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatActivityNotifier: publish failed (ignored)', [
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
 }

@@ -10,7 +10,7 @@
       <p class="txt-secondary">{{ $t('aiInfra.rerank.loadFailed') }}</p>
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
         @click="load"
       >
         {{ $t('common.retry') }}
@@ -48,7 +48,7 @@
         <select
           id="rerank-model"
           v-model="modelKey"
-          class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="rerank-model"
         >
           <option value="">{{ $t('aiInfra.rerank.modelNone') }}</option>
@@ -76,7 +76,7 @@
               type="number"
               min="2"
               max="10"
-              class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               data-testid="rerank-multiplier"
             />
           </div>
@@ -90,7 +90,7 @@
               type="number"
               min="100"
               max="5000"
-              class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               data-testid="rerank-budget"
             />
           </div>
@@ -119,13 +119,13 @@
               v-model="keyDraft[provider]"
               type="password"
               autocomplete="off"
-              class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              class="flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               :placeholder="keys[provider]?.maskedKey || $t('aiInfra.rerank.apiKeyPlaceholder')"
               :data-testid="`rerank-key-${provider}`"
             />
             <button
               type="button"
-              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
               :disabled="savingKey === provider || !keyDraft[provider]"
               :data-testid="`rerank-save-key-${provider}`"
               @click="saveKey(provider)"
@@ -137,7 +137,7 @@
 
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
           :disabled="saving"
           data-testid="rerank-save"
           @click="save"
@@ -159,20 +159,20 @@
         <input
           v-model="testQuery"
           type="text"
-          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :placeholder="$t('aiInfra.rerank.testQueryPlaceholder')"
           data-testid="rerank-test-query"
         />
         <textarea
           v-model="testDocuments"
           rows="5"
-          class="mt-2 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          class="mt-2 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           :placeholder="$t('aiInfra.rerank.testDocumentsPlaceholder')"
           data-testid="rerank-test-documents"
         />
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-2"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium mt-2"
           :disabled="testing || !testQuery.trim() || !testDocuments.trim()"
           data-testid="rerank-test-button"
           @click="runTest"

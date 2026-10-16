@@ -7,7 +7,7 @@ namespace App\AI\StructuredOutput\Schema;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 
 /**
- * JSON schema for {@see \App\Service\FeedbackExampleService::previewFalsePositive()}'s
+ * JSON schema for {@see \App\Service\Feedback\FeedbackExampleService::previewFalsePositive()}'s
  * combined summary/correction/classification call.
  */
 final class FeedbackPreviewSchema

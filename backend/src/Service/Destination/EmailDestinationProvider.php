@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Destination;
 
 use App\Repository\UserRepository;
-use App\Service\InternalEmailService;
+use App\Service\Email\InternalEmailService;
 
 final readonly class EmailDestinationProvider implements DestinationProvider
 {

@@ -1,0 +1,29 @@
+deptrac:
+  skip_violations:
+    App\DTO\Bundle\BundleDocument:
+      - App\Bundle\BundleEnvelopeValidator
+    App\DTO\Bundle\BundleImportRequest:
+      - App\Bundle\ImportOptions
+    App\Entity\InboundEmailHandler:
+      - App\Service\Security\EncryptionService
+    App\Entity\McpServerConfig:
+      - App\Service\Security\EncryptionService
+      - App\Service\Mcp\McpOAuthState
+    App\Entity\ModelHealth:
+      - App\AI\Health\ModelHealthState
+    App\Repository\ModelHealthRepository:
+      - App\AI\Health\FailureKind
+      - App\AI\Health\ModelHealthState
+    App\Repository\PluginDataRepository:
+      - App\Service\Iam\Permission
+      - App\Service\Iam\SharedResourceIds
+    App\Repository\PromptRepository:
+      - App\Service\Iam\Permission
+      - App\Service\Iam\ResourceKind\AssistantKind
+      - App\Service\Iam\SharedResourceIds
+    App\Repository\SearchIndexRepository:
+      - App\Service\SmartSearch\Index\FulltextQuery
+      - App\Service\SmartSearch\Index\SearchDocument
+    App\Repository\ShareRepository:
+      - App\Service\Iam\IamConfig
+      - App\Service\Iam\Permission

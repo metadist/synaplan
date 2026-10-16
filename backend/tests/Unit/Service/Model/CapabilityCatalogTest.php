@@ -29,6 +29,7 @@ final class CapabilityCatalogTest extends TestCase
         $this->assertSame(['SOUND2TEXT'], CapabilityCatalog::groupsForTag('audio'));
         $this->assertSame(['TEXT2SOUND'], CapabilityCatalog::groupsForTag('tts'));
         $this->assertSame([], CapabilityCatalog::groupsForTag('rerank'));
+        $this->assertSame([], CapabilityCatalog::groupsForTag('voice2voice'));
         $this->assertSame([], CapabilityCatalog::groupsForTag('mem'));
     }
 

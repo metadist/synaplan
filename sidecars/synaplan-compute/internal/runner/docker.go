@@ -11,9 +11,12 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/metadist/synaplan-compute/internal/perm"
+	"github.com/metadist/synaplan-compute/pkg/contract"
 )
 
 // ErrUnavailable is returned when dockerd is not reachable. Health still works.
@@ -40,6 +43,11 @@ type Runner interface {
 	Kill(ctx context.Context, id string) error
 	Remove(ctx context.Context, id string) error
 	Logs(ctx context.Context, id string, stdout, stderr io.Writer) error
+	// SetupEgress provisions the run's private network + throwaway proxy
+	// (CP22). TeardownEgress removes both; both are best-effort safe to
+	// call with a nil network.
+	SetupEgress(ctx context.Context, cfg EgressConfig, runID string, allow []contract.EgressHost) (*EgressNet, error)
+	TeardownEgress(ctx context.Context, net *EgressNet) error
 }
 
 // Docker is the container factory. Create always goes through Hardened.
@@ -95,7 +103,18 @@ func (d *Docker) Create(ctx context.Context, spec Spec) (string, error) {
 	if err := ValidateHardened(cfg, hc, d.Policy); err != nil {
 		return "", err
 	}
-	resp, err := d.cli.ContainerCreate(ctx, &cfg, &hc, nil, nil, "")
+	// Bind sources are validated above against OUR filesystem view; the
+	// daemon resolves them on ITS filesystem, so remap to daemon paths.
+	if err := d.retargetBinds(ctx, &hc); err != nil {
+		return "", err
+	}
+	var networking *network.NetworkingConfig
+	if spec.Egress != nil {
+		networking = &network.NetworkingConfig{
+			EndpointsConfig: map[string]*network.EndpointSettings{spec.Egress.Network: {}},
+		}
+	}
+	resp, err := d.cli.ContainerCreate(ctx, &cfg, &hc, networking, nil, "")
 	if err != nil {
 		return "", err
 	}
@@ -201,6 +220,9 @@ func (d *Docker) SweepOrphans(ctx context.Context, scratchDir string) error {
 	for _, c := range list {
 		_ = d.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true, RemoveVolumes: true})
 	}
+	if err := d.SweepEgressNetworks(ctx); err != nil && firstErr == nil {
+		firstErr = err
+	}
 	return firstErr
 }
 
@@ -223,6 +245,27 @@ func SweepScratch(scratchDir string, keep map[string]bool) error {
 		}
 	}
 	return firstErr
+}
+
+// retargetBinds rewrites every bind source to the daemon-visible path.
+// Without this the daemon mounts an empty directory of the same container
+// path on its own filesystem and the run silently sees no files.
+func (d *Docker) retargetBinds(ctx context.Context, hc *container.HostConfig) error {
+	self, err := d.inspectSelf(ctx)
+	if err != nil {
+		return err
+	}
+	for i := range hc.Mounts {
+		if hc.Mounts[i].Type != mount.TypeBind {
+			continue
+		}
+		daemonSource, err := DaemonBindSource(self.Mounts, hc.Mounts[i].Source)
+		if err != nil {
+			return err
+		}
+		hc.Mounts[i].Source = daemonSource
+	}
+	return nil
 }
 
 // Close releases the SDK client.

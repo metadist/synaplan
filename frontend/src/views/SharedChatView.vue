@@ -6,7 +6,7 @@
         class="sticky top-0 z-10 backdrop-blur-lg bg-surface/80 border-b border-light-border dark:border-dark-border"
         data-testid="section-header"
       >
-        <div class="max-w-4xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+        <div class="max-w-[70rem] mx-auto px-3 sm:px-4 py-3 sm:py-4">
           <!-- Mobile: Two-row layout, Desktop: Single-row layout -->
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <!-- Logo & Title -->
@@ -40,7 +40,7 @@
               <div class="relative">
                 <select
                   v-model="currentLang"
-                  class="appearance-none px-3 py-2 rounded-lg surface-chip txt-primary text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="appearance-none px-3 py-2 rounded-xl surface-chip txt-primary text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   @change="switchLanguage"
                 >
                   <option v-for="lang in supportedLanguages" :key="lang" :value="lang">
@@ -51,7 +51,7 @@
               <a
                 :href="config.branding.homepageUrl"
                 target="_blank"
-                class="btn-primary px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+                class="btn-primary px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap"
                 data-testid="btn-try-synaplan"
               >
                 {{ $t('shared.tryBrand', { brand: config.branding.name }) }}
@@ -76,7 +76,7 @@
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="max-w-4xl mx-auto px-4 py-20" data-testid="state-error">
+      <div v-else-if="error" class="max-w-[70rem] mx-auto px-4 py-20" data-testid="state-error">
         <div class="text-center">
           <svg
             class="w-16 h-16 text-red-500 mx-auto mb-4"
@@ -95,7 +95,7 @@
           <p class="txt-secondary mb-6">{{ $t('shared.notFoundDesc') }}</p>
           <a
             :href="config.branding.homepageUrl"
-            class="btn-primary px-6 py-3 rounded-lg inline-block"
+            class="btn-primary px-6 py-3 rounded-xl inline-block"
           >
             {{ $t('shared.visitBrand', { brand: config.branding.name }) }}
           </a>
@@ -103,7 +103,7 @@
       </div>
 
       <!-- Chat Content -->
-      <main v-else class="max-w-4xl mx-auto px-4 py-8" data-testid="section-chat-content">
+      <main v-else class="max-w-[70rem] mx-auto px-4 py-8" data-testid="section-chat-content">
         <!-- Chat Info Banner -->
         <div
           class="mb-8 p-6 rounded-lg bg-[var(--brand)]/10 border border-[var(--brand)]/20"
@@ -224,12 +224,21 @@
                 />
               </template>
 
+              <KnowledgeSources
+                v-if="
+                  message.direction === 'OUT' && message.ragSources && message.ragSources.length > 0
+                "
+                :sources="message.ragSources"
+                :show-library-link="false"
+                :load-passage="loadSharedPassage"
+              />
+
               <!-- File attachments (images, videos) -->
               <div v-if="message.file" class="mt-3">
                 <MessageImage
                   v-if="message.file.type === 'image'"
                   :url="message.file.path"
-                  :alt="message.text || 'Generated image'"
+                  :alt="t('message.imageGenerated')"
                 />
                 <MessageVideo v-if="message.file.type === 'video'" :url="message.file.path" />
               </div>
@@ -319,7 +328,7 @@
             <router-link
               v-if="config.auth.registrationEnabled"
               to="/register"
-              class="btn-primary px-6 py-3 rounded-lg font-medium inline-block"
+              class="btn-primary px-6 py-3 rounded-xl font-medium inline-block"
             >
               {{ $t('shared.getStarted') }}
             </router-link>
@@ -335,7 +344,7 @@
 
       <!-- Footer -->
       <footer class="mt-20 border-t border-light-border dark:border-dark-border py-8">
-        <div class="max-w-4xl mx-auto px-4 text-center txt-secondary text-sm">
+        <div class="max-w-[70rem] mx-auto px-4 text-center txt-secondary text-sm">
           <p>
             <BrandAttribution link-class="text-[var(--brand)] hover:underline font-medium" />
             ·
@@ -364,7 +373,10 @@ import MessageAudio from '../components/MessageAudio.vue'
 import MessageCode from '../components/MessageCode.vue'
 import MessageJson from '../components/MessageJson.vue'
 import MessageText from '../components/MessageText.vue'
+import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
 import BrandAttribution from '../components/BrandAttribution.vue'
+import { GetSharedChatRagChunkResponseSchema } from '@/generated/api-schemas'
+import type { RagSourceRef } from '@/stores/history'
 import {
   buildUploadUrl,
   isAudioFileType,
@@ -372,55 +384,17 @@ import {
   isVideoFileType,
 } from '@/utils/mediaTypes'
 import { useConfigStore } from '@/stores/config'
+import { publicAppOrigin } from '@/utils/urlHelper'
 import { httpClient } from '@/services/api/httpClient'
-import { z } from 'zod'
-import { supportedLanguages, type SupportedLanguage } from '@/i18n'
+import { collapseApiToolTurn } from '@/utils/apiToolTurn'
+import { GetSharedChatResponseSchema } from '@/generated/api-schemas'
+import { setLocale, supportedLanguages, type SupportedLanguage } from '@/i18n'
 import { parseAIResponse } from '@/utils/responseParser'
-
-// Issue #1175: user-uploaded attachments travel on the File entity M2M
-// relation, serialized by MessageApiFormatter as `files[]`. The shared
-// endpoint now returns them so viewers can see uploaded images, PDFs, audio,
-// etc. — not just the legacy single AI-generated `file`.
-const SharedChatFileSchema = z.object({
-  id: z.number(),
-  filename: z.string(),
-  fileType: z.string(),
-  filePath: z.string(),
-  fileSize: z.number().nullable().optional(),
-  fileMime: z.string().nullable().optional(),
-})
-
-const SharedChatMessageSchema = z.object({
-  id: z.number(),
-  text: z.string(),
-  direction: z.enum(['IN', 'OUT']),
-  timestamp: z.number(),
-  topic: z.string().optional(),
-  language: z.string().optional(),
-  provider: z.string().optional(),
-  file: z
-    .object({
-      path: z.string(),
-      type: z.string(),
-    })
-    .nullable()
-    .optional(),
-  files: z.array(SharedChatFileSchema).optional(),
-})
-
-const SharedChatPayloadSchema = z.object({
-  success: z.boolean(),
-  chat: z.object({
-    title: z.string(),
-    createdAt: z.string(),
-  }),
-  messages: z.array(SharedChatMessageSchema).optional(),
-})
 
 const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
-const { locale, t } = useI18n()
+const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
 
 const loading = ref(true)
@@ -449,6 +423,7 @@ interface Message {
     type: string
   } | null
   files?: SharedChatFile[]
+  ragSources?: RagSourceRef[] | null
 }
 
 interface Chat {
@@ -470,17 +445,17 @@ const initLanguage = () => {
 
   if (langParam && supportedLanguages.includes(langParam as SupportedLanguage)) {
     currentLang.value = langParam
-    locale.value = langParam
+    void setLocale(langParam, { persistAccount: false })
   } else {
     // Default to English for backwards compatibility
     currentLang.value = 'en'
-    locale.value = 'en'
+    void setLocale('en', { persistAccount: false })
   }
 }
 
 // Switch language and update URL
 const switchLanguage = () => {
-  locale.value = currentLang.value
+  void setLocale(currentLang.value, { persistAccount: false })
 
   // Update URL to include language
   const newPath = `/shared/${currentLang.value}/${token.value}`
@@ -501,12 +476,11 @@ const pageDescription = computed(() => {
   return firstMessage.substring(0, 160) + (firstMessage.length > 160 ? '...' : '')
 })
 
-const currentUrl = computed(() => {
-  return window.location.href
-})
+const baseUrl = computed(() => publicAppOrigin())
 
-const baseUrl = computed(() => {
-  return window.location.origin
+const currentUrl = computed(() => {
+  if (!token.value) return baseUrl.value
+  return `${baseUrl.value}/shared/${currentLang.value}/${token.value}`
 })
 
 // Update document title and meta tags including hreflang
@@ -633,7 +607,7 @@ onMounted(async () => {
   try {
     const data = await httpClient(`/api/v1/chats/shared/${token.value}`, {
       skipAuth: true,
-      schema: SharedChatPayloadSchema,
+      schema: GetSharedChatResponseSchema,
     })
 
     if (!data.success) {
@@ -649,6 +623,17 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+const loadSharedPassage = async (chunkId: string): Promise<string> => {
+  const data = await httpClient(
+    `/api/v1/chats/shared/${encodeURIComponent(token.value)}/rag/chunks/${encodeURIComponent(chunkId)}`,
+    {
+      skipAuth: true,
+      schema: GetSharedChatRagChunkResponseSchema,
+    }
+  )
+  return data.text
+}
 
 const formatDate = (timestamp: number): string => {
   return formatDateTime(new Date(timestamp * 1000))
@@ -669,7 +654,7 @@ const parseMessageParts = (message: Message): MessagePart[] => {
 
   // For user messages, just return as text
   if (message.direction === 'IN') {
-    return [{ type: 'text', content: message.text }]
+    return [{ type: 'text', content: collapseApiToolTurn(message.text) }]
   }
 
   // For assistant messages, parse into parts

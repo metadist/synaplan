@@ -30,10 +30,14 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
+# Job-level timeout-minutes on every job. GitHub's default is 360; a hung
+# step otherwise occupies a runner until then and still reports success.
+# Caps sit well above observed medians so ordinary variance still passes.
 jobs:
   change-scope:
     name: Classify Change Scope
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       mode: ${{ steps.classify.outputs.mode }}
       reason: ${{ steps.classify.outputs.reason }}
@@ -128,13 +132,14 @@ jobs:
   lint:
     name: PHP Code Formatting
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           # `redis` (phpredis) is in composer.json's require for `symfony/redis-messenger`,
@@ -164,6 +169,12 @@ jobs:
       - name: Run deploy-lifecycle bash tests
         run: bash deploy/scripts/tests/test-lifecycle.sh
 
+      # The one-shot that creates and publishes the deployment secrets for
+      # deploy/compose.yaml and deploy/quickstart/compose.yaml. A gap here can
+      # start MariaDB with an empty password or lock out an existing database.
+      - name: Run secrets-init bash tests
+        run: bash deploy/scripts/tests/test-secrets-init.sh
+
       # firstboot.sh executed for real, with the metadata service, the cloud CLI
       # and the data volume stubbed. It is the one script no customer can
       # recover from by hand, and the only place it otherwise runs is a
@@ -177,6 +188,7 @@ jobs:
   deployment-templates:
     name: Deployment Templates (AWS and Azure)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -202,7 +214,7 @@ jobs:
       - name: Install Packer
         uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3
         with:
-          version: 1.16.0
+          version: 1.16.1
 
       - name: Check the Packer templates
         run: |
@@ -260,13 +272,14 @@ jobs:
   mobile-tooling:
     name: Mobile Release Tooling
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
 
@@ -278,6 +291,7 @@ jobs:
   compute-sidecar:
     name: Compute Sidecar (Go)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -296,12 +310,50 @@ jobs:
           go build ./...
           make lint test
 
+      - name: No docker.sock outside the compute service (C2)
+        run: ./scripts/check-no-docker-sock.sh
+
+  transcriber-sidecar:
+    name: Transcriber Sidecar (Node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The tests run inside the built image, not on the runner's .nvmrc Node,
+      # so a base-image bump in the Dockerfile is what they exercise.
+      - name: Build the image and run the tests in it
+        working-directory: sidecars/synaplan-transcriber
+        run: |
+          set -euo pipefail
+          docker build -t synaplan-transcriber:ci .
+          docker run --rm -v "$PWD/test:/app/test:ro" synaplan-transcriber:ci node --test
+
+  voice-sidecar:
+    name: Voice Sidecar (Node)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Build the image and run the tests in it
+        working-directory: sidecars/synaplan-voice
+        run: |
+          set -euo pipefail
+          docker build -t synaplan-voice:ci .
+          docker run --rm -v "$PWD/test:/app/test:ro" synaplan-voice:ci node --test --test-force-exit
+
   backend:
     name: Backend (PHP/Symfony)
     # Off the critical path (done around minute 2-3 while e2e runs until
     # ~minute 7) and PHPUnit is single-process anyway, so more cores would not
     # shorten the run. Revisit if this job ever becomes the longest one.
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [change-scope]
     if: needs.change-scope.outputs.mode == 'heavy'
 
@@ -311,7 +363,7 @@ jobs:
 
     services:
       mysql:
-        image: mariadb:12.3@sha256:ab1c3dd381940233af12512b97d47b508fd3a0f17fbe3ba388739b7bc17cbc0b
+        image: mariadb:13.0@sha256:f1bba652ba57bea3099ca2fe1af692af537c27d96e0bcde39dce29e2ba1ec4f3
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: synaplan_test
@@ -332,7 +384,7 @@ jobs:
       # 127.0.0.1:6379. Digest pinned to match docker-compose.yml for parity
       # (Redis 7.4 — see docker-compose.yml for the Centrifugo pub/sub rationale).
       redis:
-        image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+        image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
         ports:
           - 6379:6379
         options: >-
@@ -346,7 +398,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           # `redis` (phpredis) is required by `symfony/redis-messenger`. Sessions
@@ -395,6 +447,12 @@ jobs:
       - name: Run PHPStan
         working-directory: backend
         run: composer phpstan
+
+      - name: Run deptrac
+        working-directory: backend
+        # Layer rules in deptrac.yaml; deptrac.baseline.yaml freezes the
+        # violations that predate the gate and may only shrink.
+        run: composer deptrac
 
       - name: Setup database schema
         working-directory: backend
@@ -466,6 +524,7 @@ jobs:
   backend-minimal:
     name: Backend (minimal)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: [change-scope]
     if: needs.change-scope.outputs.mode == 'heavy'
 
@@ -475,7 +534,7 @@ jobs:
 
     services:
       mysql:
-        image: mariadb:12.3@sha256:ab1c3dd381940233af12512b97d47b508fd3a0f17fbe3ba388739b7bc17cbc0b
+        image: mariadb:13.0@sha256:f1bba652ba57bea3099ca2fe1af692af537c27d96e0bcde39dce29e2ba1ec4f3
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: synaplan_test
@@ -490,7 +549,7 @@ jobs:
           --health-retries=5
 
       redis:
-        image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+        image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
         ports:
           - 6379:6379
         options: >-
@@ -504,7 +563,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
@@ -572,7 +631,7 @@ jobs:
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
 
       - name: Upload minimal OpenAPI spec
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openapi-spec-minimal
           path: backend/openapi-spec.json
@@ -603,6 +662,7 @@ jobs:
     # move this back to `ubuntu-latest-m` without re-measuring those three
     # numbers first.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [change-scope]
     if: needs.change-scope.outputs.mode == 'heavy'
 
@@ -611,7 +671,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: "8.4"
           # Same extension set as the backend job so `composer install` passes
@@ -689,18 +749,23 @@ jobs:
         run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
 
       - name: Upload OpenAPI spec artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openapi-spec
           path: backend/openapi-spec.json
           retention-days: 1
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Lint OpenAPI spec
+        # Rules live in redocly.yaml. Catches spec defects that client
+        # generators do not report, e.g. an undeclared security scheme.
+        run: npx --yes @redocly/cli@2.60.0 lint backend/openapi-spec.json
 
       - name: Install dependencies
         working-directory: frontend
@@ -735,14 +800,14 @@ jobs:
           wait "$WIDGET_PID"
 
       - name: Upload frontend build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: frontend-dist
           path: frontend/dist/
           retention-days: 1
 
       - name: Upload widget build artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: widget-dist
           path: frontend/dist-widget/
@@ -754,6 +819,7 @@ jobs:
   openapi-identical:
     name: OpenAPI identical (full vs minimal)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [frontend-build, backend-minimal]
     if: |
       always() &&
@@ -761,13 +827,13 @@ jobs:
       needs.backend-minimal.result == 'success'
     steps:
       - name: Download full OpenAPI spec
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: openapi-spec
           path: /tmp/openapi-full
 
       - name: Download minimal OpenAPI spec
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: openapi-spec-minimal
           path: /tmp/openapi-minimal
@@ -793,6 +859,7 @@ jobs:
     # (plenty of slack before the e2e jobs finish) and vue-tsc is
     # single-threaded anyway, so more cores would not shorten the run.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [frontend-build]
 
     steps:
@@ -800,7 +867,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -853,7 +920,7 @@ jobs:
           exit 1
 
       - name: Download OpenAPI spec artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: openapi-spec
           path: frontend/src/generated/
@@ -880,6 +947,22 @@ jobs:
         working-directory: frontend
         run: npm run check:types
 
+      # bundleSplit.spec.ts asserts on the built bundles (admin strings stay
+      # out of widget.js, config stays out of the app entry chunk) but skips
+      # when dist/ is absent. frontend-build already uploads both artifacts —
+      # download them so the assertions always execute here.
+      - name: Download frontend dist artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: Download widget dist artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: widget-dist
+          path: frontend/dist-widget
+
       - name: Run tests
         working-directory: frontend
         run: npm run test
@@ -887,6 +970,7 @@ jobs:
   docker-build:
     name: Build Docker Image
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [change-scope, frontend-build]
     if: needs.change-scope.outputs.mode == 'heavy'
     outputs:
@@ -903,19 +987,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download frontend build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: frontend-dist
           path: frontend/dist/
 
       - name: Download widget build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: widget-dist
           path: frontend/dist-widget/
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Extract metadata (tags, labels)
         id: meta
@@ -934,7 +1018,7 @@ jobs:
 
       - name: Build Docker image
         id: build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: _docker/backend/Dockerfile
@@ -952,7 +1036,7 @@ jobs:
           outputs: type=docker,dest=/tmp/docker-image.tar
 
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: docker-image
           path: /tmp/docker-image.tar
@@ -984,6 +1068,7 @@ jobs:
     # than per file (that changes isolation semantics inside a file, so it needs
     # its own flake review).
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [docker-build]
     strategy:
       fail-fast: false
@@ -1083,7 +1168,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download Docker image artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: docker-image
           path: /tmp
@@ -1121,7 +1206,7 @@ jobs:
           echo $! > /tmp/stack-startup.pid
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -1144,6 +1229,11 @@ jobs:
         working-directory: frontend
         run: |
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          # GitHub-hosted images ship packages.microsoft.com. When that mirror
+          # returns 403 / "no longer signed", apt update fails and Playwright
+          # never installs the Ubuntu Chromium deps we actually need.
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+          sudo sed -i '/packages\.microsoft\.com/d' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/apt-mirrors.txt 2>/dev/null || true
           npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Install Playwright system dependencies
@@ -1151,6 +1241,8 @@ jobs:
         working-directory: frontend
         run: |
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+          sudo sed -i '/packages\.microsoft\.com/d' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/apt-mirrors.txt 2>/dev/null || true
           npx playwright install-deps ${{ matrix.browser }}
 
       - name: Wait for test services
@@ -1218,9 +1310,19 @@ jobs:
             npm run ${{ matrix.npm_script }}
           fi
 
+      # Written into test-results/ so the existing artifact keeps its layout;
+      # e2e-flaky-notify reads reports/results.json at a fixed relative path.
+      - name: Collect backend logs
+        if: failure()
+        run: |
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ${{ matrix.compose_overlay }}"
+          PROFILE="${{ matrix.compose_profiles }}"
+          mkdir -p frontend/tests/e2e/test-results/backend-logs
+          $COMPOSE $PROFILE logs --no-color --timestamps > frontend/tests/e2e/test-results/backend-logs/containers.log 2>&1 || true
+
       - name: Upload Playwright test results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-results-${{ strategy.job-index }}-${{ matrix.browser }}${{ matrix.variant && format('-{0}', matrix.variant) || '' }}-${{ matrix.auth_method }}
           path: |
@@ -1242,73 +1344,57 @@ jobs:
   e2e-flaky-notify:
     name: Notify flaky E2E (Discord)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [e2e]
     if: always() && (needs.e2e.result == 'success' || needs.e2e.result == 'failure')
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Download Playwright reports
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: playwright-results-*
           path: artifacts
           merge-multiple: false
+          # Missing artifacts are the infra case (stack never started, browser
+          # install 403, quay.io timeout). Must not fail this job or we cannot
+          # tell that apart from a retry-pass flake.
+          if-no-artifact-found: ignore
 
-      - name: Notify Discord if any flaky tests
+      - name: Summarise flakes
         env:
-          HOOK: ${{ secrets.DISCORD_REPORT_LOGS_WEBHOOK }}
           BRANCH: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
+          mkdir -p artifacts
+          node scripts/e2e-flake-report.mjs \
+            --dir artifacts \
+            --e2e-result "${{ needs.e2e.result }}" \
+            --json flake-summary.json \
+            --markdown "$GITHUB_STEP_SUMMARY" \
+            --payload /tmp/discord-payload.json
+
+      - name: Upload flake summary
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: e2e-flake-summary
+          path: flake-summary.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Notify Discord
+        env:
+          HOOK: ${{ secrets.DISCORD_REPORT_LOGS_WEBHOOK }}
+        run: |
+          set -euo pipefail
           [ -n "${HOOK:-}" ] || exit 0
-          mapfile -t REPORTS < <(find artifacts -type f -name results.json 2>/dev/null | sort || true)
-          [ "${#REPORTS[@]}" -gt 0 ] || exit 0
-
-          # project · file · title — file avoids collapsing distinct tests with the same title
-          LIST=$(jq -r '
-            .. | objects
-            | select((.specs? | type) == "array")
-            | . as $suite
-            | .specs[]?
-            | . as $spec
-            | .tests[]?
-            | select(.status == "flaky")
-            | "• " + (.projectName // "?")
-              + " · " + ($suite.file // $suite.title // "?")
-              + " · " + ($spec.title // "?")
-          ' "${REPORTS[@]}" | sort -u)
-          [ -n "$LIST" ] || exit 0
-
-          N=$(printf '%s\n' "$LIST" | wc -l | tr -d ' ')
-          SHOWN=$(printf '%s\n' "$LIST" | head -15)
-          EXTRA=$(( N > 15 ? N - 15 : 0 ))
-          [ "$EXTRA" -gt 0 ] && SHOWN=$(printf '%s\n… and %s more' "$SHOWN" "$EXTRA")
-
-          # Match DiscordNotificationService embed shape (title/fields/footer/timestamp).
-          # Field values max 1024; keep the flaky list under that.
-          PAYLOAD=$(jq -n \
-            --arg branch "$BRANCH" \
-            --arg url "$RUN_URL" \
-            --arg n "$N" \
-            --arg list "$SHOWN" \
-            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{
-              embeds: [{
-                title: ("⚠️ Flaky E2E: " + $n + " test(s)"),
-                color: 16776960,
-                fields: [
-                  { name: "Branch", value: ("`" + $branch + "`"), inline: true },
-                  { name: "Count", value: $n, inline: true },
-                  { name: "Flaky tests", value: ($list | .[0:1000]), inline: false },
-                  { name: "CI run", value: ("[Open CI run](" + $url + ")"), inline: false }
-                ],
-                footer: { text: "Synaplan CI" },
-                timestamp: $ts
-              }]
-            }')
-
+          [ -s /tmp/discord-payload.json ] || exit 0
           curl --fail-with-body --silent --show-error --retry 3 \
             -H 'Content-Type: application/json' \
-            -d "$PAYLOAD" \
+            -d @/tmp/discord-payload.json \
             "$HOOK" \
             || echo "::warning::Discord notification failed"
 
@@ -1321,6 +1407,7 @@ jobs:
     # MUST match the runner used by visual-baselines.yml — snapshots are
     # rendering-environment sensitive.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [docker-build]
     env:
       APP_IMAGE: synaplan-test:ci
@@ -1342,7 +1429,7 @@ jobs:
 
       - name: Download Docker image artifact
         if: steps.baselines.outputs.exists == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: docker-image
           path: /tmp
@@ -1364,7 +1451,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.baselines.outputs.exists == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -1380,6 +1467,8 @@ jobs:
         working-directory: frontend
         run: |
           sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list
+          sudo sed -i '/packages\.microsoft\.com/d' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/apt-mirrors.txt 2>/dev/null || true
           npx playwright install --with-deps chromium
 
       - name: Run visual snapshot tests
@@ -1391,7 +1480,7 @@ jobs:
 
       - name: Upload results
         if: always() && steps.baselines.outputs.exists == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-results-visual
           path: |
@@ -1405,9 +1494,96 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
 
+  deploy-smoke:
+    name: Deploy Smoke Test (self-host)
+    # E2E runs the image with APP_ENV=test, a synchronous in-memory messenger
+    # and no worker, scheduler, Redis or Centrifugo. This job installs it the
+    # way deploy/README.md tells an operator to, from the production template
+    # deploy/compose.yaml and its pinned third-party images, and runs the same
+    # smoke test the AMI release build runs.
+    #
+    # Decision (#2271, 2026-10-11): stay pull-request-only. Do not run this
+    # job on main or on v* tags, and do not add it to the needs of
+    # docker-push-amd64 or docker-manifest.
+    #
+    # Every pull-request CI run from 2026-09-29 through 2026-10-11 was
+    # checked (376 runs). The smoke job: 283 success, 0 failure, 22
+    # cancelled because a newer push superseded the run (longest 231s, none
+    # reached the 20 minute timeout), 9 skipped with the heavy image build,
+    # and 62 runs from before the job existed. First success: 2026-09-30.
+    # That is more than 50 heavy runs and no product or environment failure,
+    # but the four-week window is not complete. A registry outage at tag
+    # time would still stop a release that has no product defect.
+    #
+    # Any failed job fails the CI run. If this job later moves onto main, a
+    # failure there stops the release tag from promoting the tested images,
+    # and on a tag it stops release-publish.yml and the AMI build.
+    # This comment does not close #2271. Revisit that issue after 2026-10-28,
+    # when four weeks have also passed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [docker-build]
+    if: github.event_name == 'pull_request'
+    env:
+      # Compose merges the host environment over deploy/.env, so the operator
+      # file stays the unmodified example. The tag exists only locally, hence
+      # pull policy never.
+      SYNAPLAN_IMAGE: synaplan-ci
+      SYNAPLAN_VERSION: ${{ needs.docker-build.outputs.app-version }}
+      SYNAPLAN_PULL_POLICY: never
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load the tested image
+        env:
+          TESTED_IMAGE_TAGS: ${{ needs.docker-build.outputs.image-tags }}
+        run: |
+          set -euo pipefail
+          docker load -i /tmp/docker-image.tar
+          source_tag="$(printf '%s\n' "$TESTED_IMAGE_TAGS" | sed -n '/./{p;q;}')"
+          [ -n "$source_tag" ] || {
+            echo "::error::docker-build did not provide a tested image tag"
+            exit 1
+          }
+          docker tag "$source_tag" "${SYNAPLAN_IMAGE}:${SYNAPLAN_VERSION}"
+
+      - name: Prepare the deployment
+        run: |
+          set -euo pipefail
+          cp deploy/selfhost.env.example deploy/.env
+          deploy/scripts/prepare.sh
+
+      - name: Pull the third-party images
+        run: |
+          n=0; until docker compose --env-file deploy/.env -f deploy/compose.yaml pull; do n=$((n+1)); [ "$n" -ge 4 ] && exit 1; sleep $((n*15)); done
+
+      - name: Validate the release
+        run: deploy/scripts/validate-release.sh
+
+      - name: Start the stack
+        run: docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+
+      - name: Smoke test
+        run: deploy/scripts/smoke-test.sh
+
+      - name: Show the stack on failure
+        if: failure()
+        run: |
+          docker compose --env-file deploy/.env -f deploy/compose.yaml ps -a
+          docker compose --env-file deploy/.env -f deploy/compose.yaml logs --no-color --tail=200
+
   docker-push-amd64:
     name: Publish amd64 Image
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # The amd64 tar produced by docker-build is the exact image E2E ran
     # against, so publishing that tar — rather than rebuilding — is what makes
     # the released image the tested one. Nothing is built here, which is why
@@ -1450,7 +1626,7 @@ jobs:
 
     steps:
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -1480,7 +1656,7 @@ jobs:
 
       - name: Download tested amd64 image artifact
         if: needs.change-scope.outputs.mode != 'promote'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: docker-image
           path: /tmp
@@ -1502,7 +1678,25 @@ jobs:
 
           temporary_tag="${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-amd64"
           docker tag "$source_tag" "$temporary_tag"
-          docker push "$temporary_tag"
+          # GHCR intermittently aborts a parallel layer upload with
+          # "unknown blob" (run 35701666361, Docker 28.0.4). Layers that
+          # already landed stay in the registry, so a later attempt mounts
+          # them and finishes. This tar is the image E2E already passed;
+          # failing here would publish nothing.
+          attempt=1
+          max_attempts=3
+          while true; do
+            if docker push "$temporary_tag"; then
+              break
+            fi
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::docker push of ${temporary_tag} failed after ${max_attempts} attempts"
+              exit 1
+            fi
+            echo "docker push failed (attempt ${attempt}/${max_attempts}), retrying..."
+            sleep $((attempt * 10))
+            attempt=$((attempt + 1))
+          done
           digest="$(
             docker buildx imagetools inspect "$temporary_tag" \
               --format '{{ .Manifest.Digest }}'
@@ -1524,7 +1718,8 @@ jobs:
     # waiting for it before building arm64 just added the E2E tail to the
     # publish path. docker-manifest still waits for E2E plus both arches
     # before moving any release tag.
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 40
     needs: [change-scope, frontend-build]
     if: >-
       always() &&
@@ -1544,7 +1739,7 @@ jobs:
 
     steps:
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -1579,14 +1774,14 @@ jobs:
       # the assets the amd64 image was tested with instead of a second build.
       - name: Download frontend build artifact
         if: needs.change-scope.outputs.mode != 'promote'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: frontend-dist
           path: frontend/dist/
 
       - name: Download widget build artifact
         if: needs.change-scope.outputs.mode != 'promote'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: widget-dist
           path: frontend/dist-widget/
@@ -1612,7 +1807,7 @@ jobs:
       - name: Build and push arm64 image
         if: needs.change-scope.outputs.mode != 'promote'
         id: arm64
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: _docker/backend/Dockerfile
@@ -1634,6 +1829,7 @@ jobs:
   docker-manifest:
     name: Publish Multi-Arch Manifest
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Joins the tested amd64 image and the native arm64 build under the release
     # tags. This is the only job that moves a release tag, and it is also the
     # one that proves the result: the verification below refuses any tag that
@@ -1684,7 +1880,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Extract release metadata
         id: meta
@@ -1810,6 +2006,7 @@ jobs:
   release-manifest:
     name: Publish Release Manifest
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # An instance learns that a newer release exists from versions.json, so the
     # manifest must never exist before the image it names. docker-manifest
     # completes only after the multi-arch manifest was created AND verified to
@@ -1921,6 +2118,7 @@ jobs:
   release-version-pin:
     name: Update the Default Release Version
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # elestio.yml, deploy/selfhost.env.example, deploy/umbrel/synaplan/ and the
     # AWS Packer template decide which version a NEW deployment installs, so
     # they may only ever name a release whose image is published and verified —
@@ -2066,6 +2264,7 @@ jobs:
             (version, \`APP_VERSION\`, and the published image digest
             \`${DIGEST}\`)
           - \`deploy/aws/packer/synaplan.pkr.hcl\` for the AWS Marketplace AMI
+          - \`deploy/quickstart/compose.yaml\` for the one-file quickstart
 
           Existing deployments are unaffected. They keep the version their operator
           pinned and change it only by following the update guide, so a redeploy never
@@ -2164,6 +2363,7 @@ jobs:
   cloudflare-deploy:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Same rationale as the publish jobs: never deploy while tests/checks fail.
     needs: [e2e, backend, frontend-checks]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
@@ -2173,7 +2373,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
 
@@ -2196,6 +2396,7 @@ jobs:
   cloudflare-check:
     name: Cloudflare Worker Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [change-scope]
     if: github.event_name == 'pull_request' && needs.change-scope.outputs.mode == 'heavy'
 
@@ -2204,7 +2405,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -2221,6 +2422,7 @@ jobs:
   openapi-promote:
     name: Carry OpenAPI Spec Forward
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: [change-scope]
     if: needs.change-scope.outputs.mode == 'promote'
     permissions:
@@ -2231,7 +2433,7 @@ jobs:
       # CI run for this SHA. A promote run is newer than the main run and
       # would otherwise be picked first while carrying no artifact.
       - name: Download the main-run OpenAPI spec
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: openapi-spec
           run-id: ${{ needs.change-scope.outputs.source_run_id }}
@@ -2239,7 +2441,7 @@ jobs:
           path: /tmp/openapi
 
       - name: Re-upload for this run
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openapi-spec
           path: /tmp/openapi/openapi-spec.json
@@ -2249,7 +2451,8 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
+    timeout-minutes: 5
+    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, transcriber-sidecar, voice-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, deploy-smoke, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
       - name: Check for failures
@@ -2263,6 +2466,8 @@ jobs:
           TEMPLATES: ${{ needs.deployment-templates.result }}
           MOBILE: ${{ needs.mobile-tooling.result }}
           COMPUTE: ${{ needs.compute-sidecar.result }}
+          TRANSCRIBER: ${{ needs.transcriber-sidecar.result }}
+          VOICE: ${{ needs.voice-sidecar.result }}
           BACKEND: ${{ needs.backend.result }}
           BACKEND_MINIMAL: ${{ needs.backend-minimal.result }}
           OPENAPI_IDENTICAL: ${{ needs.openapi-identical.result }}
@@ -2271,6 +2476,7 @@ jobs:
           DOCKER_BUILD: ${{ needs.docker-build.result }}
           E2E: ${{ needs.e2e.result }}
           E2E_VISUAL: ${{ needs.e2e-visual.result }}
+          DEPLOY_SMOKE: ${{ needs.deploy-smoke.result }}
           PUSH_AMD64: ${{ needs.docker-push-amd64.result }}
           PUSH_ARM64: ${{ needs.docker-push-arm64.result }}
           MANIFEST: ${{ needs.docker-manifest.result }}
@@ -2290,6 +2496,8 @@ jobs:
           require "Deployment Templates (AWS and Azure)" "$TEMPLATES"
           require "Mobile Release Tooling" "$MOBILE"
           require "Compute Sidecar (Go)" "$COMPUTE"
+          require "Transcriber Sidecar (Node)" "$TRANSCRIBER"
+          require "Voice Sidecar (Node)" "$VOICE"
 
           allow_skip "Backend (PHP/Symfony)" "$BACKEND"
           allow_skip "Backend (minimal)" "$BACKEND_MINIMAL"
@@ -2299,6 +2507,7 @@ jobs:
           allow_skip "Build Docker Image" "$DOCKER_BUILD"
           allow_skip "E2E Tests" "$E2E"
           allow_skip "E2E Visual Snapshots" "$E2E_VISUAL"
+          allow_skip "Deploy Smoke Test (self-host)" "$DEPLOY_SMOKE"
           allow_skip "Publish amd64 Image" "$PUSH_AMD64"
           allow_skip "Publish arm64 Image" "$PUSH_ARM64"
           allow_skip "Publish Multi-Arch Manifest" "$MANIFEST"
@@ -2326,6 +2535,7 @@ jobs:
               fi
               if [ "$EVENT" = pull_request ]; then
                 require "Cloudflare Worker Check" "$CF_CHECK"
+                require "Deploy Smoke Test (self-host)" "$DEPLOY_SMOKE"
               fi
               ;;
             thin)

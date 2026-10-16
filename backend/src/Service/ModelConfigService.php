@@ -7,6 +7,7 @@ use App\AI\Service\ProviderRegistry;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\User;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
@@ -14,6 +15,7 @@ use App\Repository\UserRepository;
 use App\Seed\DefaultModelConfigSeeder;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Iam\Policy\GroupPolicyService;
+use App\Service\Memory\MemoryExtractionService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
@@ -58,6 +60,7 @@ final readonly class ModelConfigService
         'TEXT2VID' => 'text2vid',
         'SOUND2TEXT' => 'sound2text',
         'TEXT2SOUND' => 'text2sound',
+        'VOICE_LIVE' => 'voice2voice',
     ];
 
     public function __construct(
@@ -422,14 +425,24 @@ final readonly class ModelConfigService
     {
         $setting = strtoupper($capability);
         $preferred = null;
+        // A locked instance default is the only value the member may use.
+        // The allow-list must not replace it with another model (#2103).
+        $locked = $this->isDefaultLocked($userId, $setting);
 
         foreach ($this->eachDefaultModelId($userId, $setting) as $modelId) {
-            if (!$this->isAllowedModel($userId, $modelId)) {
+            if (!$locked && !$this->isAllowedModel($userId, $modelId, $setting)) {
                 continue;
             }
 
             if ($this->isModelProviderUsable($modelId)) {
                 return $modelId;
+            }
+
+            $successor = $this->usableSuccessorOf($modelId, $userId, $setting);
+            if (null !== $successor) {
+                $this->logSuccessorSwap($modelId, $successor, $setting);
+
+                return $successor;
             }
 
             $preferred ??= $modelId;
@@ -457,11 +470,13 @@ final readonly class ModelConfigService
      */
     public function getConfiguredDefaultModel(string $capability, ?int $userId = null): ?int
     {
-        foreach ($this->eachDefaultModelId($userId, strtoupper($capability)) as $modelId) {
+        $setting = strtoupper($capability);
+        $locked = $this->isDefaultLocked($userId, $setting);
+        foreach ($this->eachDefaultModelId($userId, $setting) as $modelId) {
             if ($modelId < 1) {
                 continue;
             }
-            if (!$this->isAllowedModel($userId, $modelId)) {
+            if (!$locked && !$this->isAllowedModel($userId, $modelId, $setting)) {
                 continue;
             }
 
@@ -487,6 +502,8 @@ final readonly class ModelConfigService
             return null;
         }
 
+        $preferredIds = $this->preferredImageModelIds($setting);
+
         // Health is a preference, not a veto. Pass one skips the models the
         // monitor considers dead; pass two accepts them anyway. A wrong health
         // verdict must never be able to leave a capability with no model at
@@ -494,25 +511,87 @@ final readonly class ModelConfigService
         // status page is there to tell the operator what happened.
         foreach ([true, false] as $healthyOnly) {
             foreach ([true, false] as $selectableOnly) {
+                foreach ($preferredIds as $modelId) {
+                    $picked = $this->usablePreferredImageModel($modelId, $setting, $userId, $selectableOnly, $healthyOnly);
+                    if (null !== $picked) {
+                        return $picked;
+                    }
+                }
                 // findByTag() orders by quality DESC, id ASC.
                 foreach ($this->modelRepository->findByTag($tag, $selectableOnly) as $model) {
                     $modelId = (int) $model->getId();
-                    if (!$this->isAllowedModel($userId, $modelId)) {
+                    if (in_array($modelId, $preferredIds, true)) {
                         continue;
                     }
-                    if (!$this->isModelUsable($model)) {
-                        continue;
-                    }
-                    if ($healthyOnly && $this->isModelOffline($modelId)) {
+                    if (!$this->imageModelFits($model, $setting, $userId, $healthyOnly)) {
                         continue;
                     }
 
-                    return $model->getId();
+                    return $modelId;
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function preferredImageModelIds(string $setting): array
+    {
+        if (!in_array($setting, ['TEXT2PIC', 'PIC2PIC'], true)) {
+            return [];
+        }
+
+        $ids = [];
+        foreach (ModelCatalog::IMAGE_FALLBACK_KEYS as $key) {
+            $bid = ModelCatalog::findBidByKey($key);
+            if (null !== $bid) {
+                $ids[] = $bid;
+            }
+        }
+
+        return $ids;
+    }
+
+    private function usablePreferredImageModel(int $modelId, string $setting, ?int $userId, bool $selectableOnly, bool $healthyOnly): ?int
+    {
+        $model = $this->modelRepository->find($modelId);
+        if (!$model instanceof Model) {
+            return null;
+        }
+        $expectedTag = self::CAPABILITY_TAGS[$setting] ?? null;
+        if (null === $expectedTag || $model->getTag() !== $expectedTag) {
+            return null;
+        }
+        if ($selectableOnly && 1 !== $model->getSelectable()) {
+            return null;
+        }
+        if (!$this->imageModelFits($model, $setting, $userId, $healthyOnly)) {
+            return null;
+        }
+
+        return $modelId;
+    }
+
+    private function imageModelFits(Model $model, string $setting, ?int $userId, bool $healthyOnly): bool
+    {
+        $modelId = (int) $model->getId();
+        if ('PIC2PIC' === $setting && !in_array('pic2pic', $model->getFeatures(), true)) {
+            return false;
+        }
+        if (!$this->isAllowedModel($userId, $modelId, $setting)) {
+            return false;
+        }
+        if (!$this->isModelUsable($model)) {
+            return false;
+        }
+        if ($healthyOnly && $this->isModelOffline($modelId)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -562,8 +641,11 @@ final readonly class ModelConfigService
      * so an unchecked one keeps a retired model in play even after a migration
      * repointed BCONFIG.
      *
-     * Returns the id unchanged when it can still serve, otherwise the capability
-     * default.
+     * Returns the id unchanged when it can still serve. A retired binding is
+     * rewritten to {@see Model::getSuccessorId()} when that row can still serve
+     * — that is the model the retirement recorded, not whichever capability
+     * default happens to be live. Operator-disabled rows and retirements with
+     * no successor still fall through to the capability default.
      */
     public function resolveUsableModelId(?int $modelId, string $capability, ?int $userId = null): ?int
     {
@@ -571,7 +653,18 @@ final readonly class ModelConfigService
             return $modelId;
         }
 
-        if (!$this->isAllowedModel($userId, $modelId) || !$this->isModelProviderUsable($modelId)) {
+        if (!$this->isAllowedModel($userId, $modelId, $capability)) {
+            return $this->getDefaultModel($capability, $userId);
+        }
+
+        if (!$this->isModelProviderUsable($modelId)) {
+            $successor = $this->usableSuccessorOf($modelId, $userId, $capability);
+            if (null !== $successor) {
+                $this->logSuccessorSwap($modelId, $successor, $capability);
+
+                return $successor;
+            }
+
             return $this->getDefaultModel($capability, $userId);
         }
 
@@ -593,6 +686,32 @@ final readonly class ModelConfigService
         }
 
         return $modelId;
+    }
+
+    /**
+     * The model that serves a retired id now: its usable catalog successor,
+     * else the capability default. Null when nothing that is not itself
+     * retired can take over — the caller must refuse rather than send the id
+     * to a provider that shut it down.
+     *
+     * {@see resolveUsableModelId()} alone is not enough here: its last resort
+     * hands back the configured binding even when that binding is the retired
+     * id (or another retired one), and an operator re-enabling a retired row
+     * makes it look usable until the next seed switches it off again.
+     */
+    public function replacementForRetiredModel(int $modelId, string $capability, ?int $userId = null): ?int
+    {
+        $replacementId = $this->resolveUsableModelId($modelId, $capability, $userId);
+        if (null === $replacementId || $replacementId === $modelId) {
+            return null;
+        }
+
+        $replacement = $this->modelRepository->find($replacementId);
+        if (!$replacement instanceof Model || $replacement->isRetired()) {
+            return null;
+        }
+
+        return $replacementId;
     }
 
     /**
@@ -637,9 +756,98 @@ final readonly class ModelConfigService
         return 0 !== $id ? $id : null;
     }
 
-    private function isAllowedModel(?int $userId, int $modelId): bool
+    /**
+     * Walk {@see Model::getSuccessorId()} until a usable row, or null when the
+     * retirement recorded no replacement (or the replacement cannot serve).
+     *
+     * A cycle is treated as "no successor" rather than looping: the registry
+     * forbids self-successors, but a BID an operator edited in the admin UI is
+     * not under that test.
+     */
+    private function usableSuccessorOf(int $modelId, ?int $userId, string $capability): ?int
     {
-        return null === $this->groupPolicyService || $this->groupPolicyService->isModelAllowed($userId, $modelId);
+        $visited = [$modelId => true];
+        $current = $this->modelRepository->find($modelId);
+
+        while ($current instanceof Model) {
+            $successorId = $current->getSuccessorId();
+            if (null === $successorId || $successorId <= 0 || isset($visited[$successorId])) {
+                return null;
+            }
+
+            $visited[$successorId] = true;
+
+            if ($this->isAllowedModel($userId, $successorId, $capability) && $this->isModelProviderUsable($successorId)) {
+                return $successorId;
+            }
+
+            $current = $this->modelRepository->find($successorId);
+        }
+
+        return null;
+    }
+
+    private function logSuccessorSwap(int $fromBid, int $toBid, string $capability): void
+    {
+        $this->logger->info('Routing a retired model to its catalog successor', [
+            'configured_model_id' => $fromBid,
+            'successor_model_id' => $toBid,
+            'capability' => strtoupper($capability),
+        ]);
+    }
+
+    private function isAllowedModel(?int $userId, int $modelId, ?string $capability = null): bool
+    {
+        return null === $this->groupPolicyService || $this->groupPolicyService->isModelAllowed($userId, $modelId, $capability);
+    }
+
+    private function isDefaultLocked(?int $userId, string $setting): bool
+    {
+        return null !== $this->layeredConfigResolver
+            && $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $setting, $userId);
+    }
+
+    /**
+     * The default the settings screen should name. The id is exactly
+     * {@see getDefaultModel()}: allow-list, a locked instance value, a dead
+     * provider, a catalog successor, and the last-resort usable model.
+     *
+     * @return array{id: int|null, source: string|null, locked: bool}
+     */
+    public function reportedDefault(string $capability, int $userId): array
+    {
+        $setting = strtoupper($capability);
+        $locked = $this->isDefaultLocked($userId, $setting);
+        $id = $this->getDefaultModel($capability, $userId);
+
+        return [
+            'id' => $id,
+            'source' => null === $id ? null : ($locked ? 'admin' : $this->sourceForEffectiveModel($userId, $setting, $id)),
+            'locked' => $locked,
+        ];
+    }
+
+    /**
+     * Which configured layer produced the id generation will use.
+     * A last-resort pick that is not on the chain has no layer.
+     */
+    private function sourceForEffectiveModel(int $userId, string $setting, int $effectiveId): ?string
+    {
+        if (null === $this->layeredConfigResolver) {
+            return null;
+        }
+
+        foreach ($this->layeredConfigResolver->chain($userId, 'DEFAULTMODEL', $setting) as $raw) {
+            $modelId = $this->interpretStoredModelId($raw);
+            if (null === $modelId || (!$this->isDefaultLocked($userId, $setting) && !$this->isAllowedModel($userId, $modelId, $setting))) {
+                continue;
+            }
+            if ($modelId === $effectiveId || $this->usableSuccessorOf($modelId, $userId, $setting) === $effectiveId) {
+                return $this->layeredConfigResolver->sourceForValue($userId, 'DEFAULTMODEL', $setting, $raw);
+            }
+        }
+
+        return null;
     }
 
     private function readDefaultModel(int $ownerId, string $setting): ?int
@@ -676,6 +884,17 @@ final readonly class ModelConfigService
      * different model than the one configured. Treating it as unusable turns
      * that into a deliberate, logged fallback.
      */
+    /**
+     * Whether this catalog row can serve a request right now.
+     *
+     * Public so speech routing can tell an unusable cloud binding (no API key)
+     * apart from local whisper.cpp, which has no key.
+     */
+    public function isConfiguredModelUsable(int $modelId): bool
+    {
+        return $this->isModelProviderUsable($modelId);
+    }
+
     private function isModelProviderUsable(int $modelId): bool
     {
         $model = $this->modelRepository->find($modelId);

@@ -22,6 +22,7 @@ use App\Service\Iam\Permission;
  */
 final readonly class AssistantKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
     public const KEY = 'assistant';
 
     public function __construct(
@@ -80,7 +81,7 @@ final readonly class AssistantKind implements ShareableResourceKindInterface
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
     }
 

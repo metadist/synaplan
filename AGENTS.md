@@ -33,8 +33,8 @@ Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, e
 Without usability and stability the software is bad, whatever the API does.
 Every plan, sprint file and PR that touches anything a person sees or waits
 for is measured against this bar. It is the merge gate, not a polish pass.
-The binding contract is `_devextras/planning/202609_ux_user_flows.md`
-(rules **U1–U12**); the use-case list that applies it is
+The binding contract is `docs/UX_CONTRACT.md` (rules **U1–U12**); the
+use-case list that applies it is
 `_devextras/planning/20260913-use-case-research/README.md` §1.
 
 A user-visible change is **done** only when all seven hold:
@@ -61,12 +61,13 @@ A user-visible change is **done** only when all seven hold:
    race fix, no feature that works only while the tab is open. The full
    pre-commit gate **and** the named journey walked end to end in the browser
    (click, type, find, undo — U10) are the proof; a screenshot is not.
-7. **Every theme, every size, every locale.** Light, dark, V2, 320 px, WCAG
+7. **Every theme, every size, every locale.** Light, dark, 320 px, WCAG
    AA, all five locales in the same PR (U9).
 
 Planning rule (sprint files opened after 2026-09-13): a sprint file with
-an `ota-candidate` step names its journey (§5 of the UX contract) and
-lists the five exit bullets from its §6 before implementation starts.
+an `ota-candidate` step names its journey (in its own plan, UX contract §5)
+and lists the five exit bullets from the contract's §6 before
+implementation starts.
 Existing files add those bullets when next edited; they are not a
 retroactive merge block. "A listed screen is not a user-flow."
 
@@ -112,6 +113,7 @@ Do **not** push and wait for GitHub. The `CI` workflow is ~10–15 minutes; a mi
 | ---------- | ----------------- |
 | `make -C backend lint` | PHP Code Formatting |
 | `make -C backend phpstan` | Backend (PHP/Symfony) — PHPStan stage |
+| `make -C backend deptrac` | Backend (PHP/Symfony) — deptrac stage (layer rules, `backend/deptrac.yaml`) |
 | `make -C backend test` | Backend (PHP/Symfony) — PHPUnit stage |
 | `make -C frontend lint` | Frontend (Vue/TypeScript) — lint |
 | `docker compose exec -T frontend npm run check:types` | Frontend (Vue/TypeScript) — vue-tsc |
@@ -120,7 +122,7 @@ Do **not** push and wait for GitHub. The `CI` workflow is ~10–15 minutes; a mi
 ```bash
 make ci-local
 # same as:
-# make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
+# make lint && make -C backend phpstan && make -C backend deptrac && make test && docker compose exec -T frontend npm run check:types
 ```
 
 `make ci-local` is **not** full CI. Green here only means the unit/static jobs will pass. Playwright is a separate required job (below).
@@ -162,6 +164,8 @@ Real failure modes that have caused red CI more than once:
 
 - **`--filter` ≠ `make test`.** Characterization, integration, and feature tests live OUTSIDE the namespace you usually filter on. Always re-run unfiltered before committing.
 - **`phpstan analyse <path>` ≠ `make -C backend phpstan`.** CI analyses the WHOLE project including `tests/`. Example miss: a test closure typed `: ?string` that never returns null trips `Anonymous function never returns null` only in the full run.
+- **`SizeRatchetTest` red = a class, constructor or method got bigger, not a ledger to extend.** `backend/tests/Architecture/sizeRatchetBaseline.json` freezes every file over 800 lines, constructor over 10 parameters and method over 100 lines that predates the gate. Entries may shrink or disappear, never grow or be added: put new code into a class of its own instead of into the one that is already too big. After shrinking or splitting one, `UPDATE_SIZE_RATCHET=1 php bin/phpunit tests/Architecture/SizeRatchetTest.php` drops the dead entries — its diff must contain removals and smaller numbers only.
+- **deptrac red = a new layer violation, not a baseline to extend.** `backend/deptrac.yaml` enforces Entrypoint → Application → Repository → Entity → Shared (`App\Entity\*` must not import `App\Service\*`, `App\Repository\*` must not import `App\AI\*`, …). `backend/deptrac.baseline.yaml` freezes only the violations that predate the gate and may only shrink: fix the import (move the value object to `App\Model\`, pass the value in instead of the service), never add an entry. `make -C backend deptrac-baseline` exists to drop entries that no longer fire, and its diff must contain removals only.
 - **Snapshot / characterization tests.** `backend/tests/Characterization/` locks the routing/classifier contract via JSON snapshots. Any change to `MessageClassifier`, `MessageSorter`, the fast-path heuristic, or the AI sorter response shape WILL drift them. Re-record and review every changed line — never silently re-record:
 
   ```bash
@@ -170,17 +174,19 @@ Real failure modes that have caused red CI more than once:
   ```
 
 - **Frontend tests need Pinia + i18n + `useMarkdown` set up.** Stub heavy dependencies (`stubs: { MessageText: { template: '...', props: [...] } }`) instead of pulling the full app context into a unit test.
-- **Docker-restart cache permissions.** After `docker compose down`, `backend/var/cache/test` can lose write perms and every kernel-booting test fails with `Unable to write in the "cache" directory`. Fix, then re-run:
+- **`Unable to write in the "cache" directory (…/var/cache/test)`.** PHPUnit's `DG\BypassFinals` stream wrapper makes PHP judge `is_writable()` by mode bits, so root cannot write a `www-data:775` test cache. The dev backend entrypoint removes `var/cache/test` on start so PHPUnit recreates it as root; a backend restart fixes it, or directly:
 
   ```bash
-  docker compose exec -T backend sh -c 'rm -rf var/cache/test && mkdir -p var/cache/test && chmod -R 777 var/cache/test'
+  docker compose exec -T backend rm -rf var/cache/test
   ```
 
 - **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults a code path OFF, new logic there passes tests and is still a no-op in prod. Check the `BCONFIG` default and confirm the path is reachable before claiming a fix.
 - **`make ci-local` ≠ green CI.** It does not run Playwright. A page that unit-tests green can still fail `saved-task-roundtrip` or layout. Run `make test-e2e` before push.
+- **Flaky E2E: timeline before hypothesis.** Build the timeline from the trace first — `python3 _devextras/e2e/playwright-trace-timeline.py path/to/trace.zip` puts actions, errors, console and API calls on one clock. A fix that only raises a timeout is not a fix; the timeline shows what was waited for and why it took that long. Failed CI E2E jobs carry the backend container logs (warnings included) under `backend-logs/` in the Playwright results artifact.
 - **GitHub E2E died before any test ran.** If every E2E job fails at `Unable to download artifact` (the `docker-image` tarball), that is Actions infra — re-run the workflow. Do not “fix” product code.
-- **Playwright runs on the host, not in the `frontend` container.** `docker compose exec frontend npm run test:e2e` talks to `localhost:8000` *inside* that container and gets `ECONNREFUSED`. Use `make test-e2e` (host `npm` + browsers). If `frontend/node_modules` is root-owned from the container install, `make -C frontend deps-host` as your user, or run the matching `mcr.microsoft.com/playwright:v1.62.1-noble` image with `--network host`.
+- **Playwright runs on the host, not in the `frontend` container.** `docker compose exec frontend npm run test:e2e` talks to `localhost:8000` *inside* that container and gets `ECONNREFUSED`. Use `make test-e2e` (host `npm` + browsers). If `frontend/node_modules` is root-owned from the container install, `make -C frontend deps-host` as your user, or run the matching `mcr.microsoft.com/playwright:v1.63.0-noble` image with `--network host`.
 - **Playwright is headless by default** (`frontend/tests/e2e/playwright.config.ts`). Never set `HEADED=1` or pass `--headed` unless the user explicitly asks to watch the browser. Headed + 4 workers opens a window per worker.
+- **A local test fails in code you did not touch?** Check [Known local-only failures](docs/E2E_TESTING.md#known-local-only-failures) before debugging — a match is the dev stack, not your change.
 
 ### Mobile App Compatibility
 
@@ -222,7 +228,7 @@ mobile support a narrow, reviewable compatibility layer:
 ## Essential Commands
 
 ```bash
-docker compose up -d / down            # Start/stop services
+make up / docker compose down          # Start (status page first) / stop services
 make ci-local                          # Unit/static gate (lint, phpstan, tests, vue-tsc)
 make test-e2e                          # Playwright @ci — required before push
 make build                             # Frontend app + widget
@@ -260,26 +266,37 @@ const config = await httpClient('/api/v1/config/runtime', {
 
 - Use CSS variables and utility classes from `frontend/src/style.css` (`var(--bg-card)`, `var(--txt-primary)`, `surface-card`, `btn-primary`, …) — **never Tailwind colors directly**, never one-off custom CSS classes.
 - Tailwind utilities for layout/spacing are fine; dark mode must work (tokens handle it).
-- The V2 glass design (`frontend/src/style-v2.css`, active via the `.design-v2` class) overrides many tokens/utilities — a surface can look fine in V1 and be broken in V2.
+- The glass design (`frontend/src/style-v2.css`, active via the `.design-v2` class) overrides many tokens/utilities — a surface can look fine in the base styles and be broken under `.design-v2`.
 - See `docs/FRONTEND_CONVENTIONS.md` for the token/utility reference.
 
 ### Buttons (MANDATORY)
 
-`.btn-primary` / `.btn-secondary` / `.btn-danger` only set the **color**. They do
-**not** add padding, radius, or type size. A bare `<button class="btn-primary">`
-renders as a rectangular browser button and is unfinished work.
+`.btn-primary` and `.btn-secondary` set the **color** and the default corner
+(`rounded-xl`, 12px). They do **not** add padding or type size. `.btn-danger`
+sets only the color. A bare `<button class="btn-primary">` still needs padding
+and type size.
 
 Every clickable button must use a house utility **and** the standard shape:
 
 ```html
-<button type="button" class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium">
+<button type="button" class="btn-primary px-4 py-2.5 text-sm font-medium">
 ```
 
-- Primary action: `btn-primary px-4 py-2.5 rounded-lg` (add `inline-flex items-center gap-2` when there is an icon).
-- Secondary / cancel: `btn-secondary` with the same padding and radius.
-- Destructive: `btn-danger` with the same padding and radius.
+- Primary action: `btn-primary px-4 py-2.5` (add `inline-flex items-center gap-2` when there is an icon). The corner comes from the class. Do not add `rounded-lg` — that utility is 8px and overrides the default.
+- Secondary / cancel: `btn-secondary` with the same padding. Same default corner.
+- A pill (`rounded-full`) still wins when that shape is intentional.
+- Destructive: `btn-danger` with the same padding, plus an explicit radius (`rounded-lg` or the nearby radius).
 - **Never** a raw `<button>` or `<input type="submit">` without those classes.
 - Match nearby buttons on the same surface — do not invent a one-off size.
+
+### Icons (MANDATORY)
+
+One action ⇒ one glyph, on every surface. The canonical set is Heroicons
+outline 24 and the per-action map lives in `docs/FRONTEND_CONVENTIONS.md`
+(§ Iconography): download is `ArrowDownTrayIcon`, preview is `EyeIcon`,
+delete is `TrashIcon` — never introduce a second glyph for a mapped action.
+`mdi:` is reserved for glyphs Heroicons lacks (file-type icons via
+`previewIconForName()`). File rows use the shared `FileRowActions.vue`.
 
 ### Form controls (MANDATORY)
 
@@ -292,23 +309,23 @@ unfinished work — and it already shipped once across the whole assistants buil
 Every text field, textarea and select must carry the full house chain:
 
 ```html
-<input class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" />
+<input class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]" />
 ```
 
 - Full-width form field: the chain above (drop `mt-1` when the field is not under a label, use `flex-1 min-w-0` instead of `w-full` inside a row).
 - `px-4 py-2` without `text-sm` is the larger variant used on standalone forms — match the nearby fields, don't invent a size.
 - Add `disabled:opacity-50 disabled:cursor-not-allowed` whenever the control binds `:disabled`.
-- **Do not rely on `style-v2.css` §17b.** It force-feeds a border and background to bare fields in the V2 design only — it supplies no padding or radius, and V1 gets nothing at all. A field that "looks fine" in the default V2 design can be invisible in V1.
+- **Do not rely on `style-v2.css` §17b.** It force-feeds a border and background to bare fields in the app design only — it supplies no padding or radius, and the widget (which renders without `design-v2`) gets nothing at all. A field that "looks fine" in the app design can be invisible in the widget.
 - Only use a token that actually exists. `var(--danger)` is **not defined** — inline error text is `text-sm text-red-600 dark:text-red-400`.
 
 ### Color contrast & theme consistency (MANDATORY)
 
-Every UI surface must be readable in **both light and dark theme** (and in the V2 design variant). Poor contrast is a bug, not a style preference.
+Every UI surface must be readable in **both light and dark theme**. Poor contrast is a bug, not a style preference.
 
 - **Text must meet WCAG AA against its actual rendered background**: ≥ 4.5:1 for normal text, ≥ 3:1 for large text and icons — in BOTH themes. If you can't eyeball it, measure it (DevTools → element → contrast ratio).
 - **Never recolor a shared utility (`.pill`, `.txt-secondary`, `.icon-ghost`, …) via a broad ancestor-scoped override** (e.g. "everything inside the composer gets dark ink"). Overlays that render inside that DOM subtree — dropdowns, drop-ups, palettes, modals — have their OWN panel background and will inherit ink meant for a different surface. This exact bug shipped once: the white dark-mode composer forced `#3b4353` text onto the near-black `+`-menu panel (~1.6:1, unreadable). Scope recolors to the surface itself and restore theme colors for any overlay panels nested inside (see `style-v2.css` §19b).
 - **One color definition per concept, defined for both themes**: when adding a color, define the light AND dark value in the same change (token pair in `:root` + `.dark`, or a rule pair like `.foo` + `.dark .foo`). A light-only or dark-only color is incomplete work.
-- **Verify before done**: any change touching colors, surfaces, dropdowns, or the chat composer must be checked visually in light mode, dark mode, and V2 (toggle `.dark` / use the theme switch) before it's considered finished.
+- **Verify before done**: any change touching colors, surfaces, dropdowns, or the chat composer must be checked visually in light mode and dark mode (toggle `.dark` / use the theme switch) before it's considered finished.
 
 ### Vue 3 / Composition API
 
@@ -330,7 +347,7 @@ Every UI surface must be readable in **both light and dark theme** (and in the V
 ### i18n
 
 - All UI text through `vue-i18n` — never hardcode user-facing strings.
-- **Always update ALL five locales**: `en.json`, `de.json`, `es.json`, `fr.json`, `tr.json` (`frontend/src/i18n/`, registered as `supportedLanguages = ['de', 'en', 'es', 'fr', 'tr']`). A missing key silently falls back to English.
+- **Always update ALL five locales** in `frontend/src/i18n/locales/{en,de,es,fr,tr}/<namespace>.json` (registered as `supportedLanguages = ['de', 'en', 'es', 'fr', 'tr']`). Put a new top-level key in the namespace that already owns its siblings — see `NAMESPACE_KEYS` in `frontend/src/i18n/namespaces.ts` and `docs/FRONTEND_CONVENTIONS.md`. A missing key silently falls back to English.
 - **This is enforced.** `tests/unit/i18n/localeParity.spec.ts` gates full-file key parity against `localeParityBaseline.json`, a frozen ledger of the drift that predates the gate (`es`/`tr` ~78% translated, `de` ~93%, `fr` 100%). An English-only key added to a namespace fails the suite. The ledger is compared exactly, so it can only shrink: translate a listed key ⇒ delete its ledger entry in the same change. Only add to the ledger for a genuine exception, never to silence the gate.
 - Placeholder names (`{count}`, `{folder}`) must match English in every locale — a dropped one renders as literal text. Plural **branch counts** may differ legitimately (Turkish uses one form after a numeral), so only the placeholder names are compared.
 
@@ -426,8 +443,8 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 - Business logic or EntityManager work in a controller
 - Hardcoded user-facing strings (use `$t()`) or hardcoded AI model names (use `ModelRepository`)
 - Tailwind colors / custom CSS instead of `style.css` tokens
-- A raw or `btn-primary`-only button (missing `px-4 py-2.5 rounded-lg`)
-- An `input` / `textarea` / `select` with layout classes only (missing `px-3 py-2 rounded-lg surface-card border … txt-primary`)
+- A raw or `btn-primary`-only button (missing `px-4 py-2.5`), or `rounded-lg` on `.btn-primary` / `.btn-secondary` (that forces 8px over the 12px default)
+- An `input` / `textarea` / `select` with layout classes only (missing `px-3 py-2 rounded-xl surface-card border … txt-primary`)
 - An interactive utility (`.pill`, `.btn-*`, `.icon-ghost`) used for a static, non-clickable badge
 - `setTimeout()` to "fix" race conditions
 - German (or non-English) code comments
@@ -439,6 +456,7 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 - "Request failed" / a raw API error shown to a user; a write action whose copy does not say what did and did not happen
 - A run or stream that can end in a non-terminal state ("running" forever, silently skipped step)
 - A UI PR without the named journey walked in the browser (screenshot ≠ walk)
+- A second glyph for an action already in the icon map (`mdi:download` beside `ArrowDownTrayIcon`)
 - `console.log` debugging left in; `any` types
 
 ## Boundaries
@@ -460,8 +478,10 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 
 ## Detailed Documentation
 
+- `docs/ARCHITECTURE.md` — backend layers, size limits (`make -C backend metrics`), the chat and stream request paths
 - `docs/PHP_CONVENTIONS.md` — PHP code style, examples, patterns
 - `docs/FRONTEND_CONVENTIONS.md` — TypeScript, Vue, styling tokens, i18n
+- `docs/UX_CONTRACT.md` — UX rules U1–U12, shared patterns (share, inbox, gallery, triggers), sprint-file contract
 - `docs/API_PATTERNS.md` — Zod schemas, OpenAPI, httpClient usage
 - `docs/MIGRATIONS.md` — Doctrine migrations + idempotent seed workflow
 - `docs/E2E_TESTING.md` — Playwright E2E test guidelines
@@ -473,5 +493,5 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 The whole stack runs in Docker (`docker compose up -d`, standard file — see README/`docs/DEVELOPMENT.md` for URLs and the seeded login `demo@synaplan.com` / `demo123`). The startup script only ensures the Docker **daemon** is running; you still bring the app up yourself with `docker compose up -d`. All lint/test/build commands run inside containers via the `make` targets — see the pre-commit gate above; nothing extra is needed on the host. Non-obvious caveats discovered in this sandbox:
 
 - **`frontend-widgets` cannot start here (optional, ignore it).** It is the only service with a `mem_limit`, and the memory cgroup controller is not delegatable in this VM, so it fails with `cannot enter cgroupv2 "/sys/fs/cgroup/docker" ... threaded mode`. Every other service (frontend, backend, worker, db, redis, centrifugo, qdrant, ollama, tika, mailhog, phpmyadmin) runs fine. If `docker compose up -d` aborts partway with that error, just run it again — the rest come up. It is the dev widget-build watcher only; rebuild the widget on demand with `make -C frontend build-widget`.
-- **PHPStan needs the gRPC stubs generated first.** The dev `composer install` runs with `--no-scripts` (see `_devextras/backend/docker-entrypoint.d/10-composer-install.sh`), so `backend/lib/grpc/` stays empty and `make -C backend phpstan` reports ~52 `class.notFound` errors for `Inference\*`. Fix once (after the stack is up): `docker compose exec -T backend composer proto:generate`. The stubs are gitignored and must be regenerated whenever the backend container is rebuilt.
+- **PHPStan needs the gRPC stubs.** `backend/lib/grpc/` is gitignored; the dev backend entrypoint (`_devextras/backend/docker-entrypoint.d/10-composer-install.sh`) generates the stubs on start when they are missing. If `make -C backend phpstan` still reports ~52 `class.notFound` errors for `Inference\*`, run `docker compose exec -T backend composer proto:generate`.
 - **Local AI text generation (Ollama) segfaults here; embeddings work.** The pinned `ollama/ollama` image's `llama-server` crashes with a segfault on any chat/generate model in this sandbox (even with `OLLAMA_FLASH_ATTENTION=0`), so local chat is unavailable. Embeddings (`bge-m3`) work, so **RAG document ingestion + semantic search (`/files`, `/files/search`), and Qdrant vector features work fully with no API key.** To use chat/generation, add a cloud provider key (e.g. `GROQ_API_KEY=...` in `backend/.env`, then `docker compose restart backend worker`) — the seeded default chat model is Anthropic, so also set/select a provider you have a key for.

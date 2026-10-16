@@ -24,12 +24,20 @@
 	@not_streaming {
 		# /v1/messages is the Anthropic-compatible gateway (Claude Code SSE).
 		# Exclude it from gzip/zstd or Caddy buffers the stream into one chunk.
-		not path /api/v1/messages/stream /api/v1/widget/*/message /v1/messages
+		# /connection/* is the Centrifugo WebSocket upgrade. Compressing it,
+		# or attaching the document security headers below, makes Firefox
+		# refuse the handshake (NS_ERROR_WEBSOCKET_CONNECTION_REFUSED) while
+		# the chat page is still loading.
+		not path /api/v1/messages/stream /api/v1/widget/*/message /v1/messages /connection/*
 	}
 	encode @not_streaming zstd gzip
 
-	# Security headers (applied to all responses)
-	header {
+	# Security headers for documents and APIs. Not the WebSocket upgrade:
+	# Firefox rejects a 101 that carries these.
+	@not_realtime {
+		not path /connection/*
+	}
+	header @not_realtime {
 		X-Frame-Options "SAMEORIGIN"
 		X-Content-Type-Options "nosniff"
 		X-XSS-Protection "1; mode=block"
@@ -126,6 +134,14 @@
 		reverse_proxy {$REALTIME_UPSTREAM_ADDR:centrifugo:8000}
 	}
 
+	# Live voice gateway. The sidecar holds the provider socket. An install
+	# that has not started the `voice` profile gets a 502 on this path, which
+	# is the same as the feature being off. The upstream is overridable for
+	# the same shared-network DNS reason as Centrifugo above.
+	handle /voice/ws* {
+		reverse_proxy {$LIVE_VOICE_UPSTREAM_ADDR:voice:8096}
+	}
+
 	# Widgets first (to catch widget.js, chunks/*, etc.)
 	@widget_file {
 		file {
@@ -199,9 +215,11 @@
 		path('/widget.php') ||
 		path('/shared/*') ||
 		path('/v1/*') ||
+		path('/internal/voice/*') ||
 		path('/mcp') ||
 		path('/.well-known/oauth-protected-resource') ||
 		path('/.well-known/oauth-protected-resource/*') ||
+		path('/.well-known/synaplan-federation') ||
 		({env.APP_ENV} == 'dev' && (path('/_profiler/*') || path('/_wdt/*') || path('/_error/*')))
 	`
 	handle @backend_php {

@@ -18,6 +18,8 @@ use App\Service\Iam\Permission;
  */
 final readonly class AgentKind implements ShareableResourceKindInterface
 {
+    use DescribesResourcesIndividually;
+
     public const KEY = 'agent';
 
     public function __construct(
@@ -73,7 +75,7 @@ final readonly class AgentKind implements ShareableResourceKindInterface
         }
     }
 
-    public function onShareChanged(string $resourceId): void
+    public function onShareChanged(string $resourceId, ?array $revokedSubject = null): void
     {
     }
 
@@ -85,8 +87,8 @@ final readonly class AgentKind implements ShareableResourceKindInterface
     public function assertShareable(string $resourceId): void
     {
         $agent = $this->findAgent($resourceId);
-        if (null === $agent || !$agent->hasPublishedVersion() || $agent->isArchived()) {
-            throw new ShareNotAllowedException('A draft or archived assistant cannot be shared.');
+        if (null === $agent || $agent->isArchived()) {
+            throw new ShareNotAllowedException('An archived assistant cannot be shared.');
         }
     }
 

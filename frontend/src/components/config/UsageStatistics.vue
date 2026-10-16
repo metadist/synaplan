@@ -1,22 +1,9 @@
 <template>
   <div class="space-y-6" data-testid="page-config-usage">
-    <!-- Header -->
-    <div
-      class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-      data-testid="section-header"
-    >
-      <div>
-        <h2 class="text-xl font-semibold txt-primary mb-2">
-          {{ $t('config.usage.title') }}
-        </h2>
-        <p class="text-sm txt-secondary">
-          {{ $t('config.usage.description') }}
-        </p>
-      </div>
-
+    <div class="flex justify-end" data-testid="section-usage-actions">
       <button
         :disabled="loading || exporting"
-        class="w-full sm:w-auto btn-secondary px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+        class="w-full sm:w-auto btn-secondary px-4 py-2 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
         data-testid="btn-export"
         @click="exportUsage"
       >
@@ -278,7 +265,7 @@
               v-model="activitySearch"
               type="text"
               :placeholder="$t('config.usage.activity.searchPlaceholder')"
-              class="w-full px-3 py-2 rounded-lg border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+              class="w-full px-3 py-2 rounded-xl border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
               data-testid="input-activity-search"
               @input="onSearchInput"
             />
@@ -286,7 +273,7 @@
 
           <select
             v-model="activityAction"
-            class="px-3 py-2 rounded-lg border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+            class="px-3 py-2 rounded-xl border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
             data-testid="select-activity-action"
             @change="loadActivity(1)"
           >
@@ -301,12 +288,15 @@
             <option value="SEARCH_QUERY">{{ $t('config.usage.actions.search_query') }}</option>
             <option value="EMBEDDINGS">{{ $t('config.usage.actions.embeddings') }}</option>
             <option value="RERANK">{{ $t('config.usage.actions.rerank') }}</option>
+            <option value="MESSAGE_DIGEST">{{ $t('config.usage.actions.message_digest') }}</option>
+            <option value="VOICE_LIVE">{{ $t('config.usage.actions.voice_live') }}</option>
+            <option value="TRANSCRIPTION">{{ $t('config.usage.actions.transcription') }}</option>
           </select>
 
           <input
             v-model="activityFrom"
             type="date"
-            class="px-3 py-2 rounded-lg border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+            class="px-3 py-2 rounded-xl border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
             :title="$t('config.usage.activity.dateFrom')"
             data-testid="input-activity-from"
             @change="loadActivity(1)"
@@ -315,7 +305,7 @@
           <input
             v-model="activityTo"
             type="date"
-            class="px-3 py-2 rounded-lg border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
+            class="px-3 py-2 rounded-xl border border-light-border bg-transparent txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-brand/50"
             :title="$t('config.usage.activity.dateTo')"
             data-testid="input-activity-to"
             @change="loadActivity(1)"
@@ -323,7 +313,7 @@
 
           <button
             v-if="hasActiveFilters"
-            class="px-3 py-2 rounded-lg text-sm txt-secondary hover:txt-primary transition-colors"
+            class="px-3 py-2 rounded-xl text-sm txt-secondary hover:txt-primary transition-colors"
             :title="$t('config.usage.activity.clearFilters')"
             data-testid="btn-clear-filters"
             @click="clearFilters"
@@ -371,9 +361,27 @@
                   {{ getTimeAgo(entry.timestamp) }}
                 </td>
                 <td class="px-3 py-3">
-                  <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
-                    {{ getActionLabel(entry.action) }}
-                  </span>
+                  <RouterLink
+                    v-if="entry.chat_id"
+                    :to="{ name: 'chat', query: { chat: String(entry.chat_id) } }"
+                    class="inline-flex flex-col"
+                    :title="$t('config.usage.openChat')"
+                  >
+                    <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
+                      {{ getActionLabel(entry.action) }}
+                    </span>
+                    <span v-if="talkDuration(entry)" class="mt-1 text-xs txt-secondary">
+                      {{ talkDuration(entry) }}
+                    </span>
+                  </RouterLink>
+                  <template v-else>
+                    <span class="px-2 py-1 rounded-full text-xs font-medium surface-chip">
+                      {{ getActionLabel(entry.action) }}
+                    </span>
+                    <p v-if="talkDuration(entry)" class="mt-1 text-xs txt-secondary">
+                      {{ talkDuration(entry) }}
+                    </p>
+                  </template>
                 </td>
                 <td class="px-3 py-3 whitespace-nowrap">
                   <span class="flex items-center gap-1.5 text-xs txt-secondary">
@@ -446,7 +454,7 @@
           <div class="flex items-center gap-1">
             <button
               :disabled="activityPage <= 1"
-              class="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-40"
               :class="
                 activityPage <= 1
                   ? 'txt-secondary'
@@ -458,7 +466,7 @@
             </button>
             <button
               :disabled="activityPage <= 1"
-              class="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-40"
               :class="
                 activityPage <= 1
                   ? 'txt-secondary'
@@ -475,7 +483,7 @@
 
             <button
               :disabled="activityPage >= activityTotalPages"
-              class="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-40"
               :class="
                 activityPage >= activityTotalPages
                   ? 'txt-secondary'
@@ -487,7 +495,7 @@
             </button>
             <button
               :disabled="activityPage >= activityTotalPages"
-              class="px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40"
+              class="px-3 py-1.5 rounded-xl text-xs font-medium transition-colors disabled:opacity-40"
               :class="
                 activityPage >= activityTotalPages
                   ? 'txt-secondary'
@@ -508,6 +516,7 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { RouterLink } from 'vue-router'
 import {
   getUsageStats,
   downloadUsageExport,
@@ -697,6 +706,16 @@ const getSubscriptionStatusClass = (status: SubscriptionStatus) => {
   }
 }
 
+function talkDuration(entry: ActivityEntry): string {
+  const seconds = entry.duration_seconds
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return ''
+  const total = Math.round(seconds)
+  const minutes = Math.floor(total / 60)
+  const rest = total % 60
+  if (minutes === 0) return t('config.usage.durationSeconds', { seconds: rest })
+  return t('config.usage.durationMinutes', { minutes, seconds: rest })
+}
+
 const getActionLabel = (action: string) => {
   return t(`config.usage.actions.${action.toLowerCase()}`, action)
 }
@@ -709,6 +728,8 @@ const getSourceIcon = (source: string) => {
   switch (source.toUpperCase()) {
     case 'WHATSAPP':
       return 'mdi:whatsapp'
+    case 'TELEGRAM':
+      return 'mdi:telegram'
     case 'EMAIL':
       return 'heroicons:envelope'
     case 'WEB':
@@ -733,6 +754,8 @@ const getSourceIconBg = (source: string) => {
   switch (source.toUpperCase()) {
     case 'WHATSAPP':
       return 'bg-green-500/10'
+    case 'TELEGRAM':
+      return 'bg-[color-mix(in_srgb,var(--channel-telegram)_12%,transparent)]'
     case 'EMAIL':
       return 'bg-blue-500/10'
     case 'WEB':
@@ -757,6 +780,8 @@ const getSourceIconColor = (source: string) => {
   switch (source.toUpperCase()) {
     case 'WHATSAPP':
       return 'text-green-500'
+    case 'TELEGRAM':
+      return 'text-[var(--channel-telegram)]'
     case 'EMAIL':
       return 'text-blue-500'
     case 'WEB':

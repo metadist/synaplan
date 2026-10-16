@@ -1,6 +1,6 @@
 /* ============================================================
    Synaplan V2 Glass Design — Override Layer
-   All rules scoped under .design-v2 so V1 stays untouched.
+   App design on top of the base styles. The widget uses the base styles alone.
    Works with both light and dark modes.
    ============================================================ */
 
@@ -14,30 +14,44 @@
  * 55% white that blended into the page), darker secondary text, and stronger
  * borders/glow so cards, the rail and dividers keep their "power". */
 .design-v2 {
-  --bg-app: #e4e9f1;
-  --bg-sidebar: rgba(219, 227, 240, 0.92);
-  --bg-chat: #eef2f7;
+  /* Contrast pass: the page deepens a step so white cards lift off it
+     (1.22:1 -> 1.36:1 vs white, +12%); borders gain ~30% alpha so glass
+     edges stop blending tone-in-tone. */
+  --bg-app: #d5dee9;
+  --bg-sidebar: rgba(208, 218, 234, 0.94);
+  /* Same hue, opaque: for a sidebar surface that floats over content. */
+  --bg-sidebar-solid: #d0daea;
+  /* The other sidebar column, one step toward the chat surface. */
+  --bg-sidebar-panel: #dce4ef;
+  --bg-sidebar-panel-solid: #dce4ef;
+  --bg-chat: #e8edf4;
   --bg-card: rgba(255, 255, 255, 0.96);
-  --bg-chip: rgba(0, 0, 0, 0.05);
+  --bg-chip: rgba(0, 0, 0, 0.07);
   /* Contrast overhaul: darker secondary ink so hints, labels, timestamps
      and placeholders read clearly on the light blue-grey surfaces
      (was #4b515c). */
   --txt-secondary: #3a3f48;
-  --border-light: rgba(0, 45, 140, 0.22);
-  --brand-alpha-light: rgba(0, 63, 199, 0.09);
+  /* Same placeholder ink as the base theme: #6b6b6b is 4.9:1 on the glass
+     dropdown (#f3f4f7). Do not point this at --txt-secondary (#3a3f48, ~10:1);
+     that is why the empty row shouted as loud as a real model. */
+  --txt-model-placeholder: #6b6b6b;
+  /* Same hover ink as the base theme: 5.0:1 on the glass hover wash. */
+  --txt-model-placeholder-hover: #5e5e5e;
+  --border-light: rgba(0, 45, 140, 0.28);
+  --brand-alpha-light: rgba(0, 63, 199, 0.12);
 
-  --v2-glow: rgba(0, 63, 199, 0.16);
-  --v2-glow-strong: rgba(0, 63, 199, 0.3);
+  --v2-glow: rgba(0, 63, 199, 0.2);
+  --v2-glow-strong: rgba(0, 63, 199, 0.36);
   --v2-blur-sm: 8px;
   --v2-blur-md: 16px;
   --v2-blur-lg: 24px;
   --v2-radius: 1rem;
-  --v2-border: rgba(0, 63, 199, 0.22);
-  --v2-border-hover: rgba(0, 63, 199, 0.36);
+  --v2-border: rgba(0, 63, 199, 0.3);
+  --v2-border-hover: rgba(0, 63, 199, 0.44);
 
   /* Usage taximeter — V2 keeps the base blues; slightly stronger track alpha
      so the bar/ring stay visible on the frosted light surfaces. */
-  --usage-track: rgba(0, 63, 199, 0.14);
+  --usage-track: rgba(0, 63, 199, 0.18);
   --usage-epoch-a: #003fc7;
   --usage-epoch-b: #4f9cf9;
 }
@@ -46,24 +60,56 @@
  * Secondary text is a calm mid-grey — readable on near-black surfaces
  * without the glare of near-white ink. */
 .design-v2.dark {
-  --bg-app: #050a16;
-  --bg-sidebar: rgba(10, 16, 30, 0.7);
-  --bg-chat: #050a16;
-  --bg-card: rgba(16, 24, 42, 0.9);
-  --bg-chip: rgba(255, 255, 255, 0.04);
+  /* Contrast pass: the page deepens while cards lift and gain opacity, so
+     glass stops blending tone-in-tone (card vs app 1.12:1 -> 1.25:1, +12%). */
+  --bg-app: #02050c;
+  --bg-sidebar: rgba(8, 13, 24, 0.78);
+  --bg-sidebar-solid: #070b15;
+  /* The other sidebar column, lifted a step so the two columns stay distinct. */
+  --bg-sidebar-panel: #101828;
+  --bg-sidebar-panel-solid: #101828;
+  --bg-chat: #02050c;
+  --bg-card: rgba(20, 31, 56, 0.94);
+  --bg-chip: rgba(255, 255, 255, 0.07);
   --txt-secondary: #bdc2cc;
-  --border-light: rgba(107, 143, 214, 0.16);
-  --brand-alpha-light: rgba(107, 143, 214, 0.1);
+  /* #8b95a7 is 6.0:1 on the dark glass dropdown (#0d1526), quieter than #bdc2cc. */
+  --txt-model-placeholder: #8b95a7;
+  /* Hover wash here is rgba(107, 143, 214, 0.12). #959fb1 stays above 6:1. */
+  --txt-model-placeholder-hover: #959fb1;
+  --border-light: rgba(107, 143, 214, 0.24);
+  --brand-alpha-light: rgba(107, 143, 214, 0.14);
 
-  --v2-glow: rgba(107, 143, 214, 0.1);
-  --v2-glow-strong: rgba(107, 143, 214, 0.22);
-  --v2-border: rgba(107, 143, 214, 0.1);
-  --v2-border-hover: rgba(107, 143, 214, 0.2);
+  --v2-glow: rgba(107, 143, 214, 0.14);
+  --v2-glow-strong: rgba(107, 143, 214, 0.28);
+  --v2-border: rgba(107, 143, 214, 0.18);
+  --v2-border-hover: rgba(107, 143, 214, 0.3);
 
   /* Usage taximeter — V2 dark. */
-  --usage-track: rgba(147, 197, 253, 0.2);
+  --usage-track: rgba(147, 197, 253, 0.26);
   --usage-epoch-a: #6d9ae0;
   --usage-epoch-b: #93c5fd;
+}
+
+/* OLED black under the glass design: no navy glow, pure black page. */
+.design-v2.dark.theme-oled {
+  --bg-app: #000;
+  --bg-sidebar: #000;
+  --bg-sidebar-solid: #000;
+  --bg-sidebar-panel: #0a0a0a;
+  --bg-sidebar-panel-solid: #0a0a0a;
+  --bg-chat: #000;
+  --bg-card: rgba(10, 10, 10, 0.96);
+  --bg-chip: rgba(255, 255, 255, 0.06);
+  --txt-secondary: #c8c8c8;
+  --border-light: rgba(255, 255, 255, 0.16);
+  --v2-glow: transparent;
+  --v2-glow-strong: transparent;
+  --v2-border: rgba(255, 255, 255, 0.14);
+  --v2-border-hover: rgba(255, 255, 255, 0.28);
+  --brand-alpha-light: rgba(255, 255, 255, 0.12);
+  --usage-track: rgba(255, 255, 255, 0.16);
+  --usage-epoch-a: #d4d4d4;
+  --usage-epoch-b: #f5f5f5;
 }
 
 /* ----------------------------------------------------------
@@ -147,45 +193,45 @@
    ---------------------------------------------------------- */
 
 .design-v2 .nav-item {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.05);
   border-radius: 0.875rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.16);
   color: #2c2c2c;
   box-shadow: none;
   transition: all 0.2s ease;
 }
 .design-v2 .nav-item:hover {
-  background: rgba(0, 63, 199, 0.06);
+  background: rgba(0, 63, 199, 0.09);
   border-color: var(--v2-border);
   box-shadow: 0 0 12px var(--v2-glow);
 }
 .design-v2 .nav-item--active {
-  background: rgba(0, 63, 199, 0.1) !important;
+  background: rgba(0, 63, 199, 0.13) !important;
   border-color: var(--v2-border-hover);
   color: var(--brand);
   box-shadow:
     0 0 16px var(--v2-glow),
-    inset 0 0 0 1px rgba(0, 63, 199, 0.18);
+    inset 0 0 0 1px rgba(0, 63, 199, 0.22);
 }
 
 .design-v2.dark .nav-item {
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid rgba(107, 143, 214, 0.06);
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(107, 143, 214, 0.12);
   color: #d7dae0;
   box-shadow: none;
 }
 .design-v2.dark .nav-item:hover {
-  background: rgba(107, 143, 214, 0.05) !important;
+  background: rgba(107, 143, 214, 0.08) !important;
   border-color: var(--v2-border);
   box-shadow: 0 0 12px var(--v2-glow);
 }
 .design-v2.dark .nav-item--active {
-  background: rgba(107, 143, 214, 0.08) !important;
+  background: rgba(107, 143, 214, 0.12) !important;
   border-color: var(--v2-border-hover);
   color: var(--brand-light);
   box-shadow:
     0 0 16px var(--v2-glow),
-    inset 0 0 0 1px rgba(107, 143, 214, 0.15) !important;
+    inset 0 0 0 1px rgba(107, 143, 214, 0.2) !important;
 }
 
 /* ----------------------------------------------------------
@@ -198,31 +244,44 @@
   box-shadow:
     0 0 12px rgba(0, 63, 199, 0.25),
     0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .design-v2 .btn-primary:hover {
   background: var(--brand-hover);
   box-shadow:
     0 0 24px rgba(0, 63, 199, 0.35),
     0 4px 16px rgba(0, 0, 0, 0.12);
-  transform: translateY(-1px);
 }
 .design-v2 .btn-primary:active {
-  transform: translateY(0);
+  transform: none;
 }
 
 .design-v2 .btn-secondary {
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.16);
-  transition: all 0.2s ease;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.26);
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .design-v2.dark .btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 .design-v2 .btn-secondary:hover {
-  border-color: var(--v2-border-hover);
-  box-shadow: 0 0 12px var(--v2-glow);
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.34);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+.design-v2.dark .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 .design-v2 .btn-danger {
@@ -288,45 +347,45 @@
 .design-v2 .pill {
   backdrop-filter: blur(var(--v2-blur-sm));
   -webkit-backdrop-filter: blur(var(--v2-blur-sm));
-  background: rgba(0, 0, 0, 0.06);
-  border: 1px solid rgba(0, 0, 0, 0.16);
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.22);
   border-radius: 0.75rem;
   color: #2f3743;
   box-shadow: none;
   transition: all 0.2s ease;
 }
 .design-v2.dark .pill {
-  background: rgba(255, 255, 255, 0.09);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.24);
   color: #e4e5e9;
 }
 .design-v2 .pill:hover {
-  background: rgba(0, 63, 199, 0.1);
-  border-color: rgba(0, 63, 199, 0.3);
+  background: rgba(0, 63, 199, 0.13);
+  border-color: rgba(0, 63, 199, 0.38);
   color: var(--brand);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2.dark .pill:hover {
-  background: rgba(107, 143, 214, 0.12);
-  border-color: rgba(107, 143, 214, 0.3);
+  background: rgba(107, 143, 214, 0.16);
+  border-color: rgba(107, 143, 214, 0.38);
   color: var(--brand-light);
 }
 
 .design-v2 .pill--active {
-  background: rgba(0, 63, 199, 0.12) !important;
-  border-color: rgba(0, 63, 199, 0.3) !important;
+  background: rgba(0, 63, 199, 0.16) !important;
+  border-color: rgba(0, 63, 199, 0.38) !important;
   color: var(--brand);
   box-shadow:
     0 0 14px var(--v2-glow),
-    inset 0 0 0 1px rgba(0, 63, 199, 0.15) !important;
+    inset 0 0 0 1px rgba(0, 63, 199, 0.2) !important;
 }
 .design-v2.dark .pill--active {
-  background: rgba(107, 143, 214, 0.1) !important;
-  border-color: rgba(107, 143, 214, 0.3) !important;
+  background: rgba(107, 143, 214, 0.14) !important;
+  border-color: rgba(107, 143, 214, 0.38) !important;
   color: var(--brand-light);
   box-shadow:
     0 0 14px var(--v2-glow),
-    inset 0 0 0 1px rgba(107, 143, 214, 0.12) !important;
+    inset 0 0 0 1px rgba(107, 143, 214, 0.18) !important;
 }
 
 /* ----------------------------------------------------------
@@ -442,7 +501,7 @@
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
   border: 1px solid var(--v2-border);
-  border-radius: var(--v2-radius);
+  border-radius: var(--radius-xl, 0.75rem);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.12),
     0 0 1px var(--v2-glow);
@@ -455,15 +514,15 @@
 }
 
 .design-v2 .dropdown-item:hover {
-  background: rgba(0, 63, 199, 0.06);
+  background: rgba(0, 63, 199, 0.09);
 }
 .design-v2.dark .dropdown-item:hover {
-  background: rgba(107, 143, 214, 0.08);
+  background: rgba(107, 143, 214, 0.12);
 }
 
 .design-v2 .dropdown-item--active {
-  background: rgba(0, 63, 199, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(0, 63, 199, 0.12);
+  background: rgba(0, 63, 199, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(0, 63, 199, 0.18);
 }
 
 .design-v2 .dropdown-up {
@@ -471,7 +530,7 @@
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
   border: 1px solid var(--v2-border);
-  border-radius: var(--v2-radius);
+  border-radius: var(--radius-xl, 0.75rem);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.15),
     0 0 1px var(--v2-glow);
@@ -489,12 +548,12 @@
 
 .design-v2 .icon-ghost:hover,
 .design-v2 .icon-ghost:focus-visible {
-  background: rgba(0, 63, 199, 0.08);
+  background: rgba(0, 63, 199, 0.11);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2.dark .icon-ghost:hover,
 .design-v2.dark .icon-ghost:focus-visible {
-  background: rgba(107, 143, 214, 0.1);
+  background: rgba(107, 143, 214, 0.14);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 
@@ -524,41 +583,45 @@
 .design-v2 .sidebar-scroll::-webkit-scrollbar-thumb,
 .design-v2 .chat-input-scroll::-webkit-scrollbar-thumb,
 .design-v2 .scroll-thin::-webkit-scrollbar-thumb {
-  background: rgba(0, 63, 199, 0.12);
+  background: rgba(0, 63, 199, 0.18);
 }
 .design-v2.dark .sidebar-scroll::-webkit-scrollbar-thumb,
 .design-v2.dark .chat-input-scroll::-webkit-scrollbar-thumb,
 .design-v2.dark .scroll-thin::-webkit-scrollbar-thumb {
-  background: rgba(107, 143, 214, 0.1);
+  background: rgba(107, 143, 214, 0.16);
 }
 
 /* ----------------------------------------------------------
    13. V2 Sidebar Specific — Glass Rail & Flyout
    ---------------------------------------------------------- */
 
-.design-v2 .v2-sidebar-rail {
-  /* iOS Safari < 15.4 does not support dvh; declare 100vh first as a
-     fallback, then override with 100dvh on supporting browsers. This prevents
-     the bottom avatar button from being pushed behind the browser chrome on
-     mobile Safari, matching the MainLayout h-dvh fix from PR #832. */
-  height: 100vh;
-  height: 100dvh;
-  /* Respect the iOS notch (PWA / standalone) so the avatar at the bottom
-     stays tappable. Also pad the leading edge so a landscape side cutout
-     never clips the rail. */
+.design-v2 .v2-sidebar-rail,
+.design-v2 .v2-sidebar-panel {
+  /* Respect the iOS notch (PWA / standalone). The shell owns the viewport
+     height; these columns fill it. Pad the rail's leading edge so a landscape
+     side cutout never clips the icons. */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-
+  border-right: 1px solid var(--v2-border);
+}
+.design-v2 .v2-sidebar-rail {
+  background: var(--bg-sidebar-panel);
+}
+.design-v2 .v2-sidebar-panel {
   background: var(--bg-sidebar);
+}
+.design-v2 .v2-sidebar-panel.v2-sidebar-panel--overlay {
+  background: var(--bg-sidebar-solid);
+}
+.design-v2 .v2-sidebar-rail {
+  padding-left: env(safe-area-inset-left);
   backdrop-filter: blur(var(--v2-blur-lg));
   -webkit-backdrop-filter: blur(var(--v2-blur-lg));
-  border-right: 1px solid var(--v2-border);
 }
 .design-v2 .v2-sidebar-rail .sidebar-scroll {
   scrollbar-gutter: auto;
 }
-.design-v2.dark .v2-sidebar-rail {
+.design-v2.dark .v2-sidebar-panel {
   box-shadow: 1px 0 20px rgba(0, 0, 0, 0.3);
 }
 
@@ -580,14 +643,14 @@
 
 /* New Chat Button — branded glow, always prominent */
 .design-v2 .v2-new-chat-btn {
-  background: rgba(0, 63, 199, 0.1);
+  background: rgba(0, 63, 199, 0.14);
   color: var(--brand);
-  border: 1px solid rgba(0, 63, 199, 0.2);
+  border: 1px solid rgba(0, 63, 199, 0.28);
   box-shadow: 0 0 10px rgba(0, 63, 199, 0.08);
 }
 .design-v2 .v2-new-chat-btn:hover {
-  background: rgba(0, 63, 199, 0.18);
-  border-color: rgba(0, 63, 199, 0.35);
+  background: rgba(0, 63, 199, 0.22);
+  border-color: rgba(0, 63, 199, 0.42);
   box-shadow: 0 0 20px rgba(0, 63, 199, 0.2);
   transform: scale(1.05);
 }
@@ -599,14 +662,14 @@
   pointer-events: none;
 }
 .design-v2.dark .v2-new-chat-btn {
-  background: rgba(107, 143, 214, 0.08);
+  background: rgba(107, 143, 214, 0.12);
   color: var(--brand-light);
-  border: 1px solid rgba(107, 143, 214, 0.15);
+  border: 1px solid rgba(107, 143, 214, 0.22);
   box-shadow: 0 0 10px rgba(107, 143, 214, 0.06);
 }
 .design-v2.dark .v2-new-chat-btn:hover {
-  background: rgba(107, 143, 214, 0.15);
-  border-color: rgba(107, 143, 214, 0.3);
+  background: rgba(107, 143, 214, 0.2);
+  border-color: rgba(107, 143, 214, 0.38);
   box-shadow: 0 0 20px rgba(107, 143, 214, 0.15);
 }
 
@@ -659,22 +722,22 @@
   transition: all 0.2s ease;
 }
 .design-v2 .v2-rail-icon:hover {
-  background: rgba(0, 63, 199, 0.08);
+  background: rgba(0, 63, 199, 0.12);
   color: var(--brand);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2 .v2-rail-icon--active {
-  background: rgba(0, 63, 199, 0.1);
+  background: rgba(0, 63, 199, 0.14);
   color: var(--brand);
   box-shadow: 0 0 14px var(--v2-glow);
 }
 .design-v2.dark .v2-rail-icon:hover {
-  background: rgba(107, 143, 214, 0.08);
+  background: rgba(107, 143, 214, 0.12);
   color: var(--brand-light);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2.dark .v2-rail-icon--active {
-  background: rgba(107, 143, 214, 0.08);
+  background: rgba(107, 143, 214, 0.12);
   color: var(--brand-light);
   box-shadow: 0 0 14px var(--v2-glow);
 }
@@ -694,7 +757,7 @@
   padding-right: env(safe-area-inset-right);
 }
 .design-v2.dark .v2-mobile-tabbar {
-  background: rgba(10, 16, 30, 0.97);
+  background: rgba(7, 11, 21, 0.97);
   box-shadow: 0 -2px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -737,10 +800,10 @@
    ---------------------------------------------------------- */
 
 .design-v2 .hover-surface:hover {
-  background: rgba(0, 63, 199, 0.06) !important;
+  background: rgba(0, 63, 199, 0.09) !important;
 }
 .design-v2.dark .hover-surface:hover {
-  background: rgba(107, 143, 214, 0.08) !important;
+  background: rgba(107, 143, 214, 0.12) !important;
 }
 
 /* ----------------------------------------------------------
@@ -798,12 +861,11 @@
 .design-v2 input[type='number'],
 .design-v2 input[type='url'],
 .design-v2 input[type='tel'],
-.design-v2 select,
 .design-v2 textarea {
   background: rgba(0, 0, 0, 0.03) !important;
   border-width: 1px !important;
   border-style: solid !important;
-  border-color: rgba(0, 0, 0, 0.22) !important;
+  border-color: rgba(0, 0, 0, 0.28) !important;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
@@ -815,7 +877,6 @@
 .design-v2 input[type='number']:focus,
 .design-v2 input[type='url']:focus,
 .design-v2 input[type='tel']:focus,
-.design-v2 select:focus,
 .design-v2 textarea:focus {
   background: rgba(255, 255, 255, 0.6) !important;
   border-color: var(--v2-border-hover) !important;
@@ -829,10 +890,9 @@
 .design-v2.dark input[type='number'],
 .design-v2.dark input[type='url'],
 .design-v2.dark input[type='tel'],
-.design-v2.dark select,
 .design-v2.dark textarea {
   background: rgba(255, 255, 255, 0.05) !important;
-  border-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.26) !important;
 }
 .design-v2.dark input[type='text']:focus,
 .design-v2.dark input[type='email']:focus,
@@ -841,7 +901,6 @@
 .design-v2.dark input[type='number']:focus,
 .design-v2.dark input[type='url']:focus,
 .design-v2.dark input[type='tel']:focus,
-.design-v2.dark select:focus,
 .design-v2.dark textarea:focus {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: var(--v2-border-hover) !important;
@@ -868,6 +927,13 @@
 .design-v2.dark .checkbox-brand:hover {
   border-color: var(--brand-light);
   background: rgba(107, 143, 214, 0.06);
+}
+/* The unchecked dark rule has the same specificity as :checked and comes later,
+   so it was painting the box nearly black and leaving the near-black tick on it. */
+.design-v2.dark .checkbox-brand:checked,
+.design-v2.dark .checkbox-brand:checked:hover {
+  background: var(--brand);
+  border-color: var(--brand);
 }
 
 /* Native checkboxes and radios (not .checkbox-brand) */
@@ -1051,35 +1117,6 @@
     0 0 1px var(--v2-glow);
 }
 
-/* Memories Dialog — glass with clean background */
-.design-v2 [data-testid='modal-memories-dialog'] {
-  background: rgba(255, 255, 255, 0.97) !important;
-  backdrop-filter: blur(var(--v2-blur-lg));
-  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
-  border: 1px solid var(--v2-border) !important;
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.1),
-    0 0 1px var(--v2-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-.design-v2.dark [data-testid='modal-memories-dialog'] {
-  background: rgba(12, 18, 34, 0.97) !important;
-  box-shadow:
-    0 20px 60px rgba(0, 0, 0, 0.5),
-    0 0 1px var(--v2-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-/* Memories Dialog — inner controls glass override */
-.design-v2 [data-testid='modal-memories-dialog'] .surface-chip {
-  background: rgba(0, 0, 0, 0.03) !important;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-}
-.design-v2.dark [data-testid='modal-memories-dialog'] .surface-chip {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
 /* ----------------------------------------------------------
    OVERRIDE: Chat input textarea — must come AFTER section 17b
    to beat global form element rules at equal specificity.
@@ -1100,6 +1137,17 @@
   box-shadow: none !important;
 }
 
+/* Smart Search: the palette panel is the visible field; its input stays bare. */
+.design-v2 input[data-testid='input-smart-search'],
+.design-v2.dark input[data-testid='input-smart-search'],
+.design-v2 input[data-testid='input-smart-search']:focus,
+.design-v2.dark input[data-testid='input-smart-search']:focus {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0;
+}
+
 /* ----------------------------------------------------------
    Accessibility — honor "Reduce Transparency" / "Reduce Motion"
    (Apple HIG requirement for glass / translucent materials).
@@ -1111,12 +1159,14 @@
 @media (prefers-reduced-transparency: reduce) {
   /* Opaque the two translucent glass surfaces (others are already solid). */
   .design-v2 {
-    --bg-sidebar: #dbe3f0;
+    --bg-sidebar: #d0daea;
+    --bg-sidebar-panel: #dce4ef;
     --bg-card: #ffffff;
   }
   .design-v2.dark {
-    --bg-sidebar: #0a101e;
-    --bg-card: #10182a;
+    --bg-sidebar: #070b15;
+    --bg-sidebar-panel: #101828;
+    --bg-card: #131d35;
   }
   /* Remove the frosted-glass blur the translucency relied on. */
   .design-v2 *,
@@ -1130,7 +1180,7 @@
     background: #ffffff;
   }
   .design-v2.dark .v2-mobile-tabbar {
-    background: #0a101e;
+    background: #070b15;
   }
 }
 
@@ -1161,12 +1211,12 @@
 }
 .design-v2.dark .v2-rail-icon:hover {
   color: #d8dce6;
-  background: rgba(107, 143, 214, 0.12);
+  background: rgba(107, 143, 214, 0.16);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2.dark .v2-rail-icon--active {
   color: var(--brand-light);
-  background: rgba(107, 143, 214, 0.1);
+  background: rgba(107, 143, 214, 0.14);
   box-shadow: 0 0 14px var(--v2-glow);
 }
 
@@ -1204,23 +1254,49 @@
   opacity: 1;
 }
 .design-v2.dark [data-testid='comp-chat-input-shell'] .surface-chip {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
 }
 
 .design-v2.dark [data-testid='comp-chat-input-shell'] .pill {
-  background: rgba(255, 255, 255, 0.07) !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
   color: #d0d3db !important;
 }
+
+/* The model chip has no fill of its own. The border stays so it still reads
+   as a control on the composer; only hover and keyboard focus add a tint. */
+.design-v2 [data-testid='comp-chat-input-shell'] [data-testid='btn-model-toggle'].pill,
+.design-v2.dark [data-testid='comp-chat-input-shell'] [data-testid='btn-model-toggle'].pill {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.design-v2:not(.dark)
+  [data-testid='comp-chat-input-shell']
+  [data-testid='btn-model-toggle'].pill:hover,
+.design-v2:not(.dark)
+  [data-testid='comp-chat-input-shell']
+  [data-testid='btn-model-toggle'].pill:focus-visible {
+  background: rgba(0, 63, 199, 0.06) !important;
+  color: var(--brand) !important;
+}
+.design-v2.dark [data-testid='comp-chat-input-shell'] [data-testid='btn-model-toggle'].pill:hover,
+.design-v2.dark
+  [data-testid='comp-chat-input-shell']
+  [data-testid='btn-model-toggle'].pill:focus-visible {
+  background: rgba(107, 143, 214, 0.16) !important;
+  color: var(--brand-light) !important;
+}
 .design-v2.dark [data-testid='comp-chat-input-shell'] .pill--active {
-  background: rgba(107, 143, 214, 0.12) !important;
-  border-color: rgba(107, 143, 214, 0.28) !important;
+  background: rgba(107, 143, 214, 0.16) !important;
+  border-color: rgba(107, 143, 214, 0.36) !important;
   color: var(--brand-light) !important;
 }
 
 .design-v2.dark [data-testid='comp-chat-input-shell'] .btn-primary {
-  color: #ffffff;
+  /* Keep this rule so a composer recolor cannot paint the label. The ink is
+     the on-brand token: white fails AA on the dark-mode brand fill. */
+  color: var(--on-brand);
 }
 
 /* ----------------------------------------------------------
@@ -1239,12 +1315,12 @@
 }
 .design-v2:not(.dark) .v2-rail-icon:hover {
   color: var(--brand);
-  background: rgba(0, 63, 199, 0.1);
+  background: rgba(0, 63, 199, 0.13);
   box-shadow: 0 0 10px var(--v2-glow);
 }
 .design-v2:not(.dark) .v2-rail-icon--active {
   color: var(--brand);
-  background: rgba(0, 63, 199, 0.12);
+  background: rgba(0, 63, 199, 0.16);
   box-shadow: 0 0 14px var(--v2-glow);
 }
 
@@ -1283,4 +1359,277 @@
 .design-v2:not(.dark) [data-testid='comp-chat-input-shell'] .icon-ghost:focus-visible {
   color: var(--brand);
   background: rgba(0, 63, 199, 0.08);
+}
+
+/* Card surfaces are 16px. A button that also wears surface-card stays 12px.
+   Specificity beats .design-v2 .surface-card. Pills stay round. */
+.design-v2 button:not(.rounded-full),
+.design-v2 input[type='button']:not(.rounded-full),
+.design-v2 input[type='submit']:not(.rounded-full),
+.design-v2 input[type='reset']:not(.rounded-full),
+.design-v2 a.btn-primary:not(.rounded-full),
+.design-v2 a.btn-secondary:not(.rounded-full),
+.design-v2 a.btn-danger:not(.rounded-full) {
+  border-radius: var(--radius-xl, 0.75rem);
+}
+
+/* A full-width row inside a rounded, clipped card. Its hover fill must not
+   carry the 12px button radius: the card clips the outer corners, so the
+   first row is round only on top, middle rows are square, and the last row
+   is round only on the bottom. */
+.design-v2 button.stack-row,
+.design-v2 a.stack-row {
+  border-radius: 0;
+}
+
+/* Same 12px on fields. Beats .design-v2 .surface-card (16px) when a field
+   also wears that class. Excludes the bare composer and search inputs. */
+.design-v2
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not(
+    [type='button']
+  ):not([type='submit']):not([type='reset']):not([type='image']):not([type='hidden']):not(
+    .rounded-full
+  ):not([data-testid='input-smart-search']),
+.design-v2 textarea:not(.rounded-full):not(.chat-textarea),
+.design-v2 select:not(.rounded-full) {
+  border-radius: var(--radius-xl, 0.75rem);
+}
+
+/* Native dropdowns sit outside the !important form rules above. An !important
+   fill cannot be eased, which is why date fields faded and selects snapped. */
+.design-v2 select,
+.design-v2 .dropdown-trigger {
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.design-v2 select {
+  background: rgba(0, 0, 0, 0.03);
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.28);
+}
+.design-v2 select:focus {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: var(--v2-border-hover);
+  box-shadow: 0 0 0 3px rgba(0, 63, 199, 0.08);
+}
+.design-v2.dark select {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+.design-v2.dark select:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--v2-border-hover);
+  box-shadow: 0 0 0 3px rgba(107, 143, 214, 0.06);
+}
+
+/* Beats the form-field background and .surface-card, which otherwise hide
+   the hover on native dropdowns, date fields, and custom dropdown triggers. */
+.design-v2 select:not(:disabled):hover,
+.design-v2 input[type='date']:not(:disabled):hover,
+.design-v2 input[type='datetime-local']:not(:disabled):hover,
+.design-v2 input[type='time']:not(:disabled):hover,
+.design-v2 input[type='month']:not(:disabled):hover,
+.design-v2 input[type='week']:not(:disabled):hover,
+.design-v2 .dropdown-trigger:not(:disabled):hover {
+  cursor: pointer;
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+
+.design-v2.dark select:not(:disabled):hover,
+.design-v2.dark input[type='date']:not(:disabled):hover,
+.design-v2.dark input[type='datetime-local']:not(:disabled):hover,
+.design-v2.dark input[type='time']:not(:disabled):hover,
+.design-v2.dark input[type='month']:not(:disabled):hover,
+.design-v2.dark input[type='week']:not(:disabled):hover,
+.design-v2.dark .dropdown-trigger:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+/* The sidebar search field wears .surface-card, whose fill and border
+   otherwise sit still. Ease the same brand edge as the other fields. */
+.design-v2 [data-testid='btn-sidebar-v2-search'] {
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.design-v2 [data-testid='btn-sidebar-v2-search']:hover {
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+.design-v2.dark [data-testid='btn-sidebar-v2-search']:hover {
+  border-color: color-mix(in srgb, var(--brand) 55%, transparent);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+/* OLED Black keeps the silver accent. The rules above paint the navy wash
+   onto hover, active and focus states; restated here so they follow the
+   black and grey page. */
+.design-v2.dark.theme-oled .nav-item {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+.design-v2.dark.theme-oled .nav-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.design-v2.dark.theme-oled .nav-item--active {
+  background: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22) !important;
+}
+.design-v2.dark.theme-oled .btn-primary,
+.design-v2.dark.theme-oled .btn-primary:hover {
+  border-color: rgba(20, 20, 20, 0.2);
+  box-shadow: none;
+}
+.design-v2.dark.theme-oled .hover-surface:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.design-v2.dark.theme-oled .v2-rail-icon:hover,
+.design-v2.dark.theme-oled .v2-rail-icon--active {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+.design-v2.dark.theme-oled .pill:hover,
+.design-v2.dark.theme-oled .pill--active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
+}
+.design-v2.dark.theme-oled .v2-new-chat-btn,
+.design-v2.dark.theme-oled .v2-new-chat-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: none;
+}
+.design-v2.dark.theme-oled input[type='text']:focus,
+.design-v2.dark.theme-oled input[type='email']:focus,
+.design-v2.dark.theme-oled input[type='password']:focus,
+.design-v2.dark.theme-oled input[type='search']:focus,
+.design-v2.dark.theme-oled input[type='number']:focus,
+.design-v2.dark.theme-oled input[type='url']:focus,
+.design-v2.dark.theme-oled input[type='tel']:focus,
+.design-v2.dark.theme-oled textarea:focus {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+.design-v2.dark.theme-oled .checkbox-brand:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.design-v2.dark.theme-oled
+  [data-testid='comp-chat-input-shell']
+  [data-testid='btn-model-toggle'].pill:hover,
+.design-v2.dark.theme-oled
+  [data-testid='comp-chat-input-shell']
+  [data-testid='btn-model-toggle'].pill:focus-visible,
+.design-v2.dark.theme-oled [data-testid='comp-chat-input-shell'] .pill--active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+/* Panels, menus and modals hardcode the navy glass of dark mode. On OLED
+   they sit a step above the black page so text stays readable. */
+.design-v2.dark.theme-oled .surface-elevated,
+.design-v2.dark.theme-oled .dropdown-panel,
+.design-v2.dark.theme-oled .dropdown-up,
+.design-v2.dark.theme-oled .surface-card.shadow-2xl,
+.design-v2.dark.theme-oled select option {
+  background: #161616;
+}
+.design-v2.dark.theme-oled .bubble-ai {
+  background: rgba(22, 22, 22, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+.design-v2.dark.theme-oled .bubble-ai:hover {
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+}
+.design-v2.dark.theme-oled .bubble-user,
+.design-v2.dark.theme-oled .bubble-user:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+.dark.theme-oled .dark\:bg-gray-900 {
+  background-color: #161616;
+}
+.design-v2.dark.theme-oled [data-testid='modal-file-selection'],
+.design-v2.dark.theme-oled [data-testid='modal-pasted-text'],
+.design-v2.dark.theme-oled [data-testid='modal-chat-manager'],
+.design-v2.dark.theme-oled [data-testid='comp-file-mention-palette'] {
+  background: #161616 !important;
+}
+.design-v2.dark.theme-oled .dropdown-item:hover,
+.design-v2.dark.theme-oled .dropdown-item--active,
+.design-v2.dark.theme-oled .icon-ghost:hover,
+.design-v2.dark.theme-oled .icon-ghost:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+/* Fills that say "text-white" assume the deep blue brand. On the light OLED
+   accent that ink disappears, so it follows --on-brand instead. */
+.dark.theme-oled [class~='bg-[var(--brand)]'],
+.dark.theme-oled [class~='hover:bg-[var(--brand)]']:hover,
+.dark.theme-oled .mode-toggle-active {
+  color: var(--on-brand) !important;
+}
+
+/* User-bubble controls. The glass secondary button paints dark ink on the
+   blue fill; these rules stay on the bubble and do not reach portaled menus. */
+.design-v2 .bubble-user .btn-secondary,
+.design-v2.dark .bubble-user .btn-secondary,
+.design-v2.dark.theme-oled .bubble-user .btn-secondary {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+}
+.design-v2 .bubble-user .btn-secondary:hover,
+.design-v2.dark .bubble-user .btn-secondary:hover,
+.design-v2.dark.theme-oled .bubble-user .btn-secondary:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.28);
+  border-color: #fff;
+  box-shadow: none;
+}
+.design-v2 .bubble-user .icon-ghost,
+.design-v2.dark .bubble-user .icon-ghost,
+.design-v2 .bubble-user .txt-secondary,
+.design-v2.dark .bubble-user .txt-secondary {
+  color: #fff;
+}
+.design-v2 .bubble-user .icon-ghost:hover,
+.design-v2 .bubble-user .icon-ghost:focus-visible,
+.design-v2.dark .bubble-user .icon-ghost:hover,
+.design-v2.dark .bubble-user .icon-ghost:focus-visible,
+.design-v2.dark.theme-oled .bubble-user .icon-ghost:hover,
+.design-v2.dark.theme-oled .bubble-user .icon-ghost:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+.design-v2 .bubble-user .surface-card .txt-secondary,
+.design-v2 .bubble-user .surface-elevated .txt-secondary,
+.design-v2 .bubble-user .dropdown-panel .txt-secondary,
+.design-v2.dark .bubble-user .surface-card .txt-secondary,
+.design-v2.dark .bubble-user .surface-elevated .txt-secondary,
+.design-v2.dark .bubble-user .dropdown-panel .txt-secondary {
+  color: var(--txt-secondary);
+}
+
+/* The glass textarea is a 3% wash, so its ink would sit on the blue fill.
+   The edit field needs an opaque card in both themes. */
+.design-v2 .bubble-user textarea,
+.design-v2.dark .bubble-user textarea,
+.design-v2.dark.theme-oled .bubble-user textarea,
+.design-v2 .bubble-user textarea:focus,
+.design-v2.dark .bubble-user textarea:focus,
+.design-v2.dark.theme-oled .bubble-user textarea:focus {
+  background: var(--bg-card) !important;
+  color: var(--txt-primary) !important;
 }

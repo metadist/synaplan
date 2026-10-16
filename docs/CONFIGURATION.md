@@ -85,7 +85,7 @@ restarts:
 
 ```bash
 docker compose down -v
-SEED_DEMO_DATA=false docker compose up -d
+SEED_DEMO_DATA=false make up
 ```
 
 ---
@@ -122,6 +122,8 @@ different provider:
 |----------|---------|-------|
 | `OIDC_ADMIN_ROLES` | `admin,realm-admin,synaplan-admin,administrator` | Claim values that grant admin |
 | `OIDC_ROLE_CLAIMS` | `realm_access.roles,resource_access.{client_id}.roles,groups` | Dot-notation paths; `{client_id}` expands to `OIDC_CLIENT_ID`. Azure AD: `roles`. Auth0: `https://myapp\.com/roles` |
+| `OIDC_SCOPES` | `openid email profile offline_access` | Permissions requested at sign-in. `offline_access` is rewritten to `offline` when discovery lists `offline` and not `offline_access` (Kinde). A refused permission stops sign-in and names that permission. |
+| `OIDC_PROVIDER_LABEL` | empty | Button text. Empty shows "Enterprise SSO" in the visitor's language. |
 
 Two properties of that mapping are worth knowing before you rely on it:
 
@@ -200,6 +202,31 @@ Two caveats for the env path:
 > them from `.env` and restart). Rotate `APP_SECRET` only when you can re-enter
 > every provider key afterwards.
 
+### Availability
+
+Every install seeds the full model catalog. Which rows a person can pick is decided when the list is read, from the same provider check the router already uses (`ChatReadinessService::providerAvailability()`). A provider counts as available when its API key or server URL is present. An Ollama model also has to be pulled on that server. Saving a key under **Admin → AI Providers** surfaces that provider's models immediately. The catalog does not need to be seeded again, and the container does not need a restart.
+
+| Who | What they see |
+| --- | --- |
+| Regular users | Only models of available providers, from `GET /api/v1/config/models`. Everything else is hidden, including Ollama rows that are not pulled yet. |
+| Administrators | The same picker, unless `includeUnavailable=1` is passed on that config endpoint (admins only). The catalog under **Manage → Assistants → Models** is `GET /api/v1/admin/models`, which already returns every row and does not take that parameter. Unavailable rows stay in that list, greyed, with a badge: **Provider not configured** or **Not pulled**. |
+
+**Select suggested models** recommends only within the providers this installation can reach. A new account does not get frozen per-user default rows; the install-wide defaults apply until that person chooses a model.
+
+Local speech-to-text is a catalog row too (`service: Whisper`, tag `sound2text`). It is available when `WHISPER_ENABLED` is on and the whisper.cpp binary plus the `WHISPER_DEFAULT_MODEL` file are present, so an air-gapped install can bind SOUND2TEXT without a cloud key. Set `WEB_SPEECH_ENABLED=false` on those installs: Chrome's Web Speech API sends audio to Google.
+
+Operators can inspect and narrow the catalog from the CLI. Disable is a soft deactivate (`BACTIVE=0`, `BSELECTABLE=0`). The row stays, so chat history that points at it still resolves, and the next `app:seed` does not turn it back on. There is no command that deletes catalog rows. A row that is actually missing is inserted again on the next seed, as a new id, which breaks chat history that still points at the old one. That is why a disable keeps the row.
+
+```bash
+php bin/console app:provider:list
+php bin/console app:provider:list --fresh
+php bin/console app:model:enable --provider groq
+php bin/console app:model:disable --provider openai
+php bin/console app:model:enable --only ollama --only piper --only whisper
+```
+
+`--only` is an allow-list: those providers are enabled and every other catalog provider is soft-disabled. A cloud provider added in a later release stays off until you extend the list. It cannot be combined with `--provider` or with per-model keys. Helm exposes the same switches as `models.providers.only`, `models.providers.enabled`, and `models.providers.disabled`.
+
 ### Groq (Recommended - Free Tier)
 
 ```bash
@@ -234,7 +261,7 @@ ANTHROPIC_API_KEY=sk-ant-your_key_here
 GOOGLE_GEMINI_API_KEY=your_key_here
 ```
 
-Also unlocks the Google media models (Imagen 4, Nano Banana, Veo 3.1, Gemini TTS).
+Also unlocks the Google media models (Nano Banana image generation, Veo 3.1 video, Gemini TTS).
 
 ### Mistral
 
@@ -250,9 +277,10 @@ Chat and vision (Mistral Medium 3.5, Large 3) plus the Voxtral audio pair (trans
 XAI_API_KEY=your_key_here
 ```
 
-Long-context chat and image understanding (Grok 4.5 with a 500K window), Grok Imagine for image and
-video generation, and Grok voice for speech synthesis and transcription. Grok 4.5 always reasons at a
-fixed depth, so the Thinking toggle has no effect on it. Grok TTS reads its voice roster live from
+Long-context chat and image understanding (Grok 4.7, 4.6 and 4.5, each with a 500K window), Grok Imagine for image and
+video generation, and Grok voice for speech synthesis and transcription. Grok 4.7 accepts a reasoning
+depth (`low` / `medium` / `high` / `xhigh`); Grok 4.5 and 4.6 always reason at a
+fixed depth, so the Thinking toggle has no effect on them. Grok TTS reads its voice roster live from
 xAI (default `eve`; the five core voices eve, ara, rex, sal and leo are also available offline) and
 delivers the audio in one piece — xAI streams synthesis over a WebSocket only, which this backend
 does not speak. The realtime Speech-to-Speech API is not supported. Get a key at
@@ -264,7 +292,7 @@ does not speak. The realtime Speech-to-Speech API is not supported. Get a key at
 TRUSTEDTOKENS_API_KEY=your_key_here
 ```
 
-Open-weight models (GLM 5.2 / 5.3, DeepSeek V4 / Chimera, Qwen3.6 35B, GPT OSS 120B) served from GPUs in Munich by TNG
+Open-weight models (GLM 5.2 / 5.3, Chimera, Qwen3.6 35B, GPT OSS 120B) served from GPUs in Munich by TNG
 Technology Consulting, under German jurisdiction with zero data retention. Synaplan talks to
 its OpenAI-compatible API at `https://api.trustedtokens.eu/v1`. Get a key at
 [trustedtokens.eu](https://trustedtokens.eu/) under **Account → API Access**.
@@ -282,6 +310,38 @@ Model ids are case-sensitive (MiniMax is `MiniMax-M3`). Use a pay-as-you-go key 
 subscription plans are unsuitable for a production platform key. Get a key at
 [a2agent.me](https://a2agent.me/) under **dashboard → API keys**. Integration
 guides: [a2agent.me/integrations](https://a2agent.me/integrations).
+
+### Meta (Muse Spark and Muse Wonder)
+
+```bash
+META_API_KEY=your_key_here
+```
+
+Muse Spark 1.3, Muse Wonder (`muse-wonder-1.0`), Muse Image, and Muse Voice Transcribe
+through the Meta Model API at `https://api.meta.ai/v1`. Spark and Wonder do chat and
+image understanding with a 1M context. Spark stays the chat default: Wonder costs more
+and is meant for complex, long-running work. Muse Image generates and edits pictures
+at $0.01 per image. Muse Voice Transcribe turns a recording into text ($0.18 per hour,
+up to 10 minutes). The live transcription WebSocket is not used.
+Meta's own SDK reads `MODEL_API_KEY`; Synaplan stores the same secret as `META_API_KEY`.
+Create a key at [dev.meta.ai](https://dev.meta.ai/) under **API keys → Create API key**
+(the key is shown only once).
+Docs: [dev.meta.ai/docs/models](https://dev.meta.ai/docs/models).
+
+### Cerebras
+
+```bash
+CEREBRAS_API_KEY=your_key_here
+```
+
+Qwen 3.8 27B (chat with tools, image understanding) and GPT OSS 120B (text only) on
+Cerebras Inference at `https://api.cerebras.ai/v1`, at roughly 2,000–3,000 tokens per
+second. The Thinking toggle maps to `reasoning_effort`: off sends `none` on Qwen and
+`low` on GPT OSS, which cannot switch reasoning off. Image requests to Qwen always run
+without reasoning, and images must be PNG or JPEG. Prompts are processed by Cerebras in
+the US. Create a key at [cloud.cerebras.ai](https://cloud.cerebras.ai/) under
+**API Keys**; a free trial is available with a smaller context (65K) and rate limits.
+Docs: [inference-docs.cerebras.ai](https://inference-docs.cerebras.ai/).
 
 ### HuggingFace
 
@@ -337,6 +397,24 @@ local Ollama already offers instead of adding each by hand — see
 - **Scheduled re-check.** `app:model:health-check` re-lists each import source. A model missing
   from a **successful** listing is recorded offline (`not offered by endpoint`) and soft-disabled
   only when `MODELHEALTH.AUTO_DISABLE_ENABLED=1`; an **unreachable** endpoint changes nothing.
+
+### Where an OpenAI-compatible endpoint may point
+
+Every base URL an administrator saves, tests or imports from is checked before the server
+connects to it ([GHSA-26f3-684h-hpjh](https://github.com/metadist/synaplan/security/advisories/GHSA-26f3-684h-hpjh)):
+
+- Only `http://` and `https://` URLs. The probe does not follow redirects and connects to the
+  address the hostname resolved to during the check, so a name cannot point somewhere else between
+  the check and the request.
+- **Your own network is allowed by default** — a LocalAI, vLLM or Ollama box on `10.x`, `172.16/12`,
+  `192.168.x`, loopback, an IPv6 ULA or an overlay-VPN address (`100.64/10`) is the normal case for a
+  self-hosted gateway. Link-local addresses (`169.254.0.0/16`, `fe80::/10` — where cloud metadata
+  services answer) and the other reserved ranges are always refused.
+- `OPENAI_COMPATIBLE_PUBLIC_UPSTREAMS_ONLY=1` switches to the public-only policy every
+  user-supplied URL already gets: private networks are refused when an endpoint is saved or probed.
+  Recommended for hosted and multi-tenant installations whose administrators are not the people
+  who run the servers. Endpoints saved before the flag was set keep serving chat until they are
+  edited; **Test** and **Import models** then name the flag in their error message.
 
 ---
 
@@ -421,7 +499,7 @@ Pin a Task Prompt and run it on demand or on a schedule. Configured via
 ## Microsoft 365 connector (BCONFIG)
 
 Lets a user connect their Microsoft 365 account (currently delegated
-`Mail.Read`) from **Channels → Connections**. The app registration is
+`Mail.Read`) from **Manage → Connections**. The app registration is
 **operator-owned and install-wide**: rows live under `BOWNERID=0` only, so a
 user can never point the consent flow at an app registration the operator does
 not control. Admins manage it in **Settings → Inbound Channels → Microsoft 365
@@ -456,7 +534,7 @@ grant (consent revoked, refresh token expired), the connection flips to
 ## Dropbox connector (BCONFIG)
 
 Lets a user connect their Dropbox account as a file destination
-(`save_to_folder`, channel `dropbox`) from **Channels → Connections**. Same
+(`save_to_folder`, channel `dropbox`) from **Manage → Connections**. Same
 model as Microsoft 365: the Dropbox app is **operator-owned and install-wide**
 (`BOWNERID=0`), tokens live per user in the encrypted credential vault, and a
 rejected refresh flips the connection to `reauth_required`. Admins manage it
@@ -487,7 +565,7 @@ Media generation (image, video, audio) can run as **background jobs** instead of
 blocking the chat turn: the assistant shows a live status banner, a completion
 toast fires when the render is ready, and a global Jobs tray tracks everything.
 Configured via **BCONFIG** (not env vars). Admins manage the master switch in the
-UI (**Settings → Processing → Async media generation**); the rest can be set per
+UI (**Operate → AI infrastructure → Chat behavior → Background media generation**); the rest can be set per
 group in the `BCONFIG` table. Resolution is per-user row → global row
 (`BOWNERID=0`) → built-in code default.
 
@@ -501,7 +579,7 @@ group in the `BCONFIG` table. Resolution is per-user row → global row
 
 ¹ Existing installations are grandfathered to `0` by migration
 (`Version20260629120000`) so behavior doesn't change on upgrade — each user
-opts in via **Settings → Processing → Async media generation** (or set the
+opts in via **Operate → AI infrastructure → Chat behavior → Background media generation** (or set the
 group/per-user row directly).
 
 > **Requires the `worker` container.** Async jobs are consumed by the dedicated
@@ -526,20 +604,16 @@ Supported formats: mp3, wav, ogg, m4a, opus, flac, webm, aac, wma
 
 ---
 
-## Text-to-Speech (optional Piper)
+## Text-to-Speech (Piper)
 
-Speech **output** is a separate companion: [synaplan-tts](https://github.com/metadist/synaplan-tts)
-(`ghcr.io/metadist/synaplan-tts`). The published image ships four voices that
-match the UI locales — English, German, Spanish, Turkish. It is not started
-with the default stack.
-
-```bash
-docker compose --profile tts up -d
-```
+Speech **output** is a companion: [synaplan-tts](https://github.com/metadist/synaplan-tts)
+(`ghcr.io/metadist/synaplan-tts`). The published image ships five voices that
+match the UI locales — English, German, Spanish, French, Turkish. Local
+`make up` starts it. Stop the `tts` container to hide spoken answers.
 
 ```bash
-# backend/.env — only needed if TTS is not on localhost:10200
-SYNAPLAN_TTS_URL=http://host.docker.internal:10200
+# backend/.env — only needed if TTS is not the compose service
+SYNAPLAN_TTS_URL=http://tts:10200
 ```
 
 **Frontend language selects the voice.** `ChatView` sends the active vue-i18n
@@ -578,7 +652,7 @@ docker compose --profile office up -d
 COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
 
 # External CODE already running (reachable from backend + worker)
-OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 docker compose up -d
+OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 make up
 ```
 
 ```bash
@@ -668,10 +742,10 @@ AUTH_COOKIE_SECURE=
 
 ---
 
-## People, sharing and directory (`IAM`)
+## Users, sharing and directory (`IAM`)
 
 The four feature switches live in **Operate → System configuration → Features
-→ People & sharing**, the remaining settings under **Access → Sharing**
+→ Users & sharing**, the remaining settings under **Access → Sharing & audit**
 (`BCONFIG` group `IAM`, owner 0). They take effect immediately — no restart.
 The switches are **on by default**; pin one off for an automated deployment
 with its `FEATURE_*` environment variable (see
@@ -679,20 +753,20 @@ with its `FEATURE_*` environment variable (see
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
-| `IAM.GROUPS_ENABLED` | `1` | People page, groups, audit tab (`FEATURE_IAM_GROUPS_ENABLED`) |
+| `IAM.GROUPS_ENABLED` | `1` | Users page, groups, audit tab (`FEATURE_IAM_GROUPS_ENABLED`) |
 | `IAM.SHARING_ENABLED` | `1` | Share dialog and “Shared with me” (requires groups; `FEATURE_IAM_SHARING_ENABLED`) |
-| `IAM.GROUP_POLICIES_ENABLED` | `1` | People → Policies and group-layer defaults (requires groups; `FEATURE_IAM_GROUP_POLICIES_ENABLED`) |
-| `IAM.EVERYONE_SHARES` | `any_owner` | Who may share with everyone (`any_owner` / `admins_only`) |
-| `IAM.DIRECTORY_SYNC_ENABLED` | `1` | Put people into groups from the OIDC groups claim at sign-in (`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`) |
+| `IAM.GROUP_POLICIES_ENABLED` | `1` | Users → Policies and group-layer defaults (requires groups; `FEATURE_IAM_GROUP_POLICIES_ENABLED`) |
+| `IAM.EVERYONE_SHARES` | `disabled` when anyone can sign up, otherwise `any_owner` | Who may share with everyone who has an account (`any_owner` / `admins_only` / `disabled`). `disabled` removes that audience, including shares users created earlier, until you pick another value; those shares are kept and come back when you switch. A public instance (open self-registration) runs `disabled`. A missing row fails closed while sign-up is open. System assistants and plugin-pack assistants stay available to every account on every value. |
+| `IAM.DIRECTORY_SYNC_ENABLED` | `1` | Put users into groups from the OIDC groups claim at sign-in (`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`) |
 | `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path for directory groups |
 | `IAM.DIRECTORY_GROUP_NAMES` | `{}` | JSON map of claim value → display name |
 | `IAM.ADMIN_IMPERSONATION` | `audited` | `audited` writes an audit row; `disabled` blocks “View as user” |
-| `IAM.AUDIT_RETENTION_DAYS` | `365` | Days to keep People audit rows; `0` keeps them forever |
+| `IAM.AUDIT_RETENTION_DAYS` | `365` | Days to keep Users audit rows; `0` keeps them forever |
 
 Group policy rows live in `BGROUPCONFIG`. Only this allow-list is read from
 the group layer (`IAM.GROUP_POLICIES_ENABLED` must be on):
 
-| Key | Type | Merge across a person's groups |
+| Key | Type | Merge across a user's groups |
 | --- | ---- | ------------------------------ |
 | `DEFAULTMODEL.{CHAT,VECTORIZE,PIC2TEXT,SOUND2TEXT,MEM,TOOLS}` | catalog key | First group by `BGROUPS.BID` |
 | `MODELS.ALLOWED` | JSON list of catalog keys | Union; empty = no restriction |
@@ -700,11 +774,11 @@ the group layer (`IAM.GROUP_POLICIES_ENABLED` must be on):
 | `RATELIMITS.TIER` | `NEW` / `PRO` / `TEAM` / `BUSINESS` | Highest |
 
 A locked global row (`BCONFIG.BLOCKED = 1`) wins alone and is instance-wide —
-the People → Policies lock panel is not scoped to the selected group. Keys
+the Users → Policies lock panel is not scoped to the selected group. Keys
 outside this list never consult `BGROUPCONFIG`. See
 [Group policies and locked defaults](ADMIN.md#group-policies-and-locked-defaults).
 
-See [People and groups](ADMIN.md#people-and-groups) in the admin guide.
+See [Users and groups](ADMIN.md#users-and-groups) in the admin guide.
 
 ---
 
@@ -759,19 +833,19 @@ Unknown chain keys are skipped. Keys that FileProcessor does not already
 implement (today: `docling`) run first, then the built-in strategies. A
 down extra adapter never fails an upload. Fresh installs do **not** put
 `docling` on the document chain — an admin adds it under **Operate →
-AI infrastructure → Extraction**.
+AI infrastructure → Document reading**.
 
 `DOCLING_BASE_URL` (empty = off) points at the optional `docling`
 Compose profile (`docker compose --profile docling up -d`). The CPU
 image needs about 4 GB during OCR; there is no `mem_limit` in dev.
 `DOCLING_TIMEOUT_MS` defaults to `120000`; `DOCLING_MAX_BYTES` defaults
-to 50 MB. Admins edit those the same way as Tika: **System
-configuration → Processing → Docling** (URL, timeout, max bytes, then
-**Test connection**). Markdown from Docling is chunked heading-aware
+to 50 MB. Admins edit those the same way as Tika: **Operate → AI
+infrastructure → Document reading → Reading services → Docling** (URL,
+timeout, max bytes, then **Test connection**). Markdown from Docling is chunked heading-aware
 (tables stay together; oversized tables repeat the header row).
 
-Web search providers (admin picker on **Operate → AI infrastructure →
-Web search**):
+Web search providers (admin picker on **Operate → System configuration →
+Web search**, next to the Brave key and result count):
 
 | Key | Sovereignty | Capabilities | Key / URL |
 | --- | ----------- | ------------ | --------- |
@@ -790,7 +864,7 @@ present”, not a live probe — **Test query** is the live call.
 
 Rerank models are catalog rows with tag `rerank` (TEI
 `openaicompatible`, Jina, Cohere, Voyage). Bind one on
-**Operate → AI infrastructure → Reranking** (`DEFAULTMODEL.RERANK`).
+**Operate → AI infrastructure → Knowledge search → Reranking** (`DEFAULTMODEL.RERANK`).
 Jina / Cohere / Voyage keys use `JINA_API_KEY`, `COHERE_API_KEY`,
 `VOYAGE_API_KEY` or **plug_keys**. A TEI `/rerank` endpoint is an
 OpenAI-compatible endpoint with the `rerank` capability. With rerank
@@ -803,7 +877,7 @@ and [AI plugs](ADMIN.md#ai-plugs-s1-s4).
 
 Every feature from the September 2026 waves — people & sharing, AI assistants,
 tool registry and approvals, saved-task steps, watched pages, linked
-platforms, desktop client, office document tools, optional module gates — is a
+platforms, Synaplan Desktop, office document tools, optional module gates — is a
 `BCONFIG` flag that is **on by default** and editable under **Operate → System
 configuration → Features**. Automated deployments pin a flag with
 `FEATURE_<GROUP>_<SETTING>=false` (or `true`); the toggle then shows as locked.

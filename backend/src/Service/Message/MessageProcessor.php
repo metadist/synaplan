@@ -2,88 +2,50 @@
 
 namespace App\Service\Message;
 
+use App\AI\Exception\ProviderException;
 use App\Entity\Message;
-use App\Plug\WebSearch\WebSearchGateway;
-use App\Repository\MessageRepository;
-use App\Repository\SearchResultRepository;
-use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
-use App\Service\Message\Handler\MessageHandlerInterface;
-use App\Service\ModelConfigService;
-use App\Service\Multitask\MultitaskRoutingConfig;
-use App\Service\Multitask\TaskPlanExecutor;
-use App\Service\Multitask\TaskPlanner;
-use App\Service\Multitask\TaskPlanStore;
-use App\Service\PerfTimer;
-use App\Service\PromptService;
-use App\Service\Research\WebResearchService;
-use App\Service\Runtime\RuntimeProfile;
-use App\Service\UrlContentService;
+use App\Service\Infrastructure\PerfTimer;
+use App\Service\Message\Processing\TurnClassificationResolver;
+use App\Service\Message\Processing\TurnDispatcher;
+use App\Service\Message\Processing\TurnHistoryLoader;
+use App\Service\Message\Processing\TurnStatus;
+use App\Service\Message\Processing\TurnWebSearch;
 use Psr\Log\LoggerInterface;
 
 /**
- * Message Processor with Status Callbacks.
+ * Runs one turn: preprocessing, classification, history, linked pages and
+ * web search, rolling summary, then the handler that answers.
  *
- * Orchestrates the complete message processing pipeline:
- * 1. Preprocessing (file download, parsing)
- * 2. Classification (sorting, topic detection)
- * 3. Web Search (if needed)
- * 4. Inference (AI response generation)
- *
- * Provides status callbacks for frontend feedback
+ * process() is the buffered turn (email, MCP, Saved Tasks, webhooks, models
+ * that cannot stream); processStream() the streamed one. Both run the same
+ * stages; where they still differ, the stage names it (code cleanup V3,
+ * master plan §3, nine differences).
  */
 final readonly class MessageProcessor
 {
-    /**
-     * Conversation window replayed verbatim to the models on every turn.
-     *
-     * Every message in this window is re-sent on each turn, to the sorter AND
-     * the answer model, so the window is paid for in prompt tokens and in
-     * provider time-to-first-token. Older turns are not lost: once a chat grows
-     * past the window, {@see ConversationSummaryService} condenses the earlier
-     * span into the system prompt.
-     */
-    public const HISTORY_MAX_MESSAGES = 15;
-
-    public const HISTORY_MAX_CHARS = 15000;
-
     public function __construct(
-        private MessageRepository $messageRepository,
-        private ?SearchResultRepository $searchResultRepository,
         private MessagePreProcessor $preProcessor,
-        private MessageClassifier $classifier,
-        private InferenceRouter $router,
-        private ModelConfigService $modelConfigService,
-        private PromptService $promptService,
-        private WebSearchGateway $webSearch,
-        private SearchQueryGenerator $searchQueryGenerator,
-        private AttachmentSearchContextResolver $attachmentContextResolver,
-        private UrlContentService $urlContentService,
+        private TurnClassificationResolver $classifications,
+        private TurnHistoryLoader $history,
+        private TurnWebSearch $webSearch,
+        private TurnDispatcher $dispatcher,
         private LoggerInterface $logger,
-        private MultitaskRoutingConfig $multitaskConfig,
-        private TaskPlanner $taskPlanner,
-        private TaskPlanStore $taskPlanStore,
-        private TaskPlanExecutor $taskPlanExecutor,
-        private ConversationSummaryService $conversationSummaryService,
-        private AgentConfig $agentConfig,
-        private ?WebResearchService $webResearch = null,
     ) {
     }
 
     /**
-     * Process a message with streaming support.
+     * @param callable             $streamCallback receives the answer chunks
+     * @param callable|null        $statusCallback receives status updates
+     * @param array<string, mixed> $options        processing options (reasoning, temperature, …)
      *
-     * @param Message       $message        The message to process
-     * @param callable      $streamCallback Callback for response chunks
-     * @param callable|null $statusCallback Callback for status updates
-     * @param array         $options        Processing options (e.g., reasoning, temperature)
-     *
-     * @return array Processing result with metadata
+     * @return array<string, mixed> processing result with metadata; the content was streamed
      */
     public function processStream(Message $message, callable $streamCallback, ?callable $statusCallback = null, array $options = []): array
     {
-        $this->notify($statusCallback, 'started', 'Message processing started');
+        $status = new TurnStatus($statusCallback, $this->logger);
+        $status->report('started', 'Message processing started');
 
         $perfTimer = $options['perf_timer'] ?? null;
         if (!$perfTimer instanceof PerfTimer) {
@@ -92,998 +54,157 @@ final readonly class MessageProcessor
         }
 
         try {
-            // Step 1: Preprocessing (modifies Message entity in-place)
-            $this->notify($statusCallback, 'preprocessing', 'Downloading and parsing files...');
-
             $perfTimer->start('preprocess');
-            $message = $this->preProcessor->process($message);
+            [$message, $preprocessed] = $this->preprocess($message, $status);
             $perfTimer->stop('preprocess');
-            $preprocessed = ['hasFiles' => $message->getFile() > 0];
-
-            if ($message->getFile() > 0 && $message->getFileText()) {
-                $this->notify($statusCallback, 'preprocessing', 'File processed and text extracted');
-            }
 
             $isAgainRequest = !empty($options['is_again']);
-
-            // Check if this is a Widget request with fixed task prompt
-            // If so, skip classification entirely and use the fixed prompt
-            $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
-            $options = $this->applyAgentPinToOptions($message, $options, $hasFixedPrompt);
-            $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
-
-            // Step 2: Classification (Sorting) - skip if "Again" or Widget with fixed prompt
-            $sortingModelId = null;
-            $sortingProvider = null;
-            $sortingModelName = null;
-            $conversationHistory = [];
-
-            $promptMetadata = [];
+            $options = $this->classifications->pinAgent($message, $options);
+            $hasFixedPrompt = TurnClassificationResolver::hasFixedPrompt($options);
+            $sorting = [null, null, null];
 
             if ($hasFixedPrompt) {
-                $isWidget = !empty($options['is_widget_mode']);
-                // Saved Task runs get their own source: they skip the AI sorter
-                // like widget/API turns, but TaskPlanExecutor must still PLAN them
-                // — otherwise a multi-step task ("make an image and save it to
-                // Nextcloud") silently degrades to a plain chat answer.
-                $source = $isWidget ? 'widget' : (!empty($options['saved_task']) ? 'saved_task' : 'api');
-
-                $this->logger->info('MessageProcessor: Fixed task prompt mode', [
-                    'task_prompt' => $options['fixed_task_prompt'],
-                    'source' => $source,
-                ]);
-
-                // Skip AI classification for fixed prompt mode -- we already know the topic
-                // and don't need an expensive AI call that depends on the user's SORT model.
-                // Set language to 'auto' so the AI responds in whatever language the user writes.
-                $detectedLanguage = $message->getLanguage();
-                if (!$detectedLanguage || 'NN' === $detectedLanguage) {
-                    $detectedLanguage = 'auto';
-                }
-
-                $classification = [
-                    'topic' => $options['fixed_task_prompt'],
-                    'language' => $detectedLanguage,
-                    'source' => $source,
-                    'intent' => 'chat',
-                    'is_widget_mode' => $isWidget,
-                ];
-
-                // Pass widget's configured model as override so ChatHandler uses it
-                if (!empty($options['widget_model_id'])) {
-                    $classification['override_model_id'] = (int) $options['widget_model_id'];
-                }
-
-                $this->logger->info('MessageProcessor: Using fixed prompt (skipped AI classification)', [
-                    'language' => $detectedLanguage,
-                    'fixed_topic' => $options['fixed_task_prompt'],
-                    'source' => $source,
-                    'widget_model_id' => $options['widget_model_id'] ?? null,
-                ]);
-
-                $this->notify($statusCallback, 'classified', sprintf(
-                    '%s: Using fixed prompt',
-                    ucfirst($source)
-                ));
-
-                if (!empty($options['rag_group_key'])) {
-                    $classification['rag_group_key'] = $options['rag_group_key'];
-                }
-                if (!empty($options['rag_limit'])) {
-                    $classification['rag_limit'] = (int) $options['rag_limit'];
-                }
-                if (isset($options['rag_min_score'])) {
-                    $classification['rag_min_score'] = (float) $options['rag_min_score'];
-                }
+                $classification = $this->classifications->fixedPromptForStreamedTurn($message, $options, $status);
             } elseif (!empty($options['is_widget_mode'])) {
-                // Widget Mode without fixed prompt: still disable memories
+                // Classified before the history is loaded; the turn is
+                // classified again below (a V4 alignment item).
                 $perfTimer->start('classify');
-                $classification = $this->classifier->classify($message, $conversationHistory, null, true, $this->classifyOptions($options));
-                $classification = $this->afterClassify($classification, $options);
+                $classification = $this->classifications->afterClassify($this->classifications->classify($message, [], $options), $options);
                 $perfTimer->stop('classify');
                 $classification['is_widget_mode'] = true;
             } elseif ($isAgainRequest) {
-                // Skip sorting but preserve/override topic & language for routing
-                $topic = strtolower($message->getTopic() ?: '');
-                $language = $message->getLanguage();
-                $language = ($language && 'NN' !== $language) ? $language : 'en';
-
-                if ('' === $topic || 'unknown' === $topic) {
-                    $topic = 'chat';
-                }
-
-                if (!empty($options['model_id'])) {
-                    $modelTag = $this->modelConfigService->getModelTag((int) $options['model_id']);
-                    if ($modelTag) {
-                        $topic = $this->mapModelTagToTopic($modelTag, $topic);
-                    }
-                }
-
-                $this->logger->info('MessageProcessor: Skipping classification (Again request)', [
-                    'specified_model_id' => $options['model_id'],
-                    'topic' => $topic,
-                    'language' => $language,
-                ]);
-
-                $this->notify($statusCallback, 'classified', 'Using previously selected model (skipped classification)');
-
-                $classification = [
-                    'topic' => $topic,
-                    'language' => $language,
-                    'source' => 'again',
-                    'intent' => $this->mapTopicToIntentForAgain($topic),
-                    'model_id' => $options['model_id'],
-                ];
+                $classification = $this->classifications->againForStreamedTurn($message, $options, $status);
             } else {
-                // Normal flow: Run classification
-                $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
-                if ($sortingModelId) {
-                    $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
-                    $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
-                }
-
-                $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
-                    'model_id' => $sortingModelId,
-                    'provider' => $sortingProvider,
-                    'model_name' => $sortingModelName,
-                ]);
+                $sorting = $this->classifications->announceSorting($message, $status);
             }
 
-            // Get conversation history for context - STREAMING VERSION
-            // Priority: Use chatId if available (chat window context), otherwise fall back to trackingId
             $perfTimer->start('history');
-            if (!empty($options['incognito'])) {
-                // Incognito: nothing is persisted, so the client ships the
-                // conversation history in the request (already capped by
-                // StreamController). Build transient Message objects that the
-                // classifier and handlers consume like DB entities.
-                $conversationHistory = $this->buildIncognitoHistory($message, $options['incognito_history'] ?? []);
-                $this->logger->debug('Using request-supplied incognito history for streaming', [
-                    'history_count' => count($conversationHistory),
-                ]);
-            } elseif ($message->getChatId()) {
-                $conversationHistory = $this->messageRepository->findChatHistory(
-                    $message->getUserId(),
-                    $message->getChatId(),
-                    self::HISTORY_MAX_MESSAGES,
-                    self::HISTORY_MAX_CHARS,
-                    $message->getId(),
-                );
-                $this->logger->debug('Using chat history for streaming', [
-                    'chat_id' => $message->getChatId(),
-                    'history_count' => count($conversationHistory),
-                ]);
-            } else {
-                // Fallback for legacy messages without chatId
-                $conversationHistory = $this->messageRepository->findConversationHistory(
-                    $message->getUserId(),
-                    $message->getTrackingId(),
-                    10
-                );
-                $this->logger->debug('Using legacy trackingId history for streaming', [
-                    'tracking_id' => $message->getTrackingId(),
-                    'history_count' => count($conversationHistory),
-                ]);
-            }
+            $conversationHistory = $this->history->load($message, $options);
             $perfTimer->stop('history');
 
             if (!$isAgainRequest && !$hasFixedPrompt) {
                 if (!empty($options['force_image_description'])) {
-                    // Force image description mode (used by WhatsApp for images)
-                    $classification = [
-                        'topic' => 'general', // Used to be analyzefile, but ChatHandler handles vision now
-                        'language' => $message->getLanguage() ?: 'en',
-                        'source' => 'forced_image_description',
-                        'intent' => 'chat',
-                    ];
-                    $this->logger->info('MessageProcessor: Forcing image description mode');
+                    $classification = $this->classifications->forcedImageForStreamedTurn($message);
                 } else {
-                    // Run classification (override_model_id is NOT passed to classifier;
-                    // it's added to classification below so ChatHandler can use it)
                     $perfTimer->start('classify');
-                    $classification = $this->classifier->classify($message, $conversationHistory, null, true, $this->classifyOptions($options));
+                    $classification = $this->classifications->classify($message, $conversationHistory, $options);
                     $perfTimer->stop('classify');
                 }
-
-                $classification = $this->afterClassify($classification, $options);
-
-                // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler!)
-                // An agent pin puts the *chat* model on model_id — keep it.
-                if ('agent' !== ($classification['source'] ?? '')) {
-                    $sortingModelId = $classification['model_id'] ?? null;
-                    $sortingProvider = $classification['provider'] ?? null;
-                    $sortingModelName = $classification['model_name'] ?? null;
-
-                    unset($classification['model_id']);
-                    unset($classification['provider']);
-                    unset($classification['model_name']);
-                }
-
-                // User-selected model from dropdown → pass through as override_model_id
-                if (!empty($options['override_model_id'])) {
-                    $classification['override_model_id'] = (int) $options['override_model_id'];
-                }
-
-                $this->notify($statusCallback, 'classified', sprintf(
-                    'Topic: %s, Language: %s, Source: %s',
-                    $classification['topic'],
-                    $classification['language'],
-                    $classification['source']
-                ), [
-                    'topic' => $classification['topic'],
-                    'language' => $classification['language'],
-                    'source' => $classification['source'],
-                    'sorting_model_id' => $sortingModelId,
-                    'sorting_provider' => $sortingProvider,
-                    'sorting_model_name' => $sortingModelName,
-                    // What the sorter understood, in terms the client can turn
-                    // into plain words ("this is an image request", "this needs
-                    // a web search", "this takes several steps") — the raw topic
-                    // slug alone reads as jargon in the progress timeline.
-                    ...$this->classificationSummary($classification),
-                ]);
-
-                // Shadow mode (Sprint 1): generate + persist a task plan for
-                // real traffic WITHOUT executing it. The legacy path above still
-                // answers the user. Inert unless MULTITASK_SHADOW_MODE is on, and
-                // wrapped so it can never affect the turn. Runs only on the
-                // normal-classification branch (never widget/fixed-prompt/again).
-                $this->maybeShadowPlan($message, $conversationHistory, $perfTimer);
+                $classification = $this->classifications->afterClassify($classification, $options);
+                [$classification, $sorting] = $this->classifications->finish($classification, $options, $status, $sorting);
+                $this->dispatcher->shadowPlan($message, $conversationHistory, $perfTimer, $classification);
             }
 
-            // User-selected knowledge-base folder (RAG group key) from the chat
-            // composer. Scope this turn's retrieval to that group regardless of
-            // the classification path above (normal chat, again, widget, fixed
-            // prompt) so "add a knowledge group to the chat" works everywhere.
-            if (!empty($options['rag_group_key'])) {
-                $classification['rag_group_key'] = $options['rag_group_key'];
-            }
-            if (!empty($options['rag_limit'])) {
-                $classification['rag_limit'] = (int) $options['rag_limit'];
-            }
-            if (isset($options['rag_min_score'])) {
-                $classification['rag_min_score'] = (float) $options['rag_min_score'];
-            }
-            $classification = $this->tagSavedTaskRun($classification, $options);
+            $classification = TurnClassificationResolver::withRagScope($classification ?? [], $options);
+            $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
+            [$options, $promptMetadata] = $this->classifications->promptForStreamedTurn($message, $classification, $options, $perfTimer);
 
-            // Step 2.3: Load Prompt Metadata and apply tool restrictions
-            $topic = $classification['topic'] ?? 'general';
-            $perfTimer->start('prompt');
-            $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $classification['language'] ?? 'en');
-            $perfTimer->stop('prompt');
-            $promptMetadata = $promptData['metadata'] ?? [];
+            ['classification' => $classification, 'searchResults' => $searchResults]
+                = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status, $perfTimer);
 
-            // Stash the resolved prompt bundle in options so ChatHandler can reuse it
-            // without redoing the DB lookup + deserialize. See Phase 1b in the plan.
-            if (null !== $promptData) {
-                $options['resolved_prompt_data'] = $promptData;
-            }
+            [$options, $conversationHistory] = $this->history->applyRollingSummary($message, $classification, $options, $conversationHistory, $perfTimer);
 
-            // Step 2.5: Web Search
-            //
-            // Mirrors WebSearchTopicPolicy::shouldSearch() precedence:
-            //   (1) Prompt opts out (`tool_internet=false`)      → never search
-            //       (hard disable; beats the per-message toggle).
-            //   (2) User requested search for THIS message       → always search
-            //       (chat toggle / `/search`).
-            //   (3) Prompt opts in (`tool_internet=true`)        → always search.
-            //   (4) Asset/document-generation topic              → never search.
-            //   (5) Otherwise → trust the classifier's BWEBSEARCH vote, vetoed
-            //       for trivial greetings. The fast-path carries no vote, so
-            //       those chats skip the search round-trip.
-            //
-            // When the message refers to an attached/selected file ("what is
-            // that?" + photo, "is this still valid?" + contract PDF), the
-            // search query is built from the FILE's content — extracted text,
-            // transcript, or a vision identification — never from the literal
-            // question words (which would search "what is that").
-            $searchResults = null;
-            $topic = $classification['topic'] ?? 'general';
-            $profile = $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null;
-            if ($profile instanceof RuntimeProfile && array_key_exists('tool_internet', $profile->toolFlags)) {
-                $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
-            }
-            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options);
-            $messageText = $message->getText();
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
-            $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
-            $needsAttachmentContext = $shouldSearch && $message->hasFiles()
-                && WebSearchTopicPolicy::refersToAttachment($messageText);
-
-            // Step 2.4: Read the links the user pasted BEFORE searching, so a
-            // bare link is answered from the page itself and a research
-            // question that cites a page searches for the page's topic — not
-            // for the URL string.
-            $perfTimer->start('url_read');
-            $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
-            $perfTimer->stop('url_read');
-            if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
-                $shouldSearch = false;
-                $triggerReason = 'link_only_message_answered_from_page';
-            }
-
-            // Consolidated decision log: lets us diagnose "search didn't trigger"
-            // reports without correlating multiple log lines from different services.
-            $braveEnabled = $this->webSearch->isEnabled($message->getUserId());
-            $this->logger->info('MessageProcessor: Web search decision', [
-                'message_id' => $message->getId(),
-                'should_search' => $shouldSearch,
-                'trigger_reason' => $triggerReason,
-                'user_requested_search' => $userRequestedSearch,
-                'prompt_tool_internet' => $promptToolInternet,
-                'classifier_web_search_hint' => $classification['web_search'] ?? null,
-                'classification_source' => $classification['source'] ?? null,
-                'classification_topic' => $topic,
-                'needs_attachment_context' => $needsAttachmentContext,
-                'linked_pages_read' => $classification['url_pages_read'] ?? 0,
-                'read_pages_vote' => $classification['read_pages'] ?? null,
-                'brave_enabled' => $braveEnabled,
-            ]);
-
-            if ($shouldSearch && !$braveEnabled) {
-                $this->logger->warning('MessageProcessor: Web search requested but Brave Search is disabled', [
-                    'message_id' => $message->getId(),
-                    'trigger_reason' => $triggerReason,
-                ]);
-            }
-
-            $attachmentContext = null;
-            if ($needsAttachmentContext && $braveEnabled) {
-                $perfTimer->start('search_attachment_context');
-                $attachmentContext = $this->attachmentContextResolver->resolve($message, $message->getUserId());
-                $perfTimer->stop('search_attachment_context');
-
-                if (null === $attachmentContext && !$userRequestedSearch && true !== $promptToolInternet) {
-                    // The question is about the attachment but its content
-                    // could not be resolved (no extracted text, vision
-                    // unavailable/failed). A purely vote-triggered search
-                    // would query the literal deictic words — guaranteed
-                    // garbage — so drop it; the answer model still analyzes
-                    // the file. An explicit user request / prompt opt-in
-                    // keeps searching with the raw text (deliberate choice).
-                    $shouldSearch = false;
-                    $this->logger->info('MessageProcessor: Skipping vote-triggered web search — attachment referent unresolvable', [
-                        'message_id' => $message->getId(),
-                    ]);
-                }
-            }
-
-            if ($shouldSearch && $braveEnabled) {
-                $this->notify($statusCallback, 'searching', 'Searching the web...');
-
-                try {
-                    // Generate optimized search query using AI. A linked page
-                    // the system just read is the best hint for what the user
-                    // actually wants to know when the message itself is thin.
-                    $perfTimer->start('search_query');
-                    $searchQuery = $this->searchQueryGenerator->generate(
-                        $message->getText(),
-                        $message->getUserId(),
-                        $attachmentContext ?? $this->linkedPageContext($classification)
-                    );
-                    $perfTimer->stop('search_query');
-
-                    // Prefer classifier BLANG; fall back to inbound message language
-                    // (seeded from the UI locale). Brave needs a real ISO 639-1 code —
-                    // "auto" is a directive sentinel, not a search_lang value.
-                    $language = $this->resolveSearchLanguage($classification, $message);
-                    $country = $language;
-
-                    // Incognito: never log the user's message content.
-                    $this->logger->info('🔍 Performing web search', [
-                        'original_question' => empty($options['incognito']) ? $message->getText() : '[incognito]',
-                        'optimized_query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
-                        'language' => $language,
-                        'country' => $country,
-                        'message_id' => $message->getId(),
-                    ]);
-
-                    // search_lang (ISO 639-1) + country; BraveSearchService also
-                    // derives ui_lang (e.g. de → de-DE) for response metadata.
-                    $perfTimer->start('search_brave');
-                    $searchResults = $this->webSearch->search($searchQuery, [
-                        'country' => $country,
-                        'search_lang' => $language,
-                    ], $message->getUserId());
-                    $perfTimer->stop('search_brave');
-
-                    // Save search results to database
-                    if ($searchResults && !empty($searchResults['results'])) {
-                        // Incognito: the transient message has no id — results
-                        // stay in-memory only (still streamed to the client and
-                        // injected into the AI context) and are never persisted.
-                        if ($this->searchResultRepository && null !== $message->getId()) {
-                            $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
-                        }
-
-                        // Surface the actual sources (not just the count) the
-                        // moment the search returns, so the client can render the
-                        // "sources" box within seconds — while the answer is still
-                        // generating — instead of waiting for the final `complete`
-                        // event. Shape matches StreamController::formatSearchResultsForSse().
-                        $this->notify($statusCallback, 'search_complete', sprintf(
-                            'Found %d web results',
-                            count($searchResults['results'])
-                        ), [
-                            'results_count' => count($searchResults['results']),
-                            'query' => $searchQuery,
-                            'results' => $this->formatSearchResultsForClient($searchResults['results']),
-                        ]);
-
-                        // Step 2.6: Read the top result pages. Snippets alone
-                        // made the model hedge ("I cannot confirm the figure");
-                        // the page bodies, condensed to the question, are the
-                        // evidence it needs. Sources were already streamed above
-                        // so the client renders them while pages load.
-                        $perfTimer->start('search_read_pages');
-                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $promptToolInternet, $statusCallback);
-                        $perfTimer->stop('search_read_pages');
-                    } else {
-                        $this->logger->warning('No search results found or repository not available', [
-                            'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
-                            'provider' => $this->webSearchMetaString($searchResults, 'provider'),
-                            'fellBackFrom' => $this->webSearchMetaString($searchResults, 'fellBackFrom'),
-                            'has_repository' => null !== $this->searchResultRepository,
-                        ]);
-                        $searchResults = null; // Reset to null if no results
-                    }
-                } catch (\Exception $e) {
-                    $this->logger->error('Web search failed', [
-                        'error' => $e->getMessage(),
-                        'message_id' => $message->getId(),
-                    ]);
-
-                    // Continue processing even if search fails
-                    $this->notify($statusCallback, 'search_failed', 'Web search failed, continuing without results');
-                }
-            }
-
-            // Step 2.9: Rolling conversation summary (read-only on the hot path).
-            [$options, $conversationHistory] = $this->applyRollingSummary(
-                $message,
-                $classification,
-                $options,
-                $conversationHistory,
-                $perfTimer,
-            );
-
-            // Step 3: Inference (AI Response) mit STREAMING
-            // Get chat model info to display during generation
-            $chatModelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
-            $chatProvider = null;
-            $chatModelName = null;
-            if ($chatModelId) {
-                $chatProvider = $this->modelConfigService->getProviderForModel($chatModelId);
-                $chatModelName = $this->modelConfigService->getModelName($chatModelId);
-            }
-
-            $this->notify($statusCallback, 'generating', 'Generating response...', [
-                'model_id' => $chatModelId,
-                'provider' => $chatProvider,
-                'model_name' => $chatModelName,
-            ]);
-
-            // Use routeStream instead of route, pass options through
-            // Include search results if available
+            $this->dispatcher->announce($message, $status);
             if ($searchResults) {
                 $options['search_results'] = $searchResults;
             }
 
             $perfTimer->start('handler_total');
-            // MULTITASK_ROUTING_ENABLED (Sprint 2): route execution through the
-            // task-plan executor. For single-node plans it delegates to the same
-            // InferenceRouter with the same classification — behaviour is
-            // identical; it only additionally persists the executed plan.
-            // (Single $cls alias keeps the PHPStan "might not be defined" count stable.)
-            $cls = $classification;
-            $response = $this->isMultitaskRoutingEnabled($message)
-                ? $this->taskPlanExecutor->executeStream($message, $conversationHistory, $cls, $streamCallback, $statusCallback, $options)
-                : $this->router->routeStream($message, $conversationHistory, $cls, $streamCallback, $statusCallback, $options);
+            $response = $this->dispatcher->dispatchStreamed($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
             $perfTimer->stop('handler_total');
 
-            $classification = $this->applyEffectiveClassification($classification, $response);
-
-            // Re-add sorting model info to result (for StreamController to save)
-            $classification['sorting_model_id'] = $sortingModelId;
-            $classification['sorting_provider'] = $sortingProvider;
-            $classification['sorting_model_name'] = $sortingModelName;
-
-            // Note: content is streamed, not returned
             return [
                 'success' => true,
-                'classification' => $classification,
+                'classification' => self::withSorting($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting),
                 'response' => $response,
                 'preprocessed' => $preprocessed,
-                'search_results' => $searchResults, // Include search results in return
+                'search_results' => $searchResults,
             ];
         } catch (StreamCancelledException $e) {
-            // Explicit user cancel — not a failure. Callers must be able to
-            // tell it apart from an error: the cancelled turn is already
-            // persisted by /save-cancelled, so rendering an error on top of it
-            // would show the user two cancellation cards for one Stop click.
-            $this->logger->info('Streamed turn cancelled by user', [
-                'message_id' => $message->getId(),
-            ]);
+            // An explicit Stop is not a failure: the cancelled turn is already
+            // persisted by /save-cancelled, and an error on top of it would
+            // show two cancellation cards for one click.
+            $this->logger->info('Streamed turn cancelled by user', ['message_id' => $message->getId()]);
 
-            return [
-                'success' => false,
-                'cancelled' => true,
-                'error' => $e->getMessage(),
-                'classification' => $classification ?? null,
-            ];
+            return ['success' => false, 'cancelled' => true, 'error' => $e->getMessage(), 'classification' => $classification ?? null];
         } catch (VisionModelRequiredException $e) {
-            $this->logger->warning('Vision-capable model required for image attachments', [
-                'error' => $e->getMessage(),
-            ]);
+            $this->logger->warning('Vision-capable model required for image attachments', ['error' => $e->getMessage()]);
 
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'error_hint' => VisionModelRequiredException::HINT_CODE,
-                'classification' => $classification ?? null,
-            ];
-        } catch (\App\AI\Exception\ProviderException $e) {
-            // Handle ProviderException specially to preserve context (install instructions, etc.)
-            $this->logger->error('AI Provider failed', [
-                'error' => $e->getMessage(),
-                'provider' => $e->getProviderName(),
-                'context' => $e->getContext(),
-            ]);
-
-            $errorResult = [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'provider' => $e->getProviderName(),
-                'classification' => $classification ?? null,
-                'exception' => $e,
-            ];
-
-            // Include context data (install_command, suggested_models) if available
-            if ($context = $e->getContext()) {
-                $errorResult['context'] = $context;
-            }
-
-            return $errorResult;
+            return ['success' => false, 'error' => $e->getMessage(), 'error_hint' => VisionModelRequiredException::HINT_CODE, 'classification' => $classification ?? null];
+        } catch (ProviderException $e) {
+            return $this->providerFailure($e, $classification ?? null);
         } catch (\Throwable $e) {
-            // \Throwable (not \Exception) to match process(): a TypeError in a
-            // provider must degrade to an error result the caller can handle
-            // (SSE error event, WhatsApp error reply) instead of escaping as
-            // an HTML 500 — see the WhatsApp image webhook regression.
-            $this->logger->error('Message processing failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+            // \Throwable, so a TypeError in a provider degrades to an error
+            // result the caller can render instead of an HTML 500.
+            $this->logger->error('Message processing failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
 
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'classification' => $classification ?? null,
-                'exception' => $e,
-            ];
+            return ['success' => false, 'error' => $e->getMessage(), 'classification' => $classification ?? null, 'exception' => $e];
         }
     }
 
     /**
-     * Process a message with status callbacks.
+     * @param array<string, mixed> $options        processing options (fixed_task_prompt, model_id, …); an array
+     *                                             callable here is the status callback (old signature)
+     * @param callable|null        $statusCallback receives status updates
      *
-     * @param Message       $message        The message to process
-     * @param callable|null $statusCallback Callback for status updates
-     *
-     * @return array Processing result
-     */
-    /**
-     * Process a message with status callbacks.
-     *
-     * @param Message       $message        The message to process
-     * @param array         $options        Processing options (e.g., fixed_task_prompt, model_id)
-     * @param callable|null $statusCallback Callback for status updates
-     *
-     * @return array Processing result
+     * @return array<string, mixed> processing result
      */
     public function process(Message $message, array $options = [], ?callable $statusCallback = null): array
     {
-        // Backward compatibility: allow passing callback as 2nd argument
         if (is_callable($options) && null === $statusCallback) {
             $statusCallback = $options;
             $options = [];
         }
-
-        $this->notify($statusCallback, 'started', 'Message processing started');
+        $status = new TurnStatus($statusCallback, $this->logger);
+        $status->report('started', 'Message processing started');
 
         try {
-            // Step 1: Preprocessing (modifies Message entity in-place)
-            $this->notify($statusCallback, 'preprocessing', 'Downloading and parsing files...');
+            [$message, $preprocessed] = $this->preprocess($message, $status);
 
-            $message = $this->preProcessor->process($message);
-            $preprocessed = ['hasFiles' => $message->getFile() > 0];
-
-            if ($message->getFile() > 0 && $message->getFileText()) {
-                $this->notify($statusCallback, 'preprocessing', 'File processed and text extracted');
-            }
-
-            // Step 2: Classification (Sorting)
-            $sortingModelId = null;
-            $sortingProvider = null;
-            $sortingModelName = null;
             $isAgainRequest = !empty($options['is_again']);
-            $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
-            $options = $this->applyAgentPinToOptions($message, $options, $hasFixedPrompt);
-            $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
-            $languageOverride = $options['language'] ?? null;
-
+            $options = $this->classifications->pinAgent($message, $options);
+            $hasFixedPrompt = TurnClassificationResolver::hasFixedPrompt($options);
+            $sorting = [null, null, null];
             if (!$hasFixedPrompt && !$isAgainRequest) {
-                $sortingModelId = $this->modelConfigService->getDefaultModel('SORT', $message->getUserId());
-                if ($sortingModelId) {
-                    $sortingProvider = $this->modelConfigService->getProviderForModel($sortingModelId);
-                    $sortingModelName = $this->modelConfigService->getModelName($sortingModelId);
-                }
-
-                $this->notify($statusCallback, 'classifying', 'Analyzing message intent...', [
-                    'model_id' => $sortingModelId,
-                    'provider' => $sortingProvider,
-                    'model_name' => $sortingModelName,
-                ]);
+                $sorting = $this->classifications->announceSorting($message, $status);
             }
 
-            // Get conversation history for context - NON-STREAMING VERSION
-            // Priority: Use chatId if available (chat window context), otherwise fall back to trackingId
-            if (!empty($options['incognito'])) {
-                // Incognito: see processStream() — history comes from the request.
-                $conversationHistory = $this->buildIncognitoHistory($message, $options['incognito_history'] ?? []);
-                $this->logger->debug('Using request-supplied incognito history for non-streaming', [
-                    'history_count' => count($conversationHistory),
-                ]);
-            } elseif ($message->getChatId()) {
-                $conversationHistory = $this->messageRepository->findChatHistory(
-                    $message->getUserId(),
-                    $message->getChatId(),
-                    self::HISTORY_MAX_MESSAGES,
-                    self::HISTORY_MAX_CHARS,
-                    $message->getId(),
-                );
-                $this->logger->debug('Using chat history for non-streaming', [
-                    'chat_id' => $message->getChatId(),
-                    'history_count' => count($conversationHistory),
-                ]);
-            } else {
-                // Fallback for legacy messages without chatId
-                $conversationHistory = $this->messageRepository->findConversationHistory(
-                    $message->getUserId(),
-                    $message->getTrackingId(),
-                    10
-                );
-                $this->logger->debug('Using legacy trackingId history for non-streaming', [
-                    'tracking_id' => $message->getTrackingId(),
-                    'history_count' => count($conversationHistory),
-                ]);
-            }
+            $conversationHistory = $this->history->load($message, $options);
 
             if ($hasFixedPrompt) {
-                $isWidget = !empty($options['is_widget_mode']);
-                // See processStream(): Saved Task runs must stay plannable.
-                $source = $isWidget ? 'widget' : (!empty($options['saved_task']) ? 'saved_task' : 'api');
-
-                $this->logger->info('MessageProcessor: Using fixed task prompt', [
-                    'task_prompt' => $options['fixed_task_prompt'],
-                    'source' => $source,
-                ]);
-
-                $classification = [
-                    'topic' => $options['fixed_task_prompt'],
-                    'language' => $languageOverride ?? 'en',
-                    'source' => $source,
-                    'intent' => 'chat',
-                    'is_widget_mode' => $isWidget,
-                ];
-
-                if (!empty($options['widget_model_id'])) {
-                    $classification['override_model_id'] = (int) $options['widget_model_id'];
-                }
-
-                $this->notify($statusCallback, 'classified', sprintf('Using %s task prompt (skipped classification)', $source), [
-                    'topic' => $classification['topic'],
-                    'language' => $classification['language'],
-                    'source' => $classification['source'],
-                ]);
+                $classification = $this->classifications->fixedPromptForBufferedTurn($options, $status);
             } elseif (!empty($options['force_image_description'])) {
-                // Force image description mode (used by WhatsApp for images)
-                $classification = [
-                    'topic' => 'general', // Used to be analyzefile, but ChatHandler handles vision now
-                    'language' => $languageOverride ?? 'en',
-                    'source' => 'forced_image_description',
-                    'intent' => 'chat',
-                ];
-                $this->logger->info('MessageProcessor: Forcing image description mode (non-streaming)');
-
-                $this->notify($statusCallback, 'classified', 'Forced image description mode', [
-                    'topic' => $classification['topic'],
-                    'language' => $classification['language'],
-                    'source' => $classification['source'],
-                ]);
+                $classification = $this->classifications->forcedImageForBufferedTurn($options, $status);
             } elseif ($isAgainRequest) {
-                $resolvedTopic = strtolower($message->getTopic() ?: '');
-                if ('' === $resolvedTopic || 'unknown' === $resolvedTopic) {
-                    $resolvedTopic = 'chat';
-                }
-
-                $resolvedLanguage = $languageOverride ?? ($message->getLanguage() && 'NN' !== $message->getLanguage() ? $message->getLanguage() : 'en');
-
-                if (!empty($options['model_id'])) {
-                    $modelTag = $this->modelConfigService->getModelTag((int) $options['model_id']);
-                    if ($modelTag) {
-                        $resolvedTopic = $this->mapModelTagToTopic($modelTag, $resolvedTopic);
-                    }
-                }
-
-                $this->logger->info('MessageProcessor: Skipping classification (Again request)', [
-                    'specified_model_id' => $options['model_id'],
-                    'topic' => $resolvedTopic,
-                    'language' => $resolvedLanguage,
-                ]);
-
-                $classification = [
-                    'topic' => $resolvedTopic,
-                    'language' => $resolvedLanguage,
-                    'source' => 'again',
-                    'model_id' => $options['model_id'],
-                    'intent' => $this->mapTopicToIntentForAgain($resolvedTopic),
-                ];
-
-                $this->notify($statusCallback, 'classified', 'Using previously selected model (skipped classification)', [
-                    'topic' => $classification['topic'],
-                    'language' => $classification['language'],
-                    'source' => $classification['source'],
-                    'model_id' => $classification['model_id'],
-                ]);
+                $classification = $this->classifications->againForBufferedTurn($message, $options, $status);
             } else {
-                $classification = $this->classifier->classify($message, $conversationHistory, null, true, $this->classifyOptions($options));
-                $classification = $this->afterClassify($classification, $options);
-
-                // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler).
-                if ('agent' !== ($classification['source'] ?? '')) {
-                    $sortingModelId = $classification['model_id'] ?? null;
-                    $sortingProvider = $classification['provider'] ?? null;
-                    $sortingModelName = $classification['model_name'] ?? null;
-
-                    unset($classification['model_id']);
-                    unset($classification['provider']);
-                    unset($classification['model_name']);
-                }
-
-                // User-selected model from dropdown → pass through as override_model_id
-                if (!empty($options['override_model_id'])) {
-                    $classification['override_model_id'] = (int) $options['override_model_id'];
-                }
-
-                $this->notify($statusCallback, 'classified', sprintf(
-                    'Topic: %s, Language: %s, Source: %s',
-                    $classification['topic'],
-                    $classification['language'],
-                    $classification['source']
-                ), [
-                    'topic' => $classification['topic'],
-                    'language' => $classification['language'],
-                    'source' => $classification['source'],
-                    'sorting_model_id' => $sortingModelId,
-                    'sorting_provider' => $sortingProvider,
-                    'sorting_model_name' => $sortingModelName,
-                    // What the sorter understood, in terms the client can turn
-                    // into plain words ("this is an image request", "this needs
-                    // a web search", "this takes several steps") — the raw topic
-                    // slug alone reads as jargon in the progress timeline.
-                    ...$this->classificationSummary($classification),
-                ]);
-
-                // Shadow mode (Sprint 1): see processStream() for rationale.
-                // Inert unless MULTITASK_SHADOW_MODE is on; never affects the turn.
-                $this->maybeShadowPlan($message, $conversationHistory);
-            }
-            $classification = $this->tagSavedTaskRun($classification, $options);
-
-            $promptMetadata = [];
-            if (isset($classification['prompt_metadata']) && is_array($classification['prompt_metadata'])) {
-                $promptMetadata = $classification['prompt_metadata'];
+                $classification = $this->classifications->afterClassify($this->classifications->classify($message, $conversationHistory, $options), $options);
+                [$classification, $sorting] = $this->classifications->finish($classification, $options, $status, $sorting);
+                $this->dispatcher->shadowPlan($message, $conversationHistory, null, $classification);
             }
 
-            if ([] === $promptMetadata && !empty($classification['topic'])) {
-                $promptData = $this->promptService->getPromptWithMetadata($classification['topic'], $message->getUserId());
-                if ($promptData) {
-                    $promptMetadata = $promptData['metadata'] ?? [];
-                    $classification['prompt_metadata'] = $promptMetadata;
-                }
-            }
+            $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
+            [$classification, $options, $promptMetadata] = $this->classifications->promptForBufferedTurn($message, $classification, $options);
 
-            if (!empty($promptMetadata)) {
-                $options['prompt_metadata'] = $promptMetadata;
-            }
-
-            $searchResults = null;
-            $topic = $classification['topic'] ?? 'general';
-            $profile = $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null;
-            if ($profile instanceof RuntimeProfile && array_key_exists('tool_internet', $profile->toolFlags)) {
-                $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
-            }
-            $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
-            $classifierVote = $classification['web_search'] ?? null;
-            $userRequestedSearch = $this->userRequestedSearch($options);
-            $messageText = $message->getText();
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
-            $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
-            $needsAttachmentContext = $shouldSearch && $message->hasFiles()
-                && WebSearchTopicPolicy::refersToAttachment($messageText);
-
-            // Step 2.4: read pasted links first (see processStream()).
-            $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
-            if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
-                $shouldSearch = false;
-                $triggerReason = 'link_only_message_answered_from_page';
-            }
-
-            $braveEnabled = $this->webSearch->isEnabled($message->getUserId());
-            $this->logger->info('MessageProcessor: Web search decision', [
-                'message_id' => $message->getId(),
-                'should_search' => $shouldSearch,
-                'trigger_reason' => $triggerReason,
-                'user_requested_search' => $userRequestedSearch,
-                'prompt_tool_internet' => $promptToolInternet,
-                'classifier_web_search_hint' => $classification['web_search'] ?? null,
-                'classification_source' => $classification['source'] ?? null,
-                'classification_topic' => $topic,
-                'needs_attachment_context' => $needsAttachmentContext,
-                'linked_pages_read' => $classification['url_pages_read'] ?? 0,
-                'read_pages_vote' => $classification['read_pages'] ?? null,
-                'brave_enabled' => $braveEnabled,
-                'pipeline' => 'process',
-            ]);
-
-            if ($shouldSearch && !$braveEnabled) {
-                $this->logger->warning('MessageProcessor: Web search requested but Brave Search is disabled', [
-                    'message_id' => $message->getId(),
-                    'trigger_reason' => $triggerReason,
-                    'pipeline' => 'process',
-                ]);
-            }
-
-            $attachmentContext = null;
-            if ($needsAttachmentContext && $braveEnabled) {
-                $attachmentContext = $this->attachmentContextResolver->resolve($message, $message->getUserId());
-
-                if (null === $attachmentContext && !$userRequestedSearch && true !== $promptToolInternet) {
-                    // See processStream(): a vote-only search whose referent
-                    // lives in an unresolvable attachment would query the
-                    // literal deictic words — drop it.
-                    $shouldSearch = false;
-                    $this->logger->info('MessageProcessor: Skipping vote-triggered web search — attachment referent unresolvable', [
-                        'message_id' => $message->getId(),
-                        'pipeline' => 'process',
-                    ]);
-                }
-            }
-
-            if ($shouldSearch && $braveEnabled) {
-                $this->notify($statusCallback, 'searching', 'Searching the web...');
-
-                try {
-                    $searchQuery = $this->searchQueryGenerator->generate(
-                        $message->getText(),
-                        $message->getUserId(),
-                        $attachmentContext ?? $this->linkedPageContext($classification)
-                    );
-
-                    $language = $this->resolveSearchLanguage($classification, $message);
-                    $country = $language;
-
-                    // Incognito: never log the user's message content.
-                    $this->logger->info('🔍 Performing web search', [
-                        'original_question' => empty($options['incognito']) ? $message->getText() : '[incognito]',
-                        'optimized_query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
-                        'language' => $language,
-                        'country' => $country,
-                        'message_id' => $message->getId(),
-                    ]);
-
-                    $searchResults = $this->webSearch->search($searchQuery, [
-                        'country' => $country,
-                        'search_lang' => $language,
-                    ], $message->getUserId());
-
-                    if ($searchResults && !empty($searchResults['results'])) {
-                        // Incognito: see processStream() — results stay in-memory.
-                        if ($this->searchResultRepository && null !== $message->getId()) {
-                            $this->searchResultRepository->saveSearchResults($message, $searchResults, $searchQuery);
-                        }
-
-                        // Surface the actual sources (not just the count) the
-                        // moment the search returns, so the client can render the
-                        // "sources" box within seconds — while the answer is still
-                        // generating — instead of waiting for the final `complete`
-                        // event. Shape matches StreamController::formatSearchResultsForSse().
-                        $this->notify($statusCallback, 'search_complete', sprintf(
-                            'Found %d web results',
-                            count($searchResults['results'])
-                        ), [
-                            'results_count' => count($searchResults['results']),
-                            'query' => $searchQuery,
-                            'results' => $this->formatSearchResultsForClient($searchResults['results']),
-                        ]);
-
-                        // Step 2.6: read the top result pages (see processStream()).
-                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $promptToolInternet, $statusCallback);
-                    } else {
-                        $this->logger->warning('No search results found or repository not available', [
-                            'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
-                            'provider' => $this->webSearchMetaString($searchResults, 'provider'),
-                            'fellBackFrom' => $this->webSearchMetaString($searchResults, 'fellBackFrom'),
-                            'has_repository' => null !== $this->searchResultRepository,
-                        ]);
-                        $searchResults = null;
-                    }
-                } catch (\Exception $e) {
-                    $this->logger->error('Web search failed', [
-                        'error' => $e->getMessage(),
-                        'message_id' => $message->getId(),
-                    ]);
-
-                    $this->notify($statusCallback, 'search_failed', 'Web search failed, continuing without results');
-                }
-            }
-
+            ['classification' => $classification, 'searchResults' => $searchResults]
+                = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status);
             if ($searchResults) {
                 $classification['search_results'] = $searchResults;
             }
 
-            // Step 2.9: Rolling conversation summary — the same read-only
-            // injection as processStream(), so email / MCP / webhook turns get
-            // identical long-thread context (channel parity).
-            [$options, $conversationHistory] = $this->applyRollingSummary(
-                $message,
-                $classification,
-                $options,
-                $conversationHistory,
-            );
+            // The same read-only summary as the stream, so email, MCP and
+            // webhook turns get the same long-thread context.
+            [$options, $conversationHistory] = $this->history->applyRollingSummary($message, $classification, $options, $conversationHistory);
 
-            // Step 3: Inference (AI Response)
-            // Get chat model info to display during generation
-            $chatModelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
-            $chatProvider = null;
-            $chatModelName = null;
-            if ($chatModelId) {
-                $chatProvider = $this->modelConfigService->getProviderForModel($chatModelId);
-                $chatModelName = $this->modelConfigService->getModelName($chatModelId);
-            }
-
-            $this->notify($statusCallback, 'generating', 'Generating response...', [
-                'model_id' => $chatModelId,
-                'provider' => $chatProvider,
-                'model_name' => $chatModelName,
-            ]);
-
-            // Forward the processing options exactly like processStream() does:
-            // without them the DAG runners get an EMPTY NodeContext options array,
-            // so track_id/node_id never reach MediaGenerationHandler — async node
-            // jobs are then created without their node binding and the per-card
-            // Stop / terminal card heal (#1239) cannot address them.
-            $clsForRoute = $classification;
-            $response = $this->isMultitaskRoutingEnabled($message)
-                ? $this->taskPlanExecutor->execute($message, $conversationHistory, $clsForRoute, $statusCallback, $options)
-                : $this->router->route($message, $conversationHistory, $clsForRoute, $statusCallback, $options);
-
-            $this->notify($statusCallback, 'complete', 'Response generated', [
+            $this->dispatcher->announce($message, $status);
+            $response = $this->dispatcher->dispatchBuffered($message, $conversationHistory, $classification, $statusCallback, $options);
+            $status->report('complete', 'Response generated', [
                 'provider' => $response['metadata']['provider'] ?? 'unknown',
                 'model' => $response['metadata']['model'] ?? 'unknown',
             ]);
 
-            $classification = $this->applyEffectiveClassification($classification, $response);
-
-            $classification['sorting_model_id'] = $sortingModelId;
-            $classification['sorting_provider'] = $sortingProvider;
-            $classification['sorting_model_name'] = $sortingModelName;
-
-            if (isset($classification['search_results'])) {
-                unset($classification['search_results']);
-            }
+            $classification = self::withSorting($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting);
+            unset($classification['search_results']);
 
             return [
                 'success' => true,
@@ -1093,45 +214,14 @@ final readonly class MessageProcessor
                 'search_results' => $searchResults,
             ];
         } catch (VisionModelRequiredException $e) {
-            $this->logger->warning('Vision-capable model required for image attachments', [
-                'message_id' => $message->getId(),
-                'error' => $e->getMessage(),
-            ]);
+            $this->logger->warning('Vision-capable model required for image attachments', ['message_id' => $message->getId(), 'error' => $e->getMessage()]);
+            $status->report('error', 'Processing failed');
 
-            $this->notify($statusCallback, 'error', 'Processing failed');
+            return ['success' => false, 'error' => $e->getMessage(), 'error_hint' => VisionModelRequiredException::HINT_CODE, 'classification' => $classification ?? null, 'exception' => $e];
+        } catch (ProviderException $e) {
+            $status->report('error', 'Processing failed');
 
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'error_hint' => VisionModelRequiredException::HINT_CODE,
-                'classification' => $classification ?? null,
-                'exception' => $e,
-            ];
-        } catch (\App\AI\Exception\ProviderException $e) {
-            // Handle ProviderException specially to preserve context (install instructions, etc.)
-            $this->logger->error('AI Provider failed', [
-                'message_id' => $message->getId(),
-                'error' => $e->getMessage(),
-                'provider' => $e->getProviderName(),
-                'context' => $e->getContext(),
-            ]);
-
-            $this->notify($statusCallback, 'error', 'Processing failed');
-
-            $errorResult = [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'provider' => $e->getProviderName(),
-                'classification' => $classification ?? null,
-                'exception' => $e,
-            ];
-
-            // Include context data (install_command, suggested_models) if available
-            if ($context = $e->getContext()) {
-                $errorResult['context'] = $context;
-            }
-
-            return $errorResult;
+            return $this->providerFailure($e, $classification ?? null);
         } catch (\Throwable $e) {
             $errorDetails = [
                 'message_id' => $message->getId(),
@@ -1140,672 +230,74 @@ final readonly class MessageProcessor
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
             ];
-
             $this->logger->error('Message processing failed', $errorDetails);
+            $status->report('error', 'Processing failed');
 
-            $this->notify($statusCallback, 'error', 'Processing failed');
-
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'details' => $errorDetails,
-                'classification' => $classification ?? null,
-                'exception' => $e,
-            ];
+            return ['success' => false, 'error' => $e->getMessage(), 'details' => $errorDetails, 'classification' => $classification ?? null, 'exception' => $e];
         }
     }
 
     /**
-     * Step 2.9 (shared by process() and processStream()): rolling conversation
-     * summary — read-only on the hot path.
+     * Files are downloaded and parsed into the Message entity in place.
      *
-     * Injects the stored summary of older turns into the system prompt while
-     * the newest turns stay verbatim. NEVER calls an AI model here — the
-     * worker refreshes the store after the turn is persisted
-     * ({@see \App\Message\RefreshConversationSummaryCommand}), so this step is
-     * a cache/DB read and must not show up in time-to-first-token.
-     *
-     * Only for the chat-style path with a persisted chat; other intents ignore
-     * the option. On a cold store a capped raw excerpt of the older span is
-     * injected so those turns stay visible; the async refresh writes the
-     * condensed summary for later turns.
-     *
-     * @param array<string, mixed> $classification
-     * @param array<string, mixed> $options
-     * @param array<int, Message>  $conversationHistory
-     *
-     * @return array{0: array<string, mixed>, 1: array<int, Message>} updated [$options, $conversationHistory]
+     * @return array{0: Message, 1: array{hasFiles: bool}}
      */
-    private function applyRollingSummary(
-        Message $message,
-        array $classification,
-        array $options,
-        array $conversationHistory,
-        ?PerfTimer $perfTimer = null,
-    ): array {
-        $intent = $classification['intent'] ?? 'chat';
-        $chatId = $message->getChatId();
-        if ('chat' !== $intent || null === $chatId || $chatId <= 0) {
-            return [$options, $conversationHistory];
-        }
-
-        $perfTimer?->start('summary');
-        $totalMessages = $this->messageRepository->countByChatId(
-            $chatId,
-            excludeFailed: false,
-        );
-        $rolling = $this->conversationSummaryService->buildRollingContext(
-            $conversationHistory,
-            $totalMessages,
-            $message->getUserId(),
-            $chatId,
-        );
-        if ($rolling->applied) {
-            $options['conversation_summary'] = $rolling->summary;
-            $conversationHistory = $rolling->recentMessages;
-        }
-        $perfTimer?->stop('summary');
-
-        return [$options, $conversationHistory];
-    }
-
-    /**
-     * Mark a Saved Task run on the classification, whichever branch produced
-     * it. A chat-saved task runs through the AI sorter exactly like the turn
-     * the user typed (web-search vote, language, memories, multi-step vote),
-     * so the source is `ai_sorting`; the task id is what lets
-     * TaskPlanExecutor replay the task's pinned steps instead of re-planning.
-     *
-     * @param array<string, mixed> $classification
-     * @param array<string, mixed> $options
-     *
-     * @return array<string, mixed>
-     */
-    private function tagSavedTaskRun(array $classification, array $options): array
+    private function preprocess(Message $message, TurnStatus $status): array
     {
-        $taskId = $options['saved_task_id'] ?? null;
-        if (is_int($taskId) && $taskId > 0) {
-            $classification['saved_task_id'] = $taskId;
+        $status->report('preprocessing', 'Downloading and parsing files...');
+        $message = $this->preProcessor->process($message);
+        if ($message->getFile() > 0 && $message->getFileText()) {
+            $status->report('preprocessing', 'File processed and text extracted');
         }
 
-        return $classification;
+        return [$message, ['hasFiles' => $message->getFile() > 0]];
     }
 
     /**
-     * Read the URLs named in the message into classification['url_content']
-     * so ChatHandler (and UrlFetchRunner reuse) can answer from the page.
+     * The install command and suggested models in the exception context reach
+     * the caller, so the error card can name a recovery.
      *
-     * With {@see WebResearchService} available (production wiring) every
-     * pasted link is read by default (`URL_READ.ENABLED`): redirects and
-     * shortlink interstitials are followed, login walls are reported instead
-     * of silently yielding nothing, and large pages are condensed to the
-     * question. Without it, the legacy light fetch runs for the prompt flag
-     * `tool_url_screenshot` and for Saved Task reruns (which pin a user
-     * instruction that often wraps the URL in markdown and skip the sorter,
-     * so the planner can miss `url_fetch`).
-     *
-     * @param array<string, mixed> $promptMetadata
-     * @param array<string, mixed> $classification
+     * @param array<string, mixed>|null $classification
      *
      * @return array<string, mixed>
      */
-    private function maybeFetchUrlContent(Message $message, array $promptMetadata, array $classification, ?callable $statusCallback): array
+    private function providerFailure(ProviderException $e, ?array $classification): array
     {
-        $savedTask = 'saved_task' === ($classification['source'] ?? null) || !empty($classification['saved_task_id']);
-        $promptOptIn = !empty($promptMetadata['tool_url_screenshot']);
-        $autoRead = null !== $this->webResearch && $this->webResearch->isUrlReadEnabled();
-        if (!$savedTask && !$promptOptIn && !$autoRead) {
-            return $classification;
-        }
-
-        $urls = $this->urlContentService->extractUrls((string) $message->getText());
-        if ([] === $urls) {
-            return $classification;
-        }
-
-        if (null === $this->webResearch) {
-            $this->notify($statusCallback, 'fetching_urls', sprintf('Fetching content from %d URL(s)...', count($urls)));
-
-            $urlContentResults = $this->urlContentService->fetchMultiple($urls);
-            $successCount = count(array_filter($urlContentResults, static fn ($r) => $r->success));
-
-            if ($successCount > 0) {
-                $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
-                $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
-            }
-
-            return $classification;
-        }
-
-        try {
-            $read = $this->webResearch->readMentionedUrls(
-                $urls,
-                (string) $message->getText(),
-                $message->getUserId(),
-                fn (string $status, string $text, array $meta) => $this->notify($statusCallback, $status, $text, $meta),
-            );
-        } catch (\Throwable $e) {
-            $this->logger->warning('MessageProcessor: reading linked pages failed', [
-                'message_id' => $message->getId(),
-                'error' => $e->getMessage(),
-            ]);
-
-            return $classification;
-        }
-
-        $prompt = $this->webResearch->formatMentionedUrlsForPrompt($read);
-        if ('' !== $prompt) {
-            $classification['url_content'] = $prompt;
-        }
-        $classification['url_pages'] = $read->toClientList();
-        $classification['url_pages_read'] = $read->successCount();
-        $classification['url_page_context'] = $read->contextForQuery();
-
-        return $classification;
-    }
-
-    /**
-     * Read the top result pages and attach their condensed content to the
-     * search results (`page_content`, `fetched`, `final_url`), reporting
-     * progress to the client. The sorter's BREADPAGES vote decides how
-     * many pages (0 / 2 / 3). Any failure leaves the snippet-only results.
-     *
-     * @param array<string, mixed> $searchResults
-     * @param array<string, mixed> $classification
-     *
-     * @return array<string, mixed>
-     */
-    private function deepenSearchResults(
-        array $searchResults,
-        Message $message,
-        array $classification,
-        bool $userRequestedSearch,
-        ?bool $promptToolInternet,
-        ?callable $statusCallback,
-    ): array {
-        if (null === $this->webResearch || !$this->webResearch->isDeepSearchEnabled()) {
-            return $searchResults;
-        }
-
-        $vote = $classification['read_pages'] ?? null;
-        $maxPages = ReadPagesPolicy::pagesToRead(
-            is_int($vote) ? $vote : null,
-            ($classification['url_pages_read'] ?? 0) >= 1,
-            $userRequestedSearch || true === $promptToolInternet,
-        );
-        if ($maxPages <= 0) {
-            $this->logger->info('MessageProcessor: skipping page dumps — router voted snippets only', [
-                'message_id' => $message->getId(),
-                'read_pages_vote' => $vote,
-            ]);
-
-            return $searchResults;
-        }
-
-        try {
-            $deepened = $this->webResearch->deepen(
-                $searchResults,
-                (string) $message->getText(),
-                $message->getUserId(),
-                fn (string $status, string $text, array $meta) => $this->notify($statusCallback, $status, $text, $meta),
-                $maxPages,
-            );
-        } catch (\Throwable $e) {
-            $this->logger->warning('MessageProcessor: reading search result pages failed', [
-                'message_id' => $message->getId(),
-                'error' => $e->getMessage(),
-            ]);
-
-            return $searchResults;
-        }
-
-        $pagesRead = (int) ($deepened['pages_read'] ?? 0);
-        $this->notify($statusCallback, 'pages_read', sprintf('Read %d web page%s', $pagesRead, 1 === $pagesRead ? '' : 's'), [
-            'pages_read' => $pagesRead,
-            'pages_attempted' => (int) ($deepened['pages_attempted'] ?? 0),
-            'results' => $this->formatSearchResultsForClient($deepened['results'] ?? []),
+        $this->logger->error('AI Provider failed', [
+            'error' => $e->getMessage(),
+            'provider' => $e->getProviderName(),
+            'context' => $e->getContext(),
         ]);
 
-        return $deepened;
+        $result = [
+            'success' => false,
+            'error' => $e->getMessage(),
+            'provider' => $e->getProviderName(),
+            'classification' => $classification,
+            'exception' => $e,
+        ];
+        if ($context = $e->getContext()) {
+            $result['context'] = $context;
+        }
+
+        return $result;
     }
 
     /**
-     * A message that is nothing but link(s) whose page the system just read
-     * needs no vote-triggered web search: the answer comes from the page.
-     * Explicit requests (chat toggle, `/search`, prompt opt-in) still search.
+     * The sorting model goes back on the result (StreamController stores it),
+     * never to the handler.
      *
-     * @param array<string, mixed> $classification
-     */
-    private function linkOnlyMessageWasRead(array $classification, ?string $messageText, bool $userRequestedSearch, ?bool $promptToolInternet): bool
-    {
-        if ($userRequestedSearch || true === $promptToolInternet) {
-            return false;
-        }
-        if (($classification['url_pages_read'] ?? 0) < 1) {
-            return false;
-        }
-
-        $withoutUrls = preg_replace('#https?://\S+#i', '', (string) $messageText) ?? '';
-        $remaining = preg_replace('/[^\p{L}\p{N}]+/u', '', $withoutUrls) ?? '';
-
-        return mb_strlen($remaining) < 12;
-    }
-
-    /**
-     * @param array<string, mixed> $classification
-     */
-    private function linkedPageContext(array $classification): ?string
-    {
-        $context = $classification['url_page_context'] ?? null;
-
-        return is_string($context) && '' !== trim($context) ? $context : null;
-    }
-
-    /**
-     * Human-readable reason for the consolidated web-search decision log.
-     *
-     * Mirrors the precedence in {@see WebSearchTopicPolicy::shouldSearch()}
-     * so the log line directly explains the decision without a reader
-     * having to consult two services.
-     */
-    private function triggerReasonFor(?string $topic, bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $shouldSearch): string
-    {
-        if (!$shouldSearch) {
-            // Mirror the real precedence in WebSearchTopicPolicy::shouldSearch():
-            // the prompt opt-out is the hard disable and must be reported first.
-            if (false === $promptToolInternet) {
-                return 'disabled_by_prompt_tool_internet';
-            }
-
-            if (WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
-                return 'non_web_search_topic';
-            }
-
-            if (true === $classifierVote && WebSearchTopicPolicy::isTrivialConversational($messageText)) {
-                return 'suppressed_trivial_conversation';
-            }
-
-            return 'classifier_vote_no_search';
-        }
-
-        if ($userRequestedSearch) {
-            return 'user_requested_search';
-        }
-
-        if (true === $promptToolInternet) {
-            return 'prompt_tool_internet_opt_in';
-        }
-
-        return 'classifier_vote_search';
-    }
-
-    /**
-     * Resolve the explicit per-message web-search request from the processing
-     * options. The streaming pipeline carries it as `web_search` (the chat
-     * toggle / `/search` command, set by StreamController) while the legacy
-     * non-streaming path uses `force_web_search`; accept either so an explicit
-     * user request reliably forces a search.
-     *
-     * @param array<string, mixed> $options
-     */
-    private function userRequestedSearch(array $options): bool
-    {
-        return (bool) ($options['web_search'] ?? false)
-            || (bool) ($options['force_web_search'] ?? false);
-    }
-
-    /**
-     * Shadow-mode task planning (Sprint 1).
-     *
-     * When MULTITASK_SHADOW_MODE is on, generate a task plan for the message and
-     * persist it to BMESSAGE_TASKS for analysis — but DO NOT execute it; the
-     * legacy pipeline still produces the user's answer. Entirely best-effort:
-     * any error is logged and swallowed so the user turn is never affected.
-     *
-     * Resolution uses the effective user id (email/WhatsApp remapping parity).
-     */
-    /**
-     * Whether the task-plan executor should run for this message, resolved for
-     * the EFFECTIVE user id (email/WhatsApp remapping parity with model
-     * selection). Defaults to false on any error so a lookup glitch can never
-     * break a turn.
-     */
-    private function isMultitaskRoutingEnabled(Message $message): bool
-    {
-        try {
-            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-
-            return $this->multitaskConfig->isRoutingEnabled($userId);
-        } catch (\Throwable $e) {
-            $this->logger->warning('MessageProcessor: routing-flag lookup failed, using legacy path', [
-                'message_id' => $message->getId(),
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
-    }
-
-    private function maybeShadowPlan(Message $message, array $conversationHistory, ?PerfTimer $perfTimer = null): void
-    {
-        try {
-            if (!$this->multitaskConfig->isShadowMode()) {
-                return;
-            }
-
-            // Incognito/transient messages have no id — the plan could never be
-            // persisted, so skip the (paid) planner AI call entirely.
-            if (null === $message->getId()) {
-                return;
-            }
-
-            $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-            // Shadow planning does not answer the user but still blocks the
-            // turn, so it needs its own phase rather than silently inflating
-            // the surrounding ones.
-            $perfTimer?->start('plan_shadow');
-            try {
-                $result = $this->taskPlanner->plan($message, $conversationHistory, $userId);
-            } finally {
-                $perfTimer?->stop('plan_shadow');
-            }
-
-            // The early return above guarantees a persisted message here.
-            $messageId = $message->getId();
-            $this->taskPlanStore->persist($messageId, $result->plan, $result->modelId);
-
-            $this->logger->info('MessageProcessor: shadow task plan generated', [
-                'message_id' => $messageId,
-                'fallback' => $result->fallback,
-                'node_count' => count($result->plan->nodes),
-                'capabilities' => array_map(static fn ($n) => $n->capability->value, $result->plan->nodes),
-                'plan_model_id' => $result->modelId,
-                'validation_errors' => $result->errors,
-            ]);
-        } catch (\Throwable $e) {
-            // Shadow mode must never affect the turn.
-            $this->logger->warning('MessageProcessor: shadow task planning failed (ignored)', [
-                'message_id' => $message->getId(),
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Build transient Message entities from the request-supplied incognito
-     * history so downstream consumers (classifier, ChatHandler thread builder)
-     * see the same shape as a DB-loaded chat history. The entities are NEVER
-     * persisted — their ids stay null.
-     *
-     * @param array<int, array{role: string, content: string}> $history oldest first, already capped by StreamController
-     *
-     * @return Message[]
-     */
-    private function buildIncognitoHistory(Message $currentMessage, array $history): array
-    {
-        $entities = [];
-        $baseTimestamp = time() - count($history) - 1;
-
-        foreach (array_values($history) as $index => $entry) {
-            $role = $entry['role'];
-            $content = $entry['content'];
-            if ('' === $content) {
-                continue;
-            }
-
-            $historyMessage = new Message();
-            $historyMessage->setUserId($currentMessage->getUserId());
-            $historyMessage->setTrackingId($currentMessage->getTrackingId());
-            $historyMessage->setProviderIndex('WEB');
-            // Monotonic timestamps keep the thread order stable for consumers
-            // that sort by time.
-            $historyMessage->setUnixTimestamp($baseTimestamp + $index);
-            $historyMessage->setDateTime(date('YmdHis', $baseTimestamp + $index));
-            $historyMessage->setMessageType('WEB');
-            $historyMessage->setFile(0);
-            $historyMessage->setTopic('CHAT');
-            $historyMessage->setLanguage($currentMessage->getLanguage() ?: 'en');
-            $historyMessage->setText($content);
-            $historyMessage->setDirection('assistant' === $role ? 'OUT' : 'IN');
-            $historyMessage->setStatus('complete');
-
-            $entities[] = $historyMessage;
-        }
-
-        return $entities;
-    }
-
-    /**
-     * Map raw Brave results into the client source-card shape. Kept in sync with
-     * {@see \App\Controller\StreamController::formatSearchResultsForSse()} so the
-     * early `search_complete` payload and the final `complete` payload render
-     * identically.
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function formatSearchResultsForClient(mixed $results): array
-    {
-        if (!is_array($results)) {
-            return [];
-        }
-
-        $out = [];
-        foreach ($results as $result) {
-            if (!is_array($result)) {
-                continue;
-            }
-            $profile = $result['profile'] ?? null;
-            $out[] = [
-                'title' => is_string($result['title'] ?? null) ? $result['title'] : '',
-                'url' => is_string($result['url'] ?? null) ? $result['url'] : '',
-                'description' => is_string($result['description'] ?? null) ? $result['description'] : '',
-                'published' => $result['age'] ?? null,
-                'source' => is_array($profile) ? ($profile['name'] ?? null) : null,
-                'thumbnail' => $result['thumbnail'] ?? null,
-                'fetched' => (bool) ($result['fetched'] ?? false),
-                'final_url' => is_string($result['final_url'] ?? null) ? $result['final_url'] : null,
-            ];
-        }
-
-        return $out;
-    }
-
-    /**
-     * Resolve the ISO 639-1 language code for Brave search_lang / country.
-     *
-     * Preference: classifier BLANG → inbound message language (UI locale seed)
-     * → `en`. The `auto` sentinel is not a Brave language code.
-     *
-     * @param array<string, mixed> $classification
-     */
-    private function resolveSearchLanguage(array $classification, Message $message): string
-    {
-        foreach ([$classification['language'] ?? null, $message->getLanguage()] as $candidate) {
-            if (!is_string($candidate)) {
-                continue;
-            }
-            $normalized = strtolower(trim($candidate));
-            if ('' !== $normalized && 'auto' !== $normalized && 'nn' !== $normalized) {
-                return $normalized;
-            }
-        }
-
-        return 'en';
-    }
-
-    /**
-     * Drop agentId when the flag is off so stream callers cannot pin a chat.
-     *
-     * @param array<string, mixed> $options
+     * @param array<string, mixed>                $classification
+     * @param array{0: mixed, 1: mixed, 2: mixed} $sorting
      *
      * @return array<string, mixed>
      */
-    private function applyAgentPinToOptions(Message $message, array $options, bool $hasFixedPrompt): array
+    private static function withSorting(array $classification, array $sorting): array
     {
-        if (empty($options['agentId'])) {
-            return $options;
-        }
-        if ($hasFixedPrompt || !$this->agentConfig->isEnabled($message->getUserId())) {
-            unset($options['agentId'], $options['agentDraft']);
-        }
-
-        return $options;
-    }
-
-    /**
-     * @param array<string, mixed> $options
-     *
-     * @return array<string, mixed>
-     */
-    private function classifyOptions(array $options): array
-    {
-        $out = [];
-        if (!empty($options['agentId'])) {
-            $out['agentId'] = (int) $options['agentId'];
-        }
-        if (array_key_exists('agentDraft', $options)) {
-            $out['agentDraft'] = (bool) $options['agentDraft'];
-        }
-
-        return $out;
-    }
-
-    /**
-     * @param array<string, mixed> $classification
-     * @param array<string, mixed> $options
-     *
-     * @return array<string, mixed>
-     */
-    private function afterClassify(array $classification, array &$options): array
-    {
-        // The profile is the one runtime seam: handlers read RAG scope,
-        // limit and score from the object, so nothing is copied into
-        // scalar option keys here.
-        $profile = $classification['runtime_profile'] ?? null;
-        if ($profile instanceof RuntimeProfile) {
-            $options['runtime_profile'] = $profile;
-        }
+        $classification['sorting_model_id'] = $sorting[0];
+        $classification['sorting_provider'] = $sorting[1];
+        $classification['sorting_model_name'] = $sorting[2];
 
         return $classification;
-    }
-
-    /**
-     * Fold a handler's {@see MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY}
-     * report into the classification handed back to the caller.
-     *
-     * The classification returned from here is what StreamController persists
-     * on the IN/OUT rows (topic, `original_media_type`, …) and consults for the
-     * voice-reply guard. When a handler answered under a different route than
-     * it was dispatched with — MediaGenerationHandler handing a misrouted
-     * "audio" request to the chat answer — the stored turn must describe that
-     * chat answer, not the sorter's media vote; otherwise the bubble is
-     * rendered and re-run ("Again") as media that was never generated.
-     *
-     * @param array<string, mixed> $classification
-     * @param array<string, mixed> $response
-     *
-     * @return array<string, mixed>
-     */
-    private function applyEffectiveClassification(array $classification, array $response): array
-    {
-        $effective = $response['metadata'][MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY] ?? null;
-        if (!is_array($effective) || [] === $effective) {
-            return $classification;
-        }
-
-        foreach ($effective as $key => $value) {
-            if (null === $value) {
-                unset($classification[$key]);
-                continue;
-            }
-            $classification[$key] = $value;
-        }
-
-        $this->logger->info('MessageProcessor: handler reported an effective classification', [
-            'topic' => $classification['topic'] ?? null,
-            'intent' => $classification['intent'] ?? null,
-            'rerouted_from' => $classification['rerouted_from'] ?? null,
-        ]);
-
-        return $classification;
-    }
-
-    /**
-     * The classifier's verdict reduced to the keys the progress timeline
-     * narrates: intent, media type, web-search vote and the multi-step hint.
-     * Only keys with a value are included so older clients see no change.
-     *
-     * @param array<string, mixed> $classification
-     *
-     * @return array<string, mixed>
-     */
-    private function classificationSummary(array $classification): array
-    {
-        $summary = [];
-        foreach (['intent', 'media_type'] as $key) {
-            $value = $classification[$key] ?? null;
-            if (is_string($value) && '' !== $value) {
-                $summary[$key] = $value;
-            }
-        }
-        foreach (['web_search', 'multi_step'] as $key) {
-            if (is_bool($classification[$key] ?? null)) {
-                $summary[$key] = $classification[$key];
-            }
-        }
-
-        return $summary;
-    }
-
-    private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
-    {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'metadata' => $metadata,
-                'timestamp' => microtime(true),
-            ]);
-        }
-
-        $this->logger->info('MessageProcessor status', [
-            'status' => $status,
-            'message' => $message,
-            'metadata' => $metadata,
-        ]);
-    }
-
-    private function mapTopicToIntentForAgain(string $topic): string
-    {
-        return match ($topic) {
-            'mediamaker', 'text2pic', 'text2vid', 'text2sound' => 'image_generation',
-            'pic2text', 'analyze', 'analyzefile' => 'file_analysis',
-            'officemaker' => 'document_generation',
-            default => 'chat',
-        };
-    }
-
-    private function mapModelTagToTopic(string $modelTag, string $fallback): string
-    {
-        return match (strtolower($modelTag)) {
-            'text2pic', 'text2vid', 'text2sound' => 'mediamaker',
-            'pic2text', 'analyze', 'vision' => 'general',
-            'document', 'officemaker', 'text2doc' => 'officemaker',
-            default => $fallback ?: 'chat',
-        };
-    }
-
-    /**
-     * @param array<string, mixed>|null $searchResults
-     */
-    private function webSearchMetaString(?array $searchResults, string $key): ?string
-    {
-        $meta = $searchResults['query_metadata'] ?? null;
-        if (!\is_array($meta)) {
-            return null;
-        }
-        $value = $meta[$key] ?? null;
-
-        return \is_string($value) && '' !== $value ? $value : null;
     }
 }

@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ChatMessage from '@/components/ChatMessage.vue'
-import en from '@/i18n/en.json'
-import de from '@/i18n/de.json'
-import es from '@/i18n/es.json'
-import fr from '@/i18n/fr.json'
-import tr from '@/i18n/tr.json'
+import { loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
+const de = loadAllMessages('de')
+const es = loadAllMessages('es')
+const fr = loadAllMessages('fr')
+const tr = loadAllMessages('tr')
 
 // The backend now narrates the phases that run before the first token, so the
 // user is not left staring at "Generating response…" while the pipeline plans,

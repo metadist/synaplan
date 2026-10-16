@@ -8,7 +8,7 @@ use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\GuestSession;
 use App\Entity\Message;
-use App\Service\GuestChatConfig;
+use App\Service\Chat\GuestChatConfig;
 use App\Service\Media\MediaCancellationStore;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;

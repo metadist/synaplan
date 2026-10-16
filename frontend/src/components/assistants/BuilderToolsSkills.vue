@@ -35,7 +35,7 @@
       <span class="txt-secondary text-sm">{{ $t('assistants.mcpServers') }}</span>
       <select
         multiple
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] min-h-24"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] min-h-24"
         data-testid="select-mcp-servers"
         :value="tools.mcpServers.map(String)"
         @change="onMcpChange($event)"
@@ -55,7 +55,7 @@
           v-for="skill in skillChoices"
           :key="skill"
           type="button"
-          class="px-3 py-1.5 rounded-lg text-sm font-medium"
+          class="px-3 py-1.5 rounded-xl text-sm font-medium"
           :class="isSkillAllowed(skill) ? 'btn-primary' : 'btn-secondary'"
           :data-testid="`chip-skill-${skill}`"
           @click="toggleSkill(skill)"

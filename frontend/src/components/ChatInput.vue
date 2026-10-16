@@ -23,7 +23,7 @@
     <!-- On mobile the horizontal padding matches the drawer toggle's left
          offset (left-3 = 12px) so the composer aligns with the menu button and
          uses the full width; md+ keeps the roomier px-4. -->
-    <div class="max-w-4xl mx-auto px-3 py-2 md:px-4 md:py-4">
+    <div v-show="!liveActive" class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4">
       <!-- File and Quote Display (above input) -->
       <div
         v-if="uploadedFiles.length > 0 || quote || pastedBlocks.length > 0"
@@ -61,6 +61,39 @@
         </div>
       </div>
 
+      <div
+        v-if="pendingDesktopRun"
+        class="mb-3 surface-card rounded-lg p-3"
+        data-testid="desktop-skill-picker"
+      >
+        <p v-if="pendingDesktopRun.skills.length === 0" class="text-sm txt-primary">
+          {{ $t('config.desktop.run.noRunnableSkills', { name: pendingDesktopRun.deviceName }) }}
+        </p>
+        <p v-else class="text-sm txt-primary">
+          {{ $t('config.desktop.run.pickSkill', { name: pendingDesktopRun.deviceName }) }}
+        </p>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button
+            v-for="skill in pendingDesktopRun.skills"
+            :key="skill"
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+            :data-testid="`btn-desktop-skill-${skill}`"
+            @click="chooseDesktopSkill(skill)"
+          >
+            {{ skill }}
+          </button>
+          <button
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+            data-testid="btn-desktop-skill-cancel"
+            @click="pendingDesktopRun = null"
+          >
+            {{ $t('common.cancel') }}
+          </button>
+        </div>
+      </div>
+
       <!-- DS16: waiting/failed cards for jobs dispatched to a paired computer. -->
       <div v-if="desktopJobs.length > 0" class="mb-3 flex flex-col gap-2">
         <DesktopJobCard
@@ -84,7 +117,7 @@
           <select
             id="summarize-length"
             v-model="summarizeLength"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="select-summarize-length"
           >
             <option v-for="length in summarizeLengthOptions" :key="length" :value="length">
@@ -99,7 +132,7 @@
           <select
             id="summarize-language"
             v-model="summarizeLanguage"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="select-summarize-language"
           >
             <option v-for="language in summarizeLanguageOptions" :key="language" :value="language">
@@ -141,13 +174,11 @@
         />
 
         <!--
-          Composer body. On mobile (< md) this is a vertical stack: the textarea
-          spans the full width on top and a control bar sits below it, both inside
-          the same card. On md+ it collapses to a plain block and the two control
-          clusters return to their absolute bottom-left / bottom-right overlay
-          (via `md:contents` on the control bar).
+          Composer body. Two rows at every size: the textarea spans the full
+          width, and the control bar below holds attach, the model chip and
+          the send actions. Nothing overlays the text.
         -->
-        <div class="flex flex-col md:block">
+        <div class="flex flex-col">
           <!-- Voice activity strip.
                Only shown on the record-then-transcribe path (see
                `showVoiceActivity`): there the transcript arrives in one piece
@@ -177,27 +208,17 @@
             <span>{{ voiceActivityLabel }}</span>
           </div>
 
-          <!-- Textarea row. Mobile: full width with a comfortable 12px horizontal
-               inset (matches the control bar below) so text never sits flush
-               against the card edge. md+: py-2 (16px) + textarea min-h-[40px] =
-               56px shell, with room reserved for the overlaid plus button (left)
-               and action buttons (right). -->
+          <!-- Text row. Enhance sits on this line, at the right, once there
+               is text. It stays at the top when the field grows, so it keeps
+               the first line instead of dropping into the control bar.
+               On desktop the row is already as tall as that button
+               (44px plus its 2px offset, inside the 10px vertical padding),
+               so the button appearing does not push the composer up. -->
           <div class="max-h-[40vh] overflow-y-auto chat-input-scroll">
             <div
-              class="flex items-center gap-2 px-3 py-2.5 md:pl-[56px] md:py-2"
-              :style="isMobile ? undefined : { paddingRight: `${textareaPaddingRightPx}px` }"
+              class="flex items-start gap-1.5 px-3 py-2.5"
+              :class="isMobile ? undefined : 'min-h-[66px]'"
             >
-              <!-- Inline badge pinned to the caret start — desktop only. On mobile
-                   the badge moves next to the plus button in the control bar.
-                   (`.tool-badge` sets display unlayered and would beat a `hidden`
-                   utility, so we gate visibility with v-if, not CSS.) -->
-              <ToolBadge
-                v-if="activeTool && !isMobile"
-                :tool="activeTool"
-                class="flex-shrink-0"
-                @remove="clearTool"
-              />
-              <!-- Textarea -->
               <Textarea
                 ref="textareaRef"
                 v-model="message"
@@ -207,41 +228,87 @@
                 :rows="1"
                 class="flex-1 min-w-0"
                 data-testid="input-chat-message"
+                data-tour="chat-input"
                 @keydown="handleKeyDown"
                 @focus="isFocused = true"
                 @blur="isFocused = false"
               />
+
+              <button
+                v-if="showEnhanceInInput"
+                type="button"
+                :class="[
+                  'mt-0.5 h-[44px] min-w-[44px] flex flex-shrink-0 items-center justify-center !rounded-xl',
+                  enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
+                  enhanceLoading && 'pill--loading',
+                ]"
+                :disabled="enhanceLoading"
+                :aria-label="$t('chatInput.enhance')"
+                :title="$t('chatInput.enhance')"
+                data-testid="btn-chat-enhance"
+                @click="toggleEnhance"
+              >
+                <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
+                <SparklesIcon v-else class="w-5 h-5" />
+              </button>
             </div>
           </div>
 
-          <!-- Control bar. Mobile: a real row below the textarea (plus + badge on
-               the left, actions on the right), same 12px inset as the textarea
-               row above. md+: `display: contents` so the plus group and action
-               group fall back to their absolute overlay positions relative to
-               the card. -->
-          <div class="flex items-center gap-2 px-3 pb-2.5 md:contents">
-            <!-- Plus menu: attach + per-message controls (Model / Tools / Knowledge).
-             Exempt from the guest lock rule — the menu always opens; gated items
-             inside surface the guest hint popover. -->
-            <div
-              ref="plusMenuRef"
-              class="relative flex-shrink-0 md:absolute md:bottom-[6px] md:left-[6px]"
-              data-testid="section-chat-plus"
+          <div
+            v-if="selectedGroupLabel"
+            class="flex items-center gap-2 px-3 pb-1"
+            data-testid="chip-knowledge-folder"
+          >
+            <span class="text-xs txt-secondary">
+              {{ $t('chatInput.knowledgeActive', { name: selectedGroupLabel }) }}
+            </span>
+            <button
+              type="button"
+              class="btn-secondary inline-flex items-center px-3 py-2 rounded-xl text-xs font-medium"
+              :aria-label="$t('chatInput.knowledgeClear')"
+              data-testid="btn-knowledge-folder-clear"
+              @click="selectedGroupKey = ''"
             >
+              {{ $t('chatInput.knowledgeClear') }}
+            </button>
+          </div>
+
+          <!-- Control bar. One row at every width: the tools summary leaves
+               first, then the model name collapses to its icon. Plus, files,
+               the microphone and send stay 44px. Enhance lives on the text row. -->
+          <div
+            ref="controlsRef"
+            class="flex flex-nowrap items-center gap-1.5 px-3 pb-2.5"
+            data-testid="section-chat-controls"
+          >
+            <!-- Plus menu: attach, tools and knowledge folder.
+             Exempt from the guest lock rule — the menu always opens; gated items
+             inside surface the guest hint popover. The model chip is in the
+             control bar and gates itself. -->
+            <div ref="plusMenuRef" class="relative flex-shrink-0" data-testid="section-chat-plus">
               <button
                 type="button"
                 :class="[
-                  'surface-chip icon-ghost h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl relative touch-manipulation',
+                  'surface-chip icon-ghost relative h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl touch-manipulation',
                   plusMenuOpen && 'pill--active',
                 ]"
-                :aria-label="$t('chatInput.plusMenu.label')"
+                :aria-label="hideToolsSummary ? toolsSummaryText : $t('chatInput.plusMenu.label')"
+                :title="hideToolsSummary ? toolsSummaryText : undefined"
                 :aria-expanded="plusMenuOpen"
                 :disabled="uploading"
                 data-testid="btn-chat-plus"
+                data-tour="chat-plus"
                 @click="togglePlusMenu"
               >
                 <Icon v-if="uploading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
                 <PlusIcon v-else class="w-5 h-5" />
+                <span
+                  v-if="hideToolsSummary && !isGuestMode"
+                  class="absolute -top-1 -right-1 min-w-[1rem] h-4 px-1 rounded-full bg-[var(--brand)] text-[color:var(--on-brand)] text-[10px] font-semibold inline-flex items-center justify-center"
+                  data-testid="badge-plus-tools-count"
+                >
+                  {{ toolsCount }}
+                </span>
               </button>
 
               <div
@@ -278,23 +345,9 @@
                 </button>
 
                 <!-- Guest-mode rows: same `.pill` chip style as "Attach files"
-                     above (and the real Model/Tools/Knowledge triggers in the
-                     authenticated branch below) for a consistent list. -->
+                     above. The model chip lives in the control bar and gates
+                     itself. -->
                 <template v-if="isGuestMode">
-                  <button
-                    type="button"
-                    class="pill text-xs md:text-sm justify-between"
-                    data-testid="btn-plus-model"
-                    @click="handlePlusGate('models')"
-                  >
-                    <span class="inline-flex items-center gap-1.5">
-                      <Icon icon="mdi:tune-vertical" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                      <span class="font-medium">{{ $t('chatInput.plusMenu.model') }}</span>
-                    </span>
-                    <span class="text-xs txt-muted">{{
-                      $t('chatInput.modelDropdown.default')
-                    }}</span>
-                  </button>
                   <button
                     type="button"
                     class="pill text-xs md:text-sm"
@@ -316,10 +369,10 @@
                 </template>
 
                 <template v-else>
-                  <ModelDropdown v-model="selectedModelId" />
                   <ToolsDropdown
                     :active-command="activeTool"
                     :thinking-enabled="thinkingEnabled"
+                    :has-reasoning-levels="reasoningLevels.length > 0"
                     :voice-reply="voiceReply"
                     :supports-reasoning="supportsReasoning"
                     :enhance-enabled="enhanceEnabled"
@@ -360,46 +413,45 @@
               />
             </div>
 
-            <!-- Mobile-only badge, right of the plus button. -->
+            <!-- Files already in this chat, same size and row as the plus button. -->
+            <slot name="beside-plus" />
+
+            <!-- (`.tool-badge` sets display unlayered and would beat a `hidden`
+                 utility, so we gate visibility with v-if, not CSS.) -->
             <ToolBadge
-              v-if="activeTool && isMobile"
+              v-if="activeTool"
               :tool="activeTool"
-              class="flex-shrink-0"
+              class="min-w-0 max-w-[6.5rem] flex-shrink overflow-hidden"
               @remove="clearTool"
             />
-
-            <!-- Spacer pushes the actions to the right edge on mobile (removed on md+). -->
-            <div class="flex-1 md:hidden"></div>
-
-            <!-- Action buttons. Mobile: right side of the control bar. md+: absolute
-             bottom-right overlay (same 6px inset as the plus button, 6px gap). -->
-            <div
-              class="flex flex-shrink-0 items-center gap-1.5 md:pointer-events-none md:absolute md:bottom-[6px] md:right-[6px]"
-              data-testid="section-chat-primary-actions"
+            <span
+              v-if="!isGuestMode && !hideToolsSummary"
+              class="max-w-[10rem] shrink truncate text-xs txt-secondary"
+              data-testid="chip-tools-summary"
             >
-              <button
-                v-if="showEnhanceInInput"
-                type="button"
-                :class="[
-                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto relative',
-                  enhanceEnabled ? 'pill pill--active' : 'icon-ghost',
-                  enhanceLoading && 'pill--loading',
-                ]"
-                :disabled="enhanceLoading"
-                :aria-label="$t('chatInput.enhance')"
-                :title="$t('chatInput.enhance')"
-                data-testid="btn-chat-enhance"
-                @click="toggleEnhance"
-              >
-                <Icon v-if="enhanceLoading" icon="mdi:loading" class="w-5 h-5 animate-spin" />
-                <SparklesIcon v-else class="w-5 h-5" />
-              </button>
+              {{ toolsSummaryText }}
+            </span>
+
+            <div
+              class="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1.5"
+              data-testid="section-chat-primary-actions"
+              data-tour="chat-model"
+            >
+              <ModelDropdown
+                v-model="selectedModelId"
+                v-model:reasoning-effort="reasoningEffort"
+                class="min-w-0"
+                :levels="reasoningLevels"
+                :guest="isGuestMode"
+                :collapse-name="collapseModelName"
+                @gate="emit('guestFeatureGate', 'models')"
+              />
 
               <button
                 v-if="showMicrophoneButton"
                 type="button"
                 :class="[
-                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl pointer-events-auto',
+                  'h-[44px] min-w-[44px] flex items-center justify-center !rounded-xl flex-shrink-0',
                   isRecording ? 'bg-red-500 hover:bg-red-600' : 'icon-ghost',
                 ]"
                 :aria-label="$t('chatInput.voice')"
@@ -412,9 +464,21 @@
               </button>
 
               <button
+                v-if="showLiveInSendSlot"
+                type="button"
+                class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl flex-shrink-0 transition-all"
+                :aria-label="$t('chatInput.liveVoice.button')"
+                :title="$t('chatInput.liveVoice.button')"
+                data-testid="btn-chat-live-voice"
+                @click="onLivePress"
+              >
+                <Icon icon="mdi:waveform" class="w-5 h-5" />
+              </button>
+              <button
+                v-else
                 type="button"
                 :disabled="!isStreaming && !canSend"
-                class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl pointer-events-auto transition-all"
+                class="h-[44px] min-w-[44px] flex items-center justify-center btn-primary !rounded-xl flex-shrink-0 transition-all"
                 :aria-label="isStreaming ? 'Stop' : $t('chatInput.send')"
                 data-testid="btn-chat-send"
                 @click="isStreaming ? emit('stop') : sendMessage()"
@@ -425,16 +489,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Selected-model caption: tiny hint shown only when the user picked a
-           specific model (the Model control now lives inside the + menu). -->
-      <div
-        v-if="selectedModelId !== null && selectedModelName"
-        class="mt-1 text-center text-[8px] leading-none txt-muted"
-        data-testid="chat-model-caption"
-      >
-        {{ $t('chatInput.modelCaption', { name: selectedModelName }) }}
       </div>
     </div>
 
@@ -451,11 +505,71 @@
       @close="closePastedBlock"
       @save="savePastedBlock"
     />
+
+    <div v-if="liveActive" class="px-3 py-2 md:px-4 md:py-4">
+      <div class="mx-auto max-w-[70rem]">
+        <LiveVoicePanel
+          :phase="livePhase"
+          :status="liveStatus"
+          :status-hint="liveStatusHint"
+          :muted="liveMuted"
+          :company-line="$t('chatInput.liveVoice.companyLine', { company: liveCompany })"
+          :touches-line="$t(liveLine('chatInput.liveVoice.touchesLine'))"
+          :owner-line="$t('chatInput.liveVoice.ownerLine')"
+          :model-label="liveModelLabel"
+          :budget-label="liveBudgetLabel"
+          :mute-label="
+            liveMuted ? $t('chatInput.liveVoice.unmute') : $t('chatInput.liveVoice.mute')
+          "
+          :captions-label="
+            liveCaptions
+              ? $t('chatInput.liveVoice.captionsOn')
+              : $t('chatInput.liveVoice.captionsOff')
+          "
+          :end-label="$t('chatInput.liveVoice.end')"
+          :settings-label="$t('chatInput.liveVoice.settings')"
+          :warn-banner="
+            liveBudgetWarn && livePhase !== 'ended'
+              ? $t('chatInput.liveVoice.warnBanner', { seconds: liveSecondsLeft ?? 0 })
+              : ''
+          "
+          :terminal-message="$t(liveLine(liveTerminalMessageKey))"
+          :terminal-action-label="$t(liveTerminalActionKey)"
+          :terminal-action="liveTerminalAction"
+          :close-label="$t('chatInput.liveVoice.terminal.actionClose')"
+          @mute="liveToggleMute"
+          @captions="liveToggleCaptions"
+          @end="liveEnd"
+          @dismiss="liveDismiss"
+          @action="onLiveTerminalAction"
+        />
+      </div>
+    </div>
+
+    <LiveVoiceConsentDialog
+      v-if="liveConsentOpen"
+      :title="$t('chatInput.liveVoice.consentTitle')"
+      :body="$t(liveLine('chatInput.liveVoice.consentBody'), { company: liveCompany })"
+      :allow-label="$t('chatInput.liveVoice.consentAllow')"
+      :decline-label="$t('chatInput.liveVoice.consentDecline')"
+      @allow="liveAllowConsent"
+      @decline="liveDeclineConsent"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Ref } from 'vue'
+import {
+  ref,
+  computed,
+  watch,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  type ComputedRef,
+  type Ref,
+} from 'vue'
+import { storeToRefs } from 'pinia'
 import {
   ArrowUpIcon,
   XMarkIcon,
@@ -471,11 +585,17 @@ import ToolsDropdown from './ToolsDropdown.vue'
 import ToolBadge from './ToolBadge.vue'
 import DesktopJobCard from './DesktopJobCard.vue'
 import ModelDropdown from './ModelDropdown.vue'
+import { toolsSummaryLabel } from '@/utils/toolsSummary'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import PastedTextCard from './chat/PastedTextCard.vue'
 import PastedTextModal from './chat/PastedTextModal.vue'
 import { parseCommand } from '../commands/parse'
+import {
+  initialReasoningLevel,
+  modelReasoningLevels,
+  reasoningSendFlags,
+} from '@/utils/reasoningLevel'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
@@ -487,6 +607,14 @@ import { isNativeApp } from '@/services/api/nativeRuntime'
 import type { FileItem } from '@/services/filesService'
 import { deleteFile, getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
+import { useLiveVoice } from '@/composables/useLiveVoice'
+import { liveVoiceButtonVisible, liveVoiceReplacesSend } from '@/services/liveVoice/visibility'
+import { liveCostBudget, type LiveVoiceCostBudget } from '@/services/api/liveVoiceApi'
+import type { LimitCheckResult } from '@/composables/useLimitCheck'
+import LiveVoicePanel from '@/components/chat/LiveVoicePanel.vue'
+import type { LiveVoiceStageState } from '@/services/liveVoice/orb'
+import LiveVoiceConsentDialog from '@/components/chat/LiveVoiceConsentDialog.vue'
+import { speechFailureMessageKey } from '@/utils/speechFailure'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
@@ -498,9 +626,19 @@ import {
 } from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
+import { useChatModelPickStore } from '@/stores/chatModelPick'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useDialog } from '@/composables/useDialog'
 import { desktopApi } from '@/services/api/desktopApi'
+import { ApiError } from '@/services/api/httpClient'
+import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
+import { useDesktopDevices } from '@/composables/useDesktopDevices'
+import {
+  readDismissedJobIds,
+  rememberDismissedJobId,
+  RESTORED_JOB_LIMIT,
+  shouldRestoreDesktopJob,
+} from '@/utils/desktopJobCard'
 import QuoteChip from './QuoteChip.vue'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
 import {
@@ -531,6 +669,12 @@ interface Props {
    * md+ where the banner is a compact centered pill on the flat top edge.
    */
   bannerVisible?: boolean
+  /**
+   * The thread this message would land in is still being chosen (for example
+   * Start chat is opening an empty chat for the assistant). Keep Send off
+   * until that finishes so the message is not written into the previous chat.
+   */
+  sendLocked?: boolean
 }
 
 const props = defineProps<Props>()
@@ -583,6 +727,12 @@ const handlePlusClickOutside = (e: MouseEvent) => {
   plusMenuOpen.value = false
 }
 
+const handlePlusEscape = (e: KeyboardEvent) => {
+  if (!plusMenuOpen.value || e.key !== 'Escape') return
+  e.preventDefault()
+  plusMenuOpen.value = false
+}
+
 const message = ref('')
 const originalMessage = ref('')
 const enhancedMessage = ref('')
@@ -594,6 +744,7 @@ const uploadAbortController = ref<AbortController | null>(null)
 const enhanceEnabled = ref(false)
 const enhanceLoading = ref(false)
 const thinkingEnabled = ref(false)
+const reasoningEffort = ref('')
 const paletteVisible = ref(false)
 const paletteRef = ref<InstanceType<typeof CommandPalette> | null>(null)
 const mentionPaletteVisible = ref(false)
@@ -611,6 +762,55 @@ const isToolCommand = (name: string): name is ChatTool =>
   (TOOL_COMMANDS as readonly string[]).includes(name)
 
 const activeTool = ref<ChatTool | null>(null)
+const toolsCount = computed(() => (configStore.features?.selfAware ? 4 : 3))
+const toolsSummaryText = computed(() => {
+  const names: Record<string, string> = {
+    search: t('chatInput.tools.webSearch'),
+    pic: t('chatInput.tools.imageGen'),
+    vid: t('chatInput.tools.videoGen'),
+    help: t('selfAware.helpCommand.label'),
+  }
+  return toolsSummaryLabel(
+    {
+      count: toolsCount.value,
+      activeName: activeTool.value ? (names[activeTool.value] ?? null) : null,
+    },
+    (key, params) => String(t(key, params))
+  )
+})
+const controlsRef = ref<HTMLElement | null>(null)
+const hideToolsSummary = ref(false)
+const collapseModelName = ref(false)
+let controlsObserver: ResizeObserver | null = null
+let fittingControls = false
+
+const controlBarOverflows = (): boolean => {
+  const el = controlsRef.value
+  if (!el) return false
+  return el.scrollWidth - el.clientWidth > 1
+}
+
+/**
+ * Keep the control bar on one line. The tools summary leaves first; the
+ * model name collapses to its icon only when the row still overflows.
+ * Same order as chooseControlBarFit.
+ */
+const fitControlBar = async (): Promise<void> => {
+  if (!controlsRef.value || fittingControls || isGuestMode.value) return
+  fittingControls = true
+  try {
+    hideToolsSummary.value = false
+    collapseModelName.value = false
+    await nextTick()
+    if (!controlBarOverflows()) return
+    hideToolsSummary.value = true
+    await nextTick()
+    if (!controlBarOverflows()) return
+    collapseModelName.value = true
+  } finally {
+    fittingControls = false
+  }
+}
 const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
@@ -624,10 +824,16 @@ const speechFinalTranscript = ref('') // Accumulated final transcripts during re
 const fileSelectionModalVisible = ref(false)
 const voiceReply = ref(false)
 const discardNextRecording = ref(false)
-const selectedModelId = ref<number | null>(null)
+/** Set on unmount so a late recognition or recorder callback cannot write state or upload audio. */
+let dictationUnmounted = false
 // Knowledge-base folder ("group key") to scope this chat's RAG retrieval to.
 const knowledgeGroups = ref<Array<{ name: string; count: number }>>([])
 const selectedGroupKey = ref<string>('')
+const selectedGroupLabel = computed(() => {
+  const key = selectedGroupKey.value
+  if (!key) return ''
+  return knowledgeGroups.value.find((group) => group.name === key)?.name ?? key
+})
 
 const SILENCE_TIMEOUT_MS = 4000
 const silenceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
@@ -635,6 +841,8 @@ const autoSendPending = ref(false)
 
 const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
+const chatModelPick = useChatModelPickStore()
+const { selectedModelId } = storeToRefs(chatModelPick)
 const configStore = useConfigStore()
 const authStore = useAuthStore()
 const commandsStore = useCommandsStore()
@@ -644,7 +852,21 @@ const { warning, error: showError, success } = useNotification()
 
 // DS16: jobs dispatched to a paired computer via "Run on this computer".
 // Rendered as waiting/failed cards above the composer until dismissed.
-const desktopJobs = ref<Array<{ id: number; deviceName: string }>>([])
+// Restored from the job list so a reload mid-wait does not hide them.
+const desktopJobs = ref<Array<{ id: number; deviceName: string; chatId: number | null }>>([])
+const pendingDesktopRun = ref<{
+  deviceId: number
+  deviceName: string
+  skills: string[]
+  prompt: string
+  chatId: number | null
+} | null>(null)
+const {
+  devices,
+  ensureLoaded: ensureDesktopDevices,
+  reload: reloadDesktopDevices,
+} = useDesktopDevices()
+let desktopRestoreSeq = 0
 
 /**
  * Send the typed instruction to a paired computer as a `skill.run` job. There is
@@ -652,47 +874,174 @@ const desktopJobs = ref<Array<{ id: number; deviceName: string }>>([])
  * skill explicitly. The server never verifies the skill exists — an uninstalled
  * skill fails honestly on the device, surfaced by the waiting/failed card.
  */
-const handleRunOnDevice = async (device: { id: number; name: string }) => {
-  const prompt = message.value.trim()
-  if (!prompt) {
+const handleRunOnDevice = async (device: {
+  id: number
+  name: string
+  enabledSkills?: string[]
+}) => {
+  plusMenuOpen.value = false
+  const promptText = message.value.trim()
+  if (!promptText) {
     warning(t('config.desktop.run.needPrompt'))
+    return
+  }
+  const chatId = chatsStore.activeChatId
+
+  await reloadDesktopDevices()
+  if (chatsStore.activeChatId !== chatId) return
+
+  const fresh = devices.value.find((row) => row.id === device.id && row.status === 'active')
+  if (!fresh) {
+    showError(t('config.desktop.run.inactive', { name: device.name }))
+    return
+  }
+
+  const skills = reportedSkills(fresh.enabledSkills ?? device.enabledSkills)
+  if (fresh.skillsReported && skills.length === 0) {
+    pendingDesktopRun.value = {
+      deviceId: fresh.id,
+      deviceName: fresh.name,
+      skills: [],
+      prompt: promptText,
+      chatId,
+    }
+    return
+  }
+  if (skills.length > 0) {
+    pendingDesktopRun.value = {
+      deviceId: fresh.id,
+      deviceName: fresh.name,
+      skills,
+      prompt: promptText,
+      chatId,
+    }
     return
   }
 
   const skill = (
     await dialog.prompt({
       title: t('config.desktop.run.skillTitle'),
-      message: t('config.desktop.run.skillMessage', { name: device.name }),
+      message: t('config.desktop.run.noSkills', { name: fresh.name }),
       placeholder: t('config.desktop.run.skillPlaceholder'),
       confirmText: t('config.desktop.run.action'),
+      cancelText: t('common.cancel'),
     })
   )?.trim()
-  if (!skill) return
+  if (!skill || chatsStore.activeChatId !== chatId) return
 
   if (!/^[a-z0-9-]{1,64}$/.test(skill)) {
     showError(t('config.desktop.run.invalidSkill'))
     return
   }
 
+  await sendDesktopRun(fresh.id, fresh.name, skill, promptText, chatId)
+}
+
+const reportedSkills = (skills: string[] | undefined): string[] =>
+  (skills ?? []).filter((skill) => /^[a-z0-9-]{1,64}$/.test(skill))
+
+const chooseDesktopSkill = (skill: string) => {
+  const pending = pendingDesktopRun.value
+  if (!pending) return
+  pendingDesktopRun.value = null
+  void sendDesktopRun(pending.deviceId, pending.deviceName, skill, pending.prompt, pending.chatId)
+}
+
+const sendDesktopRun = async (
+  deviceId: number,
+  deviceName: string,
+  skill: string,
+  prompt: string,
+  chatId: number | null
+) => {
   try {
-    const { jobId } = await desktopApi.enqueueJob({
-      deviceId: device.id,
+    const { jobId, chatTitle } = await desktopApi.enqueueJob({
+      deviceId,
       skill,
       prompt,
-      chatId: chatsStore.activeChatId,
+      chatId,
     })
-    desktopJobs.value.push({ id: jobId, deviceName: device.name })
-    message.value = ''
-    success(t('config.desktop.run.sent', { name: device.name }))
+    if (chatId && chatTitle) chatsStore.applyChatTitle(chatId, chatTitle)
+    desktopJobs.value.push({ id: jobId, deviceName, chatId })
+    if (message.value.trim() === prompt) message.value = ''
+    pendingDesktopRun.value = null
+    success(t('config.desktop.run.sent', { name: deviceName }))
   } catch (err) {
-    showError(err instanceof Error ? err.message : t('config.desktop.run.enqueueFailed'))
+    if (err instanceof ApiError && err.code === 'device_inactive') {
+      showError(t('config.desktop.run.inactive', { name: deviceName }))
+      return
+    }
+    showError(t('config.desktop.run.enqueueFailed', { name: deviceName }))
+  }
+}
+
+const desktopDeviceName = (deviceId: number | null | undefined): string => {
+  if (deviceId == null) return t('config.desktop.jobCard.thisComputer')
+  return (
+    devices.value.find((device) => device.id === deviceId)?.name ||
+    t('config.desktop.jobCard.thisComputer')
+  )
+}
+
+const restoreDesktopJobs = async () => {
+  const chatId = chatsStore.activeChatId
+  const seq = ++desktopRestoreSeq
+  if (!chatId || !isDesktopAgentEnabled()) {
+    if (seq === desktopRestoreSeq) desktopJobs.value = []
+    return
+  }
+  try {
+    await ensureDesktopDevices()
+    const jobs = (await desktopApi.listJobs()) ?? []
+    if (seq !== desktopRestoreSeq || chatsStore.activeChatId !== chatId) return
+    const dismissed = readDismissedJobIds(localStorage)
+    const now = Date.now()
+    const restored: Array<{ id: number; deviceName: string; chatId: number | null }> = []
+    for (const job of jobs) {
+      if (!shouldRestoreDesktopJob(job, chatId, dismissed, now)) continue
+      restored.push({
+        id: job.id,
+        chatId,
+        deviceName: desktopDeviceName(job.deviceId),
+      })
+      if (restored.length >= RESTORED_JOB_LIMIT) break
+    }
+    const seen = new Set(restored.map((job) => job.id))
+    for (const extra of desktopJobs.value) {
+      if (extra.chatId === chatId && !seen.has(extra.id) && !dismissed.has(extra.id)) {
+        restored.unshift(extra)
+      }
+    }
+    desktopJobs.value = restored
+  } catch {
+    // A failed reload must not wipe a card the person just started.
   }
 }
 
 const dismissDesktopJob = (jobId: number) => {
-  desktopJobs.value = desktopJobs.value.filter((j) => j.id !== jobId)
+  try {
+    rememberDismissedJobId(localStorage, jobId)
+  } catch {
+    // Dismiss still hides the card for this visit when storage is blocked.
+  }
+  desktopJobs.value = desktopJobs.value.filter((job) => job.id !== jobId)
 }
-const { t, locale } = useI18n()
+
+watch(
+  () => chatsStore.activeChatId,
+  () => {
+    pendingDesktopRun.value = null
+    void restoreDesktopJobs()
+  }
+)
+
+onMounted(() => {
+  void restoreDesktopJobs()
+})
+const { t, te, locale } = useI18n()
+watch([toolsSummaryText, selectedModelId, activeTool, isGuestMode], () => {
+  void fitControlBar()
+})
 const route = useRoute()
 const router = useRouter()
 const {
@@ -787,6 +1136,7 @@ const speechLanguage = computed(() => {
     de: 'de-DE',
     fr: 'fr-FR',
     es: 'es-ES',
+    tr: 'tr-TR',
     it: 'it-IT',
     pt: 'pt-BR',
     nl: 'nl-NL',
@@ -818,19 +1168,11 @@ const showMicrophoneButton = computed(() => {
 })
 
 /**
- * Icon-only enhance control inside the input shell; visible when there is
- * text to act on. Desktop only — on mobile it crowds the narrow input, so the
- * control moves into the Tools dropdown instead.
+ * Icon-only enhance control on the text row, at the right. Visible when
+ * there is text to act on. Desktop only — on a phone it stays in the Tools
+ * menu so the narrow text line keeps its width.
  */
 const showEnhanceInInput = computed(() => message.value.trim().length > 0 && !isMobile.value)
-
-/** Reserve horizontal space so the textarea does not sit under the absolute action buttons. */
-const textareaPaddingRightPx = computed(() => {
-  if (showMicrophoneButton.value) {
-    return showEnhanceInInput.value ? 192 : 140
-  }
-  return showEnhanceInInput.value ? 120 : 80
-})
 
 /**
  * Determine which speech recognition method to use.
@@ -906,6 +1248,7 @@ const emit = defineEmits<{
     message: string,
     options?: {
       includeReasoning?: boolean
+      reasoningEffort?: string
       webSearch?: boolean
       fileIds?: number[]
       voiceReply?: boolean
@@ -919,9 +1262,13 @@ const emit = defineEmits<{
   stop: []
   guestFeatureGate: [featureKey: string]
   clearQuote: []
+  budgetBlocked: [result: LimitCheckResult]
 }>()
 
 const canSend = computed(() => {
+  if (props.sendLocked) {
+    return false
+  }
   const trimmedMessage = message.value.trim()
   const hasMessage = trimmedMessage.length > 0
   const hasFiles = uploadedFiles.value.length > 0
@@ -963,12 +1310,6 @@ const currentChatModel = computed(() => {
   return chatModels.find((model) => model.id === resolvedModelId) ?? null
 })
 
-// Name of the explicitly-picked model (null selection = "Default", no caption).
-const selectedModelName = computed(() => {
-  if (selectedModelId.value === null) return ''
-  return currentChatModel.value?.name ?? ''
-})
-
 const supportsReasoning = computed(() => {
   if (!currentChatModel.value) {
     return false
@@ -976,6 +1317,23 @@ const supportsReasoning = computed(() => {
 
   return currentChatModel.value.features?.includes('reasoning') ?? false
 })
+
+const reasoningLevels = computed(() => modelReasoningLevels(currentChatModel.value))
+
+watch(
+  () => {
+    const model = currentChatModel.value
+    const levels = modelReasoningLevels(model)
+    return `${model?.id ?? ''}:${levels.join(',')}:${model?.reasoningEffortDefault ?? ''}`
+  },
+  () => {
+    reasoningEffort.value = initialReasoningLevel(
+      reasoningLevels.value,
+      currentChatModel.value?.reasoningEffortDefault
+    )
+  },
+  { immediate: true }
+)
 
 // Auto-enable thinking when switching to a reasoning-capable model
 watch(
@@ -990,11 +1348,12 @@ watch(
   { immediate: true }
 )
 
-// Reset model dropdown when switching chats
+// Reset model dropdown when switching chats. The same clear runs after a
+// successful model-mix apply, so both paths drop the explicit pick.
 watch(
   () => chatsStore.activeChatId,
   () => {
-    selectedModelId.value = null
+    chatModelPick.clear()
   }
 )
 
@@ -1051,18 +1410,21 @@ watch(
   { immediate: false }
 )
 
-const sendMessage = () => {
-  if (isStreaming.value) {
-    warning(t('chatInput.waitForStreaming'))
-    return
-  }
+// Fetch on every open, not on every keystroke of the same command, so a
+// prompt saved or deleted on Prompts is in the next menu without a reload.
+watch(paletteVisible, (visible) => {
+  if (visible) void commandsStore.loadSavedPrompts()
+})
 
-  // If dictation is active, stop it FIRST and absorb any pending speech
-  // (final + interim) into message.value before we evaluate canSend / send.
-  // We use abort() (not stop()) on the Web Speech service so that any
-  // late native onresult event cannot write transcribed text back into
-  // message.value after we've cleared it below.
-  if (isRecording.value) {
+/**
+ * Stop Web Speech and the audio recorder.
+ *
+ * `keepText` absorbs the live transcript into the composer (send). Leaving
+ * it false discards the recording so nothing is uploaded (unmount).
+ */
+const stopDictation = (options: { keepText: boolean }) => {
+  const recording = isRecording.value
+  if (options.keepText && recording) {
     const base = speechBaseMessage.value
     const finals = speechFinalTranscript.value
     const interim = interimTranscript.value
@@ -1072,25 +1434,36 @@ const sendMessage = () => {
     if (absorbed) {
       message.value = absorbed
     }
+  }
 
-    if (webSpeechService.value) {
-      webSpeechService.value.abort()
-      webSpeechService.value = null
-    }
-    if (audioRecorder.value) {
-      discardNextRecording.value = true
-      audioRecorder.value.stopRecording()
-    }
+  if (webSpeechService.value) {
+    webSpeechService.value.abort()
+    webSpeechService.value = null
+  }
+  if (audioRecorder.value && (recording || !options.keepText)) {
+    discardNextRecording.value = true
+    audioRecorder.value.stopRecording()
+  }
+  if (recording || !options.keepText) {
     isRecording.value = false
   }
 
-  // Always clear speech tracking to prevent any late onEnd / onResult from
-  // restoring text (handles race conditions around stop/abort).
   speechBaseMessage.value = ''
   speechFinalTranscript.value = ''
   interimTranscript.value = ''
   clearSilenceTimer()
   autoSendPending.value = false
+}
+
+const sendMessage = () => {
+  if (isStreaming.value) {
+    warning(t('chatInput.waitForStreaming'))
+    return
+  }
+
+  // Absorb any pending speech, then abort recognition so a late onresult
+  // cannot write text back after the composer is cleared for the next turn.
+  stopDictation({ keepText: true })
 
   if (!canSend.value) {
     return
@@ -1110,8 +1483,14 @@ const sendMessage = () => {
     messageToSend = `/search ${query}`.trim()
   }
 
+  const reasoning = reasoningSendFlags(
+    reasoningLevels.value,
+    reasoningEffort.value,
+    thinkingEnabled.value
+  )
   const options = {
-    includeReasoning: thinkingEnabled.value,
+    includeReasoning: reasoning.includeReasoning,
+    ...(reasoning.reasoningEffort ? { reasoningEffort: reasoning.reasoningEffort } : {}),
     webSearch: hasWebSearch,
     fileIds: uploadedFiles.value.filter((f) => !f.processing).map((f) => f.file_id),
     voiceReply: voiceReply.value,
@@ -1168,7 +1547,9 @@ const toggleVoiceReply = () => {
 // any other command (e.g. /tts) keeps the legacy inline-text behaviour.
 const handleCommandSelect = (cmd: Command) => {
   paletteVisible.value = false
-  if (isToolCommand(cmd.name)) {
+  if (cmd.promptBody) {
+    message.value = cmd.promptBody
+  } else if (isToolCommand(cmd.name)) {
     setActiveTool(cmd.name)
     // Drop the partial "/cmd" the user was typing so only the query remains.
     message.value = ''
@@ -1278,6 +1659,19 @@ const handleFilesSelected = async (selectedFiles: FileItem[]) => {
     })
   })
   success(`${selectedFiles.length} file(s) attached`)
+}
+
+const attachExistingFile = (file: { file_id: number; filename: string; file_type: string }) => {
+  if (uploadedFiles.value.some((f) => f.file_id === file.file_id)) {
+    return
+  }
+  uploadedFiles.value.push({
+    file_id: file.file_id,
+    filename: file.filename,
+    file_type: file.file_type,
+    processing: false,
+  })
+  success(t('chat.conversationFiles.attached', { name: file.filename }))
 }
 
 const handleMentionSelect = (file: FileItem) => {
@@ -1478,11 +1872,16 @@ const uploadFiles = async (files: File[]) => {
           void deleteFile(result.file_id).catch(() => {})
         }
 
-        const errorKey =
-          result.extraction_error === 'audio_transcription_failed'
-            ? 'chatInput.audioTranscriptionFailed'
-            : 'chatInput.documentExtractionFailed'
-        showError(t(errorKey, { filename: result.filename }))
+        if (result.extraction_error === 'audio_transcription_failed') {
+          const failureKey = speechFailureMessageKey(result.speech_failure, 'file')
+          showError(
+            failureKey === 'chatInput.audioTranscriptionFailed'
+              ? t(failureKey, { filename: result.filename })
+              : t(failureKey)
+          )
+        } else {
+          showError(t('chatInput.documentExtractionFailed', { filename: result.filename }))
+        }
         continue
       }
 
@@ -1500,7 +1899,7 @@ const uploadFiles = async (files: File[]) => {
       if (result.text) {
         const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
         const languageInfo = result.language ? ` (${result.language})` : ''
-        success(`🎙️ Audio transcribed${languageInfo}: "${preview}"`)
+        success(t('chatInput.transcribed', { language: languageInfo, preview }))
       }
 
       console.log('✅ File uploaded and processed:', result)
@@ -1510,8 +1909,7 @@ const uploadFiles = async (files: File[]) => {
         break
       }
       console.error('❌ File upload failed:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-      showError(`File upload failed: ${errorMessage}`)
+      showError(t('chatInput.uploadError'))
 
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name)
       if (index !== -1) {
@@ -1532,12 +1930,27 @@ const clearSilenceTimer = () => {
 }
 
 onMounted(() => {
+  const controls = controlsRef.value
+  if (controls && typeof ResizeObserver !== 'undefined') {
+    controlsObserver = new ResizeObserver(() => {
+      void fitControlBar()
+    })
+    controlsObserver.observe(controls)
+  }
+  void fitControlBar()
   document.addEventListener('click', handlePlusClickOutside)
+  // Capture so Escape still closes the panel when the composer stops the
+  // event for an open command or mention palette.
+  document.addEventListener('keydown', handlePlusEscape, true)
 })
 
 onUnmounted(() => {
-  clearSilenceTimer()
+  controlsObserver?.disconnect()
+  controlsObserver = null
+  dictationUnmounted = true
+  stopDictation({ keepText: false })
   document.removeEventListener('click', handlePlusClickOutside)
+  document.removeEventListener('keydown', handlePlusEscape, true)
   if (uploadAbortController.value) {
     uploadAbortController.value.abort()
     uploadAbortController.value = null
@@ -1665,6 +2078,7 @@ const startWebSpeechRecording = async () => {
         success(t('chatInput.listeningStarted'))
       },
       onEnd: () => {
+        if (dictationUnmounted) return
         isRecording.value = false
         clearSilenceTimer()
 
@@ -1686,6 +2100,7 @@ const startWebSpeechRecording = async () => {
         }
       },
       onResult: ({ final, interim }) => {
+        if (dictationUnmounted) return
         // Snapshot semantics: the service hands us the *whole* recognition
         // session so far. Assigning (never appending) the snapshot is what
         // makes the consumer immune to Android Chrome re-emitting the same
@@ -1712,6 +2127,7 @@ const startWebSpeechRecording = async () => {
         }
       },
       onError: (error) => {
+        if (dictationUnmounted) return
         console.error('Web Speech error:', error)
         if (error.type !== 'no_speech') {
           showError(error.userMessage)
@@ -1720,12 +2136,145 @@ const startWebSpeechRecording = async () => {
       },
     })
 
-    await webSpeechService.value.start()
+    const service = webSpeechService.value
+    await service.start()
+    if (dictationUnmounted) {
+      service.abort()
+      webSpeechService.value = null
+    }
   } catch (err: unknown) {
     console.error('Failed to start Web Speech:', err)
     const errMessage = err instanceof Error ? err.message : 'Unknown error'
     showError(t('chatInput.speechError', { error: errMessage }))
     isRecording.value = false
+  }
+}
+
+function liveBudgetResult(budget: LiveVoiceCostBudget): LimitCheckResult {
+  return {
+    allowed: false,
+    limitType: 'monthly',
+    actionType: 'MESSAGES',
+    used: Number(budget.used),
+    limit: Number(budget.limit),
+    remaining: Number(budget.remaining),
+    userLevel: budget.userLevel,
+    phoneVerified: budget.phoneVerified,
+    topupAvailable: budget.topupAvailable,
+  }
+}
+
+const {
+  phase: livePhase,
+  active: liveActive,
+  consentOpen: liveConsentOpen,
+  muted: liveMuted,
+  captions: liveCaptions,
+  level: liveLevel,
+  outLevel: liveOutLevel,
+  secondsLeft: liveSecondsLeft,
+  captionText: liveCaptionText,
+  activeModel: liveModel,
+  budgetWarn: liveBudgetWarn,
+  budgetWrap: liveBudgetWrap,
+  company: liveCompany,
+  terminalAction: liveTerminalAction,
+  terminalMessageKey: liveTerminalMessageKey,
+  terminalActionKey: liveTerminalActionKey,
+  options: liveOptions,
+  press: livePress,
+  allowConsent: liveAllowConsent,
+  declineConsent: liveDeclineConsent,
+  end: liveEnd,
+  toggleMute: liveToggleMute,
+  toggleCaptions: liveToggleCaptions,
+  dismiss: liveDismiss,
+} = useLiveVoice((budget) => emit('budgetBlocked', liveBudgetResult(budget)))
+
+const showLiveVoiceButton = computed(() =>
+  liveVoiceButtonVisible({
+    enabled: configStore.voiceLive?.enabled === true,
+    guest: isGuestMode.value,
+    nativeApp: isNativeApp(),
+  })
+)
+
+const showLiveInSendSlot = computed(() =>
+  liveVoiceReplacesSend({
+    available: showLiveVoiceButton.value,
+    streaming: isStreaming.value,
+    hasText: message.value.trim().length > 0,
+    hasAttachment: uploadedFiles.value.length > 0 || pastedBlocks.value.length > 0,
+  })
+)
+
+function onLivePress() {
+  if (!showLiveInSendSlot.value) return
+  void livePress()
+}
+
+const liveStatusHint = computed(() =>
+  livePhase.value === 'connecting' ? t('chatInput.liveVoice.connectingHint') : ''
+)
+
+const liveStatus = computed(() => {
+  const phase = livePhase.value
+  if (phase === 'thinking') return t('chatInput.liveVoice.thinking')
+  if (phase === 'speaking') return t('chatInput.liveVoice.speaking')
+  if (phase === 'ending') {
+    return liveBudgetWrap.value
+      ? t('chatInput.liveVoice.wrappingUp')
+      : t('chatInput.liveVoice.ending')
+  }
+  if (phase === 'connecting') return t('chatInput.liveVoice.connecting')
+  if (phase === 'ended') return t(liveTerminalMessageKey.value)
+  return t('chatInput.liveVoice.listening')
+})
+
+/** The orb, status and caption line the chat shows above the messages while a conversation runs. */
+const liveStage = computed<LiveVoiceStageState | null>(() => {
+  if (!liveActive.value || livePhase.value === 'ended') return null
+  return {
+    phase: livePhase.value,
+    status: liveStatus.value,
+    statusHint: liveStatusHint.value,
+    micLevel: liveLevel.value,
+    outLevel: liveOutLevel.value,
+    muted: liveMuted.value,
+    captionText: liveCaptionText.value,
+    showCaption: liveCaptions.value,
+  }
+})
+
+const liveModelLabel = computed(() => liveModel.value?.name ?? '')
+
+const liveBudgetLabel = computed(() => {
+  const left = liveSecondsLeft.value
+  if (left === null) return ''
+  if (left < 90) return t('chatInput.liveVoice.budgetSeconds', { seconds: left })
+  return t('chatInput.liveVoice.budgetMinutes', { minutes: Math.max(1, Math.round(left / 60)) })
+})
+
+/** A private conversation stores nothing, so its copy must not claim a saved transcript. */
+function liveLine(key: string): string {
+  const incognitoKey = `${key}Incognito`
+  return incognitoStore.active && te(incognitoKey) ? incognitoKey : key
+}
+
+function onLiveTerminalAction() {
+  const action = liveTerminalAction.value
+  const budget = liveCostBudget(liveOptions.value?.costBudget)
+  liveDismiss()
+  if (action === 'top_up' && budget) {
+    emit('budgetBlocked', liveBudgetResult(budget))
+    return
+  }
+  if (action === 'microphone') {
+    void toggleRecording()
+    return
+  }
+  if (action === 'talk_again') {
+    onLivePress()
   }
 }
 
@@ -1735,27 +2284,38 @@ const startWebSpeechRecording = async () => {
  */
 const startWhisperRecording = async () => {
   try {
-    audioRecorder.value = new AudioRecorder({
+    const recorder = new AudioRecorder({
       onStart: () => {
+        if (dictationUnmounted) return
         isRecording.value = true
         success(t('chatInput.recordingStarted'))
       },
       onStop: () => {
+        if (dictationUnmounted) return
         isRecording.value = false
       },
       onDataAvailable: async (audioBlob: Blob) => {
+        if (dictationUnmounted) return
         console.log('🎵 Audio recorded:', audioBlob.size, 'bytes')
         await transcribeAudio(audioBlob)
       },
       onError: (error) => {
+        if (dictationUnmounted) return
         console.error('❌ Recording error:', error)
         showError(t(error.messageKey))
         isRecording.value = false
       },
     })
+    audioRecorder.value = recorder
 
-    // Check support first (with detailed diagnostics)
-    const support = await audioRecorder.value.checkSupport()
+    // Check support first (with detailed diagnostics). Unmount can happen
+    // while permission is pending; stop again after each await so a stream
+    // created when getUserMedia later resolves is not left open.
+    const support = await recorder.checkSupport()
+    if (dictationUnmounted) {
+      recorder.stopRecording()
+      return
+    }
     if (!support.supported || !support.hasDevices) {
       if (support.error) {
         showError(t(support.error.messageKey))
@@ -1763,8 +2323,10 @@ const startWhisperRecording = async () => {
       return
     }
 
-    // Start recording
-    await audioRecorder.value.startRecording()
+    await recorder.startRecording()
+    if (dictationUnmounted) {
+      recorder.stopRecording()
+    }
   } catch (err: unknown) {
     console.error('❌ Failed to start recording:', err)
     const error = err as { messageKey?: string; message?: string }
@@ -1782,7 +2344,7 @@ const startWhisperRecording = async () => {
  * Called after AudioRecorder stops and provides recorded audio.
  */
 const transcribeAudio = async (audioBlob: Blob) => {
-  if (discardNextRecording.value) {
+  if (dictationUnmounted || discardNextRecording.value) {
     discardNextRecording.value = false
     return
   }
@@ -1807,8 +2369,9 @@ const transcribeAudio = async (audioBlob: Blob) => {
 
     if (result.extraction_error === 'audio_transcription_failed') {
       // Same upload-file endpoint as attachments: empty text here means STT
-      // is missing or failed, not "no speech" (issue #1908).
-      showError(t('chatInput.dictationSttFailed'))
+      // is missing or failed, not "no speech" (issue #1908). The code names
+      // the recovery; the provider's text is not shown.
+      showError(t(speechFailureMessageKey(result.speech_failure, 'dictation')))
     } else if (result.text) {
       message.value += (message.value ? ' ' : '') + result.text
       nextTick(() => textareaRef.value?.focus())
@@ -1817,8 +2380,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
     }
   } catch (err: unknown) {
     console.error('❌ Transcription failed:', err)
-    const error = err as { message?: string }
-    showError(t('chatInput.transcriptionFailed', { error: error.message || 'Unknown error' }))
+    showError(t('chatInput.dictationSttFailed'))
   } finally {
     isRecording.value = false
     transcribing.value = false
@@ -1881,6 +2443,12 @@ const toggleEnhance = async () => {
 
   try {
     const result = await chatApi.enhanceMessage(currentText)
+    const summary =
+      result.summary ?? (result.enhanced.trim() === currentText ? 'unchanged' : 'rewritten')
+    success(t(`chatInput.enhanceSummary.${summary}`))
+    if (summary === 'unchanged') {
+      return
+    }
     originalMessage.value = currentText
     enhancedMessage.value = result.enhanced
     message.value = result.enhanced
@@ -1903,10 +2471,14 @@ const setInputText = (text: string) => {
   message.value = text
 }
 
-// Prefill + send in one step (e.g., landing example prompts).
-const submitText = (text: string) => {
+// Prefill + send in one step (e.g., landing example prompts). Resolves false
+// when the composer refused the send; the text then stays in the box.
+const submitText = async (text: string): Promise<boolean> => {
   message.value = text
-  nextTick(() => sendMessage())
+  await nextTick()
+  const sendable = !isStreaming.value && canSend.value
+  sendMessage()
+  return sendable
 }
 
 /**
@@ -1931,17 +2503,21 @@ const startDictation = async (): Promise<boolean> => {
 defineExpose<{
   textareaRef: Ref<InstanceType<typeof Textarea> | null>
   uploadFiles: (files: File[]) => Promise<void>
+  attachExistingFile: (file: { file_id: number; filename: string; file_type: string }) => void
   setInputText: (text: string) => void
-  submitText: (text: string) => void
+  submitText: (text: string) => Promise<boolean>
   startDictation: () => Promise<boolean>
   armSummarize: () => void
+  liveStage: ComputedRef<LiveVoiceStageState | null>
 }>({
   textareaRef,
   uploadFiles,
+  attachExistingFile,
   setInputText,
   submitText,
   startDictation,
   armSummarize,
+  liveStage,
 })
 </script>
 

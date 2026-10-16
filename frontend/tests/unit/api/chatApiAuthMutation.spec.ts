@@ -1,12 +1,14 @@
 /**
- * Regression guard: chatApi's SSE-token warmer refreshes on its own pool,
- * invisible to the httpClient auth-mutation lock. It must wait for an
- * in-progress impersonation swap to settle before refreshing, else it fires
- * with pre-swap cookies and clobbers the new session.
+ * Regression guard: chatApi's SSE-token warmer refreshes on its own pool.
+ * It must wait for an in-progress impersonation swap to settle before
+ * refreshing, else it fires with pre-swap cookies and clobbers the new session.
+ *
+ * The in-flight promise is only recorded AFTER that wait, so a swap holder
+ * can join a fetch already on the wire without deadlocking on its own lock.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { beginAuthMutation, endAuthMutation } from '@/services/api/httpClient'
-import { prefetchSseToken, clearSseToken } from '@/services/api/chatApi'
+import { prefetchSseToken, clearSseToken, getInFlightRefresh } from '@/services/api/chatApi'
 import { setSessionHint, clearSessionHint } from '@/services/sessionHint'
 
 const flush = async (): Promise<void> => {
@@ -91,5 +93,14 @@ describe('chatApi SSE-token warmer — auth-mutation lock (impersonation swap)',
     await flush()
 
     expect(refreshCalls()).toHaveLength(1)
+  })
+
+  it('does not expose a lock-waiter as getInFlightRefresh (would deadlock the swap)', async () => {
+    beginAuthMutation()
+    prefetchSseToken()
+    await flush()
+
+    expect(getInFlightRefresh()).toBeNull()
+    expect(refreshCalls()).toHaveLength(0)
   })
 })

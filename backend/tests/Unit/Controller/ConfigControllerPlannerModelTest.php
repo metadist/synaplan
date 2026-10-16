@@ -4,47 +4,21 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Controller;
 
-use App\AI\Credential\ChatReadinessService;
-use App\AI\Service\AiProviderDisclosure;
-use App\AI\Service\ProviderRegistry;
 use App\Controller\ConfigController;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Entity\User;
-use App\Module\Gate\ModuleGateConfig;
-use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
-use App\Repository\UserRepository;
-use App\Service\Auth\DemoLoginHint;
-use App\Service\BillingService;
-use App\Service\Branding\BrandingService;
-use App\Service\Capability\CapabilityService;
-use App\Service\Chat\ProgressNarrationConfig;
-use App\Service\Client\ClientContextResolver;
-use App\Service\Client\MobileVersionService;
-use App\Service\Config\FeatureStatusReporter;
-use App\Service\Embedding\EmbeddingMetadataService;
-use App\Service\Embedding\EmbeddingModelChangeGuard;
-use App\Service\GuestChatConfig;
-use App\Service\LocalAi\LocalAiDownloadStatusService;
-use App\Service\MailerConfig;
-use App\Service\MarketingNews\MarketingNewsConfig;
+use App\Service\Model\RoutingModelsService;
 use App\Service\ModelConfigService;
-use App\Service\Plugin\PluginManager;
-use App\Service\RegistrationConfig;
-use App\Service\Setup\SetupStateService;
-use App\Service\UsageTaximeterConfig;
-use App\Service\UserMemoryService;
-use App\Service\WebSpeechConfig;
-use App\Service\WhisperService;
+use App\Tests\Unit\Controller\Support\BuildsConfigController;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Coverage for the planner model selection endpoints (#1143): the PLAN
@@ -52,6 +26,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 final class ConfigControllerPlannerModelTest extends TestCase
 {
+    use BuildsConfigController;
+
     private EntityManagerInterface&MockObject $em;
     private ConfigRepository&MockObject $configRepository;
     private ModelRepository&MockObject $modelRepository;
@@ -65,47 +41,8 @@ final class ConfigControllerPlannerModelTest extends TestCase
         $this->modelRepository = $this->createMock(ModelRepository::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
 
-        $this->controller = new ConfigController(
-            $this->em,
-            $this->configRepository,
-            $this->modelRepository,
-            $this->createStub(ProviderRegistry::class),
-            $this->createStub(WhisperService::class),
-            $this->createStub(PluginManager::class),
-            $this->createStub(BillingService::class),
-            $this->createStub(UserMemoryService::class),
-            $this->createStub(EmbeddingModelChangeGuard::class),
-            $this->createStub(EmbeddingMetadataService::class),
-            $this->modelConfigService,
-            new ClientContextResolver(),
-            $this->createStub(BrandingService::class),
-            $this->createStub(MobileVersionService::class),
-            $this->createStub(MarketingNewsConfig::class),
-            $this->createStub(UsageTaximeterConfig::class),
-            $this->createStub(ProgressNarrationConfig::class),
-            $this->createStub(RegistrationConfig::class),
-            $this->createStub(GuestChatConfig::class),
-            $this->createStub(WebSpeechConfig::class),
-            $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
-            $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
-            $this->createStub(\App\Service\Agent\AgentConfig::class),
-            $this->createStub(\App\Service\PlatformLink\PlatformLinksConfig::class),
-            $this->createStub(\App\Service\Iam\IamConfig::class),
-            $this->createStub(ChatReadinessService::class),
-            new DemoLoginHint(
-                $this->createStub(UserRepository::class),
-                $this->createStub(UserPasswordHasherInterface::class),
-                'test',
-            ),
-            $this->createStub(SetupStateService::class),
-            $this->createStub(AiProviderDisclosure::class),
-            $this->createStub(LocalAiDownloadStatusService::class),
-            new MailerConfig(),
-            new CapabilityService(),
-            $this->createStub(FeatureStatusReporter::class),
-            $this->createStub(ModuleRegistry::class),
-            $this->createStub(ModuleGateConfig::class),
-            'http://qdrant.example',
+        $this->controller = $this->buildConfigController(
+            routingModels: new RoutingModelsService($this->em, $this->configRepository, $this->modelRepository, $this->modelConfigService),
         );
 
         $this->controller->setContainer(new Container());

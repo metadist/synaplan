@@ -6,8 +6,8 @@
 #
 # Two modes:
 #   try    (default) - local try-out: clones the repo and starts the Docker dev
-#                      stack. Open http://localhost:5173 and a live status page
-#                      walks you through the first start.
+#                      stack. The status page is http://localhost:5173 unless
+#                      the project .env sets SYNAPLAN_FRONTEND_PORT.
 #   server           - production self-hosting on a Linux box using the
 #                      deploy/ contract (published images, generated secrets,
 #                      backup/restore lifecycle). A reverse proxy for HTTPS in
@@ -46,6 +46,41 @@ say()  { printf '%s\n' "$*"; }
 step() { printf '\n==> %s\n' "$*"; }
 warn() { printf 'WARNING: %s\n' "$*" >&2; }
 die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+# Copy SYNAPLAN_*_PORT from a Compose env file. An exported shell variable
+# wins, matching Docker Compose. Only a decimal port is accepted.
+load_synaplan_ports() {
+    local file="$1"
+    [ -f "$file" ] || return 0
+    local line key value
+    while IFS= read -r line || [ -n "$line" ]; do
+        line=${line%$'\r'}
+        line="${line#"${line%%[![:space:]]*}"}"
+        case "$line" in
+            ''|\#*) continue ;;
+            SYNAPLAN_*_PORT=*) ;;
+            *) continue ;;
+        esac
+        key=${line%%=*}
+        value=${line#*=}
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        case "$value" in
+            \"*\") value=${value#\"}; value=${value%\"} ;;
+            \'*\') value=${value#\'}; value=${value%\'} ;;
+            *)
+                value=${value%%#*}
+                value="${value%"${value##*[![:space:]]}"}"
+                ;;
+        esac
+        case "$value" in
+            ''|*[!0-9]*) continue ;;
+        esac
+        if [ -z "${!key:-}" ]; then
+            export "$key=$value"
+        fi
+    done < "$file"
+}
 
 # When piped through `curl | bash`, stdin is the script itself. Prompts must
 # read from the terminal, if there is one; otherwise defaults apply silently.
@@ -118,7 +153,10 @@ fi
 say "Docker, Compose v2 and ${FETCH_TOOL} are available."
 
 if [ "$MODE" = "try" ]; then
-    for port in 5173 8000; do
+    # The project .env is what Compose will publish. Load it before the
+    # fixed-port preflight and before the URL printed at the end.
+    load_synaplan_ports "${INSTALL_DIR}/.env"
+    for port in "${SYNAPLAN_FRONTEND_PORT:-5173}" "${SYNAPLAN_BACKEND_PORT:-8000}"; do
         if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ":${port} "; then
             warn "Port ${port} is already in use - the dev stack needs it. Stop the other service or expect a failure."
         fi
@@ -154,15 +192,15 @@ if [ "$MODE" = "try" ]; then
     if [ "$MINIMAL" = "true" ]; then
         say "Note: --minimal is the default now (local AI is opt-in via COMPOSE_PROFILES=local-ai)."
     fi
-    step "Starting the standard stack (cloud AI only, ~3 GB on first run)"
+    step "Starting the standard stack (cloud AI only, ~4 GB on first run)"
 
-    docker compose -f "$COMPOSE_FILE" up -d
+    ./scripts/compose-up.sh -f "$COMPOSE_FILE"
 
     say ""
     say "============================================================"
     say " Synaplan is starting."
     say ""
-    say " OPEN  http://localhost:5173  NOW - a live status screen"
+    say " OPEN  http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}  NOW - a live status screen"
     say " shows every boot step and switches to the app when ready."
     say " The first start takes 5-15 minutes; later starts seconds."
     say ""
@@ -226,9 +264,9 @@ else
     fi
 
     # Build deploy/.env from the example:
-    #  - blank the eight secret placeholders so the lifecycle scripts generate
-    #    real, independent values into deploy/data/secrets.env (their design),
-    #  - set URL, version pin, and the first administrator.
+    #  - clear the eight secrets if an operator uncommented them, so the first
+    #    start generates independent values into deploy/data/secrets.env,
+    #  - set URL, realtime origin, version pin, and the first administrator.
     sed -e 's|^APP_SECRET=.*|APP_SECRET=|' \
         -e 's|^TOKEN_SECRET=.*|TOKEN_SECRET=|' \
         -e 's|^MARIADB_PASSWORD=.*|MARIADB_PASSWORD=|' \
@@ -239,6 +277,7 @@ else
         -e 's|^REALTIME_ADMIN_SECRET=.*|REALTIME_ADMIN_SECRET=|' \
         -e "s|^APP_URL=.*|APP_URL=${DOMAIN}|" \
         -e "s|^FRONTEND_URL=.*|FRONTEND_URL=${DOMAIN}|" \
+        -e "s|^REALTIME_ALLOWED_ORIGINS=.*|REALTIME_ALLOWED_ORIGINS=${DOMAIN}|" \
         -e "s|^BOOTSTRAP_ADMIN_EMAIL=.*|BOOTSTRAP_ADMIN_EMAIL=${ADMIN_EMAIL}|" \
         -e "s|^BOOTSTRAP_ADMIN_PASSWORD=.*|BOOTSTRAP_ADMIN_PASSWORD=${ADMIN_PASSWORD}|" \
         deploy/selfhost.env.example > "$ENV_FILE"

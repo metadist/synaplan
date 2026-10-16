@@ -17,6 +17,7 @@ use App\Service\Chat\ChatDeletionService;
 use App\Service\Digest\MessageDigestMaintenance;
 use App\Service\File\FileStorageService;
 use App\Service\File\OgImageService;
+use App\Service\Iam\ConversationFeedbackCleanup;
 use App\Service\RAG\VectorStorage\VectorStorageInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -163,6 +164,7 @@ final class ChatDeletionServiceTest extends TestCase
             $this->createMock(OgImageService::class),
             $this->vectorStorage,
             $this->documentRevisions,
+            $this->createMock(ConversationFeedbackCleanup::class),
         );
     }
 

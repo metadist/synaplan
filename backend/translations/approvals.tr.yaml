@@ -1,0 +1,8 @@
+approval:
+  chat_followup:
+    executed: 'Tamam: %preview%.'
+    executed_with_result: 'Tamam: %preview%. Sonuç: %result%'
+    failed: '%preview% çalıştırılamadı: %reason%. Hiçbir şey gönderilmedi.'
+    failed_generic: '%preview% çalıştırılamadı. Hiçbir şey gönderilmedi.'
+    rejected: 'Tamam, çalıştırmadım. Hiçbir şey gönderilmedi.'
+    unsupported: '%preview% onayınızdan sonra henüz çalıştırılamıyor. Hiçbir şey gönderilmedi.'

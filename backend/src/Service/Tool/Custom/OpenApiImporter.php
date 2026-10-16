@@ -79,12 +79,14 @@ final readonly class OpenApiImporter
                     continue;
                 }
                 $operationId = is_string($operation['operationId'] ?? null) ? $operation['operationId'] : $http.'_'.trim((string) $path, '/');
+                [$summary, $description] = $this->operationCopy($operation, $operationId);
                 $ops[] = [
                     'operationId' => $operationId,
-                    'summary' => (string) ($operation['summary'] ?? $operationId),
+                    'summary' => $summary,
+                    'description' => $description,
                     'method' => $http,
                     'path' => (string) $path,
-                    'sideEffect' => $this->guessClass($http),
+                    'sideEffect' => $this->sideEffect($http, $operation),
                     'inputSchema' => $this->flattenParameters($operation),
                     'sourceRef' => $sourceRef.'#'.$operationId,
                 ];
@@ -135,6 +137,41 @@ final readonly class OpenApiImporter
         if (is_string($encoded) && str_contains($encoded, '"$ref":"http')) {
             throw new InvalidToolTemplateException('Remote $ref is not allowed');
         }
+    }
+
+    /**
+     * Summary stays the short label. Description is what the model reads, and
+     * falls back to the summary when the document has no longer text.
+     *
+     * @param array<string, mixed> $operation
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function operationCopy(array $operation, string $operationId): array
+    {
+        $summary = trim((string) ($operation['summary'] ?? ''));
+        $description = trim((string) ($operation['description'] ?? ''));
+        if ('' === $summary) {
+            $summary = '' !== $description ? $description : $operationId;
+        }
+        if ('' === $description) {
+            $description = $summary;
+        }
+
+        return [$summary, $description];
+    }
+
+    /**
+     * @param array<string, mixed> $operation
+     */
+    private function sideEffect(string $method, array $operation): string
+    {
+        $explicit = $operation['x-synaplan-side-effect'] ?? null;
+        if (is_string($explicit) && in_array($explicit, ['read', 'write', 'destructive'], true)) {
+            return $explicit;
+        }
+
+        return $this->guessClass($method);
     }
 
     private function guessClass(string $method): string

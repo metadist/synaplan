@@ -16,6 +16,12 @@
       class="flex-1 min-h-0 overflow-y-auto scroll-thin px-3 v2-drawer-scroll"
       data-testid="nav-mobile-drawer-scroll"
     >
+      <!--
+        Reachable while the desktop rail is hidden (phone chrome). The rail
+        copy is an icon plus a truncated label; here the full sentence shows.
+      -->
+      <SchedulerStaleHint class="mb-3" />
+
       <!-- Primary actions -->
       <nav class="flex flex-col gap-1" :aria-label="$t('nav.menu')">
         <button
@@ -46,13 +52,78 @@
         </button>
 
         <button
+          v-if="iamSharingEnabled && !isGuestMode"
+          type="button"
+          class="v2-drawer-item"
+          :class="incomingActive && 'v2-drawer-item--active'"
+          data-testid="btn-mobile-nav-incoming"
+          @click="handleNavigate('/chats/incoming')"
+        >
+          <InboxArrowDownIcon class="w-5 h-5" aria-hidden="true" />
+          <span class="flex-1 text-left">{{
+            incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
+          }}</span>
+          <span
+            v-if="incomingStore.hasNew"
+            class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
+            data-testid="text-mobile-nav-incoming-count"
+            >{{ incomingStore.unseenCount }}</span
+          >
+        </button>
+
+        <button
           class="v2-drawer-item"
           :class="[filesActive && 'v2-drawer-item--active', isGuestMode && 'opacity-60']"
+          :aria-expanded="isGuestMode ? undefined : libraryExpanded"
           data-testid="btn-mobile-nav-files"
           @click="handleFilesClick"
         >
           <FolderIcon class="w-5 h-5" aria-hidden="true" />
           <span class="flex-1 text-left">{{ $t('nav.files') }}</span>
+          <Icon
+            v-if="!isGuestMode"
+            icon="mdi:chevron-down"
+            class="w-5 h-5 flex-shrink-0 transition-transform txt-secondary"
+            :class="libraryExpanded && 'rotate-180'"
+            aria-hidden="true"
+          />
+        </button>
+
+        <div v-if="!isGuestMode && libraryExpanded" class="pl-4 pb-1">
+          <router-link
+            v-for="link in libraryLinks"
+            :key="link.id"
+            :to="link.to"
+            class="v2-drawer-child"
+            :class="
+              isLibraryLinkActive(link.to, route.path)
+                ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
+                : 'txt-secondary'
+            "
+            :aria-current="isLibraryLinkActive(link.to, route.path) ? 'page' : undefined"
+            :data-testid="link.mobileTestId"
+            @click="closeDrawer"
+          >
+            <component :is="link.icon" class="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+            <span class="flex-1 truncate">{{ link.label }}</span>
+            <span
+              v-if="link.badge"
+              class="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-warning-muted)] text-[var(--status-warning-text)] tabular-nums"
+            >
+              {{ link.badge }}
+            </span>
+          </router-link>
+        </div>
+
+        <button
+          v-if="!isGuestMode"
+          type="button"
+          class="v2-drawer-item"
+          data-testid="btn-mobile-nav-search"
+          @click="handleSearchClick"
+        >
+          <MagnifyingGlassIcon class="w-5 h-5" aria-hidden="true" />
+          <span class="flex-1 text-left">{{ $t('search.palette.openButton') }}</span>
         </button>
 
         <button
@@ -244,43 +315,6 @@
                     {{ authStore.user?.email || '' }}
                   </p>
                   <button
-                    class="v2-drawer-account"
-                    :class="isPathActive('/profile') ? 'v2-drawer-account--active' : 'txt-primary'"
-                    :data-nav-active="isPathActive('/profile') ? 'true' : undefined"
-                    data-testid="btn-mobile-more-profile"
-                    @click="handleNavigate('/profile')"
-                  >
-                    <UserCircleIcon class="w-5 h-5" />
-                    <span>{{ $t('nav.profile') }}</span>
-                  </button>
-                  <button
-                    v-if="iamSharingEnabled"
-                    class="v2-drawer-account"
-                    :class="
-                      isPathActive('/chats/incoming') ? 'v2-drawer-account--active' : 'txt-primary'
-                    "
-                    :data-nav-active="isPathActive('/chats/incoming') ? 'true' : undefined"
-                    data-testid="btn-mobile-more-incoming"
-                    @click="handleNavigate('/chats/incoming')"
-                  >
-                    <span class="relative flex-shrink-0">
-                      <InboxArrowDownIcon class="w-5 h-5" />
-                      <span
-                        v-if="incomingStore.hasNew"
-                        class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--status-error)]"
-                        data-testid="dot-mobile-more-incoming-new"
-                      />
-                    </span>
-                    <span class="flex-1 truncate text-left">{{
-                      incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
-                    }}</span>
-                    <span
-                      v-if="incomingStore.hasNew"
-                      class="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
-                      >{{ incomingStore.unseenCount }}</span
-                    >
-                  </button>
-                  <button
                     v-if="iamGroupsEnabled"
                     class="v2-drawer-account"
                     :class="isPathActive('/groups') ? 'v2-drawer-account--active' : 'txt-primary'"
@@ -369,14 +403,14 @@
                 </template>
 
                 <!--
-                  Preferences holds the language and the theme, both stored on
-                  the device rather than on the account, so it stays outside the
-                  guest/authenticated split and is offered to everyone.
+                  Preferences is the single settings page. Theme stays on the
+                  device, so the entry is offered to guests as well as signed-in
+                  users. /profile is the old URL and still counts as this row.
                 -->
                 <button
                   class="v2-drawer-account"
-                  :class="isPathActive('/settings') ? 'v2-drawer-account--active' : 'txt-primary'"
-                  :data-nav-active="isPathActive('/settings') ? 'true' : undefined"
+                  :class="settingsActive ? 'v2-drawer-account--active' : 'txt-primary'"
+                  :data-nav-active="settingsActive ? 'true' : undefined"
                   data-testid="btn-mobile-more-preferences"
                   @click="handleNavigate('/settings')"
                 >
@@ -476,7 +510,7 @@
 
             <div class="flex-shrink-0" @click.stop>
               <button
-                class="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                class="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 :class="chatMenuOpenId === chat.id && 'bg-black/5 dark:bg-white/5'"
                 :aria-label="$t('nav.more')"
                 data-testid="btn-mobile-history-row-menu"
@@ -559,6 +593,7 @@
     kind="conversation"
     :resource-id="iamShareResourceId"
     :resource-name="shareModalChatTitle"
+    :owner-name="shareOwnerName"
     @close="iamShareOpen = false"
     @public-link="openPublicLinkFromIam"
   />
@@ -583,14 +618,15 @@ import {
   Cog6ToothIcon,
   CreditCardIcon,
   FolderIcon,
+  InboxArrowDownIcon,
   PlusIcon,
   RocketLaunchIcon,
   ServerIcon,
-  UserCircleIcon,
   UserGroupIcon,
-  InboxArrowDownIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
+import { useSmartSearchStore } from '../stores/smartSearch'
 import {
   isNativeServerControlAvailable,
   isPurchaseAllowed,
@@ -600,6 +636,7 @@ import { useAuthStore } from '../stores/auth'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useConfigStore } from '../stores/config'
 import { useSidebarStore } from '../stores/sidebar'
+import { useIncomingStore } from '../stores/incoming'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { useAuth } from '../composables/useAuth'
 import {
@@ -611,10 +648,13 @@ import {
 } from '../composables/useNavItems'
 import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { goToFreshChat } from '@/composables/usePinnedAssistant'
+import { displaySessionTitle } from '@/utils/displaySessionTitle'
 import { useI18n } from 'vue-i18n'
+import { isLibraryLinkActive, useLibraryLinks } from '@/composables/useLibraryLinks'
 import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
-import { useIncomingStore } from '@/stores/incoming'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
+import SchedulerStaleHint from './SchedulerStaleHint.vue'
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
 
@@ -632,8 +672,10 @@ const sidebarStore = useSidebarStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
 const { navItems, isItemActive, isGuestMode } = useNavItems()
+const { links: libraryLinks } = useLibraryLinks()
 
 const moreExpanded = ref(false)
+const libraryExpanded = ref(false)
 const expandedSection = ref<string | null>(null)
 const expandedGroup = ref<string | null>(null)
 const isCreatingChat = ref(false)
@@ -644,6 +686,9 @@ const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref('')
 const iamShareOpen = ref(false)
+const shareOwnerName = computed(
+  () => authStore.user?.firstName?.trim() || authStore.user?.email || ''
+)
 const iamShareResourceId = ref('')
 const chatMenuOpenId = ref<number | null>(null)
 const chatMenuStyle = ref<Record<string, string>>({})
@@ -665,21 +710,36 @@ const moreSections = computed(() =>
 )
 
 const filesActive = computed(() => route.path.startsWith('/files'))
-const historyActive = computed(() => route.path === '/' || route.path.startsWith('/chat'))
+
+watch(
+  filesActive,
+  (active) => {
+    if (active) libraryExpanded.value = true
+  },
+  { immediate: true }
+)
+const incomingActive = computed(
+  () => route.path.startsWith('/chats') && route.query.type === 'group'
+)
+const historyActive = computed(
+  () => !incomingActive.value && (route.path === '/' || route.path.startsWith('/chat'))
+)
 const moreActive = computed(() => moreSections.value.some((item) => isItemActive(item)))
 
 // Account-block entries live inside the "More" panel but outside navItems, so
 // they need their own active tracking to keep "More" expanded and highlight the
-// row the user is on (Profile, Memories, Statistics, Preferences, Subscription).
+// row the user is on (Preferences, Memories, Statistics, Subscription).
+// /settings covers the old /profile paths.
 const isPathActive = (path: string) => route.path.startsWith(path)
+const settingsActive = computed(() => isPathActive('/settings') || isPathActive('/profile'))
 const accountActive = computed(() =>
   [
+    '/settings',
     '/profile',
     '/groups',
     '/memories',
     '/statistics',
     '/feedbacks',
-    '/settings',
     '/subscription',
   ].some(isPathActive)
 )
@@ -688,6 +748,12 @@ const accountActive = computed(() =>
 const visibleChats = computed(() => chatsStore.historyChats.filter((c) => !c.widgetSession))
 
 const closeDrawer = () => sidebarStore.closeMobileDrawer()
+
+const smartSearchStore = useSmartSearchStore()
+const handleSearchClick = () => {
+  closeDrawer()
+  smartSearchStore.open()
+}
 
 // Navigation handlers close the drawer FIRST, then navigate: the close
 // transition starts synchronously on tap (main thread still free) and the
@@ -699,11 +765,9 @@ const handleNewChat = async () => {
   closeDrawer()
   try {
     await chatsStore.findOrCreateEmptyChat()
-    if (route.path !== '/') router.push('/')
+    await goToFreshChat(router, route)
   } finally {
-    setTimeout(() => {
-      isCreatingChat.value = false
-    }, 300)
+    isCreatingChat.value = false
   }
 }
 
@@ -723,8 +787,8 @@ const handleFilesClick = () => {
     featureGateOpen.value = true
     return
   }
-  closeDrawer()
-  router.push('/files')
+  triggerHapticImpact('light')
+  libraryExpanded.value = !libraryExpanded.value
 }
 
 const toggleMore = () => {
@@ -763,7 +827,7 @@ const handleNavigate = async (path: string) => {
 const handleOpenMemories = () => {
   closeDrawer()
   if (!memoriesEnabledForUser.value) {
-    router.push('/profile?highlight=memories')
+    router.push('/settings/chat?highlight=memories')
     return
   }
   // Navigate to the dedicated memories page instead of opening a modal — the
@@ -785,9 +849,10 @@ const handleChangeServer = () => {
 }
 
 const getDisplayTitle = (chat: StoreChat): string => {
-  if (!isDefaultChatTitle(chat.title, t('chat.newChat'))) return chat.title
-  if (chat.firstMessagePreview) return chat.firstMessagePreview
-  return t('chat.newChat')
+  const raw = !isDefaultChatTitle(chat.title, t('chat.newChat'))
+    ? chat.title
+    : chat.firstMessagePreview || t('chat.newChat')
+  return displaySessionTitle(raw)
 }
 
 const formatTimestamp = (dateStr: string): string => formatRelativeTime(new Date(dateStr))
@@ -796,6 +861,8 @@ const getChannelIcon = (chat: StoreChat): string | null => {
   switch (chat.source) {
     case 'whatsapp':
       return 'mdi:whatsapp'
+    case 'telegram':
+      return 'mdi:telegram'
     case 'email':
       return 'mdi:email-outline'
     case 'widget':
@@ -811,6 +878,8 @@ const getChannelIconClass = (chat: StoreChat): string => {
   switch (chat.source) {
     case 'whatsapp':
       return 'text-green-500'
+    case 'telegram':
+      return 'text-[var(--channel-telegram)]'
     case 'email':
       return 'text-blue-500'
     case 'widget':
@@ -1082,8 +1151,13 @@ onBeforeUnmount(() => {
     opacity 0.2s ease;
   opacity: 1;
 }
+/* clip, not hidden: a hidden box is a scroll container. scrollIntoView or
+   focus() on a still-clipped item scrolls it up during the expand, then the
+   growing row clamps scrollTop and slides the items back down under the
+   pointer. `hidden` stays as the fallback for engines without `clip`. */
 .more-accordion-inner {
   overflow: hidden;
+  overflow: clip;
   min-height: 0;
 }
 .more-accordion-enter-from,

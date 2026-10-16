@@ -2,7 +2,7 @@
   <div
     :class="[
       'synaplan-widget',
-      widgetTheme === 'dark' ? 'dark' : '',
+      widgetTheme === 'oled' ? 'dark theme-oled' : isDarkChrome ? 'dark' : '',
       testMode || internalMode ? 'relative w-full h-full' : isPreview ? 'absolute' : 'fixed',
       testMode || internalMode ? '' : 'z-[9999]',
       testMode || internalMode
@@ -94,7 +94,7 @@
           ...chatWindowClasses,
         ]"
         :style="{
-          backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
+          backgroundColor: widgetInk('#1a1a1a', '#ffffff'),
           ...chatWindowStyle,
         }"
         data-testid="section-chat-window"
@@ -130,7 +130,7 @@
             <button
               v-if="humanHandoffEnabled && chatMode === 'ai' && !handoffRequested"
               :disabled="handoffSubmitting"
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               :aria-label="$t('widget.humanHandoff.button')"
               :title="$t('widget.humanHandoff.tooltip')"
               data-testid="btn-human-handoff"
@@ -141,7 +141,7 @@
             <!-- Export button disabled - functionality preserved for future use -->
             <button
               v-if="false"
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="$t('widget.exportChat')"
               :title="$t('widget.exportChat')"
               data-testid="btn-export"
@@ -150,19 +150,17 @@
               <ArrowDownTrayIcon class="w-5 h-5 text-white" />
             </button>
             <button
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
-              :aria-label="
-                widgetTheme === 'dark' ? $t('widget.switchToLight') : $t('widget.switchToDark')
-              "
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              :aria-label="isDarkChrome ? $t('widget.switchToLight') : $t('widget.switchToDark')"
               data-testid="btn-theme"
               @click="toggleTheme"
             >
-              <SunIcon v-if="widgetTheme === 'dark'" class="w-5 h-5 text-white" />
+              <SunIcon v-if="isDarkChrome" class="w-5 h-5 text-white" />
               <MoonIcon v-else class="w-5 h-5 text-white" />
             </button>
             <button
               v-if="allowFullscreen && !isMobile"
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="isFullscreen ? $t('widget.minimize') : $t('widget.maximize')"
               data-testid="btn-fullscreen"
               @click="toggleFullscreen"
@@ -171,7 +169,7 @@
               <ArrowsPointingOutIcon v-else class="w-5 h-5 text-white" />
             </button>
             <button
-              class="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
+              class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center"
               :aria-label="$t('widget.closeChat')"
               data-testid="btn-close"
               @click="toggleChat"
@@ -186,7 +184,7 @@
           ref="messagesContainer"
           class="flex-1 overflow-y-auto p-4 flex flex-col gap-3"
           :style="{
-            backgroundColor: widgetTheme === 'dark' ? '#1a1a1a' : '#ffffff',
+            backgroundColor: widgetInk('#1a1a1a', '#ffffff'),
           }"
           data-testid="section-messages"
           @click="handleMessagesClick"
@@ -196,9 +194,9 @@
             v-if="!privacyDismissed"
             class="text-[11px] leading-relaxed px-3 py-2 rounded-xl"
             :style="{
-              backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f9fafb',
-              color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280',
-              border: `1px solid ${widgetTheme === 'dark' ? '#374151' : '#e5e7eb'}`,
+              backgroundColor: widgetInk('#2a2a2a', '#f9fafb'),
+              color: widgetInk('#9ca3af', '#6b7280'),
+              border: `1px solid ${widgetInk('#374151', '#e5e7eb')}`,
             }"
             data-testid="privacy-notice"
           >
@@ -262,7 +260,7 @@
               :style="
                 message.role === 'user'
                   ? { backgroundColor: primaryColor, color: '#ffffff' }
-                  : { backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }
+                  : { backgroundColor: widgetInk('#2a2a2a', '#f3f4f6') }
               "
             >
               <span
@@ -278,11 +276,11 @@
                 >
                   <div
                     class="h-3 w-32 rounded animate-pulse"
-                    :class="widgetTheme === 'dark' ? 'bg-white/20' : 'bg-black/10'"
+                    :class="isDarkChrome ? 'bg-white/20' : 'bg-black/10'"
                   />
                   <div
                     class="h-3 w-24 rounded animate-pulse"
-                    :class="widgetTheme === 'dark' ? 'bg-white/15' : 'bg-black/5'"
+                    :class="isDarkChrome ? 'bg-white/15' : 'bg-black/5'"
                   />
                 </div>
                 <div
@@ -297,16 +295,22 @@
                   "
                   :style="{
                     color:
-                      message.role === 'user'
-                        ? '#ffffff'
-                        : widgetTheme === 'dark'
-                          ? '#e5e5e5'
-                          : '#1f2937',
+                      message.role === 'user' ? '#ffffff' : isDarkChrome ? '#e5e5e5' : '#1f2937',
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget message markdown/linkify -->
                   <div v-html="renderMessageContent(message.content, message.role)"></div>
                 </div>
+                <KnowledgeSources
+                  v-if="
+                    message.role === 'assistant' &&
+                    message.ragSources &&
+                    message.ragSources.length > 0
+                  "
+                  :sources="message.ragSources"
+                  :show-library-link="false"
+                  :load-passage="loadWidgetPassage"
+                />
               </template>
               <div v-else-if="message.type === 'file'" class="space-y-2">
                 <!-- File attachments (clickable for download) -->
@@ -316,7 +320,7 @@
                       { id: message.fileId, filename: message.fileName },
                     ]"
                     :key="file.id"
-                    class="flex items-center gap-2 px-2 py-1 rounded-md bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                    class="flex items-center gap-2 px-2 py-1 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors cursor-pointer"
                     :title="$t('widget.downloadFile')"
                     @click="downloadFileById(file.id, file.filename)"
                   >
@@ -326,7 +330,7 @@
                         color:
                           message.role === 'user'
                             ? '#ffffff'
-                            : widgetTheme === 'dark'
+                            : isDarkChrome
                               ? '#e5e5e5'
                               : '#1f2937',
                       }"
@@ -337,7 +341,7 @@
                         color:
                           message.role === 'user'
                             ? '#ffffff'
-                            : widgetTheme === 'dark'
+                            : isDarkChrome
                               ? '#e5e5e5'
                               : '#1f2937',
                       }"
@@ -352,11 +356,7 @@
                   class="text-sm markdown-content overflow-x-auto"
                   :style="{
                     color:
-                      message.role === 'user'
-                        ? '#ffffff'
-                        : widgetTheme === 'dark'
-                          ? '#e5e5e5'
-                          : '#1f2937',
+                      message.role === 'user' ? '#ffffff' : isDarkChrome ? '#e5e5e5' : '#1f2937',
                   }"
                 >
                   <!-- eslint-disable-next-line vue/no-v-html -- widget file message markdown -->
@@ -367,12 +367,7 @@
                 v-if="message.timestamp"
                 class="text-xs mt-1 opacity-70"
                 :style="{
-                  color:
-                    message.role === 'user'
-                      ? '#ffffff'
-                      : widgetTheme === 'dark'
-                        ? '#9ca3af'
-                        : '#6b7280',
+                  color: message.role === 'user' ? '#ffffff' : isDarkChrome ? '#9ca3af' : '#6b7280',
                 }"
               >
                 <span class="font-medium">{{ getSenderLabel(message) }}</span>
@@ -385,7 +380,7 @@
           <div v-if="isTyping && !isSending && chatMode === 'human'" class="flex justify-start">
             <div
               class="rounded-2xl px-4 py-3"
-              :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
+              :style="{ backgroundColor: widgetInk('#2a2a2a', '#f3f4f6') }"
             >
               <div class="flex gap-1">
                 <div
@@ -446,7 +441,7 @@
         <!-- Input Area -->
         <div
           class="border-t p-3"
-          :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
+          :style="{ borderColor: widgetInk('#333', '#e5e7eb') }"
           data-testid="section-input"
         >
           <div
@@ -478,26 +473,26 @@
               v-for="(file, index) in selectedFiles"
               :key="`${file.name}-${file.size}`"
               class="flex items-center gap-2 p-2 rounded-lg"
-              :style="{ backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6' }"
+              :style="{ backgroundColor: widgetInk('#2a2a2a', '#f3f4f6') }"
             >
               <DocumentIcon
                 class="w-5 h-5 flex-shrink-0"
-                :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+                :style="{ color: widgetInk('#9ca3af', '#6b7280') }"
               />
               <span
                 class="text-sm flex-1 truncate"
-                :style="{ color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937' }"
+                :style="{ color: widgetInk('#e5e5e5', '#1f2937') }"
                 >{{ file.name }}</span
               >
               <span
                 class="text-xs flex-shrink-0"
-                :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+                :style="{ color: widgetInk('#9ca3af', '#6b7280') }"
                 >{{ formatFileSize(file.size) }}</span
               >
               <button
                 :disabled="isSending || uploadingFile"
                 :class="[
-                  'w-6 h-6 rounded flex items-center justify-center flex-shrink-0',
+                  'w-6 h-6 rounded-xl flex items-center justify-center flex-shrink-0',
                   isSending || uploadingFile
                     ? 'opacity-50 cursor-not-allowed'
                     : 'hover:bg-black/10 dark:hover:bg-white/10',
@@ -536,14 +531,14 @@
               />
               <button
                 :disabled="inputDisabled || !canAddMoreFiles"
-                class="w-10 h-10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-10 h-10 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 :aria-label="$t('widget.attachFile')"
                 data-testid="btn-attach"
                 @click="fileInput?.click()"
               >
                 <PaperClipIcon
                   class="w-5 h-5"
-                  :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }"
+                  :style="{ color: widgetInk('#9ca3af', '#6b7280') }"
                 />
               </button>
             </template>
@@ -559,10 +554,10 @@
                     : $t('widget.placeholder')
               "
               rows="1"
-              class="flex-1 px-4 py-2 rounded-lg resize-none focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="flex-1 px-4 py-2 rounded-xl resize-none focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
               :style="{
-                backgroundColor: widgetTheme === 'dark' ? '#2a2a2a' : '#f3f4f6',
-                color: widgetTheme === 'dark' ? '#e5e5e5' : '#1f2937',
+                backgroundColor: widgetInk('#2a2a2a', '#f3f4f6'),
+                color: widgetInk('#e5e5e5', '#1f2937'),
                 borderColor: primaryColor,
                 maxHeight: '120px',
                 minHeight: '40px',
@@ -576,7 +571,7 @@
                 canSend && !isSending && !uploadingFile ? { backgroundColor: primaryColor } : {}
               "
               :class="[
-                'w-10 h-10 rounded-lg transition-all flex items-center justify-center',
+                'w-10 h-10 rounded-xl transition-all flex items-center justify-center',
                 canSend && !isSending && !uploadingFile
                   ? 'hover:scale-110 shadow-lg'
                   : 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed',
@@ -625,9 +620,9 @@
           :class="{
             'pb-[calc(env(safe-area-inset-bottom,0px)+12px)]': isMobile && !isPreview,
           }"
-          :style="{ borderColor: widgetTheme === 'dark' ? '#333' : '#e5e7eb' }"
+          :style="{ borderColor: widgetInk('#333', '#e5e7eb') }"
         >
-          <p class="text-xs" :style="{ color: widgetTheme === 'dark' ? '#9ca3af' : '#6b7280' }">
+          <p class="text-xs" :style="{ color: widgetInk('#9ca3af', '#6b7280') }">
             {{ $t('branding.poweredBy') }}
             <a
               :href="poweredByUrl"
@@ -646,6 +641,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
+import { stripThinkingBlocks } from '@/utils/stripThinkingBlocks'
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import {
   XMarkIcon,
@@ -669,8 +665,12 @@ import {
   WidgetUnavailableError,
 } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
+import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
+import type { RagSourceRef } from '@/stores/history'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { parseAIResponse } from '@/utils/responseParser'
+import { createSmoothStream, type SmoothStream } from '@/utils/smoothStream'
+import { createUuid } from '@/utils/uuid'
 import { getMarkdownRenderer } from '@/composables/useMarkdown'
 import {
   subscribeToWidgetSessionRealtime,
@@ -697,7 +697,7 @@ interface Props {
   autoMessage?: string
   messageLimit?: number
   maxFileSize?: number
-  defaultTheme?: 'light' | 'dark'
+  defaultTheme?: 'light' | 'dark' | 'oled'
   isPreview?: boolean
   widgetTitle?: string
   widgetSubtitle?: string | null
@@ -788,6 +788,7 @@ interface Message {
   files?: MessageFile[]
   timestamp: Date
   sender?: 'user' | 'ai' | 'human' | 'system'
+  ragSources?: RagSourceRef[]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -821,7 +822,22 @@ function operatorEventFileToMessageFile(item: unknown): MessageFile {
 
 const isOpen = ref(false)
 const isFullscreen = ref(props.fullscreenMode)
-const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
+const widgetTheme = ref<'light' | 'dark' | 'oled'>(props.defaultTheme)
+const isDarkChrome = computed(() => widgetTheme.value === 'dark' || widgetTheme.value === 'oled')
+
+function widgetInk(whenDark: string, whenLight: string): string {
+  if (widgetTheme.value === 'light') return whenLight
+  if (widgetTheme.value !== 'oled') return whenDark
+  const black: Record<string, string> = {
+    '#1a1a1a': '#000',
+    '#2a2a2a': '#0a0a0a',
+    '#333': 'rgba(255,255,255,0.16)',
+    '#374151': 'rgba(255,255,255,0.16)',
+    '#9ca3af': '#c8c8c8',
+    '#e5e5e5': '#ffffff',
+  }
+  return black[whenDark] ?? whenDark
+}
 const inputMessage = ref('')
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const privacyStorageKey = `synaplan_privacy_${props.widgetId}`
@@ -1603,6 +1619,17 @@ const sendMessage = async () => {
     })
   }
 
+  let assembled = ''
+  const replySmoother = createSmoothStream({
+    onRender: (text) => {
+      const bubble = messages.value.find((m) => m.id === assistantMessageId)
+      if (!bubble) return
+      bubble.content = text
+      void scrollToBottom()
+    },
+  })
+  activeStreamSmoother = replySmoother
+
   try {
     const result = await sendWidgetMessage(props.widgetId, userMessage, sessionId.value, {
       chatId: chatId.value ?? undefined,
@@ -1611,17 +1638,16 @@ const sendMessage = async () => {
       apiUrl: props.apiUrl,
       headers: testModeHeaders.value,
       onChunk: async (chunk: string) => {
-        if (!chunk) return
+        if (!chunk || !assistantMessageId) return
         if (isTyping.value) {
           isTyping.value = false
         }
-        const lastMessage = messages.value[messages.value.length - 1]
-        if (lastMessage && lastMessage.id === assistantMessageId) {
-          lastMessage.content += chunk
-          await scrollToBottom()
-        }
+        assembled += chunk
+        replySmoother.push(assembled)
       },
     })
+
+    replySmoother.flush()
 
     if (result.chatId && result.chatId > 0) {
       chatId.value = result.chatId
@@ -1652,6 +1678,9 @@ const sendMessage = async () => {
 
     const lastMessage = messages.value[messages.value.length - 1]
     if (lastMessage && lastMessage.id === assistantMessageId) {
+      if (result.ragSources && result.ragSources.length > 0) {
+        lastMessage.ragSources = result.ragSources
+      }
       if (!lastMessage.content || lastMessage.content.length === 0) {
         if (result.text && result.text.length > 0) {
           lastMessage.content = result.text
@@ -1675,6 +1704,7 @@ const sendMessage = async () => {
       subscribeToEvents()
     }
   } catch (error) {
+    replySmoother.flush()
     if (chatMode.value === 'ai') {
       messageCount.value = Math.max(0, messageCount.value - 1)
     }
@@ -1724,6 +1754,8 @@ const sendMessage = async () => {
       }
     }
   } finally {
+    replySmoother.cancel()
+    if (activeStreamSmoother === replySmoother) activeStreamSmoother = null
     isTyping.value = false
     isSending.value = false
   }
@@ -1926,7 +1958,7 @@ const handleCloseEvent = (event: Event) => {
 
 const handleThemeSyncEvent = (event: Event) => {
   const theme = (event as CustomEvent).detail?.theme
-  if (theme === 'dark' || theme === 'light') {
+  if (theme === 'oled' || theme === 'dark' || theme === 'light') {
     widgetTheme.value = theme
   }
 }
@@ -1969,7 +2001,7 @@ const normalizeServerMessage = (rawUnknown: unknown): Message => {
         : 'ai'
 
   return {
-    id: String(raw.id ?? crypto.randomUUID()),
+    id: String(raw.id ?? createUuid()),
     role,
     type: isFileMessage ? 'file' : 'text',
     content,
@@ -1978,7 +2010,27 @@ const normalizeServerMessage = (rawUnknown: unknown): Message => {
     files,
     timestamp: new Date(timestampSeconds * 1000),
     sender,
+    ragSources: parseRagSources(raw.ragSources),
   }
+}
+
+function parseRagSources(value: unknown): RagSourceRef[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const sources: RagSourceRef[] = []
+  for (const row of value) {
+    if (!isRecord(row) || typeof row.chunkId !== 'string' || row.chunkId === '') continue
+    sources.push({
+      n: typeof row.n === 'number' ? row.n : sources.length + 1,
+      chunkId: row.chunkId,
+      fileId: typeof row.fileId === 'number' ? row.fileId : 0,
+      fileName: typeof row.fileName === 'string' ? row.fileName : '',
+      groupKey: typeof row.groupKey === 'string' ? row.groupKey : '',
+      score: typeof row.score === 'number' ? row.score : null,
+      startLine: typeof row.startLine === 'number' ? row.startLine : 0,
+      endLine: typeof row.endLine === 'number' ? row.endLine : 0,
+    })
+  }
+  return sources.length > 0 ? sources : undefined
 }
 
 /**
@@ -2014,6 +2066,20 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
   }
 
   let replayed = ''
+  const replaySmoother = createSmoothStream({
+    onRender: (text) => {
+      const bubble = findBubble()
+      if (!bubble) return
+      // The replay restarts the turn from its first token, so early chunks are
+      // shorter than the answer-so-far already painted above. Holding the
+      // painted text until the replay grows past it keeps the bubble moving
+      // forward only.
+      bubble.content = text.length >= partialText.length ? text : partialText
+      void scrollToBottom()
+    },
+    initialShown: partialText,
+  })
+  activeStreamSmoother = replaySmoother
 
   try {
     isTyping.value = partialText === ''
@@ -2024,17 +2090,11 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
         if (!chunk) return
         isTyping.value = false
         replayed += chunk
-        const bubble = findBubble()
-        if (!bubble) return
-        // The replay restarts the turn from its first token, so early chunks are
-        // shorter than the answer-so-far already painted above. Writing them
-        // straight through would rewind a long answer to its first word and
-        // re-type it; holding the painted text until the replay grows past it
-        // keeps the bubble moving forward only.
-        bubble.content = replayed.length >= partialText.length ? replayed : partialText
-        await scrollToBottom()
+        replaySmoother.push(replayed)
       },
     })
+
+    replaySmoother.flush()
 
     // Nothing was replayed and there was nothing to paint either — the turn
     // most likely finished between the history read and the attach. Mirror the
@@ -2044,12 +2104,15 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
       await loadConversationHistory(true)
     }
   } catch (error) {
+    replaySmoother.cancel()
     console.error('Failed to re-attach to the running answer:', error)
     // The turn may have finished while we were re-attaching — the persisted
     // history is authoritative, so drop the provisional bubble and reload.
     dropBubble()
     await loadConversationHistory(true)
   } finally {
+    replaySmoother.cancel()
+    if (activeStreamSmoother === replaySmoother) activeStreamSmoother = null
     isTyping.value = false
     await scrollToBottom()
   }
@@ -2161,7 +2224,7 @@ const loadConversationHistory = async (force = false) => {
 }
 
 // Use the shared markdown renderer (singleton for widget performance)
-const markdownRenderer = getMarkdownRenderer()
+const markdownRenderer = getMarkdownRenderer((key, params) => String(t(key, params ?? {})))
 
 interface CodeBlock {
   language: string
@@ -2230,12 +2293,6 @@ async function handleMessagesClick(event: MouseEvent): Promise<void> {
       console.error('Failed to copy:', err)
     }
   }
-}
-
-const stripThinkingBlocks = (text: string): string => {
-  let result = text.replace(/<think>[\s\S]*?<\/think>/g, '')
-  result = result.replace(/<think>[\s\S]*$/, '')
-  return result.trim()
 }
 
 const renderMessageContent = (value: string, role: 'user' | 'assistant' = 'assistant'): string => {
@@ -2371,7 +2428,10 @@ onMounted(() => {
   // once we know whether the session already has server-side messages.
 })
 
+let activeStreamSmoother: SmoothStream | null = null
+
 onBeforeUnmount(() => {
+  activeStreamSmoother?.cancel()
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', updateIsMobile)
     window.removeEventListener('orientationchange', updateIsMobile)
@@ -2697,6 +2757,25 @@ onBeforeUnmount(() => {
     typingDebounceTimer = null
   }
 })
+
+async function loadWidgetPassage(chunkId: string): Promise<string> {
+  const headers = buildWidgetHeaders(false)
+  if (sessionId.value) {
+    headers['X-Widget-Session'] = sessionId.value
+  }
+  const response = await fetch(
+    `${props.apiUrl}/api/v1/widget/${props.widgetId}/rag/chunks/${encodeURIComponent(chunkId)}`,
+    { headers, credentials: 'omit' }
+  )
+  if (!response.ok) {
+    throw new Error('passage')
+  }
+  const data: unknown = await response.json()
+  if (!isRecord(data) || typeof data.text !== 'string' || data.text === '') {
+    throw new Error('passage')
+  }
+  return data.text
+}
 
 function buildWidgetHeaders(includeContentType = true) {
   const headers: Record<string, string> = {}

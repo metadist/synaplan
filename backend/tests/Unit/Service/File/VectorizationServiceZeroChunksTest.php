@@ -83,4 +83,73 @@ final class VectorizationServiceZeroChunksTest extends TestCase
         $this->assertNotNull($result['error']);
         $this->assertStringContainsString('No chunks could be embedded', (string) $result['error']);
     }
+
+    public function testPartialStoreIsRolledBackWhenALaterWindowFails(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $chunker = $this->createMock(TextChunker::class);
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $storage = $this->createMock(VectorStorageFacade::class);
+        $em = $this->createMock(EntityManagerInterface::class);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getProviderId')->willReturn('bge-m3');
+        $model->method('getService')->willReturn('ollama');
+
+        $modelRepo = $this->createMock(EntityRepository::class);
+        $modelRepo->method('find')->willReturn($model);
+        $userRepo = $this->createMock(EntityRepository::class);
+        $userRepo->method('find')->willReturn(null);
+        $em->method('getRepository')->willReturnCallback(
+            static function (string $class) use ($modelRepo, $userRepo) {
+                return str_contains($class, 'User') ? $userRepo : $modelRepo;
+            }
+        );
+        $modelConfig->method('getDefaultModel')->willReturn(99);
+
+        $chunks = [];
+        for ($i = 0; $i < 10; ++$i) {
+            $chunks[] = ['content' => 'chunk '.$i, 'start_line' => $i + 1, 'end_line' => $i + 1];
+        }
+        $chunker->method('chunkify')->willReturn($chunks);
+
+        $vector = array_fill(0, 1024, 0.1);
+        $aiFacade->method('embedBatch')->willReturnCallback(
+            static function (array $texts) use ($vector): array {
+                return [
+                    'embeddings' => array_fill(0, \count($texts), $vector),
+                    'usage' => ['prompt_tokens' => \count($texts), 'total_tokens' => \count($texts)],
+                ];
+            }
+        );
+
+        $stores = 0;
+        $storage->expects($this->exactly(2))->method('storeChunkBatch')->willReturnCallback(
+            static function (array $batch) use (&$stores): int {
+                ++$stores;
+                if ($stores > 1) {
+                    throw new \RuntimeException('qdrant down');
+                }
+
+                return \count($batch);
+            }
+        );
+        $storage->expects($this->once())->method('deleteByFile')->with(1, 46);
+        $storage->method('getProviderName')->willReturn('mariadb');
+
+        $service = new VectorizationService(
+            $aiFacade,
+            $chunker,
+            $modelConfig,
+            $storage,
+            $this->createStub(RateLimitService::class),
+            $em,
+            new NullLogger(),
+        );
+
+        $result = $service->vectorizeAndStore('some text', 1, 46);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('qdrant down', $result['error']);
+    }
 }

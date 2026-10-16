@@ -100,7 +100,9 @@ final readonly class VectorSearchService
                 scopes: $scopes,
             );
 
+            $storageStarted = hrtime(true);
             $results = $this->vectorStorage->search($searchQuery);
+            $storageMs = (int) ((hrtime(true) - $storageStarted) / 1_000_000);
             $names = $this->ownerNames($results, $userId);
 
             $mapped = array_map(static function ($result) use ($userId, $names): array {
@@ -124,6 +126,14 @@ final readonly class VectorSearchService
                     'shared' => $shared,
                 ];
             }, $results);
+
+            $this->logger->info('VectorSearchService::semanticSearchByVector completed', [
+                'user_id' => $userId,
+                'storage' => $this->vectorStorage->getProviderName(),
+                'storage_ms' => $storageMs,
+                'storage_limit' => $storageLimit,
+                'hits' => count($mapped),
+            ]);
 
             if (null !== $queryText && '' !== trim($queryText)) {
                 $user = $this->userRepository->find($userId);
@@ -167,6 +177,8 @@ final readonly class VectorSearchService
         float $minScore = 0.3,
         ?array $explicitScopes = null,
     ): array {
+        $searchStarted = hrtime(true);
+
         // 1. Get embedding model from DB
         $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
 
@@ -201,6 +213,7 @@ final readonly class VectorSearchService
             'model' => $modelName,
             'provider' => $provider,
         ]);
+        $embedMs = (int) ((hrtime(true) - $searchStarted) / 1_000_000);
         $queryEmbedding = $embedResult['embedding'];
 
         $user = $this->em->getRepository(User::class)->find($userId);
@@ -221,7 +234,7 @@ final readonly class VectorSearchService
             return [];
         }
 
-        return $this->semanticSearchByVector(
+        $results = $this->semanticSearchByVector(
             $userId,
             $queryEmbedding,
             $groupKey,
@@ -230,6 +243,18 @@ final readonly class VectorSearchService
             $query,
             $explicitScopes,
         );
+
+        $this->logger->info('VectorSearchService: semantic search completed', [
+            'user_id' => $userId,
+            'model_name' => $modelName,
+            'provider' => $provider,
+            'limit' => $limit,
+            'embed_ms' => $embedMs,
+            'total_ms' => (int) ((hrtime(true) - $searchStarted) / 1_000_000),
+            'results' => count($results),
+        ]);
+
+        return $results;
     }
 
     /**
@@ -239,11 +264,20 @@ final readonly class VectorSearchService
     {
         try {
             $stats = $this->vectorStorage->getStats($userId);
+            try {
+                $shared = $this->countSharedSearchable($userId);
+            } catch (\Exception $e) {
+                $this->logger->error('VectorSearchService: shared stats failed', [
+                    'error' => $e->getMessage(),
+                    'user_id' => $userId,
+                ]);
+                $shared = ['files' => 0, 'chunks' => 0, 'groups' => 0];
+            }
 
             return [
-                'total_documents' => $stats->totalFiles,
-                'total_chunks' => $stats->totalChunks,
-                'total_groups' => $stats->totalGroups,
+                'total_documents' => $stats->totalFiles + $shared['files'],
+                'total_chunks' => $stats->totalChunks + $shared['chunks'],
+                'total_groups' => $stats->totalGroups + $shared['groups'],
                 'avg_chunk_size' => 0, // Not supported by facade yet
                 'chunks_by_group' => $stats->chunksByGroup,
             ];
@@ -260,6 +294,119 @@ final readonly class VectorSearchService
                 'avg_chunk_size' => 0,
             ];
         }
+    }
+
+    /**
+     * Indexed files the person can search that live under someone else's id.
+     *
+     * Own files are already in {@see VectorStorageFacade::getStats()}. A shared
+     * folder is counted only for that folder, never the owner's other files.
+     *
+     * @return array{files: int, chunks: int, groups: int}
+     */
+    private function countSharedSearchable(int $userId): array
+    {
+        $files = 0;
+        $chunks = 0;
+        $groups = 0;
+        /** @var array<string, true> $seenFiles */
+        $seenFiles = [];
+        /** @var array<string, true> $seenFolders */
+        $seenFolders = [];
+        /** @var array<int, array<int, array{chunks: int, groupKey: string|null}>> $filesByOwner */
+        $filesByOwner = [];
+
+        foreach ($this->ragScopeResolver->resolve($userId, null) as $scope) {
+            if ($scope->ownerId === $userId) {
+                continue;
+            }
+
+            if ([] !== $scope->fileIds) {
+                $catalog = $this->indexedFilesForOwner($filesByOwner, $scope->ownerId);
+                $added = false;
+                foreach ($scope->fileIds as $fileId) {
+                    $fileKey = $scope->ownerId.':'.$fileId;
+                    if (isset($seenFiles[$fileKey])) {
+                        continue;
+                    }
+                    $info = $catalog[$fileId] ?? null;
+                    if (null === $info || $info['chunks'] < 1) {
+                        continue;
+                    }
+                    if (
+                        null !== $scope->groupKey
+                        && '' !== $scope->groupKey
+                        && $info['groupKey'] !== $scope->groupKey
+                    ) {
+                        continue;
+                    }
+                    $seenFiles[$fileKey] = true;
+                    ++$files;
+                    $chunks += $info['chunks'];
+                    $added = true;
+                }
+                if ($added && null !== $scope->groupKey && '' !== $scope->groupKey) {
+                    $this->countSharedFolder($seenFolders, $groups, $scope->ownerId, $scope->groupKey);
+                }
+
+                continue;
+            }
+
+            if (null === $scope->groupKey || '' === $scope->groupKey) {
+                continue;
+            }
+
+            $rows = $this->vectorStorage->getFilesWithChunksByGroupKey($scope->ownerId, $scope->groupKey);
+            $added = false;
+            foreach ($rows as $fileId => $row) {
+                $fileChunks = $row['chunks'];
+                if ($fileChunks < 1) {
+                    continue;
+                }
+                $added = true;
+                $fileKey = $scope->ownerId.':'.$fileId;
+                if (isset($seenFiles[$fileKey])) {
+                    continue;
+                }
+                $seenFiles[$fileKey] = true;
+                ++$files;
+                $chunks += $fileChunks;
+            }
+            if ($added) {
+                $this->countSharedFolder($seenFolders, $groups, $scope->ownerId, $scope->groupKey);
+            }
+        }
+
+        return ['files' => $files, 'chunks' => $chunks, 'groups' => $groups];
+    }
+
+    /**
+     * One scan per owner. Shared attachments must not each scroll the collection.
+     *
+     * @param array<int, array<int, array{chunks: int, groupKey: string|null}>> $filesByOwner
+     *
+     * @return array<int, array{chunks: int, groupKey: string|null}>
+     */
+    private function indexedFilesForOwner(array &$filesByOwner, int $ownerId): array
+    {
+        if (!isset($filesByOwner[$ownerId])) {
+            $filesByOwner[$ownerId] = $this->vectorStorage->getFilesWithChunks($ownerId);
+        }
+
+        return $filesByOwner[$ownerId];
+    }
+
+    /**
+     * @param array<string, true> $seenFolders
+     */
+    private function countSharedFolder(array &$seenFolders, int &$groups, int $ownerId, string $groupKey): void
+    {
+        $folderKey = $ownerId.':'.$groupKey;
+        if (isset($seenFolders[$folderKey])) {
+            return;
+        }
+        $seenFolders[$folderKey] = true;
+        ++$groups;
     }
 
     /**
@@ -353,6 +500,64 @@ final readonly class VectorSearchService
         }
 
         return array_pad($vector, self::QUERY_VECTOR_DIMENSION, 0.0);
+    }
+
+    /**
+     * The matched passage for one source chip. Null when the chunk is missing
+     * or the caller cannot read it.
+     *
+     * @return array{chunkId: string, fileId: int, fileName: string|null, groupKey: string, text: string, startLine: int, endLine: int}|null
+     */
+    public function passage(int $userId, string $chunkId): ?array
+    {
+        $chunkId = trim($chunkId);
+        if ('' === $chunkId) {
+            return null;
+        }
+        $result = $this->vectorStorage->findChunk($userId, $chunkId);
+        if (null === $result || '' === trim($result->text) || !$this->mayReadChunk($userId, $result)) {
+            return null;
+        }
+
+        return [
+            'chunkId' => (string) $result->chunkId,
+            'fileId' => $result->fileId,
+            'fileName' => $result->fileName,
+            'groupKey' => $result->groupKey,
+            'text' => $result->text,
+            'startLine' => $result->startLine,
+            'endLine' => $result->endLine,
+        ];
+    }
+
+    /**
+     * Own chunks are readable. A foreign chunk is readable only while a live
+     * share still grants this user that owner, folder, and file.
+     */
+    private function mayReadChunk(int $userId, VectorStorage\DTO\SearchResult $chunk): bool
+    {
+        $ownerId = $chunk->ownerId ?? 0;
+        if ($ownerId === $userId) {
+            return true;
+        }
+        if ($ownerId <= 0) {
+            return false;
+        }
+        foreach ($this->ragScopeResolver->resolve($userId, null) as $scope) {
+            if ($scope->ownerId !== $ownerId) {
+                continue;
+            }
+            if (null !== $scope->groupKey && $scope->groupKey !== $chunk->groupKey) {
+                continue;
+            }
+            if ([] !== $scope->fileIds && !in_array($chunk->fileId, $scope->fileIds, true)) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

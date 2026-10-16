@@ -32,7 +32,7 @@ variable "synaplan_version" {
   # Raised by scripts/set-release-version.mjs after every published release, so
   # a build with no arguments produces the image for the release this branch
   # ships. The release workflow still passes it explicitly.
-  default     = "4.8.2"
+  default     = "5.4.2"
   description = "Released SemVer version to bake in, without a leading v. Never a mutable tag: the first boot pins deploy/.env to exactly this value."
 
   validation {
@@ -172,7 +172,7 @@ build {
 
   # The file provisioner does not create parent directories.
   provisioner "shell" {
-    inline = ["mkdir -p /tmp/synaplan/deploy"]
+    inline = ["mkdir -p /tmp/synaplan/deploy /tmp/synaplan/_docker"]
   }
 
   # The portable deployment contract, unmodified. The Azure adapter calls these
@@ -197,6 +197,15 @@ build {
   provisioner "file" {
     source      = "${local.repo_root}/deploy/azure"
     destination = "/tmp/synaplan/deploy"
+  }
+
+  # compose.yaml bind-mounts ../_docker/centrifugo/config.json relative to
+  # deploy/, which on the VM is /opt/synaplan/_docker/.... Without this file
+  # Docker creates a directory at the mount point, Centrifugo never becomes
+  # healthy, and synaplan.service waits out its 30-minute start budget.
+  provisioner "file" {
+    source      = "${local.repo_root}/_docker/centrifugo"
+    destination = "/tmp/synaplan/_docker/centrifugo"
   }
 
   provisioner "shell" {

@@ -15,6 +15,7 @@ use App\Service\Document\DocumentOfficeMergeService;
 use App\Service\Document\Persist\DocumentRevisionService;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
+use App\Service\File\FileGroupDeletionService;
 use App\Service\File\FileHelper;
 use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
@@ -28,13 +29,14 @@ use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\ProcessModelHints;
 use App\Service\File\UploadOptions;
 use App\Service\Iam\KnowledgeFolderShareCleanup;
+use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
 use App\Service\Iam\SharedFileAccess;
 use App\Service\Media\MediaAccessTokenService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
-use App\Service\StorageQuotaService;
-use App\Service\WidgetService;
+use App\Service\Usage\StorageQuotaService;
+use App\Service\Widget\WidgetService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -53,6 +55,7 @@ class FileController extends AbstractController
     public function __construct(
         private FileUploadService $uploadService,
         private FileListService $fileListService,
+        private FileGroupDeletionService $fileGroupDeletionService,
         private FileStorageService $storageService,
         private StorageQuotaService $storageQuotaService,
         private RateLimitService $rateLimitService,
@@ -206,7 +209,7 @@ class FileController extends AbstractController
                         new OA\Property(property: 'files[]', type: 'array', items: new OA\Items(type: 'string', format: 'binary')),
                         new OA\Property(property: 'group_key', type: 'string', example: 'customer-support'),
                         new OA\Property(property: 'process_level', type: 'string', enum: ['store', 'extract', 'vectorize', 'full'], example: 'vectorize'),
-                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'whatsapp', 'widget', 'api', 'generated', 'compute'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/Outlook) should set this so the file is labelled by source. compute = result of a file-work run.'),
+                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'whatsapp', 'telegram', 'widget', 'api', 'generated', 'compute'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/Outlook) should set this so the file is labelled by source. compute = result of a file-work run.'),
                         new OA\Property(property: 'original_name', type: 'string', example: '/Shared/Q3 Report.pdf', description: 'The file name at the source, preserved even when the stored name is normalised. Falls back to the uploaded filename.'),
                         new OA\Property(property: 'source_id', type: 'string', example: '12345', description: 'Stable external id of the file at its source (e.g. the Nextcloud file id). Enables overwrite-in-place and bulk stale checks. Sent with a single file per request.'),
                         new OA\Property(property: 'source_etag', type: 'string', example: 'a1b2c3', description: 'External version/etag captured at ingest; a differing value reported later marks the knowledge copy stale.'),
@@ -936,6 +939,7 @@ class FileController extends AbstractController
         tags: ['Files'],
         parameters: [
             new OA\Parameter(name: 'group_key', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'shared_folder', in: 'query', required: false, description: 'Knowledge-folder resource id (ownerId:groupKey) shared with the caller. Lists that folder instead of the caller\'s own files.', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
             new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
@@ -960,27 +964,32 @@ class FileController extends AbstractController
         }
 
         $groupKey = $request->query->get('group_key');
+        $sharedFolder = $request->query->get('shared_folder');
+        $listUserId = (int) $user->getId();
+        $sharedMeta = null;
+        if (is_string($sharedFolder) && '' !== $sharedFolder) {
+            $parsed = KnowledgeFolderKind::parseId($sharedFolder);
+            if (null === $parsed || !$this->sharedFileAccess->canReadFolder($user, $sharedFolder)) {
+                return $this->json(['error' => 'Folder not found'], Response::HTTP_NOT_FOUND);
+            }
+            [$listUserId, $groupKey] = $parsed;
+            $sharedMeta = [
+                'resourceId' => $sharedFolder,
+                'canEdit' => $this->sharedFileAccess->canEditFolder($user, $sharedFolder),
+            ];
+        }
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
         $offset = ($page - 1) * $limit;
 
-        $filters = [
-            'search' => $request->query->get('search'),
-            'file_type' => $request->query->get('file_type'),
-            'source' => $request->query->get('source'),
-            'vector_state' => $request->query->get('vector_state'),
-            'origin_kind' => $request->query->get('origin_kind'),
-            'incoming' => $request->query->has('incoming') ? $request->query->getBoolean('incoming') : null,
-            'sort' => $request->query->get('sort'),
-            'date_from' => $request->query->getInt('date_from') ?: null,
-            'date_to' => $request->query->getInt('date_to') ?: null,
-        ];
+        $filters = $this->listingFilters($request);
 
-        $result = $this->fileListService->buildListing($user->getId(), $groupKey, $offset, $limit, $filters);
+        $result = $this->fileListService->buildListing($listUserId, is_string($groupKey) ? $groupKey : null, $offset, $limit, $filters);
 
         return $this->json([
             'success' => true,
             'files' => $result['files'],
+            'shared' => $sharedMeta,
             'pagination' => [
                 'page' => $page,
                 'limit' => $limit,
@@ -994,36 +1003,52 @@ class FileController extends AbstractController
     #[OA\Get(
         path: '/api/v1/files/groups',
         summary: 'Get file groups with counts',
+        description: 'Without filters, every folder is returned. The same search and file filters as GET /api/v1/files limit the list to folders that contain at least one matching file, and the count is the number of matching files.',
         tags: ['Files'],
+        parameters: [
+            new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search in file name and content', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'file_type', in: 'query', required: false, description: 'Filter by file extension(s), comma-separated for groups', schema: new OA\Schema(type: 'string', example: 'jpg,jpeg,png')),
+            new OA\Parameter(name: 'source', in: 'query', required: false, description: 'Filter by provenance source(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'nextcloud,outlook')),
+            new OA\Parameter(name: 'vector_state', in: 'query', required: false, description: 'Filter by vector state(s), comma-separated', schema: new OA\Schema(type: 'string', example: 'vectorized')),
+            new OA\Parameter(name: 'origin_kind', in: 'query', required: false, description: 'Filter by origin kind', schema: new OA\Schema(type: 'string', example: 'image')),
+            new OA\Parameter(name: 'incoming', in: 'query', required: false, description: 'Filter the Incoming inbox: 1 = only incoming, 0 = exclude incoming', schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(name: 'date_from', in: 'query', required: false, description: 'Unix timestamp lower bound', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'date_to', in: 'query', required: false, description: 'Unix timestamp upper bound', schema: new OA\Schema(type: 'integer')),
+        ],
         responses: [
             new OA\Response(response: 200, description: 'List of file groups'),
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
-    public function getFileGroups(#[CurrentUser] ?User $user): JsonResponse
+    public function getFileGroups(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
         try {
-            $merged = $this->fileRepository->getGroupCountsByUser($user->getId());
+            $filters = $this->listingFilters($request);
+            $merged = $this->fileRepository->getGroupCountsByUser($user->getId(), $filters);
 
-            try {
-                $vectorGroups = [];
-                $allChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
-                foreach ($allChunks as $info) {
-                    $gk = $info['groupKey'] ?? '';
-                    if ('' === $gk || 'DEFAULT' === $gk) {
-                        continue;
+            // Vector-only folders have no file row to match a type, source, or
+            // date filter, so they stay in the unfiltered library view only.
+            if (!$this->listingIsNarrowed($filters)) {
+                try {
+                    $vectorGroups = [];
+                    $allChunks = $this->vectorStorageFacade->getFilesWithChunks($user->getId());
+                    foreach ($allChunks as $info) {
+                        $gk = $info['groupKey'] ?? '';
+                        if ('' === $gk || 'DEFAULT' === $gk) {
+                            continue;
+                        }
+                        $vectorGroups[$gk] = ($vectorGroups[$gk] ?? 0) + 1;
                     }
-                    $vectorGroups[$gk] = ($vectorGroups[$gk] ?? 0) + 1;
+                    foreach ($vectorGroups as $gk => $count) {
+                        $merged[$gk] = max($merged[$gk] ?? 0, $count);
+                    }
+                } catch (\Throwable $e) {
+                    $this->logger->warning('FileController: Vector store group lookup failed', ['error' => $e->getMessage()]);
                 }
-                foreach ($vectorGroups as $gk => $count) {
-                    $merged[$gk] = max($merged[$gk] ?? 0, $count);
-                }
-            } catch (\Throwable $e) {
-                $this->logger->warning('FileController: Vector store group lookup failed', ['error' => $e->getMessage()]);
             }
 
             ksort($merged);
@@ -1035,6 +1060,68 @@ class FileController extends AbstractController
 
             return $this->json(['error' => 'Failed to load file groups'], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    #[Route('/groups', name: 'delete_group', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/v1/files/groups',
+        summary: 'Delete a knowledge folder, its files, and any leftover vector chunks',
+        tags: ['Files'],
+        parameters: [
+            new OA\Parameter(
+                name: 'group_key',
+                in: 'query',
+                required: true,
+                schema: new OA\Schema(type: 'string', example: 'Contracts')
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Folder deleted',
+                content: new OA\JsonContent(
+                    required: ['success', 'deleted_files', 'deleted_chunks'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'deleted_files', type: 'integer', example: 2),
+                        new OA\Property(property: 'deleted_chunks', type: 'integer', example: 14),
+                    ],
+                    type: 'object'
+                )
+            ),
+            new OA\Response(response: 400, description: 'Missing or invalid folder name'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 500, description: 'Folder could not be deleted'),
+        ]
+    )]
+    public function deleteGroup(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $raw = $request->query->get('group_key');
+        $groupKey = is_string($raw) ? trim($raw) : '';
+        if ('' === $groupKey || 'DEFAULT' === $groupKey || mb_strlen($groupKey) > 128) {
+            return $this->json(['error' => 'A folder name is required'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $result = $this->fileGroupDeletionService->deleteGroup($user->getId(), $groupKey);
+        } catch (\Throwable $e) {
+            $this->logger->error('FileController: Failed to delete folder', [
+                'group_key' => $groupKey,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json(['error' => 'Failed to delete folder'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->json([
+            'success' => true,
+            'deleted_files' => $result['deletedFiles'],
+            'deleted_chunks' => $result['deletedChunks'],
+        ]);
     }
 
     #[Route('/facets', name: 'facets', methods: ['GET'])]
@@ -1165,12 +1252,22 @@ class FileController extends AbstractController
         }
 
         $file = $this->fileRepository->find($id);
-        if (!$file || $file->getUserId() !== $user->getId()) {
+        if (!$file) {
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        $ownerId = $file->getUserId();
+        if ($ownerId !== $user->getId()) {
+            $groupKey = $file->getGroupKey();
+            $folderId = null !== $groupKey && '' !== $groupKey
+                ? KnowledgeFolderKind::resourceId($ownerId, $groupKey)
+                : '';
+            if ('' === $folderId || !$this->sharedFileAccess->canEditFolder($user, $folderId)) {
+                return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+            }
         }
 
         $this->documentRevisionService->deleteForFile($file);
-        $this->vectorStorageFacade->deleteByFile($user->getId(), $file->getId());
+        $this->vectorStorageFacade->deleteByFile($ownerId, $file->getId());
 
         if ($file->getFilePath()) {
             $this->storageService->deleteFile($file->getFilePath());
@@ -1178,7 +1275,7 @@ class FileController extends AbstractController
 
         $groupKey = $file->getGroupKey();
         $this->fileRepository->delete($file);
-        $this->folderShareCleanup->forgetIfEmpty($user->getId(), $groupKey);
+        $this->folderShareCleanup->forgetIfEmpty($ownerId, $groupKey);
 
         return $this->json(['success' => true, 'message' => 'File deleted successfully']);
     }
@@ -1770,6 +1867,50 @@ class FileController extends AbstractController
         }
 
         return $this->sharedFileAccess->canRead($user, $file);
+    }
+
+    /**
+     * @return array{search: ?string, file_type: ?string, source: ?string, vector_state: ?string, origin_kind: ?string, incoming: ?bool, sort: ?string, date_from: ?int, date_to: ?int}
+     */
+    private function listingFilters(Request $request): array
+    {
+        return [
+            'search' => $this->optionalQueryString($request, 'search'),
+            'file_type' => $this->optionalQueryString($request, 'file_type'),
+            'source' => $this->optionalQueryString($request, 'source'),
+            'vector_state' => $this->optionalQueryString($request, 'vector_state'),
+            'origin_kind' => $this->optionalQueryString($request, 'origin_kind'),
+            'incoming' => $request->query->has('incoming') ? $request->query->getBoolean('incoming') : null,
+            'sort' => $this->optionalQueryString($request, 'sort'),
+            'date_from' => $request->query->getInt('date_from') ?: null,
+            'date_to' => $request->query->getInt('date_to') ?: null,
+        ];
+    }
+
+    private function optionalQueryString(Request $request, string $key): ?string
+    {
+        $value = $request->query->get($key);
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * @param array{search?: ?string, file_type?: ?string, source?: ?string, vector_state?: ?string, origin_kind?: ?string, incoming?: ?bool, date_from?: ?int, date_to?: ?int} $filters
+     */
+    private function listingIsNarrowed(array $filters): bool
+    {
+        foreach (['search', 'file_type', 'source', 'vector_state', 'origin_kind'] as $key) {
+            $value = $filters[$key] ?? null;
+            if (is_string($value) && '' !== trim($value)) {
+                return true;
+            }
+        }
+
+        if (!empty($filters['date_from']) || !empty($filters['date_to'])) {
+            return true;
+        }
+
+        return null !== ($filters['incoming'] ?? null);
     }
 
     /**

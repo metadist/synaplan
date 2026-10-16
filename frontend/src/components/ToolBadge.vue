@@ -10,7 +10,7 @@
     @click="handleClick"
   >
     <Icon :icon="meta.icon" class="w-4 h-4 flex-shrink-0" />
-    <span class="font-medium leading-none">{{ $t(meta.labelKey) }}</span>
+    <span class="min-w-0 truncate font-medium leading-none">{{ $t(meta.labelKey) }}</span>
     <XMarkIcon v-if="removable" class="tool-badge__x w-4 h-4 flex-shrink-0" />
   </component>
 </template>

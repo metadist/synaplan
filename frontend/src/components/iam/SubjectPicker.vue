@@ -5,8 +5,12 @@
       v-model="query"
       type="search"
       autocomplete="off"
-      class="w-full px-3 py-2 text-sm rounded-lg border border-light-border/30 dark:border-dark-border/8 bg-[var(--bg-card)] txt-primary placeholder:txt-secondary min-h-[42px]"
-      :placeholder="$t('iam.dialog.searchPlaceholder')"
+      class="w-full px-3 py-2 text-sm rounded-xl border border-light-border/30 dark:border-dark-border/8 bg-[var(--bg-card)] txt-primary placeholder:txt-secondary min-h-[42px]"
+      :placeholder="
+        personScope === 'everyone'
+          ? $t('iam.dialog.searchPlaceholder')
+          : $t('iam.dialog.searchPlaceholderSharedGroup')
+      "
       :aria-expanded="panelOpen"
       aria-controls="iam-subject-results"
       data-testid="input-iam-subject-search"
@@ -27,7 +31,7 @@
         {{ $t('iam.dialog.searchFailed') }}
         <button
           type="button"
-          class="btn-secondary ml-2 px-3 py-1.5 rounded-lg text-sm font-medium"
+          class="btn-secondary ml-2 px-3 py-1.5 rounded-xl text-sm font-medium"
           data-testid="btn-iam-search-retry"
           @click="load"
         >
@@ -39,7 +43,11 @@
         class="px-3 py-2 text-sm txt-secondary"
         data-testid="text-iam-no-matches"
       >
-        {{ $t('iam.dialog.noMatches') }}
+        {{
+          personScope === 'everyone'
+            ? $t('iam.dialog.noMatches')
+            : $t('iam.dialog.noMatchesSharedGroup')
+        }}
       </p>
       <ul v-else class="space-y-0.5">
         <li v-for="subject in subjects" :key="`${subject.type}-${subject.id}`">
@@ -78,11 +86,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: IamSubject | null]
+  open: [value: boolean]
 }>()
 
 const { t } = useI18n()
 const query = ref('')
 const subjects = ref<IamSubject[]>([])
+const personScope = ref<'shared-group' | 'everyone'>('shared-group')
 const loaded = ref(false)
 const searchError = ref(false)
 const focused = ref(false)
@@ -91,9 +101,13 @@ let timer: ReturnType<typeof setTimeout> | null = null
 
 const panelOpen = computed(() => focused.value && (props.active === undefined || props.active))
 
+watch(panelOpen, (open) => emit('open', open))
+
 const load = async () => {
   try {
-    subjects.value = await iamApi.searchSubjects(query.value)
+    const result = await iamApi.searchSubjects(query.value)
+    subjects.value = result.subjects
+    personScope.value = result.personScope
     searchError.value = false
   } catch {
     subjects.value = []

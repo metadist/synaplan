@@ -13,7 +13,7 @@
     </div>
 
     <div class="absolute top-6 right-6 flex items-center gap-2" data-testid="section-controls">
-      <button class="h-9 px-3 rounded-lg icon-ghost text-xs font-medium" @click="cycleLanguage">
+      <button class="h-9 px-3 rounded-xl icon-ghost text-xs font-medium" @click="cycleLanguage">
         {{ currentLanguage.toUpperCase() }}
       </button>
     </div>
@@ -151,7 +151,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { supportedLanguages } from '@/i18n'
+import { cycleLocale } from '@/i18n'
 import { CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
 import { authReady } from '@/stores/auth'
@@ -197,11 +197,7 @@ const officeChannelAvailable = ref(false)
 const publicHost = ref<string>('')
 const clientPolicy = ref<PlatformClientPolicy | null>(null)
 
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
+const isDark = themeStore.isDark
 
 const currentLanguage = computed(() => locale.value)
 const userEmail = computed(() => authStore.user?.email ?? '')
@@ -235,12 +231,7 @@ const targetBaseUrl = computed(() => {
 const requestedRelay = computed(() => ((route.query.redirect as string | undefined) ?? '').trim())
 
 function cycleLanguage(): void {
-  const currentIndex = supportedLanguages.indexOf(
-    locale.value as (typeof supportedLanguages)[number]
-  )
-  const next = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
-  locale.value = next
-  localStorage.setItem('language', next)
+  void cycleLocale()
 }
 
 function loadOfficeJs(): Promise<OfficeApi | null> {

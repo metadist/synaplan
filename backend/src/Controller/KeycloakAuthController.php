@@ -2,12 +2,16 @@
 
 namespace App\Controller;
 
-use App\Service\ImpersonationService;
-use App\Service\OAuthLoginResponder;
-use App\Service\OAuthStateService;
-use App\Service\OidcTokenService;
+use App\Model\AccountLanguage;
+use App\Service\Auth\ImpersonationService;
+use App\Service\Auth\OAuthLoginResponder;
+use App\Service\Auth\OidcAccessDeniedException;
+use App\Service\Auth\OidcAuthorizeParams;
+use App\Service\Auth\OidcScopeResolver;
+use App\Service\Auth\OidcTokenService;
+use App\Service\Auth\TokenService;
+use App\Service\OAuth\OAuthStateService;
 use App\Service\OidcUserService;
-use App\Service\TokenService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -50,6 +54,8 @@ class KeycloakAuthController extends AbstractController
         private string $oidcScopes,
         private string $appUrl,
         private string $frontendUrl,
+        private OidcScopeResolver $oidcScopeResolver,
+        private OidcAuthorizeParams $oidcAuthorizeParams,
     ) {
         $this->appEnv = $_ENV['APP_ENV'] ?? 'prod';
     }
@@ -68,16 +74,33 @@ class KeycloakAuthController extends AbstractController
 
             $redirectUri = $this->appUrl.'/api/v1/auth/keycloak/callback';
 
+            $supported = $discovery['scopes_supported'] ?? null;
+            $resolved = $this->oidcScopeResolver->resolve(
+                $this->oidcScopes,
+                is_array($supported) ? $supported : null,
+            );
+            if ([] !== $resolved['replaced']) {
+                $this->logger->info('OIDC scope adjusted to match the provider', [
+                    'configured' => $this->oidcScopes,
+                    'requested' => $resolved['scopes'],
+                    'replaced' => $resolved['replaced'],
+                ]);
+            }
+
             // PKCE (RFC 7636): Generate code_verifier and code_challenge
             $codeVerifier = $this->generateCodeVerifier();
             $codeChallenge = $this->generateCodeChallenge($codeVerifier);
 
             // Native (mobile) clients open this in the system browser and need
             // the result via a deep link — remember that intent in the state.
-            $stateData = ['pkce_verifier' => $codeVerifier];
+            $stateData = [
+                'pkce_verifier' => $codeVerifier,
+                'scopes' => $resolved['scopes'],
+            ];
             if ($request->query->getBoolean('native')) {
                 $stateData['native'] = true;
             }
+            $stateData = AccountLanguage::withSignupLanguage($stateData, $request->query->get('language'));
 
             // Generate signed state token with PKCE verifier embedded (no session required)
             $state = $this->oauthStateService->generateState('keycloak', $stateData);
@@ -86,19 +109,20 @@ class KeycloakAuthController extends AbstractController
                 'client_id' => $this->oidcClientId,
                 'redirect_uri' => $redirectUri,
                 'response_type' => 'code',
-                'scope' => $this->oidcScopes,
+                'scope' => $resolved['scopes'],
                 'state' => $state,
                 // PKCE parameters (RFC 7636)
                 'code_challenge' => $codeChallenge,
                 'code_challenge_method' => 'S256', // SHA-256
             ];
+            $params += $this->oidcAuthorizeParams->params();
 
             $authUrl = $discovery['authorization_endpoint'].'?'.http_build_query($params);
 
             $this->logger->info('Keycloak OAuth login initiated with PKCE', [
                 'redirect_uri' => $redirectUri,
                 'pkce_enabled' => true,
-                'scopes' => $this->oidcScopes,
+                'scopes' => $resolved['scopes'],
             ]);
 
             return $this->redirect($authUrl);
@@ -136,9 +160,16 @@ class KeycloakAuthController extends AbstractController
     {
         $code = $request->query->get('code');
         $state = $request->query->get('state');
+        $oauthError = $request->query->get('error');
+
+        if (is_string($oauthError) && '' !== $oauthError) {
+            return $this->authorizationRejected($request, $oauthError);
+        }
 
         // Validate signed state token and extract PKCE verifier (no session required)
-        $statePayload = $state ? $this->oauthStateService->validateState($state, 'keycloak') : null;
+        $statePayload = is_string($state) && '' !== $state
+            ? $this->oauthStateService->validateState($state, 'keycloak')
+            : null;
 
         if (!$statePayload) {
             $this->logger->error('Keycloak OAuth state validation failed', [
@@ -192,13 +223,16 @@ class KeycloakAuthController extends AbstractController
             }
 
             if (!$refreshToken) {
-                $offlineRequested = str_contains($this->oidcScopes, 'offline_access');
+                $requestedScopes = is_string($statePayload['scopes'] ?? null)
+                    ? $statePayload['scopes']
+                    : $this->oidcScopes;
+                $offlineRequested = $this->oidcScopeResolver->requestsRefreshToken($requestedScopes);
                 $this->logger->log(
                     $offlineRequested ? 'warning' : 'info',
                     $offlineRequested
-                        ? 'No refresh token received despite requesting offline_access scope'
-                        : 'No refresh token received (offline_access not requested, app token provides fallback)',
-                    ['scopes_requested' => $this->oidcScopes],
+                        ? 'No refresh token received despite requesting a refresh scope'
+                        : 'No refresh token received (refresh scope not requested, app token provides fallback)',
+                    ['scopes_requested' => $requestedScopes],
                 );
             }
 
@@ -217,7 +251,11 @@ class KeycloakAuthController extends AbstractController
             ]);
 
             // Find or create user + sync roles via shared OIDC user service
-            $user = $this->oidcUserService->findOrCreateFromClaims($userInfo, $refreshToken);
+            $user = $this->oidcUserService->findOrCreateFromClaims(
+                $userInfo,
+                $refreshToken,
+                AccountLanguage::normalize($statePayload['language'] ?? null),
+            );
 
             // Native (mobile) cannot use cross-origin OIDC cookies — hand the app
             // its own Bearer tokens via the deep-link handoff. The Keycloak
@@ -266,6 +304,16 @@ class KeycloakAuthController extends AbstractController
             ]);
 
             return $response;
+        } catch (OidcAccessDeniedException) {
+            // The policy already logged the reason; the browser learns nothing
+            // about which rule failed, and no account was created. Clients that
+            // do not know the error code show this sentence as-is.
+            return $this->oauthLoginResponder->error(
+                'keycloak',
+                OidcAccessDeniedException::USER_MESSAGE,
+                $native,
+                ['error_code' => OidcAccessDeniedException::ERROR_CODE],
+            );
         } catch (\Exception $e) {
             // Log detailed error information for debugging
             $errorDetails = [
@@ -285,6 +333,32 @@ class KeycloakAuthController extends AbstractController
 
             return $this->oauthLoginResponder->error('keycloak', 'Failed to authenticate with Keycloak', $native);
         }
+    }
+
+    private function authorizationRejected(Request $request, string $oauthError): Response
+    {
+        $description = $request->query->get('error_description');
+        $description = is_string($description) ? $description : null;
+        $state = $request->query->get('state');
+        $statePayload = is_string($state) && '' !== $state
+            ? $this->oauthStateService->validateState($state, 'keycloak')
+            : null;
+        $native = (bool) ($statePayload['native'] ?? false);
+
+        $failure = $this->oidcScopeResolver->describeAuthorizationError($oauthError, $description);
+        $this->logger->warning('OIDC authorization rejected by the provider', [
+            'error' => $oauthError,
+            'error_description' => $description,
+            'scopes' => $this->oidcScopes,
+            'error_code' => $failure['code'],
+        ]);
+
+        $extra = ['error_code' => $failure['code']];
+        if (null !== $failure['scope']) {
+            $extra['scope'] = $failure['scope'];
+        }
+
+        return $this->oauthLoginResponder->error('keycloak', $failure['message'], $native, $extra);
     }
 
     private function getDiscoveryConfig(): array

@@ -22,6 +22,10 @@
         <IncognitoToggle />
       </div>
 
+      <!-- Soft top edge so messages fade instead of being cut off. Sits under
+           the floating chrome (z-30) and never takes taps. -->
+      <div class="chat-top-edge" aria-hidden="true" />
+
       <!-- Drag & Drop Overlay - covers entire chat area -->
       <Transition name="fade">
         <div
@@ -40,6 +44,8 @@
         </div>
       </Transition>
 
+      <LiveVoiceStage v-if="liveStage && !needsProviderSetup" v-bind="liveStage" />
+
       <!-- First-run: no usable AI provider — replace the chat, do not let
            the user send messages that can only fail with HTTP 500. -->
       <div
@@ -47,19 +53,19 @@
         class="flex-1 min-h-0 flex flex-col"
         data-testid="state-provider-setup"
       >
-        <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+        <LocalAiDownloadCard class="mx-auto max-w-[70rem] w-full px-4 pt-4" />
         <ProviderSetupBanner />
       </div>
 
       <div
         v-else
         ref="chatContainer"
-        class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
+        class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
         :class="{ 'flex flex-col items-center': isEmptyLanding }"
         data-testid="section-messages"
         @scroll="handleScroll"
       >
-        <div class="max-w-4xl mx-auto py-6 px-4" :class="{ 'my-auto w-full': isEmptyLanding }">
+        <div class="max-w-[70rem] mx-auto py-6 px-4" :class="{ 'my-auto w-full': isEmptyLanding }">
           <!-- Loading indicator for infinite scroll -->
           <div
             v-if="historyStore.isLoadingMessages"
@@ -133,7 +139,7 @@
                 <!-- Retrying a disabled trial can never succeed. -->
                 <button
                   v-if="!guestStore.guestChatDisabled"
-                  class="px-4 py-2 rounded-lg btn-brand text-sm font-medium"
+                  class="px-4 py-2 rounded-xl btn-brand text-sm font-medium"
                   @click="guestStore.retryInit()"
                 >
                   {{ $t('guest.retry') }}
@@ -155,7 +161,9 @@
           </div>
 
           <div
-            v-else-if="historyStore.messages.length === 0 && !historyStore.isLoadingMessages"
+            v-else-if="
+              historyStore.messages.length === 0 && !historyStore.isLoadingMessages && !liveStage
+            "
             class="flex flex-col items-center justify-center px-6 py-8 gap-6"
             data-testid="state-empty"
           >
@@ -166,13 +174,12 @@
               >
                 <Icon icon="mdi:incognito" class="w-6 h-6 txt-brand" aria-hidden="true" />
               </div>
-              <h2 class="text-2xl font-semibold txt-primary mb-2">
+              <h2 class="text-2xl font-semibold txt-primary mb-2 text-balance max-w-md mx-auto">
                 {{ emptyLandingTitle }}
               </h2>
               <p class="txt-secondary">
                 {{ emptyLandingHint }}
               </p>
-              <SelfAwareEmptyHint v-if="!pinnedAgentId" @ask="handleSendMessage" />
             </div>
 
             <!-- Speed config: the expanded mix card greets the user on every
@@ -192,7 +199,10 @@
               :prompts="pinnedStarterPrompts"
               @pick="handleExamplePick"
             />
-            <ExamplePrompts v-else-if="showExamplePrompts" @pick="handleExamplePick" />
+            <GettingStartedChecklist
+              v-if="authStore.isAuthenticated && !incognitoStore.active && !pinnedAgentId"
+            />
+            <SelfAwareEmptyHint v-if="showSelfAwareEmptyHint" @ask="handleExamplePick" />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
@@ -234,7 +244,10 @@
               :files="message.files"
               :document-changes="message.documentChanges"
               :document-fidelity-lossy="message.documentFidelityLossy"
+              :voice-reply-failed="message.voiceReplyFailed"
+              :read-aloud-failed="message.readAloudFailed"
               :search-results="message.searchResults"
+              :rag-sources="message.ragSources"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
               :memory-ids="message.memoryIds"
@@ -250,14 +263,21 @@
               :was-multitask="message.wasMultitask"
               :usage="message.usage"
               :usage-extra="message.usageExtra"
+              :versions="message.versions"
+              :edits="message.edits"
               :usage-taximeter-active="usageTaximeterStore.active"
               :is-guest-mode="isGuestMode"
+              :can-rewrite="canRewriteConversation"
               :foreign-memory="sharedConversationLocked"
               @regenerate="handleRegenerate(message, $event)"
               @again="handleAgain"
+              @select-version="selectMessageVersion"
+              @edit-message="editUserMessage(message, $event)"
+              @reattach-file="reattachMessageFile"
               @retry="handleRetryMessage(message, $event)"
               @retry-task="handleTaskRetry"
               @followup-task="handleTaskFollowup"
+              @ask-user="answerAskUser(message, $event)"
               @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
               @report="openReportModal"
@@ -274,7 +294,15 @@
       <!-- Usage taximeter: desktop rail + mobile ring. Gated by the admin
            master switch and authenticated (non-guest/widget) web usage; the
            two share one store and differ only by CSS breakpoint. -->
-      <template v-if="usageTaximeterStore.active && !needsProviderSetup">
+      <!-- A shared conversation must not show the viewer's own day spend as if
+           it were the cost of this chat (#2062). -->
+      <template
+        v-if="
+          usageTaximeterStore.active &&
+          !needsProviderSetup &&
+          chatsStore.conversationAccess === 'owner'
+        "
+      >
         <ConsumptionBar />
         <ConsumptionRing />
       </template>
@@ -326,10 +354,56 @@
           @always-allow="onChatApprovalAlwaysAllow"
         />
       </div>
+      <!-- Read-only viewers of a shared chat get no composer, but still see
+           the chat's files (open only, no attach or delete). -->
+      <div
+        v-if="
+          !needsProviderSetup &&
+          !canComposeSharedChat &&
+          !incognitoStore.active &&
+          conversationFiles.length > 0
+        "
+        class="flex max-w-[70rem] mx-auto w-full px-4 mb-3"
+        data-testid="section-conversation-files-readonly"
+      >
+        <ConversationFilesBar
+          :files="conversationFiles"
+          :can-attach="false"
+          :can-delete="false"
+          @preview="previewConversationFile"
+        />
+      </div>
+      <ChatFilePreview
+        :open="conversationPreview !== null"
+        :file="conversationPreview"
+        :guest-session-id="isGuestMode ? guestStore.sessionId : null"
+        :can-reattach="canComposeSharedChat && !isGuestMode"
+        @close="conversationPreview = null"
+        @download="conversationPreview && downloadConversationPreview()"
+        @reattach="
+          conversationPreview &&
+          attachConversationFile({
+            id: conversationPreview.id,
+            name: conversationPreview.filename,
+            fileType: '',
+          })
+        "
+      />
+      <ChatAccessErrorBanner
+        v-if="
+          !needsProviderSetup &&
+          !canComposeSharedChat &&
+          (chatsStore.conversationAccessFailed || retryingConversationAccess)
+        "
+        class="max-w-[70rem] mx-auto w-full px-4 mb-3"
+        :retrying="retryingConversationAccess"
+        @retry="retryConversationAccess"
+      />
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
         :is-streaming="isStreaming"
+        :send-locked="!assistantThreadReady"
         :is-guest-mode="isGuestMode"
         :banner-visible="
           showPendingPurchaseBanner ||
@@ -337,11 +411,25 @@
           Boolean(pinnedAgentId)
         "
         :quote="quoting.pendingQuote.value"
+        @budget-blocked="showLimitOrPaywall"
         @send="handleSendMessage"
         @stop="handleUserStop"
         @guest-feature-gate="handleGuestFeatureGate"
         @clear-quote="quoting.clearPendingQuote"
       >
+        <!-- The shared chat stays selected during incognito, so its files must
+             not become attachable or deletable from this session. -->
+        <template #beside-plus>
+          <ConversationFilesBar
+            v-if="!incognitoStore.active"
+            :files="conversationFiles"
+            :can-attach="canComposeSharedChat"
+            :can-delete="canComposeSharedChat && !isGuestMode"
+            @attach="attachConversationFile"
+            @preview="previewConversationFile"
+            @delete="deleteConversationFile"
+          />
+        </template>
         <!-- Native onboarding: a signed-out store purchase waiting to be
              linked to an account outranks the guest quota banner. -->
         <template #banner>
@@ -377,6 +465,15 @@
             <span class="txt-primary">
               {{ $t('assistants.talkingTo', { name: pinnedAssistantName }) }}
             </span>
+            <button
+              type="button"
+              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-pinned-assistant-stop"
+              @click="stopPinnedAssistant"
+            >
+              <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+              {{ $t('assistants.useDefaultModel') }}
+            </button>
           </div>
         </template>
       </ChatInput>
@@ -508,28 +605,31 @@
       @close="closeMemoryDeleteDialog"
       @confirm="confirmMemoryDelete"
     />
-
-    <!-- Memories List Dialog (for viewing all memories when clicking a memory badge) -->
-    <MemoriesDialog
-      :is-open="isMemoriesDialogOpen"
-      :highlight-memory-id="highlightedMemoryId"
-      @close="closeMemoriesDialog"
-    />
   </MainLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
+import {
+  ref,
+  computed,
+  nextTick,
+  watch,
+  onMounted,
+  onBeforeUnmount,
+  defineAsyncComponent,
+} from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
+import ChatAccessErrorBanner from '@/components/ChatAccessErrorBanner.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
-import ExamplePrompts from '@/components/ExamplePrompts.vue'
 import AssistantStarterPrompts from '@/components/assistants/AssistantStarterPrompts.vue'
 import SelfAwareEmptyHint from '@/components/chat/SelfAwareEmptyHint.vue'
+import LiveVoiceStage from '@/components/chat/LiveVoiceStage.vue'
 import { parsePlatformDocs } from '@/components/chat/refs/DocRefPill'
 import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
@@ -537,6 +637,12 @@ import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
+import {
+  openSourceMessage,
+  parseOpenMessageQuery,
+  parsePositiveQueryId,
+  type OpenMessageTarget,
+} from '@/composables/useScrollToMessage'
 import { useFirstRunSetup } from '@/composables/useFirstRunSetup'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
@@ -549,13 +655,22 @@ import {
 import { useChatsStore } from '@/stores/chats'
 import { iamApi } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { canComposeChat, isSharedConversationLocked } from '@/utils/sharedConversationLock'
+import { chatGoneStatus, continueOutcomeAfterRecheck } from '@/utils/chatAccessError'
+import {
+  attachmentIdsForEdit,
+  shouldReloadTranscriptAfterVersionLink,
+} from '@/utils/editTranscript'
 import SharedConversationBanner from '@/components/iam/SharedConversationBanner.vue'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useApprovalsStore } from '@/stores/approvals'
+import { useRealtimeStore } from '@/stores/realtime'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
+import ConversationFilesBar from '@/components/chat/ConversationFilesBar.vue'
+import { useConversationFiles } from '@/composables/useConversationFiles'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
@@ -564,7 +679,14 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
-import { shouldOpenFreshAssistantChat, usePinnedAssistant } from '@/composables/usePinnedAssistant'
+import { useSmartSearchStore } from '@/stores/smartSearch'
+import { isAgentsEnabled } from '@/composables/useAgentsFeature'
+import {
+  capturePinnedAgentForSend,
+  goToFreshChat,
+  shouldOpenFreshAssistantChat,
+  usePinnedAssistant,
+} from '@/composables/usePinnedAssistant'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
 import ModelMixControl from '@/components/chat/ModelMixControl.vue'
 import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
@@ -581,18 +703,33 @@ import {
 } from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 import { chatApi } from '@/services/api'
 import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
 import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
+import {
+  applyReadAloudFailed,
+  applyVoiceReplyFailed,
+  attachVoiceReplyAudio,
+  isTaskPlanSuppressedMediaStatus,
+  isVoiceReplyFailedReason,
+  shouldAutoplayVoiceReply,
+} from '@/utils/voiceReply'
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
+import { shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
+import { pickEmptyGreetingKey } from '@/utils/emptyGreeting'
+import { claimOwnedChatForSend } from '@/utils/claimOwnedChatForSend'
+import GettingStartedChecklist from '@/components/chat/GettingStartedChecklist.vue'
 import { AudioStreamer } from '@/utils/AudioStreamer'
+import { startBargeInMonitor } from '@/services/voice/bargeIn'
+import { createSmoothStream } from '@/utils/smoothStream'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import {
   chatErrorSuggestsOtherModel,
@@ -626,7 +763,6 @@ import {
 } from '@/services/api/feedbackApi'
 import type { Contradiction } from '@/services/api/feedbackApi'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
-import MemoriesDialog from '@/components/MemoriesDialog.vue'
 import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
 import PromoTipBanner from '@/components/PromoTipBanner.vue'
 import GuestBanner from '@/components/guest/GuestBanner.vue'
@@ -660,11 +796,69 @@ const route = useRoute()
 const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
 const { isPaywallOpen, paywallReason, shouldRemind, openPaywall, closePaywall } = usePaywallPrompt()
-const { error: showErrorToast, success: showSuccessToast } = useNotification()
+const {
+  error: showErrorToast,
+  success: showSuccessToast,
+  warning: notifyWarning,
+  info: notifyInfo,
+} = useNotification()
+const smartSearchStore = useSmartSearchStore()
 const { goToProviderSetup } = useFirstRunSetup()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
+const { files: conversationFiles, refresh: refreshConversationFiles } = useConversationFiles()
+const { confirm: confirmDialog } = useDialog()
+
+const conversationPreview = ref<{ id: number; filename: string } | null>(null)
+const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
+const previewConversationFile = (file: { id: number | null; name: string }) => {
+  if (file.id == null) return
+  conversationPreview.value = { id: file.id, filename: file.name }
+}
+const downloadConversationPreview = async () => {
+  const file = conversationPreview.value
+  if (!file) return
+  const { downloadFile } = await import('@/services/filesService')
+  await downloadFile(file.id, file.filename)
+}
+const attachConversationFile = (file: { id: number | null; name: string; fileType: string }) => {
+  if (file.id === null) {
+    return
+  }
+  chatInputRef.value?.attachExistingFile({
+    file_id: file.id,
+    filename: file.name,
+    file_type: file.fileType,
+  })
+}
+
+// Remove a file the chat can use, from the "Files in this chat" popover. This is
+// a permanent delete of the file (and its indexed knowledge), so it is gated
+// behind a confirm and reports honestly what did/did not happen (U3/U8).
+const deleteConversationFile = async (file: { id: number | null; name: string }) => {
+  if (file.id === null) {
+    return
+  }
+  const ok = await confirmDialog({
+    title: t('chat.conversationFiles.deleteConfirmTitle'),
+    message: t('chat.conversationFiles.deleteConfirmMessage', { name: file.name }),
+    danger: true,
+    confirmText: t('common.delete'),
+    cancelText: t('common.cancel'),
+  })
+  if (!ok) {
+    return
+  }
+  try {
+    const { deleteFile } = await import('@/services/filesService')
+    await deleteFile(file.id)
+    showSuccessToast(t('chat.conversationFiles.deleted'))
+    await refreshConversationFiles()
+  } catch {
+    showErrorToast(t('chat.conversationFiles.deleteFailed'))
+  }
+}
 const quoting = useMessageQuoting(chatContainer)
 const autoScroll = ref(true)
 // While streaming we pin the start of the answer to the top once it grows past
@@ -682,8 +876,8 @@ const isDragging = ref(false)
 const dragCounter = ref(0)
 const historyStore = useHistoryStore()
 const chatsStore = useChatsStore()
-const sharedConversationLocked = computed(
-  () => chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
+const sharedConversationLocked = computed(() =>
+  isSharedConversationLocked(chatsStore.conversationAccess, incognitoStore.active)
 )
 const sharedConversationAccess = computed(() =>
   chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
@@ -693,18 +887,30 @@ const sharedConversationAccess = computed(() =>
 const sharedConversationOwnerName = computed(
   () => chatsStore.conversationSource?.owner?.name?.trim() || null
 )
-const canComposeSharedChat = computed(() => {
-  if (isGuestMode.value) {
-    return true
+const canComposeSharedChat = computed(() =>
+  canComposeChat({
+    guest: isGuestMode.value,
+    incognito: incognitoStore.active,
+    access: chatsStore.conversationAccess,
+    sharingEnabled: isIamSharingEnabled(),
+    chatOpen: chatsStore.activeChatId != null,
+  })
+)
+// Owner-only writes (Again, Retry, Stop, task-plan controls). Unresolved
+// access stays null while the lookup is in flight or has failed, so it must
+// not count as owner — same rule as the composer.
+const canRewriteConversation = canComposeSharedChat
+
+const retryingConversationAccess = ref(false)
+const retryConversationAccess = async () => {
+  if (retryingConversationAccess.value) return
+  retryingConversationAccess.value = true
+  try {
+    await chatsStore.retryConversationAccess()
+  } finally {
+    retryingConversationAccess.value = false
   }
-  if (sharedConversationLocked.value) {
-    return false
-  }
-  if (chatsStore.conversationAccess === 'owner') {
-    return true
-  }
-  return !isIamSharingEnabled()
-})
+}
 
 const continueSharedConversation = async () => {
   const id = chatsStore.activeChatId
@@ -714,7 +920,19 @@ const continueSharedConversation = async () => {
     chatsStore.setActiveChat(copy.id)
     await chatsStore.loadChats()
     await chatsStore.loadConversationAccess(copy.id)
-  } catch {
+  } catch (error) {
+    if (chatGoneStatus(error)) {
+      await chatsStore.loadConversationAccess(id)
+      const outcome = continueOutcomeAfterRecheck(
+        chatsStore.activeChatId === id,
+        chatsStore.conversationAccess
+      )
+      if (outcome === 'released') return
+      if (outcome === 'read-only') {
+        showErrorToast(t('iam.continueNeedsUse'))
+        return
+      }
+    }
     showErrorToast(t('iam.continueFailed'))
   }
 }
@@ -723,6 +941,7 @@ const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const mediaJobsStore = useMediaJobsStore()
 const approvalsStore = useApprovalsStore()
+const realtimeStore = useRealtimeStore()
 const guestStore = useGuestStore()
 
 const chatPendingApprovals = computed(() =>
@@ -735,6 +954,7 @@ async function onChatApprovalApproved(id: number): Promise<void> {
   try {
     await approvalsStore.approve(id)
     showSuccessToast(t('approvals.approvedToast'))
+    void settleChatApproval(id)
   } catch {
     showErrorToast(t('approvals.decideFailed'))
   }
@@ -744,6 +964,7 @@ async function onChatApprovalRejected(id: number, reason: string): Promise<void>
   try {
     await approvalsStore.reject(id, reason)
     showSuccessToast(t('approvals.rejectedToast'))
+    void settleChatApproval(id)
   } catch {
     showErrorToast(t('approvals.decideFailed'))
   }
@@ -753,10 +974,49 @@ async function onChatApprovalAlwaysAllow(id: number): Promise<void> {
   try {
     await approvalsStore.approve(id, true)
     showSuccessToast(t('approvals.approvedToast'))
+    void settleChatApproval(id)
   } catch {
     showErrorToast(t('approvals.decideFailed'))
   }
 }
+
+/**
+ * Q1: the decided approval continues this thread. Only a healthy socket can be
+ * trusted to deliver the `approval.chat_continued` event: while realtime is
+ * connecting, reconnecting, or never connected, the event may be missed, so
+ * fall back to waiting for the worker outcome, then reload once — the reload
+ * is cheap and idempotent either way.
+ */
+async function settleChatApproval(id: number): Promise<void> {
+  if (isViewUnmounted) {
+    return
+  }
+  if (realtimeStore.state === 'connected') {
+    return // the approval.chat_continued event reloads the thread
+  }
+  const chatId = chatsStore.activeChatId
+  if (chatId == null) {
+    return
+  }
+  await approvalsStore.waitForOutcome(id)
+  if (isViewUnmounted) {
+    return
+  }
+  await historyStore.loadMessages(chatId)
+}
+
+// Q1: a decided chat approval appends a follow-up message to the thread —
+// from this card or from the Approvals inbox (J-TL-2). Reload the open chat
+// when its thread continued elsewhere.
+const stopContinuationListen = approvalsStore.onChatContinued((continuation) => {
+  if (isViewUnmounted) {
+    return
+  }
+  if (continuation.chatId !== chatsStore.activeChatId) {
+    return
+  }
+  void historyStore.loadMessages(continuation.chatId)
+})
 
 function ingestApprovalRequired(data: StreamUpdatePayload): void {
   if (!isApprovalsEnabled()) {
@@ -799,9 +1059,79 @@ const {
   agentId: pinnedAgentId,
   queryAgentId,
   name: pinnedAssistantName,
-  greeting: pinnedAssistantGreeting,
   starterPrompts: pinnedStarterPrompts,
 } = usePinnedAssistant()
+
+async function stopPinnedAssistant(): Promise<void> {
+  // A thread that already names the assistant keeps that pin on its messages.
+  // Leave it for an empty chat first, then drop the address pin, so the next
+  // message goes to the default model.
+  await chatsStore.findOrCreateEmptyChat()
+  await goToFreshChat(router, route)
+}
+
+// Start chat (?agentId=) may still be leaving the previous thread. Send stays
+// off until that empty chat is the one on screen, so the first message cannot
+// land in the last conversation.
+const assistantThreadReady = ref(queryAgentId.value == null || !isAgentsEnabled())
+let assistantChatBootstrapped = assistantThreadReady.value
+let suppressNextChatHistoryLoad = false
+let suppressBottomScrollForFocus = false
+let historyLoadedChatId: number | null = null
+// The history load the activeChatId watcher has in flight. The boot path joins
+// it instead of starting a second load for the same chat: a second load makes
+// the first response stale, so the spinner waits for the slower request.
+let watcherHistoryLoad: { chatId: number; done: Promise<void> } | null = null
+// False until the mount has settled the first chat selection.
+let chatBootSettled = false
+let programmaticMessageScroll = false
+let messageFocusGeneration = 0
+let messageFocusQueue: Promise<void> = Promise.resolve()
+const messageFocusIdleStops = new Set<() => void>()
+
+// A chat load that began before a message focus was requested must not pull
+// the view back to the bottom once that focus has already scrolled.
+function bottomScrollYieldsToFocus(focusAtStart: number): boolean {
+  return suppressBottomScrollForFocus || messageFocusGeneration !== focusAtStart
+}
+
+async function openFreshAssistantChatIfNeeded(): Promise<void> {
+  if (!queryAgentId.value || !isAgentsEnabled() || !authStore.isAuthenticated) {
+    assistantThreadReady.value = true
+    return
+  }
+  if (!shouldOpenFreshAssistantChat(queryAgentId.value, historyStore.messages)) {
+    assistantThreadReady.value = true
+    return
+  }
+  assistantThreadReady.value = false
+  const previousChatId = chatsStore.activeChatId
+  suppressNextChatHistoryLoad = true
+  try {
+    const chat = await chatsStore.findOrCreateEmptyChat()
+    const chatId = chat?.id ?? chatsStore.activeChatId
+    if (chatId && chatId !== previousChatId) {
+      await historyStore.loadMessages(chatId)
+    }
+  } finally {
+    if (chatsStore.activeChatId === previousChatId) {
+      suppressNextChatHistoryLoad = false
+    }
+    assistantThreadReady.value = true
+  }
+}
+
+function captureOutgoingAgentId(): number | null {
+  return capturePinnedAgentForSend(isAgentsEnabled(), queryAgentId.value, historyStore.messages)
+}
+
+function outgoingAgentId(explicit?: number | null): number | undefined {
+  if (explicit && explicit > 0) {
+    return explicit
+  }
+  return captureOutgoingAgentId() ?? undefined
+}
+
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
 
@@ -825,21 +1155,18 @@ const showPendingPurchaseBanner = computed(
     pendingPurchaseAtSetup && !pendingPurchaseBannerDismissed.value && !authStore.isAuthenticated
 )
 
-// Personalizes the empty-state heading with the user's first name (Personal
-// Information -> First Name) when they've set one; falls back to the
-// generic greeting for guests and users without a first name on file.
-const welcomeGreeting = computed(() => {
-  const firstName = authStore.user?.firstName?.trim()
-  return firstName ? t('welcomeUser', { name: firstName }) : t('welcome')
-})
+// Chosen once per visit. A refresh picks again; later store updates must not
+// swap the heading while the person is looking at the empty chat.
+const emptyGreetingKey = pickEmptyGreetingKey(Math.random())
+
 const emptyLandingTitle = computed(() => {
   if (incognitoStore.active) {
     return t('incognito.emptyTitle')
   }
-  if (pinnedAgentId.value) {
-    return pinnedAssistantGreeting.value || pinnedAssistantName.value || welcomeGreeting.value
+  if (pinnedAgentId.value && pinnedAssistantName.value) {
+    return pinnedAssistantName.value
   }
-  return welcomeGreeting.value
+  return t(`companionLinks.greetings.${emptyGreetingKey}`)
 })
 const emptyLandingHint = computed(() => {
   if (incognitoStore.active) {
@@ -911,16 +1238,32 @@ const isEmptyLanding = computed(
     !historyStore.isLoadingMessages
 )
 
-// Guest landing only — signed-in empty chats keep the greeting, no teaser cards.
-const showExamplePrompts = computed(
-  () => !authStore.isAuthenticated && !incognitoStore.active && !configStore.marketingNews.enabled
-)
+// A running live conversation puts its orb above the messages, and the
+// welcome cards step aside until the first words arrive.
+const liveStage = computed(() => chatInputRef.value?.liveStage ?? null)
 
 // Runtime-config first-run signal: the default chat model has no usable
 // provider. Replace the composer with a tombstone so a fresh install cannot
 // produce the cryptic HTTP 500 the old banner still allowed.
 const needsProviderSetup = computed(
   () => authStore.isAuthenticated && configStore.setup.chatReady === false
+)
+
+// Empty start page: the self-aware question is the one suggested action in
+// the first week after the account was created. A pinned assistant with its
+// own starters replaces it. It only shows when the composer can submit.
+const emptyLandingActions = computed(() => ({
+  incognito: incognitoStore.active,
+  hasPinnedAssistant: Boolean(pinnedAgentId.value),
+  starterPromptCount: pinnedStarterPrompts.value.length,
+  canCompose: canComposeSharedChat.value,
+  needsProviderSetup: needsProviderSetup.value,
+  hasAccount: authStore.isAuthenticated,
+  accountCreatedAt: authStore.user?.created ?? null,
+  nowMs: Date.now(),
+}))
+const showSelfAwareEmptyHint = computed(() =>
+  shouldShowSelfAwareEmptyHint(emptyLandingActions.value)
 )
 
 // --- Speed config (model mixes) -------------------------------------------
@@ -1062,6 +1405,94 @@ watch(
   { flush: 'post' }
 )
 
+// Smart Search fills the composer via `?prefill=` (slash commands). A URL
+// can only ever produce a draft. Sending ("Ask in chat") comes solely from
+// the in-memory store intent, so a crafted link cannot send on someone's
+// behalf.
+let deliveringSearchPrefill = false
+let deliveringSearchAsk = false
+
+watch(
+  [chatInputRef, () => route.query.prefill],
+  async ([input, prefill]) => {
+    if (deliveringSearchPrefill || !input || typeof prefill !== 'string' || prefill === '') {
+      return
+    }
+    deliveringSearchPrefill = true
+    try {
+      const nextQuery = { ...route.query }
+      delete nextQuery.prefill
+      delete nextQuery.send
+      await router.replace({ path: route.path, query: nextQuery })
+      chatInputRef.value?.setInputText(prefill)
+    } finally {
+      deliveringSearchPrefill = false
+    }
+  },
+  { flush: 'post' }
+)
+
+/** Opens the thread the question goes to. Returns false when there is none. */
+async function openThreadForSearchAsk(): Promise<boolean> {
+  // An incognito session stays incognito: the question joins the current
+  // in-memory conversation instead of a new, stored chat.
+  if (incognitoStore.active) {
+    return true
+  }
+
+  const previousChatId = chatsStore.activeChatId
+  // The chat-id watcher reloads history and would replace an optimistic
+  // user message. Skip that reload, load the empty thread ourselves, then send.
+  suppressNextChatHistoryLoad = true
+  const chat = await chatsStore.findOrCreateEmptyChat()
+  await nextTick()
+  if (!chat || chat.id === previousChatId) {
+    suppressNextChatHistoryLoad = false
+  }
+  if (!chat) {
+    return false
+  }
+  await historyStore.loadMessages(chat.id)
+  return true
+}
+
+async function deliverSearchAsk(text: string): Promise<void> {
+  if (text.startsWith('/')) {
+    chatInputRef.value?.setInputText(text)
+    notifyWarning(t('search.palette.ask.commandDraft'))
+    return
+  }
+  if (!(await openThreadForSearchAsk())) {
+    chatInputRef.value?.setInputText(text)
+    notifyWarning(t('search.palette.ask.notSent'))
+    return
+  }
+  const sent = (await chatInputRef.value?.submitText(text)) ?? false
+  if (!sent) {
+    notifyWarning(t('search.palette.ask.notSent'))
+  }
+}
+
+watch(
+  [chatInputRef, () => smartSearchStore.pendingAsk],
+  async ([input, pending]) => {
+    if (deliveringSearchAsk || !input || !pending) {
+      return
+    }
+    const text = smartSearchStore.takePendingAsk()
+    if (!text) {
+      return
+    }
+    deliveringSearchAsk = true
+    try {
+      await deliverSearchAsk(text)
+    } finally {
+      deliveringSearchAsk = false
+    }
+  },
+  { flush: 'post' }
+)
+
 function initChatShortcuts(): void {
   if (!isNativeApp()) {
     return
@@ -1096,6 +1527,7 @@ let attachedRunId: string | null = null
 // Chat currently marked as "still answering" in the sidebar by this view.
 let generatingChatId: number | null = null
 let currentAudioStreamer: AudioStreamer | null = null
+let stopBargeIn: (() => void) | null = null
 const isAudioStreaming = ref(false)
 
 // Processing status for real-time feedback
@@ -1238,10 +1670,6 @@ let deleteDialogTimer: number | null = null
 const deleteDialogAutoConfirmMs = 8000
 const deleteDialogQueue = ref<Array<UserMemory & { toastId: number }>>([])
 
-// Memories list dialog state (for viewing all memories)
-const isMemoriesDialogOpen = ref(false)
-const highlightedMemoryId = ref<number | null>(null)
-
 // Use mock data in development or when API is not available
 const useMockData = import.meta.env.VITE_USE_MOCK_DATA === 'true' || false
 
@@ -1274,9 +1702,11 @@ onMounted(async () => {
 
   if (!authStore.isAuthenticated) {
     await guestStore.initSession()
+    if (isViewUnmounted) return
 
     if (guestStore.chatId) {
       const rawMessages = await guestStore.loadMessages()
+      if (isViewUnmounted) return
       if (rawMessages.length > 0) {
         historyStore.clear()
         // Use the SAME row mapper as the authenticated reload path (issue
@@ -1286,6 +1716,7 @@ onMounted(async () => {
         const loaded: Message[] = rawMessages.map((m) => mapApiMessageRow(m))
         historyStore.messages.push(...loaded)
         await nextTick()
+        if (isViewUnmounted) return
         scrollToBottom()
       }
 
@@ -1294,6 +1725,7 @@ onMounted(async () => {
       void resumeActiveRunIfAny()
     }
 
+    if (isViewUnmounted) return
     const restricted = route.query.restricted as string | undefined
     if (restricted) {
       featureGateKey.value = restricted
@@ -1302,16 +1734,20 @@ onMounted(async () => {
     }
 
     setTimeout(() => {
+      if (isViewUnmounted) return
       if (chatInputRef.value?.textareaRef) {
         chatInputRef.value.textareaRef.focus()
       }
     }, 100)
 
+    if (isViewUnmounted) return
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
     window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
     window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
     window.addEventListener('open-message-reference', handleOpenMessageReferenceEvent)
     maybeRemindAboutUpgrade()
+    assistantThreadReady.value = true
+    assistantChatBootstrapped = true
     return
   }
 
@@ -1337,38 +1773,76 @@ onMounted(async () => {
   })
 
   await Promise.all([chatsLoaded, modelsLoaded])
+  // The user may already have left the chat. route.query would then be the
+  // page they are on, and router.replace would rewrite it. The same leftover
+  // boot is what warns that the composer ref is gone.
+  if (isViewUnmounted) return
 
-  // Deep link from Saved Tasks ("Run now" / "Show results"): /?chat=<id>
-  // opens the task's chat so the user sees the run's result. Without this
-  // the query was silently ignored and the view reopened the LAST ACTIVE
-  // chat — for a task saved from a chat turn that was the original prompt
-  // with the old output.
-  const requestedChatId = Number(route.query.chat)
-  const openedSpecificChat = Number.isInteger(requestedChatId) && requestedChatId > 0
+  // Deep link: /?chat=<id> opens that thread (Saved Tasks). Without it the
+  // view reopened the last active chat. /?chat=<id>&message=<id> also scrolls
+  // to that message (long-term memory and [Message:ID] badges). Both params
+  // are removed after handling so a reload does not jump again.
+  const focusTarget = parseOpenMessageQuery(route.query)
+  const requestedChatId = focusTarget?.chatId ?? parsePositiveQueryId(route.query.chat)
+  const openedSpecificChat = requestedChatId !== null
   if (openedSpecificChat) {
-    chatsStore.setActiveChat(requestedChatId)
-    router.replace({ query: { ...route.query, chat: undefined } })
+    void router.replace({
+      query: {
+        ...route.query,
+        chat: undefined,
+        ...(focusTarget ? { message: undefined } : {}),
+      },
+    })
   }
 
-  // If no active chat, create one
-  if (!chatsStore.activeChatId) {
-    await chatsStore.createChat('New Chat')
-  } else {
-    // Load messages for active chat
-    await historyStore.loadMessages(chatsStore.activeChatId)
-    // A turn that was still generating when the page was reloaded keeps
-    // writing into this bubble instead of being lost.
-    void resumeActiveRunIfAny()
+  if (focusTarget) {
+    await enqueueMessageFocus(focusTarget)
+  } else if (requestedChatId !== null) {
+    chatsStore.setActiveChat(requestedChatId)
   }
+  if (isViewUnmounted) return
+
+  // If no active chat, create one. A message deep link loads through
+  // enqueueMessageFocus, which owns that chat's history.
+  if (!focusTarget) {
+    const bootChatId = chatsStore.activeChatId
+    if (!bootChatId) {
+      await chatsStore.createChat('New Chat')
+    } else if (watcherHistoryLoad?.chatId === bootChatId) {
+      // The selection changed while the list was loading (boot restore or a
+      // New Chat click); the watcher loads this chat and resumes its run.
+      await watcherHistoryLoad.done
+    } else if (historyLoadedChatId !== bootChatId && !incognitoStore.active) {
+      // Load messages for active chat. An incognito session started during
+      // boot keeps its transcript; ending it loads this chat.
+      await historyStore.loadMessages(bootChatId)
+      if (isViewUnmounted) return
+      if (chatsStore.activeChatId !== null) {
+        historyLoadedChatId = chatsStore.activeChatId
+      }
+      // A turn that was still generating when the page was reloaded keeps
+      // writing into this bubble instead of being lost.
+      void resumeActiveRunIfAny()
+    }
+  }
+  if (isViewUnmounted) return
 
   // Start chat from an assistant must not reopen an unrelated last thread.
   // A ?chat= deep link (Saved Tasks) keeps that thread even if agentId is set.
-  if (
-    !openedSpecificChat &&
-    shouldOpenFreshAssistantChat(queryAgentId.value, historyStore.messages)
-  ) {
-    await chatsStore.findOrCreateEmptyChat()
+  // Send stays disabled until this returns, including when the decision is
+  // "stay on this chat".
+  try {
+    if (!openedSpecificChat) {
+      await openFreshAssistantChatIfNeeded()
+    }
+  } finally {
+    if (!isViewUnmounted) {
+      assistantThreadReady.value = true
+      assistantChatBootstrapped = true
+      chatBootSettled = true
+    }
   }
+  if (isViewUnmounted) return
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
   // freshly loaded history (no-op when the admin switch is off / not authed).
@@ -1377,12 +1851,17 @@ onMounted(async () => {
     usageTaximeterStore.seedFromHistory(historyStore.messages)
   }
 
-  // Scroll to newest message after initial load
+  // Scroll to newest message after initial load. A message deep link already
+  // scrolled to that message inside enqueueMessageFocus.
   await nextTick()
-  scrollToBottom(true)
+  if (isViewUnmounted) return
+  if (!focusTarget) {
+    scrollToBottom(true)
+  }
 
   // Auto-focus ChatInput after mounting with delay
   setTimeout(() => {
+    if (isViewUnmounted) return
     if (chatInputRef.value?.textareaRef) {
       chatInputRef.value.textareaRef.focus()
     } else {
@@ -1410,8 +1889,14 @@ onMounted(async () => {
 })
 
 const handleVisibilityChangeForToken = () => {
-  if (document.visibilityState === 'visible') {
-    prefetchSseToken()
+  if (document.visibilityState !== 'visible') return
+  prefetchSseToken()
+  const chatId = chatsStore.activeChatId
+  const access = chatsStore.conversationAccess
+  if (chatsStore.conversationAccessFailed) {
+    void retryConversationAccess()
+  } else if (chatId && (access === 'read' || access === 'use')) {
+    void chatsStore.loadConversationAccess(chatId)
   }
 }
 
@@ -1451,7 +1936,7 @@ const handleKeyboardInsetChange = () => {
 }
 window.addEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
 
-// Window event handler for memory dialog (used by MessageText.vue)
+// Window event handler for memory badges (used by MessageText.vue)
 const handleOpenMemoryDialogEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ memory: UserMemory }>
   if (customEvent.detail?.memory) {
@@ -1476,17 +1961,146 @@ const handleOpenFirstRunSetupEvent = () => {
   void goToProviderSetup()
 }
 
-// Window event handler for [Message:ID] digest badges (used by MessageText.vue):
-// open the older conversation the reference points into.
+function waitForMessagesIdle(): Promise<void> {
+  if (!historyStore.isLoadingMessages) return Promise.resolve()
+  return new Promise((resolve) => {
+    let settled = false
+    let stop: (() => void) | undefined
+    const finish = () => {
+      if (settled) return
+      settled = true
+      stop?.()
+      messageFocusIdleStops.delete(finish)
+      resolve()
+    }
+    stop = watch(
+      () => historyStore.isLoadingMessages,
+      (loading) => {
+        if (!loading) finish()
+      }
+    )
+    messageFocusIdleStops.add(finish)
+    if (!historyStore.isLoadingMessages) finish()
+  })
+}
+
+async function prepareChatForMessage(
+  chatId: number,
+  isCancelled: () => boolean
+): Promise<'ready' | 'gone'> {
+  if (isCancelled()) return 'ready'
+
+  if (incognitoStore.active) {
+    await incognitoStore.endSession()
+    await nextTick()
+    if (historyStore.isLoadingMessages) await waitForMessagesIdle()
+    await nextTick()
+  }
+  if (isCancelled()) return 'ready'
+
+  if (chatsStore.activeChatId !== chatId) {
+    suppressNextChatHistoryLoad = true
+    chatsStore.setActiveChat(chatId)
+    await nextTick()
+    if (historyStore.isLoadingMessages) await waitForMessagesIdle()
+  }
+  if (isCancelled()) return 'ready'
+  if (chatsStore.activeChatId !== chatId) return 'gone'
+  if (historyStore.isLoadingMessages) await waitForMessagesIdle()
+  if (isCancelled()) return 'ready'
+  if (chatsStore.activeChatId !== chatId) return 'gone'
+
+  if (historyLoadedChatId !== chatId) {
+    await historyStore.loadMessages(chatId)
+    if (isCancelled()) return 'ready'
+    if (chatsStore.activeChatId !== chatId) return 'gone'
+    historyLoadedChatId = chatId
+    void resumeActiveRunIfAny()
+    if (usageTaximeterStore.active) {
+      usageTaximeterStore.seedFromHistory(historyStore.messages)
+    }
+  }
+
+  await nextTick()
+  return chatsStore.activeChatId === chatId ? 'ready' : 'gone'
+}
+
+function findLoadedMessageElement(messageId: number): HTMLElement | null {
+  const root = chatContainer.value
+  if (!root) return null
+  return root.querySelector<HTMLElement>(
+    `[data-testid="message-container"][data-message-id="${messageId}"]`
+  )
+}
+
+function enqueueMessageFocus(target: OpenMessageTarget): Promise<void> {
+  const generation = ++messageFocusGeneration
+  const isCancelled = () => generation !== messageFocusGeneration || isViewUnmounted
+  const run = messageFocusQueue.then(async () => {
+    if (isCancelled() || !authStore.isAuthenticated) return
+    suppressBottomScrollForFocus = true
+    try {
+      await openSourceMessage(target, {
+        ensureChatReady: (chatId) => prepareChatForMessage(chatId, isCancelled),
+        isMessageLoaded: (messageId) =>
+          historyStore.messages.some((message) => message.backendMessageId === messageId),
+        hasMoreMessages: () => historyStore.hasMoreMessages,
+        loadOlderMessages: async () => {
+          const chatId = chatsStore.activeChatId
+          if (chatId === null) return
+          await historyStore.loadMoreMessages(chatId)
+        },
+        loadedCount: () => historyStore.messages.length,
+        findElement: findLoadedMessageElement,
+        nextTick: () => nextTick(),
+        beforeScroll: () => {
+          programmaticMessageScroll = true
+        },
+        afterScroll: () => {
+          if (chatContainer.value) {
+            expectedScrollTop = chatContainer.value.scrollTop
+          }
+          autoScroll.value = false
+          stickToBottom = false
+          programmaticMessageScroll = false
+        },
+        notifyMissing: () => {
+          notifyInfo(t('messageRefs.notFound'))
+        },
+        isCancelled,
+      })
+    } finally {
+      if (generation === messageFocusGeneration) suppressBottomScrollForFocus = false
+    }
+  })
+  messageFocusQueue = run.then(
+    () => undefined,
+    () => undefined
+  )
+  return run
+}
+
+// [Message:ID] badges and `/?chat=&message=` both land here.
 const handleOpenMessageReferenceEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ messageId: number; chatId: number }>
   const chatId = customEvent.detail?.chatId
-  if (!chatId || chatId <= 0) return
-  if (chatsStore.activeChatId === chatId) return
-
-  chatsStore.setActiveChat(chatId)
-  void historyStore.loadMessages(chatId)
+  const messageId = customEvent.detail?.messageId
+  if (!chatId || chatId <= 0 || !messageId || messageId <= 0) return
+  void enqueueMessageFocus({ chatId, messageId })
 }
+
+watch(
+  () => [route.query.chat, route.query.message] as const,
+  () => {
+    if (!assistantChatBootstrapped) return
+    const target = parseOpenMessageQuery(route.query)
+    if (!target) return
+    void router.replace({
+      query: { ...route.query, chat: undefined, message: undefined },
+    })
+    void enqueueMessageFocus(target)
+  }
+)
 
 // Detach (do NOT cancel) a running turn when the user navigates away or
 // switches chats (issues #1142 / #1223 / #1225). Closes the SSE connection and
@@ -1494,7 +2108,14 @@ const handleOpenMessageReferenceEvent = (event: Event) => {
 // finishes in the background and is restored by loadMessages() on return.
 // Explicit cancellation stays in handleUserStop() (the Stop button).
 function handleNavigateAway() {
+  const runId = attachedRunId
+  const chatId = generatingChatId
   finishStreamingTurnLocally()
+  // The visible stream is gone, but the turn keeps running. Follow it quietly
+  // so the sidebar dot and the generated title update when it finishes.
+  if (!isGuestMode.value && !incognitoStore.active && runId && chatId) {
+    chatsStore.watchDetachedRun(chatId, runId)
+  }
 }
 
 /**
@@ -1556,6 +2177,11 @@ function clearGeneratingMark() {
  * itself instead of leaving the user on a bare prompt until it is persisted.
  */
 async function resumeActiveRunIfAny() {
+  // This view is about to render the turn itself. Drop the quiet watcher
+  // first so the same run is not attached twice.
+  if (chatsStore.activeChatId) {
+    chatsStore.stopDetachedRunWatch(chatsStore.activeChatId)
+  }
   const run = isGuestMode.value ? guestStore.activeRun : historyStore.activeRun
   if (!run) return
 
@@ -1590,6 +2216,7 @@ async function resumeActiveRunIfAny() {
 onBeforeUnmount(() => {
   isViewUnmounted = true
   mediaJobsStore.unsubscribe()
+  stopContinuationListen()
   handleNavigateAway()
   // Leaving the chat surface ends an incognito session: the transcript is
   // discarded and the session's ephemeral files are deleted (best effort —
@@ -1610,6 +2237,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
   window.removeEventListener('open-message-reference', handleOpenMessageReferenceEvent)
+  for (const stop of messageFocusIdleStops) stop()
+  messageFocusIdleStops.clear()
   if (stopShortcutListen) {
     stopShortcutListen()
     stopShortcutListen = null
@@ -1628,12 +2257,14 @@ onBeforeUnmount(() => {
 watch(
   () => incognitoStore.active,
   async (active) => {
+    const focusAtStart = messageFocusGeneration
     // Detach any running turn (same semantics as switching chats).
     if (isStreaming.value) {
       handleNavigateAway()
     }
     quoting.clearPendingQuote()
     historyStore.clear()
+    historyLoadedChatId = null
 
     if (!active) {
       // Session ended: restore the persisted chat. No toast here — the UI
@@ -1641,11 +2272,16 @@ watch(
       // confirmation toast would just be noise.
       if (chatsStore.activeChatId) {
         await historyStore.loadMessages(chatsStore.activeChatId)
+        if (chatsStore.activeChatId !== null) {
+          historyLoadedChatId = chatsStore.activeChatId
+        }
       }
     }
 
     await nextTick()
-    scrollToBottom(true)
+    if (!bottomScrollYieldsToFocus(focusAtStart)) {
+      scrollToBottom(true)
+    }
     setTimeout(() => {
       chatInputRef.value?.textareaRef?.focus()
     }, 100)
@@ -1656,11 +2292,17 @@ watch(
 watch(
   () => chatsStore.activeChatId,
   async (newChatId, oldChatId) => {
+    const focusAtStart = messageFocusGeneration
+    // The first selection while the view boots (from no chat) is the list
+    // arriving, not a pick. An incognito session started meanwhile keeps its
+    // transcript; ending that session restores this chat.
+    const bootSelectionUnderIncognito =
+      oldChatId == null && !chatBootSettled && incognitoStore.active
     // Picking a chat from the sidebar while incognito is active ends the
     // session (the incognito transcript is meant to be discarded). The
     // incognito watcher above restores nothing here — this watcher loads the
     // newly selected chat below.
-    if (oldChatId !== newChatId && incognitoStore.active) {
+    if (oldChatId !== newChatId && incognitoStore.active && !bootSelectionUnderIncognito) {
       void incognitoStore.endSession()
     }
 
@@ -1697,22 +2339,48 @@ watch(
       // Note: Don't call historyStore.clear() here!
       // loadMessages() replaces messages when offset=0, making clear() redundant.
       // Calling clear() first causes empty chat if loadMessages() fails silently.
-      await historyStore.loadMessages(newChatId)
+      // Start chat loads this history itself and keeps Send locked until it
+      // finishes; skipping the second load avoids wiping the first message.
+      // A message deep link sets the skip so it can await its own load.
+      if (oldChatId !== newChatId) {
+        historyLoadedChatId = null
+      }
+      const skippedHistoryLoad = suppressNextChatHistoryLoad || bootSelectionUnderIncognito
+      if (suppressNextChatHistoryLoad) {
+        suppressNextChatHistoryLoad = false
+      } else if (!bootSelectionUnderIncognito) {
+        const done = historyStore.loadMessages(newChatId)
+        watcherHistoryLoad = { chatId: newChatId, done }
+        try {
+          await done
+        } finally {
+          if (watcherHistoryLoad?.done === done) watcherHistoryLoad = null
+        }
+        if (chatsStore.activeChatId === newChatId) {
+          historyLoadedChatId = newChatId
+        }
+      }
 
       // Coming back to a chat whose turn is still generating: keep watching it
       // live. A different chat means a different run, so the previous
-      // attachment no longer applies.
+      // attachment no longer applies. The message deep link resumes after its
+      // own load; doing it here would attach to the previous transcript.
       attachedRunId = null
-      void resumeActiveRunIfAny()
+      if (!skippedHistoryLoad) {
+        void resumeActiveRunIfAny()
+      }
 
       // Usage taximeter: a chat switch resets the session (not the day totals)
-      // and rebuilds it from the newly loaded history.
-      if (usageTaximeterStore.active) {
+      // and rebuilds it from the newly loaded history. A message deep link
+      // loads that history itself and seeds after the load.
+      if (!skippedHistoryLoad && usageTaximeterStore.active) {
         usageTaximeterStore.seedFromHistory(historyStore.messages)
       }
 
       await nextTick()
-      scrollToBottom(true)
+      if (!bottomScrollYieldsToFocus(focusAtStart)) {
+        scrollToBottom(true)
+      }
 
       // Auto-focus input when switching chats
       setTimeout(() => {
@@ -1725,12 +2393,14 @@ watch(
 )
 
 watch(queryAgentId, async (id) => {
-  if (!id || !authStore.isAuthenticated) {
+  if (!assistantChatBootstrapped) {
     return
   }
-  if (shouldOpenFreshAssistantChat(id, historyStore.messages)) {
-    await chatsStore.findOrCreateEmptyChat()
+  if (!id || !authStore.isAuthenticated) {
+    assistantThreadReady.value = true
+    return
   }
+  await openFreshAssistantChatIfNeeded()
 })
 
 const userTextBefore = (messageId: string | number): string => {
@@ -1839,7 +2509,7 @@ const handleDrop = async (event: DragEvent) => {
 }
 
 const handleScroll = async () => {
-  if (!chatContainer.value) return
+  if (!chatContainer.value || programmaticMessageScroll) return
 
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
 
@@ -2306,8 +2976,9 @@ const handleContinueResponse = async (message: Message) => {
   }
 
   const trackId = Date.now()
-  let streamingRafId: number | null = null
-  let streamingDirty = false
+  const continueSmoother = createSmoothStream({
+    onRender: (text) => renderStreamingContent(text, message.id),
+  })
 
   const stopStreaming = chatApi.streamMessage({
     userId,
@@ -2316,20 +2987,11 @@ const handleContinueResponse = async (message: Message) => {
     trackId,
     language: locale.value,
     continueMessageId: message.backendMessageId,
-    agentId: pinnedAgentId.value ?? undefined,
+    agentId: outgoingAgentId(),
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
         fullContent += data.chunk
-
-        streamingDirty = true
-        if (streamingRafId === null) {
-          streamingRafId = requestAnimationFrame(() => {
-            streamingRafId = null
-            if (!streamingDirty) return
-            streamingDirty = false
-            renderStreamingContent(fullContent, message.id)
-          })
-        }
+        continueSmoother.push(fullContent)
       } else if (data.status === 'reasoning' && data.chunk) {
         const msg = historyStore.messages.find((m) => m.id === message.id)
         if (msg) {
@@ -2347,11 +3009,7 @@ const handleContinueResponse = async (message: Message) => {
           reasoningPart.content += data.chunk
         }
       } else if (data.status === 'complete') {
-        if (streamingRafId !== null) {
-          cancelAnimationFrame(streamingRafId)
-          streamingRafId = null
-        }
-
+        continueSmoother.flush()
         renderStreamingContent(fullContent, message.id)
 
         if (data.truncated) {
@@ -2380,6 +3038,8 @@ const handleContinueResponse = async (message: Message) => {
           void historyStore.reconcileMessage(message.id, message.backendMessageId)
         }
       } else if (data.status === 'error') {
+        continueSmoother.flush()
+        continueSmoother.cancel()
         message.truncated = true
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
@@ -2388,7 +3048,11 @@ const handleContinueResponse = async (message: Message) => {
     },
   })
 
-  stopStreamingFn = stopStreaming
+  stopStreamingFn = () => {
+    continueSmoother.flush()
+    continueSmoother.cancel()
+    stopStreaming()
+  }
 }
 
 interface PluginChatRoute {
@@ -2420,7 +3084,22 @@ const matchPluginChatCommand = (content: string): PluginChatRoute | null => {
  * the AI message pipeline, so no classifier/characterization change is needed.
  */
 const runPluginChatCommand = async (route: PluginChatRoute, text: string): Promise<void> => {
-  historyStore.addMessage('user', [{ type: 'text' as const, content: text }])
+  const pinnedForTurn = captureOutgoingAgentId()
+  historyStore.addMessage(
+    'user',
+    [{ type: 'text' as const, content: text }],
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    null,
+    null,
+    null,
+    null,
+    pinnedForTurn
+  )
   const userId = authStore.user?.id
   if (!userId) {
     return
@@ -2448,6 +3127,7 @@ const handleSendMessage = async (
   content: string,
   options?: {
     includeReasoning?: boolean
+    reasoningEffort?: string
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
@@ -2456,6 +3136,8 @@ const handleSendMessage = async (
     quotedText?: string
     quotedMessageId?: number
     language?: string
+    /** Assistant captured before the optimistic user message is appended. */
+    agentId?: number | null
   }
 ) => {
   if (needsProviderSetup.value) {
@@ -2468,6 +3150,37 @@ const handleSendMessage = async (
   if (pluginRoute) {
     await runPluginChatCommand(pluginRoute, content.trim())
     return
+  }
+
+  // A blank page has no chat yet. Open one before the message appears.
+  // The history load for that chat finishes first, so it cannot replace the
+  // message that follows.
+  if (!incognitoStore.active && !isGuestMode.value) {
+    const previousId = chatsStore.activeChatId
+    const chatId = await claimOwnedChatForSend({
+      activeChatId: previousId,
+      suppressHistoryLoad: () => {
+        suppressNextChatHistoryLoad = true
+      },
+      releaseHistoryLoad: () => {
+        suppressNextChatHistoryLoad = false
+      },
+      openOwnedChat: async () => {
+        await chatsStore.findOrCreateEmptyChat()
+      },
+      readActiveChatId: () => chatsStore.activeChatId,
+    })
+    if (chatId == null) {
+      showErrorToast(t('chat.sendNeedsChat'))
+      return
+    }
+    if (previousId == null) {
+      await historyStore.loadMessages(chatId)
+      if (chatsStore.activeChatId !== chatId) {
+        return
+      }
+      historyLoadedChatId = chatId
+    }
   }
 
   autoScroll.value = true
@@ -2592,6 +3305,10 @@ const handleSendMessage = async (
     }
   }
 
+  // Capture before addMessage. The optimistic row has no assistant yet, and
+  // resolvePinnedAgentId() treats any unstamped message as "this thread is
+  // not an assistant chat", which drops the ?agentId= pin on the first send.
+  const pinnedForTurn = options?.agentId ?? captureOutgoingAgentId()
   historyStore.addMessage(
     'user',
     optimisticParts,
@@ -2604,7 +3321,8 @@ const handleSendMessage = async (
     webSearchData, // webSearch
     toolData, // tool
     options?.quotedText ?? null, // quotedText
-    options?.quotedMessageId ?? null // quotedMessageId
+    options?.quotedMessageId ?? null, // quotedMessageId
+    pinnedForTurn
   )
 
   // Lift the active chat to the top of the sidebar lists right away so the
@@ -2625,7 +3343,7 @@ const handleSendMessage = async (
   promoTips.onMessageSent()
 
   // Stream to backend - use backendContent which may differ from displayContent
-  await streamAIResponse(backendContent, options)
+  await streamAIResponse(backendContent, { ...options, agentId: pinnedForTurn })
 }
 
 /**
@@ -2681,6 +3399,7 @@ function applyAssistantChatModelFooter(
   // through whenever the backend ships it so the voice-reply badge
   // appears live (no page reload required). See issue #583.
   const nestedAudio = data.aiModels?.audio
+  const nestedVoice = data.aiModels?.voice
 
   if (resolvedModel && resolvedProvider) {
     message.modelLabel = resolvedModel
@@ -2693,12 +3412,14 @@ function applyAssistantChatModelFooter(
       },
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
       ...(nestedAudio ? { audio: nestedAudio } : {}),
+      ...(nestedVoice ? { voice: nestedVoice } : {}),
     }
-  } else if (nestedChat || nestedSorting || nestedAudio) {
+  } else if (nestedChat || nestedSorting || nestedAudio || nestedVoice) {
     message.aiModels = {
       ...(nestedChat ? { chat: nestedChat } : {}),
       ...(nestedSorting ? { sorting: nestedSorting } : {}),
       ...(nestedAudio ? { audio: nestedAudio } : {}),
+      ...(nestedVoice ? { voice: nestedVoice } : {}),
     }
   }
 }
@@ -2729,19 +3450,70 @@ function buildIncognitoHistorySnapshot(): IncognitoHistoryEntry[] {
   return entries
 }
 
+/**
+ * The stream starts and returns before the server has saved the new answer.
+ * Linking immediately used the previous answer's id and rejected the request
+ * ("An answer cannot be a version of itself"), which crashed the chat.
+ * Call this from the complete/error handler, after that id exists.
+ */
+async function reloadEditedTranscript(editedChatId: number | undefined): Promise<void> {
+  if (
+    editedChatId == null ||
+    !shouldReloadTranscriptAfterVersionLink({
+      kind: 'edit',
+      incognito: incognitoStore.active,
+      editedChatId,
+      activeChatId: chatsStore.activeChatId,
+    })
+  ) {
+    return
+  }
+  await historyStore.loadMessages(editedChatId)
+}
+
+function recordVersionLink(
+  link: { kind: 'again' | 'edit'; previousId: number } | undefined,
+  createdId: number | undefined,
+  editedChatId: number | undefined
+): void {
+  if (!link || !createdId || createdId === link.previousId) return
+  void (async () => {
+    try {
+      // Again must not reload: a reload while the next Again is opening
+      // replaces that bubble and closes its model list. An edit reloads
+      // after the link so the open transcript matches the saved question.
+      // A chat switch during the stream must not load this chat over the
+      // one the person is looking at now. A failed link reloads too, so
+      // the optimistic wording does not stay when the server kept the
+      // previous question.
+      await chatApi.linkTurn(createdId, link.kind, link.previousId)
+      if (link.kind === 'edit') await reloadEditedTranscript(editedChatId)
+    } catch (err) {
+      console.error('Failed to record the answer version', err)
+      showErrorToast(t('chat.versionLinkFailed'))
+      if (link.kind === 'edit') await reloadEditedTranscript(editedChatId)
+    }
+  })()
+}
+
 const streamAIResponse = async (
   userMessage: string,
   options?: {
     includeReasoning?: boolean
+    reasoningEffort?: string
     webSearch?: boolean
     modelId?: number
     fileIds?: number[]
     voiceReply?: boolean
     isAgain?: boolean
+    /** Record this answer as a version once the server has saved it. */
+    linkVersion?: { kind: 'again' | 'edit'; previousId: number }
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
     language?: string
+    /** Assistant for this turn, captured before the optimistic user row exists. */
+    agentId?: number | null
     /**
      * Re-attach to a turn already generating on the server instead of starting
      * a new one. `userMessage` is then irrelevant — nothing is sent, the client
@@ -2761,6 +3533,13 @@ const streamAIResponse = async (
     aiConfigStore.getCurrentModel('CHAT')
   const provider = currentModel?.service || modelsStore.selectedProvider
   const modelLabel = currentModel?.name || modelsStore.selectedModel
+
+  // No owned chat: stop before the placeholder. Leaving it here spins forever,
+  // because the request below returns without finishing the bubble.
+  if (!isGuestMode.value && !incognitoStore.active && chatsStore.activeChatId == null) {
+    console.error('No active chat selected')
+    return
+  }
 
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
@@ -2787,8 +3566,17 @@ const streamAIResponse = async (
     renderStreamingContent(text.length >= paintedPrefix.length ? text : paintedPrefix, messageId)
   }
 
-  let streamingRafId: number | null = null
-  let streamingDirty = false
+  const textSmoother = createSmoothStream({
+    onRender: renderStreamingText,
+    initialShown: paintedPrefix,
+  })
+  // Stop keeps every character that already arrived; only later chunks are dropped.
+  streamingAbortController.signal.addEventListener('abort', () => {
+    textSmoother.flush()
+    textSmoother.cancel()
+  })
+
+  let editedChatIdForRestore: number | undefined
 
   try {
     if (useMockData) {
@@ -2847,6 +3635,7 @@ const streamAIResponse = async (
           }
 
           if (data.status === 'guest_limit_reached') {
+            textSmoother.cancel()
             // #1128: drop the empty assistant placeholder — same as the
             // authenticated rate-limit path (removeMessage), otherwise the
             // guest sees a blank bubble above the signup modal.
@@ -3006,6 +3795,9 @@ const streamAIResponse = async (
               if (typeof data.metadata?.error === 'string' && data.metadata.error) {
                 card.error = data.metadata.error
               }
+              if (typeof data.metadata?.text === 'string' && data.metadata.text) {
+                card.text = data.metadata.text
+              }
               if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
                 card.prompt = data.metadata.prompt
               }
@@ -3017,6 +3809,21 @@ const streamAIResponse = async (
               }
               if (data.metadata?.used_workspace === true) {
                 card.usedWorkspace = true
+              }
+              if (typeof data.metadata?.step_input === 'string') {
+                card.stepInput = data.metadata.step_input
+              }
+              if (typeof data.metadata?.step_output === 'string') {
+                card.stepOutput = data.metadata.step_output
+              }
+              if (data.metadata?.step_output_truncated === true) {
+                card.stepOutputTruncated = true
+              }
+              if (typeof data.metadata?.duration_ms === 'number') {
+                card.durationMs = data.metadata.duration_ms
+              }
+              if (isAskUserPayload(data.metadata?.ask_user)) {
+                card.askUser = data.metadata.ask_user
               }
             }
           } else if (data.status === 'task_chunk') {
@@ -3058,15 +3865,11 @@ const streamAIResponse = async (
               fullContent += data.chunk
             }
           } else if (
-            (data.status === 'file' ||
-              data.status === 'audio' ||
-              data.status === 'tts_generating' ||
-              data.status === 'links') &&
+            isTaskPlanSuppressedMediaStatus(data.status) &&
             historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
           ) {
-            // Multitask: task cards are the live media surface, so suppress the
-            // normal single-bubble media events (they still persist on the OUT
-            // message and re-render from history on reload).
+            // Multitask: task cards are the live media surface for file/links.
+            // Voice-reply audio and TTS status must still attach live (#2282).
           } else if (data.status === 'data' && data.chunk) {
             // First visible answer token: the live thinking panel folds away.
             // A buffered `<think>` block, including one split across chunks,
@@ -3081,16 +3884,7 @@ const streamAIResponse = async (
               historyStore.finishLiveThinking(messageId)
             }
             fullContent += data.chunk
-
-            streamingDirty = true
-            if (streamingRafId === null) {
-              streamingRafId = requestAnimationFrame(() => {
-                streamingRafId = null
-                if (!streamingDirty) return
-                streamingDirty = false
-                renderStreamingText(fullContent)
-              })
-            }
+            textSmoother.push(fullContent)
           } else if (data.status === 'reasoning' && data.chunk) {
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message) {
@@ -3126,11 +3920,12 @@ const streamAIResponse = async (
           } else if (data.status === 'audio') {
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.url) {
-              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
-              if (loadingIdx !== -1) {
-                message.parts.splice(loadingIdx, 1)
-              }
-              pushMediaPart(message, 'audio', normalizeMediaUrl(data.url))
+              attachVoiceReplyAudio(message, normalizeMediaUrl(data.url))
+            }
+          } else if (data.status === 'voice_reply_failed') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && isVoiceReplyFailedReason(data.reason)) {
+              applyVoiceReplyFailed(message, data.reason)
             }
           } else if (data.status === 'links') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -3162,15 +3957,11 @@ const streamAIResponse = async (
               applyDocsToMessage(streamingMessage, data.metadata?.docs)
             }
           } else if (data.status === 'complete') {
-            if (streamingRafId !== null) {
-              cancelAnimationFrame(streamingRafId)
-              streamingRafId = null
-            }
-            streamingDirty = false
-
             if (data.truncated) {
               fullContent += '\n\n---\n\n⚠️ *' + t('message.truncated') + '*'
             }
+
+            textSmoother.flush()
 
             if (fullContent) {
               renderStreamingText(fullContent)
@@ -3251,6 +4042,10 @@ const streamAIResponse = async (
                 }
               }
 
+              if (Array.isArray(data.ragSources) && data.ragSources.length > 0) {
+                message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
+              }
+
               applyDocsToMessage(message, data.docs)
 
               applyAssistantChatModelFooter(
@@ -3291,10 +4086,8 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
             scrollToBottom()
           } else if (data.status === 'error') {
-            if (streamingRafId !== null) {
-              cancelAnimationFrame(streamingRafId)
-              streamingRafId = null
-            }
+            textSmoother.flush()
+            textSmoother.cancel()
             processingStatus.value = ''
             processingMetadata.value = {}
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -3322,10 +4115,11 @@ const streamAIResponse = async (
       // Incognito turns belong to no chat — the backend processes them fully
       // in-memory and gets the conversation context from the history payload.
       const chatId = incognito ? undefined : (chatsStore.activeChatId ?? undefined)
+      editedChatIdForRestore = chatId
 
-      if (!chatId && !incognito) {
-        console.error('No active chat selected')
-        return
+      const restoreUnpersistedEdit = () => {
+        if (options?.linkVersion?.kind !== 'edit') return
+        void reloadEditedTranscript(chatId)
       }
 
       // Snapshot the in-memory transcript for the backend (prior turns only:
@@ -3358,16 +4152,34 @@ const streamAIResponse = async (
       let audioText = ''
       let insideThinkBlock = false
       let answerThinkOpen = false
-      // Frontend language selects the Piper voice. Seed English, then adopt
-      // the backend-detected reply language (meta.language) — the request
-      // already sent locale.value. Piper maps en/de/es/tr to the four voices
-      // baked into synaplan-tts; there is no separate voice picker.
-      let detectedLanguage = 'en'
+      // Frontend language selects the Piper voice. Seed with the UI locale, then
+      // adopt the backend-detected reply language (meta.language) when it arrives.
+      // Always send language on /api/v1/tts/stream (#2283).
+      let detectedLanguage = locale.value || 'en'
 
       if (options?.voiceReply) {
         currentAudioStreamer = new AudioStreamer()
         isAudioStreaming.value = true
+        currentAudioStreamer.setOnPlaybackStart(() => {
+          stopBargeIn?.()
+          stopBargeIn = startBargeInMonitor(() => {
+            stopBargeIn?.()
+            stopBargeIn = null
+            currentAudioStreamer?.stop()
+            void chatInputRef.value?.startDictation()
+          })
+        })
         currentAudioStreamer.setOnFinished(() => {
+          stopBargeIn?.()
+          stopBargeIn = null
+          isAudioStreaming.value = false
+          currentAudioStreamer = null
+        })
+        currentAudioStreamer.setOnFailure(() => {
+          const message = historyStore.messages.find((m) => m.id === messageId)
+          if (message) {
+            applyReadAloudFailed(message)
+          }
           isAudioStreaming.value = false
           currentAudioStreamer = null
         })
@@ -3384,6 +4196,7 @@ const streamAIResponse = async (
         incognito,
         history: incognitoHistory,
         includeReasoning,
+        reasoningEffort: options?.reasoningEffort,
         webSearch,
         language: options?.language ?? locale.value,
         modelId: finalModelId,
@@ -3393,7 +4206,7 @@ const streamAIResponse = async (
         ragGroupKey: options?.ragGroupKey,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
-        agentId: pinnedAgentId.value ?? undefined,
+        agentId: outgoingAgentId(options?.agentId),
         onUpdate: (data: StreamUpdatePayload) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
@@ -3617,6 +4430,9 @@ const streamAIResponse = async (
               if (typeof data.metadata?.error === 'string' && data.metadata.error) {
                 card.error = data.metadata.error
               }
+              if (typeof data.metadata?.text === 'string' && data.metadata.text) {
+                card.text = data.metadata.text
+              }
               if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
                 card.prompt = data.metadata.prompt
               }
@@ -3629,6 +4445,21 @@ const streamAIResponse = async (
               }
               if (data.metadata?.used_workspace === true) {
                 card.usedWorkspace = true
+              }
+              if (typeof data.metadata?.step_input === 'string') {
+                card.stepInput = data.metadata.step_input
+              }
+              if (typeof data.metadata?.step_output === 'string') {
+                card.stepOutput = data.metadata.step_output
+              }
+              if (data.metadata?.step_output_truncated === true) {
+                card.stepOutputTruncated = true
+              }
+              if (typeof data.metadata?.duration_ms === 'number') {
+                card.durationMs = data.metadata.duration_ms
+              }
+              if (isAskUserPayload(data.metadata?.ask_user)) {
+                card.askUser = data.metadata.ask_user
               }
             }
           } else if (data.status === 'task_chunk') {
@@ -3675,16 +4506,11 @@ const streamAIResponse = async (
               fullContent += data.chunk
             }
           } else if (
-            (data.status === 'file' ||
-              data.status === 'audio' ||
-              data.status === 'tts_generating' ||
-              data.status === 'links') &&
+            isTaskPlanSuppressedMediaStatus(data.status) &&
             historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
           ) {
-            // Multitask mode: the task cards are the live surface, so suppress
-            // the normal single-bubble media events. They still flow so the
-            // OUT message files persist; history renders the flattened bubble
-            // on reload.
+            // Multitask: task cards are the live media surface for file/links.
+            // Voice-reply audio and TTS status must still attach live (#2282).
           } else if (data.status === 'data' && data.chunk) {
             // First visible answer token: the live thinking panel folds away.
             // A buffered `<think>` block, including one split across chunks,
@@ -3741,19 +4567,9 @@ const streamAIResponse = async (
               }
             }
 
-            // Mark dirty and schedule a throttled render via rAF.
-            // This avoids re-parsing the full markdown on every single SSE chunk,
-            // which causes O(n²) rendering for long responses.
-            streamingDirty = true
-
-            if (streamingRafId === null) {
-              streamingRafId = requestAnimationFrame(() => {
-                streamingRafId = null
-                if (!streamingDirty) return
-                streamingDirty = false
-                renderStreamingText(fullContent)
-              })
-            }
+            // Reveal the chunk across frames. Parsing still happens at most
+            // once per frame; a large provider chunk no longer lands as a block.
+            textSmoother.push(fullContent)
           } else if (data.status === 'reasoning' && data.chunk) {
             // Reasoning chunks from OpenAI o-series / GPT-5 models
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -3807,16 +4623,25 @@ const streamAIResponse = async (
             }
             const message = historyStore.messages.find((m) => m.id === messageId)
             if (message && data.url) {
-              // Remove tts_loading part and replace with audio player
-              const loadingIdx = message.parts.findIndex((p) => p.type === 'tts_loading')
-              const isVoiceReply = loadingIdx !== -1
-              if (isVoiceReply) {
-                message.parts.splice(loadingIdx, 1)
-              }
               const absoluteUrl = normalizeMediaUrl(data.url)
-              // If we are already streaming audio (currentAudioStreamer exists), don't autoplay the file
-              const shouldAutoplay = isVoiceReply && !currentAudioStreamer
-              pushMediaPart(message, 'audio', absoluteUrl, { autoplay: shouldAutoplay })
+              // Play the stored spoken reply unless sentence streaming already
+              // has answer text. A streamer object alone is not enough: a task
+              // plan never feeds it, and a finished stream is no longer active.
+              const shouldAutoplay = shouldAutoplayVoiceReply(
+                message.parts.some((part) => part.type === 'tts_loading'),
+                audioText
+              )
+              attachVoiceReplyAudio(message, absoluteUrl, { autoplay: shouldAutoplay })
+            }
+          } else if (data.status === 'voice_reply_failed') {
+            const message = historyStore.messages.find((m) => m.id === messageId)
+            if (message && isVoiceReplyFailedReason(data.reason)) {
+              applyVoiceReplyFailed(message, data.reason)
+            }
+            if (currentAudioStreamer) {
+              currentAudioStreamer.stop()
+              currentAudioStreamer = null
+              isAudioStreaming.value = false
             }
           } else if (data.status === 'links') {
             // Handle web search results
@@ -3995,11 +4820,7 @@ const streamAIResponse = async (
             // mutations (parts updated, processingStatus cleared, isStreaming
             // toggled) into one paint, preserving the smooth single-frame
             // transition this phase was originally targeting.
-            if (streamingRafId !== null) {
-              cancelAnimationFrame(streamingRafId)
-              streamingRafId = null
-            }
-            streamingDirty = false
+            textSmoother.flush()
 
             if (fullContent) {
               renderStreamingText(fullContent)
@@ -4135,6 +4956,10 @@ const streamAIResponse = async (
                 message.memoryIds = data.memoryIds
               }
 
+              if (Array.isArray(data.ragSources) && data.ragSources.length > 0) {
+                message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
+              }
+
               applyDocsToMessage(message, data.docs)
 
               // Store feedback IDs if provided
@@ -4231,11 +5056,18 @@ const streamAIResponse = async (
               }
 
               // Bump chat activity so the sidebar reflects the assistant message
-              // landing without waiting for a full reload.
+              // landing without waiting for a full reload. The streaming
+              // bubble already marked this turn, so the matching realtime
+              // event does not count it a second time.
               chatsStore.bumpChatActivity(chatId)
             }
 
             historyStore.finishStreamingMessage(messageId)
+            if (typeof data.messageId === 'number') {
+              recordVersionLink(options?.linkVersion, data.messageId, chatId)
+            } else {
+              restoreUnpersistedEdit()
+            }
 
             // Issue #1070: the streamed state is only a live preview — the
             // persisted message is the single source of truth for files,
@@ -4261,12 +5093,8 @@ const streamAIResponse = async (
             currentTrackId = undefined
             currentStreamingChatId = undefined
           } else if (data.status === 'error') {
-            // Cancel any pending throttled render
-            if (streamingRafId !== null) {
-              cancelAnimationFrame(streamingRafId)
-              streamingRafId = null
-            }
-            streamingDirty = false
+            textSmoother.flush()
+            textSmoother.cancel()
 
             const rawError = typeof data.error === 'string' ? data.error : ''
             const classified =
@@ -4351,6 +5179,7 @@ const streamAIResponse = async (
               stopStreamingFn = null
               currentTrackId = undefined
               currentStreamingChatId = undefined
+              restoreUnpersistedEdit()
               return
             }
 
@@ -4401,6 +5230,7 @@ const streamAIResponse = async (
               stopStreamingFn = null
               currentTrackId = undefined
               currentStreamingChatId = undefined
+              restoreUnpersistedEdit()
               return
             }
 
@@ -4431,6 +5261,7 @@ const streamAIResponse = async (
               stopStreamingFn = null
               currentTrackId = undefined
               currentStreamingChatId = undefined
+              restoreUnpersistedEdit()
               return
             }
 
@@ -4448,11 +5279,15 @@ const streamAIResponse = async (
                 historyStore.updateStreamingMessage(messageId, t('message.cancelledByUser'))
               }
               historyStore.finishStreamingMessage(messageId)
+              if (currentStreamingChatId) {
+                chatsStore.clearLocalTurnFinished(currentStreamingChatId)
+              }
 
               streamingAbortController = null
               stopStreamingFn = null
               currentTrackId = undefined
               currentStreamingChatId = undefined
+              restoreUnpersistedEdit()
               return
             }
 
@@ -4485,6 +5320,11 @@ const streamAIResponse = async (
               historyStore.updateStreamingMessage(messageId, errorMsg)
             }
             historyStore.finishStreamingMessage(messageId)
+            if (typeof data.messageId === 'number') {
+              recordVersionLink(options?.linkVersion, data.messageId, chatId)
+            } else {
+              restoreUnpersistedEdit()
+            }
 
             // Clean up streaming resources after error
             streamingAbortController = null
@@ -4513,19 +5353,18 @@ const streamAIResponse = async (
   } catch (error) {
     console.error('❌ Streaming error:', error)
 
-    // Cancel any pending throttled render
-    if (streamingRafId !== null) {
-      cancelAnimationFrame(streamingRafId)
-      streamingRafId = null
-    }
-    streamingDirty = false
+    textSmoother.cancel()
 
     historyStore.updateStreamingMessage(messageId, t('chatError.reason.unknown'))
     historyStore.finishStreamingMessage(messageId)
+    if (currentStreamingChatId) {
+      chatsStore.clearLocalTurnFinished(currentStreamingChatId)
+    }
     streamingAbortController = null
     stopStreamingFn = null
     currentTrackId = undefined
     currentStreamingChatId = undefined
+    if (options?.linkVersion?.kind === 'edit') void reloadEditedTranscript(editedChatIdForRestore)
   }
   // NOTE: Don't clean up in finally block! The streaming is async and still running.
   // Cleanup happens in the 'complete' event handler or in handleUserStop()
@@ -4536,6 +5375,7 @@ const streamAIResponse = async (
 // persist the partial answer as cancelled (/save-cancelled). This is distinct
 // from navigating away, which detaches WITHOUT cancelling (handleNavigateAway).
 const handleUserStop = async () => {
+  if (!canRewriteConversation.value) return
   // CRITICAL: Abort signal FIRST to prevent any further chunk processing
   if (streamingAbortController) {
     streamingAbortController.abort()
@@ -4580,7 +5420,7 @@ const handleUserStop = async () => {
     }
   } else if (effectiveTrackId) {
     try {
-      await chatApi.stopStream(effectiveTrackId)
+      await chatApi.stopStream(effectiveTrackId, currentStreamingChatId ?? chatsStore.activeChatId)
     } catch (error) {
       console.error('❌ Failed to notify backend:', error)
     }
@@ -4679,8 +5519,10 @@ const handleUserStop = async () => {
   // #732: cancelled turns leave local history non-empty while chat list
   // metadata can still look empty — bump activity so "New chat" won't reuse
   // this thread via isChatEmpty().
-  if (streamingMessage && chatsStore.activeChatId) {
-    chatsStore.bumpChatActivity(chatsStore.activeChatId, {
+  const bumpChatId = currentStreamingChatId ?? chatsStore.activeChatId
+  if (streamingMessage && bumpChatId) {
+    chatsStore.clearLocalTurnFinished(bumpChatId)
+    chatsStore.bumpChatActivity(bumpChatId, {
       incrementMessageCount: true,
       firstMessagePreview: streamingMessage
         ? (streamingMessage.parts?.find((p) => p.type === 'text')?.content ?? '').slice(0, 120) ||
@@ -4764,6 +5606,7 @@ function extractUserText(message: Message): string {
 }
 
 const handleAgain = async (backendMessageId: number, modelId?: number) => {
+  if (!canRewriteConversation.value) return
   if (!authStore.isAuthenticated) {
     console.error('❌ Not authenticated - redirecting to login')
     const { error } = useNotification()
@@ -4826,8 +5669,13 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   // the single-node legacy path.
   //
   // Reattach the original file IDs so a file_analysis Again still has the
-  // attachment to analyze (issue #1910).
-  await streamAIResponse(userText, modelId ? { modelId, isAgain: true, fileIds } : { fileIds })
+  // attachment to analyze (issue #1910). The version link waits for the
+  // saved message id — streamAIResponse returns while the stream is still open.
+  const previousId = assistantMessage.backendMessageId
+  await streamAIResponse(userText, {
+    ...(modelId ? { modelId, isAgain: true, fileIds } : { fileIds }),
+    linkVersion: previousId ? { kind: 'again', previousId } : undefined,
+  })
 }
 
 /**
@@ -4838,6 +5686,7 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
  * the original turn (with its successful parts) is left untouched.
  */
 const handleTaskFollowup = async (prompt: string) => {
+  if (!canRewriteConversation.value) return
   if (!authStore.isAuthenticated || isGuestMode.value) return
   if (!prompt.trim()) return
   const planMessage =
@@ -4853,6 +5702,7 @@ const handleTaskFollowup = async (prompt: string) => {
 }
 
 const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => {
+  if (!canRewriteConversation.value) return
   if (!authStore.isAuthenticated || isGuestMode.value) return
   if (!payload.prompt || !payload.modelId) return
 
@@ -4870,6 +5720,7 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
 // Mark the card cancelled immediately (the user's intent is the source of truth)
 // and signal the backend so the provider poll aborts and stops billing.
 const handleTaskCancel = async (nodeId: string) => {
+  if (!canRewriteConversation.value) return
   // Resolve the CURRENT turn's task-plan message via the streaming flag, mirroring
   // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …), so
   // finding the FIRST active plan could match a stale earlier turn and cancel the
@@ -4892,7 +5743,7 @@ const handleTaskCancel = async (nodeId: string) => {
   const trackId = message?.taskPlan?.trackId ?? currentTrackId
   if (trackId !== undefined) {
     try {
-      await chatApi.cancelTask(trackId, nodeId)
+      await chatApi.cancelTask(trackId, nodeId, currentStreamingChatId ?? chatsStore.activeChatId)
     } catch {
       // Best-effort: the card already reflects the cancellation locally.
     }
@@ -4939,13 +5790,71 @@ function finishStreamingTurnLocally() {
     }
     historyStore.finishStreamingMessage(streamingMessage.id)
   }
+  if (currentStreamingChatId) {
+    chatsStore.clearLocalTurnFinished(currentStreamingChatId)
+  }
 
   streamingAbortController = null
   currentTrackId = undefined
   currentStreamingChatId = undefined
 }
 
+function isAskUserPayload(
+  value: unknown
+): value is NonNullable<import('@/stores/history').TaskCard['askUser']> {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    typeof (value as { question?: unknown }).question === 'string'
+  )
+}
+
+async function answerAskUser(
+  message: Message,
+  payload: { nodeId: string; answer: string; skip: boolean }
+): Promise<void> {
+  if (!message.backendMessageId) return
+  try {
+    await chatApi.answerAskUser(
+      message.backendMessageId,
+      payload.nodeId,
+      payload.answer,
+      payload.skip
+    )
+    const chatId = chatsStore.activeChatId
+    if (chatId) await historyStore.loadMessages(chatId)
+  } catch (err) {
+    showErrorToast(err instanceof Error ? err.message : t('taskPlan.askFailed'))
+  }
+}
+
+async function selectMessageVersion(messageId: number, kind: 'answer' | 'edit'): Promise<void> {
+  await chatApi.selectVersion(messageId, kind)
+  const chatId = chatsStore.activeChatId
+  if (chatId) await historyStore.loadMessages(chatId)
+}
+
+async function editUserMessage(message: Message, text: string): Promise<void> {
+  const previousId = message.backendMessageId
+  if (!isGuestMode.value && !incognitoStore.active && chatsStore.activeChatId == null) return
+  const fileIds = attachmentIdsForEdit(message.files)
+  historyStore.applySavedEdit(message.id, text)
+  await streamAIResponse(text, {
+    ...(fileIds.length > 0 ? { fileIds } : {}),
+    linkVersion: previousId ? { kind: 'edit', previousId } : undefined,
+  })
+}
+
+function reattachMessageFile(file: { id: number; filename: string; fileType?: string }): void {
+  chatInputRef.value?.attachExistingFile({
+    file_id: file.id,
+    filename: file.filename,
+    file_type: file.fileType || '',
+  })
+}
+
 const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
+  if (!canRewriteConversation.value) return
   const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
   if (messageIndex <= 0) return
 
@@ -4971,6 +5880,7 @@ const handleRegenerate = async (message: Message, modelOption: ModelOption) => {
 
 // Handle retry for rate-limited messages
 const handleRetryMessage = async (message: Message, content: string) => {
+  if (!canRewriteConversation.value) return
   // Clear the error status on the message
   historyStore.clearMessageError(message.id)
 
@@ -5029,15 +5939,9 @@ async function handleMemoryEditSave(memoryData: {
   }
 }
 
-// Memory badge click handler - opens MemoriesDialog with highlighted memory
+// Opens the Memories page; browser Back returns to this chat.
 function handleClickMemory(memory: UserMemory) {
-  highlightedMemoryId.value = memory.id
-  isMemoriesDialogOpen.value = true
-}
-
-function closeMemoriesDialog() {
-  isMemoriesDialogOpen.value = false
-  highlightedMemoryId.value = null
+  router.push({ path: '/memories', query: { highlight: String(memory.id) } })
 }
 
 function handleMemoryDiscard(memory: UserMemory & { toastId: number }) {

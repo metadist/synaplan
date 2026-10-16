@@ -1,0 +1,17 @@
+{
+  "name": "synaplan-transcriber",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Meeting notes for openDesk: Jitsi captions and Element voice messages, transcribed by Synaplan.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  }
+}

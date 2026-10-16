@@ -35,6 +35,9 @@ const (
 	ReasonOutputLimit  = "output_limit"
 	ReasonProgramError = "program_error"
 	ReasonCancelled    = "cancelled"
+	// ReasonEgressUnavailable marks runs that never started because the
+	// per-run proxy network could not be provisioned (CP22).
+	ReasonEgressUnavailable = "egress_unavailable"
 
 	FileRoleInput = "input"
 

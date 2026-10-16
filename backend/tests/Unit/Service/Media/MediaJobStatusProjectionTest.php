@@ -128,4 +128,25 @@ final class MediaJobStatusProjectionTest extends TestCase
         $status = $service->toStatusArray($job);
         self::assertFalse($status['stalled']);
     }
+
+    public function testSubmittingImageIsNotReportedAsAStalledQueue(): void
+    {
+        $store = $this->createStub(MediaJobStore::class);
+        $service = new MediaJobService($store, new NullLogger());
+
+        $job = $service->create([
+            'userId' => 1,
+            'type' => MediaJob::TYPE_IMAGE,
+            'provider' => 'openai',
+        ]);
+        $service->markSubmitting($job);
+        $reflection = new \ReflectionClass($job);
+        $created = $reflection->getProperty('created');
+        $created->setAccessible(true);
+        $created->setValue($job, time() - (MediaJobService::STALL_QUEUED_SECONDS + 30));
+
+        $status = $service->toStatusArray($job);
+        self::assertFalse($status['stalled']);
+        self::assertNull($status['stall_reason']);
+    }
 }

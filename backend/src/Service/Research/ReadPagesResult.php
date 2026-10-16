@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Service\Research;
 
-use App\Service\UrlContentResult;
-
 /**
  * Outcome of reading the links a user pasted: every attempted page (read or
  * not) plus the question-fitted text of the ones that were readable.

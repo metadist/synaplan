@@ -123,7 +123,7 @@ function handleBackdropClick(event: MouseEvent) {
             </label>
             <select
               v-model="category"
-              class="w-full surface-card px-4 py-2 rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-brand"
+              class="w-full surface-card px-4 py-2 rounded-xl txt-primary focus:outline-none focus:ring-2 focus:ring-brand"
               :disabled="isEdit"
             >
               <option v-for="cat in categories" :key="cat.value" :value="cat.value">
@@ -140,7 +140,7 @@ function handleBackdropClick(event: MouseEvent) {
             <input
               v-model="key"
               type="text"
-              class="w-full surface-card px-4 py-2 rounded-lg txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand"
+              class="w-full surface-card px-4 py-2 rounded-xl txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand"
               :placeholder="t('memories.create.keyPlaceholder')"
               :disabled="isEdit"
               required
@@ -156,7 +156,7 @@ function handleBackdropClick(event: MouseEvent) {
             <textarea
               v-model="value"
               rows="4"
-              class="w-full surface-card px-4 py-2 rounded-lg txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand resize-none"
+              class="w-full surface-card px-4 py-2 rounded-xl txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand resize-none"
               :placeholder="t('memories.create.valuePlaceholder')"
               required
               minlength="5"
@@ -172,14 +172,14 @@ function handleBackdropClick(event: MouseEvent) {
           <div class="flex items-center justify-end gap-3">
             <button
               type="button"
-              class="btn-secondary px-4 py-2 rounded-lg font-medium"
+              class="btn-secondary px-4 py-2 rounded-xl font-medium"
               @click="handleCancel"
             >
               {{ t('memories.actions.cancel') }}
             </button>
             <button
               type="submit"
-              class="btn-primary px-4 py-2 rounded-lg font-medium"
+              class="btn-primary px-4 py-2 rounded-xl font-medium"
               :disabled="!isValid || loading"
             >
               {{ loading ? t('common.saving') : t('memories.actions.save') }}

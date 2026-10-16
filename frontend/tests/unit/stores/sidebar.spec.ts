@@ -11,7 +11,7 @@ describe('Sidebar Store', () => {
     const store = useSidebarStore()
 
     expect(store.isCollapsed).toBe(false)
-    expect(store.chatSheetOpen).toBe(false)
+    expect(store.mobileDrawerOpen).toBe(false)
   })
 
   it('should toggle collapsed state', () => {
@@ -24,28 +24,13 @@ describe('Sidebar Store', () => {
     expect(store.isCollapsed).toBe(false)
   })
 
-  it('should open the history sheet', () => {
+  it('should toggle the mobile drawer', () => {
     const store = useSidebarStore()
 
-    store.openChatSheet()
-    expect(store.chatSheetOpen).toBe(true)
-  })
+    store.toggleMobileDrawer()
+    expect(store.mobileDrawerOpen).toBe(true)
 
-  it('should close the history sheet', () => {
-    const store = useSidebarStore()
-    store.chatSheetOpen = true
-
-    store.closeChatSheet()
-    expect(store.chatSheetOpen).toBe(false)
-  })
-
-  it('should toggle the history sheet', () => {
-    const store = useSidebarStore()
-
-    store.toggleChatSheet()
-    expect(store.chatSheetOpen).toBe(true)
-
-    store.toggleChatSheet()
-    expect(store.chatSheetOpen).toBe(false)
+    store.closeMobileDrawer()
+    expect(store.mobileDrawerOpen).toBe(false)
   })
 })

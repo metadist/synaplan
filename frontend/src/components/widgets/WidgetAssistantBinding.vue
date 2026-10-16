@@ -11,13 +11,13 @@
       <div class="flex flex-wrap gap-2">
         <RouterLink
           :to="{ name: 'ai-assistants', query: { id: String(selected.id) } }"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium inline-flex items-center"
         >
           {{ $t('widget.useAssistant.open') }}
         </RouterLink>
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-stop-using-assistant"
           @click="onStop"
         >
@@ -29,7 +29,7 @@
     <label v-else class="block">
       <span class="txt-secondary text-sm">{{ $t('widget.useAssistant.choose') }}</span>
       <select
-        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         data-testid="select-widget-assistant"
         :value="''"
         @change="onPick(Number(($event.target as HTMLSelectElement).value))"

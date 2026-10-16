@@ -43,7 +43,10 @@ describe('MessageText [Message:ID] badges', () => {
     const el = messageTextEl(wrapper)
     const badge = el.querySelector('.message-ref[data-digest-message-id="1234"]')
     expect(badge).not.toBeNull()
+    expect(badge?.tagName).toBe('BUTTON')
     expect(badge?.getAttribute('data-digest-chat-id')).toBe('42')
+    expect(badge?.getAttribute('aria-label')).toContain('Open the original message')
+    expect(badge?.getAttribute('aria-label')).toContain('office rent letter to realtor')
     expect(el.textContent).toContain('office rent letter to realtor')
     // The raw tag must not leak into the visible text.
     expect(el.textContent).not.toContain('[Message:1234]')

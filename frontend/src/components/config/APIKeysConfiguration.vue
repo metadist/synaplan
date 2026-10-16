@@ -53,75 +53,86 @@
     </div>
 
     <div class="surface-card p-6" data-testid="section-create-key">
-      <div class="flex flex-col sm:flex-row gap-3">
-        <input
-          v-model="newKeyName"
-          type="text"
-          :placeholder="$t('config.apiKeys.namePlaceholder')"
-          class="w-full sm:flex-1 px-4 py-2.5 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          data-testid="input-key-name"
-          @keypress.enter="createAPIKey"
-        />
-        <div class="flex flex-col gap-2 sm:w-auto">
-          <p class="text-xs txt-secondary">{{ $t('config.apiKeys.scopes.hint') }}</p>
-          <label class="flex items-center gap-2 text-sm txt-primary">
-            <input
-              v-model="includeIamRead"
-              type="checkbox"
-              class="rounded border-light-border/30 dark:border-dark-border/20"
-              data-testid="checkbox-scope-iam-read"
-            />
-            {{ $t('config.apiKeys.scopes.iamRead') }}
-          </label>
-          <label class="flex items-center gap-2 text-sm txt-primary">
-            <input
-              v-model="includeIamManage"
-              type="checkbox"
-              class="rounded border-light-border/30 dark:border-dark-border/20"
-              data-testid="checkbox-scope-iam-manage"
-            />
-            {{ $t('config.apiKeys.scopes.iamManage') }}
-          </label>
-          <label v-if="computeEnabled" class="flex items-center gap-2 text-sm txt-primary">
-            <input
-              v-model="includeComputeRun"
-              type="checkbox"
-              class="rounded border-light-border/30 dark:border-dark-border/20"
-              data-testid="checkbox-scope-compute-run"
-            />
-            {{ $t('config.apiKeys.scopes.computeRun') }}
-          </label>
-        </div>
-        <button
-          :disabled="!newKeyName.trim() || loading"
-          class="w-full sm:w-auto btn-primary px-5 py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="btn-create"
-          @click="createAPIKey"
-        >
-          <svg
-            v-if="loading"
-            class="animate-spin h-5 w-5"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+          <input
+            v-model="newKeyName"
+            type="text"
+            :placeholder="$t('config.apiKeys.namePlaceholder')"
+            class="w-full sm:flex-1 sm:min-w-0 px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="input-key-name"
+            @keypress.enter="createAPIKey"
+          />
+          <button
+            :disabled="!newKeyName.trim() || creating"
+            class="w-full sm:w-auto sm:shrink-0 btn-primary px-5 py-2.5 rounded-xl font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-create"
+            @click="createAPIKey"
           >
-            <circle
-              class="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              stroke-width="4"
-            ></circle>
-            <path
-              class="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <PlusIcon v-else class="w-5 h-5" />
-          {{ loading ? 'Creating...' : $t('config.apiKeys.createKey') }}
-        </button>
+            <svg
+              v-if="creating"
+              class="animate-spin h-5 w-5"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            <PlusIcon v-else class="w-5 h-5" />
+            {{ creating ? $t('common.creating') : $t('config.apiKeys.createKey') }}
+          </button>
+        </div>
+        <div
+          class="flex flex-col gap-2 border-t border-light-border/30 dark:border-dark-border/20 pt-4"
+        >
+          <p class="text-xs txt-secondary leading-relaxed">
+            {{ $t('config.apiKeys.scopes.hint') }}
+          </p>
+          <div class="flex flex-col gap-2">
+            <label class="flex items-start gap-2 text-sm txt-primary cursor-pointer">
+              <input
+                v-model="includeIamRead"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded border-light-border/30 dark:border-dark-border/20 accent-[var(--brand)]"
+                data-testid="checkbox-scope-iam-read"
+              />
+              {{ $t('config.apiKeys.scopes.iamRead') }}
+            </label>
+            <label class="flex items-start gap-2 text-sm txt-primary cursor-pointer">
+              <input
+                v-model="includeIamManage"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded border-light-border/30 dark:border-dark-border/20 accent-[var(--brand)]"
+                data-testid="checkbox-scope-iam-manage"
+              />
+              {{ $t('config.apiKeys.scopes.iamManage') }}
+            </label>
+            <label
+              v-if="computeEnabled"
+              class="flex items-start gap-2 text-sm txt-primary cursor-pointer"
+            >
+              <input
+                v-model="includeComputeRun"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 rounded border-light-border/30 dark:border-dark-border/20 accent-[var(--brand)]"
+                data-testid="checkbox-scope-compute-run"
+              />
+              {{ $t('config.apiKeys.scopes.computeRun') }}
+            </label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -131,8 +142,8 @@
         {{ $t('config.apiKeys.docsDesc') }}
       </p>
       <router-link
-        to="/channels/api/docs"
-        class="btn-primary px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
+        to="/apps/api/docs"
+        class="btn-primary px-6 py-3 rounded-xl font-medium inline-flex items-center gap-2"
       >
         <CommandLineIcon class="w-4 h-4" />
         {{ $t('config.apiKeys.docsTitle') }}
@@ -165,7 +176,7 @@
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         ></path>
       </svg>
-      <p class="txt-secondary text-lg">Loading API keys...</p>
+      <p class="txt-secondary text-lg">{{ $t('common.loading') }}</p>
     </div>
 
     <div
@@ -230,9 +241,6 @@
                     data-testid="badge-linked-platform"
                   >
                     {{ $t('config.apiKeys.linkedPlatform') }}
-                  </span>
-                  <span class="text-xs txt-secondary">
-                    ({{ apiKey.usageCount }} {{ $t('config.apiKeys.usageCount') }})
                   </span>
                 </div>
               </td>
@@ -320,7 +328,16 @@
             enter-from-class="opacity-0 scale-95 translate-y-4"
             leave-to-class="opacity-0 scale-95 translate-y-4"
           >
-            <div v-if="showKeyModal" class="surface-elevated max-w-2xl w-full p-6 md:p-8">
+            <div
+              v-if="showKeyModal"
+              ref="keyModalPanel"
+              class="surface-elevated max-w-2xl w-full p-6 md:p-8"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="api-key-created-title"
+              data-testid="modal-api-key-created-dialog"
+              tabindex="-1"
+            >
               <!-- Header -->
               <div class="flex items-start gap-4 mb-6">
                 <div
@@ -329,7 +346,7 @@
                   <KeyIcon class="w-6 h-6 text-green-600 dark:text-green-400" />
                 </div>
                 <div class="flex-1">
-                  <h3 class="text-xl font-semibold txt-primary mb-1">
+                  <h3 id="api-key-created-title" class="text-xl font-semibold txt-primary mb-1">
                     {{ $t('config.apiKeys.keyCreated') }}
                   </h3>
                   <p class="text-sm txt-secondary">
@@ -378,7 +395,8 @@
               <!-- Actions -->
               <div class="flex flex-col sm:flex-row gap-3">
                 <button
-                  class="flex-1 btn-primary px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-medium"
+                  type="button"
+                  class="flex-1 btn-primary px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium"
                   data-testid="btn-copy"
                   @click="copyKeyFromModal"
                 >
@@ -391,19 +409,13 @@
                   }}
                 </button>
                 <button
-                  class="flex-1 surface-chip px-4 py-3 rounded-lg font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                  type="button"
+                  class="flex-1 surface-chip px-4 py-3 rounded-xl font-medium txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   data-testid="btn-close"
                   @click="closeKeyModal"
                 >
                   {{ $t('common.close') }}
                 </button>
-              </div>
-
-              <!-- Countdown -->
-              <div class="mt-4 text-center">
-                <p class="text-xs txt-secondary">
-                  {{ $t('config.apiKeys.modal.autoClose', { seconds: modalCountdown }) }}
-                </p>
               </div>
             </div>
           </Transition>
@@ -415,8 +427,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, onMounted, onActivated, watch, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, onUnmounted, onActivated, watch, computed, nextTick } from 'vue'
 import {
   PlusIcon,
   KeyIcon,
@@ -441,7 +452,6 @@ const dialog = useDialog()
 const { success, error: showError } = useNotification()
 const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
-const route = useRoute()
 
 interface UIApiKey {
   id: number
@@ -451,7 +461,6 @@ interface UIApiKey {
   status: 'active' | 'inactive'
   created: number
   lastUsed: number | null
-  usageCount: number
   scopes: string[]
   linkedPlatform: { client: string; host: string } | null
 }
@@ -462,13 +471,15 @@ const includeIamRead = ref(false)
 const includeIamManage = ref(false)
 const includeComputeRun = ref(false)
 const computeEnabled = computed(() => getConfigSync().features?.computeEnabled === true)
+// loading tracks the initial key-list fetch; creating tracks key creation only,
+// so the form stays usable while the list loads.
 const loading = ref(false)
+const creating = ref(false)
 const error = ref<string | null>(null)
 const showKeyModal = ref(false)
 const newlyCreatedKey = ref<string>('')
 const copiedFromModal = ref(false)
-const modalCountdown = ref(30)
-let countdownInterval: number | null = null
+const keyModalPanel = ref<HTMLElement | null>(null)
 
 const loadAPIKeys = async () => {
   try {
@@ -485,7 +496,6 @@ const loadAPIKeys = async () => {
       status: key.status,
       created: key.created,
       lastUsed: key.last_used || null,
-      usageCount: 0, // Backend doesn't track this yet
       scopes: key.scopes,
       linkedPlatform: key.linked_platform ?? null,
     }))
@@ -498,10 +508,10 @@ const loadAPIKeys = async () => {
 }
 
 const createAPIKey = async () => {
-  if (!newKeyName.value.trim()) return
+  if (!newKeyName.value.trim() || creating.value) return
 
   try {
-    loading.value = true
+    creating.value = true
     error.value = null
 
     const scopes: string[] = []
@@ -534,7 +544,6 @@ const createAPIKey = async () => {
       status: 'active',
       created: response.api_key.created,
       lastUsed: null,
-      usageCount: 0,
       scopes: response.api_key.scopes,
       linkedPlatform: null,
     }
@@ -545,19 +554,10 @@ const createAPIKey = async () => {
     includeIamManage.value = false
     includeComputeRun.value = false
 
-    // Show modal with the full key
+    // Shown once. Stays open until Close, Escape, or the backdrop.
     newlyCreatedKey.value = response.api_key.key
     showKeyModal.value = true
-    modalCountdown.value = 30
     copiedFromModal.value = false
-
-    // Start countdown
-    countdownInterval = window.setInterval(() => {
-      modalCountdown.value--
-      if (modalCountdown.value <= 0) {
-        closeKeyModal()
-      }
-    }, 1000)
 
     // Show success notification
     success(t('config.apiKeys.keyCreatedSuccess'))
@@ -566,7 +566,7 @@ const createAPIKey = async () => {
     error.value = getErrorMessage(err) || t('config.apiKeys.errorCreating')
     showError(error.value!)
   } finally {
-    loading.value = false
+    creating.value = false
   }
 }
 
@@ -575,13 +575,65 @@ const maskAPIKey = (key: string): string => {
   return `${key.substring(0, 12)}...${key.substring(key.length - 8)}`
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+let previouslyFocused: HTMLElement | null = null
+let restoreFocusTimer: ReturnType<typeof setTimeout> | null = null
+
+const focusableInPanel = (): HTMLElement[] => {
+  if (!keyModalPanel.value) return []
+  return Array.from(keyModalPanel.value.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1
+  )
+}
+
+const clearRestoreFocus = () => {
+  if (restoreFocusTimer !== null) {
+    clearTimeout(restoreFocusTimer)
+    restoreFocusTimer = null
+  }
+}
+
 const closeKeyModal = () => {
   showKeyModal.value = false
   newlyCreatedKey.value = ''
-  if (countdownInterval) {
-    clearInterval(countdownInterval)
-    countdownInterval = null
+  const restore = previouslyFocused
+  previouslyFocused = null
+  clearRestoreFocus()
+  // Restoring focus inside the key event re-activates the control that opened
+  // the dialog. Move focus after that event has finished.
+  restoreFocusTimer = setTimeout(() => {
+    restoreFocusTimer = null
+    restore?.focus()
+  }, 0)
+}
+
+const onKeyModalKeydown = (event: KeyboardEvent) => {
+  if (!showKeyModal.value) return
+
+  if (event.key === 'Tab') {
+    const nodes = focusableInPanel()
+    if (nodes.length === 0) {
+      event.preventDefault()
+      return
+    }
+    const first = nodes[0]
+    const last = nodes[nodes.length - 1]
+    const active = document.activeElement
+    if (event.shiftKey && (active === first || !keyModalPanel.value?.contains(active))) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault()
+      first.focus()
+    }
+    return
   }
+
+  if (event.key !== 'Escape') return
+  event.preventDefault()
+  closeKeyModal()
 }
 
 const copyKeyFromModal = async () => {
@@ -665,8 +717,23 @@ const formatDate = (timestamp: number): string => {
   return formatDateTime(new Date(timestamp * 1000))
 }
 
+watch(showKeyModal, async (open) => {
+  if (!open) return
+  clearRestoreFocus()
+  previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  await nextTick()
+  const nodes = focusableInPanel()
+  ;(nodes[0] ?? keyModalPanel.value)?.focus()
+})
+
 onMounted(() => {
   loadAPIKeys()
+  document.addEventListener('keydown', onKeyModalKeydown)
+})
+
+onUnmounted(() => {
+  clearRestoreFocus()
+  document.removeEventListener('keydown', onKeyModalKeydown)
 })
 
 // Re-load when navigating back to this tab from api-documentation or other sub-pages.
@@ -675,14 +742,4 @@ onMounted(() => {
 onActivated(() => {
   loadAPIKeys()
 })
-
-// Watch for route changes within ConfigView (same component instance kept alive)
-watch(
-  () => route.path,
-  (newPath, oldPath) => {
-    if (newPath === '/channels/api' && oldPath !== '/channels/api') {
-      loadAPIKeys()
-    }
-  }
-)
 </script>

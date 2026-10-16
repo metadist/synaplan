@@ -25,6 +25,7 @@ jobs:
     # MUST match the runner used by CI's e2e-visual job — baselines recorded
     # on a different image would be permanently red.
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       APP_IMAGE: synaplan-test:ci
       APP_URL: http://localhost:8001
@@ -47,7 +48,7 @@ jobs:
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
       - name: Download Docker image artifact from CI run
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: docker-image
           path: /tmp
@@ -68,7 +69,7 @@ jobs:
           $COMPOSE up --wait || { $COMPOSE ps; $COMPOSE logs; exit 1; }
 
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version-file: .nvmrc
           cache: "npm"

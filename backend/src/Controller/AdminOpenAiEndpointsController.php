@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\AI\Credential\ChatReadinessService;
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\Entity\User;
+use App\Service\SelfAware\CapabilityInventory;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,6 +27,8 @@ final class AdminOpenAiEndpointsController extends AbstractController
 {
     public function __construct(
         private readonly OpenAiCompatibleEndpointRegistry $endpoints,
+        private readonly ChatReadinessService $chatReadiness,
+        private readonly ?CapabilityInventory $capabilityInventory = null,
     ) {
     }
 
@@ -67,7 +71,7 @@ final class AdminOpenAiEndpointsController extends AbstractController
                 new OA\Property(property: 'base_url', type: 'string', example: 'https://localai.example.com/v1'),
                 new OA\Property(property: 'api_key', type: 'string', nullable: true, description: 'Omit or send null to keep the existing key; empty string clears it'),
                 new OA\Property(property: 'headers', type: 'object', nullable: true),
-                new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['chat', 'vectorize', 'pic2text']),
+                new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['chat', 'vectorize', 'pic2text', 'text2pic']),
             ]
         )
     )]
@@ -97,6 +101,11 @@ final class AdminOpenAiEndpointsController extends AbstractController
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
+
+        // The model picker hides every model whose provider the availability
+        // snapshot calls offline. That snapshot is taken before this endpoint
+        // exists and lives for 30 s, so drop it before the next list request.
+        $this->refreshModelPicker();
 
         return $this->json([
             'success' => true,
@@ -155,7 +164,15 @@ final class AdminOpenAiEndpointsController extends AbstractController
             return $this->json(['error' => 'Endpoint not found'], Response::HTTP_NOT_FOUND);
         }
 
+        $this->refreshModelPicker();
+
         return $this->json(['success' => true]);
+    }
+
+    private function refreshModelPicker(): void
+    {
+        $this->chatReadiness->invalidate();
+        $this->capabilityInventory?->forget();
     }
 
     private function requireAdmin(?User $user): ?JsonResponse

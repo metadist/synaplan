@@ -6,6 +6,7 @@
       isSuperseded && 'opacity-50',
     ]"
     data-testid="message-container"
+    :data-message-id="backendMessageId != null ? String(backendMessageId) : undefined"
   >
     <!-- E2E: role marker for message-user / message-assistant -->
     <span :data-testid="`message-${role}`" class="sr-only" aria-hidden="true" />
@@ -17,11 +18,12 @@
       <ServiceIcon :service="displayProvider" :size="24" />
     </div>
 
-    <!-- Wrapper for thinking blocks + bubble -->
+    <!-- Wrapper for thinking blocks + bubble. The assistant bubble grows
+         with its text, up to the column width. -->
     <div
       :class="[
-        'flex flex-col flex-1 min-w-0 md:flex-none md:max-w-3xl gap-2',
-        role === 'user' ? 'items-end' : '',
+        'flex flex-col flex-1 min-w-0 max-w-[min(100%,60rem)] gap-2',
+        role === 'user' ? 'items-end md:flex-none md:w-fit' : 'md:flex-initial md:w-max',
       ]"
     >
       <!-- Thinking blocks (ABOVE bubble, only for assistant) -->
@@ -66,7 +68,7 @@
           v-if="role === 'assistant' && (isStreaming || copyableText)"
           type="button"
           :class="[
-            'absolute top-2 right-2 z-10 p-1.5 rounded-md txt-secondary bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 hover:txt-primary',
+            'absolute top-2 right-2 z-10 p-1.5 rounded-xl txt-secondary bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 hover:txt-primary',
             'transition-opacity duration-200',
             isStreaming
               ? 'opacity-0 pointer-events-none'
@@ -197,6 +199,33 @@
           :data-message-id="backendMessageId"
           :data-message-role="role"
         >
+          <div v-if="editing" class="space-y-2" data-testid="message-edit-form">
+            <textarea
+              v-model="editDraft"
+              class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+              rows="3"
+              :aria-label="t('chatMessage.edit')"
+              data-testid="input-message-edit"
+            />
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="btn-primary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+                data-testid="btn-message-edit-save"
+                @click="saveEdit"
+              >
+                {{ t('chatMessage.editSave') }}
+              </button>
+              <button
+                type="button"
+                class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+                data-testid="btn-message-edit-cancel"
+                @click="editing = false"
+              >
+                {{ t('chatMessage.editCancel') }}
+              </button>
+            </div>
+          </div>
           <!-- Quoted reference the user attached when sending this message -->
           <div
             v-if="quotedText"
@@ -223,7 +252,7 @@
                       ? 'bg-black/25 hover:bg-black/35'
                       : 'bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20',
                   ]"
-                  @click="downloadFile(file)"
+                  @click="openFileChip(file, $event)"
                 >
                   <Icon :icon="getFileIcon(file.fileType)" class="w-4 h-4 flex-shrink-0" />
                   <span class="font-medium truncate min-w-0 flex-1">{{ file.filename }}</span>
@@ -232,6 +261,24 @@
                     class="text-xs opacity-60 flex-shrink-0 whitespace-nowrap"
                     >{{ formatFileSize(file.fileSize) }}</span
                   >
+                  <button
+                    type="button"
+                    class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
+                    :aria-label="t('files.download')"
+                    data-testid="btn-message-file-download"
+                    @click.stop="downloadFile(file)"
+                  >
+                    <ArrowDownTrayIcon class="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
+                    :aria-label="t('chatMessage.fileReattach')"
+                    data-testid="btn-message-file-reattach"
+                    @click.stop="emit('reattachFile', file)"
+                  >
+                    <ArrowPathIcon class="h-4 w-4" />
+                  </button>
                   <FileOfficeActions
                     v-if="file.id && showOfficeActions(file)"
                     :file-id="file.id"
@@ -290,7 +337,7 @@
               <!-- Show More/Less Button -->
               <button
                 v-if="totalBadgesCount > 3"
-                class="flex items-center gap-1 px-3 py-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-sm txt-secondary font-medium"
+                class="flex items-center gap-1 px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-sm txt-secondary font-medium"
                 data-testid="btn-message-badges-toggle"
                 @click="showAllBadges = !showAllBadges"
               >
@@ -335,10 +382,11 @@
             :plan="displayTaskPlan"
             :schedule-source="scheduleSource"
             :source-message-id="backendMessageId"
-            :guest="isGuestMode"
+            :guest="isGuestMode || canRewrite === false"
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
             @followup-task="emit('followupTask', $event)"
+            @ask-user="emit('askUser', $event)"
           />
 
           <!-- Background async media job (Release 4.0 — e.g. detached video render) -->
@@ -346,6 +394,7 @@
             <MediaJobStatus
               :media-job="mediaJob!"
               :model-label="mediaJobModelLabel ?? undefined"
+              :readonly="canRewrite === false"
               @update:media-job="emit('mediaJobUpdate', $event)"
               @completed="emit('mediaJobCompleted', $event)"
               @cancel="emit('mediaJobCancel', $event)"
@@ -362,13 +411,28 @@
             :foreign-memory="foreignMemory"
           />
 
+          <p
+            v-if="role === 'assistant' && voiceReplyFailed"
+            class="px-4 pb-2 text-sm txt-secondary"
+            data-testid="voice-reply-failed"
+          >
+            {{ $t(`chat.voiceReplyFailed.${voiceReplyFailed}`) }}
+          </p>
+          <p
+            v-if="role === 'assistant' && readAloudFailed"
+            class="px-4 pb-2 text-sm txt-secondary"
+            data-testid="read-aloud-failed"
+          >
+            {{ $t('chat.readAloudStopped') }}
+          </p>
+
           <ChatErrorNotice
             v-if="role === 'assistant' && errorReason"
             class="m-3"
             :error-reason="errorReason"
             :error-message="errorMessage"
             :has-partial-answer="hasPartialAnswer"
-            :can-retry-model="canRetryModel"
+            :can-retry-model="canRewrite !== false && canRetryModel"
             :error-debug="errorDebug"
             :recommended-model-id="selectedModel?.id ?? null"
             :failed-model-id="failedModelId"
@@ -376,9 +440,10 @@
             @retry="handleErrorRetry"
           />
 
-          <!-- Continue Button (truncated response) -->
+          <!-- Continue Button (truncated response). Hidden on a shared chat:
+               continuing writes into the owner's conversation. -->
           <div
-            v-if="role === 'assistant' && truncated && !isStreaming"
+            v-if="role === 'assistant' && truncated && !isStreaming && canRewrite !== false"
             class="mt-3 pt-3 border-t border-light-border/30 dark:border-dark-border/20"
           >
             <p class="text-sm txt-muted mb-2">
@@ -386,7 +451,7 @@
             </p>
             <button
               type="button"
-              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-[var(--color-accent)] text-white hover:opacity-90 dark:bg-[var(--color-accent)] dark:text-white dark:hover:opacity-90"
+              class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl transition-colors bg-[var(--color-accent)] text-white hover:opacity-90 dark:bg-[var(--color-accent)] dark:text-white dark:hover:opacity-90"
               data-testid="btn-continue-response"
               @click="emit('continue')"
             >
@@ -405,6 +470,11 @@
           <!-- Used Feedbacks (AFTER memories, before search results) -->
           <MessageFeedbacks v-if="role === 'assistant' && feedbacks" :feedbacks="feedbacks" />
 
+          <KnowledgeSources
+            v-if="role === 'assistant' && ragSources && ragSources.length > 0"
+            :sources="ragSources"
+          />
+
           <!-- Web Search Results Carousel (AFTER content) -->
           <div
             v-if="searchResults && searchResults.length > 0 && role === 'assistant'"
@@ -413,8 +483,10 @@
             <!-- Header with Expand/Collapse Button -->
             <div class="flex items-center justify-between gap-2">
               <button
+                type="button"
                 class="flex items-center gap-2 text-sm font-medium txt-tertiary hover:txt-primary transition-colors"
                 data-testid="btn-message-sources-toggle"
+                :aria-expanded="sourcesExpanded"
                 @click="sourcesExpanded = !sourcesExpanded"
               >
                 <Icon icon="mdi:web" class="w-4 h-4" />
@@ -433,7 +505,7 @@
               >
                 <button
                   :disabled="carouselPage === 0"
-                  class="p-1 sm:p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  class="p-1 sm:p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   :title="'Previous'"
                   data-testid="btn-message-sources-prev"
                   @click="previousSource"
@@ -454,7 +526,7 @@
                 </span>
                 <button
                   :disabled="carouselPage >= Math.ceil(searchResults.length / 3) - 1"
-                  class="p-1 sm:p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  class="p-1 sm:p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   :title="'Next'"
                   data-testid="btn-message-sources-next"
                   @click="nextSource"
@@ -465,7 +537,7 @@
             </div>
 
             <!-- Carousel Container (collapsible) -->
-            <div v-show="sourcesExpanded" class="py-2 px-3">
+            <div v-show="sourcesExpanded" class="py-2 px-3" data-testid="message-sources-list">
               <div
                 class="relative overflow-x-auto sm:overflow-x-hidden scroll-thin snap-x snap-mandatory sm:snap-none"
               >
@@ -480,7 +552,7 @@
                     :key="index"
                     type="button"
                     :class="[
-                      'group flex flex-col gap-2 p-2 sm:p-3 rounded-lg transition-all cursor-pointer flex-shrink-0 snap-start',
+                      'group flex flex-col gap-2 p-2 sm:p-3 rounded-xl transition-all cursor-pointer flex-shrink-0 snap-start',
                       'w-[85%] sm:w-[calc(33.333%-0.5rem)]',
                       'bg-[var(--bg-chip)] border shadow-sm text-left font-inherit',
                       highlightedSource === index
@@ -591,6 +663,7 @@
                  properties, so we branch the whole class list instead. -->
             <div v-if="role === 'assistant' && hasInfoPopover && !isProcessing" class="relative">
               <button
+                ref="infoButtonRef"
                 type="button"
                 :class="
                   isMobileViewport
@@ -624,13 +697,33 @@
                     <div v-if="topic" class="flex items-center justify-between gap-2">
                       <span class="text-xs txt-tertiary">{{ t('chatMessage.infoTopic') }}</span>
                       <router-link
-                        :to="`/ai/instructions?topic=${topic}`"
+                        :to="`/ai/models?tab=topics&topic=${topic}`"
                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                         @click="closeInfoPopover"
                       >
                         <Icon icon="mdi:tag" class="w-3 h-3" />
                         <span class="uppercase">{{ topic }}</span>
                       </router-link>
+                    </div>
+
+                    <!-- Live model that spoke this reply. When it asked Synaplan,
+                         the Synaplan model is the AI Model row below. -->
+                    <div
+                      v-if="aiModels?.voice && isKnownModelName(aiModels.voice.model)"
+                      class="flex items-center justify-between gap-2"
+                      data-testid="info-live-model"
+                    >
+                      <span class="text-xs txt-tertiary">{{ t('chatMessage.infoLiveModel') }}</span>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl text-xs font-medium bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 transition-colors cursor-pointer"
+                        @click="handleInfoModelClick('voice')"
+                      >
+                        <Icon icon="mdi:microphone" class="w-3.5 h-3.5" />
+                        <span class="font-semibold truncate max-w-[10rem]">{{
+                          shortenModel(aiModels.voice.model)
+                        }}</span>
+                      </button>
                     </div>
 
                     <!-- AI Model (the model actually used for this response,
@@ -644,7 +737,7 @@
                       <span class="text-xs txt-tertiary">{{ t('chatMessage.infoAiModel') }}</span>
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl text-xs font-medium bg-brand-alpha-light hover:bg-brand-alpha transition-colors cursor-pointer"
                         @click="handleInfoModelClick('chat')"
                       >
                         <Icon :icon="getModelTypeIcon" class="w-3.5 h-3.5" />
@@ -668,7 +761,7 @@
                       }}</span>
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 transition-colors cursor-pointer"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl text-xs font-medium bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-400 transition-colors cursor-pointer"
                         @click="handleInfoModelClick('audio')"
                       >
                         <Icon icon="mdi:music" class="w-3.5 h-3.5" />
@@ -683,7 +776,7 @@
                       <span class="text-xs txt-tertiary">{{ $t('config.aiModels.sorting') }}</span>
                       <button
                         type="button"
-                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
+                        class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-xl text-xs font-medium bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 transition-colors cursor-pointer"
                         @click="handleInfoModelClick('sorting')"
                       >
                         <Icon icon="mdi:sort" class="w-3.5 h-3.5" />
@@ -713,6 +806,16 @@
                     <!-- Per-reply usage (tokens + cost). Rendered here so it is
                          reachable on touch devices, where the inline badge is
                          hidden to keep the footer from colliding. -->
+                    <template v-if="usageExtraLines.length > 0">
+                      <div
+                        v-for="line in usageExtraLines"
+                        :key="line"
+                        class="flex items-center justify-between gap-2"
+                        data-testid="info-usage-step"
+                      >
+                        <span class="text-xs txt-secondary">{{ line }}</span>
+                      </div>
+                    </template>
                     <template v-if="usageBadge">
                       <div class="flex items-center justify-between gap-2">
                         <span class="text-xs txt-tertiary">{{ t('chatMessage.infoTokens') }}</span>
@@ -745,6 +848,68 @@
               {{ usageBadge.tokens }} · {{ usageBadge.cost }}
             </span>
           </div>
+
+          <div
+            v-if="
+              canRewrite !== false &&
+              (role === 'assistant' ? versionList.length : editList.length) > 1
+            "
+            class="flex items-center gap-1"
+            data-testid="message-versions"
+          >
+            <button
+              type="button"
+              class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
+              :aria-label="t('chatMessage.versionPrevious')"
+              data-testid="btn-version-previous"
+              @click="stepVersion(-1)"
+            >
+              <ChevronLeftIcon class="h-4 w-4" />
+            </button>
+            <span class="text-xs txt-secondary tabular-nums">
+              {{
+                t('chatMessage.versionPosition', {
+                  current: versionPosition.current,
+                  total: versionPosition.total,
+                })
+              }}
+            </span>
+            <button
+              type="button"
+              class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
+              :aria-label="t('chatMessage.versionNext')"
+              data-testid="btn-version-next"
+              @click="stepVersion(1)"
+            >
+              <ChevronRightIcon class="h-4 w-4" />
+            </button>
+          </div>
+          <button
+            v-if="artifacts.length > 0"
+            type="button"
+            class="btn-secondary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
+            data-testid="btn-artifact-preview"
+            @click="openArtifact = artifacts[0]"
+          >
+            <EyeIcon class="h-4 w-4" />
+            {{ t('chatMessage.previewArtifact') }}
+          </button>
+          <button
+            v-if="
+              role === 'user' &&
+              backendMessageId &&
+              !editing &&
+              canRewrite !== false &&
+              !isGuestMode
+            "
+            type="button"
+            class="btn-secondary inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium"
+            data-testid="btn-message-edit"
+            @click="startEdit"
+          >
+            <PencilIcon class="h-4 w-4" />
+            {{ t('chatMessage.edit') }}
+          </button>
 
           <!-- Right: Actions (assistant only, hidden during streaming) -->
           <!-- Show if: has againData OR has backend message ID (can fetch models) -->
@@ -795,7 +960,7 @@
                  whole plan, so offer one plain "Again" that re-runs the full
                  pipeline (re-classify + re-plan). -->
             <button
-              v-if="isMultitaskTurn"
+              v-if="isMultitaskTurn && canRewrite !== false"
               type="button"
               :disabled="isSuperseded || isGuestMode"
               :class="[
@@ -815,7 +980,7 @@
               />
             </button>
 
-            <div v-else class="relative">
+            <div v-else-if="canRewrite !== false" class="relative">
               <!-- Single "Again with… ▾" control: opening the dropdown and
                    picking a model re-runs the prompt (see selectModel). The old
                    standalone "Again with <model>" button was merged into this to
@@ -915,14 +1080,16 @@
               <div class="flex flex-wrap gap-2">
                 <button
                   v-if="purchaseAllowed && config.billing.enabled"
-                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg transition-all"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg transition-all"
                   @click="$router.push('/subscription')"
                 >
                   <Icon icon="mdi:crown" class="w-4 h-4" />
                   {{ $t('limitReached.upgradeNow') }}
                 </button>
                 <button
-                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                  v-if="canRewrite !== false"
+                  type="button"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium surface-chip txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
                   @click="handleRetry"
                 >
                   <Icon icon="mdi:refresh" class="w-4 h-4" />
@@ -945,17 +1112,28 @@
   </div>
 
   <ExternalLinkWarning :url="pendingUrl" :is-open="warningOpen" @close="closeWarning" />
-  <DocumentPreviewModal
+  <ChatFilePreview
     :open="previewFile !== null"
     :file="previewFile"
-    :guest-session-id="guestSessionId"
-    @close="previewFile = null"
+    :guest-session-id="isGuestMode ? guestSessionId : null"
+    :can-reattach="canRewrite !== false && !isGuestMode"
+    :return-focus="fileReturnFocus"
+    @close="closeFilePreview"
+    @download="previewFile && downloadPreview()"
+    @reattach="previewFile && reattachPreview()"
+  />
+  <ArtifactPanel
+    v-if="openArtifact"
+    :artifact="openArtifact"
+    :filename="artifactFilename"
+    @close="openArtifact = null"
   />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
+import { TOOL_RESULT_MARKER } from '@/utils/apiToolTurn'
 import { useI18n } from 'vue-i18n'
 import {
   UserIcon,
@@ -963,6 +1141,11 @@ import {
   ChevronDownIcon,
   ClipboardDocumentIcon,
   CheckIcon,
+  ArrowDownTrayIcon,
+  PencilIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EyeIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useModelSelection, type ModelOption } from '@/composables/useModelSelection'
@@ -970,6 +1153,7 @@ import ModelCostBadge from '@/components/ModelCostBadge.vue'
 import ToolBadge from '@/components/ToolBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
+import type { RagSourceRef } from '@/stores/history'
 import { useNotification } from '@/composables/useNotification'
 import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
 import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
@@ -982,6 +1166,7 @@ import { useConfigStore } from '@/stores/config'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
+import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
@@ -996,6 +1181,7 @@ import MediaJobStatus from '@/components/MediaJobStatus.vue'
 import ProcessingTimeline from '@/components/chat/ProcessingTimeline.vue'
 import {
   timelineFromStatus,
+  timelineFromStoredCards,
   type TimelineModel,
   type TimelineStep,
 } from '@/utils/processingTimeline'
@@ -1008,14 +1194,16 @@ import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { chatErrorReasonKey } from '@/utils/chatErrorDisplay'
+import { extractArtifacts, type ChatArtifact } from '@/utils/chatArtifacts'
+import { isModuleConfigured } from '@/composables/useModuleFeature'
 
 const { t, te, locale } = useI18n()
 const guestStore = useGuestStore()
 const guestSessionId = computed(() => guestStore.sessionId)
-const previewFile = ref<{ id: number; filename: string } | null>(null)
-const DocumentPreviewModal = defineAsyncComponent(
-  () => import('@/components/files/DocumentPreviewModal.vue')
-)
+const previewFile = ref<{ id: number; filename: string; fileSize?: number } | null>(null)
+const fileReturnFocus = ref<HTMLElement | null>(null)
+const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
+const ArtifactPanel = defineAsyncComponent(() => import('@/components/chat/ArtifactPanel.vue'))
 
 const showOfficeActions = (file: MessageFile): boolean => {
   if (!file.id) return false
@@ -1025,7 +1213,40 @@ const showOfficeActions = (file: MessageFile): boolean => {
 }
 
 const openPreview = (file: MessageFile) => {
-  previewFile.value = { id: file.id, filename: file.filename }
+  previewFile.value = { id: file.id, filename: file.filename, fileSize: file.fileSize }
+}
+
+const openFileChip = (file: MessageFile, event: MouseEvent) => {
+  fileReturnFocus.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  openPreview(file)
+}
+
+const closeFilePreview = () => {
+  previewFile.value = null
+}
+
+const downloadPreview = () => {
+  const file = previewFile.value
+  if (!file) return
+  void downloadFile({
+    id: file.id,
+    filename: file.filename,
+    fileType: '',
+    filePath: '',
+    fileSize: file.fileSize,
+  })
+}
+
+const reattachPreview = () => {
+  const file = previewFile.value
+  if (!file) return
+  emit('reattachFile', {
+    id: file.id,
+    filename: file.filename,
+    fileType: '',
+    filePath: '',
+    fileSize: file.fileSize,
+  })
 }
 
 const officeSiblingIds = computed(() =>
@@ -1102,6 +1323,10 @@ interface Props {
     ok?: boolean
   }>
   documentFidelityLossy?: boolean
+  /** Voice-reply failure reason when TTS was requested but no audio was stored (#2282). */
+  voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited'
+  /** Live reading stopped. Stays visible when the full spoken file arrives. */
+  readAloudFailed?: boolean
   searchResults?: Array<{
     title: string
     url: string
@@ -1112,6 +1337,7 @@ interface Props {
     shared?: boolean
     ownerName?: string
   }> | null // Web search results
+  ragSources?: RagSourceRef[] | null
   aiModels?: {
     chat?: {
       provider: string
@@ -1127,6 +1353,11 @@ interface Props {
     // Sent independently from `chat` because voice reply pipes the
     // LLM's text through a separate TTS pipeline — see issue #583.
     audio?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
+    voice?: {
       provider: string
       model: string
       model_id: number | null
@@ -1159,10 +1390,18 @@ interface Props {
   usage?: MessageUsage | null
   // Other billed steps in the same turn (sorting, planning, transcription, media).
   usageExtra?: MessageUsage[] | null
+  versions?: { id: number; index: number; selected: boolean; model: string | null }[]
+  edits?: { id: number; index: number; selected: boolean; model: string | null }[]
   // Whether the taximeter display is active (admin switch + authed web user).
   usageTaximeterActive?: boolean
   // Status for failed/pending messages
   isGuestMode?: boolean
+  /**
+   * Owner-only writes (Again, Again with, Continue, task-plan Stop/Retry,
+   * rate-limit Retry). Shared chats keep Continue as my copy on the banner.
+   * Undefined still shows the actions; only an explicit false hides them.
+   */
+  canRewrite?: boolean
   /**
    * Received (shared) conversation: `[Memory:ID]` belongs to the chat owner.
    * MessageText renders a terminal badge and never looks the id up.
@@ -1205,6 +1444,18 @@ const stepLabel = (step: DocumentStep): string => {
  * Usage taximeter hover badge: "<tokens> · <cost>" for the complete assistant
  * turn, including routing, planning, transcription and media usage.
  */
+const usageExtraLines = computed(() => {
+  const extra = props.usageExtra ?? []
+  return extra
+    .filter((entry) => entry.totalTokens > 0)
+    .map((entry) =>
+      t('chatMessage.infoUsageStep', {
+        kind: entry.kind || 'step',
+        tokens: formatTokens(entry.totalTokens, locale.value),
+      })
+    )
+})
+
 const usageBadge = computed<{ tokens: string; cost: string } | null>(() => {
   if (props.role !== 'assistant' || !props.usageTaximeterActive) {
     return null
@@ -1214,7 +1465,9 @@ const usageBadge = computed<{ tokens: string; cost: string } | null>(() => {
 
   return {
     tokens: formatTokens(total.totalTokens, locale.value),
-    cost: formatCostDisplay(total.cost, locale.value, t('usageTaximeter.lessThanCent')),
+    cost: total.priceKnown
+      ? formatCostDisplay(total.cost, locale.value, t('usageTaximeter.lessThanCent'))
+      : t('models.costTier.unknown'),
   }
 })
 
@@ -1231,7 +1484,9 @@ const copied = ref(false)
 const copyableText = computed(() =>
   props.parts
     .filter((p) => p.type !== 'thinking')
-    .map((p) => p.content ?? '')
+    .map((p) =>
+      p.content === TOOL_RESULT_MARKER ? t('message.toolStepHidden') : (p.content ?? '')
+    )
     .join('\n')
     .trim()
 )
@@ -1254,11 +1509,11 @@ const copyMessageText = async () => {
 const showAllBadges = ref(false)
 
 // Sources expand/collapse state.
-// Default OPEN: when the assistant ran a web search, the sources are part of
-// the answer's citation context, so they should be visible without an extra
-// click. Users can still collapse the section via the chevron toggle if they
-// want a denser thread view.
-const sourcesExpanded = ref(true)
+// Default FOLDED: a web search drops its result cards under the answer. The
+// standard view keeps that section closed so the thread stays readable. The
+// Sources control unfolds and folds it again. A citation click still opens
+// the matching card.
+const sourcesExpanded = ref(false)
 
 // Carousel state for search results
 const carouselPage = ref(0) // Which "page" we're on (0-based)
@@ -1433,11 +1688,12 @@ const visibleTimelineSteps = computed<TimelineStep[]>(() => {
   return steps.filter((step) => step.state === 'active')
 })
 
-const collapsedTimelineSteps = computed<TimelineStep[]>(() =>
-  progressNarrationSwitches().steps
-    ? allTimelineSteps.value.filter((step) => !step.afterAnswer && step.state === 'done')
-    : []
-)
+const collapsedTimelineSteps = computed<TimelineStep[]>(() => {
+  if (!progressNarrationSwitches().steps) return []
+  const live = allTimelineSteps.value.filter((step) => !step.afterAnswer && step.state === 'done')
+  if (live.length > 0) return live
+  return timelineFromStoredCards(props.taskPlan?.cards)
+})
 
 // Multitask routing, #1229 smart collapse: mark a task card's prose redundant
 // when that text is already part of the final answer in the message body —
@@ -1611,15 +1867,85 @@ const emit = defineEmits<{
   mediaJobUpdate: [job: MediaJobInfo]
   mediaJobCompleted: [payload: { url: string; type: string }]
   mediaJobCancel: [jobId: string]
+  reattachFile: [file: MessageFile]
+  selectVersion: [messageId: number, kind: 'answer' | 'edit']
+  editMessage: [text: string]
+  askUser: [payload: { nodeId: string; answer: string; skip: boolean }]
 }>()
 
 const router = useRouter()
 const modelDropdownOpen = ref(false)
 const infoPopoverOpen = ref(false)
+const infoButtonRef = ref<HTMLButtonElement | null>(null)
+const editing = ref(false)
+const editDraft = ref('')
+const openArtifact = ref<ChatArtifact | null>(null)
+
+const artifactSource = computed(() =>
+  props.parts
+    .filter((part) => part.type === 'text')
+    .map((part) => part.content || '')
+    .join('\n')
+)
+const artifacts = computed(() =>
+  isModuleConfigured('chat_artifacts') ? extractArtifacts(artifactSource.value) : []
+)
+const artifactFilename = computed(() => `preview-${props.backendMessageId ?? 'chat'}`)
+const versionList = computed(() => props.versions ?? [])
+const editList = computed(() => props.edits ?? [])
+const versionPosition = computed(() => {
+  const list = props.role === 'user' ? editList.value : versionList.value
+  const current = list.findIndex((item) => item.selected) + 1
+  return { current: current > 0 ? current : 1, total: list.length }
+})
+
+function stepVersion(delta: number): void {
+  const list = props.role === 'user' ? editList.value : versionList.value
+  if (list.length < 2) return
+  const current = Math.max(
+    0,
+    list.findIndex((item) => item.selected)
+  )
+  const next = list[(current + delta + list.length) % list.length]
+  emit('selectVersion', next.id, props.role === 'user' ? 'edit' : 'answer')
+}
+
+function startEdit(): void {
+  editDraft.value = artifactSource.value
+  editing.value = true
+}
+
+function saveEdit(): void {
+  const text = editDraft.value.trim()
+  if (text === '') return
+  editing.value = false
+  emit('editMessage', text)
+}
+
+function onInfoEscape(event: KeyboardEvent): void {
+  if (event.key !== 'Escape' || !infoPopoverOpen.value) return
+  event.preventDefault()
+  closeInfoPopover()
+}
+
+watch(infoPopoverOpen, (open) => {
+  if (open) {
+    window.addEventListener('keydown', onInfoEscape)
+    return
+  }
+  window.removeEventListener('keydown', onInfoEscape)
+  infoButtonRef.value?.focus()
+})
 
 const hasMessageMetadata = computed(() => {
   if (props.topic) return true
-  if (props.aiModels?.chat || props.aiModels?.sorting || props.aiModels?.audio) return true
+  if (
+    props.aiModels?.chat ||
+    props.aiModels?.sorting ||
+    props.aiModels?.audio ||
+    props.aiModels?.voice
+  )
+    return true
   // Only count legacy model/provider as metadata when neither is a
   // channel-source token, otherwise we'd light up the info popover
   // with nothing meaningful to show (issue #653).
@@ -1636,7 +1962,7 @@ const closeInfoPopover = () => {
   infoPopoverOpen.value = false
 }
 
-const handleInfoModelClick = (modelType: 'chat' | 'sorting' | 'audio') => {
+const handleInfoModelClick = (modelType: 'chat' | 'sorting' | 'audio' | 'voice') => {
   showModelDetails(modelType)
   closeInfoPopover()
 }
@@ -1733,7 +2059,7 @@ const getModelForOption = (option: ModelOption): AIModel | undefined => {
 }
 
 // Navigate to AI models configuration with highlight
-const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
+const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio' | 'voice') => {
   if (modelType === 'chat') {
     const capabilityMap: Record<string, string> = {
       vision: 'PIC2TEXT',
@@ -1750,6 +2076,8 @@ const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
     router.push({ path: '/ai/models', query: { highlight: 'SORT' } })
   } else if (modelType === 'audio') {
     router.push({ path: '/ai/models', query: { highlight: 'TEXT2SOUND' } })
+  } else if (modelType === 'voice') {
+    router.push({ path: '/ai/models', query: { highlight: 'VOICE_LIVE' } })
   } else {
     router.push('/ai/models')
   }
@@ -1757,6 +2085,7 @@ const showModelDetails = (modelType?: 'chat' | 'sorting' | 'audio') => {
 
 // Handle retry for rate-limited messages
 const handleRetry = () => {
+  if (props.canRewrite === false) return
   // Extract text content from message
   const textContent = props.parts
     .filter((p) => p.type === 'text')
@@ -1809,6 +2138,7 @@ const handleSimpleAgain = () => {
 }
 
 const handleErrorRetry = (modelId?: number) => {
+  if (props.canRewrite === false) return
   emit('again', props.backendMessageId ?? 0, modelId)
 }
 
@@ -1919,7 +2249,7 @@ const handleReferenceClick = (event: MouseEvent) => {
       const resolvedMemories = memories.value
       if (index >= 0 && resolvedMemories && index < resolvedMemories.length) {
         const memory = resolvedMemories[index]
-        // Emit event to open MemoriesDialog in ChatView (stay in chat!)
+        // Opens the Memories page; browser Back returns to this chat.
         emit('click-memory', memory)
       }
     }
@@ -1952,6 +2282,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', handleReferenceClick)
   mobileMq.removeEventListener('change', onMobileMqChange)
+  window.removeEventListener('keydown', onInfoEscape)
   clearLongRunningTimer()
 })
 </script>

@@ -1,6 +1,7 @@
 import { test, expect } from '../test-setup'
 import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
+import { selectors } from '../helpers/selectors'
 import { FIXTURE_PATHS, PROMPTS } from '../config/test-data'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
@@ -30,6 +31,46 @@ test.describe('@ci @smoke Chat', () => {
 
     await test.step('Assert: stream ended and assistant reply non-empty', async () => {
       expect(aiText.length).toBeGreaterThan(0)
+    })
+  })
+})
+
+test.describe('@ci Chat — math formulas', () => {
+  test('formulas in a message render with KaTeX styles and fonts', async ({ page }) => {
+    await openApp(page)
+    const chat = new ChatHelper(page)
+
+    await test.step('Arrange: start new chat', async () => {
+      await chat.startNewChat()
+    })
+
+    const previousCount = await chat.sendMessage(PROMPTS.MATH_FORMULAS)
+    await chat.waitForAnswer(previousCount)
+    const userBubble = page.locator(selectors.chat.userMessageBubble).last()
+
+    await test.step('Assert: inline and display formula rendered without KaTeX errors', async () => {
+      await expect(userBubble.locator(selectors.chat.katexFormula)).toHaveCount(2)
+      await expect(userBubble.locator(selectors.chat.katexDisplay)).toHaveCount(1)
+      await expect(userBubble.locator(selectors.chat.katexError)).toHaveCount(0)
+    })
+
+    await test.step('Assert: KaTeX stylesheet applied and its fonts loaded', async () => {
+      await expect(userBubble.locator(selectors.chat.katexFormula).first()).toHaveCSS(
+        'font-family',
+        /KaTeX_Main/
+      )
+      await expect
+        .poll(() =>
+          page.evaluate(async () => {
+            await document.fonts.ready
+            const loaded: string[] = []
+            document.fonts.forEach((face) => {
+              if (face.status === 'loaded') loaded.push(face.family.replace(/["']/g, ''))
+            })
+            return loaded
+          })
+        )
+        .toEqual(expect.arrayContaining(['KaTeX_Main', 'KaTeX_Math']))
     })
   })
 })

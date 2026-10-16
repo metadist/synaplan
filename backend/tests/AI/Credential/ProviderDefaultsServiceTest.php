@@ -48,7 +48,7 @@ final class ProviderDefaultsServiceTest extends TestCase
      * apply time in an operator's install.
      */
     /**
-     * Media and speech providers share the key store (Models & keys is the one
+     * Media and speech providers share the key store (Providers & keys is the one
      * editor) but serve no chat model, so they have no recommended defaults.
      * Anything else in the store must have some.
      */

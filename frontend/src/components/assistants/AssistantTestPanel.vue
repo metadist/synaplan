@@ -16,19 +16,26 @@
       >
         {{ line }}
       </p>
+      <p
+        v-if="liveReply"
+        class="text-sm txt-primary whitespace-pre-wrap"
+        data-testid="text-test-live"
+      >
+        {{ liveReply }}
+      </p>
     </div>
     <form class="flex gap-2" @submit.prevent="send">
       <input
         ref="draftInputRef"
         v-model="draft"
         type="text"
-        class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        class="flex-1 min-w-0 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.tryDraftPlaceholder')"
         data-testid="input-test-message"
       />
       <button
         type="submit"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="sending || !draft.trim()"
         data-testid="btn-test-send"
       >
@@ -39,10 +46,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api/chatApi'
 import { useAgentsStore } from '@/stores/agents'
+import { createSmoothStream, type SmoothStream } from '@/utils/smoothStream'
+import { consumeVisibleAnswer } from '@/utils/processingTimeline'
 
 const store = useAgentsStore()
 const authStore = useAuthStore()
@@ -50,6 +59,12 @@ const draft = ref('')
 const draftInputRef = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const lines = ref<string[]>([])
+const liveReply = ref('')
+let replySmoother: SmoothStream | null = null
+
+onUnmounted(() => {
+  replySmoother?.cancel()
+})
 
 const usingDefaultChat = computed(() => {
   const chat = store.current?.draft?.models.chat
@@ -69,7 +84,17 @@ function send(): void {
   draftInputRef.value?.focus()
   lines.value.push(message)
   sending.value = true
+  liveReply.value = ''
+  replySmoother?.cancel()
   let reply = ''
+  let insideThink = false
+  let pendingThink = ''
+  const smoother = createSmoothStream({
+    onRender: (text) => {
+      liveReply.value = text
+    },
+  })
+  replySmoother = smoother
   chatApi.streamMessage({
     userId,
     message,
@@ -79,13 +104,21 @@ function send(): void {
     history: [],
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
-        reply += data.chunk
+        const visible = consumeVisibleAnswer(data.chunk, insideThink, pendingThink)
+        insideThink = visible.insideThink
+        pendingThink = visible.pending
+        reply += visible.text
+        smoother.push(reply)
       }
       if (data.status === 'complete' || data.status === 'error') {
+        smoother.flush()
         if (reply) {
           lines.value.push(reply)
         }
+        liveReply.value = ''
         sending.value = false
+        smoother.cancel()
+        if (replySmoother === smoother) replySmoother = null
       }
     },
   })

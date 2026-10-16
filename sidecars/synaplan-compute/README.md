@@ -6,6 +6,10 @@ this HTTP API (protocol 1).
 
 **Go/no-go (A0):** own sidecar. See [docs/SPIKE.md](docs/SPIKE.md), [docs/API.md](docs/API.md), and [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
+Developers start this from the Synaplan checkout with a plain
+`docker compose up`. Details: [root README](../../README.md#file-work)
+and [docs/COMPUTE.md](../../docs/COMPUTE.md).
+
 ## Layout
 
 | Path | Role |
@@ -32,11 +36,22 @@ make build
 # GET http://127.0.0.1:8080/v1/health  (unauthenticated)
 ```
 
+A checkout started with `docker compose up` does not use that command. It
+uses the fixed demo token `synaplan-dev-compute-token-change-me-32b` (see
+the root README, File work). Leave that default alone. Set your own
+`COMPUTE_TOKEN` before any shared or production host.
+
 If dockerd is unreachable, **health still works**. Runs that pass validation fail with a clean status record (`docker_unavailable`) rather than taking down the process.
 
 ### Networking
 
-Egress is **not implemented** in A0–A2. Every container is created with `NetworkMode=none`; a request with a non-empty `egress.allow` is refused with `egress_not_allowed`, and `COMPUTE_EGRESS_ENABLED` is reserved (parsed, no effect).
+Runs without `egress.allow` are created with `NetworkMode=none`. A run with
+an allow-list (only when `COMPUTE_EGRESS_ENABLED=1`) gets a private internal
+network plus a throwaway proxy container (same image, `proxy` subcommand)
+that dials the pinned public IPs; anything else is refused with
+`egress_not_allowed` (unknown host, wrong port, IP literal, private range,
+over the host cap, or flag off). See `docs/THREAT_MODEL.md` for the full
+posture.
 
 ### Permissions
 

@@ -50,12 +50,11 @@ test.describe('Summarize a document in chat', () => {
 
   test('@ci Manage Assistants has no Summarizer page link', async ({ page }) => {
     await openApp(page)
-    const manage = page.locator(NAV.sidebarV2Manage)
-    await expect(manage).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await manage.click()
-    await page.locator(NAV.flyoutGroup('assistants')).click()
-    const sub = page.locator(NAV.navSubDropdown)
-    await expect(sub).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await expect(sub.locator('[data-testid="link-sidebar-v2-doc-summary"]')).toHaveCount(0)
+    const assistants = page.locator(NAV.sidebarV2Assistants)
+    await expect(assistants).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await assistants.click()
+    const group = page.locator(NAV.panelGroup('assistants'))
+    await expect(group).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expect(group.locator('[data-testid="link-sidebar-v2-doc-summary"]')).toHaveCount(0)
   })
 })

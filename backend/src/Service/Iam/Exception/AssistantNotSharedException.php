@@ -6,7 +6,7 @@ namespace App\Service\Iam\Exception;
 
 final class AssistantNotSharedException extends \RuntimeException
 {
-    public function __construct()
+    public function __construct(public readonly ?string $assistantName = null)
     {
         parent::__construct('iam.assistantNotShared');
     }

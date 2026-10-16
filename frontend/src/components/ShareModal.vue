@@ -15,7 +15,7 @@
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-2xl font-bold txt-primary">Share File</h2>
             <button
-              class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
+              class="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
               data-testid="btn-file-share-close"
               @click="close"
             >
@@ -76,7 +76,7 @@
                     v-for="option in expiryOptions"
                     :key="option.value"
                     :class="[
-                      'p-3 rounded-lg border-2 transition-all text-left',
+                      'p-3 rounded-xl border-2 transition-all text-left',
                       selectedExpiry === option.value
                         ? 'border-[var(--brand)] bg-[var(--brand)]/10'
                         : 'border-light-border dark:border-dark-border hover:border-[var(--brand)]/50',
@@ -92,7 +92,7 @@
               <!-- Make Public Button -->
               <button
                 :disabled="sharing"
-                class="btn-primary w-full py-3 rounded-lg font-medium disabled:opacity-50"
+                class="btn-primary w-full py-3 rounded-xl font-medium disabled:opacity-50"
                 data-testid="btn-file-share-make-public"
                 @click="makePublic"
               >
@@ -120,7 +120,7 @@
                 <div class="flex items-center justify-between">
                   <span class="text-sm font-medium txt-secondary">Public Link</span>
                   <button
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary text-sm"
+                    class="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-primary text-sm"
                     data-testid="btn-file-share-copy"
                     @click="copyLink"
                   >
@@ -169,7 +169,7 @@
               <!-- Revoke Button -->
               <button
                 :disabled="revoking"
-                class="w-full py-2 rounded-lg border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                class="w-full py-2 rounded-xl border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                 data-testid="btn-file-share-revoke"
                 @click="revoke"
               >

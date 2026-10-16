@@ -1,8 +1,8 @@
 <template>
-  <div class="surface-card p-6" data-testid="openai-endpoints-panel">
+  <div :class="embedded ? '' : 'surface-card p-6'" data-testid="openai-endpoints-panel">
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
       <div>
-        <h2 class="text-xl font-semibold txt-primary">
+        <h2 v-if="!embedded" class="text-xl font-semibold txt-primary">
           {{ t('config.openaiEndpoints.title') }}
         </h2>
         <p class="text-sm txt-secondary mt-1">
@@ -11,7 +11,7 @@
       </div>
       <button
         type="button"
-        class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover-surface transition"
+        class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover-surface transition"
         :disabled="loading"
         @click="load"
       >
@@ -37,7 +37,7 @@
           <input
             v-model="form.name"
             :disabled="editingName !== null"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm disabled:opacity-60"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm disabled:opacity-60"
             :placeholder="t('config.openaiEndpoints.namePlaceholder')"
           />
         </div>
@@ -47,7 +47,7 @@
           }}</label>
           <input
             v-model="form.label"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm"
             :placeholder="t('config.openaiEndpoints.labelPlaceholder')"
           />
         </div>
@@ -57,7 +57,7 @@
           }}</label>
           <input
             v-model="form.base_url"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
             placeholder="https://localai.example.com/v1"
           />
         </div>
@@ -69,7 +69,7 @@
           }}</label>
           <select
             v-model="form.authType"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             data-testid="openai-endpoint-auth-type"
           >
             <option value="none">{{ t('config.openaiEndpoints.authTypeNone') }}</option>
@@ -86,7 +86,7 @@
             v-model="form.api_key"
             type="password"
             autocomplete="off"
-            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
+            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
             :placeholder="
               editingName
                 ? t('config.openaiEndpoints.apiKeyKeepPlaceholder')
@@ -107,7 +107,7 @@
             <input
               v-model="form.authHeader"
               type="text"
-              class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
+              class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
               :placeholder="t('config.openaiEndpoints.authHeaderPlaceholder')"
               data-testid="openai-endpoint-auth-header"
             />
@@ -120,7 +120,7 @@
               v-model="form.authToken"
               type="password"
               autocomplete="off"
-              class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
+              class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono"
               :placeholder="
                 editingName && editingHasHeaderToken
                   ? t('config.openaiEndpoints.authTokenKeepPlaceholder')
@@ -159,7 +159,7 @@
       <div class="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+          class="btn-primary px-4 py-2 rounded-xl text-sm font-medium"
           :disabled="saving"
           @click="save"
         >
@@ -167,7 +167,7 @@
         </button>
         <button
           type="button"
-          class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover-surface transition"
+          class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-medium hover-surface transition"
           :disabled="testingForm"
           @click="testForm"
         >
@@ -176,7 +176,7 @@
         <button
           v-if="editingName"
           type="button"
-          class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary text-sm font-medium hover:txt-primary transition"
+          class="px-4 py-2 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-sm font-medium hover:txt-primary transition"
           @click="resetForm"
         >
           {{ t('common.cancel') }}
@@ -259,14 +259,14 @@
               <div class="flex items-center gap-1.5">
                 <button
                   type="button"
-                  class="px-3 py-1 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary hover:border-[var(--brand)]/50 transition"
+                  class="px-3 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary hover:border-[var(--brand)]/50 transition"
                   @click="startEdit(ep)"
                 >
                   {{ t('config.openaiEndpoints.edit') }}
                 </button>
                 <button
                   type="button"
-                  class="px-3 py-1 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary transition"
+                  class="px-3 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary transition"
                   :disabled="rowTestingName === ep.name"
                   @click="testExisting(ep)"
                 >
@@ -278,7 +278,7 @@
                 </button>
                 <button
                   type="button"
-                  class="px-3 py-1 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary hover:border-[var(--brand)]/50 transition"
+                  class="px-3 py-1 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary hover:border-[var(--brand)]/50 transition"
                   :data-testid="`openai-endpoint-import-${ep.name}`"
                   @click="openImport(ep)"
                 >
@@ -286,7 +286,7 @@
                 </button>
                 <button
                   type="button"
-                  class="px-3 py-1 rounded-lg border border-red-500/40 text-red-500 text-xs font-medium hover:bg-red-500/10 transition"
+                  class="px-3 py-1 rounded-xl border border-red-500/40 text-red-500 text-xs font-medium hover:bg-red-500/10 transition"
                   :disabled="rowDeletingName === ep.name"
                   @click="remove(ep)"
                 >
@@ -315,7 +315,7 @@
       :source="importSource"
       :label="importLabel"
       @close="importSource = null"
-      @applied="load"
+      @applied="onImported"
     />
   </div>
 </template>
@@ -334,12 +334,16 @@ import ModelImportDialog from '@/components/admin/plugs/ModelImportDialog.vue'
 
 type AuthType = 'none' | 'bearer' | 'header'
 
+withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+
+const emit = defineEmits<{ changed: [] }>()
+
 const { t } = useI18n()
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
 
 const endpoints = ref<OpenAiEndpoint[]>([])
-const availableCapabilities = ref<string[]>(['chat', 'vectorize', 'pic2text', 'rerank'])
+const availableCapabilities = ref<string[]>(['chat', 'vectorize', 'pic2text', 'text2pic', 'rerank'])
 const loading = ref(false)
 const saving = ref(false)
 const testingForm = ref(false)
@@ -469,6 +473,11 @@ function formatTestResult(r: OpenAiEndpointTestResponse): string {
   return t('config.openaiEndpoints.testFail', { error: r.error ?? `HTTP ${r.status ?? '?'}` })
 }
 
+async function onImported() {
+  await load()
+  emit('changed')
+}
+
 async function load() {
   loading.value = true
   try {
@@ -510,6 +519,7 @@ async function save() {
     endpoints.value = res.endpoints
     success(t('config.openaiEndpoints.saved'))
     resetForm()
+    emit('changed')
   } catch (e: unknown) {
     showError(e instanceof Error ? e.message : t('config.openaiEndpoints.failedSave'))
   } finally {
@@ -566,6 +576,7 @@ async function remove(ep: OpenAiEndpoint) {
       resetForm()
     }
     await load()
+    emit('changed')
   } catch (e: unknown) {
     showError(e instanceof Error ? e.message : t('config.openaiEndpoints.failedDelete'))
   } finally {

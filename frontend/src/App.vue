@@ -8,6 +8,7 @@
       floating pill), so it does not push the navbar or any other content
       down — the page stays scroll-free.
     -->
+    <AmbientBackground />
     <ImpersonationBanner />
     <OfflineBanner />
     <ErrorBoundary>
@@ -22,6 +23,7 @@
     </ErrorBoundary>
     <NotificationContainer />
     <Dialog />
+    <SmartSearchPalette v-if="authStore.isAuthenticated" :key="authStore.user?.id" />
     <AnnouncementModal />
     <CookieConsent @consent="handleCookieConsent" />
     <BiometricLockScreen />
@@ -37,8 +39,12 @@ import { useTheme } from './composables/useTheme'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { brandName } from '@/router'
+import AmbientBackground from '@/components/AmbientBackground.vue'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
+import SmartSearchPalette from '@/components/search/SmartSearchPalette.vue'
+import { ensureAccountTimezone, resetAccountTimezone } from '@/composables/useAccountTimezone'
+import { clearSearchRecents } from '@/composables/search/useSearchRecents'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import AnnouncementModal from '@/components/AnnouncementModal.vue'
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
@@ -111,6 +117,31 @@ const authStore = useAuthStore()
 authStore.checkAuth().catch((err: unknown) => {
   console.error('Initial auth check failed:', err)
 })
+
+// Signing out leaves no search trail (recent titles and routes) on the device.
+watch(
+  () => authStore.user?.id,
+  (current, previous) => {
+    if (current == null && previous != null) {
+      clearSearchRecents(previous)
+    }
+  }
+)
+
+// Fill an empty profile time zone from this device once per signed-in user.
+// Fire-and-forget: a failure must not block the page, and the next action retries.
+// Signing out drops the cached zone, so the same account reads its profile again.
+watch(
+  () => authStore.user?.id,
+  (current) => {
+    if (current == null) {
+      resetAccountTimezone()
+      return
+    }
+    void ensureAccountTimezone()
+  },
+  { immediate: true }
+)
 
 // Native shell only: on resume from background, re-validate the session and
 // reconnect realtime (Epic 7.2). No-op on web.

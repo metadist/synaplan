@@ -2,11 +2,11 @@
  * Chat-input controls — Release 4.0 lean composer
  * (_devextras/planning/release4.0/10_landing-streamline-guest-ux.md §5).
  *
- * The old always-visible action row is gone. Per-message controls (Model,
- * Tools, Knowledge folder) plus "Attach files" now live inside the "+" menu.
- * The menu always opens; Thinking/Voice reply/Enhance remain toggle rows
- * INSIDE the Tools dropdown, and the only navigation lives inside the pickers
- * as clearly marked rows (Manage folders…, Summarize a document).
+ * Attach, Tools and the knowledge folder live inside the "+" menu. The model
+ * and its reasoning level are a chip in the composer, next to send. The menu
+ * always opens; Thinking/Voice reply/Enhance remain toggle rows INSIDE the
+ * Tools dropdown, and the only navigation lives inside the pickers as clearly
+ * marked rows (Manage folders…, Summarize a document).
  */
 import { test, expect, type Page } from '../test-setup'
 import { openApp } from '../helpers/auth'
@@ -65,10 +65,11 @@ test.describe('Chat input: "+" menu (§5)', () => {
     await expect(page.locator(CHAT.plusToggle)).toBeVisible({ timeout: TIMEOUTS.SHORT })
   })
 
-  test('@ci "+" menu holds Attach, Model, Tools and Knowledge folder', async ({ page }) => {
+  test('@ci "+" menu holds Attach, Tools and Knowledge folder', async ({ page }) => {
     const panel = await openPlusMenu(page)
     await expect(panel.locator(CHAT.attachBtn)).toBeVisible()
-    await expect(panel.locator(CHAT.modelToggle)).toBeVisible()
+    await expect(panel.locator(CHAT.modelToggle)).toHaveCount(0)
+    await expect(page.locator(CHAT.modelToggle)).toBeVisible()
     await expect(panel.locator(CHAT.toolsToggle)).toBeVisible()
     await expect(panel.locator(CHAT.knowledgeFolderBtn)).toBeVisible()
 

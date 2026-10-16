@@ -10,7 +10,7 @@ use App\Repository\PromptMetaRepository;
 use App\Service\File\FileHelper;
 use App\Service\File\VectorizationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
-use App\Service\UrlContentService;
+use App\Service\Research\UrlContentService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;

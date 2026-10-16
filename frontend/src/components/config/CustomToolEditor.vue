@@ -150,7 +150,7 @@ const save = async () => {
     <div class="flex flex-wrap gap-2">
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         :disabled="saving || !!bodyError"
         @click="save"
       >
@@ -158,7 +158,7 @@ const save = async () => {
       </button>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         @click="emit('close')"
       >
         {{ $t('customTools.cancel') }}

@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Media\MediaJobConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the global async media-job flag (BCONFIG, ownerId=0).
@@ -19,11 +20,22 @@ use Doctrine\DBAL\Connection;
  * the live platform are grandfathered to OFF by the dedicated data migration,
  * NOT by this seeder.
  */
-final readonly class MediaJobConfigSeeder
+#[AsTaggedItem(priority: 270)]
+final readonly class MediaJobConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'media-jobs';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=MEDIA, ownerId=0 — async jobs default ON';
     }
 
     public function seed(): SeedResult

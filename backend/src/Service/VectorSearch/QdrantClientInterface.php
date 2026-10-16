@@ -261,11 +261,33 @@ interface QdrantClientInterface
     public function deleteDigest(string $pointId): void;
 
     /**
+     * Delete digest points by logical id (`dig_{userId}_{digestId}`).
+     *
+     * Matched on the `_point_id` payload so a legacy integer-keyed point is
+     * deleted with the current UUID-keyed one. Implementations send the ids
+     * in batches rather than one request per point.
+     *
+     * @param list<string> $pointIds
+     */
+    public function deleteDigests(array $pointIds): void;
+
+    /**
      * Delete all digest points for a user.
      *
      * @return int Number of deleted points
      */
     public function deleteAllDigestsForUser(int $userId): int;
+
+    /**
+     * List every digest point for one user (payload filter on `user_id`).
+     *
+     * Pages through `POST /collections/{name}/points/scroll` via `next_page_offset`.
+     * Does not filter on `active`: reindex uses this to find points whose
+     * MariaDB row is inactive or gone, and those points may still say active.
+     *
+     * @return list<array{id: string, payload: array<string, mixed>}>
+     */
+    public function scrollDigests(int $userId): array;
 
     // --- Memory Collection Management ---
 
@@ -363,6 +385,13 @@ interface QdrantClientInterface
      * Check if Qdrant is configured and available.
      */
     public function isAvailable(): bool;
+
+    /**
+     * Probe Qdrant now and replace the cached health result. For a caller
+     * that acts on a negative answer for a long time; the per-request hot
+     * path keeps using the cached isAvailable().
+     */
+    public function refreshHealth(): bool;
 
     /**
      * Get collection info (point count, status, etc.).

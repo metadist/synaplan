@@ -40,3 +40,7 @@ email:
     company: 'Synaplan'
     rights: 'All rights reserved'
 
+
+  workspace_expiry:
+    subject: 'Your file-work workspace will be deleted soon'
+    body: "Your Synaplan file-work workspace has been idle for a while and will be deleted in %days% days, with the files the AI created for you. Open it before then to keep it:\n\n%url%\n\nIf you do nothing, the files will be removed and cannot be restored."

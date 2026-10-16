@@ -35,7 +35,7 @@ interface WidgetConfig {
   iconColor?: string
   buttonIcon?: 'chat' | 'headset' | 'help' | 'robot' | 'message' | 'support' | string
   buttonIconUrl?: string
-  defaultTheme?: 'light' | 'dark'
+  defaultTheme?: 'light' | 'dark' | 'oled'
   autoOpen?: boolean
   autoMessage?: string
   apiUrl?: string
@@ -95,6 +95,7 @@ class SynaplanWidget {
   private chatLoading = false
   private shouldOpenImmediately = false
   private closeEventHandler: (() => void) | null = null
+  private stopDropdownPlacement: (() => void) | null = null
 
   async init(config: WidgetConfig) {
     if (!config.widgetId) {
@@ -243,7 +244,8 @@ class SynaplanWidget {
     }
   }
 
-  private detectHostTheme(): 'light' | 'dark' {
+  private detectHostTheme(): 'light' | 'dark' | 'oled' {
+    if (document.documentElement.classList.contains('theme-oled')) return 'oled'
     return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
   }
 
@@ -403,15 +405,16 @@ class SynaplanWidget {
       await this.ensureVueLoaded()
 
       // Dynamically import the chat widget components
-      const [{ createApp }, ChatWidget, { i18n }, widgetStyles, markdownStyles] = await Promise.all(
-        [
+      const [{ createApp }, ChatWidget, widgetI18n, widgetStyles, markdownStyles] =
+        await Promise.all([
           import('vue'),
           import('./components/widgets/ChatWidget.vue'),
-          import('./i18n'),
+          import('./i18n/widget'),
           import('./style.css?inline'),
           import('./assets/widget-markdown.css?inline'),
-        ]
-      )
+        ])
+
+      await widgetI18n.loadWidgetLocale()
 
       // In lazy mode: hide button but keep it for later
       // In eager mode: remove button completely
@@ -516,8 +519,11 @@ class SynaplanWidget {
         poweredByUrl: this.config!.poweredByUrl,
       })
 
-      this.app.use(i18n)
+      this.app.use(widgetI18n.i18n)
       this.app.mount(root)
+      this.stopDropdownPlacement?.()
+      const { installDropdownPlacement } = await import('./utils/dropdownPlacement')
+      this.stopDropdownPlacement = installDropdownPlacement(shadow)
 
       if (this.config?.detectTheme) {
         this.startThemeObserver()
@@ -590,6 +596,9 @@ class SynaplanWidget {
       window.removeEventListener('synaplan-widget-close', this.closeEventHandler)
       this.closeEventHandler = null
     }
+
+    this.stopDropdownPlacement?.()
+    this.stopDropdownPlacement = null
 
     if (this.app) {
       this.app.unmount()

@@ -13,7 +13,10 @@ use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Seed\ModuleGateSeeder;
 use App\Service\Agent\AgentConfig;
+use App\Service\Auth\RegistrationConfig;
 use App\Service\Branding\BrandingService;
+use App\Service\Chat\ChatArtifactsConfig;
+use App\Service\Chat\GuestChatConfig;
 use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\MobileVersionService;
 use App\Service\Compute\ComputeClient;
@@ -23,10 +26,8 @@ use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Digest\MessageDigestConfig;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\Dropbox\DropboxOAuthConfig;
-use App\Service\EncryptionService;
 use App\Service\Feature\FeatureFlagEnv;
-use App\Service\FeedbackConstants;
-use App\Service\GuestChatConfig;
+use App\Service\Feedback\FeedbackConstants;
 use App\Service\Iam\IamConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Mcp\McpClientConfig;
@@ -35,11 +36,12 @@ use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\PlatformLink\PlatformLinksConfig;
-use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\WorkflowsConfig;
+use App\Service\Security\EncryptionService;
+use App\Service\SmartSearch\SmartSearchConfig;
 use App\Service\Tool\ToolsConfig;
-use App\Service\UsageTaximeterConfig;
+use App\Service\Usage\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -71,13 +73,14 @@ final readonly class SystemConfigService
         private readonly ?ModuleRegistry $modules = null,
         private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
         private readonly ?ComputeClient $computeClient = null,
+        private readonly ?ChatArtifactsConfig $chatArtifactsConfig = null,
     ) {
         $this->schema = $this->markManagedFields($this->buildSchema());
     }
 
     /**
      * Instance provider keys have exactly one editor: AI infrastructure ›
-     * Models & keys ({@see ProviderKeyStore}). Every field whose key is an env
+     * Providers & keys ({@see ProviderKeyStore}). Every field whose key is an env
      * var the {@see ProviderKeyCatalog} manages stays readable here — so the
      * response shape of /api/v1/admin/system-config does not change — but is
      * flagged `managedBy` so the UI renders a pointer instead of an input and
@@ -111,9 +114,10 @@ final readonly class SystemConfigService
     private function featureSections(): array
     {
         $sections = [
-            'people' => ['label' => 'People & sharing', 'fields' => [
+            'people' => ['label' => 'Users & sharing', 'fields' => [
                 'FEATURE_IAM_GROUPS_ENABLED',
                 'FEATURE_IAM_SHARING_ENABLED',
+                'FEATURE_IAM_USER_SEARCH_ENABLED',
                 'FEATURE_IAM_GROUP_POLICIES_ENABLED',
                 'FEATURE_IAM_DIRECTORY_SYNC_ENABLED',
             ]],
@@ -137,6 +141,9 @@ final readonly class SystemConfigService
             'platforms' => ['label' => 'Desktop & partner platforms', 'fields' => [
                 'FEATURE_DESKTOP_AGENT_ENABLED',
                 'FEATURE_PLATFORM_LINKS_ENABLED',
+            ]],
+            'search' => ['label' => 'Search', 'fields' => [
+                'FEATURE_SEARCH_AI_ENABLED',
             ]],
         ];
 
@@ -170,7 +177,7 @@ final readonly class SystemConfigService
                 'tab' => 'features', 'section' => 'modules', 'type' => 'boolean',
                 'sensitive' => false,
                 'description' => sprintf(
-                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. %s Configure the module first — see Operate → Feature status.',
+                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. %s Configure the module first — see Operate → System status.',
                     $id,
                     $onByDefault
                         ? 'On is the shipped default for new installs.'
@@ -198,7 +205,7 @@ final readonly class SystemConfigService
                 'label' => 'AI Services',
                 'sections' => [
                     'ollama' => ['label' => 'Local AI (Ollama)', 'fields' => ['OLLAMA_BASE_URL']],
-                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
+                    'cloud' => ['label' => 'Cloud AI Providers', 'fields' => ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'META_API_KEY', 'CEREBRAS_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN']],
                     'selfhosted' => ['label' => 'Self-Hosted AI', 'fields' => ['TRITON_SERVER_URL']],
                     'media' => ['label' => 'Image & Video Generation', 'fields' => ['THEHIVE_API_KEY', 'HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET']],
                     'embeddings' => ['label' => 'Embeddings (Cloudflare Workers AI)', 'fields' => ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_API_TOKEN', 'EMBEDDING_FALLBACK_PROVIDER']],
@@ -220,6 +227,8 @@ final readonly class SystemConfigService
                     'logos' => ['label' => 'Logos & Icon', 'fields' => ['BRAND_LOGO_URL', 'BRAND_LOGO_DARK_URL', 'BRAND_ICON_URL']],
                     'legal' => ['label' => 'Legal Links', 'fields' => ['BRAND_PRIVACY_URL', 'BRAND_TERMS_URL']],
                     'navigation' => ['label' => 'Start Page', 'fields' => ['BRAND_LANDING_PAGE', 'BRAND_DEFAULT_ROUTE']],
+                    'welcome' => ['label' => 'Empty chat', 'fields' => ['CHAT_WELCOME_SHOW_STORE_CARDS', 'CHAT_WELCOME_SHOW_WIDGET_PROMO']],
+                    'chat' => ['label' => 'Chat', 'fields' => ['CHAT_EXPORT_ENABLED', 'CHAT_SHARE_ENABLED', 'CHAT_ARTIFACTS_ENABLED']],
                     'attribution' => ['label' => 'Attribution ("Powered by")', 'fields' => ['BRAND_SHOW_POWERED_BY', 'BRAND_POWERED_BY_LABEL', 'BRAND_POWERED_BY_URL']],
                 ],
             ],
@@ -237,13 +246,15 @@ final readonly class SystemConfigService
                     'google' => ['label' => 'Google OAuth 2.0', 'fields' => ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CLOUD_PROJECT_ID']],
                     'github' => ['label' => 'GitHub OAuth 2.0', 'fields' => ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']],
                     'apple' => ['label' => 'Sign in with Apple', 'fields' => ['APPLE_CLIENT_ID', 'APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY', 'APPLE_APP_BUNDLE_ID']],
-                    'oidc' => ['label' => 'OIDC (Enterprise SSO)', 'fields' => ['OIDC_DISCOVERY_URL', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET']],
+                    'oidc' => ['label' => 'OIDC (Enterprise SSO)', 'fields' => ['OIDC_DISCOVERY_URL', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'OIDC_SCOPES', 'OIDC_BEARER_AUDIENCE', 'OIDC_PROVIDER_LABEL']],
+                    'oidc_access' => ['label' => 'OIDC access restrictions', 'fields' => ['OIDC_ORG_CODE', 'OIDC_ORG_CLAIM', 'OIDC_REQUIRED_ROLE', 'OIDC_ROLE_CLAIMS', 'OIDC_REQUIRED_PERMISSIONS', 'OIDC_PERMISSIONS_CLAIM', 'OIDC_ALLOW_USER_PROVISIONING']],
                 ],
             ],
             'channels' => [
                 'label' => 'Inbound Channels',
                 'sections' => [
                     'whatsapp' => ['label' => 'WhatsApp Business API', 'fields' => ['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_WEBHOOK_VERIFY_TOKEN']],
+                    'telegram' => ['label' => 'Telegram', 'fields' => ['TELEGRAM_ENABLED', 'TELEGRAM_API_BASE_URL', 'TELEGRAM_WEBHOOK_BASE_URL', 'TELEGRAM_ALLOW_LOCAL_WEBHOOK']],
                     'gmail' => ['label' => 'Smart Mail (Gmail IMAP)', 'fields' => ['GMAIL_USERNAME', 'GMAIL_PASSWORD']],
                     'm365' => ['label' => 'Microsoft 365 (Graph)', 'fields' => [
                         'M365_ENABLED', 'M365_CLIENT_ID', 'M365_CLIENT_SECRET', 'M365_TENANT', 'M365_REDIRECT_URI',
@@ -265,6 +276,7 @@ final readonly class SystemConfigService
                     'media' => ['label' => 'Async media generation', 'fields' => ['MEDIA_ASYNC_JOBS_ENABLED']],
                     'compute' => ['label' => 'File work', 'fields' => [
                         'COMPUTE_ENABLED',
+                        'COMPUTE_REQUIRE_TIER',
                         'COMPUTE_WORKSPACES_ENABLED',
                         'COMPUTE_EGRESS_ENABLED',
                         'COMPUTE_EGRESS_REQUIRES_APPROVAL',
@@ -290,7 +302,7 @@ final readonly class SystemConfigService
                 'sections' => [
                     'everyone' => ['label' => 'Everyone', 'fields' => ['IAM_EVERYONE_SHARES']],
                     'directory' => ['label' => 'Directory groups', 'fields' => ['IAM_DIRECTORY_GROUPS_CLAIM', 'IAM_DIRECTORY_GROUP_NAMES']],
-                    'audit' => ['label' => 'People & audit', 'fields' => ['IAM_ADMIN_IMPERSONATION', 'IAM_AUDIT_RETENTION_DAYS']],
+                    'audit' => ['label' => 'Users & audit', 'fields' => ['IAM_ADMIN_IMPERSONATION', 'IAM_AUDIT_RETENTION_DAYS']],
                 ],
             ],
             'routing' => [
@@ -372,18 +384,24 @@ final readonly class SystemConfigService
     /**
      * Get current configuration values with sensitive fields masked.
      *
+     * @param list<string>|null $onlyKeys limit the lookup to these keys (null = every field)
+     *
      * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool, envOverride?: bool, effectiveValue?: string, locked?: bool, keySource?: string}>
      */
-    public function getValues(?int $actingUserId = null): array
+    public function getValues(?int $actingUserId = null, ?array $onlyKeys = null): array
     {
         $values = [];
+        $wanted = null === $onlyKeys ? null : array_flip($onlyKeys);
 
         foreach ($this->schema as $key => $field) {
+            if (null !== $wanted && !isset($wanted[$key])) {
+                continue;
+            }
             $source = $field['source'] ?? 'env';
 
             // Instance provider keys live in the encrypted ProviderKeyStore
             // (BCONFIG), not in .env — report their status from there so this
-            // legacy surface and Models & keys agree. The secret half of a
+            // legacy surface and Providers & keys agree. The secret half of a
             // key + secret pair reports its own presence.
             $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
             if (null !== $storeProvider) {
@@ -461,6 +479,7 @@ final readonly class SystemConfigService
         foreach ([
             'REGISTRATION_ENABLED' => $this->registrationConfig->envOverride(),
             'GUEST_CHAT_ENABLED' => $this->guestChatConfig->envOverride(),
+            'CHAT_ARTIFACTS_ENABLED' => $this->chatArtifactsConfig?->envOverride(),
         ] as $key => $envOverride) {
             if (!isset($values[$key]) || null === $envOverride) {
                 continue;
@@ -512,7 +531,7 @@ final readonly class SystemConfigService
      * Update a single configuration value.
      *
      * `managedBy` in a failed result means the field has another editor
-     * (Models & keys); the controller answers 422 and the message names it.
+     * (Providers & keys); the controller answers 422 and the message names it.
      *
      * @return array{success: bool, requiresRestart: bool, message?: string, managedBy?: string}
      */
@@ -526,14 +545,14 @@ final readonly class SystemConfigService
         $source = $field['source'] ?? 'env';
 
         // One editor per key: instance provider keys are saved, tested and
-        // removed under AI infrastructure › Models & keys. Writing them here
+        // removed under AI infrastructure › Providers & keys. Writing them here
         // would bypass the live check and the key + secret pairing rule.
         if (isset($field['managedBy'])) {
             return [
                 'success' => false,
                 'requiresRestart' => false,
                 'managedBy' => $field['managedBy'],
-                'message' => sprintf('%s is managed under AI infrastructure › Models & keys (/admin/setup). Save, test or remove the key there.', $key),
+                'message' => sprintf('%s is managed under AI infrastructure › Providers & keys (/admin/setup). Save, test or remove the key there.', $key),
             ];
         }
 
@@ -549,10 +568,24 @@ final readonly class SystemConfigService
             ];
         }
 
+        // An empty value deletes the stored override. Booleans and selects
+        // always have a choice, so blank is a mistake rather than a clear.
+        if ('' === $value) {
+            if (\in_array($field['type'], ['boolean', 'select'], true)) {
+                return ['success' => false, 'requiresRestart' => false, 'message' => 'This setting needs a value'];
+            }
+
+            return 'database' === $source
+                ? $this->clearDatabaseValue($key, $field, $actingUserId)
+                : $this->clearEnvValue($key);
+        }
+
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {
             $capRefuse = $this->refuseComputeAboveSidecarCap($key, $value)
-                ?? $this->refuseComputeFeatureSidecarLacks($key, $value);
+                ?? $this->refuseComputeFeatureSidecarLacks($key, $value)
+                ?? $this->refuseComputeBelowRequiredTier($key, $value)
+                ?? $this->refuseComputeInvalidTier($key, $value);
             if (null !== $capRefuse) {
                 return $capRefuse;
             }
@@ -602,6 +635,116 @@ final readonly class SystemConfigService
 
         // Log the change (mask sensitive values)
         $this->logChange($key, $value);
+
+        return ['success' => true, 'requiresRestart' => true];
+    }
+
+    /**
+     * Restore the default style: clears every brand color and font override so
+     * readers fall back to the field defaults. Name, logos, legal links,
+     * navigation and attribution are brand identity, not style, and are kept.
+     *
+     * Each key clears independently through setValue(), so one failing write
+     * cannot block the rest; callers report what did and did not reset.
+     *
+     * @return array{success: bool, reset: list<string>, failed: list<string>, requiresRestart: bool}
+     */
+    public function resetBrandingStyle(?int $actingUserId = null): array
+    {
+        $reset = [];
+        $failed = [];
+
+        foreach (BrandingService::STYLE_RESET_KEYS as $key) {
+            $result = $this->setValue($key, '', $actingUserId);
+            if ($result['success']) {
+                $reset[] = $key;
+            } else {
+                $failed[] = $key;
+                $this->logger->error('Failed to reset branding style key', [
+                    'key' => $key,
+                    'error' => $result['message'],
+                ]);
+            }
+        }
+
+        return [
+            'success' => [] === $failed,
+            'reset' => $reset,
+            'failed' => $failed,
+            'requiresRestart' => false,
+        ];
+    }
+
+    /**
+     * Drop a stored override so readers fall back to the field default.
+     *
+     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string} $field
+     *
+     * @return array{success: bool, requiresRestart: bool, message?: string}
+     */
+    private function clearDatabaseValue(string $key, array $field, ?int $actingUserId): array
+    {
+        $group = $field['dbGroup'] ?? self::DB_GROUP;
+        $setting = $field['dbKey'] ?? $key;
+
+        try {
+            $this->configRepository->deleteValue(self::DB_OWNER_ID, $group, $setting);
+            $this->logChange($key, '');
+            $this->applyConfigSideEffects($group, $setting, $field['default'], $actingUserId);
+            $this->layeredConfigResolver?->reset();
+
+            return ['success' => true, 'requiresRestart' => false];
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to clear DB config', ['key' => $key, 'error' => $e->getMessage()]);
+
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Database write failed'];
+        }
+    }
+
+    /**
+     * Remove one KEY= line from .env. Absent keys are already clear.
+     *
+     * @return array{success: bool, requiresRestart: bool, message?: string}
+     */
+    private function clearEnvValue(string $key): array
+    {
+        $envFile = $this->projectDir.'/.env';
+        if (!file_exists($envFile)) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => '.env file not found'];
+        }
+
+        $content = file_get_contents($envFile);
+        if (false === $content) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to read .env file'];
+        }
+
+        $pattern = '/^'.preg_quote($key, '/').'=.*\n?/m';
+        if (!preg_match($pattern, $content)) {
+            return ['success' => true, 'requiresRestart' => false];
+        }
+
+        $backupFile = $this->createBackup();
+        if (!$backupFile) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to create backup'];
+        }
+
+        $newContent = preg_replace($pattern, '', $content);
+        if (!\is_string($newContent)) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to update .env file'];
+        }
+
+        $tempFile = $envFile.'.tmp';
+        if (false === file_put_contents($tempFile, $newContent)) {
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to write temp file'];
+        }
+
+        if (!rename($tempFile, $envFile)) {
+            @unlink($tempFile);
+
+            return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to save .env file'];
+        }
+
+        $this->logChange($key, '');
 
         return ['success' => true, 'requiresRestart' => true];
     }
@@ -766,6 +909,73 @@ final readonly class SystemConfigService
             'success' => false,
             'requiresRestart' => false,
             'message' => $subject.' not offered by this installation\'s compute sidecar yet. The switch stays off.',
+        ];
+    }
+
+    /**
+     * COMPUTE.ENABLED may only be switched on when the connected sidecar
+     * reports at least the required isolation tier (CS31). The runtime gate
+     * in ComputeConfig::isEnabled() enforces the same rule continuously, so
+     * raising REQUIRE_TIER later disables compute immediately without a
+     * refusal. Switching off is always allowed.
+     *
+     * @return array{success: false, requiresRestart: false, message: string}|null
+     */
+    private function refuseComputeBelowRequiredTier(string $key, string $value): ?array
+    {
+        if ('COMPUTE_ENABLED' !== $key || null === $this->computeClient) {
+            return null;
+        }
+        if (!in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true)) {
+            return null;
+        }
+        try {
+            $tier = $this->computeClient->health()->tier;
+        } catch (\Throwable) {
+            return [
+                'success' => false,
+                'requiresRestart' => false,
+                'message' => 'File work is not reachable right now. The switch stays off.',
+            ];
+        }
+        $required = ComputeConfig::normalizeTier(
+            $this->configRepository->getValue(0, ComputeConfig::CONFIG_GROUP, ComputeConfig::KEY_REQUIRE_TIER)
+        );
+        if (ComputeConfig::tierAtLeast($tier, $required)) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'requiresRestart' => false,
+            'message' => sprintf(
+                'the compute service reports %s; this instance requires %s',
+                ComputeConfig::tierDisplayName($tier),
+                ComputeConfig::tierDisplayName($required),
+            ),
+        ];
+    }
+
+    /**
+     * The tier requirement is only meaningful as a known tier. Reject anything
+     * else at write time: reads fail closed to the strictest tier, so a bad
+     * row would silently pin this instance to microVM.
+     *
+     * @return array{success: false, requiresRestart: false, message: string}|null
+     */
+    private function refuseComputeInvalidTier(string $key, string $value): ?array
+    {
+        if ('COMPUTE_REQUIRE_TIER' !== $key) {
+            return null;
+        }
+        if (isset(ComputeConfig::TIER_ORDER[strtolower(trim($value))])) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'requiresRestart' => false,
+            'message' => 'Isolation tier must be one of: docker, gvisor, microvm.',
         ];
     }
 
@@ -1230,7 +1440,7 @@ final readonly class SystemConfigService
             'FEATURE_IAM_GROUPS_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'People & groups: show People under Operate and let administrators create groups. Members see their groups under Account. Sharing and group policies need this to be on.',
+                'description' => 'Users & groups: show Users under Operate and let administrators create groups. Members see their groups under Account. Sharing and group policies need this to be on.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
@@ -1239,16 +1449,25 @@ final readonly class SystemConfigService
             'FEATURE_IAM_SHARING_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Sharing: let owners share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Adds Share buttons and "Shared with me" filters. Requires People & groups.',
+                'description' => 'Sharing: let owners share a knowledge folder, chat, AI assistant, saved task or chat widget with a user, a group or everyone. Adds Share buttons and "Shared with me" filters. Requires Users & groups.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_SHARING_ENABLED,
             ],
+            'FEATURE_IAM_USER_SEARCH_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'User search in the share picker. Off: an owner can share with users in a group they share, and with a group. On: an owner can share with any account on the instance. Groups are always searchable. Adding a member under Users → Groups still searches every account.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_USER_SEARCH_ENABLED,
+            ],
             'FEATURE_IAM_GROUP_POLICIES_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Group policies: let administrators set default models, allowed models, feature flags and a rate-limit tier per group (People → Policies). Locked global defaults cannot be overridden. Requires People & groups.',
+                'description' => 'Group policies: let administrators set default models, allowed models, feature flags and a rate-limit tier per group (Users → Policies). Locked global defaults cannot be overridden. Requires Users & groups.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
@@ -1257,7 +1476,7 @@ final readonly class SystemConfigService
             'FEATURE_IAM_DIRECTORY_SYNC_ENABLED' => [
                 'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Directory groups: at sign-in, put people into groups from the company login (OIDC groups claim). Does nothing without OIDC. The claim path and display names live under Sharing → Directory groups.',
+                'description' => 'Directory groups: at sign-in, put users into groups from the company login (OIDC groups claim). Does nothing without OIDC. The claim path and display names live under Sharing → Directory groups.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
@@ -1347,7 +1566,7 @@ final readonly class SystemConfigService
             'FEATURE_DESKTOP_AGENT_ENABLED' => [
                 'tab' => 'features', 'section' => 'platforms', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Synaplan Desktop: show the Desktop page, pairing codes, connected computers and the job queue the desktop client (public beta on GitHub) works from. When off, every desktop route answers 404.',
+                'description' => 'Synaplan Desktop, under Manage → Channels. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => DesktopAgentConfig::CONFIG_GROUP,
@@ -1356,21 +1575,35 @@ final readonly class SystemConfigService
             'FEATURE_PLATFORM_LINKS_ENABLED' => [
                 'tab' => 'features', 'section' => 'platforms', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Operate → Linked platforms, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
+                'description' => 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Operate → Users → Platform instances, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => PlatformLinksConfig::CONFIG_GROUP,
                 'dbKey' => PlatformLinksConfig::KEY_ENABLED,
             ],
+            'FEATURE_SEARCH_AI_ENABLED' => [
+                'tab' => 'features', 'section' => 'search', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the search model (the chat model of each person unless an admin pins one) picks the best matching result and says why. Each use is one short AI call and counts as one message. Off keeps keyword and meaning search.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => SmartSearchConfig::CONFIG_GROUP,
+                'dbKey' => SmartSearchConfig::KEY_AI_ENABLED,
+            ],
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',
                 'sensitive' => false,
-                'description' => 'Who may share a folder or chat with everyone on this instance. "any_owner" lets every owner do it; "admins_only" restricts it to administrators.',
-                'default' => IamConfig::EVERYONE_SHARES_ANY_OWNER,
+                'description' => 'Who may share with everyone who has an account. On an instance where anyone can sign up, that is every registered account. "any_owner" lets every owner do it. "admins_only" lets only administrators create those shares; shares that already exist keep working. "disabled" removes that audience: new shares are refused, and shares people created earlier grant nothing until you pick another value — the people they reached lose access without being told. Nothing is deleted, so switching back restores those shares. System assistants and plugin-pack assistants stay available to every account on every value. A public instance should use "disabled"; an install that is one organization can use "any_owner".',
+                // Mirrors IamConfigSeeder and IamConfig::everyoneSharesFallback(): the value a
+                // fresh install gets when nothing is stored, so the UI does not claim a default
+                // the seeder would not have written here.
+                'default' => $this->registrationConfig->isEnabled()
+                    ? IamConfig::EVERYONE_SHARES_DISABLED
+                    : IamConfig::EVERYONE_SHARES_ANY_OWNER,
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_EVERYONE_SHARES,
-                'options' => [IamConfig::EVERYONE_SHARES_ANY_OWNER, IamConfig::EVERYONE_SHARES_ADMINS_ONLY],
+                'options' => [IamConfig::EVERYONE_SHARES_ANY_OWNER, IamConfig::EVERYONE_SHARES_ADMINS_ONLY, IamConfig::EVERYONE_SHARES_DISABLED],
             ],
             'IAM_DIRECTORY_GROUPS_CLAIM' => [
                 'tab' => 'sharing', 'section' => 'directory', 'type' => 'text',
@@ -1403,7 +1636,7 @@ final readonly class SystemConfigService
             'IAM_AUDIT_RETENTION_DAYS' => [
                 'tab' => 'sharing', 'section' => 'audit', 'type' => 'number',
                 'sensitive' => false,
-                'description' => 'Days to keep People audit rows. Default 365. 0 keeps them forever. Run app:iam:reap-audit on a schedule to apply this.',
+                'description' => 'Days to keep Users audit rows. Default 365. 0 keeps them forever. Run app:iam:reap-audit on a schedule to apply this.',
                 'default' => (string) IamConfig::DEFAULT_AUDIT_RETENTION_DAYS,
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
@@ -1422,12 +1655,12 @@ final readonly class SystemConfigService
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
             ],
             // Outbound MCP client master switch (BCONFIG group MCP / CLIENT_ENABLED).
-            // Also toggled from Channels → MCP Servers. Seeded ON for new installs;
+            // Also toggled from Manage → Connections → MCP Servers. Seeded ON for new installs;
             // an explicit 0 row is the operator kill switch.
             'MCP_CLIENT_ENABLED' => [
                 'tab' => 'channels', 'section' => 'mcp', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Allow the assistant to call connected MCP servers (Jira, Confluence, CRM, and any other MCP endpoint). When off, saved connections stay in place but no calls are made. You can also turn this on from Channels → MCP Servers.',
+                'description' => 'Allow the assistant to call connected MCP servers (Jira, Confluence, CRM, and any other MCP endpoint). When off, saved connections stay in place but no calls are made. You can also turn this on from Manage → Connections → MCP Servers.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => McpClientConfig::CONFIG_GROUP,
@@ -1779,11 +2012,21 @@ final readonly class SystemConfigService
             'COMPUTE_ENABLED' => [
                 'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Let the assistant do short file work (Python or Node) on copies of files you chose. Also needs COMPUTE_URL and COMPUTE_TOKEN pointing at the compute sidecar. Off by default — nothing is offered until both the sidecar and this switch are on.',
+                'description' => 'Let the assistant do short file work (Python or Node) on copies of files you chose. Needs the compute sidecar (COMPUTE_URL + COMPUTE_TOKEN). Local `docker compose up` starts that sidecar and turns this on.',
                 'default' => 'false',
                 'source' => 'database',
                 'dbGroup' => ComputeConfig::CONFIG_GROUP,
                 'dbKey' => ComputeConfig::KEY_ENABLED,
+            ],
+            'COMPUTE_REQUIRE_TIER' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Minimum isolation the compute sidecar must report before file work turns on: Standard (plain Docker), Strong isolation (gVisor), Virtual machine (microVM). Synaplan Cloud requires Strong isolation.',
+                'default' => 'docker',
+                'options' => ['docker', 'gvisor', 'microvm'],
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_REQUIRE_TIER,
             ],
             'COMPUTE_WORKSPACES_ENABLED' => [
                 'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
@@ -2064,7 +2307,7 @@ final readonly class SystemConfigService
             'BRAND_ICON_URL' => [
                 'tab' => 'branding', 'section' => 'logos', 'type' => 'url',
                 'sensitive' => false,
-                'description' => 'Brand icon/favicon URL. Leave empty to use the bundled asset (app icons are produced by Epic 6).',
+                'description' => 'Brand icon URL (SVG recommended). Used for the sidebar mark, the favicon and the faint background watermark. Empty falls back to the light logo, then to the bundled Synaplan bird.',
                 'default' => '',
                 'source' => 'database', 'dbGroup' => BrandingService::GROUP, 'dbKey' => BrandingService::KEY_ICON_URL,
             ],
@@ -2169,6 +2412,51 @@ final readonly class SystemConfigService
                 'dbGroup' => MarketingNewsConfig::CONFIG_GROUP,
                 'dbKey' => MarketingNewsConfig::KEY_FEED_URL_DEFAULT,
             ],
+            'CHAT_WELCOME_SHOW_STORE_CARDS' => [
+                'tab' => 'branding', 'section' => 'welcome', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the App Store, Google Play and GitHub cards on an empty chat. On when this row is missing, so existing installations stay as they are until you turn it off.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => \App\Service\Chat\ChatWelcomeConfig::GROUP,
+                'dbKey' => \App\Service\Chat\ChatWelcomeConfig::SHOW_STORE_CARDS,
+            ],
+            'CHAT_WELCOME_SHOW_WIDGET_PROMO' => [
+                'tab' => 'branding', 'section' => 'welcome', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the "embed a chat widget on your website" promotion above the composer. On when this row is missing.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => \App\Service\Chat\ChatWelcomeConfig::GROUP,
+                'dbKey' => \App\Service\Chat\ChatWelcomeConfig::SHOW_WIDGET_PROMO,
+            ],
+            'CHAT_EXPORT_ENABLED' => [
+                'tab' => 'branding', 'section' => 'chat', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let people download a chat (Markdown, PDF, JSON) and include chats in account export. A group policy can turn this off for one group. On when this row is missing.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => \App\Service\Chat\ChatActionPolicy::GROUP,
+                'dbKey' => \App\Service\Chat\ChatActionPolicy::EXPORT,
+            ],
+            'CHAT_SHARE_ENABLED' => [
+                'tab' => 'branding', 'section' => 'chat', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let people create a public link for a chat. A group policy can turn this off for one group. On when this row is missing.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => \App\Service\Chat\ChatActionPolicy::GROUP,
+                'dbKey' => \App\Service\Chat\ChatActionPolicy::SHARE,
+            ],
+            'CHAT_ARTIFACTS_ENABLED' => [
+                'tab' => 'branding', 'section' => 'chat', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Offer a sandboxed preview for HTML and SVG answers. Off when this row is missing and CHAT_ARTIFACTS_ENABLED is empty. An explicit on in either place turns the preview on. An explicit off in either place turns it off.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ChatArtifactsConfig::GROUP,
+                'dbKey' => ChatArtifactsConfig::ENABLED,
+            ],
             // === AI Services ===
             'OLLAMA_BASE_URL' => [
                 'tab' => 'ai', 'section' => 'ollama', 'type' => 'url',
@@ -2179,7 +2467,7 @@ final readonly class SystemConfigService
             // stored encrypted in BCONFIG by ProviderKeyStore and applies without
             // a restart. markManagedFields() flags them `managedBy` (and forces
             // 'source' => 'database'): getValues() reads their status from the
-            // store, setValue() refuses the write and points at Models & keys.
+            // store, setValue() refuses the write and points at Providers & keys.
             'OPENAI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'OpenAI API key',
@@ -2209,6 +2497,18 @@ final readonly class SystemConfigService
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true,
                 'description' => 'xAI (Grok) API key — chat, image understanding, Grok Imagine media, and Grok voice',
+                'default' => '', 'source' => 'database',
+            ],
+            'META_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'Meta Model API key — Muse Spark, Muse Wonder, Muse Image, and Muse Voice Transcribe. Create it at https://dev.meta.ai/ (API keys)',
+                'default' => '', 'source' => 'database',
+            ],
+            'CEREBRAS_API_KEY' => [
+                'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
+                'sensitive' => true,
+                'description' => 'Cerebras Inference API key — GPT OSS 120B and Qwen 3.8 27B. Create it at https://cloud.cerebras.ai/ (API Keys)',
                 'default' => '', 'source' => 'database',
             ],
             'TRUSTEDTOKENS_API_KEY' => [
@@ -2389,6 +2689,66 @@ final readonly class SystemConfigService
                 'sensitive' => true, 'description' => 'OIDC client secret',
                 'default' => '',
             ],
+            'OIDC_SCOPES' => [
+                'tab' => 'auth', 'section' => 'oidc', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Space-separated permissions requested at sign-in. offline_access is rewritten to offline when the provider advertises offline and not offline_access (Kinde). A refused permission stops sign-in and names the permission. Restart required.',
+                'default' => 'openid email profile offline_access',
+            ],
+            'OIDC_BEARER_AUDIENCE' => [
+                'tab' => 'auth', 'section' => 'oidc', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Audience the access token must carry. Leave empty to use the client ID. When set, it is also requested at sign-in, which Kinde and Auth0 need (Kinde: the audience of the API registered for the application). Restart required.',
+                'default' => '',
+            ],
+            'OIDC_PROVIDER_LABEL' => [
+                'tab' => 'auth', 'section' => 'oidc', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Text on the sign-in button. Leave empty to show Enterprise SSO. Restart required.',
+                'default' => '',
+            ],
+            'OIDC_ORG_CODE' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Only people from this organization may sign in. Sent to the provider at sign-in (Kinde org_code) and checked in the token. Leave empty for no organization check. Restart required.',
+                'default' => '',
+            ],
+            'OIDC_ORG_CLAIM' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Token claim that holds the organization (dot notation). org_code for Kinde, organization for Keycloak. Restart required.',
+                'default' => 'org_code',
+            ],
+            'OIDC_REQUIRED_ROLE' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Comma-separated roles; a person needs at least one of them to sign in (case-insensitive). Roles are read from the role claims below. Leave empty for no role check. Restart required.',
+                'default' => '',
+            ],
+            'OIDC_ROLE_CLAIMS' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Comma-separated token claims that hold roles (dot notation, {client_id} placeholder). Also decides who becomes administrator. Add roles for Kinde. Restart required.',
+                'default' => 'realm_access.roles,resource_access.{client_id}.roles,groups',
+            ],
+            'OIDC_REQUIRED_PERMISSIONS' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Comma-separated permissions; a person needs all of them to sign in. Leave empty for no permission check. Restart required.',
+                'default' => '',
+            ],
+            'OIDC_PERMISSIONS_CLAIM' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Token claim that holds the permissions (dot notation). Restart required.',
+                'default' => 'permissions',
+            ],
+            'OIDC_ALLOW_USER_PROVISIONING' => [
+                'tab' => 'auth', 'section' => 'oidc_access', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Create a Synaplan account on the first SSO sign-in. Turn off to admit only people who have signed in through SSO before; accounts created another way are not taken over. Restart required.',
+                'default' => 'true',
+            ],
 
             // === Inbound Channels ===
             'WHATSAPP_ENABLED' => [
@@ -2405,6 +2765,26 @@ final readonly class SystemConfigService
                 'tab' => 'channels', 'section' => 'whatsapp', 'type' => 'password',
                 'sensitive' => true, 'description' => 'Webhook verification token',
                 'default' => '',
+            ],
+            'TELEGRAM_ENABLED' => [
+                'tab' => 'channels', 'section' => 'telegram', 'type' => 'boolean',
+                'sensitive' => false, 'description' => 'Let people connect their own Telegram bot',
+                'default' => 'false',
+            ],
+            'TELEGRAM_API_BASE_URL' => [
+                'tab' => 'channels', 'section' => 'telegram', 'type' => 'url',
+                'sensitive' => false, 'description' => 'Telegram Bot API base URL',
+                'default' => 'https://api.telegram.org',
+            ],
+            'TELEGRAM_WEBHOOK_BASE_URL' => [
+                'tab' => 'channels', 'section' => 'telegram', 'type' => 'url',
+                'sensitive' => false, 'description' => 'Public base URL Telegram calls. Empty uses APP_URL.',
+                'default' => '',
+            ],
+            'TELEGRAM_ALLOW_LOCAL_WEBHOOK' => [
+                'tab' => 'channels', 'section' => 'telegram', 'type' => 'boolean',
+                'sensitive' => false, 'description' => 'Allow a local APP_URL for the Telegram webhook (development only)',
+                'default' => 'false',
             ],
             'GMAIL_USERNAME' => [
                 'tab' => 'channels', 'section' => 'gmail', 'type' => 'email',

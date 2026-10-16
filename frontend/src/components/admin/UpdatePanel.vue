@@ -140,7 +140,7 @@ onMounted(() => {
       </div>
       <button
         type="button"
-        class="btn-secondary px-3 py-2 rounded-lg flex items-center gap-2 flex-shrink-0"
+        class="btn-secondary px-3 py-2 rounded-xl flex items-center gap-2 flex-shrink-0"
         :disabled="checking || !updatesStore.checkEnabled"
         :title="
           updatesStore.checkEnabled
@@ -229,7 +229,7 @@ onMounted(() => {
           :href="status.guideUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="btn-primary px-4 py-2 rounded-lg inline-flex items-center gap-2 text-sm font-medium"
+          class="btn-primary px-4 py-2 rounded-xl inline-flex items-center gap-2 text-sm font-medium"
           data-testid="link-admin-updates-guide"
         >
           <Icon icon="mdi:book-open-variant" class="w-4 h-4" aria-hidden="true" />

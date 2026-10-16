@@ -6,6 +6,7 @@ import type {
   TaskPlanState,
   TaskCardKind,
   TaskCardState,
+  RagSourceRef,
 } from '@/stores/history'
 import { isTaskCardKind, isTaskCardState } from '@/stores/history'
 import { extractBTextPayload } from '@/utils/jsonResponse'
@@ -13,6 +14,7 @@ import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, isMediaPartType } from '@/utils/mediaParts'
 import { isChannelSource } from '@/utils/channelSource'
+import { collapseApiToolTurn } from '@/utils/apiToolTurn'
 import { extractPastedBlocks } from '@/utils/pastedContent'
 import {
   buildUploadUrl,
@@ -20,6 +22,7 @@ import {
   isImageFileType,
   isVideoFileType,
 } from '@/utils/mediaTypes'
+import { i18n } from '@/i18n'
 
 /**
  * Issue #1070: single authoritative mapping from the persisted API row
@@ -108,7 +111,7 @@ function appendGeneratedMediaPart(message: Message, url: string, type: string): 
       partId: generatePartId(),
       type: 'image',
       url: normalized,
-      alt: 'Generated image',
+      alt: i18n.global.t('message.imageGenerated'),
     })
   } else if ('audio' === type && !message.parts.some((p) => 'audio' === p.type)) {
     message.parts.push({ partId: generatePartId(), type: 'audio', url: normalized })
@@ -155,6 +158,10 @@ export function parseContentWithThinking(
   content: string,
   role: 'user' | 'assistant' = 'assistant'
 ): Part[] {
+  if (role === 'user') {
+    content = collapseApiToolTurn(content)
+  }
+
   // Handle special file generation markers from backend
   if (content.startsWith('__FILE_GENERATED__:')) {
     const filename = content.replace('__FILE_GENERATED__:', '').trim()
@@ -297,6 +304,8 @@ export interface ApiLoadedMessageRow {
   errorReason?: string | null
   canRetryModel?: boolean | null
   errorDebug?: string | null
+  /** Voice-reply failure reason when TTS was requested but no audio was stored (#2282). */
+  voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited' | null
   provider?: string
   aiModels?: Message['aiModels']
   webSearch?: Message['webSearch']
@@ -328,8 +337,20 @@ export interface ApiLoadedMessageRow {
       usedWorkspace?: boolean
       /** #1229 smart collapse: card prose is contained in the answer body. */
       redundant?: boolean
+      step_input?: string
+      step_output?: string
+      step_output_truncated?: boolean
+      duration_ms?: number
+      ask_user?: {
+        question?: string
+        options?: string[]
+        recommended?: string
+        allowText?: boolean
+        expiresAt?: number
+      }
     }>
   } | null
+  ragSources?: RagSourceRef[] | null
   /** Background async media job (Release 4.0). */
   mediaJob?: {
     job_id: string
@@ -345,6 +366,7 @@ export interface ApiLoadedMessageRow {
     cost: string | null
     modelKey: string
     kind: string
+    priceKnown?: boolean
   } | null
   /** Auxiliary usage of the turn (sorting/routing call, media renders, TTS). */
   usageExtra?: Array<{
@@ -354,7 +376,10 @@ export interface ApiLoadedMessageRow {
     cost: string | null
     modelKey: string
     kind: string
+    priceKnown?: boolean
   }> | null
+  versions?: Message['versions']
+  edits?: Message['edits']
 }
 
 /**
@@ -364,6 +389,22 @@ export interface ApiLoadedMessageRow {
  * resolves the final message state through the exact same logic as a page
  * reload (issue #1070).
  */
+function askUserFrom(value: unknown): import('@/stores/history').TaskCard['askUser'] {
+  if (!value || typeof value !== 'object') return undefined
+  const row = value as Record<string, unknown>
+  if (typeof row.question !== 'string' || row.question.trim() === '') return undefined
+  const options = Array.isArray(row.options)
+    ? row.options.filter((option): option is string => typeof option === 'string')
+    : []
+  return {
+    question: row.question,
+    options,
+    recommended: typeof row.recommended === 'string' ? row.recommended : '',
+    allowText: row.allowText !== false,
+    expiresAt: typeof row.expiresAt === 'number' ? row.expiresAt : 0,
+  }
+}
+
 export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   const role = m.direction === 'IN' ? 'user' : 'assistant'
 
@@ -393,7 +434,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         partId: generatePartId(),
         type: 'image',
         url: absoluteUrl,
-        alt: m.text || 'Generated image',
+        alt: i18n.global.t('message.imageGenerated'),
       })
     } else if (isVideoFileType(m.file.type)) {
       parts.push({
@@ -481,6 +522,11 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         // the canonical answer surface; the duplicated card collapses (the
         // previous #1165 approach of REMOVING the body text is retired).
         redundant: c.redundant === true,
+        stepInput: typeof c.step_input === 'string' ? c.step_input : undefined,
+        stepOutput: typeof c.step_output === 'string' ? c.step_output : undefined,
+        stepOutputTruncated: c.step_output_truncated === true,
+        durationMs: typeof c.duration_ms === 'number' ? c.duration_ms : undefined,
+        askUser: askUserFrom(c.ask_user),
       }
     })
     taskPlanState = {
@@ -552,6 +598,13 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     errorReason: role === 'assistant' ? (m.errorReason ?? null) : null,
     canRetryModel: role === 'assistant' ? (m.canRetryModel ?? undefined) : undefined,
     errorDebug: role === 'assistant' ? (m.errorDebug ?? null) : null,
+    voiceReplyFailed:
+      role === 'assistant' &&
+      (m.voiceReplyFailed === 'provider_error' ||
+        m.voiceReplyFailed === 'empty_text' ||
+        m.voiceReplyFailed === 'rate_limited')
+        ? m.voiceReplyFailed
+        : undefined,
     backendMessageId: m.id,
     quotedText: m.quotedText ?? null,
     quotedMessageId: m.quotedMessageId ?? null,
@@ -560,12 +613,15 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     aiModels: m.aiModels || null,
     webSearch: m.webSearch || null,
     searchResults: m.searchResults || null,
+    ragSources: m.ragSources && m.ragSources.length > 0 ? m.ragSources : null,
     wasMultitask: m.multitask === true,
     tool: toolData,
     taskPlan: taskPlanState,
     mediaJob: parseMediaJobPayload(m.mediaJob),
     usage: m.usage ?? null,
     usageExtra: m.usageExtra ?? null,
+    versions: Array.isArray(m.versions) ? m.versions : undefined,
+    edits: Array.isArray(m.edits) ? m.edits : undefined,
   }
 }
 
@@ -583,6 +639,10 @@ export interface ApiInProgressTurn {
     query?: string | null
     resultsCount?: number | null
     type?: string | null
+    step_input?: string | null
+    step_output?: string | null
+    step_output_truncated?: boolean | null
+    duration_ms?: number | null
   }>
 }
 
@@ -630,6 +690,10 @@ export function mapInProgressTurn(turn: ApiInProgressTurn): Message {
       ? { resultsCount: c.resultsCount }
       : {}),
     ...(typeof c.type === 'string' && c.type ? { mediaType: c.type } : {}),
+    ...(typeof c.step_input === 'string' && c.step_input ? { stepInput: c.step_input } : {}),
+    ...(typeof c.step_output === 'string' && c.step_output ? { stepOutput: c.step_output } : {}),
+    ...(c.step_output_truncated === true ? { stepOutputTruncated: true } : {}),
+    ...(typeof c.duration_ms === 'number' ? { durationMs: c.duration_ms } : {}),
   }))
 
   return {
@@ -772,6 +836,9 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
     local.errorReason = persisted.errorReason
     local.canRetryModel = persisted.canRetryModel
     local.errorDebug = persisted.errorDebug ?? null
+  }
+  if (persisted.voiceReplyFailed) {
+    local.voiceReplyFailed = persisted.voiceReplyFailed
   }
   if (persisted.wasMultitask) {
     local.wasMultitask = true

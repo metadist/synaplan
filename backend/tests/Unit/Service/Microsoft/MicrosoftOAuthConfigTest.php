@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Microsoft;
 
 use App\Repository\ConfigRepository;
-use App\Service\EncryptionService;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
+use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Message;
 
-use App\Service\DiscordNotificationService;
+use App\Service\Notification\DiscordNotificationService;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 

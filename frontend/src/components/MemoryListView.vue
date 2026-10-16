@@ -13,12 +13,12 @@
             v-model="searchQuery"
             type="text"
             :placeholder="$t('memories.search.placeholder')"
-            class="w-full max-w-full min-w-0 pl-10 pr-4 py-2.5 rounded-lg surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50"
+            class="w-full max-w-full min-w-0 pl-10 pr-4 py-2.5 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand/50"
           />
         </div>
         <select
           v-model="filterValue"
-          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 rounded-lg surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
+          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 rounded-xl surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
         >
           <option value="">{{ $t('memories.listView.allMemories') }}</option>
 
@@ -46,7 +46,7 @@
         </select>
         <select
           v-model="sortBy"
-          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 rounded-lg surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
+          class="w-full md:w-auto max-w-full min-w-0 px-4 py-2.5 rounded-xl surface-chip txt-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/50"
         >
           <option value="category">{{ $t('memories.listView.sortByCategory') }}</option>
           <option value="key">{{ $t('memories.listView.sortByKey') }}</option>
@@ -60,14 +60,14 @@
           >{{ selectedMemories.length }} {{ $t('memories.selected') }}</span
         >
         <button
-          class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
+          class="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600 transition-colors"
           @click="bulkDelete"
         >
           <Icon icon="mdi:delete" class="w-4 h-4 inline mr-1" />
           {{ $t('common.delete') }}
         </button>
         <button
-          class="px-4 py-2 rounded-lg bg-gray-500 text-white hover:bg-gray-600 transition-colors"
+          class="px-4 py-2 rounded-xl bg-gray-500 text-white hover:bg-gray-600 transition-colors"
           @click="clearSelection"
         >
           {{ $t('common.cancel') }}
@@ -77,14 +77,14 @@
       <!-- View Actions -->
       <div v-else class="flex items-center gap-2">
         <button
-          class="px-4 py-2 rounded-lg surface-chip txt-primary hover:bg-opacity-80 transition-colors"
+          class="px-4 py-2 rounded-xl surface-chip txt-primary hover:bg-opacity-80 transition-colors"
           @click="selectAll"
         >
           <Icon icon="mdi:checkbox-multiple-marked" class="w-4 h-4 inline mr-1" />
           {{ $t('memories.selectAll') }}
         </button>
         <button
-          class="btn-primary px-4 py-2.5 rounded-lg"
+          class="btn-primary px-4 py-2.5 rounded-xl"
           data-testid="btn-memory-create"
           @click="$emit('create')"
         >
@@ -132,9 +132,13 @@
             v-for="memory in filteredMemories"
             :key="memory.id"
             :data-memory-id="memory.id"
+            :data-memory-highlighted="isHighlighted(memory.id) ? 'true' : undefined"
             data-testid="item-memory"
             class="border-b border-light-border/10 dark:border-dark-border/10 hover:bg-surface-soft transition-colors cursor-pointer"
-            :class="{ 'bg-brand-500/10': isSelected(memory.id) }"
+            :class="{
+              'bg-brand-500/10': isSelected(memory.id),
+              'ring-2 ring-brand bg-brand-alpha-light': isHighlighted(memory.id),
+            }"
             @click="toggleSelect(memory.id)"
           >
             <td class="p-3">
@@ -170,7 +174,7 @@
             <td class="p-3" @click.stop>
               <div class="flex items-center justify-end gap-1">
                 <button
-                  class="p-2 rounded-lg hover:bg-brand-500/10 txt-brand transition-colors"
+                  class="p-2 rounded-xl hover:bg-brand-500/10 txt-brand transition-colors"
                   :title="$t('common.edit')"
                   data-testid="btn-memory-edit"
                   @click="$emit('edit', memory)"
@@ -178,7 +182,7 @@
                   <Icon icon="mdi:pencil" class="w-4 h-4" />
                 </button>
                 <button
-                  class="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors"
+                  class="p-2 rounded-xl hover:bg-red-500/10 text-red-500 transition-colors"
                   :title="$t('common.delete')"
                   data-testid="btn-memory-delete"
                   @click="$emit('delete', memory)"
@@ -197,9 +201,16 @@
           v-for="memory in filteredMemories"
           :key="memory.id"
           :data-memory-id="memory.id"
+          :data-memory-highlighted="isHighlighted(memory.id) ? 'true' : undefined"
           data-testid="item-memory"
           class="surface-card rounded-xl p-4 cursor-pointer"
-          :class="isSelected(memory.id) ? 'ring-2 ring-brand' : ''"
+          :class="
+            isHighlighted(memory.id)
+              ? 'ring-2 ring-brand bg-brand-alpha-light'
+              : isSelected(memory.id)
+                ? 'ring-2 ring-brand'
+                : ''
+          "
           @click="toggleSelect(memory.id)"
         >
           <div class="flex items-start gap-3">
@@ -234,7 +245,7 @@
                 </div>
                 <div class="flex items-center gap-1" @click.stop>
                   <button
-                    class="p-2 rounded-lg hover:bg-brand-500/10 txt-brand transition-colors"
+                    class="p-2 rounded-xl hover:bg-brand-500/10 txt-brand transition-colors"
                     :title="$t('common.edit')"
                     data-testid="btn-memory-edit"
                     @click="$emit('edit', memory)"
@@ -242,7 +253,7 @@
                     <Icon icon="mdi:pencil" class="w-4 h-4" />
                   </button>
                   <button
-                    class="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors"
+                    class="p-2 rounded-xl hover:bg-red-500/10 text-red-500 transition-colors"
                     :title="$t('common.delete')"
                     data-testid="btn-memory-delete"
                     @click="$emit('delete', memory)"
@@ -256,11 +267,20 @@
         </div>
       </div>
 
-      <!-- Empty State -->
+      <EmptyState
+        v-if="memories.length === 0"
+        bare
+        :title="$t('memories.empty')"
+        :hint="$t('memories.emptyDesc')"
+        :action-label="$t('memories.createButton')"
+        test-id="state-memories-empty"
+        action-test-id="btn-memories-empty-create"
+        @action="emit('create')"
+      />
       <div
-        v-if="filteredMemories.length === 0"
+        v-else-if="filteredMemories.length === 0"
         class="text-center py-12"
-        data-testid="state-memories-empty"
+        data-testid="state-memories-no-results"
       >
         <Icon icon="mdi:brain-off" class="w-16 h-16 mx-auto txt-secondary mb-4" />
         <p class="txt-secondary text-lg">{{ $t('memories.noResults') }}</p>
@@ -272,12 +292,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { useDateFormat } from '@/composables/useDateFormat'
 
 interface Props {
   memories: UserMemory[]
   availableCategories: Array<{ category: string; count: number }>
+  highlightedMemoryId?: number | null
 }
 
 interface Emits {
@@ -358,6 +380,10 @@ const isAllSelected = computed(() => {
 
 function isSelected(id: number): boolean {
   return selectedMemories.value.includes(id)
+}
+
+function isHighlighted(id: number): boolean {
+  return props.highlightedMemoryId === id
 }
 
 function toggleSelect(id: number) {

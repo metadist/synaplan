@@ -3,7 +3,9 @@ import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import ComputeRunCard from '@/components/multitask/ComputeRunCard.vue'
 import type { TaskCard } from '@/stores/history'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 const runtimeFeatures = { computeWorkspacesEnabled: false }
 
@@ -15,7 +17,7 @@ function mountCard(card: Partial<TaskCard>) {
   const i18n = createI18n({
     legacy: false,
     locale: 'en',
-    messages: { en },
+    messages: { en: asI18nSchema(en) },
   })
   return mount(ComputeRunCard, {
     props: {
@@ -56,7 +58,7 @@ describe('ComputeRunCard', () => {
     const i18n = createI18n({
       legacy: false,
       locale: 'en',
-      messages: { en },
+      messages: { en: asI18nSchema(en) },
     })
     const wrapper = mount(ComputeRunCard, {
       props: {

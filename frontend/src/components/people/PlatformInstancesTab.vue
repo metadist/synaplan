@@ -15,13 +15,15 @@
       <p class="txt-secondary">{{ $t('common.loading') }}</p>
     </div>
 
-    <div
+    <EmptyState
       v-else-if="instances.length === 0"
-      class="surface-card p-12 text-center"
-      data-testid="section-empty"
-    >
-      <p class="txt-secondary">{{ $t('people.linkedPlatforms.empty') }}</p>
-    </div>
+      :title="$t('people.linkedPlatforms.empty')"
+      :hint="$t('people.linkedPlatforms.emptyHint')"
+      :action-label="$t('people.linkedPlatforms.emptyAction')"
+      to="/apps/connected"
+      test-id="section-empty"
+      action-test-id="btn-platform-instances-steps"
+    />
 
     <div v-else class="surface-card overflow-hidden">
       <div class="overflow-x-auto">
@@ -68,7 +70,7 @@
                   <button
                     v-if="instance.status === 'pending'"
                     type="button"
-                    class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+                    class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
                     data-testid="btn-approve"
                     @click="approve(instance.id)"
                   >
@@ -77,7 +79,7 @@
                   <button
                     v-if="instance.id !== 'outlook-builtin' && instance.status !== 'revoked'"
                     type="button"
-                    class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+                    class="btn-danger px-4 py-2.5 rounded-xl text-sm font-medium"
                     data-testid="btn-revoke"
                     @click="revoke(instance.id)"
                   >
@@ -94,6 +96,7 @@
 </template>
 
 <script setup lang="ts">
+import EmptyState from '@/components/common/EmptyState.vue'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'

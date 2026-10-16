@@ -5,7 +5,9 @@ import { createI18n } from 'vue-i18n'
 import AssistantGallery from '@/components/assistants/AssistantGallery.vue'
 import { useAgentsStore } from '@/stores/agents'
 import type { GalleryCard } from '@/services/api/agentsApi'
-import en from '@/i18n/en.json'
+import { asI18nSchema, loadAllMessages } from '@/i18n/loadAllMessages'
+
+const en = loadAllMessages('en')
 
 vi.mock('@/services/api/agentsApi', () => ({
   agentsApi: {
@@ -37,7 +39,7 @@ const card: GalleryCard = {
 function mountGallery() {
   setActivePinia(createPinia())
   const store = useAgentsStore()
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: asI18nSchema(en) } })
   const wrapper = mount(AssistantGallery, {
     global: {
       plugins: [i18n],
@@ -87,5 +89,33 @@ describe('AssistantGallery', () => {
 
     await wrapper.get('[data-testid="chip-gallery-archived"]').trigger('click')
     expect(wrapper.get('[data-testid="badge-card-archived"]').text()).toContain('Archived')
+  })
+
+  it('counts each chip and hides empty ones except Mine', async () => {
+    const { wrapper, store } = mountGallery()
+    store.gallery = [
+      card,
+      { ...card, id: 8, slug: 'shared-one', origin: 'shared' },
+      { ...card, id: 9, slug: 'old', status: 'archived' },
+    ]
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('[data-testid="count-gallery-mine"]').text()).toBe('1')
+    expect(wrapper.get('[data-testid="count-gallery-shared"]').text()).toBe('1')
+    expect(wrapper.get('[data-testid="count-gallery-archived"]').text()).toBe('1')
+    expect(wrapper.find('[data-testid="chip-gallery-plugin"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="chip-gallery-shared"]').attributes('title')).toContain(
+      'only the owner can change them'
+    )
+  })
+
+  it('says when a search finds nothing instead of offering to create', async () => {
+    const { wrapper, store } = mountGallery()
+    store.gallery = [card]
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[data-testid="input-gallery-search"]').setValue('zzz')
+    expect(wrapper.get('[data-testid="state-gallery-no-results"]').text()).toContain('zzz')
+    expect(wrapper.find('[data-testid="state-gallery-empty"]').exists()).toBe(false)
   })
 })

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Branding;
 
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -131,5 +132,66 @@ final class BrandingServiceTest extends TestCase
         );
 
         $this->assertTrue($this->service->getBranding()['showPoweredBy']);
+    }
+
+    /**
+     * @param array<string, string> $configured
+     */
+    #[DataProvider('iconUrlCases')]
+    public function testResolvesIconUrl(array $configured, bool $dark, ?string $expected): void
+    {
+        $this->configRepository->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => $configured[$setting] ?? null,
+        );
+
+        $this->assertSame($expected, $this->service->getIconUrl($dark));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, bool, ?string}>
+     */
+    public static function iconUrlCases(): iterable
+    {
+        $icon = [BrandingService::KEY_ICON_URL => 'https://brand.example/icon.svg'];
+        $logo = [BrandingService::KEY_LOGO_URL => 'https://brand.example/logo.svg'];
+        $logoDark = [BrandingService::KEY_LOGO_DARK_URL => 'https://brand.example/logo-dark.svg'];
+
+        yield 'nothing configured' => [[], false, null];
+        yield 'nothing configured, dark' => [[], true, null];
+        yield 'icon wins over logos' => [$icon + $logo + $logoDark, true, 'https://brand.example/icon.svg'];
+        yield 'logo stands in for a missing icon' => [$logo, false, 'https://brand.example/logo.svg'];
+        yield 'dark logo is preferred on a dark theme' => [$logo + $logoDark, true, 'https://brand.example/logo-dark.svg'];
+        yield 'light logo covers a dark theme' => [$logo, true, 'https://brand.example/logo.svg'];
+        yield 'dark logo is not used on a light theme' => [$logoDark, false, null];
+    }
+
+    /**
+     * @param array<string, string> $configured
+     */
+    #[DataProvider('logoUrlCases')]
+    public function testResolvesLogoUrl(array $configured, bool $dark, ?string $expected): void
+    {
+        $this->configRepository->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => $configured[$setting] ?? null,
+        );
+
+        $this->assertSame($expected, $this->service->getLogoUrl($dark));
+    }
+
+    /**
+     * @return iterable<string, array{array<string, string>, bool, ?string}>
+     */
+    public static function logoUrlCases(): iterable
+    {
+        $icon = [BrandingService::KEY_ICON_URL => 'https://brand.example/icon.svg'];
+        $logo = [BrandingService::KEY_LOGO_URL => 'https://brand.example/logo.svg'];
+        $logoDark = [BrandingService::KEY_LOGO_DARK_URL => 'https://brand.example/logo-dark.svg'];
+
+        yield 'nothing configured' => [[], false, null];
+        yield 'an icon is not a logo' => [$icon, false, null];
+        yield 'light logo' => [$logo + $logoDark, false, 'https://brand.example/logo.svg'];
+        yield 'dark logo on a dark theme' => [$logo + $logoDark, true, 'https://brand.example/logo-dark.svg'];
+        yield 'light logo covers a dark theme' => [$logo, true, 'https://brand.example/logo.svg'];
+        yield 'dark logo is not used on a light theme' => [$logoDark, false, null];
     }
 }

@@ -41,7 +41,7 @@ final readonly class HttpToolExecutor
     /**
      * @param array<string, mixed> $input
      *
-     * @return array{status: int, summary: string, fields: array<string, mixed>, truncated: bool}
+     * @return array{status: int, summary: string, fields: array<string, mixed>, truncated: bool, body: string}
      */
     public function execute(CustomTool $tool, array $input, int $actorId): array
     {
@@ -98,6 +98,7 @@ final readonly class HttpToolExecutor
             'summary' => $mapped['summary'],
             'fields' => $mapped['fields'],
             'truncated' => $truncated,
+            'body' => $content,
         ];
     }
 

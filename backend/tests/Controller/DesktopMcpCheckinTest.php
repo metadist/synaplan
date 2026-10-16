@@ -117,10 +117,22 @@ final class DesktopMcpCheckinTest extends WebTestCase
         self::assertSame(['skill', 'prompt', 'fileIds'], array_keys($sc['jobs'][0]['input']));
         $leaseToken = $sc['jobs'][0]['leaseToken'];
         self::assertNotEmpty($leaseToken);
+        self::assertSame(['hello-files'], $this->reloadDevice($device)->getEnabledSkills());
 
-        // Second check-in while leased → no jobs.
+        // Second check-in while leased → no jobs. Omitting skills keeps the last report.
         $checkin2 = $this->callTool($sessionId, 'agent_checkin', ['protocol' => 1], 11);
         self::assertCount(0, $checkin2['result']['structuredContent']['jobs']);
+        self::assertSame(['hello-files'], $this->reloadDevice($device)->getEnabledSkills());
+        self::assertTrue($this->reloadDevice($device)->hasReportedSkills());
+
+        // An empty list replaces the stored skills. A later check-in that omits the field keeps that empty list.
+        $this->callTool($sessionId, 'agent_checkin', ['protocol' => 1, 'enabledSkills' => []], 13);
+        $cleared = $this->reloadDevice($device);
+        self::assertSame([], $cleared->getEnabledSkills());
+        self::assertTrue($cleared->hasReportedSkills());
+
+        $this->callTool($sessionId, 'agent_checkin', ['protocol' => 1], 14);
+        self::assertSame([], $this->reloadDevice($device)->getEnabledSkills());
 
         // Report success.
         $report = $this->callTool($sessionId, 'agent_report_result', [
@@ -170,6 +182,16 @@ final class DesktopMcpCheckinTest extends WebTestCase
         self::assertSame(1, $sc['protocol']);
         self::assertCount(0, $sc['jobs'], 'an unknown protocol must never be handed work');
         self::assertGreaterThan(time() + 600, $sc['next_call_at'], 'unknown protocol should defer far into the future');
+    }
+
+    private function reloadDevice(DesktopDevice $device): DesktopDevice
+    {
+        $id = (int) $device->getId();
+        $this->em->clear();
+        $reloaded = $this->em->find(DesktopDevice::class, $id);
+        self::assertInstanceOf(DesktopDevice::class, $reloaded);
+
+        return $reloaded;
     }
 
     /**

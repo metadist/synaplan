@@ -28,6 +28,7 @@ final readonly class SummarizeApiSessionCommand
         private string $model,
         private string $requestExcerpt,
         private string $responseExcerpt,
+        private bool $interrupted = false,
     ) {
     }
 
@@ -62,5 +63,10 @@ final readonly class SummarizeApiSessionCommand
     public function getResponseExcerpt(): string
     {
         return $this->responseExcerpt;
+    }
+
+    public function isInterrupted(): bool
+    {
+        return $this->interrupted;
     }
 }

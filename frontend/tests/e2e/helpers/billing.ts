@@ -30,30 +30,29 @@ export function expectWebhookSuccess(result: WebhookResult, label: string): void
 }
 
 /**
- * Navigate to the subscription page via the sidebar, taking the correct UI path
- * for the current plan state:
- *   - FREE user → dedicated `btn-sidebar-v2-upgrade` (the dropdown does NOT contain
- *     a subscription item per `v-if="...isPro"` in SidebarV2.vue).
- *   - PRO+ user → user-menu dropdown → `btn-sidebar-v2-subscription`.
+ * Navigate to the subscription page via the sidebar.
  *
- * Waits for the user-button (always rendered once the sidebar is hydrated for an
- * authenticated user) before branching, so the plan-conditional upgrade button is
- * either definitely rendered alongside it or definitely not. Without this wait,
- * `Locator.isVisible()` (which has no built-in retry) races with hydration after
- * `page.reload()` and silently picks the wrong branch.
+ * FREE accounts get Upgrade in the sidebar footer. PRO accounts get
+ * Subscription in the profile panel, after Profile in the account menu.
+ * Neither control exists until billing config has loaded, and the account
+ * button itself is not that signal — it renders immediately. A one-shot
+ * check on Upgrade therefore took the PRO path for a FREE user. Open Profile
+ * first, then wait for whichever control this plan actually offers.
  */
 export async function navigateToSubscriptionViaUI(page: Page): Promise<void> {
   const userBtn = page.locator(selectors.userMenu.button)
   await expect(userBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  await userBtn.click()
+  await page.locator(selectors.userMenu.profileBtn).click()
 
   const upgradeBtn = page.locator(selectors.userMenu.upgradeBtn)
-  if (await upgradeBtn.isVisible()) {
-    await upgradeBtn.click()
+  const subscriptionLink = page.locator(selectors.userMenu.subscriptionLink)
+  await expect(upgradeBtn.or(subscriptionLink)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+  if (await subscriptionLink.isVisible()) {
+    await subscriptionLink.click()
   } else {
-    await userBtn.click()
-    const subscriptionBtn = page.locator(selectors.userMenu.subscriptionBtn)
-    await expect(subscriptionBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await subscriptionBtn.click()
+    await upgradeBtn.click()
   }
   await page.waitForSelector(selectors.subscription.page, { timeout: TIMEOUTS.STANDARD })
 }
@@ -167,8 +166,17 @@ export async function activateProViaUi(
 
   try {
     await page.locator(selectors.subscription.btnSelectPro).click()
+    // The plan cards are already on screen, so a selector wait can return
+    // before the POST reaches the route; unrouting then lets it through to
+    // the real Stripe call.
+    await expect.poll(() => checkoutIntercepted, { timeout: TIMEOUTS.STANDARD }).toBe(true)
+    // The mock URL reloads the page, and page.unroute() hangs while that
+    // document load is still pending.
+    await page.waitForURL(/checkout_intercepted=true/, {
+      waitUntil: 'domcontentloaded',
+      timeout: TIMEOUTS.STANDARD,
+    })
     await page.waitForSelector(selectors.subscription.cardPlan, { timeout: TIMEOUTS.STANDARD })
-    expect(checkoutIntercepted).toBe(true)
   } finally {
     await page.unroute('**/api/v1/subscription/checkout')
   }

@@ -4,24 +4,24 @@ namespace App\Service\Message;
 
 use App\Entity\Message;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
-use App\Service\Message\Handler\ChatHandler;
-use App\Service\Message\Handler\CodeGenerationHandler;
-use App\Service\Message\Handler\MediaGenerationHandler;
+use App\Service\Message\Exception\UnmappedIntentException;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingDirective;
 use App\Service\Message\Routing\RoutingLayer;
+use App\Service\Multitask\Plan\Capability;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
  * Router for Message Processing based on Intent/BTAG.
  *
- * Dispatched to:
- * - ChatHandler (normal Chat)
- * - MediaGenerationHandler (Images, Videos, Audio generation)
- * - CodeGenerationHandler (Code generation)
- * - ToolHandler (Email, Calendar, etc.)
- * - Other handlers...
+ * Dispatched to the handlers registered under `app.message.handler`:
+ * - chat (ChatHandler — plain chat and officemaker)
+ * - image_generation (MediaGenerationHandler — images, video, audio)
+ * - file_analysis (FileAnalysisHandler)
+ *
+ * Every other {@see Capability} is executed by a TaskRunner. Those intents
+ * throw {@see UnmappedIntentException} instead of falling through to chat.
  */
 final class InferenceRouter
 {
@@ -59,7 +59,7 @@ final class InferenceRouter
     ): array {
         $intent = $classification['intent'] ?? 'chat';
 
-        $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
+        ProgressCallback::notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
         // Find the handler for this intent
         $handler = $this->getHandler($intent);
@@ -75,14 +75,14 @@ final class InferenceRouter
                     ->handle($message, $thread, $rerouted, $progressCallback, $options);
             }
 
-            $this->notify($progressCallback, 'processing', "Handler complete: {$intent}");
+            ProgressCallback::notify($progressCallback, 'processing', "Handler complete: {$intent}");
 
             return $result;
         } catch (\Exception $e) {
             $this->logger->error("Handler failed: {$e->getMessage()}");
 
             if ($this->shouldFallbackToChat($intent)) {
-                $this->notify($progressCallback, 'processing', 'Falling back to chat handler');
+                ProgressCallback::notify($progressCallback, 'processing', 'Falling back to chat handler');
 
                 return $this->handlers['chat']->handle($message, $thread, $classification, $progressCallback, $options);
             }
@@ -111,7 +111,7 @@ final class InferenceRouter
             'available_handlers' => array_keys($this->handlers),
         ]);
 
-        $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
+        ProgressCallback::notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
         // Find the handler for this intent
         $handler = $this->getHandler($intent);
@@ -133,14 +133,14 @@ final class InferenceRouter
                     ->handleStream($message, $thread, $rerouted, $streamCallback, $progressCallback, $options);
             }
 
-            $this->notify($progressCallback, 'processing', "Handler complete: {$intent}");
+            ProgressCallback::notify($progressCallback, 'processing', "Handler complete: {$intent}");
 
             return $result;
         } catch (\Exception $e) {
             $this->logger->error("Handler streaming failed: {$e->getMessage()}");
 
             if ($this->shouldFallbackToChat($intent)) {
-                $this->notify($progressCallback, 'processing', 'Falling back to chat handler');
+                ProgressCallback::notify($progressCallback, 'processing', 'Falling back to chat handler');
 
                 return $this->handlers['chat']->handleStream($message, $thread, $classification, $streamCallback, $progressCallback, $options);
             }
@@ -175,7 +175,7 @@ final class InferenceRouter
         if (RoutingDirective::TYPE_RECLASSIFY === $directive->type) {
             $this->logger->info('InferenceRouter: Routing deferral could not be honoured — reclassifying via the AI sorter');
 
-            $this->notify($progressCallback, 'processing', 'Classifying request...');
+            ProgressCallback::notify($progressCallback, 'processing', 'Classifying request...');
 
             // Transient keys the pipeline attached earlier (search results,
             // fetched URL content, prompt metadata, widget model override) are
@@ -201,7 +201,7 @@ final class InferenceRouter
             'fields' => $directive->fields,
         ]);
 
-        $this->notify($progressCallback, 'processing', "Routing to handler: {$topic}");
+        ProgressCallback::notify($progressCallback, 'processing', "Routing to handler: {$topic}");
 
         return array_merge(
             $classification,
@@ -230,50 +230,20 @@ final class InferenceRouter
 
     private function getHandler(string $intent): object
     {
-        // Intent → handler. The SYSTEM intents (chat, image_generation,
-        // document_generation) come from SystemCapabilityRegistry. file_analysis
-        // is a force-route (analyzefile), not a sorter topic, so it stays in
-        // this local map — otherwise `?? 'chat'` silently sends every
-        // attachment turn to ChatHandler (issue #1910 / #1908).
-        // `document_generation` used to be MISSING here entirely, silently
-        // defaulting to 'chat' via the `?? 'chat'` below — which happened to
-        // be correct (ChatHandler runs the officemaker path internally) but
-        // was never an explicit decision. It is now an explicit registry
-        // entry; see SystemCapabilityRegistryTest for the regression test.
-        //
-        // The remaining entries are NOT product capabilities in their own
-        // right (code_generation/summarize/translate/email/calendar have no
-        // dedicated topic), so they stay a local map.
-        $handlerMap = array_merge(
-            [
-                'code_generation' => 'code_generation',
-                'summarize' => 'chat', // Uses the chat handler with a dedicated prompt
-                'translate' => 'chat',
-                'email' => 'tool',
-                'calendar' => 'tool',
-                'file_analysis' => 'file_analysis',
-            ],
-            $this->capabilityRegistry->intentToHandlerMap(),
-        );
+        // Exhaustive over Capability, with no default arm and no chat fallback.
+        // An unknown string, a planner-only capability, or a handler that is
+        // not registered fails here — before the route() catch that still
+        // falls back to chat when a dispatched handler throws (#1915).
+        $capability = Capability::tryFrom($intent);
+        if (null === $capability) {
+            throw new UnmappedIntentException($intent);
+        }
 
-        $handlerName = $handlerMap[$intent] ?? 'chat';
-
-        if (!isset($this->handlers[$handlerName])) {
-            $this->logger->warning("Handler not found: {$handlerName}, falling back to chat");
-            $handlerName = 'chat';
+        $handlerName = $capability->messageHandlerName();
+        if (null === $handlerName || !isset($this->handlers[$handlerName])) {
+            throw new UnmappedIntentException($intent);
         }
 
         return $this->handlers[$handlerName];
-    }
-
-    private function notify(?callable $callback, string $status, string $message): void
-    {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'timestamp' => time(),
-            ]);
-        }
     }
 }

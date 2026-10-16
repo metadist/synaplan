@@ -1,10 +1,5 @@
 <template>
   <div data-testid="files-grid">
-    <div class="mb-4">
-      <h2 class="text-xl font-semibold txt-primary">{{ $t('files.generated.title') }}</h2>
-      <p class="text-sm txt-secondary">{{ $t('files.generated.subtitle') }}</p>
-    </div>
-
     <!-- Kind filter: server-side origin_kind facet (image/video/audio/document/calendar) -->
     <div class="flex flex-wrap gap-1.5 mb-4" data-testid="generated-kind-filter">
       <button
@@ -42,19 +37,16 @@
       </div>
     </div>
 
-    <!-- Empty state -->
-    <div
+    <EmptyState
       v-else-if="files.length === 0"
-      class="flex flex-col items-center justify-center py-16 px-4 text-center"
-      data-testid="grid-empty"
-    >
-      <div
-        class="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4"
-      >
-        <Icon icon="mdi:image-multiple-outline" class="w-8 h-8 text-gray-400" />
-      </div>
-      <p class="text-sm txt-secondary max-w-sm">{{ $t('files.empty.generatedBody') }}</p>
-    </div>
+      bare
+      :icon="SparklesIcon"
+      :title="$t('files.empty.generatedBody')"
+      :action-label="$t('files.empty.generatedAction')"
+      to="/"
+      test-id="grid-empty"
+      action-test-id="btn-generated-empty-action"
+    />
 
     <!-- Gallery -->
     <div
@@ -77,53 +69,69 @@
           />
         </div>
         <div class="p-2">
-          <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
-            {{ fileDisplayName(file, translate, locale) }}
-          </p>
-          <p class="text-[10px] txt-secondary truncate">{{ file.uploaded_date }}</p>
-          <div class="mt-1">
+          <!--
+            The searchable mark sits directly after the filename. The name
+            shrinks first, so a long name truncates and the mark stays visible.
+            The date keeps the full width underneath.
+          -->
+          <div class="flex items-center gap-1.5 min-w-0">
+            <p
+              class="min-w-0 text-xs font-medium leading-4 txt-primary truncate"
+              :title="file.filename"
+            >
+              {{ fileDisplayName(file, translate, locale) }}
+            </p>
             <FileVectorPill
               :state="vectorStateOf(file)"
               :chunk-count="file.chunk_count ?? 0"
               :group-key="file.group_key ?? null"
             />
           </div>
+          <p class="text-[10px] txt-secondary truncate mt-0.5">{{ file.uploaded_date }}</p>
           <!--
-            Delete is meant to sit in the same spot on every card, but the
-            download button could not shrink below its label (German
-            "Herunterladen"), so on a narrow two-column tile it pushed the icon
-            buttons out of place — by a different amount depending on which of
-            the optional ones the file has. Now the label yields and the icons
-            hold their size, which keeps the trailing edge fixed.
+            Every control is the same height as Download, and the icon buttons
+            are squares of that height. On a phone the word takes the first
+            line and the squares sit under it, so the label stays readable.
           -->
-          <div class="flex items-center gap-1 mt-1.5 min-w-0">
+          <div class="flex flex-wrap items-stretch gap-1 mt-1.5 min-w-0">
             <FileOfficeActions
               v-if="showOfficeActions(file)"
+              tile
               :file-id="file.id"
               :filename="file.display_name || file.filename"
               @preview="openPreview(file)"
             />
+            <FilePushMenu
+              size="tile"
+              source="generated"
+              :targets="cloudTargets"
+              :file-id="file.id"
+              :file-name="file.display_name || file.filename"
+            />
             <button
-              class="flex-1 min-w-0 px-2 py-1 rounded-md bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
+              type="button"
+              class="btn-primary h-8 max-sm:basis-full sm:flex-1 sm:min-w-8 max-w-full px-2 text-[11px] font-medium flex items-center justify-center gap-1"
               :title="$t('files.generated.download')"
               :data-testid="`btn-generated-download-${file.id}`"
               @click="download(file)"
             >
-              <ArrowDownTrayIcon class="w-3.5 h-3.5 shrink-0" />
+              <ArrowDownTrayIcon class="w-4 h-4 shrink-0" />
               <span class="truncate">{{ $t('files.generated.download') }}</span>
             </button>
             <button
               v-if="file.chat_id"
-              class="shrink-0 px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:txt-primary transition-colors text-[11px] flex items-center gap-1"
+              type="button"
+              class="btn-secondary shrink-0 w-8 h-8 flex items-center justify-center"
               :title="$t('files.generated.openInChat')"
               :data-testid="`btn-generated-open-${file.id}`"
               @click="openInChat(file)"
             >
-              <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
+              <ChatBubbleLeftRightIcon class="w-4 h-4" />
             </button>
             <div v-if="vectorStateOf(file) !== 'vectorized'" class="relative shrink-0">
               <button
-                class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:text-[var(--brand)] transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+                type="button"
+                class="btn-secondary w-8 h-8 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 :title="$t('files.describeSortAction')"
                 :disabled="isIndexing(file.id)"
                 :data-testid="`btn-generated-index-${file.id}`"
@@ -131,14 +139,14 @@
               >
                 <Icon
                   :icon="isIndexing(file.id) ? 'mdi:loading' : 'mdi:text-box-search-outline'"
-                  class="w-3.5 h-3.5"
+                  class="w-4 h-4"
                   :class="isIndexing(file.id) && 'animate-spin'"
                 />
               </button>
               <Transition name="fade">
                 <div
                   v-if="kbMenuOpen === file.id"
-                  class="absolute right-0 bottom-full mb-1 z-30 w-52 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
+                  class="absolute right-0 bottom-full mb-1 z-30 w-52 surface-card !rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5 overflow-hidden"
                   :data-testid="`menu-generated-index-${file.id}`"
                   @click.stop
                 >
@@ -165,17 +173,17 @@
                     <span class="truncate">{{ folder.name }}</span>
                   </button>
                   <div
-                    class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 pt-1.5"
+                    class="border-t border-light-border/20 dark:border-dark-border/10 mt-1.5 px-2 pt-2 pb-2"
                   >
-                    <div class="flex items-center gap-1.5 px-3 py-1">
+                    <div class="relative">
                       <Icon
                         icon="heroicons:folder-plus"
-                        class="w-4 h-4 text-[var(--brand)] shrink-0"
+                        class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--brand)] pointer-events-none"
                       />
                       <input
                         v-model="newFolderName"
                         type="text"
-                        class="flex-1 text-xs bg-transparent txt-primary placeholder:txt-secondary/50 focus:outline-none"
+                        class="w-full pl-8 pr-2 py-2 text-sm rounded-xl bg-black/[0.04] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06] txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
                         :placeholder="$t('files.folderPicker.newPlaceholder')"
                         @keyup.enter="addToKnowledgeBase(file, newFolderName.trim())"
                         @click.stop
@@ -186,13 +194,14 @@
               </Transition>
             </div>
             <button
-              class="shrink-0 px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 text-red-400/70 hover:text-red-500 hover:bg-red-500/10 transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
+              type="button"
+              class="btn-danger shrink-0 w-8 h-8 rounded-xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               :title="$t('files.delete')"
               :disabled="isDeleting(file.id)"
               :data-testid="`btn-generated-delete-${file.id}`"
               @click="confirmAndDelete(file)"
             >
-              <TrashIcon class="w-3.5 h-3.5" />
+              <TrashIcon class="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -211,7 +220,7 @@
       <div class="flex gap-2">
         <button
           :disabled="currentPage === 1"
-          class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          class="px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           data-testid="btn-generated-prev"
           @click="previousPage"
         >
@@ -219,7 +228,7 @@
         </button>
         <button
           :disabled="currentPage >= totalPages"
-          class="px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          class="px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/8 txt-primary text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           data-testid="btn-generated-next"
           @click="nextPage"
         >
@@ -240,9 +249,17 @@ import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import {
+  ArrowDownTrayIcon,
+  ChatBubbleLeftRightIcon,
+  SparklesIcon,
+  TrashIcon,
+} from '@heroicons/vue/24/outline'
+import EmptyState from '@/components/common/EmptyState.vue'
 import FilePreview from '@/components/files/FilePreview.vue'
 import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
+import FilePushMenu from '@/components/files/FilePushMenu.vue'
+import { useCloudFolderTargets } from '@/composables/useCloudFolderTargets'
 import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
 import { previewKindForFile } from '@/services/filePreview'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
@@ -263,6 +280,7 @@ const router = useRouter()
 const { success: showSuccess, error: showError } = useNotification()
 const { confirm } = useDialog()
 const chatsStore = useChatsStore()
+const { targets: cloudTargets } = useCloudFolderTargets()
 
 const files = ref<FileItem[]>([])
 const previewFile = ref<{ id: number; filename: string } | null>(null)
@@ -325,7 +343,11 @@ const load = async (page = currentPage.value) => {
   activePlayerId.value = null
   try {
     const list = await filesService.listFiles({
-      source: 'generated',
+      // Both AI-generated media (source='generated') and file-work results
+      // (source='compute') are things the user *made* in a chat/task, so the
+      // Generated tab surfaces both — otherwise a compute run's output file has
+      // no home and "Find in Files → Generated" lands on an empty list.
+      source: 'generated,compute',
       originKind: kindFilter.value || undefined,
       sort: 'date_desc',
       page,

@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Plug\PlugConfigService;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the PLUGS group (BCONFIG, ownerId=0).
@@ -14,11 +15,22 @@ use Doctrine\DBAL\Connection;
  * reproduce today's FileProcessor order and Brave-only web search so a
  * fresh install is byte-identical with the pre-plug behaviour.
  */
-final readonly class PlugsConfigSeeder
+#[AsTaggedItem(priority: 60)]
+final readonly class PlugsConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'plugs';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=PLUGS, ownerId=0 — FileProcessor + Brave defaults';
     }
 
     public function seed(): SeedResult

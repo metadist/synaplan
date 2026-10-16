@@ -9,7 +9,7 @@
         v-model="autoMessage"
         rows="2"
         :placeholder="$t('widgets.createWizard.options.welcomePlaceholder')"
-        class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
+        class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
         data-testid="input-welcome-message"
       ></textarea>
     </div>

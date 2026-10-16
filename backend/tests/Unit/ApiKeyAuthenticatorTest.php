@@ -107,8 +107,8 @@ class ApiKeyAuthenticatorTest extends TestCase
 
         $this->apiKeyRepository
             ->expects($this->once())
-            ->method('save')
-            ->with($apiKey, false);
+            ->method('touchLastUsed')
+            ->with($apiKey);
 
         $passport = $this->authenticator->authenticate($request);
 
@@ -180,7 +180,7 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->apiKeyRepository->expects(self::any())->method('findActiveByKey')
             ->with('sk_valid_api_key_here')
             ->willReturn($apiKey);
-        $this->apiKeyRepository->method('save');
+        $this->apiKeyRepository->method('touchLastUsed');
 
         $passport = $this->authenticator->authenticate($request);
 
@@ -203,7 +203,10 @@ class ApiKeyAuthenticatorTest extends TestCase
         $this->apiKeyRepository->expects(self::any())->method('findActiveByKey')
             ->with('sk-valid-key')
             ->willReturn($apiKey);
-        $this->apiKeyRepository->method('save');
+        $this->apiKeyRepository
+            ->expects($this->once())
+            ->method('touchLastUsed')
+            ->with($apiKey);
 
         $passport = $this->authenticator->authenticate($request);
 
@@ -224,7 +227,7 @@ class ApiKeyAuthenticatorTest extends TestCase
         $request->headers->set('X-API-Key', 'valid-key');
 
         $this->apiKeyRepository->method('findActiveByKey')->willReturn($apiKey);
-        $this->apiKeyRepository->method('save');
+        $this->apiKeyRepository->method('touchLastUsed');
 
         $this->logger
             ->expects($this->exactly(2))
@@ -267,6 +270,21 @@ class ApiKeyAuthenticatorTest extends TestCase
         $content = json_decode($response->getContent(), true);
         $this->assertSame('Authentication failed', $content['error']);
         $this->assertSame('Invalid API key', $content['message']);
+    }
+
+    public function testOnAuthenticationFailureOnMessagesUsesAnthropicEnvelope(): void
+    {
+        $request = Request::create('/v1/messages', 'POST');
+        $exception = new AuthenticationException('Invalid or inactive API key');
+
+        $response = $this->authenticator->onAuthenticationFailure($request, $exception);
+
+        $this->assertSame(401, $response->getStatusCode());
+        $content = json_decode((string) $response->getContent(), true);
+        $this->assertSame('error', $content['type']);
+        $this->assertSame('authentication_error', $content['error']['type']);
+        $this->assertSame('Invalid or inactive API key', $content['error']['message']);
+        $this->assertArrayNotHasKey('success', $content);
     }
 
     // ========== onAuthenticationSuccess() ==========

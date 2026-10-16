@@ -11,9 +11,19 @@ import {
 } from '@/utils/messageMapper'
 import { finalizeSettledInProgressTurn } from '@/utils/chatErrorDisplay'
 import { authService } from '@/services/authService'
+import { useChatsStore } from '@/stores/chats'
+import { chatGoneStatus } from '@/utils/chatAccessError'
+import { transcriptAfterSavedEdit } from '@/utils/editTranscript'
+import {
+  claimSpokenMessageId,
+  hasUnboundSpoken,
+  stampSpokenMessageIds,
+} from '@/utils/spokenMessageIds'
+import { createUuid } from '@/utils/uuid'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
 import type { MessageUsage } from '@/stores/usageTaximeter'
+import type { LiveVoiceArtifact } from '@/services/liveVoice/audio'
 import type { TimelineModel, TimelineStep } from '@/utils/processingTimeline'
 
 // Re-export so existing consumers keep importing from the store module.
@@ -144,6 +154,16 @@ export interface Message {
   }>
   documentVersion?: number
   documentFidelityLossy?: boolean
+  /**
+   * Voice reply was requested but no audio was stored (#2282).
+   * Reason code maps to a localized sentence on the message.
+   */
+  voiceReplyFailed?: 'provider_error' | 'empty_text' | 'rate_limited'
+  /**
+   * Live sentence-by-sentence reading stopped. Not stored on the server:
+   * the full spoken file can still arrive and play.
+   */
+  readAloudFailed?: boolean
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
   errorReason?: string | null
@@ -169,6 +189,7 @@ export interface Message {
     source?: string
     thumbnail?: string
   }> | null // Web search results
+  ragSources?: RagSourceRef[] | null
   aiModels?: {
     chat?: {
       provider: string
@@ -184,6 +205,11 @@ export interface Message {
     // from `chat` because the LLM authors the text and a separate TTS
     // pipeline (e.g. Piper) synthesises it — see issue #583.
     audio?: {
+      provider: string
+      model: string
+      model_id: number | null
+    }
+    voice?: {
       provider: string
       model: string
       model_id: number | null
@@ -230,6 +256,8 @@ export interface Message {
   usage?: MessageUsage | null
   /** Auxiliary usage of the turn (sorting/routing call, media renders, TTS). */
   usageExtra?: MessageUsage[] | null
+  versions?: { id: number; index: number; selected: boolean; model: string | null }[]
+  edits?: { id: number; index: number; selected: boolean; model: string | null }[]
 }
 
 export const TASK_CARD_KINDS = [
@@ -295,12 +323,36 @@ export interface TaskCard {
   jobId?: string
   /** True when this run mounted the user's persistent file-work folder. */
   usedWorkspace?: boolean
+  /** Sanitized parameters sent to the step, capped. */
+  stepInput?: string
+  /** Capped output or error text for the expanded step. */
+  stepOutput?: string
+  stepOutputTruncated?: boolean
+  durationMs?: number
   /**
    * #1229 smart collapse: the card's prose is already contained in the final
    * answer body, so the card collapses to its header (set by ResultAssembler
    * at assembly time and by markRedundantTaskPlanProse client-side).
    */
   redundant?: boolean
+  askUser?: {
+    question: string
+    options: string[]
+    recommended: string
+    allowText: boolean
+    expiresAt: number
+  }
+}
+
+export interface RagSourceRef {
+  n: number
+  chunkId: string
+  fileId: number
+  fileName: string
+  groupKey: string
+  score?: number | null
+  startLine: number
+  endLine: number
 }
 
 export interface TaskPlanState {
@@ -349,6 +401,38 @@ function isLiveStream(message: Message): boolean {
   return true === message.isStreaming && message.id !== IN_PROGRESS_TURN_ID
 }
 
+/** Client-owned row (uuid). Server rows use `backend-<id>`; the synthetic in-progress bubble does not. */
+function isLocalTurnId(id: string): boolean {
+  return id !== IN_PROGRESS_TURN_ID && !id.startsWith('backend-')
+}
+
+/**
+ * Turns this response must not overwrite.
+ *
+ * - Still streaming, or streaming when the request was sent (the answer can
+ *   finish before a slow GET returns).
+ * - Created while the request was in flight (local uuid), even if it already
+ *   finished. Hydrated `backend-*` rows are not included, so a load-more that
+ *   lands in the same window does not pin the whole list.
+ */
+function protectedTurnIds(
+  current: Message[],
+  idsAtFetch: ReadonlySet<string>,
+  liveIdsAtFetch: ReadonlySet<string>
+): Set<string> {
+  const protectedIds = new Set<string>()
+  for (const message of current) {
+    if (liveIdsAtFetch.has(message.id)) {
+      protectedIds.add(message.id)
+      continue
+    }
+    if (!idsAtFetch.has(message.id) && isLocalTurnId(message.id)) {
+      protectedIds.add(message.id)
+    }
+  }
+  return protectedIds
+}
+
 /** Concatenated text content of a message, used for duplicate detection. */
 function messageTextContent(message: Message): string {
   return message.parts
@@ -379,12 +463,17 @@ function messageTextContent(message: Message): string {
  */
 export function mergeHydrationWithStreamingTail(
   snapshot: Message[],
-  current: Message[]
+  current: Message[],
+  protectedIds?: ReadonlySet<string>
 ): Message[] {
-  const firstStreamingIndex = current.findIndex(isLiveStream)
-  if (firstStreamingIndex === -1) return snapshot
-
-  let tailStart = firstStreamingIndex
+  // A live stream anchors the tail. So does a turn that was live when this
+  // request started and has since finished: the snapshot was read before the
+  // answer was stored, and dropping it leaves the user prompt with no reply.
+  let tailStart = current.findIndex(isLiveStream)
+  if (tailStart === -1 && protectedIds && protectedIds.size > 0) {
+    tailStart = current.findIndex((message) => protectedIds.has(message.id))
+  }
+  if (tailStart === -1) return snapshot
   while (
     tailStart > 0 &&
     current[tailStart - 1].role === 'user' &&
@@ -492,10 +581,11 @@ export const useHistoryStore = defineStore('history', () => {
     } | null,
     tool?: { command: string; label: string; icon: string } | null,
     quotedText?: string | null,
-    quotedMessageId?: number | null
+    quotedMessageId?: number | null,
+    agentId?: number | null
   ) => {
     messages.value.push({
-      id: crypto.randomUUID(),
+      id: createUuid(),
       role,
       parts,
       timestamp: new Date(),
@@ -509,6 +599,7 @@ export const useHistoryStore = defineStore('history', () => {
       tool,
       quotedText,
       quotedMessageId,
+      agentId: agentId && agentId > 0 ? agentId : null,
     })
   }
 
@@ -520,7 +611,13 @@ export const useHistoryStore = defineStore('history', () => {
     backendMessageId?: number,
     originalMessageId?: number
   ): string => {
-    const id = crypto.randomUUID()
+    const id = createUuid()
+    if ('assistant' === role) {
+      const chatId = useChatsStore().activeChatId
+      if (null !== chatId) {
+        useChatsStore().markLocalTurnFinished(chatId)
+      }
+    }
     messages.value.push({
       id,
       role,
@@ -541,6 +638,110 @@ export const useHistoryStore = defineStore('history', () => {
     if (message && message.parts[0]) {
       message.parts[0].content = content
     }
+  }
+
+  const claimSpokenMessage = (role: 'user' | 'assistant', messageId: number, text: string) => {
+    claimSpokenMessageId(messages.value, role, messageId, text)
+  }
+
+  const SPOKEN_ID_DELAYS_MS = [0, 400, 1200]
+
+  /**
+   * Spoken bubbles are drawn before the chat row exists. The buttons under
+   * them need that row's id, so pick it up as soon as the turn is stored
+   * and again after hang-up if the socket already closed.
+   */
+  const adoptSpokenIds = async (chatId: number, localIds: readonly string[]) => {
+    const wanted = new Set(localIds)
+    if (wanted.size === 0) return
+    const generation = loadGeneration
+    for (let attempt = 0; attempt < SPOKEN_ID_DELAYS_MS.length; attempt++) {
+      if (generation !== loadGeneration) return
+      const wait = SPOKEN_ID_DELAYS_MS[attempt] ?? 0
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
+      if (generation !== loadGeneration) return
+      if (!hasUnboundSpoken(messages.value, wanted)) return
+      try {
+        const { chatApi } = await import('@/services/api')
+        const response = (await chatApi.getChatMessages(chatId, 0, 50)) as {
+          success?: boolean
+          messages?: ApiLoadedMessageRow[]
+        }
+        if (generation !== loadGeneration) return
+        if (!response.success || !response.messages) continue
+        stampSpokenMessageIds(messages.value, response.messages.map(mapApiMessageRow), wanted)
+      } catch {
+        // The next attempt is the recovery. A reload still shows the buttons.
+      }
+    }
+  }
+
+  /** Local ids of the media messages a live call added; they are not spoken replies. */
+  const spokenArtifactIds = new Set<string>()
+
+  /**
+   * A picture, video, audio or document made during a live call. It goes
+   * after the question, before the sentence the voice says about it, in the
+   * same shape a reload shows. A stored call is read back by its row id.
+   */
+  const insertSpokenArtifact = async (artifact: LiveVoiceArtifact): Promise<void> => {
+    const generation = loadGeneration
+    const messageId = artifact.messageId
+    let row = artifact.row
+    if (typeof messageId === 'number') {
+      row = undefined
+      const { chatApi } = await import('@/services/api')
+      for (const wait of SPOKEN_ID_DELAYS_MS) {
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
+        if (generation !== loadGeneration) return
+        if (messages.value.some((item) => item.backendMessageId === messageId)) return
+        try {
+          const response = (await chatApi.getMessage(messageId)) as {
+            success?: boolean
+            message?: ApiLoadedMessageRow
+          }
+          if (response.success && response.message) {
+            row = response.message
+            break
+          }
+        } catch {
+          // The next attempt is the recovery. A reload still shows the row.
+        }
+      }
+    }
+    if (!row || generation !== loadGeneration) return
+    if (
+      typeof messageId === 'number' &&
+      messages.value.some((item) => item.backendMessageId === messageId)
+    ) {
+      return
+    }
+
+    const message = mapApiMessageRow(row)
+    if (typeof messageId !== 'number') message.backendMessageId = undefined
+    spokenArtifactIds.add(message.id)
+    let lastQuestion = -1
+    messages.value.forEach((item, index) => {
+      if (item.role === 'user') lastQuestion = index
+    })
+    if (lastQuestion === -1) messages.value.push(message)
+    else messages.value.splice(lastQuestion + 1, 0, message)
+  }
+
+  const attachSpokenReply = (details: {
+    topic?: string | null
+    aiModels?: Message['aiModels']
+    usage?: MessageUsage | null
+    usageExtra?: MessageUsage[] | null
+  }) => {
+    const message = [...messages.value]
+      .reverse()
+      .find((item) => item.role === 'assistant' && !spokenArtifactIds.has(item.id))
+    if (!message) return
+    if (typeof details.topic === 'string' && details.topic !== '') message.topic = details.topic
+    if (details.aiModels) message.aiModels = details.aiModels
+    if (details.usage) message.usage = details.usage
+    if (details.usageExtra && details.usageExtra.length > 0) message.usageExtra = details.usageExtra
   }
 
   const finishStreamingMessage = (id: string, parts?: Part[]) => {
@@ -626,12 +827,21 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  const applySavedEdit = (id: string, text: string) => {
+    messages.value = transcriptAfterSavedEdit(messages.value, id, text)
+  }
+
   const clear = () => {
+    // Drop any load that is still in flight. Incognito clears the transcript
+    // while the shared chat's messages may still be arriving. The dropped
+    // load no longer clears the loading flag, so it is cleared here.
+    loadGeneration += 1
     stopInProgressPolling()
     messages.value = []
     currentOffset.value = 0
     hasMoreMessages.value = false
     activeRun.value = null
+    isLoadingMessages.value = false
   }
 
   const loadMessages = async (chatId: number, offset = 0, limit = 50, silent = false) => {
@@ -658,6 +868,14 @@ export const useHistoryStore = defineStore('history', () => {
     }
 
     try {
+      // Captured before the request, not when the response lands. A fast stream
+      // (TestProvider after impersonation) finishes before this GET returns;
+      // `isStreaming` is already false by then, so the apply-time check alone
+      // replaces the finished answer with the mid-turn snapshot.
+      const idsAtFetch = new Set(messages.value.map((message) => message.id))
+      const liveIdsAtFetch = new Set(
+        messages.value.filter(isLiveStream).map((message) => message.id)
+      )
       const { chatApi } = await import('@/services/api')
       const response = (await chatApi.getChatMessages(chatId, offset, limit)) as {
         success?: boolean
@@ -712,8 +930,19 @@ export const useHistoryStore = defineStore('history', () => {
           // visibly stopped streaming mid-answer. Drop recovery is unaffected:
           // ChatView calls finishStreamingMessage() before recoverInterruptedTurn(),
           // so its silent reloads never see an active stream to preserve.
-          if (messages.value.some(isLiveStream)) {
-            messages.value = mergeHydrationWithStreamingTail(loadedMessages, messages.value)
+          //
+          // A load that was already in flight does. Impersonation cold-starts
+          // the chat and waits for the model catalog before this GET, so the
+          // send overlaps it. The answer is stored after the snapshot was
+          // read; applying that snapshot once `isStreaming` has flipped off
+          // deletes the reply and leaves the prompt alone.
+          const protectedIds = protectedTurnIds(messages.value, idsAtFetch, liveIdsAtFetch)
+          if (messages.value.some(isLiveStream) || protectedIds.size > 0) {
+            messages.value = mergeHydrationWithStreamingTail(
+              loadedMessages,
+              messages.value,
+              protectedIds
+            )
           } else {
             messages.value = loadedMessages
           }
@@ -726,6 +955,14 @@ export const useHistoryStore = defineStore('history', () => {
       }
     } catch (error) {
       if (myGeneration !== loadGeneration) return
+      const gone = chatGoneStatus(error)
+      if (gone) {
+        stopInProgressPolling()
+        messages.value = []
+        hasMoreMessages.value = false
+        void useChatsStore().releaseUnavailableChat(chatId, gone)
+        return
+      }
       console.error('Failed to load messages:', error)
       if (
         silent &&
@@ -834,17 +1071,37 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  function hasLiveStream(): boolean {
+    return messages.value.some(isLiveStream)
+  }
+
+  function discardMessages(): void {
+    ++loadGeneration
+    stopInProgressPolling()
+    messages.value = []
+    hasMoreMessages.value = false
+    activeRun.value = null
+    isLoadingMessages.value = false
+  }
+
   return {
     messages,
     isLoadingMessages,
+    hasLiveStream,
+    discardMessages,
     hasMoreMessages,
     activeRun,
     addMessage,
     addStreamingMessage,
     updateStreamingMessage,
+    claimSpokenMessage,
+    adoptSpokenIds,
+    insertSpokenArtifact,
+    attachSpokenReply,
     finishStreamingMessage,
     finishLiveThinking,
     markSuperseded,
+    applySavedEdit,
     removeMessage,
     setMessageStatus,
     clearMessageError,

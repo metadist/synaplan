@@ -92,21 +92,38 @@ final readonly class ComputeArtefactStore
 
         $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', $artefact->name) ?? 'artefact';
         $ext = strtolower(pathinfo($safe, PATHINFO_EXTENSION) ?: 'bin');
-        $basename = pathinfo($safe, PATHINFO_FILENAME) ?: 'artefact';
-        $filename = $basename.'_'.$runId.'_'.bin2hex(random_bytes(4)).'.'.$ext;
-        $relative = $this->paths->buildUserBaseRelativePath($userId).'/'.date('Y').'/'.date('m').'/'.$filename;
-        $absolute = rtrim($this->uploadDir, '/').'/'.$relative;
-        if (!FileHelper::ensureParentDirectory($absolute)) {
-            $this->logger->error('ComputeArtefactStore: cannot create directory', ['dir' => dirname($absolute)]);
-
-            return null;
+        $basename = strtolower(trim((string) (pathinfo($safe, PATHINFO_FILENAME) ?: 'file'), '._-'));
+        if ('' === $basename) {
+            $basename = 'file';
         }
-        $written = file_put_contents($absolute, $bytes);
-        if (false === $written || $written !== strlen($bytes)) {
-            if (is_file($absolute)) {
-                unlink($absolute);
+        $basename = substr($basename, 0, 80);
+        $displayName = $basename.'.'.$ext;
+        $relative = null;
+        $absolute = null;
+        $stored = false;
+        for ($attempt = 0; $attempt < 3; ++$attempt) {
+            $storedName = $basename.'-'.bin2hex(random_bytes(4)).'.'.$ext;
+            $relative = $this->paths->buildUserBaseRelativePath($userId).'/'.date('Y').'/'.date('m').'/'.$storedName;
+            $absolute = rtrim($this->uploadDir, '/').'/'.$relative;
+            if (!FileHelper::ensureParentDirectory($absolute)) {
+                $this->logger->error('ComputeArtefactStore: cannot create directory', ['dir' => dirname($absolute)]);
+
+                return null;
             }
-            $this->logger->error('ComputeArtefactStore: write failed', ['path' => $relative]);
+            $handle = fopen($absolute, 'xb');
+            if (false === $handle) {
+                continue;
+            }
+            $written = fwrite($handle, $bytes);
+            fclose($handle);
+            if (false !== $written && $written === strlen($bytes)) {
+                $stored = true;
+                break;
+            }
+            unlink($absolute);
+        }
+        if (!$stored) {
+            $this->logger->error('ComputeArtefactStore: write failed', ['name' => $displayName]);
 
             return null;
         }
@@ -115,17 +132,43 @@ final readonly class ComputeArtefactStore
         $file->setUserId($userId);
         $file->setFilePath($relative);
         $file->setFileType($ext);
-        $file->setFileName($filename);
+        $file->setFileName($displayName);
         $file->setFileSize(strlen($bytes));
         $file->setFileMime($artefact->mime);
         $file->setFileText('');
         $file->setSource('compute');
-        $file->setOriginKind('artefact');
+        $file->setOriginKind($this->originKindFor($artefact->mime, $ext));
         $file->setVectorState(File::VECTOR_STATE_NONE);
         $file->setMessageId($messageId);
         $this->em->persist($file);
         $this->em->flush();
 
         return $file;
+    }
+
+    /**
+     * Map a harvested artefact to one of {@see File::ORIGIN_KINDS} so it appears
+     * under the matching filter chip in the Generated tab (image/video/audio/
+     * calendar/document). Compute provenance is already carried by
+     * source='compute'; the origin kind describes the media, defaulting to
+     * 'document' for anything non-media (CSV, JSON, text, spreadsheets, …).
+     */
+    private function originKindFor(string $mime, string $ext): string
+    {
+        $mime = strtolower($mime);
+        if (str_starts_with($mime, 'image/')) {
+            return 'image';
+        }
+        if (str_starts_with($mime, 'video/')) {
+            return 'video';
+        }
+        if (str_starts_with($mime, 'audio/')) {
+            return 'audio';
+        }
+        if ('text/calendar' === $mime || 'ics' === $ext) {
+            return 'calendar';
+        }
+
+        return 'document';
     }
 }

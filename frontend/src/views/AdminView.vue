@@ -1,474 +1,422 @@
 <template>
   <MainLayout data-testid="view-admin">
-    <div class="container mx-auto px-6 py-8 max-w-7xl overflow-x-hidden">
-      <!-- Header -->
-      <PageHeader
-        :title="$t('admin.title')"
-        :subtitle="$t('admin.description')"
-        icon="mdi:shield-crown"
-      >
-        <TabNav
-          :model-value="activeTab"
-          :tabs="tabNavItems"
-          :aria-label="$t('admin.title')"
-          mobile-trigger-testid="tab-admin-mobile-trigger"
-          mobile-menu-testid="tab-admin-mobile-menu"
-          @update:model-value="onTabNavChange"
-        />
-      </PageHeader>
+    <div class="min-h-screen overflow-x-hidden bg-chat px-3 py-4 sm:p-4 md:p-8">
+      <div class="mx-auto w-full max-w-[100rem]">
+        <!-- Header -->
+        <PageHeader
+          :title="$t('admin.title')"
+          :subtitle="$t('admin.description')"
+          icon="mdi:shield-crown"
+          tour-id="admin"
+        >
+          <TabNav
+            :model-value="activeTab"
+            :tabs="tabNavItems"
+            :aria-label="$t('admin.title')"
+            mobile-trigger-testid="tab-admin-mobile-trigger"
+            mobile-menu-testid="tab-admin-mobile-menu"
+            @update:model-value="onTabNavChange"
+          />
+        </PageHeader>
 
-      <!-- Tab Content -->
-      <div class="space-y-6">
-        <!-- Overview Tab -->
-        <div v-if="activeTab === 'overview'" data-testid="section-overview">
-          <AdminSystemInfoPanel class="mb-6" />
-          <div v-if="overviewLoading" class="text-center py-12">
-            <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
-          </div>
-          <div v-else-if="overview" class="space-y-6">
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div class="surface-card rounded-lg p-6">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-sm txt-secondary">{{ $t('admin.overview.totalUsers') }}</span>
-                  <Icon icon="mdi:account-multiple" class="w-5 h-5 txt-secondary" />
-                </div>
-                <div class="text-3xl font-bold txt-primary">{{ overview.totalUsers }}</div>
-              </div>
-
-              <div
-                v-for="(count, level) in overview.usersByLevel"
-                :key="level"
-                class="surface-card rounded-lg p-6"
-              >
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-sm txt-secondary">{{ level }}</span>
-                  <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
-                </div>
-                <div class="text-3xl font-bold txt-primary">{{ count }}</div>
-              </div>
-            </div>
-
-            <!-- Registration Analytics Chart -->
-            <RegistrationChart
-              v-if="registrationAnalytics"
-              :data="registrationAnalytics"
-              :initial-period="analyticsPeriod"
-              :initial-group-by="analyticsGroupBy"
-              @update:period="updateAnalyticsPeriod"
-              @update:group-by="updateAnalyticsGroupBy"
+        <!-- Tab Content -->
+        <div class="space-y-6">
+          <!-- Overview Tab -->
+          <div v-if="activeTab === 'overview'" data-testid="section-overview">
+            <AdminAttentionPanel
+              class="mb-6"
+              :total-users="overview?.totalUsers ?? null"
+              :signups="signupCount"
             />
-
-            <!-- Active Subscriptions Overview -->
-            <div v-if="config.billing.enabled" class="surface-card rounded-lg p-6">
-              <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
-                <Icon icon="mdi:credit-card-outline" class="w-5 h-5" />
-                {{ $t('admin.usage.activeSubscriptions') }}
-              </h3>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <template v-for="(count, level) in overview.usersByLevel" :key="level">
-                  <div
-                    v-if="level !== 'NEW' && level !== 'ADMIN'"
-                    class="surface-elevated rounded-lg p-4"
-                  >
-                    <div class="flex items-center justify-between mb-2">
-                      <span class="font-semibold txt-primary">{{ level }}</span>
-                      <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
-                    </div>
-                    <div class="text-2xl font-bold txt-primary">{{ count }}</div>
-                    <div class="text-xs txt-secondary mt-1">
-                      {{ $t('admin.usage.activeSubscriptions') }}
-                    </div>
-                  </div>
-                </template>
-              </div>
+            <AdminSystemInfoPanel class="mb-6" />
+            <div v-if="overviewLoading" class="text-center py-12">
+              <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
             </div>
+            <div v-else-if="overview" class="space-y-6">
+              <!-- Stats Grid -->
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="surface-card rounded-lg p-6">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm txt-secondary">{{ $t('admin.overview.totalUsers') }}</span>
+                    <Icon icon="mdi:account-multiple" class="w-5 h-5 txt-secondary" />
+                  </div>
+                  <div class="text-3xl font-bold txt-primary">{{ overview.totalUsers }}</div>
+                </div>
 
-            <!-- Recent Users -->
-            <div class="surface-card rounded-lg p-6">
-              <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
-                <Icon icon="mdi:account-clock" class="w-5 h-5" />
-                {{ $t('admin.overview.recentUsers') }}
-              </h3>
-              <div class="overflow-x-auto">
-                <table class="w-full">
-                  <thead>
-                    <tr class="border-b border-light-border/30 dark:border-dark-border/20">
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
-                        {{ $t('admin.users.email') }}
-                      </th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
-                        {{ $t('admin.users.level') }}
-                      </th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
-                        {{ $t('admin.users.created') }}
-                      </th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
-                        {{ $t('admin.users.status') }}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="user in recentUsers"
-                      :key="user.id"
-                      class="border-b border-light-border/30 dark:border-dark-border/20 hover:bg-black/5 dark:hover:bg-white/5"
+                <div
+                  v-for="(count, level) in overview.usersByLevel"
+                  :key="level"
+                  class="surface-card rounded-lg p-6"
+                >
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm txt-secondary">{{ level }}</span>
+                    <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
+                  </div>
+                  <div class="text-3xl font-bold txt-primary">{{ count }}</div>
+                </div>
+              </div>
+
+              <!-- Registration Analytics Chart -->
+              <RegistrationChart
+                v-if="registrationAnalytics"
+                :data="registrationAnalytics"
+                :initial-period="analyticsPeriod"
+                :initial-group-by="analyticsGroupBy"
+                @update:period="updateAnalyticsPeriod"
+                @update:group-by="updateAnalyticsGroupBy"
+              />
+
+              <!-- Active Subscriptions Overview -->
+              <div v-if="config.billing.enabled" class="surface-card rounded-lg p-6">
+                <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
+                  <Icon icon="mdi:credit-card-outline" class="w-5 h-5" />
+                  {{ $t('admin.usage.activeSubscriptions') }}
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <template v-for="(count, level) in overview.usersByLevel" :key="level">
+                    <div
+                      v-if="level !== 'NEW' && level !== 'ADMIN'"
+                      class="surface-elevated rounded-lg p-4"
                     >
-                      <td class="py-3 px-4 txt-primary">{{ user.email }}</td>
-                      <td class="py-3 px-4">
-                        <span :class="getLevelBadgeClass(user.level)">{{ user.level }}</span>
-                      </td>
-                      <td class="py-3 px-4 txt-secondary text-sm">
-                        {{ formatDate(user.created) }}
-                      </td>
-                      <td class="py-3 px-4">
-                        <Icon
-                          v-if="user.emailVerified"
-                          icon="mdi:check-circle"
-                          class="w-5 h-5 text-green-500"
-                          :title="$t('admin.users.verified')"
-                        />
-                        <Icon
-                          v-else
-                          icon="mdi:alert-circle"
-                          class="w-5 h-5 text-yellow-500"
-                          :title="$t('admin.users.unverified')"
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Prompts Tab -->
-        <div v-if="activeTab === 'prompts'" data-testid="section-prompts">
-          <div v-if="promptsLoading" class="text-center py-12">
-            <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
-          </div>
-          <div v-else class="space-y-4">
-            <div v-for="prompt in prompts" :key="prompt.id" class="surface-card rounded-lg p-6">
-              <div class="flex items-start justify-between mb-4">
-                <div class="flex-1">
-                  <div class="flex items-center gap-3 mb-2">
-                    <h3 class="text-lg font-semibold txt-primary">{{ prompt.topic }}</h3>
-                    <span
-                      class="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
-                    >
-                      {{ prompt.language }}
-                    </span>
-                  </div>
-                  <p class="text-sm txt-secondary mb-4">{{ prompt.shortDescription }}</p>
-                </div>
-                <button
-                  class="btn-secondary px-4 py-2 rounded-lg"
-                  :data-testid="`btn-edit-prompt-${prompt.id}`"
-                  @click="togglePromptEdit(prompt.id)"
-                >
-                  <Icon
-                    :icon="editingPromptId === prompt.id ? 'mdi:close' : 'mdi:pencil'"
-                    class="w-4 h-4"
-                  />
-                </button>
-              </div>
-
-              <!-- Edit Form -->
-              <div
-                v-if="editingPromptId === prompt.id"
-                class="space-y-4 mt-4 pt-4 border-t border-light-border/30 dark:border-dark-border/20"
-              >
-                <div>
-                  <label class="block text-sm font-medium txt-primary mb-2">{{
-                    $t('admin.prompts.shortDesc')
-                  }}</label>
-                  <input
-                    v-model="editingPrompt.shortDescription"
-                    type="text"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                    :data-testid="`input-prompt-desc-${prompt.id}`"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium txt-primary mb-2">{{
-                    $t('admin.prompts.prompt')
-                  }}</label>
-                  <textarea
-                    v-model="editingPrompt.prompt"
-                    rows="10"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none font-mono text-sm"
-                    :data-testid="`textarea-prompt-${prompt.id}`"
-                  ></textarea>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium txt-primary mb-2">{{
-                    $t('admin.prompts.selectionRules')
-                  }}</label>
-                  <textarea
-                    v-model="editingPrompt.selectionRules"
-                    rows="4"
-                    class="w-full px-4 py-2.5 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary focus:ring-2 focus:ring-[var(--brand)] focus:outline-none font-mono text-sm"
-                    :placeholder="$t('admin.prompts.selectionRulesPlaceholder')"
-                    :data-testid="`textarea-selection-rules-${prompt.id}`"
-                  ></textarea>
-                </div>
-                <div class="flex justify-end gap-3">
-                  <button
-                    class="btn-secondary px-6 py-2.5 rounded-lg"
-                    data-testid="btn-cancel-edit-prompt"
-                    @click="cancelEditPrompt()"
-                  >
-                    {{ $t('common.cancel') }}
-                  </button>
-                  <button
-                    class="btn-primary px-6 py-2.5 rounded-lg"
-                    :disabled="promptSaving"
-                    data-testid="btn-save-prompt"
-                    @click="savePrompt(prompt.id)"
-                  >
-                    {{ $t('common.save') }}
-                  </button>
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="font-semibold txt-primary">{{ level }}</span>
+                        <Icon :icon="getLevelIcon(level)" class="w-5 h-5 txt-secondary" />
+                      </div>
+                      <div class="text-2xl font-bold txt-primary">{{ count }}</div>
+                      <div class="text-xs txt-secondary mt-1">
+                        {{ $t('admin.usage.activeSubscriptions') }}
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </div>
 
-              <!-- Read-only View -->
-              <div v-else class="space-y-2">
-                <div class="bg-chat rounded-lg p-4 font-mono text-sm txt-secondary">
-                  {{ prompt.prompt }}
-                </div>
-                <div v-if="prompt.selectionRules" class="text-xs txt-secondary">
-                  <strong>{{ $t('admin.prompts.selectionRules') }}:</strong>
-                  {{ prompt.selectionRules }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Usage Tab -->
-        <div v-if="activeTab === 'usage'" data-testid="section-usage">
-          <!-- Period Selector -->
-          <div class="surface-card rounded-lg p-4 mb-6">
-            <div class="flex gap-2 flex-wrap">
-              <button
-                v-for="period in ['day', 'week', 'month', 'all']"
-                :key="period"
-                :class="[
-                  'px-4 py-2 rounded-lg font-medium',
-                  usageStatsPeriod === period ? 'btn-primary' : 'btn-secondary',
-                ]"
-                :data-testid="`btn-period-${period}`"
-                @click="loadUsageStats(period as any)"
-              >
-                {{ $t(`admin.usage.period.${period}`) }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="usageStatsLoading" class="text-center py-12">
-            <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
-          </div>
-          <div v-else-if="usageStats" class="space-y-6">
-            <!-- Usage Chart -->
-            <UsageChart :data="usageStats.byAction" />
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <!-- Recent Users -->
               <div class="surface-card rounded-lg p-6">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-sm txt-secondary">{{ $t('admin.usage.totalRequests') }}</span>
-                  <Icon icon="mdi:message" class="w-5 h-5 txt-secondary" />
-                </div>
-                <div class="text-3xl font-bold txt-primary">
-                  {{ (usageStats.total_requests || 0).toLocaleString() }}
-                </div>
-              </div>
-
-              <div class="surface-card rounded-lg p-6">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-sm txt-secondary">{{ $t('admin.usage.totalTokens') }}</span>
-                  <Icon icon="mdi:alphabetical-variant" class="w-5 h-5 txt-secondary" />
-                </div>
-                <div class="text-3xl font-bold txt-primary">
-                  {{ (usageStats.total_tokens || 0).toLocaleString() }}
-                </div>
-              </div>
-
-              <div class="surface-card rounded-lg p-6">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-sm txt-secondary">{{ $t('admin.usage.totalCost') }}</span>
-                  <Icon icon="mdi:currency-usd" class="w-5 h-5 txt-secondary" />
-                </div>
-                <div class="text-3xl font-bold txt-primary">
-                  ${{ (usageStats.total_cost || 0).toFixed(2) }}
-                </div>
-              </div>
-
-              <div class="surface-card rounded-lg p-6">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-sm txt-secondary">{{ $t('admin.usage.avgLatency') }}</span>
-                  <Icon icon="mdi:speedometer" class="w-5 h-5 txt-secondary" />
-                </div>
-                <div class="text-3xl font-bold txt-primary">
-                  {{ (usageStats.avg_latency || 0).toFixed(0) }}ms
-                </div>
-              </div>
-            </div>
-
-            <!-- By Action -->
-            <div class="surface-card rounded-lg p-6">
-              <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
-                <Icon icon="mdi:gesture-tap" class="w-5 h-5" />
-                {{ $t('admin.usage.byAction') }}
-              </h3>
-              <div class="space-y-2">
-                <div
-                  v-for="(stats, action) in usageStats.byAction"
-                  :key="action"
-                  class="flex items-center justify-between py-2 px-4 rounded-lg bg-chat"
-                >
-                  <span class="txt-primary font-medium">{{ action }}</span>
-                  <div class="flex gap-6 text-sm txt-secondary">
-                    <span>{{ stats.count.toLocaleString() }} {{ $t('admin.usage.requests') }}</span>
-                    <span>{{ stats.tokens.toLocaleString() }} {{ $t('admin.usage.tokens') }}</span>
-                    <span>${{ stats.cost.toFixed(4) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- By Provider -->
-            <div class="surface-card rounded-lg p-6">
-              <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
-                <Icon icon="mdi:server-network" class="w-5 h-5" />
-                {{ $t('admin.usage.byProvider') }}
-              </h3>
-              <div class="space-y-2">
-                <div
-                  v-for="(stats, provider) in usageStats.byProvider"
-                  :key="provider"
-                  class="flex items-center justify-between py-2 px-4 rounded-lg bg-chat"
-                >
-                  <span class="txt-primary font-medium">{{ provider }}</span>
-                  <div class="flex gap-6 text-sm txt-secondary">
-                    <span>{{ stats.count.toLocaleString() }} {{ $t('admin.usage.requests') }}</span>
-                    <span>{{ stats.tokens.toLocaleString() }} {{ $t('admin.usage.tokens') }}</span>
-                    <span>${{ stats.cost.toFixed(4) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- By Model -->
-            <div
-              v-if="usageStats.byModel && Object.keys(usageStats.byModel).length > 0"
-              class="surface-card rounded-lg p-6"
-            >
-              <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
-                <Icon icon="mdi:robot" class="w-5 h-5" />
-                {{ $t('admin.usage.topModels') }}
-              </h3>
-              <div class="space-y-2">
-                <div
-                  v-for="(stats, model) in usageStats.byModel"
-                  :key="model"
-                  class="flex items-center justify-between py-2 px-4 rounded-lg bg-chat"
-                >
-                  <span
-                    class="txt-primary font-medium text-sm truncate max-w-[200px]"
-                    :title="String(model)"
-                    >{{ model }}</span
-                  >
-                  <div class="flex gap-6 text-sm txt-secondary">
-                    <span>{{ stats.count.toLocaleString() }} {{ $t('admin.usage.requests') }}</span>
-                    <span>{{ stats.tokens.toLocaleString() }} {{ $t('admin.usage.tokens') }}</span>
-                    <span>${{ stats.cost.toFixed(4) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Top Users -->
-            <div class="surface-card rounded-lg p-6">
-              <h3 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
-                <Icon icon="mdi:trophy" class="w-5 h-5" />
-                {{ $t('admin.usage.topUsers') }}
-              </h3>
-              <p class="text-sm txt-secondary mb-4">
-                {{ $t('admin.usage.topUsersHint') }}
-              </p>
-              <div class="overflow-x-auto">
-                <table class="w-full">
-                  <thead>
-                    <tr class="border-b border-light-border/30 dark:border-dark-border/20">
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">#</th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
-                        {{ $t('admin.users.email') }}
-                      </th>
-                      <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
-                        {{ $t('admin.users.level') }}
-                      </th>
-                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
-                        {{ $t('admin.usage.requests') }}
-                      </th>
-                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
-                        {{ $t('admin.usage.tokens') }}
-                      </th>
-                      <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
-                        {{ $t('admin.usage.cost') }}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <template v-if="usageStatsTopUsers.length === 0">
-                      <tr>
-                        <td colspan="6" class="py-10 px-4 text-center text-sm txt-secondary">
-                          {{ $t('admin.usage.topUsersEmpty') }}
-                        </td>
+                <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
+                  <Icon icon="mdi:account-clock" class="w-5 h-5" />
+                  {{ $t('admin.overview.recentUsers') }}
+                </h3>
+                <div class="overflow-x-auto">
+                  <table class="w-full">
+                    <thead>
+                      <tr class="border-b border-light-border/30 dark:border-dark-border/20">
+                        <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                          {{ $t('admin.users.email') }}
+                        </th>
+                        <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                          {{ $t('admin.users.level') }}
+                        </th>
+                        <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                          {{ $t('admin.users.created') }}
+                        </th>
+                        <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                          {{ $t('admin.users.status') }}
+                        </th>
                       </tr>
-                    </template>
-                    <template v-else>
+                    </thead>
+                    <tbody>
                       <tr
-                        v-for="(user, index) in usageStatsTopUsers"
+                        v-for="user in recentUsers"
                         :key="user.id"
-                        class="border-b border-light-border/30 dark:border-dark-border/20"
+                        class="border-b border-light-border/30 dark:border-dark-border/20 hover:bg-black/5 dark:hover:bg-white/5"
                       >
-                        <td class="py-3 px-4 txt-secondary text-sm">{{ index + 1 }}</td>
-                        <td class="py-3 px-4 txt-primary">{{ user.email || '—' }}</td>
+                        <td class="py-3 px-4 txt-primary">{{ user.email }}</td>
                         <td class="py-3 px-4">
                           <span :class="getLevelBadgeClass(user.level)">{{ user.level }}</span>
                         </td>
-                        <td class="py-3 px-4 text-right txt-secondary">
-                          {{ user.requests.toLocaleString() }}
+                        <td class="py-3 px-4 txt-secondary text-sm">
+                          {{ formatDate(user.created) }}
                         </td>
-                        <td class="py-3 px-4 text-right txt-secondary">
-                          {{ user.tokens.toLocaleString() }}
-                        </td>
-                        <td class="py-3 px-4 text-right txt-secondary">
-                          ${{ user.cost.toFixed(2) }}
+                        <td class="py-3 px-4">
+                          <Icon
+                            v-if="user.emailVerified"
+                            icon="mdi:check-circle"
+                            class="w-5 h-5 text-green-500"
+                            :title="$t('admin.users.verified')"
+                          />
+                          <Icon
+                            v-else
+                            icon="mdi:alert-circle"
+                            class="w-5 h-5 text-yellow-500"
+                            :title="$t('admin.users.unverified')"
+                          />
                         </td>
                       </tr>
-                    </template>
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Subscriptions Tab -->
-        <div v-if="activeTab === 'subscriptions'" data-testid="section-subscriptions">
-          <AdminSubscriptionsPanel />
-        </div>
+          <!-- Usage Tab -->
+          <div v-if="activeTab === 'usage'" data-testid="section-usage">
+            <AdminLiveVoicePanel v-if="config.voiceLive?.enabled" class="mb-6" />
+            <!-- Period Selector -->
+            <div class="surface-card rounded-lg p-4 mb-6">
+              <div class="flex gap-2 flex-wrap">
+                <button
+                  v-for="period in ['day', 'week', 'month', 'all']"
+                  :key="period"
+                  :class="[
+                    'px-4 py-2 rounded-xl font-medium',
+                    usageStatsPeriod === period ? 'btn-primary' : 'btn-secondary',
+                  ]"
+                  :data-testid="`btn-period-${period}`"
+                  @click="loadUsageStats(period as any)"
+                >
+                  {{ $t(`admin.usage.period.${period}`) }}
+                </button>
+              </div>
+            </div>
 
-        <!-- Moderation Tab -->
-        <div v-if="activeTab === 'moderation'" data-testid="section-moderation">
-          <AdminModerationPanel />
-        </div>
+            <div v-if="usageStatsLoading" class="text-center py-12">
+              <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
+            </div>
+            <div v-else-if="usageStats" class="space-y-6">
+              <!-- Usage Chart -->
+              <UsageChart :data="usageStats.byAction" />
+              <!-- Stats Grid -->
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="surface-card rounded-lg p-6">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm txt-secondary">{{ $t('admin.usage.totalRequests') }}</span>
+                    <Icon icon="mdi:message" class="w-5 h-5 txt-secondary" />
+                  </div>
+                  <div class="text-3xl font-bold txt-primary">
+                    {{ (usageStats.total_requests || 0).toLocaleString() }}
+                  </div>
+                </div>
 
-        <!-- App server Tab (native shell only) -->
-        <div v-if="activeTab === 'appServer'">
-          <NativeServerControl />
+                <div class="surface-card rounded-lg p-6">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm txt-secondary">{{ $t('admin.usage.totalTokens') }}</span>
+                    <Icon icon="mdi:alphabetical-variant" class="w-5 h-5 txt-secondary" />
+                  </div>
+                  <div class="text-3xl font-bold txt-primary">
+                    {{ (usageStats.total_tokens || 0).toLocaleString() }}
+                  </div>
+                </div>
+
+                <div class="surface-card rounded-lg p-6">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm txt-secondary">{{ $t('admin.usage.totalCost') }}</span>
+                    <Icon icon="mdi:currency-usd" class="w-5 h-5 txt-secondary" />
+                  </div>
+                  <div class="text-3xl font-bold txt-primary">
+                    ${{ (usageStats.total_cost || 0).toFixed(2) }}
+                  </div>
+                </div>
+
+                <div class="surface-card rounded-lg p-6">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm txt-secondary">{{ $t('admin.usage.avgLatency') }}</span>
+                    <Icon icon="mdi:speedometer" class="w-5 h-5 txt-secondary" />
+                  </div>
+                  <div class="text-3xl font-bold txt-primary">
+                    {{ (usageStats.avg_latency || 0).toFixed(0) }}ms
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex justify-end">
+                <button
+                  type="button"
+                  class="btn-secondary px-4 py-2 rounded-xl text-sm font-medium"
+                  data-testid="btn-usage-accordion-toggle-all"
+                  @click="
+                    allUsageSectionsOpen ? collapseAllUsageSections() : expandAllUsageSections()
+                  "
+                >
+                  {{
+                    allUsageSectionsOpen
+                      ? $t('admin.config.accordion.collapseAll')
+                      : $t('admin.config.accordion.expandAll')
+                  }}
+                </button>
+              </div>
+
+              <AccordionStack testid="usage-accordion">
+                <AccordionSection
+                  panel-id="usage-section-by-action"
+                  :title="$t('admin.usage.byAction')"
+                  :open="isUsageSectionOpen('byAction')"
+                  header-testid="btn-usage-section-by-action"
+                  @toggle="toggleUsageSection('byAction')"
+                >
+                  <template #leading>
+                    <Icon icon="mdi:gesture-tap" class="w-5 h-5 txt-secondary flex-shrink-0" />
+                  </template>
+                  <div class="space-y-2">
+                    <div
+                      v-for="(stats, action) in usageStats.byAction"
+                      :key="action"
+                      class="flex items-center justify-between py-2 px-4 rounded-lg bg-chat"
+                    >
+                      <span class="txt-primary font-medium">{{
+                        usageActionLabel(String(action))
+                      }}</span>
+                      <div class="flex gap-6 text-sm txt-secondary">
+                        <span
+                          >{{ stats.count.toLocaleString() }} {{ $t('admin.usage.requests') }}</span
+                        >
+                        <span
+                          >{{ stats.tokens.toLocaleString() }} {{ $t('admin.usage.tokens') }}</span
+                        >
+                        <span>${{ stats.cost.toFixed(4) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </AccordionSection>
+
+                <AccordionSection
+                  panel-id="usage-section-by-provider"
+                  :title="$t('admin.usage.byProvider')"
+                  :open="isUsageSectionOpen('byProvider')"
+                  header-testid="btn-usage-section-by-provider"
+                  @toggle="toggleUsageSection('byProvider')"
+                >
+                  <template #leading>
+                    <Icon icon="mdi:server-network" class="w-5 h-5 txt-secondary flex-shrink-0" />
+                  </template>
+                  <div class="space-y-2">
+                    <div
+                      v-for="(stats, provider) in usageStats.byProvider"
+                      :key="provider"
+                      class="flex items-center justify-between py-2 px-4 rounded-lg bg-chat"
+                    >
+                      <span class="txt-primary font-medium">{{ provider }}</span>
+                      <div class="flex gap-6 text-sm txt-secondary">
+                        <span
+                          >{{ stats.count.toLocaleString() }} {{ $t('admin.usage.requests') }}</span
+                        >
+                        <span
+                          >{{ stats.tokens.toLocaleString() }} {{ $t('admin.usage.tokens') }}</span
+                        >
+                        <span>${{ stats.cost.toFixed(4) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </AccordionSection>
+
+                <AccordionSection
+                  v-if="usageHasModels"
+                  panel-id="usage-section-by-model"
+                  :title="$t('admin.usage.topModels')"
+                  :open="isUsageSectionOpen('byModel')"
+                  header-testid="btn-usage-section-by-model"
+                  @toggle="toggleUsageSection('byModel')"
+                >
+                  <template #leading>
+                    <Icon icon="mdi:robot" class="w-5 h-5 txt-secondary flex-shrink-0" />
+                  </template>
+                  <div class="space-y-2">
+                    <div
+                      v-for="(stats, model) in usageStats.byModel"
+                      :key="model"
+                      class="flex items-center justify-between py-2 px-4 rounded-lg bg-chat"
+                    >
+                      <span
+                        class="txt-primary font-medium text-sm truncate max-w-[200px]"
+                        :title="String(model)"
+                        >{{ model }}</span
+                      >
+                      <div class="flex gap-6 text-sm txt-secondary">
+                        <span
+                          >{{ stats.count.toLocaleString() }} {{ $t('admin.usage.requests') }}</span
+                        >
+                        <span
+                          >{{ stats.tokens.toLocaleString() }} {{ $t('admin.usage.tokens') }}</span
+                        >
+                        <span>${{ stats.cost.toFixed(4) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </AccordionSection>
+
+                <AccordionSection
+                  panel-id="usage-section-top-users"
+                  :title="$t('admin.usage.topUsers')"
+                  :open="isUsageSectionOpen('topUsers')"
+                  header-testid="btn-usage-section-top-users"
+                  @toggle="toggleUsageSection('topUsers')"
+                >
+                  <template #leading>
+                    <Icon icon="mdi:trophy" class="w-5 h-5 txt-secondary flex-shrink-0" />
+                  </template>
+                  <p class="text-sm txt-secondary mb-4">
+                    {{ $t('admin.usage.topUsersHint') }}
+                  </p>
+                  <div class="overflow-x-auto">
+                    <table class="w-full">
+                      <thead>
+                        <tr class="border-b border-light-border/30 dark:border-dark-border/20">
+                          <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">#</th>
+                          <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                            {{ $t('admin.users.email') }}
+                          </th>
+                          <th class="text-left py-2 px-4 text-sm font-medium txt-secondary">
+                            {{ $t('admin.users.level') }}
+                          </th>
+                          <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
+                            {{ $t('admin.usage.requests') }}
+                          </th>
+                          <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
+                            {{ $t('admin.usage.tokens') }}
+                          </th>
+                          <th class="text-right py-2 px-4 text-sm font-medium txt-secondary">
+                            {{ $t('admin.usage.cost') }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <template v-if="usageStatsTopUsers.length === 0">
+                          <tr>
+                            <td colspan="6" class="py-10 px-4 text-center text-sm txt-secondary">
+                              {{ $t('admin.usage.topUsersEmpty') }}
+                            </td>
+                          </tr>
+                        </template>
+                        <template v-else>
+                          <tr
+                            v-for="(user, index) in usageStatsTopUsers"
+                            :key="user.id"
+                            class="border-b border-light-border/30 dark:border-dark-border/20"
+                          >
+                            <td class="py-3 px-4 txt-secondary text-sm">{{ index + 1 }}</td>
+                            <td class="py-3 px-4 txt-primary">{{ user.email || '—' }}</td>
+                            <td class="py-3 px-4">
+                              <span :class="getLevelBadgeClass(user.level)">{{ user.level }}</span>
+                            </td>
+                            <td class="py-3 px-4 text-right txt-secondary">
+                              {{ user.requests.toLocaleString() }}
+                            </td>
+                            <td class="py-3 px-4 text-right txt-secondary">
+                              {{ user.tokens.toLocaleString() }}
+                            </td>
+                            <td class="py-3 px-4 text-right txt-secondary">
+                              ${{ user.cost.toFixed(2) }}
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </AccordionSection>
+              </AccordionStack>
+            </div>
+          </div>
+
+          <!-- Subscriptions Tab -->
+          <div v-if="activeTab === 'subscriptions'" data-testid="section-subscriptions">
+            <AdminSubscriptionsPanel />
+          </div>
+
+          <!-- App server Tab (native shell only) -->
+          <div v-if="activeTab === 'appServer'">
+            <NativeServerControl />
+          </div>
         </div>
       </div>
     </div>
@@ -481,21 +429,21 @@ import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AdminAttentionPanel from '@/components/admin/AdminAttentionPanel.vue'
+import AccordionSection from '@/components/AccordionSection.vue'
+import AccordionStack from '@/components/AccordionStack.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import RegistrationChart from '@/components/admin/RegistrationChart.vue'
 import UsageChart from '@/components/admin/UsageChart.vue'
+import { useAccordion } from '@/composables/useAccordion'
 import {
   adminApi,
-  type SystemPrompt,
   type UsageStats,
   type SystemOverview,
   type RegistrationAnalytics,
 } from '@/services/api/adminApi'
 const AdminSubscriptionsPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSubscriptionsPanel.vue')
-)
-const AdminModerationPanel = defineAsyncComponent(
-  () => import('@/components/admin/AdminModerationPanel.vue')
 )
 const AdminSystemInfoPanel = defineAsyncComponent(
   () => import('@/components/admin/AdminSystemInfoPanel.vue')
@@ -504,16 +452,18 @@ const NativeServerControl = defineAsyncComponent(
   () => import('@/components/NativeServerControl.vue')
 )
 import { useConfigStore } from '@/stores/config'
+import AdminLiveVoicePanel from '@/components/admin/AdminLiveVoicePanel.vue'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { adminDashboardRedirect } from '@/router/operateRedirects'
 
 const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
 const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
-type TabId = 'overview' | 'prompts' | 'usage' | 'subscriptions' | 'moderation' | 'appServer'
+type TabId = 'overview' | 'usage' | 'subscriptions' | 'appServer'
 interface AdminTab {
   id: TabId
   label: string
@@ -521,12 +471,7 @@ interface AdminTab {
 }
 
 const isValidTab = (tab: unknown): tab is TabId =>
-  tab === 'overview' ||
-  tab === 'prompts' ||
-  tab === 'usage' ||
-  tab === 'subscriptions' ||
-  tab === 'moderation' ||
-  tab === 'appServer'
+  tab === 'overview' || tab === 'usage' || tab === 'subscriptions' || tab === 'appServer'
 
 const tabFromQuery = (): TabId => {
   const tab = route.query.tab
@@ -544,10 +489,8 @@ const activeTab = ref<TabId>(tabFromQuery())
 const tabs = computed<AdminTab[]>(() => {
   const baseTabs: AdminTab[] = [
     { id: 'overview', label: t('admin.tabs.overview'), icon: 'mdi:view-dashboard' },
-    { id: 'prompts', label: t('admin.tabs.prompts'), icon: 'mdi:text-box-multiple' },
     { id: 'usage', label: t('admin.tabs.usage'), icon: 'mdi:chart-bar' },
     { id: 'subscriptions', label: t('admin.tabs.subscriptions'), icon: 'mdi:credit-card-outline' },
-    { id: 'moderation', label: t('admin.tabs.moderation'), icon: 'mdi:flag-outline' },
   ]
   // Native shell only: the backend the app connects to is a client-side bootstrap
   // value with no meaning on the web build, so the tab is hidden there.
@@ -591,29 +534,41 @@ const recentUsers = computed(() => overview.value?.recentUsers ?? [])
 
 // Registration Analytics
 const registrationAnalytics = ref<RegistrationAnalytics | null>(null)
+const signupCount = computed(() =>
+  registrationAnalytics.value
+    ? registrationAnalytics.value.timeline.reduce((sum, point) => sum + point.count, 0)
+    : null
+)
 const analyticsPeriod = ref<'7d' | '30d' | '90d' | '1y' | 'all'>('30d')
 const analyticsGroupBy = ref<'day' | 'week' | 'month'>('day')
-
-// Prompts
-const prompts = ref<SystemPrompt[]>([])
-const promptsLoading = ref(false)
-const editingPromptId = ref<number | null>(null)
-const editingPrompt = ref<Partial<SystemPrompt>>({})
-const promptSaving = ref(false)
 
 // Usage Stats
 const usageStats = ref<UsageStats | null>(null)
 const usageStatsLoading = ref(false)
 const usageStatsPeriod = ref<'day' | 'week' | 'month' | 'all'>('week')
 const usageStatsTopUsers = computed(() => usageStats.value?.topUsers ?? [])
+const usageHasModels = computed(
+  () => !!usageStats.value?.byModel && Object.keys(usageStats.value.byModel).length > 0
+)
+const usageSectionIds = computed(() => {
+  const ids = ['byAction', 'byProvider']
+  if (usageHasModels.value) ids.push('byModel')
+  ids.push('topUsers')
+  return ids
+})
+const {
+  isOpen: isUsageSectionOpen,
+  toggle: toggleUsageSection,
+  expandAll: expandAllUsageSections,
+  collapseAll: collapseAllUsageSections,
+  allOpen: allUsageSectionsOpen,
+} = useAccordion(usageSectionIds)
 
 // Load data based on active tab
 watch(activeTab, (newTab: string) => {
   if (newTab === 'overview') {
     if (!overview.value) loadOverview()
     if (!registrationAnalytics.value) loadRegistrationAnalytics()
-  } else if (newTab === 'prompts' && prompts.value.length === 0) {
-    loadPrompts()
   } else if (newTab === 'usage' && !usageStats.value) {
     loadUsageStats()
   }
@@ -662,18 +617,6 @@ async function updateAnalyticsGroupBy(newGroupBy: string) {
   await loadRegistrationAnalytics()
 }
 
-async function loadPrompts() {
-  promptsLoading.value = true
-  try {
-    const response = await adminApi.getSystemPrompts()
-    prompts.value = response.prompts
-  } catch (error) {
-    console.error('Failed to load prompts:', error)
-  } finally {
-    promptsLoading.value = false
-  }
-}
-
 async function loadUsageStats(period: 'day' | 'week' | 'month' | 'all' = 'week') {
   usageStatsLoading.value = true
   usageStatsPeriod.value = period
@@ -686,46 +629,14 @@ async function loadUsageStats(period: 'day' | 'week' | 'month' | 'all' = 'week')
   }
 }
 
-// Prompt actions
-function togglePromptEdit(promptId: number) {
-  if (editingPromptId.value === promptId) {
-    cancelEditPrompt()
-  } else {
-    const prompt = prompts.value.find((p: SystemPrompt) => p.id === promptId)
-    if (prompt) {
-      editingPromptId.value = promptId
-      editingPrompt.value = {
-        shortDescription: prompt.shortDescription,
-        prompt: prompt.prompt,
-        selectionRules: prompt.selectionRules || '',
-      }
-    }
-  }
-}
-
-function cancelEditPrompt() {
-  editingPromptId.value = null
-  editingPrompt.value = {}
-}
-
-async function savePrompt(promptId: number) {
-  promptSaving.value = true
-  try {
-    const response = await adminApi.updatePrompt(promptId, editingPrompt.value)
-    // Update local state
-    const index = prompts.value.findIndex((p: SystemPrompt) => p.id === promptId)
-    if (index !== -1) {
-      prompts.value[index] = response.prompt
-    }
-    cancelEditPrompt()
-  } catch (error) {
-    console.error('Failed to save prompt:', error)
-  } finally {
-    promptSaving.value = false
-  }
-}
-
 // Helpers
+function usageActionLabel(action: string): string {
+  return t(
+    `config.usage.actions.${action.toLowerCase()}`,
+    action.replaceAll('_', ' ').toUpperCase()
+  )
+}
+
 function getLevelIcon(level: string): string {
   const icons: Record<string, string> = {
     NEW: 'mdi:star-outline',
@@ -763,8 +674,10 @@ function formatDate(dateStr: string): string {
 watch(
   () => route.query.tab,
   () => {
-    if (route.query.tab === 'users') {
-      void router.replace({ name: 'admin-people' })
+    // Users, Prompts and Moderation moved to their topic pages.
+    const redirect = adminDashboardRedirect(route)
+    if (redirect !== true) {
+      void router.replace(redirect)
       return
     }
     activeTab.value = tabFromQuery()

@@ -13,13 +13,13 @@ use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Seed\ModuleGateSeeder;
 use App\Service\Admin\SystemConfigService;
+use App\Service\Auth\RegistrationConfig;
+use App\Service\Chat\GuestChatConfig;
 use App\Service\Digest\MessageDigestConfig;
-use App\Service\EncryptionService;
 use App\Service\Feature\FeatureFlagEnv;
-use App\Service\GuestChatConfig;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
-use App\Service\RegistrationConfig;
+use App\Service\Security\EncryptionService;
 use App\Tests\Unit\Module\Fixture\BuildsAllModules;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -459,6 +459,7 @@ final class SystemConfigServiceTest extends TestCase
             'FEATURE_BUNDLE_ENABLED', 'FEATURE_WORKFLOWS_BUILDER_ENABLED', 'FEATURE_MULTITASK_URL_FETCH_ENABLED',
             'FEATURE_TOOLS_REGISTRY_ENABLED', 'FEATURE_TOOLS_APPROVALS_ENABLED', 'FEATURE_TOOLS_CUSTOM_HTTP_ENABLED',
             'FEATURE_DOCUMENT_TOOLS_ENABLED', 'FEATURE_DESKTOP_AGENT_ENABLED', 'FEATURE_PLATFORM_LINKS_ENABLED',
+            'FEATURE_SEARCH_AI_ENABLED',
         ] as $expected) {
             $this->assertContains($expected, $seen);
             $this->assertSame('true', $schema['fields'][$expected]['default'], $expected.' ships ON');
@@ -651,7 +652,7 @@ final class SystemConfigServiceTest extends TestCase
     }
 
     /**
-     * NV05 (D2): instance provider keys have one editor — Models & keys. The
+     * NV05 (D2): instance provider keys have one editor — Providers & keys. The
      * legacy field stays readable but a write is refused and the message
      * names the new home, so an API client learns where to go.
      */
@@ -664,7 +665,7 @@ final class SystemConfigServiceTest extends TestCase
 
             self::assertFalse($result['success'], $key.' must not be writable here');
             self::assertSame(ProviderKeyCatalog::MANAGED_BY, $result['managedBy'] ?? null);
-            self::assertStringContainsString('Models & keys', $result['message'] ?? '');
+            self::assertStringContainsString('Providers & keys', $result['message'] ?? '');
             self::assertStringContainsString($key, $result['message'] ?? '');
         }
     }
@@ -684,7 +685,7 @@ final class SystemConfigServiceTest extends TestCase
             if (!isset($fields[$envVar])) {
                 continue; // aliases like GEMINI_API_KEY have no config field
             }
-            self::assertSame(ProviderKeyCatalog::MANAGED_BY, $fields[$envVar]['managedBy'] ?? null, $envVar.' must be managed by Models & keys');
+            self::assertSame(ProviderKeyCatalog::MANAGED_BY, $fields[$envVar]['managedBy'] ?? null, $envVar.' must be managed by Providers & keys');
             self::assertSame('database', $fields[$envVar]['source'] ?? null, $envVar.' is stored by the key store, not .env');
         }
 
@@ -784,5 +785,80 @@ final class SystemConfigServiceTest extends TestCase
             $this->assertSame(ModuleGateConfig::GROUP, $fields[$key]['dbGroup']);
             $this->assertSame(ModuleGateConfig::settingFor($id), $fields[$key]['dbKey']);
         }
+    }
+
+    public function testEmptyBrandColorDeletesTheStoredRow(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('deleteValue')
+            ->with(0, 'BRANDING', 'BRAND_PRIMARY_COLOR');
+        $this->configRepository->expects($this->never())
+            ->method('setValue');
+
+        $result = $this->service->setValue('BRAND_PRIMARY_COLOR', '');
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['requiresRestart']);
+    }
+
+    public function testEmptyBooleanIsRejected(): void
+    {
+        $this->configRepository->expects($this->never())->method('deleteValue');
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $result = $this->service->setValue('REGISTRATION_ENABLED', '');
+
+        $this->assertFalse($result['success']);
+    }
+
+    public function testResetBrandingStyleClearsColorsAndFontsButKeepsIdentity(): void
+    {
+        $deleted = [];
+        $this->configRepository->expects($this->exactly(9))
+            ->method('deleteValue')
+            ->willReturnCallback(function (int $ownerId, string $group, string $setting) use (&$deleted): bool {
+                $this->assertSame(0, $ownerId);
+                $this->assertSame('BRANDING', $group);
+                $deleted[] = $setting;
+
+                return true;
+            });
+
+        $result = $this->service->resetBrandingStyle();
+
+        $this->assertTrue($result['success']);
+        $this->assertSame([], $result['failed']);
+        $this->assertFalse($result['requiresRestart']);
+        $this->assertSame([
+            'BRAND_PRIMARY_COLOR',
+            'BRAND_SECONDARY_COLOR',
+            'BRAND_ACCENT_COLOR',
+            'BRAND_PRIMARY_COLOR_DARK',
+            'BRAND_SECONDARY_COLOR_DARK',
+            'BRAND_ACCENT_COLOR_DARK',
+            'BRAND_FONT_FAMILY',
+            'BRAND_HEADING_FONT_FAMILY',
+            'BRAND_FONT_URL',
+        ], $result['reset']);
+        $this->assertSame($result['reset'], $deleted);
+    }
+
+    public function testResetBrandingStyleReportsWhatDidAndDidNotReset(): void
+    {
+        $this->configRepository->method('deleteValue')
+            ->willReturnCallback(function (int $ownerId, string $group, string $setting): bool {
+                if ('BRAND_FONT_URL' === $setting) {
+                    throw new \RuntimeException('db down');
+                }
+
+                return true;
+            });
+
+        $result = $this->service->resetBrandingStyle();
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(['BRAND_FONT_URL'], $result['failed']);
+        $this->assertCount(8, $result['reset']);
+        $this->assertNotContains('BRAND_FONT_URL', $result['reset']);
     }
 }

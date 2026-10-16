@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
-use App\Service\UsageStatsService;
+use App\Service\Usage\UsageStatsService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -145,7 +145,7 @@ class UsageStatsController extends AbstractController
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Paginated activity log',
+                description: 'Paginated rows. Each item includes duration_seconds (spoken length) when the action recorded one, otherwise null, and chat_id when the row belongs to a chat. Live conversations use action VOICE_LIVE.',
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean'),

@@ -22,9 +22,9 @@ final class RoutingSnapshot
     ) {
     }
 
-    public static function updateMode(): bool
+    public static function updateMode(string $env = 'UPDATE_ROUTING_SNAPSHOTS'): bool
     {
-        $flag = getenv('UPDATE_ROUTING_SNAPSHOTS');
+        $flag = getenv($env);
 
         return false !== $flag && '' !== $flag && '0' !== $flag;
     }

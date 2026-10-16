@@ -36,7 +36,7 @@
         :href="storeUrl"
         target="_blank"
         rel="noopener noreferrer"
-        class="btn-primary px-8 py-3 rounded-lg font-medium"
+        class="btn-primary px-8 py-3 rounded-xl font-medium"
         data-testid="btn-force-update"
       >
         {{ $t('forceUpdate.cta') }}

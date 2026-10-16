@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Seed;
 
+use App\Service\Auth\RegistrationConfig;
 use App\Service\Iam\IamConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the global IAM flags (BCONFIG, ownerId=0).
@@ -14,12 +16,29 @@ use Doctrine\DBAL\Connection;
  * the feature flags seed ON (Version20260911090000 also flips rows that
  * earlier releases seeded OFF); operators turn them off under System
  * configuration → Features or pin them with `FEATURE_IAM_*=false`.
+ * Exception: USER_SEARCH_ENABLED seeds OFF (#2060) — the share picker must
+ * not expose the user directory unless an admin opts in.
+ * EVERYONE_SHARES seeds `disabled` when anyone can sign up, and `any_owner`
+ * when registration is invite-only or SSO-only (#2096). Existing rows are
+ * never overwritten; the upgrade migration applies the public-instance default.
  */
-final readonly class IamConfigSeeder
+#[AsTaggedItem(priority: 160)]
+final readonly class IamConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
+        private RegistrationConfig $registration,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'iam';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=IAM, ownerId=0 — feature flags default ON';
     }
 
     public function seed(): SeedResult
@@ -27,15 +46,28 @@ final readonly class IamConfigSeeder
         $rows = [
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_GROUPS_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_SHARING_ENABLED, 'value' => '1'],
+            ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_USER_SEARCH_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_DIRECTORY_SYNC_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_GROUP_POLICIES_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_DIRECTORY_GROUPS_CLAIM, 'value' => IamConfig::DEFAULT_DIRECTORY_GROUPS_CLAIM],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_DIRECTORY_GROUP_NAMES, 'value' => '{}'],
-            ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_EVERYONE_SHARES, 'value' => IamConfig::EVERYONE_SHARES_ANY_OWNER],
+            ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_EVERYONE_SHARES, 'value' => $this->everyoneSharesSeedValue()],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_ADMIN_IMPERSONATION, 'value' => IamConfig::IMPERSONATION_AUDITED],
             ['ownerId' => 0, 'group' => IamConfig::CONFIG_GROUP, 'setting' => IamConfig::KEY_AUDIT_RETENTION_DAYS, 'value' => (string) IamConfig::DEFAULT_AUDIT_RETENTION_DAYS],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'iam_config', $rows);
+    }
+
+    /**
+     * A public instance (open self-registration) has no organization boundary,
+     * so the seeded audience is off. An invite-only or SSO-only install keeps
+     * today's "any owner may share with everyone" behavior.
+     */
+    private function everyoneSharesSeedValue(): string
+    {
+        return $this->registration->isEnabled()
+            ? IamConfig::EVERYONE_SHARES_DISABLED
+            : IamConfig::EVERYONE_SHARES_ANY_OWNER;
     }
 }

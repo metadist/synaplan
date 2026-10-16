@@ -64,6 +64,8 @@ final class StructuredOutputCapabilityTest extends TestCase
             'xai' => ['xai', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'trustedtokens' => ['trustedtokens', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'a2agent' => ['a2agent', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
+            'meta' => ['meta', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
+            'cerebras' => ['cerebras', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'openaicompatible' => ['openaicompatible', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'huggingface' => ['huggingface', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'openai' => ['openai', StructuredOutputDialect::OPENAI_RESPONSES_TEXT_FORMAT],
@@ -93,6 +95,10 @@ final class StructuredOutputCapabilityTest extends TestCase
             'fable 5.1' => ['claude-fable-5-1'],
             'fable 5.1 dated alias' => ['claude-fable-5-1-20260812'],
             'mythos 5.1' => ['claude-mythos-5-1'],
+            'opus 5.5' => ['claude-opus-5-5'],
+            'opus 5.5 dated alias' => ['claude-opus-5-5-20260922'],
+            'sonnet 5.5' => ['claude-sonnet-5-5'],
+            'sonnet 5.5 dated alias' => ['claude-sonnet-5-5-20260928'],
         ];
     }
 

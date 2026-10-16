@@ -179,6 +179,7 @@ export const fileSourceSchema = z.enum([
   'nextcloud',
   'opencloud',
   'whatsapp',
+  'telegram',
   'widget',
   'api',
   'generated',
@@ -254,6 +255,13 @@ export type FileFacets = z.infer<typeof fileFacetsSchema>
 export const fileListResponseSchema = z.object({
   success: z.boolean(),
   files: z.array(fileItemSchema),
+  shared: z
+    .object({
+      resourceId: z.string(),
+      canEdit: z.boolean(),
+    })
+    .nullable()
+    .optional(),
   pagination: z.object({
     page: z.number(),
     limit: z.number(),
@@ -683,6 +691,8 @@ export interface FileListOptions {
   dateTo?: number
   page?: number
   limit?: number
+  /** Shared knowledge-folder id (`ownerId:groupKey`) to list instead of the caller's files. */
+  sharedFolder?: string
 }
 
 /**
@@ -704,6 +714,7 @@ export const listFiles = async (options: FileListOptions = {}): Promise<FileList
   if (options.sort) params.sort = options.sort
   if (options.dateFrom) params.date_from = options.dateFrom
   if (options.dateTo) params.date_to = options.dateTo
+  if (options.sharedFolder) params.shared_folder = options.sharedFolder
 
   const response = await api.get('/api/v1/files', { params })
   // Validate at runtime: the schema is the same definition the FileListResponse
@@ -782,16 +793,57 @@ export const deleteMultipleFiles = async (
   }))
 }
 
+export const deleteFolderResponseSchema = z.object({
+  success: z.boolean(),
+  deleted_files: z.number(),
+  deleted_chunks: z.number(),
+})
+export type DeleteFolderResponse = z.infer<typeof deleteFolderResponseSchema>
+
+/**
+ * Delete a knowledge folder: its files and any vector chunks still filed under
+ * that name. Chunks can outlive the files, and the folder tile stays until
+ * those chunks are removed.
+ */
+export const deleteFolder = async (groupKey: string): Promise<DeleteFolderResponse> => {
+  const response = await api.delete(
+    `/api/v1/files/groups?group_key=${encodeURIComponent(groupKey)}`
+  )
+  return deleteFolderResponseSchema.parse(response.data)
+}
+
 /**
  * Get file groups (unique group keys with file counts from RAG documents)
  *
  * @returns Array of group names with file counts
  */
-export const getFileGroups = async (): Promise<Array<{ name: string; count: number }>> => {
+export const getFileGroups = async (
+  options: Pick<
+    FileListOptions,
+    | 'search'
+    | 'fileType'
+    | 'source'
+    | 'vectorState'
+    | 'originKind'
+    | 'incoming'
+    | 'dateFrom'
+    | 'dateTo'
+  > = {}
+): Promise<Array<{ name: string; count: number }>> => {
+  const params: Record<string, string | number> = {}
+  if (options.search) params.search = options.search
+  if (options.fileType) params.file_type = options.fileType
+  if (options.source) params.source = options.source
+  if (options.vectorState) params.vector_state = options.vectorState
+  if (options.originKind) params.origin_kind = options.originKind
+  if (options.incoming !== undefined) params.incoming = options.incoming ? 1 : 0
+  if (options.dateFrom) params.date_from = options.dateFrom
+  if (options.dateTo) params.date_to = options.dateTo
+
   const response = await api.get<{
     success: boolean
     groups: Array<{ name: string; count: number }>
-  }>('/api/v1/files/groups')
+  }>('/api/v1/files/groups', { params })
   return response.data.groups
 }
 
@@ -936,6 +988,13 @@ export const downloadFile = async (fileId: number, filename: string): Promise<vo
  * @param fileId File ID
  * @param filename Original filename for download
  */
+export const fetchGuestFileBlob = async (sessionId: string, fileId: number): Promise<Blob> => {
+  return httpClient<Blob>(
+    `/api/v1/guest/files/${encodeURIComponent(sessionId)}/${fileId}/download`,
+    { responseType: 'blob' }
+  )
+}
+
 export const downloadGuestFile = async (
   sessionId: string,
   fileId: number,
@@ -1203,6 +1262,7 @@ export default {
   acceptIncomingBulk,
   deleteFile,
   deleteMultipleFiles,
+  deleteFolder,
   getFileGroups,
   getFileContent,
   downloadFile,

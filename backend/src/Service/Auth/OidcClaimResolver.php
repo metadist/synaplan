@@ -65,6 +65,40 @@ final readonly class OidcClaimResolver
     }
 
     /**
+     * Role names from every matching claim path. Items may be plain strings
+     * (Keycloak `realm_access.roles`, `groups`) or objects carrying a `key`
+     * (Kinde `roles: [{"id": …, "key": "admin", "name": "Admin"}]`).
+     *
+     * @param array<string, mixed> $claims
+     * @param list<list<string>>   $paths
+     *
+     * @return list<string>
+     */
+    public function roleValues(array $claims, array $paths): array
+    {
+        $out = [];
+        foreach ($paths as $segments) {
+            $value = $this->resolve($claims, $segments);
+            if (is_string($value) && '' !== $value) {
+                $out[] = $value;
+                continue;
+            }
+            if (!is_array($value)) {
+                continue;
+            }
+            foreach ($value as $item) {
+                if (is_string($item) && '' !== $item) {
+                    $out[] = $item;
+                } elseif (is_array($item) && is_string($item['key'] ?? null) && '' !== $item['key']) {
+                    $out[] = $item['key'];
+                }
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
      * @param array<string, mixed> $claims
      */
     public function issuer(array $claims, string $discoveryUrl = ''): string

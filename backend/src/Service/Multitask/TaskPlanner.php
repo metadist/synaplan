@@ -5,24 +5,31 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\AI\Service\AiFacade;
+use App\AI\Stream\VisibleAnswer;
 use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\TaskPlanSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\Agent\Policy\AssistantPlanLimits;
 use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Context\AttachmentDigest;
 use App\Service\Context\TokenEstimator;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
+use App\Service\File\FileTypeResolver;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
+use App\Service\Message\SpokenInput;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlan;
+use App\Service\Multitask\Plan\TaskPlanNormalizer;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\Skill\SkillCatalog;
+use App\Service\Prompt\PromptService;
 use App\Service\Prompt\TimeContextBuilder;
-use App\Service\PromptService;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\SelfAwareConfig;
@@ -56,6 +63,12 @@ final readonly class TaskPlanner
      */
     private const PLANNING_MAX_TOKENS = 3000;
 
+    /**
+     * Second budget used only when the first plan JSON was cut off. Thinking
+     * models spend the first budget before the object starts (#2264).
+     */
+    private const PLANNING_RETRY_MAX_TOKENS = 8000;
+
     public function __construct(
         private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
@@ -73,6 +86,7 @@ final readonly class TaskPlanner
         private ?OfficePdfRoutingDecorator $officePdfRouting = null,
         private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
         private ?AttachmentDigest $attachmentDigest = null,
+        private ?ConversationFileCatalog $conversationFiles = null,
     ) {
     }
 
@@ -100,6 +114,7 @@ final readonly class TaskPlanner
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
         $systemPrompt = $this->buildSystemPrompt($promptRow->getPrompt(), $userId, $message, $options);
+        $systemPrompt .= $this->conversationFilePlannerHint($message, $conversationHistory);
         $messages = $this->buildMessages($systemPrompt, $message, $conversationHistory);
 
         try {
@@ -130,8 +145,29 @@ final readonly class TaskPlanner
         }
 
         $decoded = $this->decodeJson($raw);
+        if (null === $decoded && $this->plannerOutputWasCut($raw, $response)) {
+            $retried = $this->retryCutOffPlan($messages, $userId, $modelId, $aiOptions);
+            if (null !== $retried) {
+                $decoded = $retried['decoded'];
+                $raw = $retried['raw'];
+                if (null !== $retried['planningUsage']) {
+                    $planningUsage = $this->combinePlanningUsage($planningUsage, $retried['planningUsage']);
+                }
+            }
+        }
         if (null === $decoded) {
             return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage);
+        }
+
+        // A node that reads `$nX.text` but forgot to list nX in depends_on
+        // may be scheduled before nX and answer from an empty reference.
+        // Complete the edges from the references themselves (#mcp-handover).
+        $repaired = TaskPlanNormalizer::missingDependencies($decoded);
+        if ([] !== $repaired) {
+            $this->logger->info('TaskPlanner: inferred missing depends_on edges from $nX references', [
+                'added' => $repaired,
+            ]);
+            $decoded = TaskPlanNormalizer::inferDependencies($decoded);
         }
 
         $allowed = $this->allowedCapabilitiesFromOptions($options);
@@ -285,7 +321,66 @@ final readonly class TaskPlanner
             $text = $this->officePdfRouting->decoratePrompt($text);
         }
 
-        return $text."\n\n".$this->timeContextBlock($message, $options);
+        return $text."\n\n".$this->timeContextBlock($message, $options).$this->assistantInstructionBlock($options);
+    }
+
+    /**
+     * The assistant's own instructions, so a planned file can follow a template
+     * that exists only there. They do not add a capability the list omitted.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function assistantInstructionBlock(array $options): string
+    {
+        $profile = $options['runtime_profile'] ?? null;
+        if (!$profile instanceof RuntimeProfile) {
+            $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+            $profile = $classification['runtime_profile'] ?? null;
+        }
+        $instructions = AssistantPlanLimits::instructions($profile instanceof RuntimeProfile ? $profile : null);
+        if (null === $instructions) {
+            return '';
+        }
+
+        return "\n\n## Assistant instructions\n"
+            ."Follow these when choosing steps and when writing a file. They do not add a capability that is absent from the list above.\n\n"
+            .$instructions;
+    }
+
+    /**
+     * @param array<int, Message> $conversationHistory
+     */
+    private function conversationFilePlannerHint(Message $message, array $conversationHistory): string
+    {
+        if (null === $this->conversationFiles) {
+            return '';
+        }
+
+        $catalog = $this->conversationFiles->build($message, $conversationHistory);
+        if (SpokenInput::isMarked($message)) {
+            $spokenText = trim($message->getText());
+            $messageId = $message->getId();
+            $catalog = array_values(array_filter(
+                $catalog,
+                static function (ConversationFile $file) use ($spokenText, $messageId): bool {
+                    // ConversationFile labels .webm as video. Browser voice
+                    // notes are audio, same as FileTypeResolver / SpokenInput.
+                    $category = FileTypeResolver::resolveCategory('', $file->displayName, $file->relativePath);
+                    if ('audio' !== $category || $file->messageId !== $messageId) {
+                        return true;
+                    }
+
+                    return trim($file->extractedText) !== $spokenText;
+                },
+            ));
+        }
+
+        $block = $this->conversationFiles->renderInventoryBlock($catalog);
+        if ('' === $block) {
+            return '';
+        }
+
+        return $block.'If the user asks about a file listed above, plan a file_analysis or rag_query step even when this turn has no new attachment. When they want file work on one of those files, set code_run params.inputFileNames to its quoted name. Do not invent an id, and do not turn on the shared workspace only because the file is listed here.'."\n";
     }
 
     /**
@@ -354,7 +449,10 @@ final readonly class TaskPlanner
             return null;
         }
 
-        return AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile);
+        return AssistantPlanLimits::withoutDisabledTools(
+            AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile),
+            $profile,
+        );
     }
 
     /**
@@ -393,7 +491,7 @@ final readonly class TaskPlanner
     /**
      * Resolve the two timezone signals the {@see TimeContextBuilder} needs: the
      * user's stored IANA timezone (profile, authoritative) and the approximate
-     * Cloudflare country. Mirrors {@see \App\Service\Message\Handler\ChatHandler::buildTimeContext()}.
+     * Cloudflare country. Mirrors {@see \App\Service\Prompt\ChatSystemPromptBuilder::timeContext()}.
      *
      * @param array<string, mixed> $options
      *
@@ -450,6 +548,14 @@ final readonly class TaskPlanner
     private function buildCurrentMessageJson(Message $message): string
     {
         $fileText = $message->getFileText() ?: '';
+        // The spoken transcript is already BTEXT. Leaving it in BFILETEXT
+        // makes the planner treat the voice note as an attachment.
+        if (
+            SpokenInput::isLegacySpokenAudio($message)
+            || (SpokenInput::isMarked($message) && trim($fileText) === trim($message->getText()))
+        ) {
+            $fileText = '';
+        }
         if ('' !== $fileText) {
             $digest = $this->attachmentDigest ?? new AttachmentDigest(new TokenEstimator());
             $fileText = $digest->forRoutingWithConfig($fileText, $message->getUserId(), $message->getFileType());
@@ -463,12 +569,24 @@ final readonly class TaskPlanner
 
         $attached = [];
         foreach ($message->getFiles() as $file) {
+            // The transcript is the user's message. Offering the audio file
+            // makes the planner treat the turn as a file task.
+            if (SpokenInput::isSpokenAudio($message, $file)) {
+                continue;
+            }
             $attached[] = $file->getFileType() ?: $file->getFileMime();
         }
         if ([] !== $attached) {
             $data['BATTACHED_FILES'] = implode(', ', $attached);
             $data['BATTACHED_COUNT'] = count($attached);
-        } elseif ($message->getFile() > 0) {
+        } elseif (
+            $message->getFile() > 0
+            && 0 === $message->getFiles()->count()
+            && !SpokenInput::isLegacySpokenAudio($message)
+        ) {
+            // File rows were already considered above. Falling through after a
+            // spoken recording was skipped would advertise it again, including
+            // a .webm voice note whose legacy type is still set.
             $data['BATTACHED_FILES'] = (string) $message->getFileType();
             $data['BATTACHED_COUNT'] = 1;
         }
@@ -482,5 +600,84 @@ final readonly class TaskPlanner
     private function decodeJson(string $raw): ?array
     {
         return $this->jsonDecoder->decode($raw)->data;
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     */
+    private function plannerOutputWasCut(string $raw, array $response): bool
+    {
+        $finish = is_string($response['finish_reason'] ?? null) ? $response['finish_reason'] : null;
+
+        return VisibleAnswer::isUnusable($raw, $finish)
+            || VisibleAnswer::isCutJson(VisibleAnswer::withoutReasoning($raw));
+    }
+
+    /**
+     * One more planning call with thinking disabled and a larger completion
+     * budget. A gateway that rejects the flag throws; the caller keeps the
+     * single-chat fallback.
+     *
+     * @param list<array{role: string, content: string}> $messages
+     * @param array<string, mixed>                       $aiOptions
+     *
+     * @return array{decoded: array<string, mixed>, raw: string, planningUsage: array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null}|null
+     */
+    private function retryCutOffPlan(array $messages, ?int $userId, ?int $modelId, array $aiOptions): ?array
+    {
+        $this->logger->info('TaskPlanner: planner JSON was cut off, retrying without thinking', [
+            'model_id' => $modelId,
+        ]);
+
+        $aiOptions['max_tokens'] = self::PLANNING_RETRY_MAX_TOKENS;
+        $aiOptions['disable_thinking'] = true;
+
+        try {
+            $response = $this->aiFacade->chat($messages, $userId, $aiOptions);
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanner: truncated-plan retry failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        $raw = (string) ($response['content'] ?? '');
+        $decoded = $this->decodeJson($raw);
+        if (null === $decoded) {
+            return null;
+        }
+
+        return [
+            'decoded' => $decoded,
+            'raw' => $raw,
+            'planningUsage' => $this->recordPlanningUsage($userId, $modelId, $response),
+        ];
+    }
+
+    /**
+     * The retry is a second billed call. The message badge stores one planning
+     * entry, so both attempts have to be added together or the first call's
+     * tokens and cost disappear from history.
+     *
+     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}|null $first
+     * @param array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}      $second
+     *
+     * @return array{promptTokens: int, completionTokens: int, totalTokens: int, cost: string, modelKey: string, kind: string}
+     */
+    private function combinePlanningUsage(?array $first, array $second): array
+    {
+        if (null === $first) {
+            return $second;
+        }
+
+        return [
+            'promptTokens' => $first['promptTokens'] + $second['promptTokens'],
+            'completionTokens' => $first['completionTokens'] + $second['completionTokens'],
+            'totalTokens' => $first['totalTokens'] + $second['totalTokens'],
+            'cost' => bcadd($first['cost'], $second['cost'], 6),
+            'modelKey' => '' !== $second['modelKey'] ? $second['modelKey'] : $first['modelKey'],
+            'kind' => $first['kind'],
+        ];
     }
 }

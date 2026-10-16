@@ -7,6 +7,7 @@ namespace App\Tests\Unit\AI\Messages;
 use App\AI\Messages\Translator\GeminiMessagesTranslator;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class GeminiMessagesTranslatorTest extends TestCase
 {
@@ -101,5 +102,140 @@ final class GeminiMessagesTranslatorTest extends TestCase
         $this->assertSame('tool_use', $anthropic['stop_reason']);
         $this->assertSame('mcp__2__memory_search', $anthropic['content'][0]['name']);
         $this->assertSame(7, $anthropic['usage']['input_tokens']);
+    }
+
+    public function testThoughtSignatureRoundTripsOnFunctionCall(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromGeminiResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'content' => [
+                    'parts' => [[
+                        'thoughtSignature' => 'sig-from-part',
+                        'functionCall' => [
+                            'name' => 'web_search',
+                            'args' => ['query' => 'x'],
+                            'thoughtSignature' => 'sig-abc',
+                        ],
+                    ]],
+                ],
+            ]],
+        ], ['model' => 'gemini-3-flash']);
+
+        $this->assertSame('sig-abc', $anthropic['content'][0]['thought_signature']);
+
+        $payload = $t->toGeminiRequest([
+            'model' => 'gemini-3-flash',
+            'max_tokens' => 32,
+            'messages' => [
+                ['role' => 'user', 'content' => 'hi'],
+                ['role' => 'assistant', 'content' => $anthropic['content']],
+            ],
+        ]);
+
+        $this->assertArrayNotHasKey(
+            'thoughtSignature',
+            $payload['contents'][1]['parts'][0]['functionCall'],
+        );
+        $this->assertSame(
+            'sig-abc',
+            $payload['contents'][1]['parts'][0]['thoughtSignature'],
+        );
+    }
+
+    public function testThoughtSignatureOnASiblingPartIsAttachedToTheToolUse(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromGeminiResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'content' => [
+                    'parts' => [
+                        ['thoughtSignature' => 'sig-sibling'],
+                        [
+                            'functionCall' => [
+                                'name' => 'write_file',
+                                'args' => ['path' => 'hello.md'],
+                            ],
+                        ],
+                    ],
+                ],
+            ]],
+        ], ['model' => 'gemini-3.5-flash']);
+
+        $this->assertSame('sig-sibling', $anthropic['content'][0]['thought_signature']);
+    }
+
+    public function testTwoFunctionCallsDoNotShareTheFirstSignature(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromGeminiResponse([
+            'candidates' => [[
+                'finishReason' => 'STOP',
+                'thoughtSignature' => 'sig-candidate',
+                'content' => [
+                    'parts' => [
+                        ['thoughtSignature' => 'sig-a'],
+                        [
+                            'functionCall' => [
+                                'name' => 'web_search',
+                                'args' => ['query' => 'node'],
+                            ],
+                        ],
+                        ['thoughtSignature' => 'sig-b'],
+                        [
+                            'functionCall' => [
+                                'name' => 'write_file',
+                                'args' => ['path' => 'hello.md'],
+                            ],
+                        ],
+                    ],
+                ],
+            ]],
+        ], ['model' => 'gemini-3.5-flash']);
+
+        $this->assertSame('sig-a', $anthropic['content'][0]['thought_signature']);
+        $this->assertSame('web_search', $anthropic['content'][0]['name']);
+        $this->assertSame('sig-b', $anthropic['content'][1]['thought_signature']);
+        $this->assertSame('write_file', $anthropic['content'][1]['name']);
+    }
+
+    public function testStreamAttachesCandidateThoughtSignatureToFunctionCall(): void
+    {
+        $sse = 'data: '.json_encode([
+            'candidates' => [[
+                'thoughtSignature' => 'sig-candidate',
+                'content' => [
+                    'parts' => [[
+                        'functionCall' => [
+                            'name' => 'write_file',
+                            'args' => ['path' => 'a.md'],
+                        ],
+                    ]],
+                ],
+            ]],
+        ], \JSON_THROW_ON_ERROR)."\n\n";
+        $t = new GeminiMessagesTranslator(new MockHttpClient(new MockResponse($sse)));
+        $toolBlock = null;
+        $t->stream(
+            [
+                'model' => 'gemini-3.5-flash',
+                'max_tokens' => 32,
+                'messages' => [['role' => 'user', 'content' => 'hi']],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'https://generativelanguage.googleapis.com'],
+            static function (array $event) use (&$toolBlock): void {
+                if (
+                    'content_block_start' === $event['event']
+                    && 'tool_use' === ($event['data']['content_block']['type'] ?? '')
+                ) {
+                    $toolBlock = $event['data']['content_block'];
+                }
+            },
+        );
+
+        $this->assertIsArray($toolBlock);
+        $this->assertSame('sig-candidate', $toolBlock['thought_signature'] ?? null);
     }
 }

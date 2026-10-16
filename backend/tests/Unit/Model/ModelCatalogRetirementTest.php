@@ -80,9 +80,38 @@ final class ModelCatalogRetirementTest extends TestCase
     }
 
     /**
-     * A retirement whose row is still active in the catalog is worse than no
-     * retirement: the registry claims the model is dead while the seeder keeps
-     * shipping it as usable.
+     * #2413: OpenAI shuts gpt-image-1 down on 2026-10-23 and gpt-image-1.5 on
+     * 2026-12-01; both retire to GPT Image 2.5 Flare ahead of the shutdown.
+     */
+    public function testTheGptImage1RowsRetireToGptImage25Flare(): void
+    {
+        $flare = ModelCatalog::findBidByKey('openai:gpt-image-2.5-flare:text2pic');
+        self::assertSame(348, $flare);
+
+        foreach ([29 => 'gpt-image-1', 151 => 'gpt-image-1.5'] as $bid => $providerId) {
+            $record = ModelCatalog::retirement($bid);
+            self::assertNotNull($record, $providerId.' must be retired');
+            self::assertSame($providerId, $record['providerId']);
+            self::assertSame('openai:gpt-image-2.5-flare:text2pic', $record['successor']);
+            self::assertSame($flare, ModelCatalog::successorBid($bid));
+        }
+
+        $successorRows = array_values(array_filter(
+            ModelCatalog::all(),
+            static fn (array $row): bool => 348 === $row['id'],
+        ));
+        self::assertNotEmpty($successorRows, 'GPT Image 2.5 Flare (BID 348) is missing from the catalog');
+        $successorRow = $successorRows[0];
+        self::assertSame(1, $successorRow['active']);
+        self::assertSame(1, $successorRow['selectable']);
+        self::assertFalse(ModelCatalog::isRetired(348));
+    }
+
+    /**
+     * A retirement whose row is still active is worse than no retirement: the
+     * registry claims the model is dead while the seeder keeps shipping it as
+     * usable. The catalog derives the flags from the registry, so this asserts
+     * the derivation rather than an author's memory.
      */
     public function testARetiredModelStillInTheCatalogIsSwitchedOff(): void
     {
@@ -99,10 +128,32 @@ final class ModelCatalogRetirementTest extends TestCase
         }
 
         self::assertSame([], $live, sprintf(
-            'BID(s) %s are recorded as retired but still carry active/selectable = 1 in ModelCatalog. '
-            .'Set both to 0 so a fresh install never offers them.',
+            'BID(s) %s are recorded as retired but ModelCatalog::all() still reports them as '
+            .'active/selectable. The derivation in ModelCatalog::rows() is broken.',
             implode(', ', $live),
         ));
+    }
+
+    /**
+     * The point of deriving instead of asking: a row that claims to be active
+     * must come out switched off anyway. Before this, "set active/selectable to
+     * 0 as well" was a second manual step, and the only thing standing between
+     * forgetting it and a fresh install offering a dead model was this test.
+     */
+    public function testTheRegistryOverridesARowThatStillClaimsToBeActive(): void
+    {
+        $retiredBid = array_key_first(ModelCatalog::retirements());
+        self::assertNotNull($retiredBid, 'The registry is empty, so there is nothing to derive from.');
+
+        $rows = ModelCatalog::withRetirementsApplied([
+            ['id' => $retiredBid, 'active' => 1, 'selectable' => 1],
+            ['id' => -1, 'active' => 1, 'selectable' => 1],
+        ]);
+
+        self::assertSame(0, $rows[0]['active'], "Retired BID {$retiredBid} was left active.");
+        self::assertSame(0, $rows[0]['selectable'], "Retired BID {$retiredBid} was left selectable.");
+        self::assertSame(1, $rows[1]['active'], 'A model that is not retired must be left untouched.');
+        self::assertSame(1, $rows[1]['selectable'], 'A model that is not retired must be left untouched.');
     }
 
     #[DataProvider('retirementProvider')]
@@ -175,6 +226,88 @@ final class ModelCatalogRetirementTest extends TestCase
             ModelCatalog::isRetired($successorBid),
             "BID {$bid}: successor {$successorBid} is itself retired. Point at a live model instead.",
         );
+    }
+
+    /**
+     * The suggestion the availability report prints must be safe to paste: a
+     * live row of the same provider and capability. A suggestion that needed
+     * checking before it could be used would be worth nothing.
+     */
+    public function testSuggestedSuccessorIsALiveSiblingOfTheSameCapability(): void
+    {
+        $byBid = [];
+        foreach (ModelCatalog::all() as $model) {
+            $byBid[(int) $model['id']] = $model;
+        }
+
+        $checked = 0;
+
+        foreach (array_keys(ModelCatalog::retirements()) as $bid) {
+            $retiredRow = $byBid[$bid] ?? null;
+            if (null === $retiredRow) {
+                self::assertNull(
+                    ModelCatalog::suggestSuccessorKey($bid),
+                    "BID {$bid} is not in the catalog, so its capability is unknown and nothing may be suggested.",
+                );
+                continue;
+            }
+
+            $suggestion = ModelCatalog::suggestSuccessorKey($bid);
+            if (null === $suggestion) {
+                continue;
+            }
+
+            $suggestedBid = ModelCatalog::findBidByKey($suggestion);
+            self::assertNotNull($suggestedBid, "BID {$bid}: suggested key '{$suggestion}' does not resolve.");
+            self::assertNotSame($bid, $suggestedBid, "BID {$bid}: suggested itself.");
+            self::assertFalse(ModelCatalog::isRetired($suggestedBid), "BID {$bid}: suggested retired BID {$suggestedBid}.");
+            self::assertSame(1, (int) $byBid[$suggestedBid]['active'], "BID {$bid}: suggested inactive BID {$suggestedBid}.");
+            self::assertSame($retiredRow['tag'], $byBid[$suggestedBid]['tag'], "BID {$bid}: suggested a different capability.");
+            self::assertSame(
+                ModelCatalog::normalizeProvider((string) $retiredRow['service']),
+                ModelCatalog::normalizeProvider((string) $byBid[$suggestedBid]['service']),
+                "BID {$bid}: suggested another provider, whose key the operator may not hold.",
+            );
+            ++$checked;
+        }
+
+        self::assertGreaterThan(0, $checked, 'No retired row is still in the catalog, so nothing was actually checked.');
+    }
+
+    /**
+     * A long-context tier keyed on a model nobody can select any more is dead
+     * config that reads like a live rate — and dropping it was another line on
+     * the retirement checklist that only a person could remember.
+     *
+     * The tier is keyed by providerId and applies to every tag of that model, so
+     * it stays legitimate as long as one row still carries the id: retiring the
+     * chat row of a model whose vision row lives on changes nothing here.
+     */
+    public function testNoLongContextTierIsKeyedOnAModelThatIsFullyRetired(): void
+    {
+        $liveProviderIds = [];
+        foreach (ModelCatalog::all() as $model) {
+            if (1 === (int) ($model['active'] ?? 0)) {
+                $liveProviderIds[(string) $model['providerId']] = true;
+            }
+        }
+
+        $stale = [];
+        foreach (ModelCatalog::retirements() as $record) {
+            $providerId = $record['providerId'];
+            if (isset($liveProviderIds[$providerId])) {
+                continue;
+            }
+            if (null !== ModelCatalog::contextPricing($providerId)) {
+                $stale[$providerId] = true;
+            }
+        }
+
+        self::assertSame([], array_keys($stale), sprintf(
+            'ModelCatalog::CONTEXT_PRICING still prices a long-context tier for %s, which no live row '
+            .'carries any more. Drop the tier together with the last row of that model.',
+            implode(', ', array_keys($stale)),
+        ));
     }
 
     public function testARetirementNeverPointsAtItself(): void

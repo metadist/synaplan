@@ -103,7 +103,7 @@ async function handleDelete(memory: UserMemory) {
           </p>
         </div>
         <button
-          class="btn-primary px-4 py-2 rounded-lg font-medium flex items-center gap-2"
+          class="btn-primary px-4 py-2 rounded-xl font-medium flex items-center gap-2"
           @click="handleCreate"
         >
           <Plus :size="18" />
@@ -117,7 +117,7 @@ async function handleDelete(memory: UserMemory) {
         <input
           v-model="searchQuery"
           type="text"
-          class="w-full surface-card pl-10 pr-4 py-3 rounded-lg txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand"
+          class="w-full surface-card pl-10 pr-4 py-3 rounded-xl txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-brand"
           :placeholder="t('memories.search.placeholder')"
         />
       </div>

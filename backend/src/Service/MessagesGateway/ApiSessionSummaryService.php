@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\MessagesGateway;
 
+use App\AI\Messages\AnthropicContentText;
+use App\AI\Messages\ApiSessionClient;
+use App\AI\Messages\ClaudeCodeTurnText;
 use App\AI\Service\AiFacade;
 use App\Entity\Chat;
 use App\Entity\Message;
@@ -17,9 +20,15 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
 
 /**
- * Rolling 2-3 sentence summary of an API/agent session, kept as one chat in
- * the user's normal chat list (BCHATS source 'api' + a single OUT message
- * updated in place).
+ * Rolling record of an API/agent session, kept as one chat in the user's
+ * normal chat list (BCHATS source 'api').
+ *
+ * The chat holds the actual turns the external client saw — one IN message
+ * with the user's request excerpt and one OUT message with the assistant's
+ * response excerpt per request — plus ONE rolling summary message (topic
+ * `api_session`, labelled as a session log) that is updated in place. The
+ * summary alone used to be the whole thread, so opening the conversation in
+ * Synaplan showed a third-person recap instead of what was said (#2023).
  *
  * Runs ONLY on the messenger worker ({@see \App\MessageHandler\SummarizeApiSessionCommandHandler})
  * — never on the API request path. Excerpts arrive pre-capped in the queue
@@ -32,9 +41,9 @@ use Symfony\Component\Lock\LockFactory;
  * {@see ModelConfigService::getSummaryModelConfig()} (ANALYZE → CHAT). Never
  * hardcodes a model name.
  *
- * Privacy: mirrors BUSELOG's posture — no full transcripts are persisted,
- * only the short derived summary. Pending excerpts live in the cache pool
- * (capped) until folded, then are dropped.
+ * Privacy: no full transcripts are persisted, only the short capped excerpts
+ * ({@see self::EXCERPT_MAX_CHARS}) as turns plus the derived summary. Pending
+ * excerpts live in the cache pool (capped) until folded, then are dropped.
  */
 final readonly class ApiSessionSummaryService
 {
@@ -61,6 +70,13 @@ final readonly class ApiSessionSummaryService
     private const CHAT_SOURCE = 'api';
     private const MESSAGE_TYPE = 'API';
     private const MESSAGE_TOPIC = 'api_session';
+    // Turns reuse the plain conversation topic, mirroring how MessageProcessor
+    // persists external history — the summary keeps its own topic so the
+    // in-place lookup below never grabs a turn.
+    private const TURN_TOPIC = 'CHAT';
+    // Language-neutral tag: the summary is machine text in the user's language
+    // and must not read as a message someone sent.
+    private const SUMMARY_LABEL = '[Session log]';
 
     public function __construct(
         private AiFacade $aiFacade,
@@ -86,7 +102,19 @@ final readonly class ApiSessionSummaryService
         string $model,
         string $requestExcerpt,
         string $responseExcerpt,
+        bool $interrupted = false,
     ): void {
+        $humanRequest = AnthropicContentText::humanText($requestExcerpt);
+        $requestExcerpt = ClaudeCodeTurnText::visibleRequest($humanRequest);
+        // A tool-only turn has no person text, but the assistant reply is
+        // still part of the session. A side request or a reminder is not.
+        if ('' !== trim($humanRequest) && '' === $requestExcerpt) {
+            return;
+        }
+        if ($interrupted) {
+            $responseExcerpt = trim($responseExcerpt."\n\n".$this->interruptedSentence($userId));
+        }
+
         $stateKey = self::CACHE_PREFIX.hash('sha256', $userId.'|'.$sessionKey);
 
         // Serialize concurrent worker messages for the same session so the
@@ -97,6 +125,7 @@ final readonly class ApiSessionSummaryService
         try {
             $state = $this->readState($stateKey);
 
+            $requestExcerpt = AnthropicContentText::humanText($requestExcerpt);
             $entry = trim(sprintf(
                 "Request: %s\nResponse: %s",
                 $this->clip(trim($requestExcerpt), self::EXCERPT_MAX_CHARS),
@@ -126,7 +155,7 @@ final readonly class ApiSessionSummaryService
                 return;
             }
 
-            $chatId = $this->upsertSessionChat($userId, $state, $client, $summary, $model, $language);
+            $chatId = $this->upsertSessionChat($userId, $user, $state, $client, $summary, $model, $language, $state['pending']);
 
             $state['summary'] = $summary;
             $state['pending'] = [];
@@ -146,6 +175,13 @@ final readonly class ApiSessionSummaryService
     {
         $userId = (int) $user->getId();
         $modelConfig = $this->modelConfigService->getSummaryModelConfig($userId);
+        $provider = strtolower(trim((string) ($modelConfig['provider'] ?? '')));
+        $modelName = $modelConfig['model'] ?? null;
+        // The dev stub answers with a canned "demo mode" paragraph and a
+        // placeholder image. That must not become the session log.
+        if ('test' === $provider || !\is_string($modelName) || '' === trim($modelName)) {
+            return $this->plainExcerptSummary($pending);
+        }
 
         $sections = [];
         if ('' !== $previousSummary) {
@@ -159,7 +195,7 @@ final readonly class ApiSessionSummaryService
                 ['role' => 'user', 'content' => implode("\n\n", $sections)],
             ], $userId, [
                 'provider' => $modelConfig['provider'] ?? null,
-                'model' => $modelConfig['model'] ?? null,
+                'model' => $modelName,
                 'temperature' => 0.2,
                 'max_tokens' => self::SUMMARY_MAX_TOKENS,
             ]);
@@ -215,7 +251,7 @@ final readonly class ApiSessionSummaryService
     {
         $requests = [];
         foreach ($pending as $entry) {
-            if (1 !== preg_match('/^Request:\s*(.*)$/s', $entry, $match)) {
+            if (1 !== preg_match('/^Request:[ \t]*(.*)$/s', $entry, $match)) {
                 continue;
             }
             $parts = preg_split('/^Response:\s*/m', (string) $match[1], 2);
@@ -298,12 +334,14 @@ final readonly class ApiSessionSummaryService
     }
 
     /**
-     * Create the per-session chat on first refresh, then update the single
-     * OUT message's text in place on subsequent refreshes.
+     * Create the per-session chat on first refresh, append the folded turns as
+     * real IN/OUT messages, then update the single labelled summary message's
+     * text in place on subsequent refreshes.
      *
      * @param array{chatId: int|null} $state
+     * @param list<string>            $turns pending "Request: …\nResponse: …" entries being folded
      */
-    private function upsertSessionChat(int $userId, array $state, string $client, string $summary, string $model, string $language): int
+    private function upsertSessionChat(int $userId, User $user, array $state, string $client, string $summary, string $model, string $language, array $turns): int
     {
         $chat = null;
         if (null !== $state['chatId']) {
@@ -317,14 +355,44 @@ final readonly class ApiSessionSummaryService
             $chat = new Chat();
             $chat->setUserId($userId);
             $chat->setSource(self::CHAT_SOURCE);
-            $chat->setTitle(sprintf('%s · %s', $this->clientLabel($client), date('Y-m-d H:i')));
+            $chat->setTitle(sprintf('%s · %s', $this->clientLabel($client), ApiSessionClient::localStamp($user)));
             $this->em->persist($chat);
             $this->em->flush();
+        } elseif (ApiSessionClient::DESKTOP === $client) {
+            $retitled = ApiSessionClient::retitleDesktop((string) $chat->getTitle());
+            if (null !== $retitled) {
+                $chat->setTitle($retitled);
+            }
+        }
+
+        // One second per message keeps the turn order stable for readers that
+        // sort by time; the summary lands last so list previews keep showing
+        // the compact trail.
+        $tick = time();
+        foreach ($turns as $entry) {
+            [$request, $response] = $this->splitTurn($entry);
+            $request = AnthropicContentText::humanText($request);
+            if ('' !== $request) {
+                $this->appendTurnMessage($userId, $chat, 'IN', $request, $language, $tick);
+                ++$tick;
+            }
+            if ('' !== $response) {
+                $this->appendTurnMessage($userId, $chat, 'OUT', $response, $language, $tick);
+                ++$tick;
+            }
+        }
+
+        if ('' === trim($summary)) {
+            $chat->updateTimestamp();
+            $this->em->flush();
+
+            return (int) $chat->getId();
         }
 
         $message = $this->em->getRepository(Message::class)->findOneBy([
             'chatId' => $chat->getId(),
             'direction' => 'OUT',
+            'topic' => self::MESSAGE_TOPIC,
         ]);
 
         if (null === $message) {
@@ -340,15 +408,60 @@ final readonly class ApiSessionSummaryService
             $this->em->flush();
         }
 
-        $message->setText($summary);
+        $message->setText(self::SUMMARY_LABEL.' '.$summary);
         $message->setLanguage($language);
-        $message->setUnixTimestamp(time());
-        $message->setDateTime(date('YmdHis'));
+        $message->setUnixTimestamp($tick);
+        $message->setDateTime(date('YmdHis', $tick));
         $message->setMeta('api_session.model', $model);
         $chat->updateTimestamp();
         $this->em->flush();
 
         return (int) $chat->getId();
+    }
+
+    private function interruptedSentence(int $userId): string
+    {
+        $user = $this->em->getRepository(User::class)->find($userId);
+        $locale = $user instanceof User ? strtolower(substr($user->getLocale(), 0, 2)) : 'en';
+
+        return match ($locale) {
+            'de' => 'Diese Antwort wurde unterbrochen. Der Text darüber ist angekommen, bevor die Verbindung geschlossen wurde.',
+            'es' => 'Esta respuesta se interrumpió. El texto de arriba es lo que llegó antes de que se cerrara la conexión.',
+            'fr' => 'Cette réponse a été interrompue. Le texte ci-dessus est arrivé avant la fermeture de la connexion.',
+            'tr' => 'Bu yanıt yarıda kesildi. Yukarıdaki metin, bağlantı kapanmadan önce gelen kısımdır.',
+            default => 'This answer was interrupted. The text above is what arrived before the connection closed.',
+        };
+    }
+
+    private function appendTurnMessage(int $userId, Chat $chat, string $direction, string $text, string $language, int $timestamp): void
+    {
+        $turn = new Message();
+        $turn->setUserId($userId);
+        $turn->setTrackingId($timestamp);
+        $turn->setMessageType(self::MESSAGE_TYPE);
+        $turn->setTopic(self::TURN_TOPIC);
+        $turn->setDirection($direction);
+        $turn->setStatus('complete');
+        $turn->setText($text);
+        $turn->setLanguage($language);
+        $turn->setUnixTimestamp($timestamp);
+        $turn->setDateTime(date('YmdHis', $timestamp));
+        $turn->setChat($chat);
+        $this->em->persist($turn);
+    }
+
+    /**
+     * Split a folded "Request: …\nResponse: …" entry back into its turns.
+     *
+     * @return array{0: string, 1: string} request text, response text (either may be empty)
+     */
+    private function splitTurn(string $entry): array
+    {
+        if (1 !== preg_match('/^Request:[ \t]*(.*?)(?:\nResponse:[ \t]*(.*))?$/s', $entry, $match)) {
+            return ['', ''];
+        }
+
+        return [trim((string) $match[1]), trim((string) ($match[2] ?? ''))];
     }
 
     /**
@@ -470,11 +583,31 @@ final readonly class ApiSessionSummaryService
 
     private function clientLabel(string $client): string
     {
-        return match ($client) {
-            'claude-code' => 'Claude Code',
-            'openai-api' => 'API client (OpenAI-compatible)',
-            default => 'API client',
-        };
+        return ApiSessionClient::label($client);
+    }
+
+    /**
+     * Factual stand-in when no real summarizer model is configured.
+     * Uses the person's own request text, never the dev stub's canned reply.
+     *
+     * @param list<string> $pending
+     */
+    private function plainExcerptSummary(array $pending): string
+    {
+        $bits = [];
+        foreach ($pending as $entry) {
+            [$request] = $this->splitTurn($entry);
+            $text = trim(AnthropicContentText::humanText($request));
+            if ('' !== $text) {
+                $bits[] = $text;
+            }
+        }
+
+        if ([] === $bits) {
+            return '';
+        }
+
+        return $this->clip(implode(' ', $bits), self::SUMMARY_MAX_CHARS);
     }
 
     private function clip(string $value, int $maxChars): string

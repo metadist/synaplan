@@ -56,7 +56,7 @@
     <div class="flex flex-col gap-2 mt-2">
       <button
         type="button"
-        class="btn-primary w-full py-2.5 rounded-lg text-sm font-semibold"
+        class="btn-primary w-full py-2.5 rounded-xl text-sm font-semibold"
         data-testid="setup-provider-continue"
         @click="emit('next')"
       >
@@ -91,7 +91,7 @@ const selectedName = ref('')
 
 /**
  * Only providers whose key makes chat possible belong on the "connect one
- * provider so chat works" step; media and speech keys live in Models & keys.
+ * provider so chat works" step; media and speech keys live in AI infrastructure › Providers & keys.
  */
 const chatProviders = computed(() => providers.value.filter((p) => p.chat))
 

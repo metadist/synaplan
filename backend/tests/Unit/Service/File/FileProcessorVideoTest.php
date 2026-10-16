@@ -12,7 +12,7 @@ use App\Service\File\PdfRasterizer;
 use App\Service\File\TextCleaner;
 use App\Service\File\TikaClient;
 use App\Service\File\VideoAnalysisService;
-use App\Service\WhisperService;
+use App\Service\Stt\WhisperService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -60,9 +60,11 @@ class FileProcessorVideoTest extends TestCase
             tikaMinEntropy: 2.0,
         );
 
-        // No external STT and no local whisper -> external API transcription path.
+        // Cloud speech is configured; local whisper is not. The video path
+        // transcribes through that cloud model and does not call a provider
+        // that was never set up.
         $this->whisperService->method('isAvailable')->willReturn(false);
-        $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
+        $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(true);
     }
 
     protected function tearDown(): void

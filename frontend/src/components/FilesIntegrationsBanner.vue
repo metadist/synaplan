@@ -31,7 +31,7 @@
         :href="integration.url"
         target="_blank"
         rel="noopener noreferrer"
-        class="group flex items-center gap-2 px-3 py-1.5 rounded-lg border border-light-border/30 dark:border-dark-border/15 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/[0.03] transition-all"
+        class="group flex items-center gap-2 px-3 py-1.5 rounded-xl border border-light-border/30 dark:border-dark-border/15 hover:border-[var(--brand)]/50 hover:bg-[var(--brand)]/[0.03] transition-all"
         :title="$t('files.integrationsBanner.openLink', { name: integration.name })"
         :data-testid="`btn-integration-${integration.id}`"
       >
@@ -50,7 +50,7 @@
 
       <button
         type="button"
-        class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors flex-shrink-0"
+        class="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors flex-shrink-0"
         :aria-label="$t('files.integrationsBanner.dismiss')"
         :title="$t('files.integrationsBanner.dismiss')"
         data-testid="btn-integrations-dismiss"

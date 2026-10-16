@@ -5,8 +5,14 @@ Commands and workflows for developing Synaplan.
 ## Service Management
 
 ```bash
-# Start all services
-docker compose up -d
+# Start all services (status page on :5173 first, then remaining images)
+make up
+# equivalent: ./scripts/compose-up.sh
+# A plain `docker compose up -d` waits for every image pull before :5173 answers.
+# It also warns when the project .env (next to docker-compose.yml) replaces
+# Docker defaults or holds app settings Compose never reads. That file is only
+# for SYNAPLAN_*_PORT and compose overrides (.env.example); app settings go in
+# backend/.env.
 
 # Stop all services
 docker compose down
@@ -31,9 +37,10 @@ The worker boot script (`docker-compose.yml`) is **fail-fast**:
 - If the `./backend` bind-mount is broken (no `bin/console`), it exits with `64` instead of looping forever on a silenced error (this used to hang the worker for hours unnoticed).
 - The DB-ready wait is bounded to ~3 minutes and prints the actual SQL error every 10 retries.
 - It logs the resolved `APP_ENV` on boot.
+- It starts only once the backend is healthy, so `cache:warmup` never reads a `vendor/` that the backend's `composer install` is still writing.
 - A Docker `healthcheck` probes for the live `messenger:consume` process every 30 s — `docker compose ps` reports `(unhealthy)` immediately if the consumer ever dies.
 
-The worker **MUST run in the same `APP_ENV` as the backend container**. The `RedisService` prefixes every key with `synaplan:{env}:`, so a mismatch (e.g. backend `dev` / worker `prod`) silently splits the system in two: the worker consumes `AdvanceMediaJobCommand` messages but `findByKey()` reads the wrong namespace and returns `null`, leaving the job stuck in `queued` until the reaper times it out 20 min later. Local dev uses `APP_ENV=dev` for both; production uses `prod` for both (see `synaplan-platform/docker-compose.yml`).
+The worker **MUST run in the same `APP_ENV` as the backend container**. The `RedisService` prefixes every key with `synaplan:{env}:`, so a mismatch (e.g. backend `dev` / worker `prod`) silently splits the system in two: the worker consumes `AdvanceMediaJobCommand` messages but `findByKey()` reads the wrong namespace and returns `null`, leaving the job stuck in `queued` until the reaper times it out 20 min later. Local dev pins `APP_ENV=dev` for both in `docker-compose.yml` and `docker-compose-minimal.yml` (a host or project `.env` `APP_ENV` cannot change it); production uses `prod` for both (see `synaplan-platform/docker-compose.yml`).
 
 After switching branches a `docker compose restart worker` is enough to pick up code changes (the entrypoint clears and re-warms the cache).
 
@@ -74,29 +81,15 @@ keys in both overlay files (the architecture test fails if either is
 missing), and never a second hand-written `isEnabled()` + feature-status
 block.
 
-### Secure compute (optional)
+### Secure compute
 
-Short Python or Node file work for the assistant. Off by default. The sidecar
-is a Compose profile; PHP never talks to Docker.
+Short Python or Node file work for the assistant. `make up` starts
+the sidecar, builds the Python/Node runtimes from this repo, and turns the
+feature on. PHP never talks to Docker. Never publish port 8080.
 
-```bash
-make -C sidecars/synaplan-compute images
-COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
-  COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
-  docker compose --profile compute up -d
-```
-
-The sidecar process is distroless `nonroot`. Set `COMPUTE_DOCKER_GID` to the
-host docker socket group so it can talk to dockerd. The runner never pulls:
-build the Python/Node images (`make -C sidecars/synaplan-compute images`) and
-pin those digests in `sidecars/synaplan-compute/internal/images/map.go` or the
-first run fails with image-not-found.
-
-Then set **COMPUTE.ENABLED** under Operate → System config (or
-`FEATURE_COMPUTE_ENABLED=true`). Feature Status → *Secure compute* must show
-Available. Never publish port 8080. Persistent folders and website fetches
-are extra switches (`COMPUTE.WORKSPACES_ENABLED`, `COMPUTE.EGRESS_ENABLED`),
-also off. See [COMPUTE.md](./COMPUTE.md) and
+Hide it with `COMPUTE_URL=disabled` or `FEATURE_COMPUTE_ENABLED=false`.
+Website fetches stay off (`COMPUTE.EGRESS_ENABLED`). See
+[COMPUTE.md](./COMPUTE.md) and
 [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
 
 ### Office conversion (optional)
@@ -104,7 +97,7 @@ also off. See [COMPUTE.md](./COMPUTE.md) and
 Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
 legacy-format analysis, and “Combine as PDF” need a **Collabora CODE** sidecar
 (`collabora/code`). The sidecar is **off by default** (`profiles: [office]`), so
-`docker compose up -d` does not pull the image or spend the extra ~2 GB RAM.
+`make up` does not pull the image or spend the extra ~2 GB RAM.
 The compose file defaults `OFFICE_CONVERT_URL` to `http://collabora:9980`;
 override that env for an external CODE, or set `OFFICE_CONVERT_URL=disabled`.
 
@@ -138,9 +131,9 @@ PDFs with tables and two-column layouts extract more cleanly when the
 (`profiles: [docling]`). Compose sets `DOCLING_BASE_URL=http://docling:5001`;
 leave that empty in `.env` to keep Docling off. A down sidecar never fails
 an upload — Tika stays the fallback. Enable Docling in
-**Operate → AI infrastructure → Extraction** (add `docling` to the
+**Operate → AI infrastructure → Document reading** (add `docling` to the
 document chain). URL, timeout and **Test connection** match Tika under
-**System configuration → Processing → Docling**. Then:
+**Reading services → Docling** on the same tab. Then:
 
 ```bash
 docker compose --profile docling up -d
@@ -158,7 +151,7 @@ default** (`profiles: [searxng]`). Compose sets
 keep SearXNG off. Health is “URL set”, not a live probe — a down
 sidecar fails that provider and the configured fallback (or an empty
 result set) is used. Enable SearXNG in
-**Operate → AI infrastructure → Web search**. Then:
+**Operate → System configuration → Web search**. Then:
 
 ```bash
 docker compose --profile searxng up -d
@@ -177,7 +170,7 @@ The chat bubble for an async video shows `Auftrag läuft noch / Job still runnin
 4. **Re-arm a stuck job** without waiting for the reaper:
    `docker compose exec -T backend php bin/console app:media:advance-jobs <job_id>` (or `--all` for every active job).
 5. **The reaper backstop** (`app:media:reap-jobs`) drives every stale / past-deadline job to `timed_out` with a localized error so no bubble hangs forever. The local `scheduler` service runs it every tick; `docker compose exec -T backend php bin/console app:media:reap-jobs` still works if you need it immediately.
-6. **Saved Task schedules** (`app:saved-tasks:tick`) claim due tasks with a compare-and-set and a cross-node Redis lock (`saved-tasks-tick`). The local `docker-compose.yml` `scheduler` service runs this every tick after the media reaper (`SYNAPLAN_ROLE=scheduler`), same as self-host / prod. Fire a due task by hand with `docker compose exec -T backend php bin/console app:saved-tasks:tick` if you do not want to wait for the next cycle. It is a no-op while `SAVEDTASKS / ENABLED` is globally off. Production host-cron (`cron-saved-tasks.sh` in `synaplan-platform`) is a separate PR. Overview UI: **Channels → Saved Tasks**.
+6. **Saved Task schedules** (`app:saved-tasks:tick`) claim due tasks with a compare-and-set and a cross-node Redis lock (`saved-tasks-tick`). The local `docker-compose.yml` `scheduler` service (`SYNAPLAN_ROLE=scheduler`) runs it every minute in its own lane, so a long task run never holds up the reapers — same loop as self-host and production (see [Background jobs](ADMIN.md#background-jobs-scheduler)). Fire a due task by hand with `docker compose exec -T backend php bin/console app:saved-tasks:tick` if you do not want to wait for the next cycle. It is a no-op while `SAVEDTASKS / ENABLED` is globally off. Overview UI: **Channels → Saved Tasks**.
 
 ### Redis (cache, sessions, locks, messenger, realtime)
 
@@ -221,7 +214,7 @@ Both resolve to the host gateway (`host-gateway`). Use `docker-host` in `backend
 
 ### Vector database (Qdrant)
 
-Qdrant ships with the main compose file and starts automatically with `docker compose up -d`.
+Qdrant ships with the main compose file and starts automatically with `make up`.
 The backend reaches it via `QDRANT_URL=http://qdrant:6333` (or `http://docker-host:6333` for production parity).
 No extra repo or external service needed.
 
@@ -297,7 +290,7 @@ make -C frontend generate-schemas
 ```bash
 # Reset database (deletes all data!)
 docker compose down -v
-docker compose up -d
+make up
 
 # Run migrations
 docker compose exec backend php bin/console doctrine:migrations:migrate
@@ -381,6 +374,15 @@ services:
 ```
 
 Requires NVIDIA driver 550+ (for CUDA 13 compatibility with current Ollama images).
+
+### Ollama model retention
+
+`OLLAMA_KEEP_ALIVE` (default `24h`, set for the `ollama` service in
+`docker-compose.yml`) controls how long models stay loaded in memory. Without
+it, Ollama unloads `bge-m3` after 5 idle minutes and the next file search pays
+a ~3.4s cold model load. Override it from the shell or root `.env`
+(`backend/.env` is not read by compose interpolation); use `-1` to pin models
+indefinitely at the cost of resident RAM.
 
 ---
 

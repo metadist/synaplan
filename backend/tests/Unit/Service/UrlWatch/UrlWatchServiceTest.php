@@ -6,9 +6,9 @@ namespace App\Tests\Unit\Service\UrlWatch;
 
 use App\Entity\UrlWatch;
 use App\Repository\UrlWatchRepository;
+use App\Service\Research\UrlContentResult;
+use App\Service\Research\UrlContentService;
 use App\Service\Security\SsrfGuard;
-use App\Service\UrlContentResult;
-use App\Service\UrlContentService;
 use App\Service\UrlWatch\TextDiff;
 use App\Service\UrlWatch\UrlWatchCompareResult;
 use App\Service\UrlWatch\UrlWatchFetchFailedException;

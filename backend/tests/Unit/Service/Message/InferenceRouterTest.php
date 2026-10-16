@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Message;
 
 use App\Entity\Message;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Exception\UnmappedIntentException;
 use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
@@ -159,12 +160,10 @@ final class InferenceRouterTest extends TestCase
         );
     }
 
-    public function testUnknownIntentFallsBackToTheChatHandler(): void
+    public function testUnknownIntentDoesNotFallBackToTheChatHandler(): void
     {
         $chatHandler = $this->createHandlerMock('chat');
-        $chatHandler->expects(self::once())
-            ->method('handle')
-            ->willReturn(['content' => 'fallback', 'metadata' => []]);
+        $chatHandler->expects(self::never())->method('handle');
 
         $router = new InferenceRouter(
             [$chatHandler],
@@ -173,10 +172,109 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(MessageClassifier::class),
         );
 
+        $this->expectException(UnmappedIntentException::class);
+        $this->expectExceptionMessage('No message handler for intent "some_unregistered_intent".');
+
         $router->route(
             $this->createMock(Message::class),
             [],
             ['intent' => 'some_unregistered_intent'],
+        );
+    }
+
+    /**
+     * document_export is a real capability, but InferenceRouter has no handler
+     * for it. The old `?? 'chat'` default would answer with a chat turn that
+     * only claims a PDF was produced.
+     */
+    public function testPlannerOnlyIntentDoesNotFallBackToTheChatHandler(): void
+    {
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->expects(self::never())->method('handle');
+
+        $router = new InferenceRouter(
+            [$chatHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+        );
+
+        $this->expectException(UnmappedIntentException::class);
+        $this->expectExceptionMessage('No message handler for intent "document_export".');
+
+        $router->route(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'document_export'],
+        );
+    }
+
+    public function testSummarizeIntentRoutesToTheChatHandler(): void
+    {
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->expects(self::once())
+            ->method('handle')
+            ->willReturn(['content' => 'summary', 'metadata' => []]);
+
+        $router = new InferenceRouter(
+            [$chatHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+        );
+
+        $result = $router->route(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'summarize'],
+        );
+
+        self::assertSame(['content' => 'summary', 'metadata' => []], $result);
+    }
+
+    public function testVideoGenerationIntentRoutesToTheImageGenerationHandler(): void
+    {
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->expects(self::never())->method('handle');
+
+        $imageHandler = $this->createHandlerMock('image_generation');
+        $imageHandler->expects(self::once())
+            ->method('handle')
+            ->willReturn(['content' => 'video', 'metadata' => []]);
+
+        $router = new InferenceRouter(
+            [$imageHandler, $chatHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+        );
+
+        $router->route(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'video_generation'],
+        );
+    }
+
+    public function testAMissingRegisteredHandlerDoesNotFallBackToChat(): void
+    {
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->expects(self::never())->method('handle');
+
+        $router = new InferenceRouter(
+            [$chatHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+        );
+
+        $this->expectException(UnmappedIntentException::class);
+        $this->expectExceptionMessage('No message handler for intent "image_generation".');
+
+        $router->route(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'image_generation'],
         );
     }
 

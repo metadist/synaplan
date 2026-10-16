@@ -10,7 +10,9 @@ use App\Repository\UserRepository;
 use App\Service\File\FileProcessor;
 use App\Service\File\TikaClient;
 use App\Service\RateLimitService;
-use App\Service\WhisperService;
+use App\Service\Stt\SpeechLanguageContext;
+use App\Service\Stt\TranscriptionLanguageDecider;
+use App\Service\Stt\WhisperService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -104,9 +106,9 @@ final readonly class MessagePreProcessor
         ]);
 
         if ($hasLegacyFile) {
-            $this->notify($progressCallback, 'preprocessing', 'Processing file...');
+            ProgressCallback::notify($progressCallback, 'preprocessing', 'Processing file...');
             $this->processFile($message);
-            $this->notify($progressCallback, 'preprocessing', 'File processing complete.');
+            ProgressCallback::notify($progressCallback, 'preprocessing', 'File processing complete.');
         }
 
         // Process new multiple files (File entities)
@@ -115,7 +117,7 @@ final readonly class MessagePreProcessor
                 'count' => $messageFiles->count(),
             ]);
 
-            $this->notify($progressCallback, 'preprocessing', "Processing {$messageFiles->count()} file(s)...");
+            ProgressCallback::notify($progressCallback, 'preprocessing', "Processing {$messageFiles->count()} file(s)...");
             $processed = 0;
             foreach ($messageFiles as $messageFile) {
                 $this->logger->info('PreProcessor: Processing file', [
@@ -125,9 +127,9 @@ final readonly class MessagePreProcessor
 
                 $this->processMessageFile($messageFile, $message);
                 ++$processed;
-                $this->notify($progressCallback, 'preprocessing', "Processed $processed/{$messageFiles->count()} files");
+                ProgressCallback::notify($progressCallback, 'preprocessing', "Processed $processed/{$messageFiles->count()} files");
             }
-            $this->notify($progressCallback, 'preprocessing', 'All files processed.');
+            ProgressCallback::notify($progressCallback, 'preprocessing', 'All files processed.');
 
             // CRITICAL: Persist changes to File entities!
             // Incognito/transient messages (id === null) must NEVER be
@@ -289,20 +291,20 @@ final readonly class MessagePreProcessor
 
             try {
                 $result = $useExternal
-                    ? $this->aiFacade->transcribe($fullPath, $userId)
-                    : $this->transcribeWithWhisper($fullPath, null);
+                    ? $this->aiFacade->transcribe($fullPath, $userId, [
+                        'channel_language' => $message->getLanguage(),
+                    ])
+                    : $this->transcribeLocal($fullPath, $message->getLanguage());
                 $this->persistTranscriptionUsage($message, $result);
                 $transcribedText = $this->transcribedText($result);
                 if ('' !== $transcribedText) {
                     $messageFile->setFileText($transcribedText);
                     $messageFile->setStatus('processed');
 
-                    // Update message text for better classification
-                    // If message text is placeholder like '[Audio message]', replace it with transcription
-                    $currentText = $message->getText();
-                    if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
-                        $message->setText($transcribedText);
-                    }
+                    // A voice note with no caption becomes the message text and
+                    // is routed like typed text. A caption is left alone.
+                    SpokenInput::applyTranscript($message, $transcribedText);
+                    $this->rememberDetectedLanguage($message, $result);
 
                     $this->logger->info('PreProcessor: Audio transcribed', [
                         'file_id' => $messageFile->getId(),
@@ -464,24 +466,19 @@ final readonly class MessagePreProcessor
 
             try {
                 $result = $useExternal
-                    ? $this->aiFacade->transcribe($fullPath, $userId)
-                    : $this->transcribeWithWhisper($fullPath, $message->getLanguage());
+                    ? $this->aiFacade->transcribe($fullPath, $userId, [
+                        'channel_language' => $message->getLanguage(),
+                    ])
+                    : $this->transcribeLocal($fullPath, $message->getLanguage());
                 $this->persistTranscriptionUsage($message, $result);
                 $transcribedText = $this->transcribedText($result);
                 if ('' !== $transcribedText) {
                     $message->setFileText($transcribedText);
 
-                    // Update message text for better classification
-                    // If message text is placeholder like '[Audio message]', replace it with transcription
-                    $currentText = $message->getText();
-                    if (empty($currentText) || '[Audio message]' === $currentText || '[Audio]' === $currentText) {
-                        $message->setText($transcribedText);
-                    }
-
-                    // Update detected language if different
-                    if ('unknown' !== $result['language'] && $result['language'] !== $message->getLanguage()) {
-                        $message->setLanguage($result['language']);
-                    }
+                    // A voice note with no caption becomes the message text and
+                    // is routed like typed text. A caption is left alone.
+                    SpokenInput::applyTranscript($message, $transcribedText);
+                    $this->rememberDetectedLanguage($message, $result);
 
                     $this->logger->info('PreProcessor: Audio transcribed successfully', [
                         'text_length' => strlen($transcribedText),
@@ -611,6 +608,52 @@ final readonly class MessagePreProcessor
     }
 
     /**
+     * Local whisper.cpp, with the same unhinted-then-hinted rule as the
+     * external path. Only the channel language is known here; the external
+     * path also sees the account and recent messages.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function transcribeLocal(string $filePath, string $channelLanguage): ?array
+    {
+        $speech = SpeechLanguageContext::fromSignals(
+            ['channel_language' => $channelLanguage],
+            null,
+            null,
+            [],
+        );
+        if ([] === $speech['expected']) {
+            return $this->transcribeWithWhisper($filePath, null);
+        }
+
+        return (new TranscriptionLanguageDecider())->transcribe(
+            function (?string $hint) use ($filePath): array {
+                return $this->transcribeWithWhisper($filePath, $hint) ?? [
+                    'text' => '',
+                    'language' => 'unknown',
+                    'duration' => 0,
+                ];
+            },
+            $speech['expected'],
+            $speech['hint'],
+        );
+    }
+
+    /**
+     * @param array<string, mixed>|null $result
+     */
+    private function rememberDetectedLanguage(Message $message, ?array $result): void
+    {
+        $language = $result['language'] ?? null;
+        if (!is_string($language) || 1 !== preg_match('/^[a-z]{2}$/', $language)) {
+            return;
+        }
+        if ($language !== $message->getLanguage()) {
+            $message->setLanguage($language);
+        }
+    }
+
+    /**
      * Transcribe audio file with Whisper.
      */
     private function transcribeWithWhisper(string $filePath, ?string $languageHint = null): ?array
@@ -648,16 +691,5 @@ final readonly class MessagePreProcessor
         }
 
         $message->setMeta('ai_transcription_usage', (string) json_encode($usage));
-    }
-
-    private function notify(?callable $callback, string $status, string $message): void
-    {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'timestamp' => time(),
-            ]);
-        }
     }
 }

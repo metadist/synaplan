@@ -113,6 +113,17 @@ class ConversationSummaryPromptsTest extends TestCase
         self::assertStringContainsString('…', $rendered);
     }
 
+    public function testRenderMessageReplacesAGeneratedMediaMarker(): void
+    {
+        $rendered = ConversationSummaryPrompts::renderMessage(
+            $this->makeMessage(9, 'OUT', '__IMAGE_GENERATED__'),
+        );
+
+        self::assertStringNotContainsString('__', $rendered);
+        self::assertStringNotContainsString('Generated ', $rendered);
+        self::assertStringContainsString('image', $rendered);
+    }
+
     public function testTokenBudgetScalesWithCapAndHasAFloor(): void
     {
         self::assertSame(max(256, (int) ceil(4000 / 3) + 256), ConversationSummaryPrompts::tokenBudget(4000));

@@ -18,6 +18,7 @@ use Doctrine\ORM\Mapping as ORM;
 class ComputeWorkspace
 {
     public const STATUS_ACTIVE = 'active';
+    public const STATUS_EXPIRING = 'expiring';
     public const STATUS_DELETED = 'deleted';
 
     #[ORM\Id]
@@ -103,6 +104,27 @@ class ComputeWorkspace
     {
         $this->usedMb = max(0, $usedMb);
         $this->lastUsed = $lastUsed;
+    }
+
+    public function getLastUsed(): ?\DateTimeImmutable
+    {
+        return $this->lastUsed;
+    }
+
+    public function markExpiring(\DateTimeImmutable $expiresAt): void
+    {
+        $this->status = self::STATUS_EXPIRING;
+        $this->expiresAt = $expiresAt;
+    }
+
+    /**
+     * The owner came back inside the grace period: another full period,
+     * like a fresh workspace.
+     */
+    public function renew(\DateTimeImmutable $expiresAt): void
+    {
+        $this->status = self::STATUS_ACTIVE;
+        $this->expiresAt = $expiresAt;
     }
 
     public function markDeleted(): void

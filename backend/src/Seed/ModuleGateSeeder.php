@@ -7,6 +7,7 @@ namespace App\Seed;
 use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the per-module gate flags `MODULES.GATE_<ID>` (BCONFIG, ownerId=0).
@@ -16,10 +17,11 @@ use Doctrine\DBAL\Connection;
  * keep the value they already have. Insert-if-missing only — operator
  * overrides are never touched (no migration on upgrades).
  */
-final readonly class ModuleGateSeeder
+#[AsTaggedItem(priority: 20)]
+final readonly class ModuleGateSeeder implements SeederInterface
 {
     /** Module ids whose `MODULES.GATE_<ID>` seeds ON for new installs. */
-    private const DEFAULT_ON = ['tika', 'docling', 'office_convert', 'searxng', 'piper_tts', 'local_ai', 'higgsfield', 'google_ai', 'thehive', 'stripe_billing', 'mobile_iap', 'whatsapp', 'compute'];
+    private const DEFAULT_ON = ['tika', 'docling', 'office_convert', 'searxng', 'piper_tts', 'local_ai', 'higgsfield', 'google_ai', 'thehive', 'stripe_billing', 'mobile_iap', 'whatsapp', 'telegram', 'compute', 'opendesk_stt', 'federation', 'chat_artifacts', 'live_voice'];
 
     public function __construct(
         private Connection $connection,
@@ -50,6 +52,16 @@ final readonly class ModuleGateSeeder
         }
 
         return $rows;
+    }
+
+    public function label(): string
+    {
+        return 'module-gates';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=MODULES — defaults from the module registry';
     }
 
     public function seed(): SeedResult

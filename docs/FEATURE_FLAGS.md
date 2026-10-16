@@ -35,7 +35,7 @@ becomes `FEATURE_IAM_SHARING_ENABLED`, `MODULES.GATE_TIKA` becomes
 `FEATURE_MODULES_GATE_TIKA`. The same name is the field key in the admin UI.
 
 Example for a Kubernetes values file that ships an instance without the
-desktop client and without group policies:
+Synaplan Desktop and without group policies:
 
 ```yaml
 env:
@@ -54,28 +54,32 @@ directly.
 ## Features switched on in the last waves
 
 Everything below merged to `main` between 2026-09-03 and 2026-09-11 and is
-now on by default. "What users see" is what disappears when the flag is off.
+now on by default — except user search in the share picker, which is
+deliberately off by default ([#2060](https://github.com/metadist/synaplan/issues/2060)).
+"What users see" is what disappears when the flag is off.
 
 | Wave | Feature | What users see | `BCONFIG` key | Environment variable | Default | Shipped in |
 | ---- | ------- | -------------- | ------------- | -------------------- | ------- | ---------- |
-| 1 | People & groups | **Operate → People** (users, groups, audit); **Account → My groups**; group API | `IAM.GROUPS_ENABLED` | `FEATURE_IAM_GROUPS_ENABLED` | on | [#1708](https://github.com/metadist/synaplan/pull/1708), [#1742](https://github.com/metadist/synaplan/pull/1742) |
+| 1 | Users & groups | **Operate → Users** (users, groups, audit); **Account → My groups**; group API | `IAM.GROUPS_ENABLED` | `FEATURE_IAM_GROUPS_ENABLED` | on | [#1708](https://github.com/metadist/synaplan/pull/1708), [#1742](https://github.com/metadist/synaplan/pull/1742) |
 | 1–2 | Sharing | **Share** on folders, chats, AI assistants, saved tasks and widgets; "Shared with me" filters and pills | `IAM.SHARING_ENABLED` | `FEATURE_IAM_SHARING_ENABLED` | on | [#1713](https://github.com/metadist/synaplan/pull/1713), [#1714](https://github.com/metadist/synaplan/pull/1714), [#1717](https://github.com/metadist/synaplan/pull/1717) |
-| 2 | Directory groups | Groups filled from the company login (OIDC groups claim); People → Audit | `IAM.DIRECTORY_SYNC_ENABLED` | `FEATURE_IAM_DIRECTORY_SYNC_ENABLED` | on | [#1718](https://github.com/metadist/synaplan/pull/1718) |
-| 2 | Group policies | **People → Policies**: default and allowed models, feature switches and rate-limit tier per group; locked defaults | `IAM.GROUP_POLICIES_ENABLED` | `FEATURE_IAM_GROUP_POLICIES_ENABLED` | on | [#1719](https://github.com/metadist/synaplan/pull/1719), [#1722](https://github.com/metadist/synaplan/pull/1722) |
+| – | User search in share picker | Finding user accounts by name or email in the share dialog; when off, only groups (and Everyone, per policy) can be picked | `IAM.USER_SEARCH_ENABLED` | `FEATURE_IAM_USER_SEARCH_ENABLED` | **off** ([#2060](https://github.com/metadist/synaplan/issues/2060)) |
+| 2 | Directory groups | Groups filled from the company login (OIDC groups claim); Users → Audit | `IAM.DIRECTORY_SYNC_ENABLED` | `FEATURE_IAM_DIRECTORY_SYNC_ENABLED` | on | [#1718](https://github.com/metadist/synaplan/pull/1718) |
+| 2 | Group policies | **Users → Policies**: default and allowed models, feature switches and rate-limit tier per group; locked defaults | `IAM.GROUP_POLICIES_ENABLED` | `FEATURE_IAM_GROUP_POLICIES_ENABLED` | on | [#1719](https://github.com/metadist/synaplan/pull/1719), [#1722](https://github.com/metadist/synaplan/pull/1722) |
 | 2–3 | AI assistants (agent builder) | The assistant builder (instructions, knowledge folders, tools, publish as widget), `/api/v1/agents`, shared knowledge folders | `AGENTS.ENABLED` | `FEATURE_AGENTS_ENABLED` | on | [#1738](https://github.com/metadist/synaplan/pull/1738), [#1763](https://github.com/metadist/synaplan/pull/1763), [#1769](https://github.com/metadist/synaplan/pull/1769) |
 | 3 | Assistants in routing | The message sorter may answer with an assistant marked "reachable from chat" | `AGENTS.ROUTABLE_ENABLED` | `FEATURE_AGENTS_ROUTABLE_ENABLED` | on | [#1769](https://github.com/metadist/synaplan/pull/1769) |
 | 3 | Export / import bundles | Move assistants, instructions and saved tasks between installs (`/api/v1/bundles`) | `BUNDLE.ENABLED` | `FEATURE_BUNDLE_ENABLED` | on | [#1769](https://github.com/metadist/synaplan/pull/1769) |
-| 3 | AI plugs: extraction, web search, rerank, model import, plugin adapters | **Operate → AI infrastructure** tabs (Extraction, Web search, Rerank); Docling and SearXNG providers | – (provider configuration; optional module gates below) | – | on | [#1750](https://github.com/metadist/synaplan/pull/1750), [#1756](https://github.com/metadist/synaplan/pull/1756), [#1758](https://github.com/metadist/synaplan/pull/1758), [#1760](https://github.com/metadist/synaplan/pull/1760), [#1761](https://github.com/metadist/synaplan/pull/1761), [#1762](https://github.com/metadist/synaplan/pull/1762) |
+| 3 | AI plugs: extraction, web search, rerank, model import, plugin adapters | **Operate → AI infrastructure** (Document reading, Knowledge search → Reranking) and **Operate → System configuration → Web search**; Docling and SearXNG providers | – (provider configuration; optional module gates below) | – | on | [#1750](https://github.com/metadist/synaplan/pull/1750), [#1756](https://github.com/metadist/synaplan/pull/1756), [#1758](https://github.com/metadist/synaplan/pull/1758), [#1760](https://github.com/metadist/synaplan/pull/1760), [#1761](https://github.com/metadist/synaplan/pull/1761), [#1762](https://github.com/metadist/synaplan/pull/1762) |
 | 3 | Watched pages (URL watch) | **Saved Tasks → Watched pages**: one saved copy per address, scheduled compare and diff mail; "get this URL" in chat | `MULTITASK.URL_FETCH_ENABLED` | `FEATURE_MULTITASK_URL_FETCH_ENABLED` | on | [#1754](https://github.com/metadist/synaplan/pull/1754), [#1813](https://github.com/metadist/synaplan/pull/1813) |
-| 3 | Linked platforms | Nextcloud / ownCloud / OpenCloud users link their existing Synaplan account; **Operate → Linked platforms**, **Account → Linked platforms** | `PLATFORM_LINKS.ENABLED` | `FEATURE_PLATFORM_LINKS_ENABLED` | on | [#1745](https://github.com/metadist/synaplan/pull/1745) |
+| 3 | Linked platforms | Nextcloud / ownCloud / OpenCloud users link their existing Synaplan account; **Operate → Users → Platform instances**, **Account → Linked platforms** | `PLATFORM_LINKS.ENABLED` | `FEATURE_PLATFORM_LINKS_ENABLED` | on | [#1745](https://github.com/metadist/synaplan/pull/1745) |
 | 4 | Tool registry | One registry of callables (MCP, custom HTTP, built-in) for the assistant and Saved Tasks | `TOOLS.REGISTRY_ENABLED` | `FEATURE_TOOLS_REGISTRY_ENABLED` | on (kill switch) | [#1774](https://github.com/metadist/synaplan/pull/1774) |
 | 4 | Approvals | Ask before a tool that changes or deletes something runs; unattended Saved Tasks pause under **Approvals** | `TOOLS.APPROVALS_ENABLED` | `FEATURE_TOOLS_APPROVALS_ENABLED` | on | [#1774](https://github.com/metadist/synaplan/pull/1774) |
 | 4 | Custom tools | Users declare their own HTTP / OpenAPI tools under **Connections** | `TOOLS.CUSTOM_HTTP_ENABLED` | `FEATURE_TOOLS_CUSTOM_HTTP_ENABLED` | on | [#1774](https://github.com/metadist/synaplan/pull/1774) |
 | 5 | Saved Tasks Steps editor & webhook trigger | **Steps** on a saved task (tool step, condition, outbound webhook, ask-before-run); webhook trigger | `WORKFLOWS.BUILDER_ENABLED` | `FEATURE_WORKFLOWS_BUILDER_ENABLED` | on | [#1821](https://github.com/metadist/synaplan/pull/1821) |
-| 5 | Desktop client (public beta) | **Channels → Desktop**: pairing codes, connected computers, job queue; download link to [synaplan-desktop](https://github.com/metadist/synaplan-desktop) | `DESKTOP_AGENT.ENABLED` | `FEATURE_DESKTOP_AGENT_ENABLED` | on | [#1669](https://github.com/metadist/synaplan/pull/1669), [#1808](https://github.com/metadist/synaplan/pull/1808) |
+| 5 | Synaplan Desktop | **Channels → Synaplan Desktop**: pairing codes and connected computers. There is no installer yet; the app is built from [synaplan-desktop](https://github.com/metadist/synaplan-desktop). When off, that page is hidden, pairing stops, a paired computer cannot chat, and waiting tasks are not picked up. | `DESKTOP_AGENT.ENABLED` | `FEATURE_DESKTOP_AGENT_ENABLED` | on | [#1669](https://github.com/metadist/synaplan/pull/1669), [#1808](https://github.com/metadist/synaplan/pull/1808) |
 | – | Office document tools | The assistant builds and revises Word, Excel and PowerPoint files step by step | `DOCUMENT_TOOLS.ENABLED` | `FEATURE_DOCUMENT_TOOLS_ENABLED` | on | [#1685](https://github.com/metadist/synaplan/pull/1685) |
-| 5 | Secure compute (file work) | Chat card for short Python or Node file work. `/v1` gateways offer `code_execution` only with the `compute:run` API-key grant. Assistants stay opted out until `code_run` is listed. Needs `COMPUTE_URL` + `COMPUTE_TOKEN` **and** this flag. Off = absent, no teaser. | `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **off** | Wave 5 A3/B1, B2 |
-| 5 | File-work workspace | **Files → Workspace** and **Open workspace** on a finished run. One folder per user between runs. Off = B1/B2 ephemeral behaviour, no tab, no chip. Needs file work itself. | `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **off** | Wave 5 B3 |
+| – | AI help in search | **Ctrl/Cmd+K**: for a question in plain words, the tools model picks the best result from the list and says why in one sentence (Best action card). It never changes anything by itself. Off = keyword and meaning search only, no "Ask the AI" row. Also absent while no tools model is configured. | `SEARCH.AI_ENABLED` | `FEATURE_SEARCH_AI_ENABLED` | on | Smart Search S5 |
+| 5 | Secure compute (file work) | Chat card for short Python or Node file work. `/v1` gateways offer `code_execution` only with the `compute:run` API-key grant. Assistants stay opted out until `code_run` is listed. Needs `COMPUTE_URL` + `COMPUTE_TOKEN` **and** this flag. Off = absent, no teaser. Local compose starts the sidecar and pins this on. | `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **on** (local compose / seed when sidecar env is set) | Wave 5 A3/B1, B2 |
+| 5 | File-work workspace | **Files → Workspace** and **Open workspace** on a finished run. One folder per user between runs. Off = B1/B2 ephemeral behaviour, no tab, no chip. Needs file work itself. | `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **on** (same rule as ENABLED) | Wave 5 B3 |
 | 5 | File-work websites | A run may fetch from a short, pinned list of public websites. Off = every run stays offline. Private addresses are always refused. Can only be switched on when the sidecar reports `features.egress: true`; the bundled sidecar does not yet. | `COMPUTE.EGRESS_ENABLED` | `FEATURE_COMPUTE_EGRESS_ENABLED` | **off** | Wave 5 B3 |
 | Intermezzo | Optional module gates | Hide an unconfigured module (Tika, Docling, SearXNG, Piper TTS, Collabora, WhatsApp, Stripe, mobile IAP, Google AI, Higgsfield, TheHive, local AI): its routes answer 404 and no card is shown | `MODULES.GATE_<ID>` | `FEATURE_MODULES_GATE_<ID>` | **On for new installs** for ids in `ModuleGateSeeder` (`DEFAULT_ON`); others **off** (visible with a "needs setup" state). Existing rows are never overwritten. | [#1815](https://github.com/metadist/synaplan/pull/1815), [#1816](https://github.com/metadist/synaplan/pull/1816), [#1817](https://github.com/metadist/synaplan/pull/1817) |
 
@@ -91,17 +95,32 @@ Two related switches keep their previous defaults on purpose:
 
 | Features tab section | Flags |
 | -------------------- | ----- |
-| People & sharing | `FEATURE_IAM_GROUPS_ENABLED`, `FEATURE_IAM_SHARING_ENABLED`, `FEATURE_IAM_GROUP_POLICIES_ENABLED`, `FEATURE_IAM_DIRECTORY_SYNC_ENABLED` |
+| Users & sharing | `FEATURE_IAM_GROUPS_ENABLED`, `FEATURE_IAM_SHARING_ENABLED`, `FEATURE_IAM_USER_SEARCH_ENABLED`, `FEATURE_IAM_GROUP_POLICIES_ENABLED`, `FEATURE_IAM_DIRECTORY_SYNC_ENABLED` |
 | AI assistants | `FEATURE_AGENTS_ENABLED`, `FEATURE_AGENTS_ROUTABLE_ENABLED`, `FEATURE_BUNDLE_ENABLED` |
 | Saved tasks & watched pages | `FEATURE_WORKFLOWS_BUILDER_ENABLED`, `FEATURE_MULTITASK_URL_FETCH_ENABLED` |
 | Tools & approvals | `FEATURE_TOOLS_REGISTRY_ENABLED`, `FEATURE_TOOLS_APPROVALS_ENABLED`, `FEATURE_TOOLS_CUSTOM_HTTP_ENABLED` |
 | Office documents | `FEATURE_DOCUMENT_TOOLS_ENABLED` |
+| Search | `FEATURE_SEARCH_AI_ENABLED` |
 | Desktop & partner platforms | `FEATURE_DESKTOP_AGENT_ENABLED`, `FEATURE_PLATFORM_LINKS_ENABLED` |
+| Processing → File work | `FEATURE_COMPUTE_ENABLED`, `FEATURE_COMPUTE_WORKSPACES_ENABLED`, `FEATURE_COMPUTE_EGRESS_ENABLED` |
 | Optional modules | `FEATURE_MODULES_GATE_<ID>` for every declared module |
 
 The non-boolean companions (directory claim path, group display names,
 everyone-shares policy, tool policies per class, approval expiry) stay on the
 **Access → Sharing** and **Routing → Tool policies** tabs.
+
+`IAM.EVERYONE_SHARES` is one of those companions, not a boolean flag. It is
+`any_owner`, `admins_only`, or `disabled`. `disabled` is what a public
+instance runs: anyone can sign up, so "everyone" would be every registered
+account. With `disabled`, new shares to all accounts are refused, and shares
+people created earlier grant nothing until an operator picks another value;
+they are kept, listed to the owner as not in effect, and come back when the
+value changes. A missing row fails closed while sign-up is open. Invite-only
+and SSO-only installs keep `any_owner` unless an operator changes it (a fresh
+install reads `REGISTRATION_ENABLED` at first start; turning sign-up off later
+does not move this setting). System assistants and plugin-pack assistants
+are the platform's own shares and stay shared with every account on every
+value; a share a person created does not.
 
 ## For developers
 
@@ -127,5 +146,5 @@ everyone-shares policy, tool policies per class, approval expiry) stay on the
   per-user row first. Writing the global switch from System configuration
   therefore also deletes the acting administrator's own row for that flag.
 
-See also [CONFIGURATION.md](CONFIGURATION.md), [ADMIN.md](ADMIN.md) and
-[DESKTOP.md](DESKTOP.md).
+See also [CONFIGURATION.md](CONFIGURATION.md), [ADMIN.md](ADMIN.md),
+[DESKTOP.md](DESKTOP.md) and [COMPUTE.md](COMPUTE.md).

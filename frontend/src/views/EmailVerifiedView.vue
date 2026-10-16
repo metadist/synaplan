@@ -12,17 +12,15 @@
       ></div>
     </div>
     <div class="absolute top-6 right-6 flex items-center gap-4" data-testid="section-controls">
-      <button class="h-10 px-4 rounded-lg icon-ghost text-sm font-medium" @click="cycleLanguage">
+      <button class="h-10 px-4 rounded-xl icon-ghost text-sm font-medium" @click="cycleLanguage">
         {{ currentLanguage.toUpperCase() }}
       </button>
       <button
-        class="h-10 w-10 rounded-lg icon-ghost flex items-center justify-center"
-        :aria-label="
-          themeStore.theme.value === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
-        "
+        class="h-10 w-10 rounded-xl icon-ghost flex items-center justify-center"
+        :aria-label="$t('appearance.cycle')"
         @click="toggleTheme"
       >
-        <SunIcon v-if="themeStore.theme.value === 'dark'" class="w-5 h-5" />
+        <SunIcon v-if="themeStore.isDark?.value" class="w-5 h-5" />
         <MoonIcon v-else class="w-5 h-5" />
       </button>
     </div>
@@ -48,7 +46,7 @@
 
         <div class="space-y-3">
           <Button
-            class="w-full btn-primary py-3 rounded-lg font-medium"
+            class="w-full btn-primary py-3 rounded-xl font-medium"
             data-testid="btn-continue"
             @click="handleContinue"
           >
@@ -75,7 +73,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { supportedLanguages } from '@/i18n'
+import { cycleLocale } from '@/i18n'
 import { SunIcon, MoonIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
@@ -94,20 +92,10 @@ let countdownInterval: number | null = null
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const currentIndex = supportedLanguages.indexOf(
-    locale.value as (typeof supportedLanguages)[number]
-  )
-  const next = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
-  locale.value = next
-  localStorage.setItem('language', next)
+  void cycleLocale()
 }
 
-const toggleTheme = () => {
-  const themes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system']
-  const currentIndex = themes.indexOf(themeStore.theme.value)
-  const nextTheme = themes[(currentIndex + 1) % themes.length]
-  themeStore.setTheme(nextTheme)
-}
+const toggleTheme = () => themeStore.cycleTheme()
 
 const handleContinue = () => {
   router.push('/login')

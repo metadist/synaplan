@@ -24,6 +24,14 @@ class Share
     /** @var list<string> */
     public const SUBJECT_TYPES = [self::SUBJECT_USER, self::SUBJECT_GROUP, self::SUBJECT_EVERYONE];
 
+    /**
+     * `grantedBy` of a share the platform wrote rather than a person: seeded
+     * system assistants and plugin-pack assistants. Such an everyone-share
+     * keeps reaching every account when the user-facing audience is turned
+     * off (#2096).
+     */
+    public const PLATFORM_GRANTOR = 0;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
@@ -135,5 +143,14 @@ class Share
     public function getCreated(): int
     {
         return $this->created;
+    }
+
+    /**
+     * Written by the platform (system seeding, plugin pack install), not by a
+     * person. See {@see self::PLATFORM_GRANTOR}.
+     */
+    public function isPlatformGrant(): bool
+    {
+        return self::PLATFORM_GRANTOR === $this->grantedBy;
     }
 }

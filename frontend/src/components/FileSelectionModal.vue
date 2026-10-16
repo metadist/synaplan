@@ -40,7 +40,7 @@
             <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
               <button
                 :disabled="isUploading"
-                class="btn-primary px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                class="btn-primary px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-file-selection-upload"
                 @click="triggerFileUpload"
               >
@@ -123,12 +123,12 @@
                 v-model="searchQuery"
                 type="text"
                 :placeholder="$t('fileSelection.searchPlaceholder')"
-                class="flex-1 min-w-0 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="flex-1 min-w-0 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-file-selection-search"
               />
               <select
                 v-model="filterStatus"
-                class="shrink-0 min-w-[7rem] px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="shrink-0 min-w-[7rem] px-2 py-1.5 sm:px-4 sm:py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="select-file-selection-status"
               >
                 <option value="all">{{ $t('fileSelection.allStatuses') }}</option>
@@ -254,7 +254,7 @@
                       !['vectorized', 'extracting', 'vectorizing'].includes(file.status) &&
                       !skipsExtraction(extensionOf(file.filename) || file.file_type)
                     "
-                    class="p-1 sm:p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
+                    class="p-1 sm:p-1.5 rounded-xl hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
                     :title="$t('fileSelection.reVectorize')"
                     data-testid="btn-file-revectorize"
                     @click="handleReVectorize(file.id)"
@@ -262,7 +262,7 @@
                     <Icon icon="heroicons:arrow-path" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                   <button
-                    class="p-1 sm:p-1.5 rounded hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
+                    class="p-1 sm:p-1.5 rounded-xl hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors"
                     :title="$t('fileSelection.viewContent')"
                     data-testid="btn-file-view"
                     @click="openContentModal(file.id)"
@@ -270,7 +270,7 @@
                     <Icon icon="heroicons:eye" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                   <button
-                    class="hidden sm:block p-1.5 rounded hover:bg-blue-500/10 text-blue-400 transition-colors"
+                    class="hidden sm:block p-1.5 rounded-xl hover:bg-blue-500/10 text-blue-400 transition-colors"
                     :title="$t('fileSelection.download')"
                     data-testid="btn-file-download"
                     @click="handleDownload(file.id, file.filename)"
@@ -278,7 +278,7 @@
                     <ArrowDownTrayIcon class="w-4 h-4" />
                   </button>
                   <button
-                    class="p-1 sm:p-1.5 rounded hover:bg-red-500/10 text-red-400 transition-colors"
+                    class="p-1 sm:p-1.5 rounded-xl hover:bg-red-500/10 text-red-400 transition-colors"
                     :title="$t('fileSelection.deleteFile')"
                     data-testid="btn-file-delete"
                     @click="confirmDeleteFile(file.id)"
@@ -308,7 +308,7 @@
             <div class="flex items-center gap-2 sm:gap-3">
               <button
                 v-if="selectedFiles.length > 0"
-                class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                class="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
                 :title="$t('fileSelection.deleteSelected')"
                 :aria-label="$t('fileSelection.deleteSelected')"
                 data-testid="btn-file-selection-delete-selected"
@@ -317,7 +317,7 @@
                 <TrashIcon class="w-4 h-4" />
               </button>
               <button
-                class="btn-secondary px-3 py-2 sm:px-4 rounded-lg text-sm font-medium"
+                class="btn-secondary px-3 py-2 sm:px-4 rounded-xl text-sm font-medium"
                 data-testid="btn-file-selection-cancel"
                 @click="emit('close')"
               >
@@ -325,7 +325,7 @@
               </button>
               <button
                 :disabled="selectedFiles.length === 0"
-                class="btn-primary px-3 py-2 sm:px-4 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                class="btn-primary px-3 py-2 sm:px-4 rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 data-testid="btn-file-selection-attach"
                 @click="attachFiles"
               >

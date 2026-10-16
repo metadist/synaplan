@@ -6,17 +6,29 @@ namespace App\Seed;
 
 use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for SELF_AWARE flags (BCONFIG, ownerId=0).
  *
  * Insert-if-missing only — operator overrides are never touched.
  */
-final readonly class SelfAwareConfigSeeder
+#[AsTaggedItem(priority: 120)]
+final readonly class SelfAwareConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'self-aware';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=SELF_AWARE, ownerId=0 — default ON';
     }
 
     public function seed(): SeedResult

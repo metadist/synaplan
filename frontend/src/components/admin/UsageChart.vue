@@ -12,7 +12,7 @@
       >
         <button
           :class="[
-            'px-3 py-1.5 rounded text-xs font-medium transition-all',
+            'px-3 py-1.5 rounded-xl text-xs font-medium transition-all',
             chartType === 'line'
               ? 'bg-[var(--brand)] text-white'
               : 'txt-secondary hover:txt-primary',
@@ -24,7 +24,7 @@
         </button>
         <button
           :class="[
-            'px-3 py-1.5 rounded text-xs font-medium transition-all',
+            'px-3 py-1.5 rounded-xl text-xs font-medium transition-all',
             chartType === 'bar'
               ? 'bg-[var(--brand)] text-white'
               : 'txt-secondary hover:txt-primary',
@@ -96,7 +96,9 @@ const chartData = computed(() => {
   const tokens = labels.map((action) => props.data[action].tokens)
 
   return {
-    labels: labels.map((l) => l.replace('_', ' ').toUpperCase()),
+    labels: labels.map((action) =>
+      t(`config.usage.actions.${action.toLowerCase()}`, action.replaceAll('_', ' ').toUpperCase())
+    ),
     datasets: [
       {
         label: t('admin.usage.requests'),

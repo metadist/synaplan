@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUsageTaximeterStore } from '@/stores/usageTaximeter'
+import { useSidebarLayout } from '@/composables/useSidebarLayout'
 import { formatCostDisplay, formatTokens } from '@/utils/usageFormat'
 import UsageStatsPanel from '@/components/usage/UsageStatsPanel.vue'
 
@@ -13,9 +14,11 @@ import UsageStatsPanel from '@/components/usage/UsageStatsPanel.vue'
  * popover are mutually exclusive and never overlap the composer/messages.
  *
  * Only rendered by the parent when the taximeter is active (auth + admin
- * switch) and on >= 768 px (the ring covers mobile).
+ * switch). It shows only where the content pane leaves room beside the chat
+ * column; otherwise ConsumptionRing takes over (same thresholds, inverted).
  */
 const store = useUsageTaximeterStore()
+const { panelDocked } = useSidebarLayout()
 const { t, locale } = useI18n()
 
 const rootEl = ref<HTMLElement | null>(null)
@@ -131,7 +134,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootEl" class="usage-bar" data-testid="usage-consumption-bar">
+  <div
+    ref="rootEl"
+    class="usage-bar"
+    :class="!panelDocked && 'usage-bar--roomy'"
+    data-testid="usage-consumption-bar"
+  >
     <button
       type="button"
       class="usage-bar__trigger"
@@ -144,6 +152,7 @@ onBeforeUnmount(() => {
       @touchstart.passive="onTouchStart"
       @touchend="onTouchEnd"
     >
+      <span class="usage-bar__today txt-secondary">{{ t('usageTaximeter.todayLabel') }}</span>
       <span class="usage-bar__head txt-secondary">{{ displayCost }}</span>
       <span class="usage-bar__track">
         <span
@@ -171,20 +180,27 @@ onBeforeUnmount(() => {
 .usage-bar {
   position: absolute;
   top: 50%;
-  /* Align to the right edge of the centered chat column (max-w-4xl = 56rem),
+  /* Align to the right edge of the centered chat column (70rem),
      nudged ~20px further right so the rail sits just past the user avatar
      rather than at the far window edge. Clamped so it never leaves the
      viewport on narrow windows. */
-  left: min(calc(50% + 28rem + 10px), calc(100% - 3.25rem));
+  left: min(calc(50% + 35rem + 10px), calc(100% - 4.5rem));
   transform: translateY(-50%);
   z-index: 20;
   display: none;
 }
 
-/* Wide desktop only; below 1024 px the compact ring takes over so the rail
-   can never overlap the chat column/composer. */
-@media (min-width: 1024px) {
+/* The bar needs a content pane of ~81rem: the 70rem chat column plus its own
+   width on the right. With the docked panel (rail 56px + panel 280px) that is
+   a 1664px window; with the rail alone (panel folded, or below 1024px) 1384px.
+   Below that the ring shows instead. Mirrored in ConsumptionRing.vue. */
+@media (min-width: 1664px) {
   .usage-bar {
+    display: block;
+  }
+}
+@media (min-width: 1384px) {
+  .usage-bar.usage-bar--roomy {
     display: block;
   }
 }
@@ -198,6 +214,18 @@ onBeforeUnmount(() => {
   background: transparent;
   border: none;
   cursor: pointer;
+}
+
+.usage-bar__today {
+  /* Wraps instead of widening the rail: "Le vôtre aujourd’hui" would
+     otherwise push past the window edge and lose half its letters. */
+  max-width: 3.75rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .usage-bar__head {

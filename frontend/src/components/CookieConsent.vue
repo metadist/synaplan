@@ -32,14 +32,14 @@
             </div>
             <div class="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button
-                class="px-4 py-2 rounded-lg border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium txt-primary"
+                class="px-4 py-2 rounded-xl border border-light-border dark:border-dark-border bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium txt-primary"
                 data-testid="btn-cookie-reject"
                 @click="rejectAll"
               >
                 {{ $t('cookies.rejectAll') }}
               </button>
               <button
-                class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"
+                class="btn-primary px-4 py-2 rounded-xl text-sm font-medium"
                 data-testid="btn-cookie-accept"
                 @click="acceptAll"
               >

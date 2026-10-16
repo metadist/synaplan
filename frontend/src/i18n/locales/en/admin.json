@@ -1,0 +1,1417 @@
+{
+  "adminModelStatus": {
+    "subtitle": "Which AI models are currently working, and which are not.",
+    "loading": "Loading model health…",
+    "loadFailed": "Model health could not be loaded.",
+    "never": "never",
+    "noMatches": "No models match the current filters.",
+    "freeHint": "Checking is free: providers are only asked which models they publish. No AI model is ever run for this.",
+    "states": {
+      "online": "Online",
+      "degraded": "Impaired",
+      "offline": "Offline",
+      "unconfigured": "Not set up",
+      "unknown": "Unknown"
+    },
+    "sources": {
+      "probe": "provider model list",
+      "listing": "import source listing",
+      "traffic": "real usage"
+    },
+    "summary": {
+      "allGood": "All models are answering",
+      "problems": "{count} model(s) need attention",
+      "lastCheck": "Last checked",
+      "monitoringOff": "Automatic checking is switched off, so this page only shows the last known state."
+    },
+    "filters": {
+      "onlyProblems": "Only show problems",
+      "capability": "Task",
+      "allCapabilities": "All tasks"
+    },
+    "provider": {
+      "affected": "{count} affected"
+    },
+    "retired": {
+      "label": "Retired",
+      "title": "Retired models",
+      "hint": "The provider no longer offers these models. They are switched off, no longer checked, and never count as a problem.",
+      "retiredOn": "Retired on {date}",
+      "successor": "Replaced by {name}",
+      "noSuccessor": "No replacement"
+    },
+    "model": {
+      "lastSuccess": "Last worked",
+      "errorRate": "{percent}% of the last {total} calls failed",
+      "source": "Based on",
+      "autoDisabled": "Switched off automatically",
+      "switchedOff": "Switched off",
+      "exempt": "Exempt from automatic switch-off"
+    },
+    "actions": {
+      "refresh": "Check now",
+      "refreshProvider": "Check this provider",
+      "refreshProviderAria": "Check {provider} now",
+      "resetCounters": "Clear error history",
+      "exempt": "Exempt from automation",
+      "unexempt": "Allow automation again"
+    },
+    "confirmResetTitle": "Clear error history?",
+    "confirmResetMessage": "\"{name}\" will then be judged on new usage only. A check that already found this model retired is not undone.",
+    "messages": {
+      "refreshed": "Checked {count} model(s).",
+      "refreshFailed": "The check could not be completed.",
+      "exempted": "This model is now exempt from automatic switch-off.",
+      "unexempted": "Automatic switch-off applies to this model again.",
+      "exemptFailed": "The exemption could not be changed.",
+      "countersReset": "Error history cleared.",
+      "countersResetFailed": "The error history could not be cleared."
+    }
+  },
+  "platformConnect": {
+    "title": "Connect Synaplan",
+    "subtitle": "Authorise {client} to use this Synaplan account.",
+    "loading": "Checking your session…",
+    "confirmPrompt": "Connect {client} at {host} as {uid}?",
+    "connectButton": "Connect {client}",
+    "scopesNote": "Grants access to chats, files and search. The key stays on the platform — you do not type it.",
+    "connecting": "Connecting…",
+    "successTitle": "Connected.",
+    "successSubtitle": "You can close this window if it doesn't close on its own.",
+    "errorTitle": "Couldn't connect",
+    "retry": "Try again",
+    "helpLine": "This window was opened by another app. It is safe to close.",
+    "notYou": "Not you? Sign out",
+    "errorMissingState": "This connection request is incomplete. Start again from the other app.",
+    "errorOfficeNotReady": "Office.js is not available. This page must be opened from inside Outlook.",
+    "errorNotSignedIn": "You are not signed in. Refresh the window and sign in again.",
+    "errorIssuanceFailed": "Synaplan could not finish this connection.",
+    "errorUnknownClient": "This connection request is not recognised.",
+    "errorFlagOff": "Linking this platform is not enabled on this Synaplan instance.",
+    "errorNoDeliveryChannel": "Synaplan could not hand the connection back to Outlook. Open this page from inside Outlook and try again.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "this app"
+    }
+  },
+  "admin": {
+    "liveVoice": {
+      "title": "Live conversations",
+      "intro": "People talking right now. Ending one stops the microphone within a few seconds. The transcript already saved stays in the chat.",
+      "empty": "No one is in a live conversation.",
+      "loading": "Loading…",
+      "seconds": "{seconds} s",
+      "someone": "this person",
+      "kill": "End conversation",
+      "killTitle": "End this live conversation?",
+      "killMessage": "This ends the live conversation for {email}. The transcript already saved stays in the chat. Nothing further is sent.",
+      "killed": "The conversation will stop within a few seconds.",
+      "killFailed": "Could not end the conversation.",
+      "loadFailed": "Could not load live conversations.",
+      "directHint": "When this is on, the next OpenAI conversation connects from the browser. Google and xAI stay on this server. Turning it off does not move a conversation that is already running.",
+      "directTurnOn": "Turn on direct connection",
+      "directTurnOff": "Turn off direct connection",
+      "directSaved": "Saved. The next OpenAI conversation uses this setting.",
+      "directFailed": "Could not save the direct connection setting."
+    },
+    "title": "Operate",
+    "description": "Your server at a glance: users, sign-ups and usage.",
+    "tabs": {
+      "overview": "Overview",
+      "users": "Users",
+      "usage": "Usage",
+      "subscriptions": "Subscriptions",
+      "appServer": "App server"
+    },
+    "overview": {
+      "totalUsers": "Total Users",
+      "recentUsers": "Recent Users"
+    },
+    "systemInfo": {
+      "title": "System Info",
+      "refresh": "Refresh",
+      "loadError": "Failed to load system info",
+      "phpVersion": "PHP Version",
+      "memoryLimit": "Memory Limit",
+      "inUse": "{value} in use",
+      "diskFree": "Disk Free",
+      "ofTotal": "of {value} total",
+      "diskUsage": "Disk usage",
+      "opcache": "OPcache",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "peakMemory": "Peak Memory",
+      "uploadMax": "Max Upload Size",
+      "postMax": "Max POST Size",
+      "maxExecTime": "Max Execution Time",
+      "os": "Operating System",
+      "server": "Server",
+      "hostname": "Hostname"
+    },
+    "analytics": {
+      "registrations": "User Registrations",
+      "usageByAction": "Usage by Action",
+      "period": {
+        "7d": "7 Days",
+        "30d": "30 Days",
+        "90d": "90 Days",
+        "1y": "1 Year",
+        "all": "All Time"
+      },
+      "groupBy": {
+        "day": "Day",
+        "week": "Week",
+        "month": "Month"
+      }
+    },
+    "users": {
+      "email": "Email",
+      "level": "Level",
+      "type": "Type",
+      "provider": "Provider",
+      "created": "Created",
+      "status": "Status",
+      "actions": "Actions",
+      "delete": "Delete user",
+      "currentUser": "(You)",
+      "verified": "Verified",
+      "notVerified": "Not verified",
+      "notVerifiedHint": "This user cannot sign in until the account is verified.",
+      "addUser": "Add user",
+      "displayName": "Display name",
+      "password": "Password",
+      "createUser": "Create account",
+      "accountCreated": "Account created. They can sign in now.",
+      "createFailed": "The account could not be created.",
+      "markVerified": "Mark verified",
+      "markVerifiedConfirm": "{email} can sign in without opening the email.",
+      "verifiedNow": "The account is verified.",
+      "verifyFailed": "The account could not be verified.",
+      "resendVerification": "Resend verification email",
+      "resendVerificationConfirm": "Send another verification email to {email}?",
+      "resent": "Verification email sent.",
+      "resendFailed": "The verification email was not sent.",
+      "registrationNoMail": "Sign-up is on, but mail is not configured. New accounts stay unverified until you mark them verified in Users. Set MAILER_DSN to send email instead.",
+      "unverified": "Unverified",
+      "searchPlaceholder": "Search by email...",
+      "noUsers": "No users found",
+      "deleteConfirmTitle": "Delete User?",
+      "deleteConfirmDesc": "Are you sure you want to delete {email}? This action cannot be undone.",
+      "deleteConfirmCheckbox": "Yes, I confirm deletion of all user data (including chats, widgets, documents)",
+      "userDeleted": "User {email} has been successfully deleted",
+      "userDeleteFailed": "Failed to delete user",
+      "levelUpdated": "User level updated to {level}",
+      "levelUpdateFailed": "Failed to update user level",
+      "levelConfirmTitle": "Change the level of {email}?",
+      "levelConfirmMessage": "{email} moves from {oldLevel} to {newLevel}. The new level applies immediately.",
+      "levelConfirmAdmin": "{email} becomes an administrator with full access to every admin function. This applies immediately.",
+      "levelConfirmAction": "Change level",
+      "loadFailed": "Failed to load users",
+      "invalidResponse": "The server sent an unexpected response"
+    },
+    "impersonate": {
+      "button": "View as user",
+      "buttonTitle": "Impersonate this user",
+      "confirmTitle": "Impersonate {email}?",
+      "confirmMessage": "You will be signed in as {email}. Every action you take and every change you make will be attributed to this account. Use the banner at the top to exit when you are done.",
+      "confirmAction": "Start session",
+      "started": "You are now viewing the application as {email}.",
+      "startFailed": "Could not start impersonation",
+      "disabled": "Viewing as another user is turned off on this instance.",
+      "disabledTitle": "Viewing as another user is turned off",
+      "cannotImpersonateSelf": "You cannot impersonate yourself.",
+      "banner": {
+        "viewing": "Viewing as {email}",
+        "adminLabel": "Signed in as {email}",
+        "exitButton": "Exit",
+        "exitButtonTitle": "Restore your admin session"
+      },
+      "stopped": "Admin session restored.",
+      "stopFailed": "Could not exit impersonation"
+    },
+    "prompts": {
+      "shortDesc": "Short Description",
+      "prompt": "Prompt",
+      "selectionRules": "Selection Rules",
+      "selectionRulesPlaceholder": "Optional: Rules for automatic selection of this prompt",
+      "edit": "Edit",
+      "write": "Write",
+      "preview": "Preview",
+      "previewEmpty": "Nothing to preview yet. Write the prompt first.",
+      "saved": "Saved the prompt for {topic}.",
+      "saveFailed": "Could not save this prompt. Your edits are still in the form.",
+      "loadFailed": "Could not load the prompts.",
+      "retry": "Try again",
+      "empty": "No system prompts are installed on this server.",
+      "discardTitle": "Discard unsaved edits?",
+      "discardMessage": "You have unsaved changes on another prompt. Those edits will be dropped."
+    },
+    "usage": {
+      "title": "Usage Statistics",
+      "period": {
+        "day": "24 Hours",
+        "week": "7 Days",
+        "month": "30 Days",
+        "all": "All Time"
+      },
+      "totalRequests": "Requests",
+      "totalTokens": "Tokens",
+      "totalCost": "Cost",
+      "avgLatency": "Avg. Latency",
+      "byAction": "By Action",
+      "byProvider": "By Provider",
+      "topModels": "Top Models",
+      "topUsers": "Top Users",
+      "topUsersHint": "Users with the most API requests in the selected period (up to 25).",
+      "topUsersEmpty": "No usage data for this period. Try \"All time\" or wait until users generate activity.",
+      "model": "Model",
+      "requests": "requests",
+      "tokens": "tokens",
+      "cost": "Cost",
+      "activeSubscriptions": "Active Subscriptions",
+      "subscriptionOverview": "Subscription Overview"
+    },
+    "subscriptions": {
+      "title": "Subscription Plans",
+      "description": "Manage prices, cost budgets and active status for each subscription tier. Prices are shown to users in onboarding and on the subscription page.",
+      "level": "Level",
+      "name": "Name",
+      "priceMonthly": "Price/Month",
+      "priceYearly": "Price/Year",
+      "currency": "Currency",
+      "budgetMonthly": "Budget/Month",
+      "budgetYearly": "Budget/Year",
+      "active": "Active",
+      "actions": "Actions",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saveSuccess": "Plan updated successfully",
+      "saveError": "Failed to update plan",
+      "loadError": "Failed to load subscriptions",
+      "noSubscriptions": "No subscription plans found. Create subscription plans in the database first.",
+      "budgetHint": "Budget defines the maximum token cost (in EUR) allowed per billing period. Set to 0 for unlimited usage. Prices are the public display prices; purchases in the mobile app use the app store price."
+    },
+    "moderation": {
+      "title": "Content moderation",
+      "description": "Review reported content and, if needed, suspend or ban the offending account.",
+      "empty": "No reports match this filter.",
+      "loadError": "Failed to load reports",
+      "updateError": "Update failed",
+      "reportUpdated": "Report updated",
+      "userStatusUpdated": "Account status updated",
+      "unresolvedUser": "Owner not resolved",
+      "totalCount": "{count} reports",
+      "suspend": "Suspend",
+      "ban": "Ban",
+      "reactivate": "Reactivate",
+      "filters": {
+        "all": "All",
+        "open": "Open",
+        "reviewed": "Reviewed",
+        "actioned": "Actioned",
+        "dismissed": "Dismissed"
+      },
+      "col": {
+        "reason": "Reason",
+        "content": "Content",
+        "reportedUser": "Reported user",
+        "created": "Reported",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "reportStatus": {
+        "open": "Open",
+        "reviewed": "Reviewed",
+        "actioned": "Actioned",
+        "dismissed": "Dismissed"
+      },
+      "accountStatus": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "banned": "Banned"
+      },
+      "confirm": {
+        "suspended": {
+          "title": "Suspend account?",
+          "message": "Suspend {user}? They will be signed out and cannot use the platform until reactivated."
+        },
+        "banned": {
+          "title": "Ban account?",
+          "message": "Ban {user}? This blocks the account permanently. This action should be reserved for severe violations."
+        },
+        "active": {
+          "title": "Reactivate account?",
+          "message": "Reactivate {user}? They will be able to sign in and use the platform again."
+        }
+      }
+    },
+    "config": {
+      "title": "System configuration",
+      "description": "Sign-in, features and tools, channels and the look of this server.",
+      "aiPointer": "AI providers, keys, models, document reading and search are set up under AI infrastructure.",
+      "aiPointerLink": "Open AI infrastructure",
+      "loadError": "Failed to load configuration",
+      "saveError": "Failed to save configuration",
+      "savedButNotRefreshed": "Saved, but the menus could not be refreshed. Reload the page to see the change.",
+      "saved": "Configuration saved",
+      "savedLive": "Saved — takes effect immediately",
+      "dbOverridesEnv": "Stored encrypted in the database — overrides any matching value in .env.",
+      "managedKeys": {
+        "title": "Provider keys are managed under AI infrastructure › Providers & keys.",
+        "helm": "Keys set in the environment or by a Helm chart are picked up automatically — a chart install does not need this page. Use Providers & keys only to add or override a key from the UI.",
+        "stateNone": "not set",
+        "stateDb": "UI override",
+        "stateEnv": "environment / Helm",
+        "summary": "{env} from the environment, {db} overridden in the UI.",
+        "cta": "Open Providers & keys"
+      },
+      "envOverridesDb": "Locked by the environment variable {key}. It is currently {value}. Set {key} in your deployment's environment, then restart the backend.",
+      "unsaved": "Unsaved changes",
+      "clear": "Clear",
+      "clearHint": "Remove the saved value. The default is used again.",
+      "cleared": "Removed — the default is in use again.",
+      "testConnection": "Test connection",
+      "testFailed": "Connection test failed",
+      "commandCopied": "Command copied to clipboard",
+      "groups": {
+        "access": "Access",
+        "features": "Features & tools",
+        "channels": "Channels & apps",
+        "appearance": "Appearance",
+        "more": "More settings"
+      },
+      "accordion": {
+        "expandAll": "Expand all",
+        "collapseAll": "Collapse all",
+        "jumpTo": "Jump to section"
+      },
+      "liveBadge": "Live",
+      "liveHint": "Changes take effect immediately, no restart required.",
+      "brandingMode": {
+        "light": "You are editing the LIGHT mode settings — colors saved here apply when the app is in light mode. Switch the app to dark mode to edit the dark mode colors.",
+        "dark": "You are editing the DARK mode settings — colors saved here apply when the app is in dark mode. Switch the app to light mode to edit the light mode colors."
+      },
+      "brandingReset": {
+        "title": "Reset to the default style",
+        "description": "Restores the default Synaplan colors and fonts for light and dark mode. The name, logos, legal links, landing pages and attribution stay as they are.",
+        "button": "Reset style",
+        "resetting": "Resetting…",
+        "confirmTitle": "Reset the style to the defaults?",
+        "confirmMessage": "Your custom colors and fonts (light and dark mode) will be replaced with the Synaplan defaults. The name, logos, links and attribution stay untouched. This cannot be undone.",
+        "success": "Style reset — the defaults are in use again.",
+        "partial": "{reset} setting(s) reset, {failed} failed — the failed ones kept your values.",
+        "failed": "The style could not be reset. Your values are unchanged.",
+        "unconfirmed": "We could not confirm whether the style was reset. Reload the page to see the current style."
+      },
+      "restartBanner": {
+        "title": "Configuration Updated — Restart Required",
+        "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
+        "copyCommand": "Copy Command",
+        "copyFailed": "Could not copy. Select the command and copy it manually."
+      },
+      "m365": {
+        "title": "Before these fields work: register an app in Azure",
+        "intro": "Microsoft 365 sign-in needs an app registration in Azure. You do this once, it takes about five minutes, and afterwards every user can connect their own account.",
+        "portalLink": "Azure portal → App registrations",
+        "step1": "Open {portal} and choose “New registration”. Any name works, for example “Synaplan”.",
+        "step2": "Under “Redirect URI”, pick the platform type Web (not SPA) and paste this address exactly:",
+        "step3": "Go to “API permissions” → “Add a permission” → “Microsoft Graph” → “Delegated permissions” and add all of these:",
+        "step3Note": "offline_access is not optional: without it Microsoft issues no refresh token and every scheduled run stops working after an hour.",
+        "step4": "Go to “Certificates & secrets” → “New client secret” and copy the Value column — not the Secret ID. It is shown only this once.",
+        "step5": "Paste the client ID and the secret into the fields below, set the tenant, and switch M365_ENABLED on. Users then connect their own account under Apps › Microsoft 365.",
+        "ready": "Ready — users can connect their Microsoft 365 account under Apps › Microsoft 365.",
+        "notReady": "Not active yet. Fill in the fields below and switch M365_ENABLED on.",
+        "copyFailed": "Could not copy. Select the text and copy it manually."
+      },
+      "dropbox": {
+        "title": "Before these fields work: create an app in the Dropbox App Console",
+        "intro": "The Dropbox connection needs a Dropbox app. You do this once, it takes about five minutes, and afterwards every user can connect their own account.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Open the {console} and choose “Create app”. Pick “Scoped access” and “Full Dropbox”. Any name works, for example “Synaplan”.",
+        "step2": "On the “Permissions” tab, enable both of these and click “Submit”:",
+        "step3": "On the “Settings” tab, under “OAuth 2 → Redirect URIs”, add this address exactly:",
+        "step4": "Still on the “Settings” tab, copy the App key and the App secret (click “Show”).",
+        "step5": "Paste the app key and the secret into the fields below and switch DROPBOX_ENABLED on. Users then connect their own account under Apps › Dropbox.",
+        "ready": "Ready — users can connect their Dropbox account under Apps › Dropbox.",
+        "notReady": "Not active yet. Fill in the fields below and switch DROPBOX_ENABLED on.",
+        "copyFailed": "Could not copy. Select the text and copy it manually.",
+        "resetTitle": "Reset all Dropbox connections",
+        "resetDescription": "Removes every user's Dropbox connection on this installation, including the stored tokens. Use this after changing the Dropbox app or its permissions — everyone can then connect their account again freshly.",
+        "resetButton": "Reset connections",
+        "resetConfirmTitle": "Reset all Dropbox connections?",
+        "resetConfirmMessage": "Every user's Dropbox connection will be removed, and each user has to connect their Dropbox account again. This cannot be undone.",
+        "resetDone": "No Dropbox connections to remove | 1 Dropbox connection removed | {count} Dropbox connections removed",
+        "resetFailed": "The reset failed. Please try again."
+      },
+      "tabs": {
+        "auth": "Sign-in & registration",
+        "sharing": "Sharing & audit",
+        "features": "Features",
+        "web_search": "Web search",
+        "tools": "Tools & automation",
+        "email": "Email",
+        "channels": "Channels & integrations",
+        "mobile": "Mobile app",
+        "branding": "Branding",
+        "interface": "Interface",
+        "guest_landing": "Guest landing page"
+      },
+      "tabIntro": {
+        "auth": "Who may register and sign in, and which sign-in providers are offered.",
+        "sharing": "What users may share with everyone, which login groups are synced, and how long the audit log is kept.",
+        "features": "Switch whole features on or off for everyone on this server. Changes apply immediately.",
+        "web_search": "Choose who looks things up on the web for chat, and test it with a query.",
+        "tools": "What the AI may do on its own: saved tasks, approval rules for tools and file work in a sandbox.",
+        "email": "The mail server used to send sign-up, password and notification emails.",
+        "channels": "Inbound channels such as WhatsApp and email, plus Microsoft 365, Dropbox and MCP connections.",
+        "mobile": "The oldest app version that may connect, and where users download the apps.",
+        "branding": "Name, colors, fonts, logos and legal links.",
+        "interface": "Whether usage is shown and what chat displays while it works.",
+        "guest_landing": "The news shown to visitors on the guest landing page.",
+        "more": "Settings that are not sorted into a topic yet."
+      },
+      "panelSettings": {
+        "web_search": {
+          "title": "Brave Search settings",
+          "hint": "API key and number of results for Brave Search, the default provider."
+        }
+      },
+      "sections": {
+        "ai_selfhosted": "Self-hosted AI (NVIDIA Triton)",
+        "ai_tts": "Speech output (text-to-speech)",
+        "ai_cloud": "Additional provider settings",
+        "ai_embeddings": "Embeddings (Cloudflare Workers AI)",
+        "processing_tika": "Apache Tika",
+        "processing_docling": "Docling",
+        "processing_rasterize": "PDF rasterizer",
+        "processing_whisper": "Whisper (audio transcription)",
+        "vectordb_qdrant": "Vector database (Qdrant)",
+        "vectordb_qdrant_search": "Search thresholds and limits",
+        "routing_multitask": "Multi-step routing",
+        "routing_conversation_summary": "Rolling conversation summary",
+        "routing_deep_memory": "Deep memory (message digests)",
+        "processing_media": "Background media generation",
+        "processing_brave": "Brave Search",
+        "routing_saved_tasks": "Saved tasks",
+        "routing_tools": "Tool approval rules",
+        "processing_compute": "File work"
+      },
+      "fields": {
+        "TIKA_BASE_URL": "Apache Tika URL",
+        "TIKA_TIMEOUT_MS": "Request timeout (ms)",
+        "TIKA_RETRIES": "Max retries",
+        "TIKA_HTTP_USER": "HTTP auth username",
+        "TIKA_HTTP_PASS": "HTTP auth password",
+        "DOCLING_BASE_URL": "Docling serve URL (empty = off)",
+        "DOCLING_TIMEOUT_MS": "Request timeout (ms)",
+        "DOCLING_MAX_BYTES": "Max file size (bytes)",
+        "RASTERIZE_DPI": "PDF rasterization DPI",
+        "RASTERIZE_PAGE_CAP": "Max pages to rasterize",
+        "RASTERIZE_TIMEOUT_MS": "Rasterization timeout (ms)",
+        "WHISPER_ENABLED": "Enable audio transcription",
+        "WHISPER_DEFAULT_MODEL": "Default Whisper model",
+        "BRAVE_SEARCH_ENABLED": "Enable web search",
+        "BRAVE_SEARCH_API_KEY": "Brave Search API key",
+        "BRAVE_SEARCH_COUNT": "Results per search",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Run image, video and audio generation in the background so chat is never blocked. The assistant shows a live status and a toast when it finishes. When off, the turn waits until the file is ready. Needs the worker container.",
+        "COMPUTE_ENABLED": "Let the assistant do short file work (Python or Node) on copies of files you chose. Needs the compute sidecar (COMPUTE_URL + COMPUTE_TOKEN). A local docker compose up starts that sidecar and turns this on.",
+        "COMPUTE_REQUIRE_TIER": "Minimum isolation the sidecar must report before file work turns on: Standard (plain Docker), Strong isolation (gVisor), or Virtual machine (microVM). Synaplan Cloud requires Strong isolation.",
+        "COMPUTE_WORKSPACES_ENABLED": "Keep a folder between file-work runs so the assistant can continue earlier work. Files → Workspace shows what is in it. Also needs file work itself to be on.",
+        "COMPUTE_EGRESS_ENABLED": "Let a file-work run fetch from a short list of public websites the assistant named. Off by default — runs stay offline. Private or local addresses are always refused. Can only be switched on when the sidecar offers website access.",
+        "COMPUTE_EGRESS_REQUIRES_APPROVAL": "When a run will fetch from the web, ask the owner first even if everyday file work would run automatically. On by default.",
+        "COMPUTE_EGRESS_MAX_HOSTS": "How many websites one file-work run may list. Default 8.",
+        "COMPUTE_DEFAULT_TIMEOUT_SEC": "Default seconds a file-work run may take.",
+        "COMPUTE_DEFAULT_MEMORY_MB": "Default memory cap in megabytes for a file-work run.",
+        "COMPUTE_DEFAULT_CPU": "Default CPU share for a file-work run.",
+        "COMPUTE_DEFAULT_PIDS": "Default process cap for a file-work run.",
+        "COMPUTE_DEFAULT_OUTPUT_MB": "Default size cap in megabytes for files the run may create.",
+        "COMPUTE_MAX_TIMEOUT_SEC": "Hard ceiling in seconds for a file-work run.",
+        "COMPUTE_POLICY_INTERACTIVE": "When the owner is present (chat or a live API call): run file work automatically, ask first, or never run it. An assistant cannot loosen this.",
+        "COMPUTE_POLICY_UNATTENDED": "When a saved task runs file work on its own: ask the owner first (default), run automatically, or never run it. An assistant cannot loosen this.",
+        "COMPUTE_WORKSPACE_TTL_DAYS": "How many days a file-work folder may sit unused before cleanup can remove it. Default 90.",
+        "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Apps › Synaplan Desktop. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository.",
+        "FEATURE_SEARCH_AI_ENABLED": "AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why in one sentence. It never changes anything by itself. Each use is one short AI call. Off keeps keyword and meaning search."
+      },
+      "fieldOptions": {
+        "COMPUTE_REQUIRE_TIER": {
+          "docker": "Standard (plain Docker)",
+          "gvisor": "Strong isolation (gVisor)",
+          "microvm": "Virtual machine (microVM)"
+        },
+        "COMPUTE_POLICY_INTERACTIVE": {
+          "auto": "Run automatically",
+          "approve": "Ask first",
+          "block": "Never run"
+        },
+        "COMPUTE_POLICY_UNATTENDED": {
+          "auto": "Run automatically",
+          "approve": "Ask first",
+          "block": "Never run"
+        }
+      },
+      "valueSet": "This setting has a saved value.",
+      "valueEmpty": "This setting is still empty.",
+      "search": {
+        "label": "Search settings",
+        "placeholder": "Search by name or key, e.g. registration or SMTP",
+        "noHits": "No setting matches “{query}”.",
+        "clear": "Clear search"
+      }
+    },
+    "attention": {
+      "title": "Needs attention",
+      "allGood": "Nothing needs your attention right now.",
+      "loadFailed": "The server status could not be loaded. Try again.",
+      "models": "{count} model needs attention. | {count} models need attention.",
+      "unhealthy": "{name} is switched on but not responding.",
+      "needsSetup": "{name} is switched on but not set up yet.",
+      "openModelHealth": "Open model health",
+      "openStatus": "Open system status",
+      "cards": {
+        "people": "Users",
+        "peopleHint": "Accounts on this server",
+        "signups": "New sign-ups",
+        "signupsHint": "In the period of the chart below",
+        "features": "Features off",
+        "featuresHint": "Switched off or not set up",
+        "models": "Models to check",
+        "modelsHint": "Offline, failing or retired"
+      }
+    }
+  },
+  "statistics": {
+    "title": "Welcome to synaplan!",
+    "messageStats": "Message Statistics",
+    "totalMessages": "Total Messages",
+    "messagesSent": "Messages Sent",
+    "messagesReceived": "Messages Received",
+    "totalFiles": "Total Files",
+    "filesSent": "Files Sent",
+    "filesReceived": "Files Received",
+    "latestFiles": "Latest Files",
+    "received": "Received",
+    "sent": "Sent"
+  },
+  "aiInfra": {
+    "modelImport": {
+      "title": "Import models",
+      "importModels": "Import models",
+      "importPulled": "Import pulled models",
+      "unreachable": "This endpoint did not answer. Check it under Test, then try again.",
+      "empty": "This endpoint offers no models to import.",
+      "selectAllNew": "Select all new",
+      "probeLabel": "Check what each model can do (uses a little credit)",
+      "colModel": "Model",
+      "colTags": "Capabilities",
+      "colPrice": "Price per 1M tokens",
+      "colStatus": "Status",
+      "exists": "Already added",
+      "new": "New",
+      "tagsHint": "Allowed capabilities: {tags}. Separate several with commas.",
+      "pricePair": "{in} in / {out} out",
+      "apply": "Import {count}",
+      "applying": "Importing…",
+      "applied": "Imported {created} model row(s), skipped {skipped} already present.",
+      "applyFailed": "The models could not be imported.",
+      "noValidTags": "Give each selected model at least one valid capability.",
+      "filterLabel": "Filter models",
+      "filterPlaceholder": "Filter by name or id"
+    },
+    "extraction": {
+      "lead": "Choose how documents are turned into text. Docling keeps tables and headings; if it is not running, Tika is used instead and uploads never fail.",
+      "family": {
+        "document": "Documents",
+        "text": "Plain text",
+        "image": "Images",
+        "audio": "Audio",
+        "audio_no_cloud": "Audio without cloud STT",
+        "video": "Video"
+      },
+      "moveUp": "Up",
+      "moveDown": "Down",
+      "remove": "Remove",
+      "add": "Add",
+      "addPlaceholder": "Add an adapter…",
+      "healthAvailable": "available",
+      "healthUnavailable": "unavailable",
+      "sidecarSettings": "Addresses, timeouts and a connection test for each service are under Reading services on this tab.",
+      "sidecarSettingsLink": "Go to reading services",
+      "servicesTitle": "Reading services",
+      "servicesHint": "Where Tika, Docling, the PDF rasterizer and Whisper run, and their limits.",
+      "testTitle": "Test with a file",
+      "testHint": "Upload a sample. You will see which adapter won and why the others did not.",
+      "testButton": "Test with a file",
+      "testing": "Testing…",
+      "winner": "Winner: {winner}",
+      "attemptMs": "{ms} ms",
+      "doclingUnavailableTika": "Docling unavailable — Tika used instead",
+      "doclingRejectedTika": "Docling reached but refused the file — Tika used instead",
+      "save": "Save chain",
+      "saved": "Extraction chain saved. The next upload uses it.",
+      "saveFailed": "The extraction chain could not be saved",
+      "emptyChain": "Each file type needs at least one adapter.",
+      "loadFailed": "Could not load extraction settings",
+      "verdict": {
+        "quality_ok": "accepted",
+        "not_applicable": "not gated",
+        "markdown_structure": "accepted (tables or headings)",
+        "empty": "empty",
+        "low_quality": "too little useful text",
+        "unavailable": "unavailable",
+        "rejected": "reached but refused the file",
+        "unsupported": "does not support this file",
+        "unknown": "unknown adapter",
+        "skipped": "skipped",
+        "rewritten": "converted for the next adapter"
+      }
+    },
+    "webSearch": {
+      "lead": "Choose who looks up the web for chat. The next search uses the new provider — no restart. Test query shows titles so you can see it working.",
+      "docs": "Documentation",
+      "healthAvailable": "available",
+      "healthUnavailable": "unavailable",
+      "capabilities": "Capabilities",
+      "capability": {
+        "freshness": "Freshness",
+        "country": "Country",
+        "language": "Language",
+        "siteFilter": "Site filter",
+        "fullContent": "Full page text",
+        "answer": "Answer"
+      },
+      "sovereignty": {
+        "selfHosted": "self-hosted",
+        "eu": "EU",
+        "usCloud": "US cloud"
+      },
+      "apiKey": "API key",
+      "apiKeyPlaceholder": "Paste an API key",
+      "saveKey": "Save key",
+      "keySaved": "Key saved and verified. The next search can use it.",
+      "fallback": "Fallback provider",
+      "fallbackNone": "No fallback",
+      "allowUsers": "Allow users to choose their provider",
+      "save": "Save web search",
+      "saved": "Web search settings saved. The next chat search uses them.",
+      "savedInactive": "{provider} is not ready ({reason}). Chat web search will return nothing.",
+      "savedInactiveFallback": "{provider} is not ready ({reason}). Chat web search will use the fallback.",
+      "savedInactiveBoth": "{provider} is not ready ({reason}). The fallback is not ready either. Chat web search will return nothing.",
+      "saveFailed": "Web search settings could not be saved",
+      "loadFailed": "Could not load web search settings",
+      "testTitle": "Test query",
+      "testHint": "Run a short query. You will see up to five titles from the active provider.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Test query",
+      "testing": "Testing…",
+      "testProvider": "Answered by {provider}",
+      "testProviderFallback": "Answered by {provider} (fell back from {from})",
+      "allowUsersHint": "When this is on, each person can pick a different search provider in Preferences."
+    },
+    "rerank": {
+      "title": "Reranking",
+      "lead": "After search finds many snippets, a reranker puts the most useful ones first. Leave this off until a test shows it helps. Chat stays the same while it is off.",
+      "enable": "Use reranking on document search",
+      "model": "Rerank model",
+      "modelNone": "No model selected",
+      "multiplier": "How many extra snippets to fetch (2–10)",
+      "budgetMs": "Give up after this many milliseconds (100–5000)",
+      "llmFallback": "Use the chat model when no rerank model is set",
+      "llmFallbackHint": "This uses the summary model for every search and can cost more. Prefer a dedicated rerank model.",
+      "healthAvailable": "available",
+      "healthUnavailable": "unavailable",
+      "apiKey": {
+        "jina": "Jina API key",
+        "cohere": "Cohere API key",
+        "voyage": "Voyage API key"
+      },
+      "apiKeyPlaceholder": "Paste an API key",
+      "saveKey": "Save key",
+      "keySaved": "Key saved. The next rerank can use it.",
+      "save": "Save reranking",
+      "saved": "Reranking settings saved. The next document search uses them.",
+      "savedOff": "Reranking settings saved. Document search keeps the original vector order.",
+      "savedInactive": "Reranking settings saved. They stay inactive until a rerank model or the chat-model fallback is available.",
+      "saveFailed": "Reranking settings could not be saved",
+      "loadFailed": "Could not load reranking settings",
+      "testTitle": "Test with sample snippets",
+      "testHint": "Type a question and one snippet per line. You will see the new order so you can check it is working.",
+      "testQueryPlaceholder": "What is the invoice total?",
+      "testDocumentsPlaceholder": "The invoice total is 120 euro.\nOffice hours are 9 to 5.",
+      "testButton": "Test order",
+      "testing": "Testing…",
+      "lastEval": {
+        "title": "Last measurement",
+        "line": "On {date}: found the right snippet {recallOff} of the time without reranking, {recallOn} with it. Slowest answers took {p95Off} ms without and {p95On} ms with."
+      }
+    },
+    "searchModels": {
+      "title": "Smart Search",
+      "lead": "The models behind the search palette (Ctrl/Cmd+K). Search questions use each person's chat model until you pick one model for everyone. The search index follows the document embedding model until you pick another.",
+      "loading": "Loading the search models…",
+      "loadFailed": "The search models could not be loaded.",
+      "noModel": "no model",
+      "undo": "Undo",
+      "ai": {
+        "label": "AI model for search questions",
+        "hint": "The first choice uses the chat model each person already uses. Any model under “Same model for everyone” is used for the whole server. It only points at a result and never changes anything by itself.",
+        "inherit": "Each person's chat model",
+        "globalGroup": "Same model for everyone",
+        "userChat": "Search questions use each person's chat model. Yours is {model}.",
+        "userChatUnavailable": "Search questions use each person's chat model. Yours cannot answer right now, so your search shows no AI help.",
+        "ready": "Everyone's search questions are answered by {model}.",
+        "off": "AI help in search is switched off, so the palette shows no AI row.",
+        "openFlag": "Turn it on in Features",
+        "unavailable": "The chosen model cannot answer right now, so the palette shows no AI row. Pick another model or set up its provider.",
+        "saved": "Everyone's search questions now use {model}.",
+        "savedUserChat": "Search questions use each person's chat model again.",
+        "restored": "Everyone's search questions use {model} again.",
+        "restoredUserChat": "Search questions use each person's chat model again."
+      },
+      "embed": {
+        "label": "Embedding model for the search index",
+        "hint": "Finds pages, settings, chats and files by meaning. Changing it re-reads the whole index in the background.",
+        "inherit": "Same as the document embedding model: {model}",
+        "separate": "Search and documents use different embedding models, so each search makes two short embedding calls.",
+        "otherRun": "Another embedding change is running. You can change this model when it has finished.",
+        "confirmTitle": "Change the search embedding model?",
+        "confirmMessage": "Search re-reads {count} entries with {model} in the background, one short embedding call each. Until an entry is done it is found by keywords only. If the change fails, search stays on {current}.",
+        "confirm": "Change and re-read",
+        "started": "Search is moving to {model}. You can follow the progress here.",
+        "savedNoRun": "Search uses {model}. The index already fits it, so nothing had to be re-read."
+      },
+      "reason": {
+        "notPulled": "not downloaded in Ollama",
+        "providerUnavailable": "no API key for {service}"
+      },
+      "index": {
+        "empty": "The search index is still empty. It fills as users use Synaplan.",
+        "keywordOnly": "Search finds by keywords only until the index has been read with the embedding model.",
+        "coverage": "{embedded} of {rows} index entries can be found by meaning."
+      },
+      "run": {
+        "running": "Re-reading the index with {model}: {done} of {total}. Search keeps working meanwhile.",
+        "completed": "The search index uses {model}.",
+        "partial": "The search index uses {model}. {count} entries could not be read and are found by keywords only until they change.",
+        "failed": "Moving the index to {model} failed, so search is back on {previous}. Entries that were already moved are found by keywords only until they are read again. Pick a model above to try again.",
+        "cancelled": "Moving the index to {model} was stopped. Search stays on {previous}."
+      },
+      "refused": {
+        "invalid_model": "{model} cannot be used for search right now. The previous model stays.",
+        "probe_failed": "{model} did not answer a test call, so nothing was changed.",
+        "run_in_progress": "Another embedding change is running. Nothing was changed; try again when it has finished.",
+        "unknown": "The model could not be changed. The previous one stays."
+      }
+    }
+  },
+  "providerHelp": {
+    "openAria": "How to set this up",
+    "createKeyLink": "Create API key",
+    "downloadLink": "Download Ollama",
+    "groq": {
+      "title": "Groq API key",
+      "message": "Create a free Groq API key in the Groq console, then paste it here. The free tier is usually enough to start chatting in under a minute."
+    },
+    "openai": {
+      "title": "OpenAI API key",
+      "message": "Create an API key in your OpenAI account (API keys page), then paste it here. Usage is billed by OpenAI."
+    },
+    "anthropic": {
+      "title": "Anthropic API key",
+      "message": "Create an API key in the Anthropic console (Settings → Keys), then paste it here to use Claude models."
+    },
+    "google": {
+      "title": "Google Gemini API key",
+      "message": "Create a Gemini API key in Google AI Studio, then paste it here. A free tier is available for many models."
+    },
+    "mistral": {
+      "title": "Mistral API key",
+      "message": "Create an API key in the Mistral console, then paste it here. Mistral offers a free tier for getting started."
+    },
+    "trustedtokens": {
+      "title": "TrustedTokens API key",
+      "message": "Create an API key at TrustedTokens (Account → API Access), then paste it here. Inference runs on German GPUs with EU data residency."
+    },
+    "a2agent": {
+      "title": "A2Agent API key",
+      "message": "Create a pay-as-you-go API key at A2Agent (dashboard → API keys), then paste it here. Prompts are processed by mainland-China model vendors (Qwen, DeepSeek, MiniMax) through this gateway. A2Agent serves users outside mainland China. Operators handling EU personal data should decide per their DPA."
+    },
+    "meta": {
+      "title": "Meta API key",
+      "message": "Create an API key in the Meta Model API dashboard (API keys), then paste it here. This unlocks Muse Spark, Muse Wonder, Muse Image, and Muse Voice Transcribe. Prompts are processed by Meta."
+    },
+    "cerebras": {
+      "title": "Cerebras API key",
+      "message": "Create an API key in the Cerebras Cloud dashboard (API Keys), then paste it here. This unlocks GPT OSS 120B and Qwen 3.8 27B with very fast answers. Prompts are processed by Cerebras in the US."
+    },
+    "huggingface": {
+      "title": "HuggingFace API token",
+      "message": "Create an access token in your HuggingFace settings, then paste it here to use HuggingFace Inference models."
+    },
+    "xai": {
+      "title": "xAI API key",
+      "message": "Create an API key in the xAI console, then paste it here to use Grok models."
+    },
+    "perplexity": {
+      "title": "Perplexity API key",
+      "message": "Create an API key in your Perplexity account, then paste it here to use Sonar models. The same key is used for web search if you pick Perplexity under System configuration › Web search."
+    },
+    "ollama": {
+      "title": "Local AI with Ollama",
+      "message": "Download Ollama and pull a capable model such as gpt-oss:120b (or a smaller one like llama3.2 if your machine has less RAM). No API key is needed — Synaplan talks to Ollama at the configured URL."
+    }
+  },
+  "people": {
+    "title": "Users",
+    "subtitle": "Accounts, groups, policies and reported content on this server.",
+    "tabs": {
+      "users": "Users",
+      "groups": "Groups",
+      "policies": "Policies",
+      "linkedPlatforms": "Platform instances",
+      "moderation": "Moderation",
+      "audit": "Audit"
+    },
+    "openPeople": "Open Users",
+    "backToOperate": "Back to Operate",
+    "myGroups": {
+      "subtitle": "Groups you belong to on this instance.",
+      "emptyMember": "You are not in a group yet. An administrator can add you on the Users page.",
+      "emptyAdmin": "No groups yet. Create one on the Users page.",
+      "leave": "Leave",
+      "leaveConfirm": "Leave the group \"{name}\"? You lose access to what this group can see. Anything you shared with this group stays shared with the other members. You can take that back later from each item's Share dialog.",
+      "leaveConfirmWithShares": "Leave the group \"{name}\"? You lose access to what this group can see. 1 item you shared with this group stays shared with the other members. Leave keeps that sharing. Leave and stop sharing removes it. | Leave the group \"{name}\"? You lose access to what this group can see. {count} items you shared with this group stay shared with the other members. Leave keeps that sharing. Leave and stop sharing removes it.",
+      "leaveAndStopSharing": "Leave and stop sharing",
+      "left": "You left the group. Items you shared with it stay shared with the other members.",
+      "leftAndStopped": "You left the group and stopped sharing your items with it.",
+      "leaveFailed": "Could not leave the group.",
+      "leaveDirectory": "This membership comes from your login and cannot be left here.",
+      "ledBy": "Led by {name}",
+      "noLeader": "No one leads this group yet.",
+      "alsoIn": "Also in this group: {names}",
+      "onlyYou": "You are the only user in this group.",
+      "sharedLine": "Shared with this group: {items}",
+      "youCanLeave": "You can leave. You then lose access to what this group can see.",
+      "youLead": "You lead this group. You can leave, and you then lose access to what this group can see."
+    },
+    "users": {
+      "groups": "Groups",
+      "identities": "Sign-in"
+    },
+    "groups": {
+      "name": "Name",
+      "kind": "Kind",
+      "members": "Members",
+      "memberCount": "{count} member | {count} members",
+      "fromLogin": "From your login",
+      "manual": "Manual",
+      "create": "Create group",
+      "createTitle": "Create a group",
+      "createPrompt": "Group name",
+      "rename": "Rename",
+      "renameTitle": "Rename group",
+      "delete": "Delete",
+      "deleteConfirm": "Delete the group \"{name}\"? Users stay in the instance. {shares}, and {policies}.",
+      "deleteConfirmShares": "1 share to this group ends | {count} shares to this group end",
+      "deleteConfirmPolicies": "1 policy is removed | {count} policies are removed",
+      "deleteConfirmUnknown": "Delete the group \"{name}\"? Users stay in the instance. Shares to this group end, and the group's policies are removed.",
+      "empty": "No groups yet. Create one to start sharing later.",
+      "loadError": "Groups could not be loaded.",
+      "saveError": "The group could not be saved.",
+      "created": "Group created.",
+      "renamed": "Group renamed.",
+      "deleted": "Group deleted.",
+      "directoryReadOnly": "This group comes from your login and cannot be renamed or deleted here.",
+      "directoryManagedHint": "Membership from your login is updated at the next sign-in. You can still add extra users by hand.",
+      "addMember": "Add a user",
+      "addMemberPlaceholder": "Search by name or email",
+      "addMemberNotFound": "No user matches that name or email.",
+      "removeMember": "Remove",
+      "removeConfirm": "Remove {email} from this group? Items they shared with this group stay shared.",
+      "roleMember": "Member",
+      "roleManager": "Manager",
+      "memberAdded": "User added to the group.",
+      "memberRemoved": "User removed from the group.",
+      "sharedWith": "Shared with this group",
+      "sharedEmpty": "Nothing is shared with this group yet.",
+      "sharedLoading": "Loading shared items…",
+      "resourceKind": {
+        "conversation": "Chat",
+        "knowledge_folder": "Folder",
+        "assistant": "AI assistant",
+        "saved_task": "Saved task",
+        "widget": "Chat widget",
+        "agent": "Agent",
+        "tool": "Tool"
+      },
+      "manualHint": "Created by hand in Synaplan, not from your login.",
+      "fromLoginHint": "Created from your company login.",
+      "roleLabel": "Role",
+      "roleUpdated": "Role updated."
+    },
+    "audit": {
+      "when": "When",
+      "who": "Who",
+      "actionLabel": "Action",
+      "kind": "Kind",
+      "resource": "Resource",
+      "subject": "Details",
+      "empty": "No audit events yet.",
+      "more": "Load more",
+      "loadError": "The audit log could not be loaded.",
+      "filterAll": "All",
+      "action": {
+        "share_grant": "Shared",
+        "share_revoke": "Share removed",
+        "group_create": "Group created",
+        "group_update": "Group updated",
+        "group_rename": "Group renamed",
+        "group_delete": "Group deleted",
+        "group_member_set": "Member added",
+        "group_member_remove": "Member removed",
+        "group_member_leave": "Left a group",
+        "directory_sync": "Login group updated",
+        "impersonation_start": "Started viewing as user",
+        "impersonation_stop": "Stopped viewing as user",
+        "admin_metadata_view": "Looked at resource list",
+        "policy_set": "Updated group policies",
+        "policy_lock": "Locked a setting",
+        "platform_link_linked": "Platform linked",
+        "platform_link_disconnected": "Platform disconnected",
+        "platform_link_reassigned": "Platform link moved to another account",
+        "platform_link_exchange_failed": "Platform link failed",
+        "platform_link_redirect_rejected": "Platform redirect rejected",
+        "platform_instance_registered": "Platform registered",
+        "platform_instance_approved": "Platform approved",
+        "platform_instance_revoked": "Platform revoked",
+        "admin_user_level_change": "User level changed",
+        "messages_gateway_flags": "Gateway settings changed",
+        "messages_gateway_upstream": "Gateway address changed",
+        "messages_gateway_aliases": "Model aliases changed"
+      },
+      "what": "What happened",
+      "emptyNote": "This log records who did what. It does not open chat or file contents.",
+      "someone": "Someone",
+      "anItem": "an item",
+      "sentence": {
+        "shareGrant": "{who} shared “{resource}” with {subject}.",
+        "shareRevoke": "{who} stopped sharing “{resource}” with {subject}.",
+        "withSubject": "{who}: {action} — {resource}, with {subject}.",
+        "generic": "{who}: {action} — {resource}."
+      },
+      "on": "On",
+      "off": "Off",
+      "none": "none",
+      "changeLine": "{label}: {old} → {new}",
+      "gatewaySetting": {
+        "ENABLED": "Gateway",
+        "ALLOW_OPERATOR_KEY": "Server key",
+        "MCP_TOOLS_ENABLED": "Tool servers",
+        "MCP_TOOLS_WITH_CLIENT_TOOLS": "Tool servers with client tools",
+        "MCP_MAX_ITERATIONS": "Tool rounds",
+        "WEB_SEARCH_MODE": "Web search",
+        "WEB_FETCH_MODE": "Web fetch",
+        "VISION_MODE": "Image understanding",
+        "VISION_IMAGE_DETAIL": "Image detail",
+        "VISION_MAX_IMAGES": "Images per request",
+        "CONTEXT_INJECTION_ENABLED": "Extra context",
+        "BUDGET_NOTICE_ENABLED": "Budget notice",
+        "SESSION_SUMMARY_ENABLED": "Session summary",
+        "MODEL_ALIASES": "Model aliases",
+        "UPSTREAM_URL": "Gateway address"
+      }
+    },
+    "linkedPlatforms": {
+      "intro": "Nextcloud, ownCloud and Outlook servers that asked to use this Synaplan. Approve one so its users can connect their own accounts under Apps.",
+      "empty": "No platforms have registered yet.",
+      "client": "Platform",
+      "host": "Address",
+      "status": "Status",
+      "actions": "Actions",
+      "approve": "Approve",
+      "revoke": "Revoke",
+      "approved": "Platform approved.",
+      "revoked": "Platform revoked.",
+      "approveError": "The platform could not be approved.",
+      "revokeError": "The platform could not be revoked.",
+      "loadError": "Platforms could not be loaded.",
+      "revokeTitle": "Revoke this platform?",
+      "revokeConfirm": "Revoke this platform? Every linked key for it will stop working.",
+      "statusValue": {
+        "active": "Active",
+        "pending": "Waiting for approval",
+        "revoked": "Revoked"
+      },
+      "emptyHint": "A server registers when someone installs the Synaplan add-in in Nextcloud, ownCloud or Outlook and enters this server’s address.",
+      "emptyAction": "Show the setup steps"
+    },
+    "policies": {
+      "group": "Group",
+      "chooseGroup": "Select a group",
+      "helper": "These settings apply to everyone in the group. A personal setting still wins. An instance lock ignores both the group value and personal settings.",
+      "pickGroup": "Select a group to edit its policies.",
+      "defaultModels": "Default models",
+      "allowedModels": "Allowed models",
+      "allowedHelper": "Leave every use empty so users can use every model. Ticking models limits only that use. A use with nothing ticked stays available.",
+      "allowedLimits": "This limits: {names}. Every other use stays available.",
+      "features": "Features",
+      "featuresHelper": "Leave as the instance default unless this group must turn a feature on or off.",
+      "featureOn": "On for this group",
+      "featureOff": "Off for this group",
+      "inheritedOn": "The instance default is on.",
+      "inheritedOff": "The instance default is off.",
+      "inheritedUnset": "The instance has no default, so this is off.",
+      "willInherit": "Will use the instance default after you save.",
+      "groupForcesOn": "This group turns it on for its members.",
+      "groupForcesOff": "This group turns it off for its members.",
+      "rateLimit": "Rate-limit tier",
+      "useGlobal": "Use the instance default",
+      "useBillingTier": "Use the user’s plan",
+      "conflict": "Another group sets a different default. The group with the lowest number wins.",
+      "locks": "Locked instance defaults",
+      "locksHelper": "These locks apply to the whole instance, not one group. While a lock is on, only the instance default is used. Group and personal values stay saved but are ignored. Turn a lock off to use them again.",
+      "save": "Save policies",
+      "saved": "Group policies saved.",
+      "lockSaved": "Instance lock updated.",
+      "lockIgnored": "Not used while the instance lock is on.",
+      "lockMissingDefault": "There is no instance default to lock. Set the instance value first, then lock it.",
+      "loadError": "Policies could not be loaded.",
+      "saveError": "Policies could not be saved.",
+      "capability": {
+        "CHAT": "Chat",
+        "SORT": "Sorting",
+        "ANALYZE": "Analysis",
+        "VECTORIZE": "Search",
+        "PIC2TEXT": "Image to text",
+        "TEXT2PIC": "Text to image",
+        "PIC2PIC": "Image edit",
+        "TEXT2VID": "Text to video",
+        "IMG2VID": "Image to video",
+        "SOUND2TEXT": "Speech to text",
+        "TEXT2SOUND": "Text to speech",
+        "MEM": "Memory",
+        "TOOLS": "Tools"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Saved tasks",
+        "DESKTOP_AGENT_ENABLED": "Synaplan Desktop",
+        "DOCUMENT_TOOLS_ENABLED": "Document tools",
+        "SEARCH_AI_ENABLED": "AI help in search",
+        "MULTITASK_ROUTING_ENABLED": "Multi-step routing",
+        "MULTITASK_PARALLEL_ENABLED": "Parallel steps",
+        "MULTITASK_URL_FETCH_ENABLED": "Fetch web pages",
+        "MULTITASK_MCP_FETCH_ENABLED": "Read from connected tools",
+        "MULTITASK_MCP_ACTION_ENABLED": "Act through connected tools",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Search email",
+        "TOOLS_REGISTRY_ENABLED": "Tool catalog",
+        "TOOLS_APPROVALS_ENABLED": "Tool approvals",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Custom HTTP tools",
+        "WORKFLOWS_BUILDER_ENABLED": "Task steps editor",
+        "CHAT_EXPORT_ENABLED": "Export chats",
+        "CHAT_SHARE_ENABLED": "Share chats"
+      }
+    },
+    "intro": {
+      "users": "Everyone with an account here. Change a level, verify an address or turn an account off.",
+      "groups": "Groups bundle users so you can share assistants and set rules once for all of them.",
+      "policies": "Policies decide what a group may use, for example which features or models.",
+      "moderation": "Content users reported. Review it, then keep or remove it.",
+      "audit": "A record of who changed what on this server, newest first."
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Can view",
+      "use": "Can use",
+      "edit": "Can edit",
+      "manage": "Can manage"
+    },
+    "share": "Share",
+    "sharedWithMe": "Shared with me",
+    "incoming": {
+      "title": "Incoming chats",
+      "subtitle": "Chats that users or groups shared with you",
+      "menu": "Incoming chats",
+      "purpose": "Shared with you",
+      "menuNew": "New incoming chats",
+      "new": "New",
+      "newCount": "{count} new incoming",
+      "owner": "from {name}",
+      "sourceGroup": "This chat belongs to {owner}. It reached you through the group \"{name}\".",
+      "sourceEveryone": "This chat belongs to {owner}. It was shared with everyone who has an account.",
+      "sourceDirect": "This chat belongs to {owner}. It was shared with you personally.",
+      "emptyText": "No incoming chats",
+      "filter": {
+        "label": "Filter chats",
+        "all": "All",
+        "private": "Owned",
+        "group": "Group",
+        "widget": "Widget"
+      },
+      "pill": {
+        "private": "Owned",
+        "privateTitle": "You own this chat. Sharing it does not change that.",
+        "sharedWithPeople": "1 person | {count} people",
+        "sharedWithPeopleTitle": "Shared with 1 person | Shared with {count} people",
+        "group": "Group",
+        "groupTitle": "Shared with the group \"{name}\"",
+        "groupTitleGeneric": "Shared with a group",
+        "everyone": "Everyone",
+        "everyoneTitle": "Shared with everyone who has an account",
+        "direct": "Shared with you",
+        "directTitle": "Shared with you personally",
+        "from": "From {name}",
+        "widget": "Widget",
+        "widgetTitle": "A visitor conversation from one of your chat widgets"
+      }
+    },
+    "everyone": "Everyone with an account",
+    "owner": "Owner",
+    "fileUnavailable": "This file is no longer available.",
+    "kind": {
+      "assistant": "AI assistant",
+      "saved_task": "Saved task",
+      "widget": "Chat widget"
+    },
+    "runCopy": "Run as my copy",
+    "runCopyConfirm": "Create your own copy of this saved task? It will run only when you start it.",
+    "assistantNotShared": "This task's AI assistant is not shared with you.",
+    "assistantNotSharedNamed": "The AI assistant “{name}” is not shared with you. Ask the owner to share it, then try again.",
+    "sharedBy": "From {name}",
+    "continueAsCopy": "Continue as my copy",
+    "continueFailed": "Couldn't create your copy. Please try again.",
+    "continueNeedsUse": "Your copy was not created. You can still read this chat.",
+    "readOnly": "You can view this conversation. To add a message, continue it as your own copy.",
+    "sharedFolder": "Shared · {name}",
+    "banner": {
+      "knowledge_folder": {
+        "sourceGroup": "This folder belongs to {owner}. It reached you through the group \"{name}\".",
+        "sourceEveryone": "This folder belongs to {owner}. It was shared with everyone who has an account.",
+        "sourceDirect": "This folder belongs to {owner}. It was shared with you personally."
+      },
+      "assistant": {
+        "sourceGroup": "This assistant belongs to {owner}. It reached you through the group \"{name}\".",
+        "sourceEveryone": "This assistant belongs to {owner}. It was shared with everyone who has an account.",
+        "sourceDirect": "This assistant belongs to {owner}. It was shared with you personally."
+      },
+      "saved_task": {
+        "sourceGroup": "This saved task belongs to {owner}. It reached you through the group \"{name}\".",
+        "sourceEveryone": "This saved task belongs to {owner}. It was shared with everyone who has an account.",
+        "sourceDirect": "This saved task belongs to {owner}. It was shared with you personally."
+      },
+      "widget": {
+        "sourceGroup": "This chat widget belongs to {owner}. It reached you through the group \"{name}\".",
+        "sourceEveryone": "This chat widget belongs to {owner}. It was shared with everyone who has an account.",
+        "sourceDirect": "This chat widget belongs to {owner}. It was shared with you personally."
+      }
+    },
+    "dialog": {
+      "title": "Share \"{name}\"",
+      "who": "Who",
+      "searchPlaceholder": "Search a user or group…",
+      "searchPlaceholderSharedGroup": "Search users in a group you share, or a group…",
+      "permission": "Permission",
+      "sharedWith": "Shared with",
+      "empty": "Only you can see this.",
+      "cancel": "Cancel",
+      "remove": "Remove",
+      "removeTitle": "Stop sharing",
+      "removeConfirm": "Remove {name}?",
+      "removeConfirmConversation": "Remove {name}? They lose this chat and can no longer make their own copy.",
+      "loadFailed": "Couldn't load who this is shared with.",
+      "saveFailed": "Couldn't share this. Please try again.",
+      "shared": "Shared with {name}.",
+      "sharedFind": "Shared with {name}. {find}",
+      "removed": "Stopped sharing with {name}.",
+      "removeFailed": "Couldn't stop sharing. Please try again.",
+      "permissionFailed": "Couldn't change the permission. Please try again.",
+      "noMatches": "No user or group matches.",
+      "noMatchesSharedGroup": "No one in a group you share, and no group, matches that name.",
+      "searchFailed": "Couldn't search users or groups.",
+      "tryAgain": "Try again",
+      "everyoneInactive": "This share is saved, but nobody else can use it while sharing with everyone is turned off. You can remove it here.",
+      "ownerLine": "Owner · {name}",
+      "publicLink": "Public link",
+      "publicLinkHint": "Anyone with the link can view.",
+      "managePublicLink": "Manage public link",
+      "openPublicLink": "Manage public link",
+      "subjectType": {
+        "user": "user",
+        "group": "group"
+      },
+      "consequence": {
+        "conversation": {
+          "read": "Can view — they can open this chat read-only.",
+          "use": "Can use — they can continue this chat as their own copy."
+        },
+        "knowledge_folder": {
+          "read": "Can view — they can see the folder.",
+          "use": "Can use — the AI may use these files.",
+          "edit": "Can edit — they can change files in this folder.",
+          "manage": "Can manage — they can share this folder with others."
+        },
+        "assistant": {
+          "read": "Can view — they can see the card and clone it.",
+          "use": "Can use — they can start a chat with this assistant.",
+          "edit": "Can edit — they can change this assistant."
+        },
+        "saved_task": {
+          "read": "Can view — they can see the card.",
+          "use": "Can use — they can make their own copy."
+        },
+        "widget": {
+          "read": "Can view — they can open the widget settings.",
+          "edit": "Can edit — they can change the widget settings.",
+          "manage": "Can manage — they can share this widget with others."
+        }
+      },
+      "find": {
+        "conversation": "They will find it under Incoming chats.",
+        "knowledge_folder": "It appears in their Sources as shared.",
+        "assistant": "They will find it under Assistants → Shared with me.",
+        "saved_task": "They can use it as a template under Automations.",
+        "widget": "They will find it under Chat Widgets."
+      }
+    }
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (document text extraction)"
+    },
+    "docling": {
+      "label": "Docling (document conversion)"
+    },
+    "office_convert": {
+      "label": "Office conversion"
+    },
+    "searxng": {
+      "label": "SearXNG web search"
+    },
+    "piper_tts": {
+      "label": "Piper text-to-speech"
+    },
+    "local_ai": {
+      "label": "Local AI (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Higgsfield video generation"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "TheHive image generation"
+    },
+    "stripe_billing": {
+      "label": "Stripe billing"
+    },
+    "mobile_iap": {
+      "label": "Mobile in-app purchases"
+    },
+    "whatsapp": {
+      "label": "WhatsApp channel"
+    },
+    "telegram": {
+      "label": "Telegram channel"
+    },
+    "federation": {
+      "label": "Partners"
+    },
+    "opendesk_stt": {
+      "label": "Meeting notes"
+    },
+    "live_voice": {
+      "label": "Live conversations"
+    },
+    "compute": {
+      "label": "Secure compute (file work)",
+      "running": "File work is running.",
+      "runningOff": "The sidecar is running; file work is turned off under System configuration › Tools & automation.",
+      "unreachable": "The file-work sidecar is not reachable.",
+      "unset": "COMPUTE_URL or COMPUTE_TOKEN is not set.",
+      "reachable": "Sidecar reachable.",
+      "notRunning": "Sidecar not running: File work is unavailable."
+    },
+    "state": {
+      "available": "Available",
+      "needs_setup": "Needs setup",
+      "absent": "Not installed"
+    },
+    "notice": {
+      "title": "{module} is not available on this installation",
+      "body": "This feature is optional. It is switched on by the administrator of this installation.",
+      "howToEnable": "How to enable it",
+      "openFeatureStatus": "Open system status"
+    },
+    "chat_artifacts": {
+      "label": "HTML and SVG preview"
+    }
+  },
+  "partners": {
+    "title": "Partners",
+    "subtitle": "Connect with other companies. Nothing is shared until you choose it.",
+    "unreachable": "Your server runs on a private address, so other companies can't reach it. Partners need a public https address.",
+    "empty": "Work with other businesses. Send an invite, or paste one you received. Your files stay on your server.",
+    "companyName": "Company name",
+    "open": "Open to partners",
+    "openedLine": "Open to partners as {name}.",
+    "fingerprint": "Key {fingerprint}",
+    "close": "Close to partners",
+    "closeTitle": "Close to partners?",
+    "closeMessage": "New connections stop. Every current partner is disconnected. Nothing they already copied is deleted.",
+    "invite": "Invite a partner",
+    "inviteHelp": "Send this address to the other company's admin. It works once and expires in 7 days.",
+    "copy": "Copy address",
+    "copied": "Address copied.",
+    "pasteLabel": "Have an invite?",
+    "pastePlaceholder": "Paste the invite address",
+    "connect": "Connect",
+    "connected": "Connected. Nothing is shared yet, on either side.",
+    "pending": "Invite waiting",
+    "active": "Connected",
+    "paused": "Paused",
+    "pausedByThem": "They paused this connection.",
+    "pause": "Pause",
+    "resume": "Resume",
+    "disconnect": "Disconnect",
+    "disconnectTitle": "Disconnect {name}?",
+    "disconnectMessage": "This connection stops now. Nothing already copied is deleted.",
+    "removeInvite": "Remove invite",
+    "removeInviteTitle": "Remove this invite?",
+    "removeInviteMessage": "The link stops working. Nothing was shared.",
+    "pausedHere": "Paused. They cannot use this connection until you resume.",
+    "pausedPending": "Paused here. The other server has not confirmed yet.",
+    "resumed": "Resumed.",
+    "resumedPending": "Resumed here. The other server has not confirmed yet.",
+    "disconnected": "Disconnected. This connection stops now.",
+    "disconnectedPending": "Disconnected here. The other server has not confirmed yet.",
+    "inviteRemoved": "Invite removed. The link no longer works.",
+    "closed": "Closed. New connections stop.",
+    "inviteReady": "Invite ready. Send the address to the other admin.",
+    "loadFailed": "Partners could not be loaded. Try again.",
+    "joinTitle": "You are invited",
+    "joinBody": "{name} ({domain}) invited your company. On your Synaplan, open Operate, then Partners, and paste this address.",
+    "joinInvalid": "This invite is not valid or has expired.",
+    "errors": {
+      "not_reachable": "Your server runs on a private address, so other companies can't reach it. Partners need a public https address.",
+      "not_open": "Open to partners before connecting.",
+      "invite_invalid": "This invite is not valid.",
+      "invite_expired": "This invite has expired. Ask for a new one.",
+      "already_partner": "You are already connected with this server.",
+      "self": "That invite was created on this server.",
+      "peer_unreachable": "The other server did not answer. Nothing was connected.",
+      "peer_rejected": "The other server refused the request.",
+      "bad_signature": "The request signature is not valid.",
+      "sodium_missing": "This server cannot sign partner requests. The signing library is missing.",
+      "invalid_name": "Enter a company name of up to 80 characters.",
+      "invite_limit": "You already have 20 unused invites. Use one, or wait until one expires.",
+      "not_paused_by_us": "They paused this connection. You can disconnect, or wait for them to resume.",
+      "not_partner": "That connection was not found.",
+      "bad_url": "That address is not a public https server.",
+      "replay": "This request was already used."
+    }
+  }
+}

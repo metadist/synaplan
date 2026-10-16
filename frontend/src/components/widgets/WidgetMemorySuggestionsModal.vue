@@ -48,7 +48,7 @@
                   </p>
                 </div>
                 <button
-                  class="p-1.5 rounded-lg txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors flex-shrink-0"
+                  class="p-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-gray-100 dark:hover:bg-white/5 transition-colors flex-shrink-0"
                   @click="close"
                 >
                   <Icon icon="heroicons:x-mark" class="w-4.5 h-4.5" />
@@ -148,7 +148,7 @@
 
                   <button
                     v-if="!isRejected(item.id)"
-                    class="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500 flex-shrink-0"
+                    class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:text-red-500 flex-shrink-0"
                     :title="$t('widgets.detail.memorySuggestions.reject')"
                     @click.stop="reject(item.id)"
                   >
@@ -156,7 +156,7 @@
                   </button>
                   <button
                     v-else
-                    class="p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary flex-shrink-0"
+                    class="p-1 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity txt-secondary hover:txt-primary flex-shrink-0"
                     :title="$t('widgets.detail.memorySuggestions.undo')"
                     @click.stop="undoReject(item.id)"
                   >

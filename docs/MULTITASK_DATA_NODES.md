@@ -6,7 +6,7 @@ nodes (`backend/src/Service/Multitask/`). Besides the generator/answer nodes
 that pull external information into the turn and hand it downstream as
 citable text via `$nX.text`.
 
-Planning docs: `_devextras/planning/release4.0/08_mcp-data-nodes-and-skill-registry.md`
+Planning docs: `_devextras/planning/2026-archive/20260623-release4.0/08_mcp-data-nodes-and-skill-registry.md`
 and `09_external-data-nodes.md` (locked decisions).
 
 ## The uniform data-node contract
@@ -27,6 +27,46 @@ Every data node obeys the same rules (plan 09 §2):
 7. **Flag-gated** — one `BCONFIG` flag per node; a disabled block is omitted
    from the planner catalog entirely (the planner never learns it exists) and
    the runner re-checks the flag at run time.
+8. **Guaranteed handover** — the answering node always sees what its data
+   nodes returned, however the planner wired the reference (see below).
+
+## How data reaches the answer (and what guards it)
+
+The planner is asked to wire `"… based on:\n$n1.text"` into the answering
+node's `inputs.text` and to list `n1` in `depends_on`. Planner models get this
+wrong in predictable ways, and every one of them used to end as "the tool
+call succeeded, the answer says no data was provided" (reported against a
+connected B2 storage server). Three layers now make the handover structural:
+
+| Layer | Where | What it catches |
+| ----- | ----- | --------------- |
+| Sorter hint | `ConnectedSystemsHint` → appended to the `tools:sort` prompt | The BMULTI vote decides whether the planner runs at all. Without knowing the user's connections, "is my Backblaze bucket reachable?" was voted single-step and MCP never ran. The hint names the enabled MCP servers (and cached tool names); no connection ⇒ prompt unchanged. |
+| Plan repair | `TaskPlanNormalizer` (before validation) | A node that reads `$nX.text` but omits `nX` from `depends_on` could be scheduled before its data node. Missing edges are inferred from the references (logged as `TaskPlanner: inferred missing depends_on edges`). |
+| Reference tolerance | `NodeContext` | `$n1.output`, `$n1.result`, `$n1.content`, `${n1.text}` … resolve to the node text instead of leaking as literal placeholders. |
+| Runner safety net | `UpstreamHandover` in `ChatRunner` | Whatever is still missing — `inputs.text = "$message.text"`, data parked under `inputs.context` — is appended to the user message as a labelled "Data returned by the previous steps" block. A correctly spliced plan already contains the text verbatim, so nothing is added; when it fires, `ChatRunner: plan did not hand over upstream step output` is logged with the node ids. |
+
+Debugging a turn: `BMESSAGEMETA.task_plan_definition` holds the executed plan
+(exact `inputs`/`depends_on`), the usage ledger shows whether a `PLANNING`
+call happened at all, and `McpFetchRunner: tool call succeeded` reports the
+returned character count per tool call.
+
+A tool attempt that does not succeed is a **reportable failure**. The card
+stays `failed`, and answer steps (`chat`, `summarize`, `translate`,
+`rag_query`, `compose_reply`) still run. Two shapes:
+
+- `isError: true` — the tool answered. The error says the server reported it
+  (`McpFetchRunner: tool reported an error`).
+- `McpClientException` — the request failed or the response could not be read,
+  including after a write POST. The error says the server could not be reached,
+  or, for a write, that it did not confirm the action (`McpActionRunner: write
+  action was not confirmed`). It does not claim the tool reported an error.
+
+`UpstreamHandover` appends that text as a `FAILED` block for the model.
+`compose_reply` copies only the labelled block, not the model instructions.
+Refusals made before the call (flag off, unknown tool, topic not allowed,
+mutating tool) stay hard failures: dependents skip. A plan that contains
+`mcp_fetch` or `mcp_action` does not fall back to legacy chat, which cannot
+see the connection and would claim none exists.
 
 ## The nodes
 
@@ -83,7 +123,7 @@ The outbound MCP client rolls out via seed rows, not a code default:
 activates the client, while an operator's explicit `0` override survives
 every deploy (the kill switch). The built-in code default stays OFF as the
 safety net when no row exists and the seeder has not run. Calls still
-require a connected server (Channels → MCP Servers) and the per-topic
+require a connected server (Manage → Connections → MCP Servers) and the per-topic
 "MCP Data Sources" opt-in.
 
 `email_search` rolls out the same way (Phase M step M3d):
@@ -143,7 +183,7 @@ node. The runner re-checks every gate at run time (defense in depth).
 
 ## Connections UI
 
-- **Channels → MCP Servers** (`/channels/mcp`): connect external MCP servers
+- **Manage → Connections → MCP Servers** (`/channels/mcp`): connect external MCP servers
   (Streamable HTTP URL + optional auth header, encrypted at rest), test the
   connection, browse discovered tools. The page also shows a **task usage
   panel**: one flip switch per routing topic that toggles the topic's

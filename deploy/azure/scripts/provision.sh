@@ -164,6 +164,17 @@ rsync -a --delete \
     "$STAGE_DIR/deploy/" "$APP_DIR/deploy/"
 chmod 0755 "$APP_DIR/deploy/scripts"/*.sh "$APP_DIR/deploy/host"/*.sh "$APP_DIR/deploy/azure/scripts"/*.sh
 
+# compose.yaml bind-mounts ../_docker/centrifugo/config.json from deploy/, so
+# the file has to live at $APP_DIR/_docker on the VM. Packer stages it next to
+# deploy/; a missing copy is a first boot that waits 30 minutes for a
+# healthcheck that can never pass.
+install -d -m 0755 "$APP_DIR/_docker"
+rsync -a "$STAGE_DIR/_docker/" "$APP_DIR/_docker/"
+[[ -f "$APP_DIR/_docker/centrifugo/config.json" ]] || {
+    printf 'The Centrifugo config did not land in the image; refusing to bake an image whose stack cannot start\n' >&2
+    exit 1
+}
+
 # Persistent state lives on a separate managed disk so an instance can be
 # replaced without losing anything. The application tree keeps the paths lib.sh
 # expects and reaches the disk through symlinks.
@@ -173,11 +184,19 @@ ln -sfn "$DATA_MOUNT/.lifecycle" "$APP_DIR/deploy/.lifecycle"
 ln -sfn "$DATA_MOUNT/.env" "$APP_DIR/deploy/.env"
 
 log "Publishing the operator commands"
-ln -sfn "$APP_DIR/deploy/host/update.sh" /usr/local/bin/synaplan-update
-ln -sfn "$APP_DIR/deploy/host/configure-tls.sh" /usr/local/bin/synaplan-tls
-ln -sfn "$APP_DIR/deploy/azure/scripts/snapshot.sh" /usr/local/bin/synaplan-snapshot
-ln -sfn "$APP_DIR/deploy/azure/scripts/admin-password.sh" /usr/local/bin/synaplan-admin-password
-ln -sfn "$APP_DIR/deploy/scripts/smoke-test.sh" /usr/local/bin/synaplan-smoke-test
+# Wrappers, not symlinks. Every one of these scripts locates lib.sh relative
+# to its own path, and through a symlink that path is /usr/local/bin — each
+# command then dies with "lib.sh: No such file or directory". An exec wrapper
+# hands the script its real path as $0, so the lookup works unchanged.
+publish_command() {
+    printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$2" > "/usr/local/bin/$1"
+    chmod 0755 "/usr/local/bin/$1"
+}
+publish_command synaplan-update "$APP_DIR/deploy/host/update.sh"
+publish_command synaplan-tls "$APP_DIR/deploy/host/configure-tls.sh"
+publish_command synaplan-snapshot "$APP_DIR/deploy/azure/scripts/snapshot.sh"
+publish_command synaplan-admin-password "$APP_DIR/deploy/azure/scripts/admin-password.sh"
+publish_command synaplan-smoke-test "$APP_DIR/deploy/scripts/smoke-test.sh"
 
 log "Installing the Azure Backup application-consistency hooks"
 # Azure Backup reads this file before it snapshots the disks and runs the two
@@ -204,6 +223,35 @@ chmod 0644 "$APP_DIR/image-release"
 log "Installing the systemd units"
 install -m 0644 "$APP_DIR/deploy/azure/systemd/synaplan-firstboot.service" /etc/systemd/system/
 install -m 0644 "$APP_DIR/deploy/azure/systemd/synaplan.service" /etc/systemd/system/
+
+# The packaged Caddyfile listens on :80 only. Firstboot replaces it, but a
+# failed firstboot would otherwise leave Caddy serving that default. Bake the
+# self-signed site now so 443 is the listener even if firstboot is still
+# running, and do not start Caddy until firstboot has written the real file.
+install -d -m 0755 /etc/caddy
+install -d -o caddy -g caddy -m 0750 /var/log/caddy
+install -m 0644 "$APP_DIR/deploy/host/caddy/Caddyfile.selfsigned" /etc/caddy/Caddyfile
+# The Caddyfile serves a certificate pair that only exists once the first boot
+# has minted it for the instance (configure-tls.sh) — baking a real pair into
+# the image would hand the SAME private key to every customer. Validation still
+# needs files to load, so: a throwaway pair, validate, delete.
+install -d -m 0755 /etc/caddy/selfsigned
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+    -keyout /etc/caddy/selfsigned/key.pem -out /etc/caddy/selfsigned/cert.pem \
+    -days 1 -subj '/CN=throwaway' 2>/dev/null
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+chown -R caddy:caddy /var/log/caddy
+rm -f /etc/caddy/selfsigned/key.pem /etc/caddy/selfsigned/cert.pem
+install -d -m 0755 /etc/systemd/system/caddy.service.d
+cat > /etc/systemd/system/caddy.service.d/20-synaplan-order.conf <<'EOF'
+[Unit]
+After=synaplan-firstboot.service
+Requires=synaplan-firstboot.service
+
+[Service]
+LogsDirectory=caddy
+EOF
+
 systemctl daemon-reload
 systemctl enable docker.service synaplan-firstboot.service synaplan.service caddy.service
 

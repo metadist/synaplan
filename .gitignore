@@ -8,6 +8,9 @@
 
 .fixtures_loaded
 
+# Local compute sidecar state (host-path binds, see docker-compose.yml)
+.compute-data/
+
 # IDE
 .vscode/
 .idea/
@@ -96,3 +99,7 @@ _devextras/local-ignore/
 # and those must stay visible to git. Only a run without --output lands here.
 /mobile-release-manifest.json
 /mobile-impact-manifest.json
+
+# Local git worktrees; committing one adds a submodule entry without a URL,
+# which breaks every checkout that initializes submodules.
+/.worktrees/

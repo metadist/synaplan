@@ -1,4 +1,33 @@
 {
+    "pdf_edit_attached_file": {
+        "plan": {
+            "language": "en",
+            "reply_node": "n2",
+            "tasks": [
+                {
+                    "capability": "code_run",
+                    "depends_on": [],
+                    "id": "n1",
+                    "params": {
+                        "image": "python",
+                        "script": "print('cannot change text inside a PDF in place')"
+                    }
+                },
+                {
+                    "capability": "compose_reply",
+                    "depends_on": [
+                        "n1"
+                    ],
+                    "id": "n2",
+                    "inputs": {
+                        "text": "$n1.text"
+                    }
+                }
+            ],
+            "version": 1
+        },
+        "utterance": "Change 'Dummy PDF file' to 'PDF File' in the attached PDF"
+    },
     "u1_outlook_calendar_write": {
         "plan": {
             "language": "en",

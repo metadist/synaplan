@@ -114,6 +114,9 @@ framework:
             'App\Message\CrawlWidgetUrlMessage': async_index
             'App\Message\ReVectorizeMessage': async_index
             'App\Message\SyncPlatformDocsMessage': async_index
+            'App\Message\SearchIndexMessage': async_index
+            'App\Message\SearchReindexUserMessage': async_index
+            'App\Message\SearchReindexCatalogMessage': async_index
             # Async media jobs (Release 4.0): each message advances one render by
             # a single non-blocking step then re-dispatches itself (DelayStamp)
             # for the next poll. Short hops, never a worker pinned for minutes.
@@ -124,6 +127,17 @@ framework:
             # Public webhook → Saved Task run. Accepted on the request path,
             # executed here so proxy timeouts never trigger duplicate runs.
             'App\Message\RunSavedTaskCommand': async_ai_high
+            # Finished chat turn → realtime fan-out. Off the HTTP stream so a
+            # slow gateway cannot hold the reply, and one worker broadcast
+            # reaches the owner plus current share subjects.
+            'App\Message\PublishChatActivity': async_index
+            # Telegram webhook → chat turn. Off the HTTP request so a slow
+            # reply does not make Telegram retry the same update.
+            'App\Message\ProcessTelegramUpdateCommand': async_ai_high
+            # Album parts wait here until the whole album arrived.
+            'App\Message\ProcessTelegramAlbumCommand': async_ai_high
+            # Finished render → Telegram upload, off the media worker.
+            'App\Message\DeliverTelegramMediaCommand': async_ai_high
 
 when@test:
     framework:
@@ -145,3 +159,13 @@ when@test:
                 # Only this key is overridden — the rest of the routing map
                 # from the base config is merged in unchanged.
                 'App\Message\ExtractMemoriesCommand': sync
+                # The test stack has no messenger worker. A turn in one chat
+                # digests the user's other chats before that response finishes.
+                # TestProvider only creates an entry when a batch line contains
+                # `remember:`, so other specs do not gain long-term memory entries.
+                'App\Message\DigestOtherChatsCommand': sync
+                # The test stack has no messenger worker. Run the turn in the
+                # webhook request so Playwright can see the reply.
+                'App\Message\ProcessTelegramUpdateCommand': sync
+                'App\Message\ProcessTelegramAlbumCommand': sync
+                'App\Message\DeliverTelegramMediaCommand': sync

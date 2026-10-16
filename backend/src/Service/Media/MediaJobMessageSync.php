@@ -6,9 +6,11 @@ namespace App\Service\Media;
 
 use App\Repository\MessageRepository;
 use App\Service\File\ThumbnailService;
+use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Multitask\TaskPlanStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Keeps the persisted OUT message in sync with a terminal {@see MediaJob}.
@@ -44,6 +46,7 @@ final readonly class MediaJobMessageSync
         private ThumbnailService $thumbnailService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private EventDispatcherInterface $events,
     ) {
     }
 
@@ -119,7 +122,11 @@ final readonly class MediaJobMessageSync
                     $message->setText($errorText);
                 }
             } elseif (MediaJob::STATUS_COMPLETED === $job->getStatus()) {
-                $message->setText('');
+                $message->setText(GeneratedMediaTextRenderer::storageMarker($job->getType()));
+                $prompt = trim((string) $job->getPrompt());
+                if ('' !== $prompt) {
+                    $message->setMeta('media_prompt', $prompt);
+                }
                 $this->attachGeneratedFile($job, $message);
             }
         }
@@ -158,6 +165,8 @@ final readonly class MediaJobMessageSync
         // (best-effort; the persisted state above + the client poll are the
         // fallback if realtime is disabled/unreachable).
         $this->realtimeNotifier->publishUpdate($job);
+
+        $this->events->dispatch(new MediaJobTerminalEvent($job, $messageId));
     }
 
     /**

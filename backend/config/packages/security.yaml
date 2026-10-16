@@ -60,12 +60,17 @@ security:
             user_checker: App\Security\AccountStatusChecker
 
     access_control:
+        # Voice sidecar callbacks. The controller checks an HMAC; the sidecar
+        # has no user cookie. Do not put these under the public API document.
+        - { path: ^/internal/voice, roles: PUBLIC_ACCESS }
+
         # OpenAI-compatible endpoints (require API key auth)
         - { path: ^/v1, roles: IS_AUTHENTICATED_FULLY }
 
         # MCP: public discovery (RFC 9728 metadata) + CORS preflight; the
         # endpoint itself requires authentication.
         - { path: ^/\.well-known/oauth-protected-resource, roles: PUBLIC_ACCESS }
+        - { path: ^/\.well-known/synaplan-federation, roles: PUBLIC_ACCESS }
         - { path: ^/mcp, methods: [OPTIONS], roles: PUBLIC_ACCESS }
         - { path: ^/mcp, roles: IS_AUTHENTICATED_FULLY }
 
@@ -146,6 +151,12 @@ security:
         - { path: ^/api/v1/platform-links/instances/[^/]+/public$, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/exchange$, methods: [POST], roles: PUBLIC_ACCESS }
 
+        # Partner handshake. The invite preview and the signed connect call
+        # prove themselves (unguessable token, Ed25519 signature). Admin routes
+        # stay behind the catch-all below.
+        - { path: ^/api/v1/federation/invites/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/federation/connect$, methods: [POST], roles: PUBLIC_ACCESS }
+
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
 
@@ -201,6 +212,7 @@ security:
         # Webhook endpoints (email webhook is public, WhatsApp requires verification)
         - { path: ^/api/v1/webhooks/email, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/webhooks/whatsapp, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/webhooks/telegram/, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/webhooks/saved-tasks/, roles: PUBLIC_ACCESS }
 
         # Stripe webhook (public - secured by signature verification)

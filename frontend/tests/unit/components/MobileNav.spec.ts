@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import MobileNav from '@/components/MobileNav.vue'
+import { useChatsStore } from '@/stores/chats'
 
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: vi.fn().mockResolvedValue({ chats: [], total: 0 }),
@@ -128,5 +129,27 @@ describe('MobileNav', () => {
 
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
     expect(wrapper.find('[data-testid="section-mobile-history"]').exists()).toBe(true)
+  })
+
+  it('releases the New Chat lock when create settles and ignores a second click while it runs', async () => {
+    const wrapper = await mountNav()
+    const chats = useChatsStore()
+    let release!: (chat: null) => void
+    const pending = new Promise<null>((resolve) => {
+      release = resolve
+    })
+    const create = vi.spyOn(chats, 'findOrCreateEmptyChat').mockReturnValue(pending)
+
+    const button = wrapper.get('[data-testid="btn-mobile-nav-new"]')
+    await button.trigger('click')
+    expect(button.attributes('disabled')).toBe('')
+    expect(create).toHaveBeenCalledTimes(1)
+
+    await button.trigger('click')
+    expect(create).toHaveBeenCalledTimes(1)
+
+    release(null)
+    await flushPromises()
+    expect(button.attributes('disabled')).toBeUndefined()
   })
 })

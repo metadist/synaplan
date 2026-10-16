@@ -18,4 +18,9 @@ final class NullPublisher implements RealtimePublisherInterface
     {
         // intentionally empty
     }
+
+    public function publishMany(array $channels, string $eventType, array $payload): void
+    {
+        // intentionally empty
+    }
 }

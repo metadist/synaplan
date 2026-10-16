@@ -7,18 +7,24 @@ namespace App\Tests\Unit\Service\Multitask;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
+use App\Entity\User;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlanValidator;
 use App\Service\Multitask\TaskPlanner;
+use App\Service\Prompt\PromptService;
 use App\Service\Prompt\TimeContextBuilder;
-use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
+use App\Service\Usage\RecordedUsage;
 use App\Tests\Support\SkillCatalogFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -231,6 +237,108 @@ final class TaskPlannerTest extends TestCase
         self::assertGreaterThanOrEqual(3000, $options['max_tokens'] ?? 0);
     }
 
+    public function testCutOffPlannerJsonIsRetriedWithoutThinking(): void
+    {
+        $calls = [];
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$calls): array {
+                $calls[] = $opts;
+                if (1 === count($calls)) {
+                    return [
+                        'content' => '<think>planning'."\n".'{"version":1,"tasks":[{"id":"n1","capability":"mcp_fetch"',
+                        'finish_reason' => 'length',
+                    ];
+                }
+
+                return ['content' => json_encode([
+                    'version' => 1,
+                    'language' => 'en',
+                    'reply_node' => 'n1',
+                    'tasks' => [['id' => 'n1', 'capability' => 'chat']],
+                ])];
+            }
+        );
+
+        $result = $this->planner->plan($this->message('Look up the runbook'), [], 1);
+
+        self::assertFalse($result->fallback);
+        self::assertCount(2, $calls);
+        self::assertTrue($calls[1]['disable_thinking'] ?? false);
+        self::assertGreaterThan($calls[0]['max_tokens'] ?? 0, $calls[1]['max_tokens'] ?? 0);
+        self::assertSame(Capability::Chat, $result->plan->nodes[0]->capability);
+    }
+
+    public function testCutOffRetryAddsBothPlanningUsages(): void
+    {
+        $user = $this->createMock(User::class);
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturn($user);
+
+        $attempt = 0;
+        $rateLimit = $this->createMock(RateLimitService::class);
+        $rateLimit->method('recordUsage')->willReturnCallback(function () use (&$attempt): RecordedUsage {
+            ++$attempt;
+
+            return 1 === $attempt
+                ? new RecordedUsage('0.010000', '0.010000', 10, 20, 30)
+                : new RecordedUsage('0.020000', '0.020000', 40, 50, 90);
+        });
+
+        $planner = new TaskPlanner(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->modelConfigService,
+            new TaskPlanValidator(),
+            $this->createMock(LoggerInterface::class),
+            $users,
+            new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
+            $rateLimit,
+            $this->alwaysOnStructuredOutputConfig(),
+        );
+
+        $calls = 0;
+        $this->aiFacade->method('chat')->willReturnCallback(function () use (&$calls): array {
+            ++$calls;
+            if (1 === $calls) {
+                return [
+                    'content' => '{"version":1,"tasks":[{"id":"n1"',
+                    'finish_reason' => 'length',
+                    'provider' => 'openaicompatible',
+                    'model' => 'qwen3.8:27b',
+                ];
+            }
+
+            return [
+                'content' => json_encode([
+                    'version' => 1,
+                    'language' => 'en',
+                    'reply_node' => 'n1',
+                    'tasks' => [['id' => 'n1', 'capability' => 'chat']],
+                ]),
+                'provider' => 'openaicompatible',
+                'model' => 'qwen3.8:27b',
+            ];
+        });
+
+        $result = $planner->plan($this->message('Look up the runbook'), [], 1);
+
+        self::assertFalse($result->fallback);
+        $usage = $result->planningUsage;
+        self::assertNotNull($usage);
+        self::assertSame(50, $usage['promptTokens']);
+        self::assertSame(70, $usage['completionTokens']);
+        self::assertSame(120, $usage['totalTokens']);
+        self::assertSame('0.030000', $usage['cost']);
+        self::assertSame('PLANNING', $usage['kind']);
+    }
+
     public function testPlanForwardsTheTaskPlanSchemaToTheAiFacade(): void
     {
         $options = null;
@@ -247,6 +355,90 @@ final class TaskPlannerTest extends TestCase
         self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
         self::assertSame('task_plan', $options['structured_output']->name);
         self::assertFalse($options['structured_output']->strict);
+    }
+
+    public function testPlannerSystemPromptListsConversationFiles(): void
+    {
+        $catalog = $this->createMock(ConversationFileCatalog::class);
+        $catalog->method('build')->willReturn([
+            new ConversationFile(
+                'file:77',
+                'brief.pdf',
+                ConversationFile::CATEGORY_DOCUMENT,
+                ConversationFile::ORIGIN_UPLOADED,
+                '/tmp/brief.pdf',
+                'brief.pdf',
+                77,
+            ),
+        ]);
+        $catalog->method('renderInventoryBlock')->willReturn(
+            "\n\n## Files available in this conversation\n\n- `file:77` \"brief.pdf\" (document, shared earlier in this conversation)\n",
+        );
+
+        $sentMessages = null;
+        $this->aiFacade->method('chat')->willReturnCallback(static function (array $messages) use (&$sentMessages): array {
+            $sentMessages = $messages;
+
+            return ['content' => '{"version":1,"language":"en","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}'];
+        });
+
+        $planner = new TaskPlanner(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->modelConfigService,
+            new TaskPlanValidator(),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(UserRepository::class),
+            new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
+            $this->createMock(RateLimitService::class),
+            $this->alwaysOnStructuredOutputConfig(),
+            conversationFiles: $catalog,
+        );
+
+        $planner->plan($this->message('was steht im brief?'), [], 1);
+
+        $system = is_array($sentMessages) ? (string) ($sentMessages[0]['content'] ?? '') : '';
+        self::assertStringContainsString('## Files available in this conversation', $system);
+        self::assertStringContainsString('file:77', $system);
+        self::assertStringContainsString('plan a file_analysis or rag_query', $system);
+    }
+
+    public function testPlannerReceivesAssistantInstructionsAndHidesWebSearchWhenInternetIsOff(): void
+    {
+        $sentMessages = null;
+        $this->aiFacade->method('chat')->willReturnCallback(static function (array $messages) use (&$sentMessages): array {
+            $sentMessages = $messages;
+
+            return ['content' => '{"version":1,"language":"en","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}'];
+        });
+
+        $profile = new RuntimeProfile(
+            promptId: 20,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Daily report template: one line, weekday and count.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: ['tool_internet' => false],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 7,
+        );
+
+        $this->planner->plan($this->message('save my daily report as report.txt'), [], 1, [
+            'runtime_profile' => $profile,
+        ]);
+
+        $system = is_array($sentMessages) ? (string) ($sentMessages[0]['content'] ?? '') : '';
+        self::assertStringContainsString('Daily report template: one line, weekday and count.', $system);
+        self::assertStringNotContainsString('- "web_search":', $system);
     }
 
     public function testPlanOmitsTheTaskPlanSchemaWhenTheKillSwitchIsOff(): void
@@ -285,5 +477,178 @@ final class TaskPlannerTest extends TestCase
         $planner->plan($this->message(), [], 1);
 
         self::assertArrayNotHasKey('structured_output', $options ?? []);
+    }
+
+    /**
+     * Issue #2287: a voice note is not offered to the planner as an audio
+     * attachment, so the plan has no file_analysis or extract_text node for it.
+     */
+    public function testSpokenVoiceNoteIsPlannedLikeTypedText(): void
+    {
+        $text = 'Wie wird das Wetter heute in Münster?';
+        $file = $this->createMock(File::class);
+        $file->method('getFileType')->willReturn('ogg');
+        $file->method('getFileName')->willReturn('voice.ogg');
+        $file->method('getFileText')->willReturn($text);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getFiles')->willReturn(new ArrayCollection([$file]));
+        $message->method('getMeta')->willReturnCallback(
+            static fn (string $key, ?string $default = null): ?string => 'text_source' === $key ? 'transcript' : $default
+        );
+
+        $this->aiFacade->method('chat')->willReturnCallback(static function (array $messages): array {
+            $current = json_decode((string) end($messages)['content'], true);
+            $offered = is_array($current) && isset($current['BATTACHED_FILES']);
+
+            return ['content' => json_encode([
+                'version' => 1,
+                'language' => 'de',
+                'reply_node' => 'n1',
+                'tasks' => [[
+                    'id' => 'n1',
+                    'capability' => $offered ? 'extract_text' : 'web_search',
+                ]],
+            ])];
+        });
+
+        $result = $this->planner->plan($message, [], 1);
+
+        self::assertFalse($result->fallback);
+        self::assertCount(1, $result->plan->nodes);
+        self::assertSame(Capability::WebSearch, $result->plan->nodes[0]->capability);
+        $capabilities = array_map(static fn ($node) => $node->capability, $result->plan->nodes);
+        self::assertNotContains(Capability::FileAnalysis, $capabilities);
+        self::assertNotContains(Capability::ExtractText, $capabilities);
+    }
+
+    public function testSpokenWebmNoteIsNotReattachedFromTheLegacyFileSlot(): void
+    {
+        $text = 'Wie wird das Wetter heute in Münster?';
+        $file = $this->createMock(File::class);
+        $file->method('getFileType')->willReturn('webm');
+        $file->method('getFileName')->willReturn('recording.webm');
+        $file->method('getFileText')->willReturn($text);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(55);
+        $message->method('getFileType')->willReturn('webm');
+        $message->method('getFilePath')->willReturn('uploads/7/recording.webm');
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getFiles')->willReturn(new ArrayCollection([$file]));
+        $message->method('getMeta')->willReturnCallback(
+            static fn (string $key, ?string $default = null): ?string => 'text_source' === $key ? 'transcript' : $default
+        );
+
+        $this->aiFacade->method('chat')->willReturnCallback(static function (array $messages): array {
+            $current = json_decode((string) end($messages)['content'], true);
+            $offered = is_array($current) && isset($current['BATTACHED_FILES']);
+
+            return ['content' => json_encode([
+                'version' => 1,
+                'language' => 'de',
+                'reply_node' => 'n1',
+                'tasks' => [[
+                    'id' => 'n1',
+                    'capability' => $offered ? 'extract_text' : 'web_search',
+                ]],
+            ])];
+        });
+
+        $result = $this->planner->plan($message, [], 1);
+
+        self::assertSame(Capability::WebSearch, $result->plan->nodes[0]->capability);
+    }
+
+    public function testSpokenWebmNoteIsLeftOutOfTheConversationFileInventory(): void
+    {
+        $text = 'Wie wird das Wetter heute in Münster?';
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(9);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+        $message->method('getMeta')->willReturnCallback(
+            static fn (string $key, ?string $default = null): ?string => 'text_source' === $key ? 'transcript' : $default
+        );
+
+        /** @var list<ConversationFile>|null $rendered */
+        $rendered = null;
+        $catalog = $this->createMock(ConversationFileCatalog::class);
+        $catalog->method('build')->willReturn([
+            new ConversationFile(
+                'file:3',
+                'recording.webm',
+                ConversationFile::CATEGORY_VIDEO,
+                ConversationFile::ORIGIN_ATTACHED,
+                '/tmp/recording.webm',
+                '7/recording.webm',
+                3,
+                9,
+                'IN',
+                $text,
+            ),
+            new ConversationFile(
+                'file:4',
+                'brief.pdf',
+                ConversationFile::CATEGORY_DOCUMENT,
+                ConversationFile::ORIGIN_UPLOADED,
+                '/tmp/brief.pdf',
+                '7/brief.pdf',
+                4,
+                8,
+                'IN',
+                'a letter',
+            ),
+        ]);
+        $catalog->method('renderInventoryBlock')->willReturnCallback(
+            /**
+             * @param list<ConversationFile> $files
+             */
+            function (array $files) use (&$rendered): string {
+                $rendered = $files;
+
+                return "\n\n## Files available in this conversation\n";
+            }
+        );
+
+        $planner = new TaskPlanner(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->modelConfigService,
+            new TaskPlanValidator(),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(UserRepository::class),
+            new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
+            $this->createMock(RateLimitService::class),
+            $this->alwaysOnStructuredOutputConfig(),
+            conversationFiles: $catalog,
+        );
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '{"version":1,"language":"de","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}',
+        ]);
+
+        $planner->plan($message, [], 1);
+
+        self::assertIsArray($rendered);
+        $references = array_map(static fn (ConversationFile $file): string => $file->reference, $rendered);
+        self::assertSame(['file:4'], $references);
     }
 }

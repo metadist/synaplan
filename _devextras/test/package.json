@@ -11,8 +11,8 @@
     "vue": "^3.4.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "6.0.8",
-    "vite": "6.4.3"
+    "@vitejs/plugin-vue": "6.0.10",
+    "vite": "6.4.4"
   }
 }
 

@@ -2,6 +2,7 @@ import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
+import { assertStreamSucceeded } from '../helpers/stream'
 import { TIMEOUTS } from '../config/config'
 
 /**
@@ -65,9 +66,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
     })
 
     await test.step('Assert: the streaming turn finished and a card has text', async () => {
-      await bubble
-        .locator(selectors.chat.messageDone)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
+      await assertStreamSucceeded(bubble, TIMEOUTS.LONG)
 
       const cardText = (await bubble.locator(selectors.multitask.card(1)).innerText()).trim()
       expect(cardText.length).toBeGreaterThan(0)
@@ -85,7 +84,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
     await test.step('Assert: task cards are still visible after a page reload (#1070)', async () => {
       // Before the fix, the persisted row had no card data, so a reload lost the
       // task-plan bubble entirely — only the compose_reply text remained.
-      await page.reload()
+      await chat.reload()
       const reloadedBubble = chat.conversationBubbles().nth(previousCount)
       await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
 
@@ -151,9 +150,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
     })
 
     await test.step('Assert: turn completes successfully', async () => {
-      await bubble
-        .locator(selectors.chat.messageDone)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+      await assertStreamSucceeded(bubble, TIMEOUTS.VERY_LONG)
     })
 
     await test.step('Assert: Sources dropdown is visible (QA feedback #1076)', async () => {
@@ -163,7 +160,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
     })
 
     await test.step('Assert: Sources dropdown still visible after reload', async () => {
-      await page.reload()
+      await chat.reload()
       const reloadedBubble = chat.conversationBubbles().nth(previousCount)
       await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await expect(reloadedBubble.locator(selectors.chat.sourcesToggle)).toBeVisible({
@@ -236,9 +233,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
       await bubble
         .locator(selectors.multitask.plan)
         .waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-      await bubble
-        .locator(selectors.chat.messageDone)
-        .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
+      await assertStreamSucceeded(bubble, TIMEOUTS.VERY_LONG)
     })
 
     await test.step('Assert: the audio player is visible WITHOUT a reload', async () => {
@@ -248,7 +243,7 @@ test.describe('@ci @multitask Multi-task routing', () => {
     })
 
     await test.step('Assert: the audio player is still visible after a reload', async () => {
-      await page.reload()
+      await chat.reload()
       const reloadedBubble = chat.conversationBubbles().nth(previousCount)
       await reloadedBubble.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
       await reloadedBubble

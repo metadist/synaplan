@@ -8,6 +8,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -20,12 +21,28 @@ final class QdrantClientDirect implements QdrantClientInterface
 {
     private const HEALTH_CACHE_TTL_OK = 30;
     private const HEALTH_CACHE_TTL_FAIL = 60;
+
+    /**
+     * A probe that ran out of time still skips Qdrant for the next calls (a
+     * hung Qdrant must not stall every chat turn), but only briefly: one slow
+     * healthz is not an outage and must not switch memories off for a minute.
+     */
+    private const HEALTH_CACHE_TTL_TIMEOUT = 5;
+
+    /** Idle budget for healthz; must not trip on a busy but healthy Qdrant. */
+    private const HEALTH_PROBE_TIMEOUT_SECONDS = 2.0;
+
+    private const PROBE_OK = 'ok';
+    private const PROBE_DOWN = 'down';
+    private const PROBE_TIMEOUT = 'timeout';
     private const DEFAULT_VECTOR_DIM = 1024;
     private const DEFAULT_MEMORIES_COLLECTION = 'user_memories';
     private const DEFAULT_DOCUMENTS_COLLECTION = 'user_documents';
     private const DEFAULT_DIGESTS_COLLECTION = 'user_message_digests';
     private const DEFAULT_ROUTING_ANCHORS_COLLECTION = 'routing_anchors';
     private const BATCH_LIMIT = 100;
+    private const DIGEST_SCROLL_PAGE_SIZE = 256;
+    private const DIGEST_SCROLL_MAX_PAGES = 200;
 
     /** @var array<string, bool> tracks which collections have been verified/created */
     private array $ensuredCollections = [];
@@ -534,6 +551,42 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    public function deleteDigests(array $pointIds): void
+    {
+        $pointIds = array_values(array_unique(array_filter(
+            $pointIds,
+            static fn (string $pointId): bool => '' !== $pointId,
+        )));
+        if ([] === $pointIds) {
+            return;
+        }
+
+        foreach (array_chunk($pointIds, self::BATCH_LIMIT) as $chunk) {
+            try {
+                // Payload filter, not primary ids: legacy points are integer-keyed
+                // and only share `_point_id` with the current UUID-keyed point.
+                $this->qdrantRequest('POST', "/collections/{$this->digestsCollection}/points/delete?wait=true", [
+                    'filter' => [
+                        'must' => [
+                            ['key' => '_point_id', 'match' => ['any' => $chunk]],
+                        ],
+                    ],
+                ]);
+            } catch (\Throwable $e) {
+                if ($this->isMissingCollectionError($e)) {
+                    return;
+                }
+
+                $this->logger->error('Failed to delete digest points from Qdrant', [
+                    'count' => count($chunk),
+                    'error' => $e->getMessage(),
+                ]);
+
+                throw new \RuntimeException('Failed to delete digest points: '.$e->getMessage(), 0, $e);
+            }
+        }
+    }
+
     public function deleteAllDigestsForUser(int $userId): int
     {
         try {
@@ -569,6 +622,80 @@ final class QdrantClientDirect implements QdrantClientInterface
             ]);
 
             return 0;
+        }
+    }
+
+    public function scrollDigests(int $userId): array
+    {
+        try {
+            $pointsByLogical = [];
+            $offset = null;
+            $seenOffsets = [];
+            $page = 0;
+
+            while (true) {
+                ++$page;
+                if ($page > self::DIGEST_SCROLL_MAX_PAGES) {
+                    throw new \RuntimeException(sprintf('Digest scroll exceeded %d pages for user %d', self::DIGEST_SCROLL_MAX_PAGES, $userId));
+                }
+
+                $request = [
+                    'filter' => [
+                        'must' => [
+                            ['key' => 'user_id', 'match' => ['value' => $userId]],
+                        ],
+                    ],
+                    'limit' => self::DIGEST_SCROLL_PAGE_SIZE,
+                    'with_payload' => true,
+                    'with_vector' => false,
+                ];
+                if (null !== $offset) {
+                    $request['offset'] = $offset;
+                }
+
+                $response = $this->qdrantRequest('POST', "/collections/{$this->digestsCollection}/points/scroll", $request);
+                foreach ($response['result']['points'] ?? [] as $point) {
+                    $payloadPointId = $point['payload']['_point_id'] ?? null;
+                    if (is_string($payloadPointId) && '' !== $payloadPointId) {
+                        $logical = $payloadPointId;
+                    } elseif (is_string($point['id'] ?? null) || is_int($point['id'] ?? null)) {
+                        $logical = (string) $point['id'];
+                    } else {
+                        continue;
+                    }
+                    if ('' === $logical || isset($pointsByLogical[$logical])) {
+                        continue;
+                    }
+                    $pointsByLogical[$logical] = [
+                        'id' => $logical,
+                        'payload' => is_array($point['payload'] ?? null) ? $point['payload'] : [],
+                    ];
+                }
+
+                $next = $response['result']['next_page_offset'] ?? null;
+                if (null === $next) {
+                    break;
+                }
+                $offsetKey = is_scalar($next) ? (string) $next : json_encode($next);
+                if (isset($seenOffsets[$offsetKey])) {
+                    break;
+                }
+                $seenOffsets[$offsetKey] = true;
+                $offset = $next;
+            }
+
+            return array_values($pointsByLogical);
+        } catch (\Throwable $e) {
+            if ($this->isMissingCollectionError($e)) {
+                return [];
+            }
+
+            $this->logger->error('Failed to scroll digests in Qdrant', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('Failed to scroll digests: '.$e->getMessage(), 0, $e);
         }
     }
 
@@ -1186,24 +1313,46 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
 
         if (null === $this->cache) {
-            return $this->doHealthCheck();
+            return self::PROBE_OK === $this->probeHealth();
         }
 
-        $cacheKey = 'qdrant.health.'.sha1($this->qdrantUrl);
-
         try {
-            return (bool) $this->cache->get($cacheKey, function (ItemInterface $item): bool {
-                $isHealthy = $this->doHealthCheck();
+            return (bool) $this->cache->get($this->healthCacheKey(), function (ItemInterface $item): bool {
+                $outcome = $this->probeHealth();
 
-                $item->expiresAfter($isHealthy ? self::HEALTH_CACHE_TTL_OK : self::HEALTH_CACHE_TTL_FAIL);
+                $item->expiresAfter(match ($outcome) {
+                    self::PROBE_OK => self::HEALTH_CACHE_TTL_OK,
+                    self::PROBE_TIMEOUT => self::HEALTH_CACHE_TTL_TIMEOUT,
+                    default => self::HEALTH_CACHE_TTL_FAIL,
+                });
 
-                return $isHealthy;
+                return self::PROBE_OK === $outcome;
             });
         } catch (\Throwable $e) {
             $this->logger->warning('Qdrant health check cache failed', ['error' => $e->getMessage()]);
 
-            return $this->doHealthCheck();
+            return self::PROBE_OK === $this->probeHealth();
         }
+    }
+
+    public function refreshHealth(): bool
+    {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+
+        try {
+            $this->cache?->delete($this->healthCacheKey());
+        } catch (\Throwable $e) {
+            $this->logger->warning('Qdrant health cache reset failed', ['error' => $e->getMessage()]);
+        }
+
+        return $this->healthCheck();
+    }
+
+    private function healthCacheKey(): string
+    {
+        return 'qdrant.health.'.sha1($this->qdrantUrl);
     }
 
     public function getHealthDetails(): array
@@ -1772,20 +1921,28 @@ final class QdrantClientDirect implements QdrantClientInterface
         return $allPoints;
     }
 
-    private function doHealthCheck(): bool
+    /**
+     * @return self::PROBE_*
+     */
+    private function probeHealth(): string
     {
         try {
+            // Idle timeout only: `max_duration` surfaces as a plain transport
+            // error and would be cached as a full outage.
             $response = $this->httpClient->request('GET', "{$this->qdrantUrl}/healthz", [
                 'headers' => $this->getHeaders(),
-                'timeout' => 0.5,
-                'max_duration' => 0.5,
+                'timeout' => self::HEALTH_PROBE_TIMEOUT_SECONDS,
             ]);
 
-            return 200 === $response->getStatusCode();
+            return 200 === $response->getStatusCode() ? self::PROBE_OK : self::PROBE_DOWN;
+        } catch (TimeoutExceptionInterface $e) {
+            $this->logger->warning('Qdrant health check timed out', ['error' => $e->getMessage()]);
+
+            return self::PROBE_TIMEOUT;
         } catch (\Throwable $e) {
             $this->logger->warning('Qdrant health check failed', ['error' => $e->getMessage()]);
 
-            return false;
+            return self::PROBE_DOWN;
         }
     }
 

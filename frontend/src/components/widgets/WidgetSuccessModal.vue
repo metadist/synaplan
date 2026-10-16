@@ -39,7 +39,7 @@
                 class="surface-chip p-4 rounded-lg overflow-x-auto text-sm font-mono txt-primary border border-light-border/30 dark:border-dark-border/20"
               ><code>{{ embedCode }}</code></pre>
               <button
-                class="absolute top-2 right-2 px-3 py-1.5 rounded-lg bg-[var(--brand)] text-white text-xs font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-1.5"
+                class="absolute top-2 right-2 px-3 py-1.5 rounded-xl bg-[var(--brand)] text-white text-xs font-medium hover:bg-[var(--brand-hover)] transition-colors flex items-center gap-1.5"
                 data-testid="btn-copy-code"
                 @click="copyCode"
               >
@@ -83,7 +83,7 @@
             {{ $t('widgets.success.aiSetupLink') }}
           </button>
           <button
-            class="btn-primary px-5 py-2.5 rounded-lg transition-colors font-medium"
+            class="btn-primary px-5 py-2.5 rounded-xl transition-colors font-medium"
             data-testid="btn-close"
             @click="$emit('close')"
           >

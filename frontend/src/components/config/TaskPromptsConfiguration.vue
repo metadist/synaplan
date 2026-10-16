@@ -14,7 +14,9 @@
             data-testid="stat-total"
           >
             <Icon icon="heroicons:rectangle-stack" class="w-4 h-4 text-[var(--brand)]" />
-            <span class="text-sm font-semibold txt-primary">{{ prompts.length }}</span>
+            <span v-if="!loading" class="text-sm font-semibold txt-primary">{{
+              prompts.length
+            }}</span>
             <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statTotal') }}</span>
           </div>
           <div
@@ -22,7 +24,9 @@
             data-testid="stat-system"
           >
             <Icon icon="heroicons:shield-check" class="w-4 h-4 text-blue-500" />
-            <span class="text-sm font-semibold txt-primary">{{ systemPromptCount }}</span>
+            <span v-if="!loading" class="text-sm font-semibold txt-primary">{{
+              systemPromptCount
+            }}</span>
             <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statSystem') }}</span>
           </div>
           <div
@@ -30,13 +34,15 @@
             data-testid="stat-custom"
           >
             <Icon icon="heroicons:user" class="w-4 h-4 text-purple-500" />
-            <span class="text-sm font-semibold txt-primary">{{ customPromptCount }}</span>
+            <span v-if="!loading" class="text-sm font-semibold txt-primary">{{
+              customPromptCount
+            }}</span>
             <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statCustom') }}</span>
           </div>
         </div>
 
         <button
-          class="px-4 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
+          class="px-4 py-2.5 rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
           data-testid="btn-create-prompt"
           @click="showCreateModal = true"
         >
@@ -80,12 +86,12 @@
                 v-model="promptListSearch"
                 type="text"
                 :placeholder="$t('config.taskPrompts.searchPlaceholder')"
-                class="w-full pl-9 pr-9 py-2 rounded-lg surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full pl-9 pr-9 py-2 rounded-xl surface-chip border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-prompt-search"
               />
               <button
                 v-if="promptListSearch"
-                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded txt-secondary hover:txt-primary"
+                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-xl txt-secondary hover:txt-primary"
                 :title="$t('config.taskPrompts.clearFilters')"
                 data-testid="btn-clear-search"
                 @click="promptListSearch = ''"
@@ -95,7 +101,7 @@
             </div>
             <button
               type="button"
-              class="p-2 rounded-lg surface-chip txt-secondary hover:txt-primary transition-colors"
+              class="p-2 rounded-xl surface-chip txt-secondary hover:txt-primary transition-colors"
               :title="
                 viewDensity === 'compact'
                   ? $t('config.taskPrompts.densityDetailed')
@@ -166,120 +172,164 @@
 
         <!-- Scrollable category groups -->
         <div class="flex-1 overflow-y-auto py-2" data-testid="section-task-prompt-cards">
-          <template v-for="group in categorizedPrompts" :key="group.id">
-            <div v-if="group.prompts.length > 0" class="px-2 mb-1">
-              <button
-                type="button"
-                class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md txt-secondary hover:txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors text-[11px] uppercase tracking-wide font-semibold"
-                :data-testid="`group-${group.id}`"
-                @click="toggleGroup(group.id)"
-              >
-                <Icon
-                  :icon="
-                    isGroupCollapsed(group.id)
-                      ? 'heroicons:chevron-right'
-                      : 'heroicons:chevron-down'
-                  "
-                  class="w-3.5 h-3.5"
-                />
-                <Icon :icon="group.icon" class="w-3.5 h-3.5" />
-                <span class="flex-1 text-left">{{ group.label }}</span>
-                <span
-                  class="px-1.5 rounded-full text-[10px] font-semibold leading-none py-0.5 bg-light-border/30 dark:bg-dark-border/20"
-                >
-                  {{ group.prompts.length }}
-                </span>
-              </button>
-
-              <ul v-if="!isGroupCollapsed(group.id)" class="space-y-0.5 mt-1">
-                <li v-for="prompt in group.prompts" :key="prompt.id">
-                  <button
-                    type="button"
-                    class="w-full text-left px-2 rounded-md transition-all group flex items-center gap-2"
-                    :class="[
-                      viewDensity === 'compact' ? 'py-1.5' : 'py-2.5',
-                      selectedPromptId === prompt.id
-                        ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
-                        : 'hover:bg-light-border/10 dark:hover:bg-dark-border/10 txt-primary',
-                    ]"
-                    :data-testid="`card-prompt-${prompt.topic}`"
-                    :title="prompt.shortDescription || prompt.topic"
-                    @click="onCardSelect(prompt.id)"
-                  >
-                    <!-- Active indicator stripe -->
-                    <span
-                      class="w-0.5 self-stretch rounded-full transition-all"
-                      :class="
-                        selectedPromptId === prompt.id ? 'bg-[var(--brand)]' : 'bg-transparent'
-                      "
-                    />
-
-                    <Icon
-                      :icon="topicIcon(prompt.topic)"
-                      class="w-4 h-4 flex-shrink-0"
-                      :class="
-                        selectedPromptId === prompt.id
-                          ? 'text-[var(--brand)]'
-                          : 'txt-secondary group-hover:text-[var(--brand)]'
-                      "
-                    />
-
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-1.5">
-                        <span class="text-sm font-medium truncate">{{ prompt.name }}</span>
-
-                        <!-- Inline mini-badges (always visible) -->
-                        <span
-                          v-if="prompt.isUserOverride"
-                          class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 leading-none flex-shrink-0"
-                          :title="$t('config.taskPrompts.badgeOverride')"
-                          data-testid="badge-override"
-                        >
-                          {{ $t('config.taskPrompts.badgeOverride') }}
-                        </span>
-                        <span
-                          v-if="prompt.shared"
-                          class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-[var(--brand)]/10 text-[var(--brand)] leading-none flex-shrink-0"
-                          data-testid="badge-shared-assistant"
-                        >
-                          {{ $t('iam.sharedWithMe') }}
-                        </span>
-                      </div>
-                      <p
-                        v-if="viewDensity === 'detailed' && prompt.shortDescription"
-                        class="text-[11px] txt-secondary line-clamp-1 mt-0.5"
-                      >
-                        {{ prompt.shortDescription }}
-                      </p>
-                      <p
-                        v-else-if="viewDensity === 'detailed'"
-                        class="text-[10px] txt-secondary font-mono truncate mt-0.5"
-                      >
-                        {{ prompt.topic }}
-                      </p>
-                    </div>
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </template>
-
           <div
-            v-if="filteredPrompts.length === 0"
+            v-if="loading"
             class="text-center py-12 px-4"
-            data-testid="text-no-prompts-match"
+            role="status"
+            data-testid="task-prompts-loading"
           >
-            <Icon icon="heroicons:funnel" class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30" />
-            <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.noPromptsMatch') }}</p>
+            <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.loading') }}</p>
+          </div>
+          <div
+            v-else-if="error"
+            class="text-center py-12 px-4"
+            data-testid="task-prompts-load-error"
+            role="alert"
+          >
+            <p class="text-sm txt-secondary">{{ error }}</p>
             <button
-              v-if="promptListSearch || promptListFilter !== 'all'"
-              class="text-xs text-[var(--brand)] hover:underline mt-2"
-              data-testid="btn-clear-filters"
-              @click="clearFilters"
+              type="button"
+              class="btn-secondary mt-4 px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-task-prompts-retry"
+              @click="loadPrompts()"
             >
-              {{ $t('config.taskPrompts.clearFilters') }}
+              {{ $t('common.retry') }}
             </button>
           </div>
+          <template v-else>
+            <template v-for="group in categorizedPrompts" :key="group.id">
+              <div v-if="group.prompts.length > 0" class="px-2 mb-1">
+                <button
+                  type="button"
+                  class="w-full flex items-center gap-2 px-2 py-1.5 rounded-xl txt-secondary hover:txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors text-[11px] uppercase tracking-wide font-semibold"
+                  :data-testid="`group-${group.id}`"
+                  @click="toggleGroup(group.id)"
+                >
+                  <Icon
+                    :icon="
+                      isGroupCollapsed(group.id)
+                        ? 'heroicons:chevron-right'
+                        : 'heroicons:chevron-down'
+                    "
+                    class="w-3.5 h-3.5"
+                  />
+                  <Icon :icon="group.icon" class="w-3.5 h-3.5" />
+                  <span class="flex-1 text-left">{{ group.label }}</span>
+                  <span
+                    class="px-1.5 rounded-full text-[10px] font-semibold leading-none py-0.5 bg-light-border/30 dark:bg-dark-border/20"
+                  >
+                    {{ group.prompts.length }}
+                  </span>
+                </button>
+
+                <ul v-if="!isGroupCollapsed(group.id)" class="space-y-0.5 mt-1">
+                  <li v-for="prompt in group.prompts" :key="prompt.id">
+                    <button
+                      type="button"
+                      class="w-full text-left px-2 rounded-xl transition-all group flex items-center gap-2"
+                      :class="[
+                        viewDensity === 'compact' ? 'py-1.5' : 'py-2.5',
+                        selectedPromptId === prompt.id
+                          ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+                          : 'hover:bg-light-border/10 dark:hover:bg-dark-border/10 txt-primary',
+                      ]"
+                      :data-testid="`card-prompt-${prompt.topic}`"
+                      :title="prompt.shortDescription || prompt.topic"
+                      @click="onCardSelect(prompt.id)"
+                    >
+                      <!-- Active indicator stripe -->
+                      <span
+                        class="w-0.5 self-stretch rounded-full transition-all"
+                        :class="
+                          selectedPromptId === prompt.id ? 'bg-[var(--brand)]' : 'bg-transparent'
+                        "
+                      />
+
+                      <Icon
+                        :icon="topicIcon(prompt.topic)"
+                        class="w-4 h-4 flex-shrink-0"
+                        :class="
+                          selectedPromptId === prompt.id
+                            ? 'text-[var(--brand)]'
+                            : 'txt-secondary group-hover:text-[var(--brand)]'
+                        "
+                      />
+
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-sm font-medium truncate">{{ prompt.name }}</span>
+
+                          <!-- Inline mini-badges (always visible) -->
+                          <span
+                            v-if="prompt.isUserOverride"
+                            class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 leading-none flex-shrink-0"
+                            :title="$t('config.taskPrompts.badgeOverride')"
+                            data-testid="badge-override"
+                          >
+                            {{ $t('config.taskPrompts.badgeOverride') }}
+                          </span>
+                          <span
+                            v-if="prompt.shared"
+                            class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-[var(--brand)]/10 text-[var(--brand)] leading-none flex-shrink-0"
+                            data-testid="badge-shared-assistant"
+                          >
+                            {{ $t('iam.sharedWithMe') }}
+                          </span>
+                        </div>
+                        <p
+                          v-if="viewDensity === 'detailed' && prompt.shortDescription"
+                          class="text-[11px] txt-secondary line-clamp-1 mt-0.5"
+                        >
+                          {{ prompt.shortDescription }}
+                        </p>
+                        <p
+                          v-else-if="viewDensity === 'detailed'"
+                          class="text-[10px] txt-secondary font-mono truncate mt-0.5"
+                        >
+                          {{ prompt.topic }}
+                        </p>
+                      </div>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </template>
+
+            <div
+              v-if="filteredPrompts.length === 0 && !topicFiltersActive"
+              class="text-center py-12 px-4"
+              data-testid="text-no-prompts"
+            >
+              <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.noPrompts') }}</p>
+              <button
+                type="button"
+                class="btn-primary mt-4 inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+                data-testid="btn-no-prompts-create"
+                @click="showCreateModal = true"
+              >
+                {{ $t('config.taskPrompts.createNew') }}
+              </button>
+            </div>
+            <div
+              v-else-if="filteredPrompts.length === 0"
+              class="text-center py-12 px-4"
+              data-testid="text-no-prompts-match"
+            >
+              <Icon
+                icon="heroicons:funnel"
+                class="w-10 h-10 mx-auto mb-2 txt-secondary opacity-30"
+              />
+              <p class="text-sm txt-secondary">{{ $t('config.taskPrompts.noPromptsMatch') }}</p>
+              <button
+                v-if="promptListSearch || promptListFilter !== 'all'"
+                class="text-xs text-[var(--brand)] hover:underline mt-2"
+                data-testid="btn-clear-filters"
+                @click="clearFilters"
+              >
+                {{ $t('config.taskPrompts.clearFilters') }}
+              </button>
+            </div>
+          </template>
         </div>
 
         <!-- Hidden compat select for legacy automation tools -->
@@ -307,7 +357,7 @@
             data-testid="section-prompt-header"
           >
             <button
-              class="lg:hidden p-2 rounded-lg hover:bg-light-border/10 dark:hover:bg-dark-border/10"
+              class="lg:hidden p-2 rounded-xl hover:bg-light-border/10 dark:hover:bg-dark-border/10"
               :title="$t('config.taskPrompts.backToList')"
               data-testid="btn-back-to-list"
               @click="backToListMobile"
@@ -350,7 +400,7 @@
             <button
               v-if="canSharePrompt"
               type="button"
-              class="btn-secondary inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+              class="btn-secondary inline-flex items-center px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap"
               data-testid="btn-share-assistant"
               @click="openAssistantShare"
             >
@@ -359,7 +409,7 @@
             <button
               v-if="showSaveAsTask"
               type="button"
-              class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+              class="btn-secondary inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap"
               data-testid="btn-save-as-task"
               @click="onSaveAsTask"
             >
@@ -468,7 +518,7 @@
               <textarea
                 v-model="formData.shortDescription"
                 rows="3"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
+                class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
                 :placeholder="$t('config.taskPrompts.descriptionPlaceholder')"
                 data-testid="input-description"
               />
@@ -487,7 +537,7 @@
               <textarea
                 v-model="formData.selectionRules"
                 rows="3"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
+                class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-none disabled:opacity-50"
                 :placeholder="$t('config.taskPrompts.rulesPlaceholder')"
                 data-testid="input-rules"
               />
@@ -506,7 +556,7 @@
               <select
                 v-model="formData.language"
                 :disabled="currentPrompt.isDefault && isAdmin"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="input-language"
               >
                 <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
@@ -564,12 +614,9 @@
                 </label>
 
                 <!--
-                  Internet search is tri-state (auto / always on / always off).
-                  A checkbox can only express two states, so saving silently
-                  collapsed the "let the classifier decide" default (null) into
-                  "always off" and disabled web search for the prompt (#1138).
-                  A dropdown keeps all three states distinguishable and lets an
-                  admin restore "auto" at any time.
+                  Internet search is "auto" (the AI decides per message) or
+                  "off". A prompt cannot force a search on every message; a
+                  single message is searched via Tools → Web Search.
                 -->
                 <div class="mb-3 p-3 rounded-lg surface-chip">
                   <div class="flex items-center gap-3 mb-2">
@@ -580,13 +627,12 @@
                   </div>
                   <select
                     v-model="formData.toolInternet"
-                    class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                    class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                     data-testid="select-tool-internet"
                   >
                     <option value="auto">
                       {{ $t('config.taskPrompts.internetSearch.auto') }}
                     </option>
-                    <option value="on">{{ $t('config.taskPrompts.internetSearch.on') }}</option>
                     <option value="off">{{ $t('config.taskPrompts.internetSearch.off') }}</option>
                   </select>
                   <p class="text-xs txt-secondary mt-1.5 flex items-center gap-1">
@@ -633,7 +679,7 @@
                   <button
                     v-for="tool in markdownTools"
                     :key="tool.label"
-                    class="p-2 rounded hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
+                    class="p-2 rounded-xl hover:bg-[var(--brand)]/10 txt-secondary hover:txt-primary transition-colors"
                     :title="tool.label"
                     data-testid="btn-markdown-tool"
                     @click="insertMarkdown(tool.before, tool.after)"
@@ -647,7 +693,7 @@
                 ref="contentTextarea"
                 v-model="formData.content"
                 rows="18"
-                class="w-full px-4 py-3 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono leading-relaxed"
+                class="w-full px-4 py-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono leading-relaxed"
                 :placeholder="$t('config.taskPrompts.contentPlaceholder')"
                 data-testid="input-content"
               />
@@ -737,7 +783,7 @@
                   </div>
                   <button
                     :disabled="loading"
-                    class="w-7 h-7 rounded-lg hover:bg-rose-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="w-7 h-7 rounded-xl hover:bg-rose-500/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                     :title="$t('config.taskPrompts.unlinkFile')"
                     data-testid="btn-unlink"
                     @click="handleDeleteFile(file.messageId)"
@@ -779,7 +825,7 @@
                   v-model="availableFilesSearch"
                   type="text"
                   :placeholder="$t('config.taskPrompts.searchFilesPlaceholder')"
-                  class="w-full pl-10 pr-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                  class="w-full pl-10 pr-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   data-testid="input-file-search"
                   @input="loadAvailableFiles"
                 />
@@ -831,7 +877,7 @@
                   <button
                     :disabled="loading || isFileLinked(file.messageId)"
                     :class="[
-                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5',
+                      'px-3 py-1.5 rounded-xl text-xs font-medium transition-colors flex items-center gap-1.5',
                       isFileLinked(file.messageId)
                         ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-default'
                         : 'bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20',
@@ -907,7 +953,7 @@
               </p>
               <button
                 :disabled="loading"
-                class="px-5 py-2.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/30 font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-5 py-2.5 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/30 font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="btn-delete"
                 @click="handleDelete"
               >
@@ -936,7 +982,7 @@
               {{ $t('config.taskPrompts.selectPromptDescription') }}
             </p>
             <button
-              class="px-5 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm inline-flex items-center gap-2"
+              class="px-5 py-2.5 rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm inline-flex items-center gap-2"
               data-testid="btn-create-prompt-empty"
               @click="showCreateModal = true"
             >
@@ -965,7 +1011,7 @@
             {{ $t('config.taskPrompts.createNew') }}
           </h3>
           <button
-            class="p-2 rounded-lg hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors"
+            class="p-2 rounded-xl hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors"
             :title="$t('common.close', 'Close')"
             data-testid="btn-close"
             @click="showCreateModal = false"
@@ -977,7 +1023,7 @@
         <div class="space-y-4">
           <div v-if="newPromptContent === '' && newPromptRules === ''" class="flex justify-end">
             <button
-              class="text-xs px-3 py-1.5 rounded-lg bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors flex items-center gap-1.5"
+              class="text-xs px-3 py-1.5 rounded-xl bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors flex items-center gap-1.5"
               data-testid="btn-load-template"
               @click="loadTemplates"
             >
@@ -995,7 +1041,7 @@
               <input
                 v-model="newPromptTopic"
                 type="text"
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :placeholder="$t('config.taskPrompts.topicPlaceholder')"
                 data-testid="input-new-topic"
               />
@@ -1008,7 +1054,7 @@
               <input
                 v-model="newPromptName"
                 type="text"
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :placeholder="$t('config.taskPrompts.namePlaceholder')"
                 data-testid="input-new-name"
               />
@@ -1020,7 +1066,7 @@
               </label>
               <select
                 v-model="newPromptLanguage"
-                class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 data-testid="input-new-language"
               >
                 <option v-for="lang in PROMPT_LANGUAGES" :key="lang.value" :value="lang.value">
@@ -1038,7 +1084,7 @@
             <textarea
               v-model="newPromptDescription"
               rows="2"
-              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
+              class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
               :placeholder="$t('config.taskPrompts.descriptionPlaceholder')"
               data-testid="input-new-description"
             ></textarea>
@@ -1055,7 +1101,7 @@
             <textarea
               v-model="newPromptRules"
               rows="3"
-              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
+              class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y"
               :placeholder="SELECTION_RULES_TEMPLATE"
               data-testid="input-new-rules"
             ></textarea>
@@ -1070,7 +1116,7 @@
             <textarea
               v-model="newPromptContent"
               rows="8"
-              class="w-full px-4 py-2.5 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono resize-y"
+              class="w-full px-4 py-2.5 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono resize-y"
               :placeholder="PROMPT_CONTENT_TEMPLATE"
               data-testid="input-new-content"
             ></textarea>
@@ -1100,7 +1146,7 @@
                 v-model="newPromptFilesSearch"
                 type="text"
                 :placeholder="$t('config.taskPrompts.searchFilesPlaceholderShort')"
-                class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+                class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-xs focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
                 data-testid="input-new-file-search"
               />
             </div>
@@ -1185,7 +1231,7 @@
             class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4 border-t border-light-border/30 dark:border-dark-border/20"
           >
             <button
-              class="w-full sm:flex-1 px-6 py-3 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors font-medium"
+              class="w-full sm:flex-1 px-6 py-3 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-light-border/10 dark:hover:bg-dark-border/10 transition-colors font-medium"
               data-testid="btn-cancel-create"
               @click="showCreateModal = false"
             >
@@ -1193,7 +1239,7 @@
             </button>
             <button
               :disabled="!canCreatePrompt"
-              class="w-full sm:flex-1 px-6 py-3 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              class="w-full sm:flex-1 px-6 py-3 rounded-xl bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               data-testid="btn-confirm-create"
               @click="handleCreateNew"
             >
@@ -1376,6 +1422,9 @@ const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
 const promptListSearch = ref('')
 const promptListFilter = ref<'all' | 'system' | 'custom' | 'shared'>('all')
+const topicFiltersActive = computed(
+  () => promptListSearch.value.trim() !== '' || promptListFilter.value !== 'all'
+)
 const iamSharingEnabled = computed(() => isIamSharingEnabled())
 const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
@@ -1628,7 +1677,7 @@ const editorTabs = computed(() => {
 useEscapeKey(() => (showCreateModal.value = false), showCreateModal)
 
 const contentTextarea = ref<HTMLTextAreaElement | null>(null)
-const loading = ref(false)
+const loading = ref(true)
 const error = ref<string | null>(null)
 
 const promptFiles = ref<PromptFile[]>([])
@@ -1840,10 +1889,8 @@ const loadPrompts = async () => {
         toolInternet: internetModeFromMetadata(metadata),
       }
     })
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Failed to load prompts'
-    error.value = errorMessage
-    showError(errorMessage)
+  } catch {
+    error.value = t('config.taskPrompts.loadFailed')
   } finally {
     loading.value = false
   }

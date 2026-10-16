@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Service;
 
-use App\Service\MemoryExtractionService;
+use App\Service\Memory\MemoryExtractionService;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**

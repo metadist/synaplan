@@ -61,7 +61,7 @@ describe('SetupProviderStep', () => {
     expect(wrapper.find('[data-testid="setup-provider-grid"]').exists()).toBe(true)
   })
 
-  // Media/speech keys share Models & keys but cannot make chat work — an
+  // Media/speech keys share Providers & keys but cannot make chat work — an
   // ElevenLabs key set via the environment must not read as "your AI is ready".
   it('lists only chat providers and ignores configured media/speech keys', async () => {
     listProviderKeys.mockResolvedValue({

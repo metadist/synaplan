@@ -126,6 +126,20 @@
       "matchPackageNames": ["ghcr.io/metadist/**"]
     },
     {
+      // github-actions digests matched no rule above: every group is either
+      // minor/patch or a docker manager. Each pin opened its own PR and, like
+      // the docker digests before they were grouped, sorted ahead of real
+      // dependency updates (pinDigest > pin > digest) and consumed
+      // prHourlyLimit. There is no changelog; a green CI run on the new SHA
+      // is the review (docs/DEPENDENCY_UPDATES.md §7). Majors stay individual:
+      // this rule matches digest types only, and the major rule below sets
+      // no groupName.
+      "description": "GitHub Actions digest bumps grouped -- no changelog, CI is the review",
+      "groupName": "GitHub Actions Digests",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest", "pinDigest"]
+    },
+    {
       "description": "Major updates: always individual, manual review",
       "matchUpdateTypes": ["major"],
       "automerge": false,

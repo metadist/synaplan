@@ -6,18 +6,22 @@ namespace App\Controller;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\UserProviderKeyResolver;
+use App\AI\Messages\AppChatCredential;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\McpServerConfigRepository;
+use App\Service\Billing\PremiumFeatureGate;
+use App\Service\Iam\AuditLogWriter;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
-use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
+use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,7 +29,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
- * Settings API for the Anthropic-compatible Messages gateway (Channels → AI Agents).
+ * Settings API for the Anthropic-compatible Messages gateway
+ * (Manage → Developer & devices → Coding clients).
  */
 #[Route('/api/v1/messages-gateway', name: 'api_messages_gateway_')]
 #[OA\Tag(name: 'Messages Gateway', description: 'Anthropic-compatible Messages API gateway settings')]
@@ -45,6 +50,11 @@ final class MessagesGatewayController extends AbstractController
         private readonly GatewayToolCatalog $toolCatalog,
         private readonly McpServerConfigRepository $mcpServers,
         private readonly LoggerInterface $logger,
+        private readonly AppChatCredential $appChatCredential,
+        private readonly AuditLogWriter $auditLogWriter,
+        private readonly EntityManagerInterface $entityManager,
+        #[Autowire('%env(APP_URL)%')]
+        private readonly string $appUrl = '',
     ) {
     }
 
@@ -59,7 +69,7 @@ final class MessagesGatewayController extends AbstractController
         response: 200,
         description: 'Gateway status',
         content: new OA\JsonContent(
-            required: ['enabled', 'upstream_url', 'keys', 'budget', 'is_admin', 'setup', 'model_aliases'],
+            required: ['enabled', 'upstream_url', 'keys', 'budget', 'is_admin', 'setup', 'model_aliases', 'app_chat_credential'],
             properties: [
                 new OA\Property(property: 'enabled', type: 'boolean', example: false),
                 new OA\Property(property: 'allow_operator_key', type: 'boolean', example: false),
@@ -141,9 +151,16 @@ final class MessagesGatewayController extends AbstractController
                 ),
                 new OA\Property(property: 'is_admin', type: 'boolean', example: false),
                 new OA\Property(
+                    property: 'app_chat_credential',
+                    description: 'Whether the signed-in user\'s default chat model can pay for app chat. ready: a local model (Ollama or a custom endpoint) or a resolved provider key. missing: that model needs a key and none is available. unset: no default chat model is selected.',
+                    type: 'string',
+                    enum: ['ready', 'missing', 'unset'],
+                    example: 'missing',
+                ),
+                new OA\Property(
                     property: 'setup',
                     properties: [
-                        new OA\Property(property: 'base_url_hint', type: 'string'),
+                        new OA\Property(property: 'base_url_hint', type: 'string', example: 'http://localhost:8000', description: 'Origin that serves /v1/messages. Copied into ANTHROPIC_BASE_URL.'),
                         new OA\Property(property: 'env_api_key', type: 'string', example: 'ANTHROPIC_API_KEY'),
                         new OA\Property(property: 'env_auth_token', type: 'string', example: 'ANTHROPIC_AUTH_TOKEN'),
                         new OA\Property(property: 'note', type: 'string'),
@@ -209,8 +226,9 @@ final class MessagesGatewayController extends AbstractController
                 'allowed' => $budget['allowed'],
             ],
             'is_admin' => $isAdmin,
+            'app_chat_credential' => $this->appChatCredential->forUser($user),
             'setup' => [
-                'base_url_hint' => '(your Synaplan origin, e.g. https://web.synaplan.com)',
+                'base_url_hint' => $this->publicApiOrigin(),
                 'env_api_key' => 'ANTHROPIC_API_KEY',
                 'env_auth_token' => 'ANTHROPIC_AUTH_TOKEN',
                 'note' => 'Set exactly one of ANTHROPIC_API_KEY (x-api-key) or ANTHROPIC_AUTH_TOKEN (Bearer).',
@@ -219,6 +237,12 @@ final class MessagesGatewayController extends AbstractController
     }
 
     #[Route('/keys/{provider}', name: 'put_key', methods: ['PUT', 'POST'], requirements: ['provider' => 'anthropic|openai|google'])]
+    #[OA\Post(
+        path: '/api/v1/messages-gateway/keys/{provider}',
+        summary: 'Save a BYO provider API key for the Messages gateway',
+        security: [['Bearer' => []]],
+        tags: ['Messages Gateway'],
+    )]
     #[OA\Put(
         path: '/api/v1/messages-gateway/keys/{provider}',
         summary: 'Save a BYO provider API key for the Messages gateway',
@@ -377,8 +401,18 @@ final class MessagesGatewayController extends AbstractController
 
         $url = trim((string) ($decoded['upstream_url'] ?? ''));
 
+        $previous = $this->auditSafeUrl($this->config->upstreamUrl());
+
         try {
-            $this->config->setUpstreamUrl($url, (int) $user->getId());
+            $this->entityManager->wrapInTransaction(function () use ($user, $request, $url, $previous): void {
+                $this->config->setUpstreamUrl($url, (int) $user->getId());
+                $this->auditGatewayChange($user, $request, 'messages_gateway.upstream', 'upstream', [
+                    'UPSTREAM_URL' => [
+                        'old' => $previous,
+                        'new' => $this->auditSafeUrl($this->config->upstreamUrl()),
+                    ],
+                ]);
+            });
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
@@ -444,6 +478,7 @@ final class MessagesGatewayController extends AbstractController
             return $this->json(['error' => 'model_aliases must be an object'], Response::HTTP_BAD_REQUEST);
         }
 
+        $previous = $this->config->modelAliases();
         $clean = [];
         foreach ($aliases as $from => $to) {
             if (\is_string($from) && '' !== $from && \is_string($to) && '' !== $to) {
@@ -451,13 +486,19 @@ final class MessagesGatewayController extends AbstractController
             }
         }
 
-        $this->configRepository->setValue(
-            0,
-            MessagesGatewayConfig::CONFIG_GROUP,
-            MessagesGatewayConfig::KEY_MODEL_ALIASES,
-            // Force object encoding so {} stays {} (never []) in BCONFIG.
-            json_encode((object) $clean, \JSON_THROW_ON_ERROR),
-        );
+        $this->entityManager->wrapInTransaction(function () use ($user, $request, $previous, $clean): void {
+            $this->configRepository->setValue(
+                0,
+                MessagesGatewayConfig::CONFIG_GROUP,
+                MessagesGatewayConfig::KEY_MODEL_ALIASES,
+                // Force object encoding so {} stays {} (never []) in BCONFIG.
+                json_encode((object) $clean, \JSON_THROW_ON_ERROR),
+            );
+
+            $this->auditGatewayChange($user, $request, 'messages_gateway.aliases', 'aliases', [
+                'MODEL_ALIASES' => ['old' => $previous, 'new' => $clean],
+            ]);
+        });
 
         return new JsonResponse(['success' => true, 'model_aliases' => (object) $clean]);
     }
@@ -574,19 +615,29 @@ final class MessagesGatewayController extends AbstractController
         }
 
         $response = [];
-        foreach ($updated as $key => $value) {
-            $this->configRepository->setValue(
-                0,
-                MessagesGatewayConfig::CONFIG_GROUP,
-                $key,
-                \is_bool($value) ? ($value ? '1' : '0') : (string) $value,
-            );
-            $response[strtolower($key)] = $value;
-        }
+        $changes = [];
+        $this->entityManager->wrapInTransaction(function () use ($updated, $user, $request, &$response, &$changes): void {
+            foreach ($updated as $key => $value) {
+                $new = \is_bool($value) ? ($value ? '1' : '0') : (string) $value;
+                $old = $this->configRepository->getValue(0, MessagesGatewayConfig::CONFIG_GROUP, $key);
+                $this->configRepository->setValue(
+                    0,
+                    MessagesGatewayConfig::CONFIG_GROUP,
+                    $key,
+                    $new,
+                );
+                $response[strtolower($key)] = $value;
+                $changes[$key] = ['old' => $old, 'new' => $new];
+            }
 
-        $this->logger->warning('MessagesGateway: settings updated (audit)', [
+            if ([] !== $changes) {
+                $this->auditGatewayChange($user, $request, 'messages_gateway.flags', 'flags', $changes);
+            }
+        });
+
+        $this->logger->info('MessagesGateway: settings updated', [
             'acting_user_id' => $user->getId(),
-            'updated' => $response,
+            'updated' => array_keys($response),
         ]);
 
         return new JsonResponse(['success' => true, 'updated' => (object) $response]);
@@ -700,10 +751,82 @@ final class MessagesGatewayController extends AbstractController
     }
 
     /**
+     * One Users → Audit row for a gateway settings write. Values are setting
+     * names and model ids, never provider keys.
+     *
+     * @param array<string, mixed> $changes
+     */
+    private function auditGatewayChange(User $user, Request $request, string $action, string $resourceId, array $changes): void
+    {
+        $this->auditLogWriter->record(
+            (int) $user->getId(),
+            $action,
+            'messages_gateway',
+            $resourceId,
+            ['changes' => $changes],
+            (string) $request->getClientIp(),
+        );
+    }
+
+    /**
+     * Query strings and fragments can carry a provider token. The audit row
+     * keeps the host and path only.
+     */
+    private function auditSafeUrl(string $url): string
+    {
+        $parts = parse_url($url);
+        if (!\is_array($parts)) {
+            return $url;
+        }
+
+        $scheme = \is_string($parts['scheme'] ?? null) ? $parts['scheme'] : '';
+        $host = \is_string($parts['host'] ?? null) ? $parts['host'] : '';
+        if ('' === $scheme || '' === $host) {
+            return $url;
+        }
+
+        $safe = $scheme.'://'.$host;
+        if (isset($parts['port'])) {
+            $safe .= ':'.$parts['port'];
+        }
+        if (\is_string($parts['path'] ?? null) && '' !== $parts['path']) {
+            $safe .= $parts['path'];
+        }
+
+        return rtrim($safe, '/');
+    }
+
+    /**
      * @param array<mixed> $decoded
      */
     private function submittedValue(array $decoded, string $key): mixed
     {
         return $decoded[strtolower($key)] ?? $decoded[$key] ?? null;
+    }
+
+    /**
+     * Origin of APP_URL, without a path. Coding clients call /v1/messages
+     * on this host, which is not always the web page origin.
+     */
+    private function publicApiOrigin(): string
+    {
+        $raw = trim($this->appUrl);
+        if ('' === $raw) {
+            return '';
+        }
+
+        $parts = parse_url($raw);
+        $scheme = \is_array($parts) && \is_string($parts['scheme'] ?? null) ? $parts['scheme'] : '';
+        $host = \is_array($parts) && \is_string($parts['host'] ?? null) ? $parts['host'] : '';
+        if ('' === $scheme || '' === $host) {
+            return rtrim($raw, '/');
+        }
+
+        $origin = $scheme.'://'.$host;
+        if (isset($parts['port'])) {
+            $origin .= ':'.$parts['port'];
+        }
+
+        return $origin;
     }
 }

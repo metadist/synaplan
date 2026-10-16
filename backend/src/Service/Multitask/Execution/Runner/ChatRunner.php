@@ -6,17 +6,22 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
+use App\AI\Stream\VisibleAnswer;
 use App\Entity\Prompt;
+use App\Service\Agent\Policy\AssistantPlanLimits;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Knowledge\KnowledgeContextFormatter;
+use App\Service\Message\SlashCommandCopy;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
+use App\Service\Multitask\Execution\UpstreamHandover;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
-use App\Service\PromptService;
+use App\Service\Prompt\PromptService;
+use App\Service\RAG\ChatKnowledgeContextLoader;
 use App\Service\RAG\VectorSearchService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\Docs\PlatformDocsRetriever;
@@ -58,6 +63,8 @@ final readonly class ChatRunner implements TaskRunner
         private ?SelfAwarePromptDecorator $selfAwarePromptDecorator = null,
         #[Autowire(lazy: true)]
         private ?PlatformDocsRetriever $platformDocsRetriever = null,
+        private ?SlashCommandCopy $slashCommandCopy = null,
+        private ?ChatKnowledgeContextLoader $knowledge = null,
     ) {
     }
 
@@ -96,17 +103,37 @@ final readonly class ChatRunner implements TaskRunner
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
         $systemPrompt = $this->systemPrompt($node, $language, $context, $topicBinding['systemPrompt']);
-        $systemPrompt = $this->decorateSelfAwareTopic($systemPrompt, $node, $context, $text);
+        $systemPrompt = $this->decorateSelfAwareTopic($systemPrompt, $node, $context, $text, $modelId);
         $ragChunks = 0;
+        $ragSources = [];
         if (Capability::RagQuery === $node->capability) {
-            $ragContext = $this->ragContext($text, $context, $ragChunks);
+            $ragContext = $this->ragContext($text, $context, $ragChunks, $ragSources);
+            if ('' === $ragContext && !empty($context->classification['slash_docs'])) {
+                $empty = $this->slashCommandCopy?->docsNotFound($language)
+                    ?? 'No matching file was found in your knowledge base.';
+                $context->streamChunk($empty);
+
+                return NodeResult::ok($empty, [], ['rag_chunks' => 0, 'rag_empty' => true]);
+            }
             $systemPrompt .= $ragContext;
         }
         $systemPrompt .= $this->linkedPagesContext($context);
 
+        // Structural handover: whatever the plan wired (or forgot to wire),
+        // the output of every upstream step reaches the answering model.
+        // A correctly spliced `$nX.text` is already in $text → nothing added.
+        $handover = UpstreamHandover::missing($node, $context, $text, $inputs);
+        if ([] !== $handover) {
+            $this->logger->info('ChatRunner: plan did not hand over upstream step output, appending it to the prompt', [
+                'node' => $node->id,
+                'capability' => $node->capability->value,
+                'appended' => UpstreamHandover::labels($handover),
+            ]);
+        }
+
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user', 'content' => $text],
+            ['role' => 'user', 'content' => $text.UpstreamHandover::render($handover)],
         ];
 
         // Stream tokens into the node's card (task_chunk) while accumulating the
@@ -114,10 +141,25 @@ final readonly class ChatRunner implements TaskRunner
         // Only visible answer text passes through — structured reasoning chunks
         // (chain-of-thought from thinking models) must never reach the user (#1067).
         $full = '';
+        $finishReason = null;
+        $streamOptions = array_filter([
+            'provider' => $provider,
+            'model' => $modelName,
+            'temperature' => 0.3,
+        ], static fn ($v) => null !== $v);
+        if (is_string($provider) && 'openaicompatible' === strtolower($provider)
+            && is_string($modelName) && VisibleAnswer::modelHidesAnswerBehindThinking($modelName)) {
+            $streamOptions['disable_thinking'] = true;
+        }
         try {
             $response = $this->aiFacade->chatStream(
                 $messages,
-                static function ($chunk) use (&$full, $context): void {
+                static function ($chunk) use (&$full, &$finishReason, $context): void {
+                    if (is_array($chunk) && 'finish' === ($chunk['type'] ?? null) && is_string($chunk['finish_reason'] ?? null)) {
+                        $finishReason = $chunk['finish_reason'];
+
+                        return;
+                    }
                     $piece = StreamChunk::visibleText($chunk);
                     if ('' === $piece) {
                         return;
@@ -126,12 +168,11 @@ final readonly class ChatRunner implements TaskRunner
                     $context->streamChunk($piece);
                 },
                 $context->userId,
-                array_filter([
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'temperature' => 0.3,
-                ], static fn ($v) => null !== $v),
+                $streamOptions,
             );
+            if (is_string($response['finish_reason'] ?? null) && '' !== $response['finish_reason']) {
+                $finishReason = $response['finish_reason'];
+            }
         } catch (StreamCancelledException $e) {
             // Not a model failure: the user pressed Stop. Reporting it as a
             // failed node would drop the `cancelled` marker and make the turn
@@ -146,8 +187,15 @@ final readonly class ChatRunner implements TaskRunner
             return NodeResult::failed($node->capability->value.' failed: '.$e->getMessage());
         }
 
-        if ('' === trim($full)) {
-            return NodeResult::failed($node->capability->value.' produced empty output');
+        // A thinking model can fill the whole completion with reasoning, or cut
+        // a JSON tool call in half. That is not a finished answer — marking the
+        // step Done leaves the chat with nothing saved (#2264).
+        if ('' === trim($full) || VisibleAnswer::isUnusable($full, $finishReason)) {
+            $cutOff = VisibleAnswer::failedBecauseOutputWasCut($full, $finishReason);
+
+            return NodeResult::failed($cutOff
+                ? 'The model ran out of room before it finished the answer.'
+                : $node->capability->value.' produced empty output');
         }
 
         $metadata = [
@@ -160,6 +208,9 @@ final readonly class ChatRunner implements TaskRunner
         ];
         if (Capability::RagQuery === $node->capability) {
             $metadata['rag_chunks'] = $ragChunks;
+        }
+        if ([] !== $ragSources) {
+            $metadata['rag_sources'] = $ragSources;
         }
 
         return NodeResult::ok($full, [], $metadata);
@@ -182,16 +233,31 @@ final readonly class ChatRunner implements TaskRunner
     {
         $selected = $context->classification['model_id'] ?? null;
         if (is_numeric($selected) && (int) $selected > 0) {
-            return (int) $selected;
+            return $this->usableModelId((int) $selected, $capabilityTag, $context);
         }
 
         $override = $context->classification['override_model_id'] ?? null;
         if (is_numeric($override) && (int) $override > 0) {
-            return (int) $override;
+            return $this->usableModelId((int) $override, $capabilityTag, $context);
         }
 
         if (null !== $topicModelId && $topicModelId > 0) {
-            return $topicModelId;
+            return $this->usableModelId($topicModelId, $capabilityTag, $context);
+        }
+
+        return $this->modelConfigService->getDefaultModel($capabilityTag, $context->userId)
+            ?? $this->modelConfigService->getDefaultModel('CHAT', $context->userId);
+    }
+
+    /**
+     * An explicit id still has to be one this member may use. A disallowed id
+     * is replaced the same way the single-step chat path does.
+     */
+    private function usableModelId(int $modelId, string $capabilityTag, NodeContext $context): ?int
+    {
+        $usable = $this->modelConfigService->resolveUsableModelId($modelId, $capabilityTag, $context->userId);
+        if (null !== $usable && $usable > 0) {
+            return $usable;
         }
 
         return $this->modelConfigService->getDefaultModel($capabilityTag, $context->userId)
@@ -248,7 +314,10 @@ final readonly class ChatRunner implements TaskRunner
      * (same service, same context block format); any retrieval failure is
      * logged and the node answers without context instead of failing.
      */
-    private function ragContext(string $query, NodeContext $context, int &$chunks): string
+    /**
+     * @param list<array<string, mixed>> $sources
+     */
+    private function ragContext(string $query, NodeContext $context, int &$chunks, array &$sources): string
     {
         $groupKey = $context->classification['rag_group_key']
             ?? $context->options['rag_group_key']
@@ -257,17 +326,29 @@ final readonly class ChatRunner implements TaskRunner
         $minScore = $context->options['rag_min_score'] ?? null;
 
         // A pinned assistant carries its scope in the RuntimeProfile, never
-        // as scalar copies (see ChatHandler::ragSettings).
-        $profile = $context->options['runtime_profile'] ?? null;
+        // as scalar copies (see ChatKnowledgeContextLoader::settings).
+        $profile = $context->options['runtime_profile'] ?? $context->classification['runtime_profile'] ?? null;
+        $profile = $profile instanceof RuntimeProfile ? $profile : null;
+        $explicitScopes = null;
         if ($profile instanceof RuntimeProfile) {
             $groupKey ??= $profile->primaryRagGroupKey();
             $limit ??= $profile->ragLimit;
             $minScore ??= $profile->ragMinScore;
+            $explicitScopes = $this->knowledge?->assistantScopes(
+                $profile,
+                $context->userId ?? $context->message->getUserId(),
+            );
         }
 
         $groupKey = is_string($groupKey) && '' !== $groupKey ? $groupKey : null;
         $limit = null !== $limit ? max(1, min(50, (int) $limit)) : 20;
         $minScore = null !== $minScore ? max(0.0, min(1.0, (float) $minScore)) : 0.2;
+
+        // An assistant with no folders and "also search the user's files" off
+        // searches nothing. A null scope list would expand to the viewer's files.
+        if ([] === $explicitScopes) {
+            return '';
+        }
 
         try {
             $results = $this->vectorSearchService->semanticSearch(
@@ -276,6 +357,7 @@ final readonly class ChatRunner implements TaskRunner
                 $groupKey,
                 limit: $limit,
                 minScore: $minScore,
+                explicitScopes: $explicitScopes,
             );
         } catch (\Throwable $e) {
             $this->logger->warning('ChatRunner: RAG retrieval failed, answering without context', [
@@ -291,6 +373,7 @@ final readonly class ChatRunner implements TaskRunner
         }
 
         $chunks = count($results);
+        $sources = $this->knowledgeContextFormatter->citationRefs($results);
 
         return $this->knowledgeContextFormatter->formatRagContext($results);
     }
@@ -314,7 +397,7 @@ final readonly class ChatRunner implements TaskRunner
         return "\n\n".$urlContent;
     }
 
-    private function decorateSelfAwareTopic(string $systemPrompt, TaskNode $node, NodeContext $context, string $query): string
+    private function decorateSelfAwareTopic(string $systemPrompt, TaskNode $node, NodeContext $context, string $query, ?int $modelId): string
     {
         if (null === $this->selfAwarePromptDecorator) {
             return $systemPrompt;
@@ -351,29 +434,43 @@ final readonly class ChatRunner implements TaskRunner
             $context->userId ?? $context->message->getUserId(),
             $isWidget,
             $docsHits,
+            $modelId,
         );
     }
 
     private function systemPrompt(TaskNode $node, string $language, NodeContext $context, ?string $topicPrompt = null): string
     {
-        if (null !== $topicPrompt && '' !== $topicPrompt) {
-            return $topicPrompt.$this->pipelineDirective($context);
+        $task = null !== $topicPrompt && '' !== $topicPrompt
+            ? $topicPrompt
+            : match ($node->capability) {
+                Capability::Summarize => sprintf(
+                    'You are a precise summarizer. Summarize the user text concisely%s in language "%s". Return ONLY the summary, no preamble.',
+                    isset($node->params['max_words']) && is_numeric($node->params['max_words']) ? ' in about '.(int) $node->params['max_words'].' words' : '',
+                    $language,
+                ),
+                Capability::Translate => sprintf(
+                    'Translate the user text into "%s". Return ONLY the translation.',
+                    is_string($node->params['target'] ?? null) ? $node->params['target'] : $language,
+                ),
+                default => sprintf('You are a helpful assistant. Answer in language "%s".', $language),
+            };
+
+        return $this->withAssistantInstructions($task, $context).$this->pipelineDirective($context);
+    }
+
+    /**
+     * The pinned assistant's instructions, kept beside the task contract so a
+     * summary is still only a summary and a file step still follows the template.
+     */
+    private function withAssistantInstructions(string $taskPrompt, NodeContext $context): string
+    {
+        $profile = $context->options['runtime_profile'] ?? $context->classification['runtime_profile'] ?? null;
+        $instructions = AssistantPlanLimits::instructions($profile instanceof RuntimeProfile ? $profile : null);
+        if (null === $instructions || str_contains($taskPrompt, $instructions)) {
+            return $taskPrompt;
         }
 
-        $base = match ($node->capability) {
-            Capability::Summarize => sprintf(
-                'You are a precise summarizer. Summarize the user text concisely%s in language "%s". Return ONLY the summary, no preamble.',
-                isset($node->params['max_words']) && is_numeric($node->params['max_words']) ? ' in about '.(int) $node->params['max_words'].' words' : '',
-                $language,
-            ),
-            Capability::Translate => sprintf(
-                'Translate the user text into "%s". Return ONLY the translation.',
-                is_string($node->params['target'] ?? null) ? $node->params['target'] : $language,
-            ),
-            default => sprintf('You are a helpful assistant. Answer in language "%s".', $language),
-        };
-
-        return $base.$this->pipelineDirective($context);
+        return $taskPrompt."\n\nAssistant instructions (follow these; the lines above still decide the output shape):\n".$instructions;
     }
 
     /**

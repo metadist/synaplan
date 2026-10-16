@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
 use App\Service\Auth\AppleClientSecretGenerator;
 use App\Service\Auth\AppleIdentityTokenVerifier;
+use App\Service\Auth\OAuthLoginResponder;
+use App\Service\Auth\TokenService;
 use App\Service\ModelConfigService;
-use App\Service\OAuthLoginResponder;
-use App\Service\OAuthStateService;
-use App\Service\TokenService;
+use App\Service\OAuth\OAuthStateService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -71,7 +72,10 @@ class AppleAuthController extends AbstractController
             return $this->oauthLoginResponder->error('apple', 'Apple Sign-In is not configured', $native);
         }
 
-        $state = $this->oauthStateService->generateState('apple', $native ? ['native' => true] : []);
+        $state = $this->oauthStateService->generateState('apple', AccountLanguage::withSignupLanguage(
+            $native ? ['native' => true] : [],
+            $request->query->get('language'),
+        ));
 
         $params = [
             'client_id' => $this->appleClientId,
@@ -87,6 +91,11 @@ class AppleAuthController extends AbstractController
     }
 
     #[Route('/callback', name: 'apple_auth_callback', methods: ['GET', 'POST'])]
+    #[OA\Get(
+        path: '/api/v1/auth/apple/callback',
+        summary: 'Handle the Apple OAuth callback',
+        tags: ['Authentication']
+    )]
     #[OA\Post(
         path: '/api/v1/auth/apple/callback',
         summary: 'Handle the Apple OAuth callback (form_post)',
@@ -133,7 +142,11 @@ class AppleAuthController extends AbstractController
 
             $claims = $this->identityTokenVerifier->verify($identityToken);
             $profile = $this->parseUserField($userField);
-            $user = $this->findOrCreateUser($claims, $profile);
+            $user = $this->findOrCreateUser(
+                $claims,
+                $profile,
+                AccountLanguage::normalize($statePayload['language'] ?? null),
+            );
 
             $this->logger->info('Apple OAuth successful', [
                 'user_id' => $user->getId(),
@@ -164,6 +177,7 @@ class AppleAuthController extends AbstractController
                 new OA\Property(property: 'firstName', type: 'string', nullable: true, description: 'Given name, only present on the first authorization'),
                 new OA\Property(property: 'lastName', type: 'string', nullable: true, description: 'Family name, only present on the first authorization'),
                 new OA\Property(property: 'email', type: 'string', nullable: true, description: 'Email, only present on the first authorization'),
+                new OA\Property(property: 'language', type: 'string', nullable: true, description: 'UI language used during signup (de, en, es, fr, tr).', example: 'de'),
             ]
         )
     )]
@@ -198,7 +212,11 @@ class AppleAuthController extends AbstractController
             'email' => isset($body['email']) && is_string($body['email']) ? $body['email'] : null,
         ];
 
-        $user = $this->findOrCreateUser($claims, $profile);
+        $user = $this->findOrCreateUser(
+            $claims,
+            $profile,
+            AccountLanguage::normalize($body['language'] ?? null),
+        );
 
         $accessToken = $this->tokenService->generateAccessToken($user);
         $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
@@ -215,6 +233,7 @@ class AppleAuthController extends AbstractController
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
                 'firstName' => $this->extractFirstName($user),
+                'language' => $user->getPreferredLanguage(),
             ],
             'tokens' => [
                 'accessToken' => $accessToken,
@@ -258,7 +277,7 @@ class AppleAuthController extends AbstractController
      * @param array{sub: string, email: ?string, emailVerified: bool, isPrivateEmail: bool} $claims
      * @param array{firstName: ?string, lastName: ?string, email: ?string}                  $profile
      */
-    private function findOrCreateUser(array $claims, array $profile): User
+    private function findOrCreateUser(array $claims, array $profile, ?string $signupLanguage = null): User
     {
         $appleSub = $claims['sub'];
         $email = $claims['email'] ?? $profile['email'];
@@ -313,6 +332,9 @@ class AppleAuthController extends AbstractController
         }
 
         $user->setUserDetails($details);
+        if ($isNewUser) {
+            $user->applySignupLanguage($signupLanguage);
+        }
 
         if (!$user->isEmailVerified() && $claims['emailVerified']) {
             $user->setEmailVerified(true);

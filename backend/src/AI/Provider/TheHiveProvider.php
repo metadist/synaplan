@@ -51,7 +51,7 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
     }
 
     /**
-     * The instance key from Models & keys (DB first, THEHIVE_API_KEY bootstrap).
+     * The instance key from Providers & keys (DB first, THEHIVE_API_KEY bootstrap).
      * Resolved per call so a key saved in the admin UI applies without a restart.
      */
     private function apiKey(): ?string

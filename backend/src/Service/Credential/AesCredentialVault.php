@@ -6,7 +6,7 @@ namespace App\Service\Credential;
 
 use App\Entity\Credential;
 use App\Repository\CredentialRepository;
-use App\Service\EncryptionService;
+use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
 
 final readonly class AesCredentialVault implements CredentialVaultInterface

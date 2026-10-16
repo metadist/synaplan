@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { test, expect } from '../test-setup'
 import { selectors } from '../helpers/selectors'
 import { login } from '../helpers/auth'
@@ -5,7 +6,7 @@ import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS, getApiUrl } from '../config/config'
 
 /**
- * Operate → Feature status: the declared feature modules of the installation.
+ * Operate → System status: the declared feature modules of the installation.
  *
  * Spans the module registry (`App\Module\ModuleRegistry`), the status API
  * (`/api/v1/features/status` → `modules[]`) and the rendered section, so the
@@ -17,7 +18,7 @@ import { TIMEOUTS, getApiUrl } from '../config/config'
  * Deterministic and provider-free (@ci); read-only. Auth: the worker
  * `storageState` is a non-admin user, so this spec logs in as the seeded admin.
  */
-test.describe('@ci Feature status', () => {
+test.describe('@ci System status', () => {
   test.beforeEach(async ({ page }) => {
     await login(page, CREDENTIALS.getAdminCredentials())
     await page.goto('/admin/features')
@@ -78,4 +79,80 @@ test.describe('@ci Feature status', () => {
       ).toBe(configured)
     }
   })
+
+  test('shows the compute sidecar card with one plain state sentence', async ({ page }) => {
+    // The backend always sends the compute entry (healthy or degraded), so
+    // the card renders on every stack. Reachability itself depends on the
+    // environment and is asserted only as internal consistency.
+    await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
+      timeout: TIMEOUTS.EXTREME,
+    })
+    const card = page.locator(selectors.featureStatus.computeSection)
+    await expect(card).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await expect(card.locator(selectors.featureStatus.computeStateLine)).not.toHaveText('')
+    await expect(card.locator(selectors.featureStatus.computeStatusPill)).not.toHaveText('')
+    await expect(card.locator(selectors.featureStatus.computeConfigLink)).toHaveAttribute(
+      'href',
+      /\/admin\/config\?tab=tools&section=compute/
+    )
+  })
+
+  test('shows stopped jobs on the card and a sidebar hint that opens system status', async ({
+    page,
+  }) => {
+    await mockSchedulerStatus(page, 'stale')
+    await page.goto('/')
+
+    const hint = page
+      .locator(selectors.featureStatus.schedulerSidebarHint)
+      .filter({ visible: true })
+    await expect(hint).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
+    await hint.click()
+
+    await expect(page).toHaveURL(/\/admin\/features/)
+    await expect(page.locator(selectors.featureStatus.schedulerStateLine)).toContainText(
+      'Background jobs have stopped',
+      { timeout: TIMEOUTS.STANDARD }
+    )
+    await expect(page.locator(selectors.featureStatus.schedulerStateLine)).toContainText(
+      'are not running'
+    )
+  })
+
+  test('shows a running sentence and no sidebar hint', async ({ page }) => {
+    await mockSchedulerStatus(page, 'running')
+    await page.goto('/admin/features')
+
+    await expect(page.locator(selectors.featureStatus.schedulerStateLine)).toContainText(
+      'Background jobs are running',
+      { timeout: TIMEOUTS.STANDARD }
+    )
+    await expect(
+      page.locator(selectors.featureStatus.schedulerSidebarHint).filter({ visible: true })
+    ).toHaveCount(0)
+  })
 })
+
+async function mockSchedulerStatus(page: Page, state: 'stale' | 'running'): Promise<void> {
+  const now = Math.floor(Date.now() / 1000)
+  const finished = state === 'running' ? now - 300 : now - 7_200
+  await page.route('**/api/v1/admin/scheduler/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        state,
+        maxAgeSeconds: 180,
+        checkedAt: now,
+        lastRunAt: finished,
+        lanes: (['tick', 'tasks', 'hourly', 'daily', 'health'] as const).map((lane) => ({
+          lane,
+          lastStartedAt: finished - 5,
+          lastFinishedAt: finished,
+          failedJobs: [],
+          unfinishedJobs: [],
+        })),
+      }),
+    })
+  })
+}

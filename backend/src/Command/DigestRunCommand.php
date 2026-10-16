@@ -64,15 +64,49 @@ final class DigestRunCommand extends Command
             $lock->release();
         }
 
-        $io->success(sprintf(
-            'Digest run: %d users processed, %d skipped, %d batches, %d messages scanned, %d digests created.',
+        if ((bool) $input->getOption('dry-run')) {
+            $this->renderProposals($io, $summary['proposals']);
+        }
+
+        $line = sprintf(
+            'Digest run: %d users processed, %d skipped, %d batches, %d messages scanned, %d digests created, %d failed batches, %d skipped for budget.',
             $summary['users'],
             $summary['skipped_users'],
             $summary['batches'],
             $summary['scanned'],
             $summary['created'],
-        ));
+            $summary['failed_batches'],
+            $summary['skipped_budget'],
+        );
+
+        if ($summary['aborted']) {
+            $io->error($line.' Aborted: '.($summary['abort_reason'] ?? 'unknown').'.');
+
+            return Command::FAILURE;
+        }
+
+        $io->success($line);
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @param list<array{user_id: int, title: string, message_id: int}> $proposals
+     */
+    private function renderProposals(SymfonyStyle $io, array $proposals): void
+    {
+        if ([] === $proposals) {
+            $io->writeln('Dry run: the model picked no messages.');
+
+            return;
+        }
+
+        $io->table(
+            ['User', 'Message', 'Proposed title'],
+            array_map(
+                static fn (array $proposal): array => [$proposal['user_id'], $proposal['message_id'], $proposal['title']],
+                $proposals,
+            ),
+        );
     }
 }

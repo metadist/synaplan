@@ -7,6 +7,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\ModelConfigService;
+use App\Tests\Support\FileAnalysisHandlerFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -42,7 +43,7 @@ class FileAnalysisHandlerGenericTypeTest extends TestCase
         $this->uploadDir = sys_get_temp_dir().'/synaplan-file-analysis-generic-'.bin2hex(random_bytes(8));
         mkdir($this->uploadDir, 0o775, true);
 
-        $this->handler = new FileAnalysisHandler(
+        $this->handler = FileAnalysisHandlerFactory::create(
             $this->aiFacade,
             $this->modelConfigService,
             $this->logger,

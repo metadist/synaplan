@@ -7,6 +7,15 @@ class ProviderException extends \RuntimeException
     private const HTTP_STATUS_MIN = 400;
     private const HTTP_STATUS_MAX = 599;
 
+    /** Longest provider reply kept in a message, context, log line or chat quote. */
+    public const TEXT_EXCERPT_CHARS = 300;
+
+    /** Block reason for an image the provider's safety filter discarded. */
+    private const FILTERED_BLOCK_REASON = 'SAFETY';
+
+    /** Provider names whose spelling ucfirst() gets wrong. */
+    private const DISPLAY_NAMES = ['openai' => 'OpenAI', 'xai' => 'xAI'];
+
     /**
      * @param int $code the upstream HTTP status when the provider rejected the
      *                  request, so callers can relay it instead of flattening
@@ -79,6 +88,85 @@ class ProviderException extends \RuntimeException
             $provider,
             $context,
         );
+    }
+
+    /**
+     * The image model answered without an image, e.g. Gemini with only a text
+     * part and finishReason STOP. The message names the provider and quotes
+     * the reply, so a REST caller learns what the model said.
+     *
+     * Returns {@see NoImageException} so the circuit breaker and model-health
+     * monitor treat it as the request, not as an outage. It is still a
+     * {@see ProviderException}.
+     *
+     * @param string|null $textResponse First text the provider returned, if any
+     * @param string|null $finishReason Provider finish reason, if any
+     */
+    public static function noImage(string $provider, string $model, ?string $textResponse, ?string $finishReason): NoImageException
+    {
+        $displayName = self::displayName($provider);
+        $excerpt = null !== $textResponse ? mb_substr(trim($textResponse), 0, self::TEXT_EXCERPT_CHARS) : '';
+
+        $message = '' !== $excerpt
+            ? sprintf('%s returned text instead of an image (%s): "%s"', $displayName, $model, $excerpt)
+            : sprintf('%s returned no image (%s%s)', $displayName, $model, null !== $finishReason ? ', finish reason '.$finishReason : '');
+
+        return new NoImageException($message, $provider, [
+            'text_response' => '' !== $excerpt ? $excerpt : null,
+            'finish_reason' => $finishReason,
+            'model' => $model,
+        ]);
+    }
+
+    /**
+     * The provider's safety filter discarded every generated image, e.g.
+     * Imagen with only `raiFilteredReason` in its predictions. The filter
+     * note is not a model reply, so it carries a block reason and the chat
+     * explains the filter instead of asking for an image instruction.
+     *
+     * Returns {@see NoImageException}: a filtered prompt is the request, not
+     * an outage, and must not open the circuit.
+     */
+    public static function imageFiltered(string $provider, string $model, string $filterNote): NoImageException
+    {
+        $excerpt = mb_substr(trim($filterNote), 0, self::TEXT_EXCERPT_CHARS);
+
+        return new NoImageException(
+            sprintf('%s filtered the generated image (%s): "%s"', self::displayName($provider), $model, $excerpt),
+            $provider,
+            [
+                'block_reason' => self::FILTERED_BLOCK_REASON,
+                'text_response' => '' !== $excerpt ? $excerpt : null,
+                'model' => $model,
+            ],
+        );
+    }
+
+    /** Provider name as people read it: "OpenAI", not "Openai". */
+    public static function displayName(string $provider): string
+    {
+        return self::DISPLAY_NAMES[strtolower($provider)] ?? ucfirst($provider);
+    }
+
+    /**
+     * Fields for an error log line: the provider and, when it told us, the
+     * model, finish reason and an excerpt of its reply.
+     *
+     * @return array<string, string>
+     */
+    public function logContext(): array
+    {
+        $context = ['provider' => $this->providerName];
+        foreach (['model', 'finish_reason', 'block_reason'] as $key) {
+            if (is_string($this->context[$key] ?? null) && '' !== $this->context[$key]) {
+                $context[$key] = $this->context[$key];
+            }
+        }
+        if (is_string($this->context['text_response'] ?? null) && '' !== $this->context['text_response']) {
+            $context['text_response'] = mb_substr($this->context['text_response'], 0, self::TEXT_EXCERPT_CHARS);
+        }
+
+        return $context;
     }
 
     /**

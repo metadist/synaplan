@@ -19,7 +19,7 @@
           </div>
           <button
             type="button"
-            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             @click="emit('close')"
           >
             {{ $t('workflows.close') }}
@@ -46,7 +46,7 @@
         <StepPicker v-model="picked" :tools="tools" />
         <button
           type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-add-step"
           :disabled="!picked"
           @click="addPicked"
@@ -59,7 +59,7 @@
         <div class="flex flex-wrap gap-2">
           <button
             type="button"
-            class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+            class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-save-steps"
             :disabled="saving"
             @click="save"

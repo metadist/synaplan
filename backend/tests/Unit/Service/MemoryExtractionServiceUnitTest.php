@@ -10,7 +10,7 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
-use App\Service\MemoryExtractionService;
+use App\Service\Memory\MemoryExtractionService;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;

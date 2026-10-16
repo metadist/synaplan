@@ -211,14 +211,14 @@ onMounted(load)
         <textarea
           v-model="promptText"
           rows="14"
-          class="w-full px-4 py-3 surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono rounded-lg"
+          class="w-full px-4 py-3 surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] resize-y font-mono rounded-xl"
           :disabled="loading"
         />
 
         <!-- Reset to Default -->
         <div v-if="!isDefault" class="flex items-center">
           <button
-            class="px-3 py-2 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 border border-red-500/30 transition-colors flex items-center gap-1.5"
+            class="px-3 py-2 rounded-xl text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 border border-red-500/30 transition-colors flex items-center gap-1.5"
             @click="resetPrompt"
           >
             <Icon icon="heroicons:arrow-path" class="w-3.5 h-3.5" />

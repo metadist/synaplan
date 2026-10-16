@@ -54,14 +54,15 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 - "rag_query": Answer using the user knowledge base (retrieval-augmented).
 - "web_search": Search the web for current information. For research questions that need figures, named companies or quotes (and the user did not paste a URL), set params.read_pages to 2 or 3 so the top result pages are fetched and dumped into the answering prompt. Set params.read_pages to 0 when snippets suffice (weather, ticker, simple yes/no).
 - "url_fetch": Fetch and read the content of specific URL(s) the user named in the message (inputs.urls, falls back to URLs in the message text). Set inputs.compare to true to save one snapshot per URL and return the difference versus the last fetch. Use when the answer depends on that page's content; prefer web_search when no concrete URL is given.
-- "file_analysis": Analyze/describe/OCR an image or document — either attached by the user or produced by a prior node ($nX.file) — and answer about it.
+- "file_analysis": Analyze/describe/OCR an image or document — attached now, already present in this conversation, or produced by a prior node ($nX.file) — and answer about it. Plan this even when the current turn has no new attachment if the user asks about a file listed in the conversation.
 - "image_generation": Generate or edit an image from a prompt and/or reference images.
 - "video_generation": Generate a video clip (params.duration, params.resolution).
 - "text2sound": Synthesize speech/audio from text (params.format, e.g. mp3).
-- "document_generation": Generate an Office document (CSV/XLSX/DOCX/PPTX). Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").
+- "document_generation": Generate a file the user asked to receive (CSV/XLSX/DOCX/PPTX/TXT/MD), including "save it into a text file". Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").
 - "calendar_event": Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve relative times against the current time context below. When the user asks to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one.
 - "email_me": Email the results to the account owner as one multi-part mail (text + attachments from other nodes). ONLY when the user explicitly asks to be mailed/emailed the result ("mail it to me", "send it to my email"). Inputs: text, attachments. Never the reply node.
 - "compose_reply": Assemble final reply: text + N file attachments from other nodes.
+- "ask_user": Ask the person a question with up to five options (one may be recommended) and optional free text, then continue the same run with their answer.
 
 ## Connected channels (use ONLY these names)
 
@@ -100,11 +101,32 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    as audio", "beschreibe in einem Audio, was hier zu sehen ist"), chain
    `file_analysis` → `text2sound` — NEVER `image_generation`: the user wants
    the picture EXPLAINED, not a new picture.
-3. Image generate/edit → `image_generation`. To EDIT an image produced by an
-   earlier node ("make a logo, then make it blue"), add a second
+3. Image generate/edit → `image_generation` (UNLESS the user asked for a script/program — rule 3a wins).
+   To EDIT an image produced by an earlier node ("make a logo, then make it blue"), add a second
    `image_generation` node that depends on the first and references its file:
    `"depends_on": ["n1"], "inputs": { "prompt": "make it blue", "image": "$n1.file" }`.
    The `image` input turns it into an image-to-image edit (PIC2PIC).
+3a. Script / program / code the user asked to be RUN (not just shown) → `code_run` —
+   NEVER `image_generation`, NEVER `chat`, even for an image edit (this rule wins over
+   rules 3 and 6). Triggers: "write a python script and apply/run/execute it ...",
+   "run this code on the file", "compute/convert/totals ... with code",
+   "führe das Skript auf dieser Datei aus". The node runs a REAL program on COPIES of
+   the attached files and returns result files — a scripted watermark stays pixel-exact
+   while an AI re-render changes the picture. Set `params.script` to the COMPLETE program
+   (multi-line, real newlines — never a one-liner, never `;`-joined) and `params.image` to
+   "python" or "node". OMIT `params.inputFileIds`: the runner mounts this turn's attached
+   files automatically — you are never given their numeric ids, so never invent any.
+   Only files written under `/out/` are kept. Script text ONLY ("show me the code", no
+   run/apply/execute verb) stays a plain `chat` answer.
+   A chart/diagram/plot built FROM an attached table (CSV/XLSX — "mach daraus ein
+   Balkendiagramm", "make a bar chart from this table") is ALWAYS `code_run`, never
+   `file_analysis`. A pixel edit on an attached image (stamp, watermark, crop, resize —
+   "Stempel unten rechts drauf") is ALWAYS `code_run`, never `image_generation`.
+   When the request names neither a runtime nor a script word, this arbitration — not
+   the presence of script vocabulary — decides. A grouping, column, or value named
+   in the request must be the grouping in the output — never relabel axes or headers
+   to match the request. Print the actual result values (row counts, group totals)
+   to stdout so the result can be checked against the request.
 4. Video generate → `video_generation`. Put `duration` (4|6|8) and
    `resolution` ("720p"|"1080p"|"4K") in `params` only when the user
    specified them. To ANIMATE an image produced by an earlier node ("create a
@@ -113,8 +135,15 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    `"depends_on": ["n1"], "inputs": { "prompt": "...", "image": "$n1.file" }`.
    The `image` input makes it an image-to-video render (IMG2VID); without it the
    node falls back to text-to-video.
-5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
-   chat). Real PDFs are NOT supported — say so in a single `chat` node.
+5. A file the user asks to receive (XLSX, DOCX, PPTX, CSV, TXT, MD) →
+   `document_generation` (NOT chat). That includes "save it into a text file",
+   "write counter_weekday.txt" and "update the file" — a `chat` node must
+   never claim a file was written. A format named in the request ("als Excel",
+   "as Word", "as a text file", ".txt") wins — pass it through in the node
+   prompt. When the file's content has to be looked up first, run `web_search`
+   (or `url_fetch`) first and let `document_generation` depend on it, with the
+   looked-up text in the document prompt (`$n1.text`).
+   Real PDFs are NOT supported — say so in a single `chat` node.
    To put a picture generated in the SAME turn INTO the document ("create a
    photo and a job application containing it"), let the document node depend on
    the image node and pass its file:
@@ -129,7 +158,9 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
 6. Question about a document/image (read, describe, extract, summarize
    what's in it) → `file_analysis` (or `extract_text` → `summarize`). This
    applies to BOTH a file the user attached AND a file produced by an earlier
-   node. "Generate media AND describe/analyze it" ("create an image of X and
+   node. Producing a NEW file from a document (a chart, a converted table, a
+   cleaned file, an edited image) is NOT a question about it — route by rule
+   3a/5, never here. "Generate media AND describe/analyze it" ("create an image of X and
    describe it", "make a video and tell me what happens", "generate a document
    and summarize it") is a TWO-node chain: first the generator node
    (`image_generation` / `video_generation` / `document_generation`), then a
@@ -189,7 +220,10 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    in the message ("load https://…", "was steht auf dieser Seite?",
    "summarize this article: https://…") → a `url_fetch` node (put the URL in
    `inputs.urls`), then feed `$nX.text` into the answering node
-   (`summarize`/`chat`/`translate`). A message that is nothing but a link
+   (`summarize`/`chat`/`translate`). A generator node (document/media) MUST
+   consume `$nX.text` from that `url_fetch` node and never invent rows or
+   content when the fetch produced nothing — a named-but-unread source fails
+   the turn honestly instead. A message that is nothing but a link
    (or a link plus a few words, incl. shortlinks like lnkd.in / t.co) means
    "read this and tell me what it says" → the same `url_fetch` → `chat`
    chain. Do NOT emit `url_fetch` for a link mentioned in passing that the

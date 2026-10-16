@@ -1,58 +1,47 @@
 import type { PromptMetadata } from '@/services/api/promptsApi'
 
 /**
- * Tri-state web-search setting for a prompt (issue #1138).
+ * Web-search setting for a prompt.
  *
- * The backend's `tool_internet` metadata flag has three meaningful states and
- * the routing layer (`WebSearchTopicPolicy::shouldSearch`) treats them
- * differently:
- *   - 'auto' → key absent / null → no preference, the classifier decides
- *   - 'on'   → `true`            → always search
- *   - 'off'  → `false`           → never search
+ * The backend's `tool_internet` metadata flag is read by the routing layer
+ * (`WebSearchTopicPolicy::shouldSearch`):
+ *   - 'auto' → key absent (or a stored `true`) → the AI decides per message
+ *   - 'off'  → `false`                         → never search
  *
- * A plain checkbox can only express two states and silently collapsed the
- * 'auto' default into 'off' on save, hard-disabling web search.
+ * A prompt cannot force a search on every message. A stored `true` from an
+ * older build reads as 'auto' and is dropped on the next save.
  */
-export type InternetSearchMode = 'auto' | 'on' | 'off'
+export type InternetSearchMode = 'auto' | 'off'
 
 /**
- * Derive the tri-state mode from prompt metadata.
+ * Derive the mode from prompt metadata.
  *
- * Uses `??` so an explicit `false` ('off') is preserved instead of being
- * collapsed into 'auto'; only a missing/null value falls through to 'auto'.
- * The legacy `tool_internet_search` alias is honoured for older metadata rows.
+ * Only an explicit `false` is 'off'. The legacy `tool_internet_search` alias
+ * is honoured for older metadata rows.
  */
 export function internetModeFromMetadata(
   metadata: PromptMetadata | null | undefined
 ): InternetSearchMode {
   const raw =
     metadata?.tool_internet ?? (metadata?.tool_internet_search as boolean | null | undefined)
-  if (true === raw) {
-    return 'on'
-  }
-  if (false === raw) {
-    return 'off'
-  }
-  return 'auto'
+  return false === raw ? 'off' : 'auto'
 }
 
 /**
- * Write the tri-state mode back into a metadata payload.
+ * Write the mode back into a metadata payload.
  *
- * Only the explicit 'on'/'off' choices set `tool_internet`. For 'auto' the key
- * is left unset so the backend keeps the "classifier decides" default (the
+ * 'off' sets `tool_internet=false`. For 'auto' the key is left unset (the
  * metadata save path rewrites the whole set, so an absent key clears any
- * previously stored override).
+ * previously stored value).
  */
 export function applyInternetModeToMetadata(
   metadata: PromptMetadata,
   mode: InternetSearchMode
 ): void {
-  if ('on' === mode) {
-    metadata.tool_internet = true
-  } else if ('off' === mode) {
+  if ('off' === mode) {
     metadata.tool_internet = false
   } else {
     delete metadata.tool_internet
   }
+  delete metadata.tool_internet_search
 }

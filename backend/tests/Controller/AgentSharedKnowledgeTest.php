@@ -39,6 +39,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
         $config->setValue(0, AgentConfig::CONFIG_GROUP, AgentConfig::KEY_ENABLED, '1');
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '1');
         $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_SHARING_ENABLED, '1');
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_USER_SEARCH_ENABLED, '1');
         $this->em->flush();
     }
 
@@ -59,13 +60,13 @@ final class AgentSharedKnowledgeTest extends WebTestCase
                 'knowledge' => ['ownFolder' => true, 'folders' => [(int) $stranger->getId().':third-party']],
             ],
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $agent = $this->json()['agent'];
         $agentId = (int) $agent['id'];
         $ownFolder = 'TASKPROMPT:agent:'.$agent['slug'];
 
         $this->postJson('/api/v1/agents/'.$agentId.'/publish', ['changelog' => 'v1']);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         // Owner keeps editing after publishing — the recipient must not see this.
         $this->client->request(
@@ -74,7 +75,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
             server: ['CONTENT_TYPE' => 'application/json'],
             content: json_encode(['draft' => $agent['draft'] + ['behaviour' => ['starterPrompts' => ['Unpublished secret starter']]]], JSON_THROW_ON_ERROR),
         );
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         $ragScopes = static::getContainer()->get(RagScopeResolver::class);
         $runtime = static::getContainer()->get(AgentRuntimeResolver::class);
@@ -92,7 +93,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
             'subjectId' => $recipientId,
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $profile = $runtime->resolve($agentId, $recipient);
         self::assertSame(RagScopeResolver::sharedPickerKey($ownerId, $ownFolder), $profile->primaryRagGroupKey(), 'a foreign scope is emitted in the shared picker form');
@@ -111,7 +112,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
 
         $this->authenticateClient($this->client, $recipient);
         $this->client->request('GET', '/api/v1/agents/gallery');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $card = null;
         foreach ($this->json()['cards'] as $candidate) {
             if ((int) $candidate['id'] === $agentId) {
@@ -131,7 +132,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
         $this->authenticateClient($this->client, $owner);
 
         $this->postJson('/api/v1/agents', ['name' => 'Routing test '.uniqid()]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $agent = $this->json()['agent'];
         $agentId = (int) $agent['id'];
         $topic = 'agent:'.$agent['slug'];
@@ -141,7 +142,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
         self::assertNotContains($topic, array_column($prompts->getTopicsWithDescriptions(0, 'en', $ownerId), 'topic'));
 
         $this->postJson('/api/v1/agents/'.$agentId.'/publish', ['changelog' => 'v1']);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertNotContains($topic, $prompts->getAllTopics(0, $ownerId), 'published but not routable stays pinned-only');
 
         $this->client->request(
@@ -150,7 +151,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
             server: ['CONTENT_TYPE' => 'application/json'],
             content: json_encode(['routable' => true], JSON_THROW_ON_ERROR),
         );
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertContains($topic, $prompts->getAllTopics(0, $ownerId), 'routable assistants are offered to the sorter');
         self::assertContains($topic, array_column($prompts->getTopicsWithDescriptions(0, 'en', $ownerId), 'topic'));
 
@@ -171,14 +172,14 @@ final class AgentSharedKnowledgeTest extends WebTestCase
         $this->authenticateClient($this->client, $owner);
 
         $this->postJson('/api/v1/agents', ['name' => 'Kind split '.uniqid()]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
         $agent = $this->json()['agent'];
         $agentId = (int) $agent['id'];
         $promptId = (int) $agent['promptId'];
         $topic = 'agent:'.$agent['slug'];
 
         $this->client->request('GET', '/api/v1/prompts');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $listed = array_column($this->json()['prompts'] ?? [], 'topic');
         self::assertNotContains($topic, $listed, 'an assistant\'s instruction is not an instruction of its own');
 
@@ -186,7 +187,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
         self::assertNotContains($topic, array_map(static fn ($p) => $p->getTopic(), $prompts->findAllForUser($ownerId)));
 
         $this->postJson('/api/v1/agents/'.$agentId.'/publish', ['changelog' => 'v1']);
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
         $this->postJson('/api/v1/shares', [
             'kind' => 'assistant',
@@ -195,7 +196,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
             'subjectId' => (int) $recipient->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
 
         $this->postJson('/api/v1/shares', [
             'kind' => 'agent',
@@ -204,7 +205,7 @@ final class AgentSharedKnowledgeTest extends WebTestCase
             'subjectId' => (int) $recipient->getId(),
             'permission' => 'use',
         ]);
-        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
     }
 
     /**

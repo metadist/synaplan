@@ -45,28 +45,28 @@
         </div>
         <div class="flex items-center gap-2">
           <button
-            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20 flex items-center gap-1.5"
+            class="px-3 py-1.5 rounded-xl text-sm font-medium transition-colors bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20 flex items-center gap-1.5"
             @click="activateSelected"
           >
             <CheckCircleIcon class="w-4 h-4" />
             {{ $t('mail.activate') }}
           </button>
           <button
-            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-gray-500/10 txt-secondary hover:bg-gray-500/20 flex items-center gap-1.5"
+            class="px-3 py-1.5 rounded-xl text-sm font-medium transition-colors bg-gray-500/10 txt-secondary hover:bg-gray-500/20 flex items-center gap-1.5"
             @click="deactivateSelected"
           >
             <XCircleIcon class="w-4 h-4" />
             {{ $t('mail.deactivate') }}
           </button>
           <button
-            class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 flex items-center gap-1.5"
+            class="px-3 py-1.5 rounded-xl text-sm font-medium transition-colors bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 flex items-center gap-1.5"
             @click="deleteSelected"
           >
             <TrashIcon class="w-4 h-4" />
             {{ $t('mail.deleteSelected') }}
           </button>
           <button
-            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
+            class="p-1.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary"
             :aria-label="$t('common.cancel')"
             @click="selectedHandlers = []"
           >
@@ -122,7 +122,7 @@
               class="w-5 h-5 rounded border-2 border-light-border dark:border-dark-border peer-checked:border-[var(--brand)] peer-checked:bg-[var(--brand)] transition-all flex items-center justify-center"
             >
               <CheckIcon
-                class="w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity"
+                class="w-3 h-3 text-[var(--on-brand)] opacity-0 peer-checked:opacity-100 transition-opacity"
               />
             </div>
           </label>
