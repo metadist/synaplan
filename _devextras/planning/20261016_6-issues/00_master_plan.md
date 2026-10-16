@@ -110,12 +110,14 @@ This section says how the change becomes a merged pull request.
 
    ```bash
    gh pr create --base <parent> --title "<type>(<scope>): <why>" --body-file <body>
-   gh pr edit <number> --add-reviewer copilot
+   gh api -X POST repos/metadist/synaplan/pulls/<number>/requested_reviewers \
+     -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
    ```
 
-   If the reviewer login differs on this repo, request the Copilot code
-   reviewer the repository already uses. The request has to succeed. A
-   pull request Copilot never saw is not done.
+   `gh pr edit --add-reviewer copilot` does not resolve a user on this
+   repo. The bot login above is what leaves a `review_requested` event
+   for Copilot, the same reviewer as on #2514. Confirm the event. A pull
+   request Copilot never saw is not done.
 9. **Read every Copilot comment.** Fix what is a real defect, a broken
    contract, or a missed test. Reply on the thread when you decline one,
    with the reason (out of scope, already covered, or a wrong reading of
