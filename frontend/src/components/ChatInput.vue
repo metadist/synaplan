@@ -424,8 +424,10 @@
               class="min-w-0 max-w-[6.5rem] flex-shrink overflow-hidden"
               @remove="clearTool"
             />
+            <!-- The "4 tools" count is a desktop hint. On a phone the plus
+                 button already opens the tools, so the label only crowds the row. -->
             <span
-              v-if="!isGuestMode && !hideToolsSummary"
+              v-if="!isGuestMode && !hideToolsSummary && !isMobile"
               class="max-w-[10rem] shrink truncate text-xs txt-secondary"
               data-testid="chip-tools-summary"
             >
@@ -513,21 +515,12 @@
           :status="liveStatus"
           :status-hint="liveStatusHint"
           :muted="liveMuted"
-          :company-line="$t('chatInput.liveVoice.companyLine', { company: liveCompany })"
-          :touches-line="$t(liveLine('chatInput.liveVoice.touchesLine'))"
-          :owner-line="$t('chatInput.liveVoice.ownerLine')"
           :model-label="liveModelLabel"
           :budget-label="liveBudgetLabel"
           :mute-label="
             liveMuted ? $t('chatInput.liveVoice.unmute') : $t('chatInput.liveVoice.mute')
           "
-          :captions-label="
-            liveCaptions
-              ? $t('chatInput.liveVoice.captionsOn')
-              : $t('chatInput.liveVoice.captionsOff')
-          "
           :end-label="$t('chatInput.liveVoice.end')"
-          :settings-label="$t('chatInput.liveVoice.settings')"
           :warn-banner="
             liveBudgetWarn && livePhase !== 'ended'
               ? $t('chatInput.liveVoice.warnBanner', { seconds: liveSecondsLeft ?? 0 })
@@ -538,7 +531,6 @@
           :terminal-action="liveTerminalAction"
           :close-label="$t('chatInput.liveVoice.terminal.actionClose')"
           @mute="liveToggleMute"
-          @captions="liveToggleCaptions"
           @end="liveEnd"
           @dismiss="liveDismiss"
           @action="onLiveTerminalAction"
@@ -2187,7 +2179,6 @@ const {
   declineConsent: liveDeclineConsent,
   end: liveEnd,
   toggleMute: liveToggleMute,
-  toggleCaptions: liveToggleCaptions,
   dismiss: liveDismiss,
 } = useLiveVoice((budget) => emit('budgetBlocked', liveBudgetResult(budget)))
 

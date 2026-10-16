@@ -325,6 +325,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         language: String(locale.value || 'en'),
         client: 'web',
         incognito: incognito.active,
+        ...(incognito.active ? { useSavedContext: incognito.useSavedContext } : {}),
       })
       openedSessionId = session.sessionId
       if (!liveRunIs(run)) return

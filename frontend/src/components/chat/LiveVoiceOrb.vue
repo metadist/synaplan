@@ -241,20 +241,22 @@ onUnmounted(() => {
     aria-hidden="true"
     data-testid="live-voice-orb"
   >
-    <canvas ref="canvas" class="absolute inset-0 h-full w-full" />
+    <canvas ref="canvas" class="live-orb__glow absolute inset-0 h-full w-full" />
     <div
       v-if="phase === 'connecting'"
       class="live-orb__connect"
       data-testid="live-voice-connecting-ring"
       aria-hidden="true"
     />
-    <div class="live-orb__body">
-      <div class="live-orb__cloud live-orb__cloud--a" />
-      <div class="live-orb__cloud live-orb__cloud--b" />
-      <div class="live-orb__cloud live-orb__cloud--c" />
-      <div class="live-orb__sheen" />
-      <div class="live-orb__rim" />
-      <div class="live-orb__shine" />
+    <div class="live-orb__scaler">
+      <div class="live-orb__body">
+        <div class="live-orb__cloud live-orb__cloud--a" />
+        <div class="live-orb__cloud live-orb__cloud--b" />
+        <div class="live-orb__cloud live-orb__cloud--c" />
+        <div class="live-orb__sheen" />
+        <div class="live-orb__rim" />
+        <div class="live-orb__shine" />
+      </div>
     </div>
   </div>
 </template>
@@ -268,11 +270,31 @@ onUnmounted(() => {
   --orb-spin: 16s;
 }
 
-.live-orb__body {
+/* Scale lives on the wrapper. The circle itself must not be transformed:
+   WebKit drops border-radius clipping on a transformed layer, so the
+   blurred clouds paint a square behind the orb. Firefox keeps the clip. */
+.live-orb__scaler {
   position: absolute;
   inset: 23%;
-  overflow: hidden;
   border-radius: 9999px;
+  transform: scale(var(--orb-scale));
+  box-shadow:
+    0 26px 56px -18px color-mix(in srgb, var(--brand) 75%, transparent),
+    0 0 60px color-mix(in srgb, var(--brand) 30%, transparent);
+  transition:
+    filter 400ms ease,
+    opacity 400ms ease;
+}
+
+.live-orb__glow {
+  background: transparent;
+}
+
+.live-orb__body {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
   background: radial-gradient(
     circle at 34% 26%,
     color-mix(in srgb, var(--brand-light) 55%, #fff) 0%,
@@ -282,14 +304,12 @@ onUnmounted(() => {
     color-mix(in srgb, var(--brand-fill) 80%, #000) 100%
   );
   box-shadow:
-    0 26px 56px -18px color-mix(in srgb, var(--brand) 75%, transparent),
-    0 0 60px color-mix(in srgb, var(--brand) 30%, transparent),
     inset 0 -10px 24px color-mix(in srgb, #000 16%, transparent),
     inset 0 0 0 1px color-mix(in srgb, #fff 22%, transparent);
-  transform: scale(var(--orb-scale));
-  transition:
-    filter 400ms ease,
-    opacity 400ms ease;
+  clip-path: circle(50%);
+  /* A mask, not only overflow, so filter and mix-blend stay inside the circle. */
+  -webkit-mask-image: radial-gradient(circle, #fff 99%, transparent 100%);
+  mask-image: radial-gradient(circle, #fff 99%, transparent 100%);
   isolation: isolate;
 }
 
@@ -385,7 +405,7 @@ onUnmounted(() => {
   --orb-spin: 8s;
 }
 
-.live-orb[data-phase='connecting'] .live-orb__body {
+.live-orb[data-phase='connecting'] .live-orb__scaler {
   opacity: 0.8;
 }
 
@@ -399,13 +419,13 @@ onUnmounted(() => {
   --orb-spin: 9s;
 }
 
-.live-orb[data-muted='true'] .live-orb__body {
+.live-orb[data-muted='true'] .live-orb__scaler {
   filter: saturate(0.3);
   opacity: 0.6;
 }
 
-.live-orb[data-phase='ended'] .live-orb__body,
-.live-orb[data-phase='idle'] .live-orb__body {
+.live-orb[data-phase='ended'] .live-orb__scaler,
+.live-orb[data-phase='idle'] .live-orb__scaler {
   opacity: 0.5;
 }
 

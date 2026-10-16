@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Service\Chat\Stream;
 
 /**
- * How a streamed turn runs: reasoning, web search, voice reply, memories,
- * the model or prompt the person picked, the knowledge-base folder, and the
- * pinned assistant.
+ * How a streamed turn runs: reasoning, web search, voice reply, saved
+ * context, the model or prompt the person picked, the knowledge-base folder,
+ * and the pinned assistant.
  */
 final readonly class StreamTurnOptions
 {
@@ -21,7 +21,7 @@ final readonly class StreamTurnOptions
         public string $reasoningEffort = '',
         public bool $webSearch = false,
         public bool $voiceReply = false,
-        public bool $disableMemories = false,
+        public StreamSavedContext $savedContext = new StreamSavedContext(),
         public ?string $modelId = null,
         public bool $isAgain = false,
         public ?string $fixedTaskPromptTopic = null,

@@ -54,7 +54,7 @@ class StreamController extends AbstractController
     #[OA\Post(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response (POST body)',
-        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, reasoningEffort, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, agentId, draft, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
+        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, reasoningEffort, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, agentId, draft, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, disableKnowledge, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
         security: [['Bearer' => []]],
         tags: ['Messages'],
         requestBody: new OA\RequestBody(

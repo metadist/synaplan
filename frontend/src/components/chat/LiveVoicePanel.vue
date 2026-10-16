@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
 import type { LivePhase } from '@/services/liveVoice/machine'
 import type { LiveTerminalAction } from '@/services/liveVoice/terminal'
 
@@ -9,15 +8,10 @@ const props = defineProps<{
   status: string
   statusHint: string
   muted: boolean
-  companyLine: string
-  touchesLine: string
-  ownerLine: string
   modelLabel: string
   budgetLabel: string
   muteLabel: string
-  captionsLabel: string
   endLabel: string
-  settingsLabel: string
   warnBanner: string
   terminalMessage: string
   terminalActionLabel: string
@@ -27,7 +21,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   mute: []
-  captions: []
   end: []
   dismiss: []
   action: []
@@ -92,14 +85,6 @@ function onKeydown(event: KeyboardEvent) {
       >
         {{ muteLabel }}
       </button>
-      <button
-        type="button"
-        class="btn-secondary px-4 py-2.5 text-sm font-medium"
-        data-testid="btn-live-voice-captions"
-        @click="emit('captions')"
-      >
-        {{ captionsLabel }}
-      </button>
       <div class="ml-auto flex min-w-0 items-center gap-3">
         <div class="hidden min-w-0 text-right min-[480px]:block">
           <p class="truncate text-sm txt-primary">{{ modelLabel }}</p>
@@ -139,18 +124,6 @@ function onKeydown(event: KeyboardEvent) {
         </button>
       </div>
     </div>
-
-    <p v-if="!connecting" class="mt-3 text-xs txt-secondary">
-      {{ ownerLine }} {{ companyLine }} {{ touchesLine }}
-      <span v-if="budgetLabel" class="min-[480px]:hidden">{{ budgetLabel }}.</span>
-      <RouterLink
-        to="/ai/models?highlight=VOICE_LIVE"
-        class="underline"
-        data-testid="link-live-voice-settings"
-      >
-        {{ settingsLabel }}
-      </RouterLink>
-    </p>
   </section>
 </template>
 

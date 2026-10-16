@@ -1,10 +1,8 @@
 <template>
   <button
     type="button"
-    :class="[
-      'flex items-center justify-center w-10 h-10 rounded-full shadow-lg active:scale-95 transition-transform',
-      incognitoStore.active ? 'btn-primary' : 'surface-card txt-primary',
-    ]"
+    class="incognito-toggle flex items-center justify-center w-10 h-10 shadow-lg active:scale-95 transition-transform"
+    :class="incognitoStore.active ? 'btn-primary' : 'surface-card txt-primary'"
     :aria-label="incognitoStore.active ? $t('incognito.toggleEnd') : $t('incognito.toggleStart')"
     :title="incognitoStore.active ? $t('incognito.toggleEnd') : $t('incognito.toggleStart')"
     :aria-pressed="incognitoStore.active"
@@ -56,3 +54,14 @@ const handleToggle = async () => {
   await incognitoStore.endSession()
 }
 </script>
+
+<style scoped>
+/* The resting button wears surface-card, so it keeps that card's corner
+   (16px in the app design). Activating it swaps in btn-primary; a
+   rounded-full on the same control then wins and the button jumps to a
+   circle. Pin the corner so both states match the other header buttons,
+   on every screen. */
+button.incognito-toggle.incognito-toggle {
+  border-radius: var(--v2-radius, 0.75rem);
+}
+</style>

@@ -95,40 +95,19 @@ describe('MobileNav', () => {
     Element.prototype.scrollIntoView = vi.fn()
   })
 
-  it('places a History link with the primary buttons, matching the desktop rail', async () => {
+  it('lists chats under the primary buttons without a separate History control', async () => {
     const wrapper = await mountNav()
 
-    const newChat = wrapper.find('[data-testid="btn-mobile-nav-new"]')
-    const history = wrapper.find('[data-testid="btn-mobile-nav-history"]')
-    const files = wrapper.find('[data-testid="btn-mobile-nav-files"]')
-    const more = wrapper.find('[data-testid="btn-mobile-nav-more"]')
-
-    expect(newChat.exists()).toBe(true)
-    expect(history.exists()).toBe(true)
-    expect(files.exists()).toBe(true)
-    expect(more.exists()).toBe(true)
-    expect(history.text()).toContain('History')
+    expect(wrapper.find('[data-testid="btn-mobile-nav-new"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-mobile-nav-history"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-mobile-nav-files"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-mobile-nav-more"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-mobile-history"]').exists()).toBe(true)
 
     const buttons = wrapper
       .findAll('[data-testid^="btn-mobile-nav-"]')
       .map((btn) => btn.attributes('data-testid'))
-    expect(buttons).toEqual([
-      'btn-mobile-nav-new',
-      'btn-mobile-nav-history',
-      'btn-mobile-nav-files',
-      'btn-mobile-nav-more',
-    ])
-  })
-
-  it('jumps to the in-drawer history list', async () => {
-    const wrapper = await mountNav('/channels')
-    await flushPromises()
-
-    await wrapper.find('[data-testid="btn-mobile-nav-history"]').trigger('click')
-    await flushPromises()
-
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled()
-    expect(wrapper.find('[data-testid="section-mobile-history"]').exists()).toBe(true)
+    expect(buttons).toEqual(['btn-mobile-nav-new', 'btn-mobile-nav-files', 'btn-mobile-nav-more'])
   })
 
   it('releases the New Chat lock when create settles and ignores a second click while it runs', async () => {

@@ -106,8 +106,11 @@ final readonly class StreamTurnPreparer
             $processingOptions['is_guest_mode'] = true;
         }
 
-        if ($turn->caller->isWidget() || $turn->caller->isGuest() || $options->disableMemories) {
+        if ($turn->caller->isWidget() || $turn->caller->isGuest() || $options->savedContext->disableMemories) {
             $processingOptions['disable_memories'] = true;
+        }
+        if ($options->savedContext->disableKnowledge) {
+            $processingOptions['disable_knowledge'] = true;
         }
 
         if ($turn->incognito) {

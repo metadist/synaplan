@@ -764,6 +764,10 @@ export const chatApi = {
     quotedMessageId?: number
     /** Incognito mode: the turn is processed fully in-memory on the server. */
     incognito?: boolean
+    /** Skip saved memories, feedback and digests for this turn. */
+    disableMemories?: boolean
+    /** Skip the saved knowledge base for this turn. */
+    disableKnowledge?: boolean
     /** Incognito only: the in-memory transcript (oldest first) for context. */
     history?: IncognitoHistoryEntry[]
     /** Pin this turn to an assistant (gallery chat or test panel). */
@@ -781,6 +785,8 @@ export const chatApi = {
       paramsObj.incognito = '1'
       paramsObj.history = opts.history ?? []
     }
+    if (opts.disableMemories) paramsObj.disableMemories = '1'
+    if (opts.disableKnowledge) paramsObj.disableKnowledge = '1'
     if (opts.trackId) paramsObj.trackId = opts.trackId.toString()
     if (opts.includeReasoning) paramsObj.reasoning = '1'
     if (opts.reasoningEffort) paramsObj.reasoningEffort = opts.reasoningEffort

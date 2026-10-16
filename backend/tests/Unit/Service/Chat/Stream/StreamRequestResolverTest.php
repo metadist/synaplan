@@ -167,6 +167,22 @@ final class StreamRequestResolverTest extends TestCase
         }
     }
 
+    public function testIncognitoCanSkipSavedMemoriesAndKnowledge(): void
+    {
+        $skipped = $this->resolve([
+            'message' => 'Hi',
+            'incognito' => true,
+            'disableMemories' => true,
+            'disableKnowledge' => true,
+        ]);
+        self::assertTrue($skipped->options->savedContext->disableMemories);
+        self::assertTrue($skipped->options->savedContext->disableKnowledge);
+
+        $kept = $this->resolve(['message' => 'Hi', 'incognito' => true]);
+        self::assertFalse($kept->options->savedContext->disableMemories);
+        self::assertFalse($kept->options->savedContext->disableKnowledge);
+    }
+
     public function testAChatIsRequiredOutsideIncognito(): void
     {
         try {
