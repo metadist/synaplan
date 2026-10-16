@@ -58,7 +58,7 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 - "image_generation": Generate or edit an image from a prompt and/or reference images.
 - "video_generation": Generate a video clip (params.duration, params.resolution).
 - "text2sound": Synthesize speech/audio from text (params.format, e.g. mp3).
-- "document_generation": Generate an Office document (CSV/XLSX/DOCX/PPTX). Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").
+- "document_generation": Generate a file the user asked to receive (CSV/XLSX/DOCX/PPTX/TXT/MD), including "save it into a text file". Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").
 - "calendar_event": Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve relative times against the current time context below. When the user asks to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one.
 - "email_me": Email the results to the account owner as one multi-part mail (text + attachments from other nodes). ONLY when the user explicitly asks to be mailed/emailed the result ("mail it to me", "send it to my email"). Inputs: text, attachments. Never the reply node.
 - "compose_reply": Assemble final reply: text + N file attachments from other nodes.
@@ -135,10 +135,15 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    `"depends_on": ["n1"], "inputs": { "prompt": "...", "image": "$n1.file" }`.
    The `image` input makes it an image-to-video render (IMG2VID); without it the
    node falls back to text-to-video.
-5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
-   chat). A format named in the request ("als Excel", "as Word") wins — pass
-   it through in the node prompt. Real PDFs are NOT supported — say so in a
-   single `chat` node.
+5. A file the user asks to receive (XLSX, DOCX, PPTX, CSV, TXT, MD) →
+   `document_generation` (NOT chat). That includes "save it into a text file",
+   "write counter_weekday.txt" and "update the file" — a `chat` node must
+   never claim a file was written. A format named in the request ("als Excel",
+   "as Word", "as a text file", ".txt") wins — pass it through in the node
+   prompt. When the file's content has to be looked up first, run `web_search`
+   (or `url_fetch`) first and let `document_generation` depend on it, with the
+   looked-up text in the document prompt (`$n1.text`).
+   Real PDFs are NOT supported — say so in a single `chat` node.
    To put a picture generated in the SAME turn INTO the document ("create a
    photo and a job application containing it"), let the document node depend on
    the image node and pass its file:

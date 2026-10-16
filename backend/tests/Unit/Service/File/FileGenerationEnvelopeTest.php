@@ -133,6 +133,9 @@ class FileGenerationEnvelopeTest extends TestCase
         yield 'von csv nach excel' => ['Konvertiere von CSV nach Excel.', 'xlsx'];
         yield 'url source never elects' => ['Lad https://example.com/data.xlsx und mach ein Diagramm.', null];
         yield 'csv explicit' => ['Export the table as CSV, please.', 'csv'];
+        yield 'named text file' => ['Save it into a text file counter_weekday.txt', 'txt'];
+        yield 'text file without extension' => ['Save the count as a text file.', 'txt'];
+        yield 'markdown file' => ['Write the notes as markdown in notes.md', 'md'];
         yield 'word document' => ['Write it as a Word document.', 'docx'];
         yield 'german word compound' => ['Schreib mir ein Word-Dokument dazu.', 'docx'];
         yield 'powerpoint' => ['Make me a PowerPoint deck from this.', 'pptx'];

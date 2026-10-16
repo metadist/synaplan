@@ -75,6 +75,10 @@ final class FileGenerationEnvelope
             'docx' => '/\b\.?docx?\b|word-dokument|word-datei|microsoft word|\bals word\b|\bas word\b|\bword document\b/i',
             'pptx' => '/\b\.?pptx?\b|powerpoint|präsentation|presentation/i',
             'csv' => '/\b\.?csv\b/i',
+            // Extension only. "text file … counter_weekday.txt" must stay one
+            // match: this loop ignores a pattern that hits more than once.
+            'txt' => '/\.txt\b/i',
+            'md' => '/\.md\b/i',
         ];
 
         $winner = null;
@@ -92,7 +96,19 @@ final class FileGenerationEnvelope
             }
         }
 
-        return $winner;
+        if (null !== $winner) {
+            return $winner;
+        }
+
+        // A named kind with no extension ("save it as a text file").
+        if (1 === preg_match('/\btext file\b|\btextdatei\b|\bplain text\b/iu', $text)) {
+            return 'txt';
+        }
+        if (1 === preg_match('/\bmarkdown\b/iu', $text)) {
+            return 'md';
+        }
+
+        return null;
     }
 
     /**

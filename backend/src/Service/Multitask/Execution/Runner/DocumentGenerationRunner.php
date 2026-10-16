@@ -54,7 +54,7 @@ final readonly class DocumentGenerationRunner implements TaskRunner
     public function describe(): array
     {
         return [
-            new SkillDescriptor(Capability::DocumentGeneration, 'Generate an Office document (CSV/XLSX/DOCX/PPTX). Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").'),
+            new SkillDescriptor(Capability::DocumentGeneration, 'Generate a file the user asked to receive (CSV/XLSX/DOCX/PPTX/TXT/MD), including "save it into a text file". Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").'),
         ];
     }
 
