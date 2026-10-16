@@ -60,6 +60,19 @@ export async function updateWidgetViaApi(
   }
 }
 
+export async function deleteWidgetViaApi(
+  request: APIRequestContext,
+  credentials: { user: string; pass: string },
+  widgetId: string
+): Promise<void> {
+  const headers = await getAuthHeaders(request, credentials)
+  const response = await request.delete(`${getApiUrl()}/api/v1/widgets/${widgetId}`, { headers })
+  if (response.status() !== 404 && !response.ok()) {
+    const body = await response.text()
+    throw new Error(`Widget API delete failed: ${response.status()} ${body}`)
+  }
+}
+
 const widgetTestHtml = readFileSync(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures/widget-test.html'),
   'utf-8'
@@ -69,13 +82,15 @@ const widgetTestHtml = readFileSync(
 export async function gotoWidgetTestPage(
   page: Page,
   widgetId: string,
-  apiUrl: string
+  apiUrl: string,
+  extra: Record<string, string> = {}
 ): Promise<void> {
   await page.route(/\/widget-test\.html/, async (route) => {
     await route.fulfill({ contentType: 'text/html', body: widgetTestHtml })
   })
 
-  const url = `/widget-test.html?widgetId=${encodeURIComponent(widgetId)}&apiUrl=${encodeURIComponent(apiUrl)}`
+  const params = new URLSearchParams({ widgetId, apiUrl, ...extra })
+  const url = `/widget-test.html?${params.toString()}`
   await page.goto(url, { waitUntil: 'domcontentloaded' })
 
   const loadError = page.locator(selectors.widget.loadError)
@@ -89,9 +104,10 @@ export async function gotoWidgetTestPage(
 export async function openWidgetOnTestPage(
   page: Page,
   widgetId: string,
-  apiUrl: string
+  apiUrl: string,
+  extra: Record<string, string> = {}
 ): Promise<void> {
-  await gotoWidgetTestPage(page, widgetId, apiUrl)
+  await gotoWidgetTestPage(page, widgetId, apiUrl, extra)
 
   const widgetButton = page.locator(selectors.widget.button)
   try {

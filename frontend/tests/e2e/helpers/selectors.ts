@@ -470,6 +470,11 @@ export const selectors = {
     messageUserText: '[data-testid="message-user-text"]',
     /** E2E: present in assistant bubble when streaming finished */
     messageDone: '[data-testid="message-done"]',
+    closeButton: '[data-testid="btn-close"]',
+    themeButton: '[data-testid="btn-theme"]',
+    fullscreenButton: '[data-testid="btn-fullscreen"]',
+    fullscreenBackdrop: '[data-testid="fullscreen-backdrop"]',
+    root: '[data-testid="comp-chat-widget"]',
     // Error and warning selectors
     warningMessageLimit: '[data-testid="warning-message-limit"]',
     errorMessageLimitReached: '[data-testid="error-message-limit-reached"]',

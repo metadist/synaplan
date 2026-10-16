@@ -13,4 +13,6 @@ A line here is the record. Chat is not.
 
 | 2026-10-16 | Sprint 04 #2519 | Visitors no longer see internal sources. `ChatWidget` does not paint `KnowledgeSources` from history or from the live complete event. `TurnWebSearch` skips web search on a widget turn and still reads pasted links. Unit tests green. PHPStan green. Full PHPUnit green. |
 
-Next: sprint 05.
+| 2026-10-16 | Sprint 05 #2504 | Playwright covers close/reopen (`@ci` `@crossbrowser`), theme, fullscreen, the 4-of-5 message limit, and removing a staged file. Chromium run of the new tests is green, including the limit test after the session history has loaded. |
+
+Next: sprint 06.
