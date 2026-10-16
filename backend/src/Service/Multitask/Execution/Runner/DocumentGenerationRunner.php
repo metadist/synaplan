@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\Message;
+use App\Service\Agent\Policy\AssistantPlanLimits;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\UnreadSourceGuard;
@@ -15,6 +16,7 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Runtime\RuntimeProfile;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -74,6 +76,7 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         if (null !== $namedFormat) {
             $prompt .= "\n\nThe file MUST be a .{$namedFormat} file (the user explicitly asked for this format).";
         }
+        $prompt = $this->withAssistantInstructions($prompt, $context);
 
         $language = is_string($context->classification['language'] ?? null)
             ? $context->classification['language']
@@ -250,6 +253,21 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         }
 
         return ltrim($relative, '/');
+    }
+
+    /**
+     * Keep the officemaker envelope contract, and still hand the assistant's
+     * template to the model that writes the file body.
+     */
+    private function withAssistantInstructions(string $prompt, NodeContext $context): string
+    {
+        $profile = $context->options['runtime_profile'] ?? $context->classification['runtime_profile'] ?? null;
+        $instructions = AssistantPlanLimits::instructions($profile instanceof RuntimeProfile ? $profile : null);
+        if (null === $instructions) {
+            return $prompt;
+        }
+
+        return $prompt."\n\nFollow these assistant instructions for the file content. Still answer with the file envelope only.\n".$instructions;
     }
 
     private function syntheticMessage(NodeContext $context, string $prompt, string $language): Message

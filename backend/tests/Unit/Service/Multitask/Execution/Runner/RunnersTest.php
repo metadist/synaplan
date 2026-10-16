@@ -45,7 +45,9 @@ use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Prompt\PromptService;
+use App\Service\RAG\ChatKnowledgeContextLoader;
 use App\Service\RAG\VectorSearchService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Search\BraveSearchService;
 use App\Tests\Support\WebSearchGatewayFactory;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -519,6 +521,96 @@ final class RunnersTest extends TestCase
         self::assertTrue($result->isSuccessful());
         self::assertSame('plain answer', $result->text);
         self::assertSame(0, $result->metadata['rag_chunks'] ?? null);
+    }
+
+    public function testRagQuerySearchesNothingWhenTheAssistantHasNoKnowledge(): void
+    {
+        $vectorSearch = $this->createMock(VectorSearchService::class);
+        $vectorSearch->expects(self::never())->method('semanticSearch');
+        $knowledge = $this->createMock(ChatKnowledgeContextLoader::class);
+        $knowledge->method('assistantScopes')->willReturn([]);
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb('nothing found');
+
+            return [];
+        });
+        $profile = new RuntimeProfile(
+            promptId: 1,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Use only the folders I attached.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: ['tool_internet' => true],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 4,
+        );
+        $runner = new ChatRunner(
+            $aiFacade,
+            $this->createMock(ModelConfigService::class),
+            $vectorSearch,
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $this->createMock(PromptService::class),
+            $this->createMock(LoggerInterface::class),
+            knowledge: $knowledge,
+        );
+
+        $result = $runner->run(
+            new TaskNode('n1', Capability::RagQuery, [], ['text' => 'what is in the folder?']),
+            new NodeContext($this->message('what is in the folder?'), [], 1, [
+                'language' => 'en',
+                'runtime_profile' => $profile,
+            ]),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(0, $result->metadata['rag_chunks'] ?? null);
+    }
+
+    public function testSummarizeKeepsTheTaskContractAndTheAssistantInstructions(): void
+    {
+        $captured = null;
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb) use (&$captured): array {
+            $captured = $messages[0]['content'];
+            $cb('Friday: 10');
+
+            return [];
+        });
+        $profile = new RuntimeProfile(
+            promptId: 1,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Daily report template: weekday and count.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: [],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 4,
+        );
+        $runner = new ChatRunner(
+            $aiFacade,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(VectorSearchService::class),
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $this->createMock(PromptService::class),
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $result = $runner->run(
+            new TaskNode('n1', Capability::Summarize, [], ['text' => 'ten results']),
+            new NodeContext($this->message('ten results'), [], 1, [
+                'language' => 'en',
+                'runtime_profile' => $profile,
+            ]),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertStringContainsString('Return ONLY the summary', (string) $captured);
+        self::assertStringContainsString('Daily report template: weekday and count.', (string) $captured);
     }
 
     public function testChatRunnerIsolatesModelFailure(): void
@@ -1329,6 +1421,44 @@ final class RunnersTest extends TestCase
         self::assertSame('document_generation', $captured['intent']);
     }
 
+    public function testDocumentGenerationKeepsOfficemakerAndPassesAssistantInstructions(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $text = null;
+        $classification = null;
+        $handler->method('handle')->willReturnCallback(function ($msg, $thread, $class) use (&$text, &$classification): array {
+            $text = $msg->getText();
+            $classification = $class;
+
+            return ['metadata' => ['generated_file' => ['filename' => 'report.txt', 'path' => '01/report.txt']]];
+        });
+        $profile = new RuntimeProfile(
+            promptId: 1,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Daily report template: weekday and count.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: [],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 4,
+        );
+
+        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UnreadSourceGuard::class)))->run(
+            new TaskNode('n1', Capability::DocumentGeneration, [], ['prompt' => 'save my daily report as report.txt']),
+            new NodeContext($this->message('save my daily report as report.txt'), [], 1, [
+                'language' => 'en',
+                'runtime_profile' => $profile,
+            ]),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame('officemaker', $classification['topic']);
+        self::assertStringContainsString('Daily report template: weekday and count.', (string) $text);
+        self::assertStringContainsString('file envelope only', (string) $text);
+    }
+
     /**
      * #1382: the picture an upstream image node just rendered must reach the
      * officemaker prompt, otherwise the document node can only guess a marker.
@@ -1486,6 +1616,34 @@ final class RunnersTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('not configured', (string) $result->error);
+    }
+
+    public function testWebSearchRefusesWhenTheAssistantDisabledInternet(): void
+    {
+        $brave = $this->createMock(BraveSearchService::class);
+        $brave->expects(self::never())->method('search');
+        $runner = new WebSearchRunner($this->createMock(SearchQueryGenerator::class), WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'synaplan']);
+        $profile = new RuntimeProfile(
+            promptId: 1,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Count mentions.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: ['tool_internet' => false],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 4,
+        );
+
+        $result = $runner->run($node, new NodeContext($this->message('search'), [], 1, [
+            'language' => 'en',
+            'runtime_profile' => $profile,
+        ]));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('not allowed to search', (string) $result->error);
     }
 
     public function testWebSearchReusesPrefetchedResultsForWholeMessageQuery(): void

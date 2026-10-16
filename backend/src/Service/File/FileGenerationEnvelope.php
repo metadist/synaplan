@@ -96,19 +96,27 @@ final class FileGenerationEnvelope
             }
         }
 
-        if (null !== $winner) {
-            return $winner;
+        // Phrases compete with extensions by position. "Convert report.txt to
+        // Markdown" elects md; "as a text file" elects txt even after a source
+        // spreadsheet mention. A source preposition still loses.
+        $phrases = [
+            'txt' => '/\btext file\b|\btextdatei\b|\bplain text\b/iu',
+            'md' => '/\bmarkdown\b/iu',
+        ];
+        foreach ($phrases as $extension => $pattern) {
+            if (false === preg_match_all($pattern, $text, $matches, PREG_OFFSET_CAPTURE)) {
+                continue;
+            }
+            foreach ($matches[0] as [$match, $pos]) {
+                if ($pos < $winnerPos || self::isSourceMention($text, $pos)) {
+                    continue;
+                }
+                $winner = $extension;
+                $winnerPos = $pos;
+            }
         }
 
-        // A named kind with no extension ("save it as a text file").
-        if (1 === preg_match('/\btext file\b|\btextdatei\b|\bplain text\b/iu', $text)) {
-            return 'txt';
-        }
-        if (1 === preg_match('/\bmarkdown\b/iu', $text)) {
-            return 'md';
-        }
-
-        return null;
+        return $winner;
     }
 
     /**

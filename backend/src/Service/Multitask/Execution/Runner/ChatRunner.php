@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\AI\Stream\VisibleAnswer;
 use App\Entity\Prompt;
+use App\Service\Agent\Policy\AssistantPlanLimits;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\Message\SlashCommandCopy;
@@ -20,6 +21,7 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\Prompt\PromptService;
+use App\Service\RAG\ChatKnowledgeContextLoader;
 use App\Service\RAG\VectorSearchService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\Docs\PlatformDocsRetriever;
@@ -62,6 +64,7 @@ final readonly class ChatRunner implements TaskRunner
         #[Autowire(lazy: true)]
         private ?PlatformDocsRetriever $platformDocsRetriever = null,
         private ?SlashCommandCopy $slashCommandCopy = null,
+        private ?ChatKnowledgeContextLoader $knowledge = null,
     ) {
     }
 
@@ -324,16 +327,28 @@ final readonly class ChatRunner implements TaskRunner
 
         // A pinned assistant carries its scope in the RuntimeProfile, never
         // as scalar copies (see ChatKnowledgeContextLoader::settings).
-        $profile = $context->options['runtime_profile'] ?? null;
+        $profile = $context->options['runtime_profile'] ?? $context->classification['runtime_profile'] ?? null;
+        $profile = $profile instanceof RuntimeProfile ? $profile : null;
+        $explicitScopes = null;
         if ($profile instanceof RuntimeProfile) {
             $groupKey ??= $profile->primaryRagGroupKey();
             $limit ??= $profile->ragLimit;
             $minScore ??= $profile->ragMinScore;
+            $explicitScopes = $this->knowledge?->assistantScopes(
+                $profile,
+                $context->userId ?? $context->message->getUserId(),
+            );
         }
 
         $groupKey = is_string($groupKey) && '' !== $groupKey ? $groupKey : null;
         $limit = null !== $limit ? max(1, min(50, (int) $limit)) : 20;
         $minScore = null !== $minScore ? max(0.0, min(1.0, (float) $minScore)) : 0.2;
+
+        // An assistant with no folders and "also search the user's files" off
+        // searches nothing. A null scope list would expand to the viewer's files.
+        if ([] === $explicitScopes) {
+            return '';
+        }
 
         try {
             $results = $this->vectorSearchService->semanticSearch(
@@ -342,6 +357,7 @@ final readonly class ChatRunner implements TaskRunner
                 $groupKey,
                 limit: $limit,
                 minScore: $minScore,
+                explicitScopes: $explicitScopes,
             );
         } catch (\Throwable $e) {
             $this->logger->warning('ChatRunner: RAG retrieval failed, answering without context', [
@@ -424,24 +440,37 @@ final readonly class ChatRunner implements TaskRunner
 
     private function systemPrompt(TaskNode $node, string $language, NodeContext $context, ?string $topicPrompt = null): string
     {
-        if (null !== $topicPrompt && '' !== $topicPrompt) {
-            return $topicPrompt.$this->pipelineDirective($context);
+        $task = null !== $topicPrompt && '' !== $topicPrompt
+            ? $topicPrompt
+            : match ($node->capability) {
+                Capability::Summarize => sprintf(
+                    'You are a precise summarizer. Summarize the user text concisely%s in language "%s". Return ONLY the summary, no preamble.',
+                    isset($node->params['max_words']) && is_numeric($node->params['max_words']) ? ' in about '.(int) $node->params['max_words'].' words' : '',
+                    $language,
+                ),
+                Capability::Translate => sprintf(
+                    'Translate the user text into "%s". Return ONLY the translation.',
+                    is_string($node->params['target'] ?? null) ? $node->params['target'] : $language,
+                ),
+                default => sprintf('You are a helpful assistant. Answer in language "%s".', $language),
+            };
+
+        return $this->withAssistantInstructions($task, $context).$this->pipelineDirective($context);
+    }
+
+    /**
+     * The pinned assistant's instructions, kept beside the task contract so a
+     * summary is still only a summary and a file step still follows the template.
+     */
+    private function withAssistantInstructions(string $taskPrompt, NodeContext $context): string
+    {
+        $profile = $context->options['runtime_profile'] ?? $context->classification['runtime_profile'] ?? null;
+        $instructions = AssistantPlanLimits::instructions($profile instanceof RuntimeProfile ? $profile : null);
+        if (null === $instructions || str_contains($taskPrompt, $instructions)) {
+            return $taskPrompt;
         }
 
-        $base = match ($node->capability) {
-            Capability::Summarize => sprintf(
-                'You are a precise summarizer. Summarize the user text concisely%s in language "%s". Return ONLY the summary, no preamble.',
-                isset($node->params['max_words']) && is_numeric($node->params['max_words']) ? ' in about '.(int) $node->params['max_words'].' words' : '',
-                $language,
-            ),
-            Capability::Translate => sprintf(
-                'Translate the user text into "%s". Return ONLY the translation.',
-                is_string($node->params['target'] ?? null) ? $node->params['target'] : $language,
-            ),
-            default => sprintf('You are a helpful assistant. Answer in language "%s".', $language),
-        };
-
-        return $base.$this->pipelineDirective($context);
+        return $taskPrompt."\n\nAssistant instructions (follow these; the lines above still decide the output shape):\n".$instructions;
     }
 
     /**

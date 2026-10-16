@@ -23,6 +23,7 @@ use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\PromptService;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Usage\RecordedUsage;
 use App\Tests\Support\SkillCatalogFactory;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -407,6 +408,37 @@ final class TaskPlannerTest extends TestCase
         self::assertStringContainsString('## Files available in this conversation', $system);
         self::assertStringContainsString('file:77', $system);
         self::assertStringContainsString('plan a file_analysis or rag_query', $system);
+    }
+
+    public function testPlannerReceivesAssistantInstructionsAndHidesWebSearchWhenInternetIsOff(): void
+    {
+        $sentMessages = null;
+        $this->aiFacade->method('chat')->willReturnCallback(static function (array $messages) use (&$sentMessages): array {
+            $sentMessages = $messages;
+
+            return ['content' => '{"version":1,"language":"en","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}'];
+        });
+
+        $profile = new RuntimeProfile(
+            promptId: 20,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Daily report template: one line, weekday and count.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: ['tool_internet' => false],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 7,
+        );
+
+        $this->planner->plan($this->message('save my daily report as report.txt'), [], 1, [
+            'runtime_profile' => $profile,
+        ]);
+
+        $system = is_array($sentMessages) ? (string) ($sentMessages[0]['content'] ?? '') : '';
+        self::assertStringContainsString('Daily report template: one line, weekday and count.', $system);
+        self::assertStringNotContainsString('- "web_search":', $system);
     }
 
     public function testPlanOmitsTheTaskPlanSchemaWhenTheKillSwitchIsOff(): void
