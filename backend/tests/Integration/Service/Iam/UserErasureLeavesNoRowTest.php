@@ -40,10 +40,8 @@ final class UserErasureLeavesNoRowTest extends KernelTestCase
                 $left[] = $class;
             }
         }
-        $expected = UserErasureCoverageTest::NOT_ERASED_YET;
-        sort($expected);
 
-        self::assertSame($expected, $left, 'These user-owned tables still hold a row of the deleted account.');
+        self::assertSame([], $left, 'These user-owned tables still hold a row of the deleted account.');
     }
 
     private function persistUser(EntityManagerInterface $em): User

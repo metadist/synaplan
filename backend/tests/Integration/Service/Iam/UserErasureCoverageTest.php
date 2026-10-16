@@ -26,15 +26,6 @@ final class UserErasureCoverageTest extends KernelTestCase
         'IdentityEraser', 'CredentialEraser',
     ];
 
-    /**
-     * User-owned tables that account deletion does not erase yet: no eraser,
-     * no foreign key with ON DELETE CASCADE, no listener (found 2026-10-15,
-     * code cleanup V3). The list may only shrink — erase a table, delete its
-     * entry here. {@see UserErasureLeavesNoRowTest} expects exactly these
-     * tables to keep a row.
-     */
-    public const NOT_ERASED_YET = [];
-
     public function testErasersRunInTheEstablishedOrder(): void
     {
         self::assertSame(self::ORDER, array_map(
@@ -43,7 +34,7 @@ final class UserErasureCoverageTest extends KernelTestCase
         ));
     }
 
-    public function testEveryUserOwnedEntityIsErasedOrListedAsAGap(): void
+    public function testEveryUserOwnedEntityIsErasedWithItsAccount(): void
     {
         $covered = [];
         foreach ($this->erasers() as $eraser) {
@@ -54,16 +45,8 @@ final class UserErasureCoverageTest extends KernelTestCase
             array_keys(UserOwnedTables::in(static::getContainer()->get(EntityManagerInterface::class))),
             $covered,
         ));
-        sort($notErased);
-        $known = self::NOT_ERASED_YET;
-        sort($known);
 
-        self::assertSame(
-            $known,
-            $notErased,
-            'A user-owned entity is not erased with its account. Name it in an eraser\'s covers(); '
-            .'when a gap is closed, remove its entry from NOT_ERASED_YET.',
-        );
+        self::assertSame([], $notErased, 'A user-owned entity is not erased with its account. Name it in an eraser\'s covers().');
     }
 
     /**
