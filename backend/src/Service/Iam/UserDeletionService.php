@@ -14,7 +14,8 @@ use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 /**
  * Deletes an account and everything it owns in one transaction. Each domain
  * erases its own rows ({@see UserDataEraserInterface}); external cleanups the
- * erasers queued run after the commit.
+ * erasers queued run after the commit, and a failing one is logged without
+ * reporting the committed deletion as failed.
  */
 final readonly class UserDeletionService
 {
@@ -54,15 +55,6 @@ final readonly class UserDeletionService
             $this->em->flush();
 
             $this->em->getConnection()->commit();
-
-            foreach ($erasure->pendingCleanups() as $cleanup) {
-                $cleanup();
-            }
-
-            $this->logger->info('User and all related data deleted successfully', [
-                'user_id' => $userId,
-                'email' => $email,
-            ]);
         } catch (\Throwable $e) {
             $this->em->getConnection()->rollBack();
 
@@ -74,6 +66,27 @@ final readonly class UserDeletionService
             ]);
 
             throw $e;
+        }
+
+        $this->runCleanups($erasure);
+
+        $this->logger->info('User and all related data deleted successfully', [
+            'user_id' => $userId,
+            'email' => $email,
+        ]);
+    }
+
+    private function runCleanups(UserErasure $erasure): void
+    {
+        foreach ($erasure->pendingCleanups() as $cleanup) {
+            try {
+                $cleanup();
+            } catch (\Throwable $e) {
+                $this->logger->error('Account deletion cleanup failed after the commit', [
+                    'user_id' => $erasure->userId,
+                    'exception' => $e,
+                ]);
+            }
         }
     }
 }
