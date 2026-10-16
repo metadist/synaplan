@@ -108,7 +108,7 @@ describe('ChatWidget visitor sources', () => {
               text: ANSWER,
               timestamp: 1_700_000_000,
               ragSources: sources,
-            }
+            },
           ])
         }
         return new Response('{}', { status: 404 })
