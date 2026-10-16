@@ -92,25 +92,30 @@ Do not add a second flag.
 ### Frontend
 
 New test beside `frontend/tests/unit/components/widgets/ChatWidgetFullscreen.spec.ts`.
-Mount `ChatWidget` the same way (`testMode: true`, the heroicon mock, the
-transition stub).
+Reuse the heroicon mock and the transition stub. Mount as a visitor:
+`testMode` stays false. `loadConversationHistory()` returns before any
+fetch when `testMode`, `isPreview`, or `internalMode` is set
+(`isTestEnvironment`), so a history stub on that mount never supplies
+the assistant message and the absence assertions pass on the unfixed
+widget.
 
-Seed one assistant message the way history does: stub the history call
-the widget makes so the payload contains five `ragSources` with empty
-`fileName`, `groupKey` `WIDGET:wdg_787cca022ca90b45fb4d41c19048155c`,
-and real `chunkId`s. One of them has `startLine` 29.
+Stub the visitor history request. The payload is one assistant message
+whose text is a sentence the test can see, plus five `ragSources` with
+empty `fileName`, `groupKey`
+`WIDGET:wdg_787cca022ca90b45fb4d41c19048155c`, and real `chunkId`s. One
+of them has `startLine` 29.
 
-After flush:
+After flush, assert the answer sentence is in the document. Only then:
 
 - `[data-testid="knowledge-sources"]` is absent
 - the text "Show the passage" is absent
 - the text `WIDGET:wdg_` is absent
 
-The same assertions cover history, because the seed is a history payload.
-If the live `complete` path is reachable in this mount without a model
-round-trip, assert it too. If it is not, the history assertion plus the
-deleted assignment in review is enough; do not boot a fake stream just
-to set a property.
+That is the history path. For the live `complete` path, drive the same
+widget far enough that an assistant bubble is on screen and the handler
+that used to assign `ragSources` has run, with five refs in the payload.
+Assert the answer text, then the same three absences. Do not accept a
+review comment in place of that assertion.
 
 `SharedChatView` tests that show `handbook.pdf` and open a passage stay
 green. Do not edit them except to prove they still pass.

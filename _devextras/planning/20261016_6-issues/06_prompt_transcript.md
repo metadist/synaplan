@@ -23,8 +23,8 @@ do not get that text. It lives for this visit. It is not stored.
 | # | Decision |
 | - | -------- |
 | 1 | The surface is a dialog opened from the existing message info popover (`btn-message-info` / `popover-message-info` in `ChatMessage.vue`). It is not a new route and not a rail item. |
-| 2 | The source is the message array `ChatMessageAssembler` already builds for the provider (`forStreamedTurn` for web chat). Capture it at that boundary. Do not rebuild it in the controller. |
-| 3 | The web chat `complete` SSE event gains an optional `providerMessages` array for the signed-in owner. Each item is `{ role, text }` with `role` one of `instructions`, `you`, `assistant`. Map provider roles before they leave the server. |
+| 2 | The transcript is the request the provider was actually given, after that provider's own transformation. `ChatMessageAssembler` is the input, not the record. OpenAI drops history when `previous_response_id` is set and restores it on fallback (`OpenAIProvider::executeResponsesCreateStreamed`). Anthropic drops or merges turns. `ChatToolLoop::run()` adds tool results on later requests. Capture at the provider call, once per request in the turn, including a tool round and a fallback that resends history. Roles in the payload are `instructions`, `you`, `assistant`, mapped from the provider roles at that boundary. |
+| 3 | The signed-in web chat delivers `providerMessages` on the live response only. Do not put it on the `complete` event that `SseWriter::send()` hands to `ChatRunRecorder`: that recorder serializes the whole event into the replay buffer, which would store the transcript. Strip it before `record()`, or send it on a path the recorder does not see. Replay and resume keep working. A reloaded chat has no transcript. |
 | 4 | Widget turns, email, webhooks, MCP, shared-chat reads, and history reloads omit the field. A missing field means the dialog explains that nothing was recorded for this reply. |
 | 5 | No migration, no new table, no column on `BMESSAGE`. Reloading the chat drops the transcript. Say so in the dialog. Persistence needs a schema review and is a later track. |
 | 6 | Do not log the transcript. The existing "web search decision" style logs stay free of message text added by this sprint. |
@@ -87,10 +87,10 @@ Keep it small. Suggested shape, names adjustable to the folder they land in:
 | Piece | Responsibility |
 | ----- | -------------- |
 | A value object, for example `App\Model\ProviderTranscript` | `fromMessages(array $messages): self`, `redact()`, `cap(int $max)`, `toArray(): list<array{role: string, text: string}>`. No I/O. |
-| The chat stream complete path for the signed-in web chat | Attach `toArray()` from the assembler's messages. One call site. |
+| The provider call for the signed-in web chat | Build the transcript from the messages about to be sent, after the provider's reduction, merge, and tool-round additions. One capture per request. |
 | Widget / shared / history serializers | Do not add the key. |
 | OpenAPI on that complete event or the message schema the frontend already parses | Optional property, generated Zod, no hand-written interface. |
-| `ChatMessage.vue` | Button in the info popover, dialog, five locales. Hidden when the message has no transcript and this is not a live reply that just omitted it — show the empty sentence only when they open the control on a reply that has no transcript. The control itself is absent for widget and shared chat because those views do not mount this action. |
+| `ChatMessage.vue` | The opener stays on every assistant reply in the signed-in chat, including after a reload when no transcript was kept. The empty sentence is inside the dialog. The opener is absent in the widget and on a shared link because those views do not mount this action. |
 
 `ChatMessage.vue` is already large. The dialog markup and the mapping
 from `providerMessages` to blocks go in a new component under
@@ -106,9 +106,12 @@ Backend, PHPUnit:
 - Messages containing `Bearer abc.def` and `sk-test-secret` become text
   with those secrets replaced, roles mapped, order kept.
 - Over 32 000 characters, the array is capped and the truncated flag is set.
-- A widget complete payload (the test that already builds a widget turn,
-  or a focused test of the serializer branch) has no `providerMessages` key.
-- A signed-in stream complete payload includes the key.
+- A widget payload has no `providerMessages` key.
+- A signed-in live response includes the key, and the recorded replay
+  event for that turn does not. Resume still replays the answer.
+- OpenAI with `previous_response_id`, and a tool round, record the
+  messages that were sent on that request, not the assembler array from
+  before the reduction.
 
 Frontend, Vitest:
 

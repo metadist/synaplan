@@ -63,7 +63,7 @@ These tests are the product of the sprint. Run them before the pull
 request:
 
 ```bash
-cd frontend && npx playwright test tests/widget.spec.ts
+cd frontend && npm run test:e2e -- tests/e2e/tests/widget.spec.ts
 ```
 
 Headless. Then the unfiltered gate below, because a green file is not
@@ -84,7 +84,7 @@ close-and-reopen test. Run that test file, not the whole Firefox matrix,
 unless the helper change is shared:
 
 ```bash
-cd frontend && npm run test:e2e:firefox -- tests/widget.spec.ts
+cd frontend && npm run test:e2e:firefox -- tests/e2e/tests/widget.spec.ts
 ```
 
 Commit `test(widget): cover visitor chrome in Playwright`. Push. Pull
