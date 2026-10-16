@@ -1,7 +1,9 @@
+import { ref } from 'vue'
+
 const CAPTIONS_KEY = 'synaplan.liveVoice.captions'
 const VOICES_KEY = 'synaplan.liveVoice.voices'
 
-export function captionsPreferred(): boolean {
+function readCaptionsPreferred(): boolean {
   try {
     return localStorage.getItem(CAPTIONS_KEY) !== '0'
   } catch {
@@ -9,7 +11,19 @@ export function captionsPreferred(): boolean {
   }
 }
 
+/** Shared with the live conversation and the voice settings, so a change applies immediately. */
+const captionsOn = ref(readCaptionsPreferred())
+
+export function captionsPreferred(): boolean {
+  return captionsOn.value
+}
+
+export function captionsPreferredRef() {
+  return captionsOn
+}
+
 export function setCaptionsPreferred(on: boolean): void {
+  captionsOn.value = on
   try {
     localStorage.setItem(CAPTIONS_KEY, on ? '1' : '0')
   } catch {

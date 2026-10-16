@@ -345,7 +345,6 @@
     "voice": {
       "title": "Conversations en direct",
       "intro": "Choisissez la voix des conversations en direct. Votre voix est envoyée à {company} pendant que vous parlez, et le coût utilise le même budget d’utilisation mensuel que le chat.",
-      "modelsHint": "Le modèle et sa voix se règlent sous {page}.",
       "model": "Modèle vocal",
       "voice": "Voix",
       "captions": "Afficher les sous-titres pendant que vous parlez",
@@ -366,7 +365,6 @@
       "profile": "Profil",
       "appearance": "Langue et apparence",
       "chat": "Chat et IA",
-      "voice": "Conversations en direct",
       "data": "Données et confidentialité",
       "billing": "Facturation",
       "security": "Sécurité",
