@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Chat\Stream;
 
 use App\Entity\Message;
+use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\Media\MediaJobRebinder;
 use App\Service\Message\MessageProcessor;
 use App\Service\Realtime\SseWriter;
@@ -30,6 +31,7 @@ final readonly class NonStreamingTurn
         private StreamTurnFinisher $finisher,
         private StreamUsageRecorder $usage,
         private LoggerInterface $logger,
+        private ProviderTranscriptCapture $transcripts,
     ) {
     }
 
@@ -94,7 +96,14 @@ final readonly class NonStreamingTurn
         $this->finisher->afterReply($turn, $state->chat, $metadata, $text);
         $usage = $this->usage->recordBufferedReply($turn, $state, $outgoing, $metadata, $classification, $text);
 
-        $sse->send('complete', $this->completePayload($turn, $outgoing, $classification, $metadata, $usage, $searchResults, $ragSources));
+        $completeData = $this->completePayload($turn, $outgoing, $classification, $metadata, $usage, $searchResults, $ragSources);
+        $transcript = $this->transcripts->payload();
+        $this->transcripts->reset();
+        if (null !== $transcript && null === $turn->caller->widgetSession && null === $turn->caller->guestSession) {
+            $completeData['providerMessages'] = $transcript;
+        }
+
+        $sse->send('complete', $completeData);
     }
 
     /**

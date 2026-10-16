@@ -190,6 +190,8 @@ export interface Message {
     thumbnail?: string
   }> | null // Web search results
   ragSources?: RagSourceRef[] | null
+  providerMessages?: Array<{ role: 'instructions' | 'you' | 'assistant'; text: string }> | null
+  providerMessagesTruncated?: boolean
   aiModels?: {
     chat?: {
       provider: string

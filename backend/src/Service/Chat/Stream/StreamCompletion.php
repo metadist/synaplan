@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Chat\Stream;
 
 use App\Service\Chat\GuestSessionService;
+use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunRecorder;
 use App\Service\Realtime\SseWriter;
@@ -31,6 +32,7 @@ final readonly class StreamCompletion
         private WidgetSessionService $widgetSessionService,
         private GuestSessionService $guestSessionService,
         private LoggerInterface $logger,
+        private ProviderTranscriptCapture $transcripts,
     ) {
     }
 
@@ -64,6 +66,12 @@ final readonly class StreamCompletion
         $totals = $this->usage->liveTotals($turn);
         if (null !== $totals) {
             $event->set('usage_totals', $totals);
+        }
+
+        $transcript = $this->transcripts->payload();
+        $this->transcripts->reset();
+        if (null !== $transcript && null === $turn->caller->widgetSession && null === $turn->caller->guestSession) {
+            $event->set('providerMessages', $transcript);
         }
 
         $sse->send('complete', $event->data());

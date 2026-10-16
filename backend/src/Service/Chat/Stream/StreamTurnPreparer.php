@@ -98,6 +98,14 @@ final readonly class StreamTurnPreparer
             }
         }
 
+        if (!$turn->caller->isWidget() && !$turn->caller->isGuest()) {
+            $processingOptions['capture_transcript'] = true;
+        }
+
+        if ($turn->caller->isGuest()) {
+            $processingOptions['is_guest_mode'] = true;
+        }
+
         if ($turn->caller->isWidget() || $turn->caller->isGuest() || $options->disableMemories) {
             $processingOptions['disable_memories'] = true;
         }

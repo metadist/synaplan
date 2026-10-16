@@ -84,6 +84,7 @@ function assertSourcesHidden(wrapper: ReturnType<typeof mountVisitor>) {
   expect(wrapper.find('[data-testid="knowledge-sources"]').exists()).toBe(false)
   expect(wrapper.text()).not.toContain('Show the passage')
   expect(wrapper.html()).not.toContain('WIDGET:wdg_')
+  expect(wrapper.text()).not.toMatch(/what was sent/i)
 }
 
 describe('ChatWidget visitor sources', () => {

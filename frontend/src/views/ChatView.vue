@@ -248,6 +248,8 @@
               :read-aloud-failed="message.readAloudFailed"
               :search-results="message.searchResults"
               :rag-sources="message.ragSources"
+              :provider-messages="message.providerMessages"
+              :provider-messages-truncated="message.providerMessagesTruncated"
               :ai-models="message.aiModels"
               :web-search="message.webSearch"
               :memory-ids="message.memoryIds"
@@ -4046,6 +4048,13 @@ const streamAIResponse = async (
                 message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
               }
 
+              const sent = data.providerMessages as
+                { messages?: Message['providerMessages']; truncated?: boolean } | undefined
+              if (sent && Array.isArray(sent.messages)) {
+                message.providerMessages = sent.messages
+                message.providerMessagesTruncated = sent.truncated === true
+              }
+
               applyDocsToMessage(message, data.docs)
 
               applyAssistantChatModelFooter(
@@ -4958,6 +4967,13 @@ const streamAIResponse = async (
 
               if (Array.isArray(data.ragSources) && data.ragSources.length > 0) {
                 message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
+              }
+
+              const sent = data.providerMessages as
+                { messages?: Message['providerMessages']; truncated?: boolean } | undefined
+              if (sent && Array.isArray(sent.messages)) {
+                message.providerMessages = sent.messages
+                message.providerMessagesTruncated = sent.truncated === true
               }
 
               applyDocsToMessage(message, data.docs)

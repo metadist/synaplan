@@ -8,6 +8,7 @@ use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\AI\Stream\VisibleAnswer;
+use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\Document\ChatDocumentOutput;
 use App\Service\Message\ProgressCallback;
 use Psr\Log\LoggerInterface;
@@ -33,6 +34,7 @@ final readonly class ChatReplyGenerator
         private AiFacade $aiFacade,
         private ChatDocumentOutput $documents,
         private LoggerInterface $logger,
+        private ProviderTranscriptCapture $transcripts,
     ) {
     }
 
@@ -44,8 +46,18 @@ final readonly class ChatReplyGenerator
     public function complete(ChatTurn $turn, ChatModelChoice $model, array $messages, array $aiOptions, array $options, ?callable $progressCallback): ChatReply
     {
         $userId = $turn->message->getUserId();
+        $this->transcripts->reset();
+        $capture = !empty($options['capture_transcript'])
+            && empty($turn->classification['is_widget_mode'])
+            && empty($turn->options['is_widget_mode'])
+            && empty($turn->options['is_guest_mode']);
+        if ($capture) {
+            $this->transcripts->enable();
+        }
         $documentEdit = $this->documents->tryToolsEdit($turn->topic(), $model->modelId, $messages, $turn->message, $aiOptions, $progressCallback, !empty($options['incognito']));
         if (null !== $documentEdit) {
+            $this->transcripts->seal();
+
             return new ChatReply(
                 content: $documentEdit->content,
                 metadata: self::chosenModelMetadata($model, $documentEdit->usage),
@@ -53,12 +65,20 @@ final readonly class ChatReplyGenerator
             );
         }
 
+        if ($capture) {
+            $this->transcripts->record($messages);
+        }
+
         $heartbeat = $options['heartbeat'] ?? null;
         if (is_callable($heartbeat)) {
-            return $this->collectWithHeartbeat($messages, $userId, $aiOptions, $heartbeat, $model);
+            $reply = $this->collectWithHeartbeat($messages, $userId, $aiOptions, $heartbeat, $model);
+            $this->transcripts->seal();
+
+            return $reply;
         }
 
         $response = $this->aiFacade->chat($messages, $userId, $aiOptions);
+        $this->transcripts->seal();
 
         return new ChatReply(
             content: $response['content'] ?? null,
@@ -129,14 +149,25 @@ final readonly class ChatReplyGenerator
 
         $answer = new StreamedAnswer($streamCallback, $turn->perfTimer);
         $turn->perfTimer->start('provider_total');
+        $this->transcripts->reset();
+        $capture = empty($turn->classification['is_widget_mode'])
+            && empty($turn->options['is_widget_mode'])
+            && empty($turn->options['is_guest_mode']);
+        if ($capture) {
+            $this->transcripts->enable();
+        }
         $documentEdit = $this->documents->tryToolsEdit($turn->topic(), $model->modelId, $messages, $message, $aiOptions, $progressCallback, $incognito);
         if (null !== $documentEdit) {
             $metadata = self::chosenModelMetadata($model, $documentEdit->usage);
             $this->documents->applyEditResult($documentEdit, $message, $metadata);
             $answer($documentEdit->content);
         } else {
+            if ($capture) {
+                $this->transcripts->record($messages);
+            }
             $metadata = $this->aiFacade->chatStream($messages, $answer, $message->getUserId(), $aiOptions);
         }
+        $this->transcripts->seal();
         $turn->perfTimer->stop('provider_total');
 
         return new ChatReply(
