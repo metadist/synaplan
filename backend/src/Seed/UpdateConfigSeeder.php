@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Update\UpdateConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the update-notice config (BCONFIG, ownerId=0).
@@ -21,11 +22,22 @@ use Doctrine\DBAL\Connection;
  * missing. Changing a default later would need an explicit UPDATE migration
  * (see docs/MIGRATIONS.md).
  */
-final readonly class UpdateConfigSeeder
+#[AsTaggedItem(priority: 210)]
+final readonly class UpdateConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'updates';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=UPDATES, ownerId=0 — default ON';
     }
 
     public function seed(): SeedResult

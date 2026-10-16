@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Chat\ProgressNarrationConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the chat progress-narration switches (BCONFIG, ownerId=0).
@@ -18,11 +19,22 @@ use Doctrine\DBAL\Connection;
  * NOT propagate to existing installs; that needs an explicit UPDATE migration
  * (see docs/MIGRATIONS.md).
  */
-final readonly class ProgressNarrationConfigSeeder
+#[AsTaggedItem(priority: 220)]
+final readonly class ProgressNarrationConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'progress-narration';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=PROGRESS_NARRATION, ownerId=0';
     }
 
     public function seed(): SeedResult

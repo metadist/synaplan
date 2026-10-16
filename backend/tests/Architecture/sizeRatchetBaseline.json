@@ -1,7 +1,7 @@
 {
     "_comment": "Size ratchet ledger (tests/Architecture/SizeRatchetTest.php). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_SIZE_RATCHET=1 and review the diff.",
     "recorded": "2026-10-14",
-    "updated": "2026-10-15",
+    "updated": "2026-10-16",
     "limits": {
         "fileLines": 800,
         "constructorParams": 10,
@@ -9,7 +9,7 @@
     },
     "counts": {
         "fileLines": 57,
-        "constructorParams": 71,
+        "constructorParams": 69,
         "methodLines": 147
     },
     "fileLines": {
@@ -79,7 +79,6 @@
         "src/AI/OpenAI/OpenAiGatewayToolLoop.php::OpenAiGatewayToolLoop": 13,
         "src/AI/Service/AiFacade.php::AiFacade": 16,
         "src/AI/Service/ProviderRegistry.php::ProviderRegistry": 12,
-        "src/Command/SeedAllCommand.php::SeedAllCommand": 36,
         "src/Controller/AdminController.php::AdminController": 12,
         "src/Controller/AgentController.php::AgentController": 14,
         "src/Controller/AppleAuthController.php::AppleAuthController": 12,
@@ -115,7 +114,6 @@
         "src/Service/Email/InboundEmailHandlerService.php::InboundEmailHandlerService": 12,
         "src/Service/File/FileProcessor.php::FileProcessor": 17,
         "src/Service/File/FileUploadService.php::FileUploadService": 12,
-        "src/Service/Iam/UserDeletionService.php::UserDeletionService": 36,
         "src/Service/Mcp/McpOAuthState.php::McpOAuthState": 11,
         "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler": 22,
         "src/Service/Message/MessageClassifier.php::MessageClassifier": 21,

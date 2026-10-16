@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Message\Routing\NativeToolRoutingConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the global native-tool-routing flag (BCONFIG, ownerId=0).
@@ -21,11 +22,22 @@ use Doctrine\DBAL\Connection;
  * default, which needed {@see \DoctrineMigrations\Version20260901000000} to
  * reach installs a seeder alone cannot touch.
  */
-final readonly class NativeToolRoutingConfigSeeder
+#[AsTaggedItem(priority: 90)]
+final readonly class NativeToolRoutingConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'native-tool-routing';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=NATIVE_TOOL_ROUTING, ownerId=0 — default OFF';
     }
 
     public function seed(): SeedResult

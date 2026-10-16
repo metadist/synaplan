@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\MarketingNews\MarketingNewsConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for global marketing news config (BCONFIG, ownerId=0).
@@ -14,11 +15,22 @@ use Doctrine\DBAL\Connection;
  * Synaplan marketing until an admin opts in via System Config. Insert-if-missing
  * only — operator overrides are never touched.
  */
-final readonly class MarketingNewsConfigSeeder
+#[AsTaggedItem(priority: 240)]
+final readonly class MarketingNewsConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'marketing-news';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=MARKETING_NEWS, ownerId=0 — master switch OFF';
     }
 
     public function seed(): SeedResult

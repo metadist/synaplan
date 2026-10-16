@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the global structured-output flag (BCONFIG, ownerId=0).
@@ -16,11 +17,22 @@ use Doctrine\DBAL\Connection;
  * defaults are bootstrap-only (AGENTS.md) — {@see
  * \DoctrineMigrations\Version20260901000000} inserts the same row for them.
  */
-final readonly class StructuredOutputConfigSeeder
+#[AsTaggedItem(priority: 110)]
+final readonly class StructuredOutputConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'structured-output';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=STRUCTURED_OUTPUT, ownerId=0 — default ON';
     }
 
     public function seed(): SeedResult

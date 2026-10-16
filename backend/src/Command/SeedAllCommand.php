@@ -4,140 +4,28 @@ declare(strict_types=1);
 
 namespace App\Command;
 
-use App\Seed\AgentConfigSeeder;
-use App\Seed\BrandingConfigSeeder;
-use App\Seed\BundleConfigSeeder;
-use App\Seed\ComputeConfigSeeder;
-use App\Seed\DefaultModelConfigSeeder;
-use App\Seed\DemoWidgetConfigSeeder;
-use App\Seed\DesktopAgentConfigSeeder;
-use App\Seed\DocumentToolsConfigSeeder;
-use App\Seed\EmbeddingRouterConfigSeeder;
-use App\Seed\FileContextConfigSeeder;
-use App\Seed\IamConfigSeeder;
-use App\Seed\MarketingNewsConfigSeeder;
-use App\Seed\McpConfigSeeder;
-use App\Seed\MediaJobConfigSeeder;
-use App\Seed\MessagesGatewayConfigSeeder;
-use App\Seed\MobileConfigSeeder;
-use App\Seed\ModelRetirementSeeder;
-use App\Seed\ModelSeeder;
-use App\Seed\ModuleGateSeeder;
-use App\Seed\MultitaskConfigSeeder;
-use App\Seed\NativeToolRoutingConfigSeeder;
-use App\Seed\PlatformLinksConfigSeeder;
-use App\Seed\PlugsConfigSeeder;
-use App\Seed\ProgressNarrationConfigSeeder;
-use App\Seed\PromptSeeder;
-use App\Seed\RateLimitConfigSeeder;
-use App\Seed\SavedTaskConfigSeeder;
+use App\Seed\SeederInterface;
 use App\Seed\SeedResult;
-use App\Seed\SelfAwareConfigSeeder;
-use App\Seed\SmartSearchConfigSeeder;
-use App\Seed\StructuredOutputConfigSeeder;
-use App\Seed\SubscriptionPlanSeeder;
-use App\Seed\ToolsConfigSeeder;
-use App\Seed\UpdateConfigSeeder;
-use App\Seed\UsageTaximeterConfigSeeder;
-use App\Seed\WorkflowsConfigSeeder;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
-/**
- * Run every idempotent app:*:seed step in dependency order.
- *
- * Order:
- *   1. models        (BMODELS — referenced by DEFAULTMODEL config)
- *   1b. model-retirements (BMODELS — deactivates models the provider retired;
- *                    must follow `models` so a freshly inserted retired row is
- *                    switched off in the same run)
- *   2. prompts       (BPROMPTS)
- *   3. defaults      (BCONFIG: DEFAULTMODEL → references model IDs from step 1)
- *   4. rate-limits   (BCONFIG: SYSTEM_FLAGS, RATELIMITS_*)
- *   5. subscriptions (BSUBSCRIPTIONS — plan cost budgets)
- *   6. multitask     (BCONFIG: MULTITASK routing flags)
- *   7. mcp           (BCONFIG: MCP outbound-client flags, ownerId=0 — default ON)
- *   8. media-jobs    (BCONFIG: MEDIA async media flag, ownerId=0 — default ON)
- *   9. branding      (BCONFIG: BRANDING white-label defaults, ownerId=0)
- *  10. mobile        (BCONFIG: MOBILE forced-update gate defaults, ownerId=0)
- *  11. marketing-news (BCONFIG: MARKETING_NEWS guest-landing flags, master switch OFF)
- *  12. usage-taximeter (BCONFIG: USAGE_TAXIMETER display switch, ownerId=0 — default ON)
- *  13. updates       (BCONFIG: UPDATES release-notice switch + manifest URL, ownerId=0 — default ON)
- *  14. messages-gateway (BCONFIG: MESSAGES_GATEWAY Anthropic-compatible API flags, ownerId=0 — default OFF)
- *  15. saved-tasks   (BCONFIG: SAVEDTASKS.ENABLED, ownerId=0 — default ON for new/local installs)
- *  16. file-context  (BCONFIG: FILE_CONTEXT conversation-file flags, ownerId=0 — default OFF)
- *  17. desktop-agent (BCONFIG: DESKTOP_AGENT.ENABLED, ownerId=0 — default ON)
- *  17b. iam          (BCONFIG: IAM.* flags, ownerId=0 — feature flags default ON)
- *  17c. agents       (BCONFIG: AGENTS.ENABLED, ownerId=0 — default ON)
- *  17d. platform-links (BCONFIG: PLATFORM_LINKS.ENABLED, ownerId=0 — default ON)
- *  17e. bundle       (BCONFIG: BUNDLE.ENABLED, ownerId=0 — default ON)
- *  18. self-aware    (BCONFIG: SELF_AWARE flags, ownerId=0 — default ON)
- *  19. structured-output (BCONFIG: STRUCTURED_OUTPUT.ENABLED, ownerId=0 — default ON)
- *  20. embedding-router (BCONFIG: EMBEDDING_ROUTER.ENABLED + CONFIDENCE_THRESHOLD, ownerId=0 — default OFF)
- *  21. native-tool-routing (BCONFIG: NATIVE_TOOL_ROUTING.ENABLED, ownerId=0 — default OFF)
- *  22. document-tools (BCONFIG: DOCUMENT_TOOLS flags, ownerId=0 — ENABLED default ON)
- *  23. plugs         (BCONFIG: PLUGS extraction/search/rerank defaults, ownerId=0)
- *  24. tools         (BCONFIG: TOOLS registry/approvals/custom-HTTP flags, ownerId=0)
- *  24b. workflows    (BCONFIG: WORKFLOWS.BUILDER_ENABLED, ownerId=0 — default ON)
- *  25. module-gates  (BCONFIG: MODULES.GATE_<ID> from ModuleGateSeeder::defaultValue())
- *  26. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
- *
- * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
- * on every container startup in dev AND prod.
- *
- * A failing step does not stop the others. The entrypoint keeps the container
- * running when this command fails, so an abort would leave every later step —
- * model retirements included — silently unapplied until someone reads the
- * startup log. Each step is idempotent and catalog-keyed (the defaults
- * reference catalog BIDs, not rows read back from step 1), so running the rest
- * is safe; the command still exits non-zero and names the failed steps.
- */
 #[AsCommand(
     name: 'app:seed',
     description: 'Run all idempotent catalog/config seeders (models, prompts, defaults, rate limits, demo widget)',
 )]
 final class SeedAllCommand extends Command
 {
+    /**
+     * @param iterable<SeederInterface> $seeders in dependency order (tag priority)
+     */
     public function __construct(
-        private readonly ModelSeeder $modelSeeder,
-        private readonly ModelRetirementSeeder $modelRetirementSeeder,
-        private readonly PromptSeeder $promptSeeder,
-        private readonly DefaultModelConfigSeeder $defaultModelConfigSeeder,
-        private readonly RateLimitConfigSeeder $rateLimitConfigSeeder,
-        private readonly DemoWidgetConfigSeeder $demoWidgetConfigSeeder,
-        private readonly SubscriptionPlanSeeder $subscriptionPlanSeeder,
-        private readonly MultitaskConfigSeeder $multitaskConfigSeeder,
-        private readonly McpConfigSeeder $mcpConfigSeeder,
-        private readonly MediaJobConfigSeeder $mediaJobConfigSeeder,
-        private readonly BrandingConfigSeeder $brandingConfigSeeder,
-        private readonly MobileConfigSeeder $mobileConfigSeeder,
-        private readonly MarketingNewsConfigSeeder $marketingNewsConfigSeeder,
-        private readonly UsageTaximeterConfigSeeder $usageTaximeterConfigSeeder,
-        private readonly ProgressNarrationConfigSeeder $progressNarrationConfigSeeder,
-        private readonly UpdateConfigSeeder $updateConfigSeeder,
-        private readonly MessagesGatewayConfigSeeder $messagesGatewayConfigSeeder,
-        private readonly SavedTaskConfigSeeder $savedTaskConfigSeeder,
-        private readonly FileContextConfigSeeder $fileContextConfigSeeder,
-        private readonly DesktopAgentConfigSeeder $desktopAgentConfigSeeder,
-        private readonly IamConfigSeeder $iamConfigSeeder,
-        private readonly AgentConfigSeeder $agentConfigSeeder,
-        private readonly BundleConfigSeeder $bundleConfigSeeder,
-        private readonly PlatformLinksConfigSeeder $platformLinksConfigSeeder,
-        private readonly SelfAwareConfigSeeder $selfAwareConfigSeeder,
-        private readonly StructuredOutputConfigSeeder $structuredOutputConfigSeeder,
-        private readonly EmbeddingRouterConfigSeeder $embeddingRouterConfigSeeder,
-        private readonly NativeToolRoutingConfigSeeder $nativeToolRoutingConfigSeeder,
-        private readonly DocumentToolsConfigSeeder $documentToolsConfigSeeder,
-        private readonly SmartSearchConfigSeeder $smartSearchConfigSeeder,
-        private readonly PlugsConfigSeeder $plugsConfigSeeder,
-        private readonly ToolsConfigSeeder $toolsConfigSeeder,
-        private readonly WorkflowsConfigSeeder $workflowsConfigSeeder,
-        private readonly ComputeConfigSeeder $computeConfigSeeder,
-        private readonly ModuleGateSeeder $moduleGateSeeder,
+        #[AutowireIterator(SeederInterface::TAG)]
+        private readonly iterable $seeders,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -145,42 +33,16 @@ final class SeedAllCommand extends Command
 
     protected function configure(): void
     {
+        $lines = [];
+        foreach ($this->seeders as $seeder) {
+            $lines[] = sprintf('  %2d. %-22s %s', count($lines) + 1, $seeder->label(), $seeder->description());
+        }
+
         $this->setHelp(
-            "Convenience aggregator that runs every idempotent seed step in dependency order.\n\n".
-            "  1. app:model:seed              (BMODELS)\n".
-            "  1b. model retirements         (BMODELS — deactivate models retired upstream)\n".
-            "  2. app:prompt:seed             (BPROMPTS, ownerId=0)\n".
-            "  3. app:config:seed-defaults    (BCONFIG, group=DEFAULTMODEL/ai)\n".
-            "  4. app:ratelimit:seed-defaults (BCONFIG, group=RATELIMITS_*/SYSTEM_FLAGS)\n".
-            "  5. subscription cost budgets   (BSUBSCRIPTIONS)\n".
-            "  6. multitask routing flags     (BCONFIG, group=MULTITASK)\n".
-            "  7. mcp outbound-client flags   (BCONFIG, group=MCP, ownerId=0 — default ON)\n".
-            "  8. media-jobs async flag       (BCONFIG, group=MEDIA, ownerId=0 — default ON)\n".
-            "  9. branding defaults           (BCONFIG, group=BRANDING, ownerId=0)\n".
-            "  10. mobile gate defaults       (BCONFIG, group=MOBILE, ownerId=0)\n".
-            "  11. marketing news flags       (BCONFIG, group=MARKETING_NEWS, ownerId=0 — master switch OFF)\n".
-            "  12. usage taximeter switch      (BCONFIG, group=USAGE_TAXIMETER, ownerId=0 — default ON)\n".
-            "  13. update notice config       (BCONFIG, group=UPDATES, ownerId=0 — default ON)\n".
-            "  14. messages gateway flags     (BCONFIG, group=MESSAGES_GATEWAY, ownerId=0 — default OFF)\n".
-            "  15. saved-tasks flag           (BCONFIG, group=SAVEDTASKS, ownerId=0 — default ON for new/local)\n".
-            "  16. file-context flags         (BCONFIG, group=FILE_CONTEXT, ownerId=0 — default OFF)\n".
-            "  17. desktop-agent flag         (BCONFIG, group=DESKTOP_AGENT, ownerId=0 — default ON)\n".
-            "  17b. iam flags                 (BCONFIG, group=IAM, ownerId=0 — feature flags default ON)\n".
-            "  17c. agents flag               (BCONFIG, group=AGENTS, ownerId=0 — default ON)\n".
-            "  17d. platform-links flag       (BCONFIG, group=PLATFORM_LINKS, ownerId=0 — default ON)\n".
-            "  17e. bundle flag               (BCONFIG, group=BUNDLE, ownerId=0 — default ON)\n".
-            "  18. self-aware flags           (BCONFIG, group=SELF_AWARE, ownerId=0 — default ON)\n".
-            "  19. structured-output flag     (BCONFIG, group=STRUCTURED_OUTPUT, ownerId=0 — default ON)\n".
-            "  20. embedding-router flags     (BCONFIG, group=EMBEDDING_ROUTER, ownerId=0 — default OFF)\n".
-            "  21. native-tool-routing flag   (BCONFIG, group=NATIVE_TOOL_ROUTING, ownerId=0 — default OFF)\n".
-            "  22. document-tools flags       (BCONFIG, group=DOCUMENT_TOOLS, ownerId=0 — ENABLED default ON)\n".
-            "  23. plugs defaults             (BCONFIG, group=PLUGS, ownerId=0 — today's FileProcessor + Brave)\n".
-            "  24. tools flags                (BCONFIG, group=TOOLS, ownerId=0)\n".
-            "  24b. workflows builder flag    (BCONFIG, group=WORKFLOWS, ownerId=0 — default ON)\n".
-            "  25. module-gates               (BCONFIG, group=MODULES, defaults from ModuleGateSeeder)\n".
-            "  26. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
-            "All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.\n".
-            'A failing step does not stop the others; the command then exits non-zero and names the failed steps.'
+            "Convenience aggregator that runs every idempotent seed step in dependency order.\n\n"
+            .implode("\n", $lines)."\n\n"
+            ."All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.\n"
+            .'A failing step does not stop the others; the command then exits non-zero and names the failed steps.'
         );
     }
 
@@ -189,49 +51,14 @@ final class SeedAllCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $io->title('Synaplan seed: idempotent catalog/config bootstrap');
 
-        $steps = [
-            ['models',      fn (): SeedResult => $this->modelSeeder->seed()],
-            ['model-retirements', fn (): SeedResult => $this->modelRetirementSeeder->seed()],
-            ['prompts',     fn (): SeedResult => $this->promptSeeder->seed()],
-            ['defaults',    fn (): SeedResult => $this->defaultModelConfigSeeder->seed()],
-            ['rate-limits', fn (): SeedResult => $this->rateLimitConfigSeeder->seed()],
-            ['subscriptions', fn (): SeedResult => $this->subscriptionPlanSeeder->seed()],
-            ['multitask',   fn (): SeedResult => $this->multitaskConfigSeeder->seed()],
-            ['mcp',         fn (): SeedResult => $this->mcpConfigSeeder->seed()],
-            ['media-jobs',  fn (): SeedResult => $this->mediaJobConfigSeeder->seed()],
-            ['branding',    fn (): SeedResult => $this->brandingConfigSeeder->seed()],
-            ['mobile',      fn (): SeedResult => $this->mobileConfigSeeder->seed()],
-            ['marketing-news', fn (): SeedResult => $this->marketingNewsConfigSeeder->seed()],
-            ['usage-taximeter', fn (): SeedResult => $this->usageTaximeterConfigSeeder->seed()],
-            ['progress-narration', fn (): SeedResult => $this->progressNarrationConfigSeeder->seed()],
-            ['updates',      fn (): SeedResult => $this->updateConfigSeeder->seed()],
-            ['messages-gateway', fn (): SeedResult => $this->messagesGatewayConfigSeeder->seed()],
-            ['saved-tasks', fn (): SeedResult => $this->savedTaskConfigSeeder->seed()],
-            ['file-context', fn (): SeedResult => $this->fileContextConfigSeeder->seed()],
-            ['desktop-agent', fn (): SeedResult => $this->desktopAgentConfigSeeder->seed()],
-            ['iam', fn (): SeedResult => $this->iamConfigSeeder->seed()],
-            ['agents', fn (): SeedResult => $this->agentConfigSeeder->seed()],
-            ['bundle', fn (): SeedResult => $this->bundleConfigSeeder->seed()],
-            ['platform-links', fn (): SeedResult => $this->platformLinksConfigSeeder->seed()],
-            ['self-aware', fn (): SeedResult => $this->selfAwareConfigSeeder->seed()],
-            ['structured-output', fn (): SeedResult => $this->structuredOutputConfigSeeder->seed()],
-            ['embedding-router', fn (): SeedResult => $this->embeddingRouterConfigSeeder->seed()],
-            ['native-tool-routing', fn (): SeedResult => $this->nativeToolRoutingConfigSeeder->seed()],
-            ['document-tools', fn (): SeedResult => $this->documentToolsConfigSeeder->seed()],
-            ['smart-search', fn (): SeedResult => $this->smartSearchConfigSeeder->seed()],
-            ['plugs', fn (): SeedResult => $this->plugsConfigSeeder->seed()],
-            ['tools', fn (): SeedResult => $this->toolsConfigSeeder->seed()],
-            ['workflows', fn (): SeedResult => $this->workflowsConfigSeeder->seed()],
-            ['compute', fn (): SeedResult => $this->computeConfigSeeder->seed()],
-            ['module-gates', fn (): SeedResult => $this->moduleGateSeeder->seed()],
-            ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
-        ];
-
         $rows = [];
         $failed = [];
-        foreach ($steps as [$label, $callable]) {
+        $total = 0;
+        foreach ($this->seeders as $seeder) {
+            ++$total;
+            $label = $seeder->label();
             try {
-                $result = $this->runStep($io, $label, $callable);
+                $result = $this->runStep($io, $label, $seeder);
             } catch (\Throwable $e) {
                 $failed[] = $label;
                 $this->logger->error('Seed step failed', ['step' => $label, 'exception' => $e]);
@@ -255,7 +82,7 @@ final class SeedAllCommand extends Command
             $io->error(sprintf(
                 '%d of %d seed steps failed: %s. All other steps completed.',
                 count($failed),
-                count($steps),
+                $total,
                 implode(', ', $failed),
             ));
 
@@ -267,13 +94,10 @@ final class SeedAllCommand extends Command
         return Command::SUCCESS;
     }
 
-    /**
-     * @param callable(): SeedResult $step
-     */
-    private function runStep(SymfonyStyle $io, string $label, callable $step): SeedResult
+    private function runStep(SymfonyStyle $io, string $label, SeederInterface $seeder): SeedResult
     {
         $io->section("Seeding: $label");
-        $result = $step();
+        $result = $seeder->seed();
         $io->writeln(sprintf(
             '  → inserted=%d, updated=%d, skipped=%d, preserved=%d',
             $result->inserted,

@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\File\GeneratedImageVisionFlag;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the conversation file-context flags (BCONFIG, ownerId=0).
@@ -18,11 +19,22 @@ use Doctrine\DBAL\Connection;
  * propagate to existing installs; that needs an explicit UPDATE migration
  * (see docs/MIGRATIONS.md).
  */
-final readonly class FileContextConfigSeeder
+#[AsTaggedItem(priority: 180)]
+final readonly class FileContextConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'file-context';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=FILE_CONTEXT, ownerId=0 — default OFF';
     }
 
     public function seed(): SeedResult

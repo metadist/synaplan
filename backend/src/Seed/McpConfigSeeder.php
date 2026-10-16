@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Mcp\McpClientConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the outbound MCP client flags (BCONFIG, ownerId=0).
@@ -20,11 +21,22 @@ use Doctrine\DBAL\Connection;
  * Manage → Connections → MCP Servers and the per-topic "MCP Data Sources" opt-in
  * (`tool_mcp`) are still required before any call happens.
  */
-final readonly class McpConfigSeeder
+#[AsTaggedItem(priority: 280)]
+final readonly class McpConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'mcp';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=MCP, ownerId=0 — default ON';
     }
 
     public function seed(): SeedResult

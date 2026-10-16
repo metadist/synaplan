@@ -6,15 +6,27 @@ namespace App\Seed;
 
 use App\Service\Compute\ComputeConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Bootstrap-only COMPUTE.* defaults. Existing rows are never overwritten.
  */
-final readonly class ComputeConfigSeeder
+#[AsTaggedItem(priority: 30)]
+final readonly class ComputeConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'compute';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=COMPUTE, ownerId=0';
     }
 
     public function seed(): SeedResult
