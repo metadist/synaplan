@@ -197,7 +197,7 @@ the Doctrine mapping and proves that none is left.
 | -------- | ------ | ------ | ---------------- |
 | 200 | `AccessCredentialsEraser` | verification tokens, tokens, API keys, sessions | — |
 | 195 | `ConnectionEraser` | connections (each secret through the vault), custom tools | — |
-| 190 | `KnowledgeEraser` | knowledge-base vectors | — |
+| 190 | `KnowledgeEraser` | knowledge-base rows | the vector store's copy |
 | 185 | `DesktopEraser` | desktop jobs, then paired devices | — |
 | 180 | `UsageLogEraser` | usage log | — |
 | 170 | `WidgetEraser` | widgets and their sessions | — |
@@ -208,7 +208,7 @@ the Doctrine mapping and proves that none is left.
 | 135 | `UrlWatchEraser` | watched pages | — |
 | 130 | `ConversationEraser` | chats, messages, conversation summaries, email verification attempts | summary copies in Redis |
 | 125 | `VoiceSessionEraser` | live voice sessions | an open session's provider slot |
-| 120 | `FileEraser` | document revisions, stored files and their rows | empty upload directories |
+| 120 | `FileEraser` | document revisions, file rows | stored files, empty upload directories |
 | 115 | `ComputeEraser` | file-work runs and workspaces | one `DeleteComputeWorkspaceCommand` per sidecar folder |
 | 110 | `InboxEraser` | inbound email handlers | — |
 | 100 | `ConfigEraser` | per-user settings | — |
@@ -218,13 +218,17 @@ the Doctrine mapping and proves that none is left.
 | 60 | `IdentityEraser` | group memberships, external identities, Telegram bot | Telegram webhook |
 | 50 | `CredentialEraser` | every secret the account still owns | — |
 
-Secrets never wait for the commit: the vault deletes them inside the
-transaction, so a vault failure rolls the whole deletion back.
-`CredentialEraser` runs last because `IdentityEraser` still reads the
-Telegram bot token to drop its webhook. The sidecar folder cleanup is the
-only reference left once the workspace row is gone, so it travels on
-`async_index`, which retries it five times and then parks it in `failed`
-for an operator.
+Nothing irreversible happens before the commit: stored files and the vector
+store's copy go after it, so a late failure that rolls the deletion back
+leaves the account whole. Secrets live in the database, so the vault
+forgets them inside the transaction, and a vault failure rolls the whole
+deletion back. `CredentialEraser` runs last because `IdentityEraser`
+still reads the Telegram bot token to drop its webhook. The sidecar folder
+cleanup is the only reference left once the workspace row is gone, so it
+travels on `async_index`, which retries it five times and then parks it in
+`failed` for an operator. A summary refresh still running when the account
+goes writes nothing back: its upsert checks the chat's owner in the same
+statement.
 
 ## Where new code goes
 

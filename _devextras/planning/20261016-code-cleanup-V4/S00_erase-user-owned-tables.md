@@ -161,3 +161,14 @@ Seven new erasers instead of six; the rest follows the plan.
   worker change (AGENTS.md, ask first).
 - **Journey.** `account-deletion.spec.ts` only covers the public info
   page; the walk on the dev stack is recorded in STATUS.
+- **Review round 1 (Copilot, two findings).** `FileEraser` deleted the
+  stored bytes inside the transaction, so a late failure (the new vault
+  sweep, or any later eraser) rolled the rows back over missing files: the
+  bytes now go after the commit, and the same audit moved
+  `KnowledgeEraser`'s vector-store purge there too (its rows stay inside).
+  A summary refresh that outlived the account could write the summary back:
+  `ChatSummaryRepository::upsert()` now inserts only while the chat exists
+  and belongs to the user, in the same statement, and the Redis copy is
+  written only when the row was. Carried: the other post-turn workers
+  (memory extraction, digests, the Smart Search index) can still write a
+  row for an account deleted while they run.
