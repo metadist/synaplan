@@ -15,15 +15,15 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
- * A file's revisions go with the file: both inside the transaction, before
- * the upload directories are tidied after the commit.
+ * Revisions and file rows go inside the transaction; the stored bytes are
+ * deleted only after the commit, because a rollback cannot restore them.
  */
 final class FileEraserTest extends TestCase
 {
-    public function testRemovesTheRevisionsBeforeTheFilesTheyVersion(): void
+    public function testRemovesTheRowsInsideTheTransactionAndTheBytesAfterTheCommit(): void
     {
         $order = [];
-        $file = new File();
+        $file = (new File())->setFilePath('42/2026/10/report.pdf');
         $revisions = $this->createMock(DocumentRevisionRepository::class);
         $revisions->expects(self::once())->method('deleteForUser')->with(42)
             ->willReturnCallback(static function () use (&$order): void {
@@ -32,14 +32,23 @@ final class FileEraserTest extends TestCase
         $files = $this->createStub(FileRepository::class);
         $files->method('findBy')->willReturn([$file]);
         $em = $this->createStub(EntityManagerInterface::class);
-        $em->method('remove')->willReturnCallback(static function (object $row) use (&$order, $file): void {
-            $order[] = $row === $file ? 'file' : 'other';
+        $em->method('remove')->willReturnCallback(static function () use (&$order): void {
+            $order[] = 'file row';
+        });
+        $storage = $this->createStub(FileStorageService::class);
+        $storage->method('deleteFile')->willReturnCallback(static function (string $path) use (&$order): bool {
+            $order[] = 'bytes '.$path;
+
+            return true;
         });
 
         $erasure = new UserErasure(42, 'ada@example.test');
-        (new FileEraser($em, $files, $revisions, $this->createStub(FileStorageService::class), new NullLogger()))->erase($erasure);
+        (new FileEraser($em, $files, $revisions, $storage, new NullLogger()))->erase($erasure);
 
-        self::assertSame(['revisions', 'file'], $order);
-        self::assertCount(1, $erasure->pendingCleanups());
+        self::assertSame(['revisions', 'file row'], $order, 'No byte may be deleted before the commit.');
+        foreach ($erasure->pendingCleanups() as $cleanup) {
+            $cleanup();
+        }
+        self::assertSame(['revisions', 'file row', 'bytes 42/2026/10/report.pdf'], $order);
     }
 }

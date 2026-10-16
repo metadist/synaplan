@@ -81,6 +81,16 @@ class RagDocumentRepository extends ServiceEntityRepository
             ->execute();
     }
 
+    public function deleteByUser(int $userId): int
+    {
+        return $this->createQueryBuilder('r')
+            ->delete()
+            ->where('r.userId = :userId')
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->execute();
+    }
+
     /**
      * Deletes RAG documents by MessageId/FileId.
      *
