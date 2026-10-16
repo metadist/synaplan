@@ -34,9 +34,16 @@ export function createGeminiAdapter({
   }
 
   const setup = () => {
+    const generationConfig = { responseModalities: ['AUDIO'] }
+    const voice = String(config.voice ?? '').trim()
+    if (voice !== '') {
+      generationConfig.speechConfig = {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } },
+      }
+    }
     const body = {
       model: `models/${config.model}`,
-      generationConfig: { responseModalities: ['AUDIO'] },
+      generationConfig,
       systemInstruction: { parts: [{ text: config.instructions }] },
       tools: [{
         functionDeclarations: [{

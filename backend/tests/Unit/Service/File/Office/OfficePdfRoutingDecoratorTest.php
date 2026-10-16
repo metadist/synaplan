@@ -59,7 +59,7 @@ final class OfficePdfRoutingDecoratorTest extends TestCase
 5. If the user asks for output the capability list cannot produce (e.g. a real
    PDF, a phone call), use a single `chat` node and tell them plainly what is
    not possible. Do NOT pretend.
-5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
+5. A file the user asks to receive (XLSX, DOCX, PPTX, CSV, TXT, MD) → `document_generation` (NOT
    chat). Real PDFs are NOT supported — say so in a single `chat` node.
 PROMPT;
 
@@ -70,7 +70,7 @@ PROMPT;
         self::assertStringContainsString('single `document_export` node — NOT extract_text + document_generation', $out);
         self::assertStringContainsString('document_generation, document_export, document_combine, calendar_event), surfaced through `compose_reply`.', $out);
         self::assertStringContainsString('single `document_combine` node', $out);
-        self::assertStringContainsString('Office document (XLSX, DOCX, PPTX, CSV, PDF)', $out);
+        self::assertStringContainsString('A file the user asks to receive (XLSX, DOCX, PPTX, CSV, TXT, MD, PDF)', $out);
         self::assertStringNotContainsString('e.g. a real', $out);
         self::assertStringContainsString('OFFICE_PDF_ROUTING', $out);
         self::assertStringContainsString('set BTOPIC to "officemaker"', $out);

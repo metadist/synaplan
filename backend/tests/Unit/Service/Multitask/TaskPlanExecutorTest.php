@@ -889,6 +889,78 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertSame('router answer', $result['content']);
     }
 
+    public function testPinnedAssistantPlansAndSavesTheFile(): void
+    {
+        // A chat pinned to an assistant skips the sorter and stays intent=chat.
+        // Planning must still run, and a file step must stay on the DAG —
+        // the legacy router would only talk about the file.
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'web_search', 'inputs' => ['query' => 'synaplan']],
+                ['id' => 'n2', 'capability' => 'document_generation', 'depends_on' => ['n1'], 'inputs' => ['prompt' => 'Save the count to counter_weekday.txt. $n1.text']],
+            ],
+        ]);
+        $this->planner->expects(self::once())->method('plan')->willReturn(new TaskPlanResult($plan, fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Document created: counter_weekday.txt',
+            'files' => [['path' => '/api/v1/files/uploads/counter_weekday.txt', 'type' => 'document']],
+            'node_statuses' => ['n1' => 'done', 'n2' => 'done'],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $this->executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'agent:new-assistant', 'language' => 'en', 'source' => 'agent'],
+        );
+
+        self::assertSame('Document created: counter_weekday.txt', $result['content']);
+        self::assertSame('document', $result['metadata']['file']['type']);
+    }
+
+    public function testPinnedAssistantSingleDocumentNodeRunsDagNotChat(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n1',
+            'tasks' => [[
+                'id' => 'n1',
+                'capability' => 'document_generation',
+                'inputs' => ['prompt' => 'Friday 2026-10-16: 10'],
+            ]],
+        ]);
+        $this->planner->expects(self::once())->method('plan')->willReturn(new TaskPlanResult($plan, fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Document created: counter_weekday.txt',
+            'files' => [['path' => '/api/v1/files/uploads/counter_weekday.txt', 'type' => 'document']],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $this->executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'agent:new-assistant', 'language' => 'en', 'source' => 'agent'],
+        );
+
+        self::assertSame('Document created: counter_weekday.txt', $result['content']);
+    }
+
+    public function testPinnedAssistantSmallTalkStillUsesTheChatRouter(): void
+    {
+        $this->planner->expects(self::once())->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::never())->method('execute');
+        $this->router->expects(self::once())->method('route')->willReturn(['content' => 'Hello.']);
+
+        $result = $this->executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'agent:new-assistant', 'language' => 'en', 'source' => 'agent'],
+        );
+
+        self::assertSame('Hello.', $result['content']);
+    }
+
     public function testSavedTaskRunExecutesItsAuthoredStepsRegardlessOfTriggerType(): void
     {
         // A task with authored "Advanced steps" must run EXACTLY those steps on

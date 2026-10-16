@@ -29,9 +29,9 @@ final readonly class OfficePdfRoutingDecorator
 
     private const PLANNER_HARD_RULE_NO_PDF = "If the user asks for output the capability list cannot produce (e.g. a\n   phone call)";
 
-    private const PLANNER_OFFICE_FORMATS = 'Office document (XLSX, DOCX, PPTX, CSV)';
+    private const PLANNER_OFFICE_FORMATS = 'A file the user asks to receive (XLSX, DOCX, PPTX, CSV, TXT, MD)';
 
-    private const PLANNER_OFFICE_FORMATS_WITH_PDF = 'Office document (XLSX, DOCX, PPTX, CSV, PDF)';
+    private const PLANNER_OFFICE_FORMATS_WITH_PDF = 'A file the user asks to receive (XLSX, DOCX, PPTX, CSV, TXT, MD, PDF)';
 
     private const SORTER_MARKER = 'OFFICE_PDF_ROUTING';
 

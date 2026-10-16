@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\SavedTask;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
+use App\Service\Agent\Policy\AssistantPlanLimits;
 use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Infrastructure\PerfTimer;
@@ -16,6 +17,7 @@ use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\DagExecutor;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Plan\Capability;
+use App\Service\Multitask\Plan\PlanEligibility;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
@@ -26,12 +28,11 @@ use Psr\Log\LoggerInterface;
  * Executes a task plan. Drop-in replacement for {@see InferenceRouter} at the
  * MessageProcessor call sites, gated by MULTITASK_ROUTING_ENABLED.
  *
- * Plan source + path selection:
- *   - AI-classified messages (classification source `ai_sorting`) AND non-image
- *     file attachments (`attachment_document_or_audio`) are sent to the
- *     {@see TaskPlanner}. Other deterministic/simple branches (fast-path chat,
- *     slash commands, widget, again) keep using the proven single-node path —
- *     no planner latency, no behaviour change. File attachments are planned so
+ * Plan source + path selection ({@see PlanEligibility}):
+ *   - AI-classified messages, non-image file attachments, saved tasks and a
+ *     chat pinned to an assistant are sent to the {@see TaskPlanner}. Other
+ *     deterministic branches (fast-path chat, slash commands, widget, again)
+ *     keep the single-node path. File attachments are planned so
  *     multi-intent messages ("summarize this DOCX, make an image and read it
  *     aloud") are no longer reduced to a lone file analysis (issue #1192); a
  *     single-intent attachment still degrades to the legacy single-node path.
@@ -150,7 +151,7 @@ final readonly class TaskPlanExecutor
                 $classification,
             );
         }
-        if ($this->shouldUseLegacyRouter($plan)) {
+        if ($this->shouldUseLegacyRouter($plan, $classification)) {
             return $this->withPlanningUsage(
                 $this->runSingleNode(
                     fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
@@ -229,7 +230,7 @@ final readonly class TaskPlanExecutor
                 $classification,
             );
         }
-        if ($this->shouldUseLegacyRouter($plan)) {
+        if ($this->shouldUseLegacyRouter($plan, $classification)) {
             return $this->withPlanningUsage(
                 $this->runSingleNode(
                     fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
@@ -275,15 +276,17 @@ final readonly class TaskPlanExecutor
      * InferenceRouter (the behaviour-identical Sprint-2 degenerate path).
      *
      * Multi-node plans always run the DAG. A single-node plan uses the DAG
-     * unless its capability is on {@see LEGACY_ROUTER_CAPABILITIES} — otherwise
-     * the legacy router, fed the original classification, silently degrades a
-     * lone `tool_call` / `email_me` / `calendar_event` into a plain chat answer
-     * that merely *describes* the step and still reports `completed`.
-     * Authored Saved Task graphs always run the DAG: the classification for a
-     * fixed run is `intent = chat`, so the legacy router would skip the node's
-     * params and answer as chat (issue #1882, Copilot review on PR #1952).
+     * unless its capability is on {@see LEGACY_ROUTER_CAPABILITIES} AND that
+     * capability is what the classification already routes to. Otherwise the
+     * legacy router, fed the original classification, silently degrades a
+     * lone `tool_call` / `email_me` / `calendar_event` — or a file the planner
+     * chose for a pinned assistant that stayed `intent = chat` — into a plain
+     * chat answer that merely describes the step.
+     * Authored Saved Task graphs always run the DAG (issue #1882).
+     *
+     * @param array<string, mixed> $classification
      */
-    private function shouldUseLegacyRouter(TaskPlanResult $result): bool
+    private function shouldUseLegacyRouter(TaskPlanResult $result, array $classification): bool
     {
         if ($result->authored) {
             return false;
@@ -294,7 +297,19 @@ final readonly class TaskPlanExecutor
             return false;
         }
 
-        return in_array($plan->nodes[0]->capability, self::LEGACY_ROUTER_CAPABILITIES, true);
+        $node = $plan->nodes[0];
+        if (!in_array($node->capability, self::LEGACY_ROUTER_CAPABILITIES, true)) {
+            return false;
+        }
+
+        // The router runs the classification. A fallback plan, or a node that
+        // matches it, stays there. A pinned assistant stays intent=chat, so a
+        // planned file or search has to stay on the DAG or the reply only talks.
+        return PlanEligibility::useLegacyRouter(
+            $result->fallback,
+            $node->capability,
+            $this->mapper->capabilityForClassification($classification),
+        );
     }
 
     private function planNeedsCapabilityChatCannotPerform(TaskPlan $plan): bool
@@ -389,29 +404,13 @@ final readonly class TaskPlanExecutor
      */
     private function planForExecution(Message $message, array $thread, array $classification, array $options = [], ?callable $progressCallback = null): ?TaskPlanResult
     {
-        // Messages eligible for multi-task planning:
-        //   - `ai_sorting`: genuinely AI-classified turns.
-        //   - `attachment_document_or_audio`: non-image file attachments. These
-        //     used to be force-routed to single-node file analysis, which
-        //     silently dropped any *additional* intents in the same message
-        //     ("summarize this DOCX, make an image and read it aloud" became just
-        //     a summary). Sending them to the planner restores multi-intent
-        //     support. This is safe because a single-intent attachment yields a
-        //     single-node (or fallback) plan → shouldUseLegacyRouter() delegates
-        //     to the legacy router with the original analyzefile classification,
-        //     i.e. identical behaviour. Only genuinely multi-intent messages run
-        //     the DAG (issue #1192).
-        //   - `saved_task`: Saved Task runs (manual "Run now" and the scheduler
-        //     tick). They pin their prompt and skip the sorter, but the stored
-        //     instruction is a full user turn ("make an image of a cat and save
-        //     it to Nextcloud", "create a calendar entry", …) — without planning
-        //     every rerun degraded to a single chat answer that only TALKED
-        //     about the steps. A single-intent instruction still collapses to a
-        //     one-node plan → legacy path, identical to a normal chat turn.
+        // Eligible sources: {@see PlanEligibility}. Attachments stay here so a
+        // multi-intent file message is not collapsed to analysis (#1192).
+        // Saved tasks and pinned assistants skip the sorter with intent=chat;
+        // without planning they only talk about the file they were asked to save.
         $source = $classification['source'] ?? null;
         $deterministicFileIntent = $this->isDeterministicDocumentFileIntent($classification);
-        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio', 'saved_task'], true)
-            && !$deterministicFileIntent) {
+        if (!PlanEligibility::shouldPlan(is_string($source) ? $source : null) && !$deterministicFileIntent) {
             return null;
         }
 
@@ -1143,6 +1142,6 @@ final readonly class TaskPlanExecutor
             return null;
         }
 
-        return AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile);
+        return AssistantPlanLimits::withoutDisabledTools(AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile), $profile);
     }
 }

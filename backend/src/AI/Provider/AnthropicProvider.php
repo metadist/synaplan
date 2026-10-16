@@ -16,6 +16,7 @@ use App\AI\Tool\CatalogToolUse;
 use App\AI\Tool\OpenAiToolShapes;
 use App\AI\Tool\ToolCallAccumulator;
 use App\AI\ToolCalling\ToolCallingCapability;
+use App\Service\Chat\ProviderTranscriptCapture;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -178,6 +179,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         private ?ProviderKeyStore $keyStore = null,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
         private ToolCallingCapability $toolCallingCapability = new ToolCallingCapability(),
+        private ?ProviderTranscriptCapture $transcripts = null,
     ) {
     }
 
@@ -1123,18 +1125,8 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
 
     /**
      * Split the system message out and normalise the conversation so it
-     * satisfies Anthropic's Messages API constraints, which are stricter than
-     * the OpenAI-style providers the rest of the app targets:
-     *   - every message must have non-empty content,
-     *   - user/assistant turns must strictly alternate,
-     *   - the first message must be a `user` turn.
-     *
-     * WhatsApp/e-mail threads routinely carry blank-text rows (media-only,
-     * placeholder or error rows) and the loaded history window can begin on an
-     * assistant turn; either one makes Anthropic reject the WHOLE request with
-     * an HTTP 400 invalid_request_error, while other providers silently accept
-     * it. Sanitising here fixes every channel (WhatsApp, e-mail, web, task DAG)
-     * in one place.
+     * satisfies Anthropic's Messages API constraints (non-empty content,
+     * alternating user/assistant turns, leading `user` turn).
      *
      * @param list<array<string, mixed>> $convertedMessages
      *
@@ -1153,8 +1145,6 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                 continue;
             }
 
-            // Drop empty-content turns: Anthropic rejects "" / empty content
-            // blocks with a 400, unlike OpenAI/Groq/Gemini.
             if (!$this->hasMeaningfulContent($message['content'] ?? null)) {
                 continue;
             }
@@ -1164,6 +1154,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
 
         $conversationMessages = $this->mergeConsecutiveRoles($conversationMessages);
         $conversationMessages = $this->dropLeadingAssistantTurns($conversationMessages);
+        $this->transcripts?->recordAnthropicRequest($systemMessage, $conversationMessages);
 
         return [$systemMessage, $conversationMessages];
     }

@@ -526,7 +526,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 50%;
   left: 0.625rem;
-  z-index: 1;
+  z-index: 10;
   display: flex;
   transform: translateY(-50%);
   pointer-events: none;

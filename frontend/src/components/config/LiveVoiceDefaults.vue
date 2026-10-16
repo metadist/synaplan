@@ -42,45 +42,16 @@
           role="listbox"
           aria-labelledby="live-voice-model-label"
         >
-          <div
+          <LiveVoiceMenuFilter
             v-if="showModelFilter"
-            class="shrink-0 border-b border-light-border/30 px-2 pb-3 pt-2 dark:border-dark-border/20"
-            data-testid="section-live-voice-model-filter"
-          >
-            <label class="sr-only" for="live-voice-model-filter">
-              {{ t('config.aiModels.dropdownFilterLabel') }}
-            </label>
-            <div class="relative">
-              <MagnifyingGlassIcon
-                class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 txt-secondary"
-                aria-hidden="true"
-              />
-              <input
-                id="live-voice-model-filter"
-                ref="modelFilterInput"
-                v-model="modelFilter"
-                type="text"
-                autocomplete="off"
-                spellcheck="false"
-                enterkeyhint="go"
-                class="w-full rounded-xl surface-card border border-light-border/30 py-1.5 pl-9 pr-9 text-sm txt-primary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] dark:border-dark-border/20"
-                :placeholder="t('config.aiModels.dropdownFilterPlaceholder')"
-                data-testid="input-live-voice-model-filter"
-                @keydown.enter="onModelFilterEnter"
-                @keydown.escape.stop.prevent="onModelFilterEscape"
-              />
-              <button
-                v-if="modelFilter"
-                type="button"
-                class="icon-ghost absolute right-1.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md"
-                :aria-label="t('config.aiModels.dropdownClearFilter')"
-                data-testid="btn-live-voice-model-filter-clear"
-                @click="clearModelFilter"
-              >
-                <XMarkIcon class="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            </div>
-          </div>
+            ref="modelFilterField"
+            v-model="modelFilter"
+            test-id="live-voice-model-filter"
+            :label="t('config.aiModels.dropdownFilterLabel')"
+            :placeholder="t('config.aiModels.dropdownFilterPlaceholder')"
+            @submit="chooseFirstModel"
+            @escape="onModelFilterEscape"
+          />
           <div class="flex min-h-0 flex-col gap-1 overflow-y-auto pt-2">
             <button
               v-for="model in visibleModels"
@@ -139,8 +110,8 @@
           data-testid="select-live-voice-voice"
           @click="toggle('voice')"
         >
-          <span class="block truncate capitalize">{{
-            voices.length > 0 ? voice : t('settings.voice.noVoices')
+          <span class="block truncate">{{
+            voices.length > 0 ? selectedVoiceName : t('settings.voice.noVoices')
           }}</span>
         </button>
         <SpeakerWaveIcon
@@ -155,22 +126,42 @@
           role="listbox"
           aria-labelledby="live-voice-voice-label"
         >
-          <div class="min-h-0 overflow-y-auto">
+          <LiveVoiceMenuFilter
+            v-if="showVoiceFilter"
+            ref="voiceFilterField"
+            v-model="voiceFilter"
+            test-id="live-voice-voice-filter"
+            :label="t('settings.voice.filterLabel')"
+            :placeholder="t('settings.voice.filterPlaceholder')"
+            @submit="chooseFirstVoice"
+            @escape="onVoiceFilterEscape"
+          />
+          <div class="flex min-h-0 flex-col gap-1 overflow-y-auto pt-2">
             <button
-              v-for="name in voices"
-              :key="name"
+              v-for="row in visibleVoices"
+              :key="row.id"
               type="button"
               role="option"
-              :aria-selected="name === voice"
-              :class="['dropdown-item w-full', name === voice && 'dropdown-item--active']"
+              :aria-selected="row.id === voice"
+              :class="['dropdown-item w-full', row.id === voice && 'dropdown-item--active']"
               data-testid="btn-live-voice-voice-option"
-              @click="chooseVoice(name)"
+              @click="chooseVoice(row.id)"
             >
               <SpeakerWaveIcon class="h-5 w-5 shrink-0" aria-hidden="true" />
-              <span class="min-w-0 flex-1 truncate text-left font-medium capitalize">{{
-                name
-              }}</span>
+              <span class="min-w-0 flex-1 text-left">
+                <span class="block truncate font-medium">{{ row.name }}</span>
+                <span v-if="row.tone" class="block truncate text-xs txt-secondary">{{
+                  row.tone
+                }}</span>
+              </span>
             </button>
+            <p
+              v-if="voiceFilter.trim() && visibleVoices.length === 0"
+              class="px-3 py-2 text-sm txt-secondary"
+              data-testid="text-live-voice-voice-filter-empty"
+            >
+              {{ t('settings.voice.filterEmpty', { query: voiceFilter.trim() }) }}
+            </p>
           </div>
         </div>
       </div>
@@ -181,17 +172,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  ChevronDownIcon,
-  CpuChipIcon,
-  MagnifyingGlassIcon,
-  SpeakerWaveIcon,
-  XMarkIcon,
-} from '@heroicons/vue/24/outline'
+import { ChevronDownIcon, CpuChipIcon, SpeakerWaveIcon } from '@heroicons/vue/24/outline'
 import ModelCostBadge from '@/components/ModelCostBadge.vue'
+import LiveVoiceMenuFilter from '@/components/config/LiveVoiceMenuFilter.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import type { LiveVoiceModel } from '@/services/api/liveVoiceApi'
 import { voiceCompany } from '@/services/liveVoice/company'
+import { voiceCopy } from '@/services/liveVoice/voiceCopy'
 import type { AIModel } from '@/types/ai-models'
 
 const props = defineProps<{
@@ -215,17 +202,25 @@ const emit = defineEmits<{
 /** Same cutoff as the other model menus: a short list is faster to scan than to filter. */
 const FILTER_MIN = 6
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const root = ref<HTMLElement | null>(null)
-const modelFilterInput = ref<HTMLInputElement | null>(null)
+const modelFilterField = ref<{ focus: () => void } | null>(null)
+const voiceFilterField = ref<{ focus: () => void } | null>(null)
 const menu = ref<'model' | 'voice' | null>(null)
 const modelFilter = ref('')
+const voiceFilter = ref('')
 
 const selectedModel = computed(
   () => props.models.find((model) => model.id === props.modelId) ?? null
 )
 const voices = computed(() => selectedModel.value?.voices ?? [])
 const showModelFilter = computed(() => props.models.length >= FILTER_MIN)
+const showVoiceFilter = computed(() => voices.value.length >= FILTER_MIN)
+const selectedVoiceName = computed(() => {
+  const id = props.voice
+  if (id === '') return ''
+  return voiceCopy(t, te, selectedModel.value?.provider ?? '', id).name
+})
 
 const pricedModels = computed(() =>
   props.models.flatMap((model) => {
@@ -239,6 +234,21 @@ const selectedPriced = computed(() =>
 )
 
 const modelFilterTerms = computed(() => normalize(modelFilter.value).split(/\s+/).filter(Boolean))
+const voiceRows = computed(() => {
+  const provider = selectedModel.value?.provider ?? ''
+  return voices.value.map((id) => ({ id, ...voiceCopy(t, te, provider, id) }))
+})
+const visibleVoices = computed(() => {
+  const sorted = [...voiceRows.value].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  )
+  const terms = normalize(voiceFilter.value).split(/\s+/).filter(Boolean)
+  if (terms.length === 0) return sorted
+  return sorted.filter((row) => {
+    const text = normalize(`${row.name} ${row.tone} ${row.id}`)
+    return terms.every((term) => text.includes(term))
+  })
+})
 const visibleModels = computed(() => {
   const sorted = [...props.models].sort((a, b) =>
     (a.name ?? '').localeCompare(b.name ?? '', undefined, { sensitivity: 'base' })
@@ -256,6 +266,7 @@ const visibleModels = computed(() => {
 watch(menu, (value) => {
   emit('menu', value !== null)
   if (value !== 'model') modelFilter.value = ''
+  if (value !== 'voice') voiceFilter.value = ''
 })
 watch(
   () => props.dismiss,
@@ -311,13 +322,14 @@ function toggle(which: 'model' | 'voice') {
   if (which === 'voice' && (props.saving || voices.value.length === 0)) return
   menu.value = menu.value === which ? null : which
   if (menu.value === 'model' && showModelFilter.value) {
-    void nextTick(() => modelFilterInput.value?.focus())
+    void nextTick(() => modelFilterField.value?.focus())
+  }
+  if (menu.value === 'voice' && showVoiceFilter.value) {
+    void nextTick(() => voiceFilterField.value?.focus())
   }
 }
 
-function onModelFilterEnter(event: KeyboardEvent) {
-  if (event.isComposing || event.keyCode === 229) return
-  event.preventDefault()
+function chooseFirstModel() {
   const first = visibleModels.value[0]
   if (first) chooseModel(first)
 }
@@ -325,15 +337,24 @@ function onModelFilterEnter(event: KeyboardEvent) {
 function onModelFilterEscape() {
   if (modelFilter.value) {
     modelFilter.value = ''
-    modelFilterInput.value?.focus()
+    modelFilterField.value?.focus()
     return
   }
   menu.value = null
 }
 
-function clearModelFilter() {
-  modelFilter.value = ''
-  modelFilterInput.value?.focus()
+function chooseFirstVoice() {
+  const first = visibleVoices.value[0]
+  if (first) chooseVoice(first.id)
+}
+
+function onVoiceFilterEscape() {
+  if (voiceFilter.value) {
+    voiceFilter.value = ''
+    voiceFilterField.value?.focus()
+    return
+  }
+  menu.value = null
 }
 
 function chooseModel(model: LiveVoiceModel) {

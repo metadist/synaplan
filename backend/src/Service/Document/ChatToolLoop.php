@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Document;
 
 use App\AI\Service\AiFacade;
+use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\Document\Tool\DocumentSession;
 use App\Service\Document\Tool\DocumentToolRegistry;
 use App\Service\Document\Tool\DocumentToolResult;
@@ -33,6 +34,7 @@ final readonly class ChatToolLoop
         private LoggerInterface $logger,
         private ?ToolRegistry $toolRegistry = null,
         private ?ToolsConfig $toolsConfig = null,
+        private ?ProviderTranscriptCapture $transcripts = null,
     ) {
     }
 
@@ -79,6 +81,7 @@ final readonly class ChatToolLoop
             if ((time() - $started) >= self::WALL_CLOCK_SECONDS) {
                 break;
             }
+            $this->transcripts?->record($messages);
             $response = $this->aiFacade->chat($messages, $userId, $options);
             $usage = $this->mergeUsage($usage, is_array($response['usage'] ?? null) ? $response['usage'] : []);
             $content = (string) ($response['content'] ?? '');

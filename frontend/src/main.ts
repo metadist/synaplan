@@ -20,6 +20,7 @@ import { isNativeApp, getNativeApiBaseUrl } from './services/api/nativeRuntime'
 import { setApiBaseUrl } from './services/api/httpClient'
 import { loadNativeTokens } from './services/api/nativeAuth'
 import { applyBrandingTheme } from './utils/brandingTheme'
+import { installDropdownPlacement } from './utils/dropdownPlacement'
 
 // Bootstrap app - load config before mounting.
 // We MUST install global error handlers and mount the app even when bootstrap
@@ -121,4 +122,5 @@ import { applyBrandingTheme } from './utils/brandingTheme'
   }
 
   app.mount('#app')
+  installDropdownPlacement()
 })()

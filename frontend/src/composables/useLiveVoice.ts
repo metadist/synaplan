@@ -26,7 +26,7 @@ import { liveCueForTransition, playLiveCue } from '@/services/liveVoice/cues'
 import { nextLivePhase, type LivePhase } from '@/services/liveVoice/machine'
 import {
   captionsPreferredRef,
-  preferredVoice,
+  resolveLiveVoice,
   setCaptionsPreferred,
 } from '@/services/liveVoice/preferences'
 import {
@@ -314,7 +314,10 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
       await micPromise
       if (!liveRunIs(run) || mic === null) return
       const model = defaultModel()
-      const voice = model ? preferredVoice(model.provider ?? '') : ''
+      const listed = model?.voices ?? []
+      const voice = model
+        ? resolveLiveVoice(model.id ?? null, model.provider ?? '', listed, model.voice ?? '')
+        : ''
       const session = await startLiveVoiceSession({
         chatId: chats.activeChatId,
         modelId: model?.id ?? null,

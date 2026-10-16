@@ -56,8 +56,11 @@ final readonly class TurnWebSearch
         $messageText = $message->getText();
         $userRequestedSearch = $this->userRequestedSearch($options, $classification)
             || WebSearchTopicPolicy::isExplicitSearchRequest($messageText);
-        $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
-        $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
+        $widgetTurn = !empty($options['is_widget_mode']) || !empty($classification['is_widget_mode']);
+        $shouldSearch = !$widgetTurn && WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
+        $triggerReason = $widgetTurn
+            ? 'widget_turn'
+            : $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
         $needsAttachmentContext = $shouldSearch && $message->hasFiles() && WebSearchTopicPolicy::refersToAttachment($messageText);
 
         $perfTimer?->start('url_read');
