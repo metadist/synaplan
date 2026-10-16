@@ -163,6 +163,36 @@ the property it is assigned to (`streamAIResponse.onUpdate`), the variable a
 call initialises (`useChatsStore`), or else the function it is passed to
 (`onMounted`); a repeat gets `#2`, `#3` in source order.
 
+### Chat stream handler
+
+The chat view's stream events are handled in `src/services/chat/stream/`, never
+inline in `ChatView.vue`:
+
+- `streamUpdateHandler.ts` builds one dispatch table per audience:
+  `createMemberStreamHandler()`, `createGuestStreamHandler()` and
+  `createContinueStreamHandler()`. An event of an aborted turn is dropped;
+  every other event feeds the progress timeline and then reaches the handler
+  registered for its `status`.
+- `handlers/` holds one small function per status, grouped by concern:
+  `progress`, `content`, `tasks`, `memory` (signed-in only), `guest` (guests
+  only), `completion`, `memberError` and `continuation`. A status that only one
+  audience receives is registered only in that audience's table, so a guest
+  stream can never reach memory code.
+- A handler changes nothing directly. Every side effect goes through the
+  `StreamTurn` it is given (`streamTurn.ts`): the message, the history store,
+  the processing indicator, the run, the usage meter and, for a signed-in turn,
+  the memory stores, the chat list and the outcome notices. `ChatView.vue`
+  builds the turn and picks the transport; it handles no status itself.
+- `paintStreamedAnswer()` turns the accumulated text into message parts;
+  `messageUpdates.ts` holds the message changes the handlers share.
+
+A new status is one function in the matching `handlers/` module, registered in
+the table of every audience that receives it, with a unit test against the fake
+turn in `tests/unit/services/chat/stream/fakeTurn.ts`.
+`tests/unit/views/ChatView.stream.spec.ts` replays recorded event sequences
+through the mounted chat view and snapshots the resulting messages, so a change
+to what a turn renders shows up there.
+
 ## UI Patterns
 
 **Dialogs**: Use `useDialog()` composable

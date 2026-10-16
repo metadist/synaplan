@@ -1,0 +1,121 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { memberErrorHandler } from '@/services/chat/stream/handlers/memberError'
+import type { Message } from '@/stores/history'
+import { assistantMessage, fakeMemberTurn } from './fakeTurn'
+
+describe('member error handler', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  it('finishes a dropped connection without an error and recovers the stored turn', () => {
+    const turn = fakeMemberTurn(
+      assistantMessage({ parts: [{ type: 'text', content: 'Already answered' }] })
+    )
+
+    memberErrorHandler({ status: 'error', error: 'Connection interrupted' }, turn)
+
+    expect(turn.history.finishStreamingMessage).toHaveBeenCalledWith('assistant-1')
+    expect(turn.history.recoverInterruptedTurn).toHaveBeenCalledWith(42)
+    expect(turn.message()?.errorReason).toBeUndefined()
+  })
+
+  it('removes the empty answer of a chat that is gone', () => {
+    const turn = fakeMemberTurn()
+
+    memberErrorHandler({ status: 'error', error: 'Chat not found' }, turn)
+
+    expect(turn.history.removeMessage).toHaveBeenCalledWith('assistant-1')
+    expect(turn.outcome.showError).toHaveBeenCalledWith('chat.notFound', 5000)
+    expect(turn.outcome.restoreUnpersistedEdit).toHaveBeenCalled()
+  })
+
+  it('marks the prompt rate-limited and opens the limit modal', () => {
+    const prompt = {
+      id: 'user-1',
+      role: 'user',
+      parts: [],
+      timestamp: new Date(),
+    } as unknown as Message
+    const turn = fakeMemberTurn()
+    turn.history.messages.unshift(prompt)
+
+    memberErrorHandler(
+      { status: 'error', error: 'Rate limit exceeded', limit_type: 'hourly', used: 5, limit: 5 },
+      turn
+    )
+
+    expect(turn.history.setMessageStatus).toHaveBeenCalledWith(
+      'user-1',
+      'rate_limited',
+      'rate_limit',
+      expect.objectContaining({ limitType: 'hourly', used: 5, userLevel: 'PRO' })
+    )
+    expect(turn.outcome.showLimit).toHaveBeenCalledWith(
+      expect.objectContaining({ allowed: false, limitType: 'hourly' })
+    )
+  })
+
+  it('offers a top-up when the monthly budget is spent', () => {
+    const turn = fakeMemberTurn()
+
+    memberErrorHandler(
+      {
+        status: 'error',
+        error: 'Budget',
+        code: 'COST_BUDGET_EXCEEDED',
+        used: 3.5,
+        topup_available: true,
+      },
+      turn
+    )
+
+    expect(turn.outcome.showLimit).toHaveBeenCalledWith(
+      expect.objectContaining({ limitType: 'monthly', used: 3.5, topupAvailable: true })
+    )
+  })
+
+  it('shows the Stop notice for a cancelled turn with no text yet', () => {
+    const turn = fakeMemberTurn()
+
+    memberErrorHandler({ status: 'error', error: 'Stream cancelled by user' }, turn)
+
+    expect(turn.history.updateStreamingMessage).toHaveBeenCalledWith(
+      'assistant-1',
+      'message.cancelledByUser'
+    )
+    expect(turn.chats.clearLocalTurnFinished).toHaveBeenCalledWith(42)
+  })
+
+  it('stores the classified failure and shows its sentence, never a transport string', () => {
+    const classified = fakeMemberTurn()
+    const unclassified = fakeMemberTurn()
+
+    memberErrorHandler(
+      {
+        status: 'error',
+        error: 'The model is overloaded.',
+        errorReason: 'provider_error',
+        messageId: 9,
+      },
+      classified
+    )
+    memberErrorHandler({ status: 'error', error: 'Connection failed (HTTP 500)' }, unclassified)
+
+    expect(classified.message()).toMatchObject({
+      errorReason: 'provider_error',
+      errorMessage: 'The model is overloaded.',
+      backendMessageId: 9,
+    })
+    expect(classified.history.updateStreamingMessage).toHaveBeenCalledWith(
+      'assistant-1',
+      'The model is overloaded.'
+    )
+    expect(classified.outcome.recordVersion).toHaveBeenCalledWith(9)
+    expect(unclassified.message()?.errorReason).toBe('unknown')
+    expect(unclassified.history.updateStreamingMessage).toHaveBeenCalledWith(
+      'assistant-1',
+      'chatError.reason.unknown'
+    )
+  })
+})

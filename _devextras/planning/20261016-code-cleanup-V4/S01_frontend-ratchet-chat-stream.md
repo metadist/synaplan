@@ -162,3 +162,32 @@ the code. Guests must not reach signed-in stores.
 The other 28 files over 800 lines. `ChatWidget.vue`: whether its stream
 code repeats the same statuses is recorded in STATUS for V5. Any visual
 change.
+
+## 10. As delivered (2026-10-16)
+
+S1a followed the plan. S1b meets every exit line (`ChatView.vue` 4,470
+lines, `streamAIResponse()` ≈ 50, the four `ChatView.vue` stream entries
+gone from the ledger); the layout and the last commit differ:
+
+- **One factory per audience instead of a variant flag.**
+  `createMemberStreamHandler()`, `createGuestStreamHandler()` and
+  `createContinueStreamHandler()` each take their own turn type. A guest
+  turn has no memory stores at all, so "a guest can never reach memory
+  code" holds for the type checker, not only for the table.
+- **Three more handler modules.** `complete` and `error` differ most
+  between the audiences, so they are `handlers/completion.ts` and
+  `handlers/memberError.ts` rather than part of `content.ts`; the continue
+  stream has `handlers/continuation.ts`. `document_step` and
+  `generating_file` sit with the progress statuses. The message changes the
+  handlers share are `messageUpdates.ts`; the spoken reply's sentence
+  splitting is `VoiceReplyStream`.
+- **S1.5 carries the S1.6 shape.** One handler for every transport needs
+  the turn first, so `streamAIResponse()` builds the turn and picks the
+  transport from S1.5 on. That left `ChatView.vue` at 4,726 lines, and
+  S1.6 moved the last two stream blocks out instead: the answer painter
+  (`paintStreamedAnswer()`) and the post-answer memory poll
+  (`useExtractedMemoryPoll()`, which owns its timers and takes the
+  validated response as it is).
+- **No behaviour change.** No transcript line moved; the journeys match
+  S1a's head step for step. Five things the walks found on S1a's head as
+  well are in STATUS for the owner, unchanged here.

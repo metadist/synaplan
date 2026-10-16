@@ -663,13 +663,13 @@ import MarketingNews from '@/components/MarketingNews.vue'
 import AssistantStarterPrompts from '@/components/assistants/AssistantStarterPrompts.vue'
 import SelfAwareEmptyHint from '@/components/chat/SelfAwareEmptyHint.vue'
 import LiveVoiceStage from '@/components/chat/LiveVoiceStage.vue'
-import { parsePlatformDocs } from '@/components/chat/refs/DocRefPill'
 import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
+import { useExtractedMemoryPoll } from '@/composables/useExtractedMemoryPoll'
 import {
   openSourceMessage,
   parseOpenMessageQuery,
@@ -678,13 +678,7 @@ import {
 } from '@/composables/useScrollToMessage'
 import { useFirstRunSetup } from '@/composables/useFirstRunSetup'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
-import {
-  useHistoryStore,
-  isTaskCardKind,
-  isTaskCardState,
-  type Message,
-  type Part,
-} from '@/stores/history'
+import { useHistoryStore, type Message, type Part } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
 import { iamApi } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
@@ -707,7 +701,7 @@ import { useConversationFiles } from '@/composables/useConversationFiles'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
-import { useUsageTaximeterStore, type UsageTotals } from '@/stores/usageTaximeter'
+import { useUsageTaximeterStore } from '@/stores/usageTaximeter'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useMessageDigestsStore } from '@/stores/messageDigests'
@@ -730,7 +724,6 @@ import {
   cloneTimelineModel,
   cloneTimelineSteps,
   createTimelineState,
-  consumeVisibleAnswer,
   ingestTimelineEvent,
   type TimelineState,
 } from '@/utils/processingTimeline'
@@ -740,20 +733,10 @@ import { useDialog } from '@/composables/useDialog'
 import { chatApi } from '@/services/api'
 import { prefetchSseToken } from '@/services/api/chatApi'
 import type { ModelOption } from '@/composables/useModelSelection'
-import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
-import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaParts'
-import {
-  applyReadAloudFailed,
-  applyVoiceReplyFailed,
-  attachVoiceReplyAudio,
-  isTaskPlanSuppressedMediaStatus,
-  isVoiceReplyFailedReason,
-  shouldAutoplayVoiceReply,
-} from '@/utils/voiceReply'
+import { generatePartId } from '@/utils/mediaParts'
+import { applyReadAloudFailed } from '@/utils/voiceReply'
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
-import { isChannelSource } from '@/utils/channelSource'
-import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { shouldShowSelfAwareEmptyHint } from '@/utils/emptyLandingActions'
@@ -762,18 +745,29 @@ import { claimOwnedChatForSend } from '@/utils/claimOwnedChatForSend'
 import GettingStartedChecklist from '@/components/chat/GettingStartedChecklist.vue'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { startBargeInMonitor } from '@/services/voice/bargeIn'
-import { createSmoothStream } from '@/utils/smoothStream'
-import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
+import { createSmoothStream, type SmoothStream } from '@/utils/smoothStream'
 import {
-  chatErrorSuggestsOtherModel,
-  shouldFinishWithoutErrorOnTransportDrop,
-} from '@/utils/chatErrorDisplay'
+  createContinueStreamHandler,
+  createGuestStreamHandler,
+  createMemberStreamHandler,
+} from '@/services/chat/stream/streamUpdateHandler'
+import type {
+  GuestTurn,
+  MemberTurn,
+  ProcessingIndicator,
+  StreamingProcessingMetadata,
+  StreamModelFallback,
+  StreamRun,
+  StreamTurn,
+} from '@/services/chat/stream/streamTurn'
+import { paintStreamedAnswer } from '@/services/chat/stream/streamedAnswer'
+import { VoiceReplyStream } from '@/services/chat/stream/voiceReplyStream'
+import { isRecoverableStreamError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
 import { pluginCommands } from '@/stores/commands'
 import { i18n } from '@/i18n'
 import { z } from 'zod'
 import {
-  parseMediaJobPayload,
   applyMediaJobUpdateToMessage,
   mapApiMessageRow,
   parseContentWithThinking,
@@ -1175,13 +1169,6 @@ function outgoingAgentId(explicit?: number | null): number | undefined {
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
 
-function applyDocsToMessage(message: Message, raw: unknown): void {
-  const docs = parsePlatformDocs(raw)
-  if (docs) {
-    message.docs = docs
-  }
-}
-
 const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
 
 // MOBILE-APP SEAM (native onboarding): remind a signed-out user that
@@ -1572,26 +1559,6 @@ const isAudioStreaming = ref(false)
 
 // Processing status for real-time feedback
 const processingStatus = ref<string>('')
-type StreamingProcessingMetadata = {
-  model_name?: string
-  provider?: string
-  topic?: string
-  language?: string
-  customMessage?: string
-  results_count?: number
-  pages_total?: number
-  pages_read?: number
-  urls_total?: number
-  urls_read?: number
-  handler?: string
-  stage?: string
-  filename?: string
-  documentSteps?: Array<{
-    labelKey: string
-    labelParams?: Record<string, unknown>
-    ok?: boolean
-  }>
-}
 
 const processingMetadata = ref<StreamingProcessingMetadata>({})
 
@@ -1609,60 +1576,10 @@ const ingestTimeline = (data: StreamUpdatePayload) => {
   message.processingModel = cloneTimelineModel(processingTimeline.value.model)
 }
 
-// Backend pipeline steps that only need a label in the thinking indicator:
-// no metadata, no side effects. Kept in one list so the guest and the
-// authenticated stream handler stay in sync.
-const PIPELINE_PROGRESS_STATUSES = [
-  'analyzing_prompt',
-  'planning',
-  'searching_files',
-  'checking_memories',
-]
-
-const isPipelineProgressStatus = (status: string | undefined): status is string =>
-  typeof status === 'string' && PIPELINE_PROGRESS_STATUSES.includes(status)
-
-// Web research steps: the backend reads the links the user pasted
-// (`fetching_urls` → `urls_fetched`) and the top result pages of a web search
-// (`reading_pages` → `pages_read`). `pages_read` also refreshes the sources
-// with their `fetched` flag and the count shown on the Web Search badge.
-// Shared by the guest and the authenticated stream handler.
-const RESEARCH_STATUSES = ['fetching_urls', 'urls_fetched', 'reading_pages', 'pages_read']
-
-const applyResearchStatus = (messageId: string, data: StreamUpdatePayload): boolean => {
-  if (typeof data.status !== 'string' || !RESEARCH_STATUSES.includes(data.status)) {
-    return false
-  }
-  const meta = data.metadata || {}
-  processingStatus.value = data.status
-  processingMetadata.value = {
-    customMessage: data.message || undefined,
-    pages_total: meta.pages_total,
-    pages_read: meta.pages_read,
-    urls_total: meta.urls_total,
-    urls_read: meta.urls_read,
-  }
-
-  if (data.status === 'pages_read') {
-    const searchMsg = historyStore.messages.find((m) => m.id === messageId)
-    if (searchMsg) {
-      const results = meta.results
-      if (Array.isArray(results) && results.length > 0) {
-        searchMsg.searchResults = results as NonNullable<Message['searchResults']>
-      }
-      const pagesRead = typeof meta.pages_read === 'number' ? meta.pages_read : 0
-      searchMsg.webSearch = { ...(searchMsg.webSearch || {}), pagesRead }
-    }
-  }
-
-  return true
-}
-
 // Phase 3e: non-blocking pill that surfaces when backgrounded memory
 // extraction (Phase 2) completes after the assistant message has already
 // landed. Lives outside the bubble so it can never push content around.
-const memoryToastVisible = ref(false)
-const memoryToastMessage = ref('')
+const { memoryToastVisible, memoryToastMessage, scheduleMemoryPoll } = useExtractedMemoryPoll()
 
 // Memory suggestion toasts
 const activeMemoryToasts = ref<Array<UserMemory & { toastId: number }>>([])
@@ -2286,7 +2203,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()
-  clearMemoryPollTimers()
 })
 
 // Incognito session lifecycle: the toggle (MainLayout on mobile, floating
@@ -2625,220 +2541,7 @@ watch(
   }
 )
 
-// Phase 2c: timers tied to the backgrounded memory-extraction polling.
-// Tracked so onBeforeUnmount can cancel them — otherwise a slow Claude
-// Opus extraction (or a queue backlog) can keep polling for ~25 s after
-// the user navigates away and would update reactive state on an
-// unmounted component.
-const memoryPollTimers = new Set<ReturnType<typeof setTimeout>>()
 let isViewUnmounted = false
-
-function trackTimer(handle: ReturnType<typeof setTimeout>): void {
-  memoryPollTimers.add(handle)
-}
-
-function clearMemoryPollTimers(): void {
-  for (const handle of memoryPollTimers) {
-    clearTimeout(handle)
-  }
-  memoryPollTimers.clear()
-}
-
-/**
- * Phase 2c: poll the backgrounded memory extraction outcome a couple of
- * times after the SSE stream completes. The messenger worker takes 2-7 s
- * to do the extraction LLM call + Qdrant writes; polling at 3 s and 8 s
- * covers ~95% of cases without hammering the API.
- *
- * Pushes any saved memories into the local memories store so the
- * `[Memory:ID]` badges in the assistant response resolve immediately. We
- * also surface a non-blocking toast/strip indicator (handled in Phase 3e).
- */
-async function pollExtractedMemoriesOnce(messageId: number): Promise<boolean> {
-  try {
-    const result = await chatApi.getExtractedMemories(messageId)
-    if (isViewUnmounted) return true
-    if (result.status === 'pending') {
-      return false
-    }
-
-    for (const memoryData of result.saved) {
-      if (!memoryData?.id) continue
-
-      const existing = memoriesStore.memories.find((m) => m.id === memoryData.id)
-      if (!existing) {
-        const allowedSources = [
-          'auto_detected',
-          'user_created',
-          'user_edited',
-          'ai_edited',
-        ] as const
-        type MemorySource = (typeof allowedSources)[number]
-        const rawSource = String(memoryData.source ?? 'auto_detected')
-        const source: MemorySource = (allowedSources as readonly string[]).includes(rawSource)
-          ? (rawSource as MemorySource)
-          : 'auto_detected'
-
-        memoriesStore.memories.push({
-          id: memoryData.id,
-          category: String(memoryData.category ?? ''),
-          key: String(memoryData.key ?? ''),
-          value: String(memoryData.value ?? ''),
-          source,
-          messageId: (memoryData.messageId as number | null | undefined) ?? null,
-          created: Number(memoryData.created ?? Math.floor(Date.now() / 1000)),
-          updated: Number(memoryData.updated ?? Math.floor(Date.now() / 1000)),
-        })
-      }
-    }
-
-    // Mirror old `analyzing_memories → memories_complete` UI pulse, but
-    // outside the bubble (Phase 3e moves the indicator to a fixed pill).
-    if (result.saved.length > 0 || result.delete_suggestions.length > 0) {
-      memoryToastMessage.value =
-        result.saved.length > 0
-          ? t('processing.memoriesCompleteTitle')
-          : t('processing.analyzingMemoriesTitle')
-      memoryToastVisible.value = true
-      const hideHandle = setTimeout(() => {
-        memoryPollTimers.delete(hideHandle)
-        if (isViewUnmounted) return
-        memoryToastVisible.value = false
-      }, 3000)
-      trackTimer(hideHandle)
-    }
-
-    return true
-  } catch (e) {
-    console.warn('Memory extraction poll failed:', e)
-    return false
-  }
-}
-
-function schedulePostStreamMemoryPoll(messageId: number): void {
-  // Phase 2c: poll the backgrounded extraction outcome.
-  //
-  // Schedule increases gradually (2s, 4s, 7s, 12s, 20s) so cheap
-  // extractions show toasts almost immediately while slow ones (Claude
-  // Opus, queue backlog) still get picked up. Stop on the first non-
-  // pending response or after the schedule is exhausted.
-  const delaysMs = [2000, 4000, 7000, 12000, 20000]
-  let attempt = 0
-
-  const tick = async () => {
-    if (isViewUnmounted) return
-    if (attempt >= delaysMs.length) return
-    const done = await pollExtractedMemoriesOnce(messageId)
-    if (done || isViewUnmounted) return
-    attempt += 1
-    if (attempt < delaysMs.length) {
-      const nextHandle = setTimeout(() => {
-        memoryPollTimers.delete(nextHandle)
-        void tick()
-      }, delaysMs[attempt])
-      trackTimer(nextHandle)
-    }
-  }
-
-  const firstHandle = setTimeout(() => {
-    memoryPollTimers.delete(firstHandle)
-    void tick()
-  }, delaysMs[0])
-  trackTimer(firstHandle)
-}
-
-/**
- * Parse accumulated streaming content and update message parts.
- * Extracted so it can be called from the rAF throttle and the flush on 'complete'.
- *
- * Phase 3a + 3b refactor:
- *   - Each part gets a stable `partId` the first time it appears, so the
- *     `<MessagePart>` v-for can use it as `:key` and Vue won't reuse the
- *     wrong DOM nodes when parts split mid-stream.
- *   - Reconcile structural parts in place. The last text part grows by
- *     mutating `.content` (no new object reference), so child components
- *     bound to that part don't unmount/remount on every animation frame.
- *     Earlier parts (e.g. a finished code block followed by more streaming
- *     prose) keep their identity instead of being re-created each tick.
- */
-function applyDocumentStep(messageId: string, data: StreamUpdatePayload): void {
-  processingStatus.value = 'generating_file'
-  const meta = (data.metadata ?? {}) as Record<string, unknown>
-  const step = {
-    labelKey:
-      typeof meta.labelKey === 'string'
-        ? meta.labelKey
-        : (data.message ?? 'processing.documentStepFailed'),
-    labelParams:
-      meta.labelParams && typeof meta.labelParams === 'object'
-        ? (meta.labelParams as Record<string, unknown>)
-        : {},
-    ok: meta.ok !== false,
-  }
-  const existing = Array.isArray(processingMetadata.value?.documentSteps)
-    ? processingMetadata.value.documentSteps
-    : []
-  processingMetadata.value = {
-    ...(processingMetadata.value ?? {}),
-    stage: 'writing',
-    documentSteps: [...existing, step],
-  }
-  const message = historyStore.messages.find((m) => m.id === messageId)
-  if (message) {
-    message.documentChanges = [...(message.documentChanges ?? []), step]
-  }
-}
-
-function applyDocumentComplete(message: Message, data: StreamUpdatePayload): void {
-  if (Array.isArray(data.documentChanges)) {
-    message.documentChanges = data.documentChanges
-  }
-  if (typeof data.documentVersion === 'number') {
-    message.documentVersion = data.documentVersion
-  }
-  if (data.documentFidelityLossy === true) {
-    message.documentFidelityLossy = true
-  }
-}
-
-function applyMediaJobToMessage(message: Message | undefined, raw: unknown): void {
-  if (!message) return
-  // Accept both the bare job payload ({ job_id, type, state }, as sent on the
-  // `complete` event) AND a metadata envelope that nests it under `media_job` /
-  // `mediaJob` (as sent on the `generating` progress event). Attaching the job
-  // as early as the `generating` event lets the MediaJobStatus banner take over
-  // immediately, so the bubble shows ONE in-progress surface instead of
-  // flashing the routing status / inline "generating…" placeholder first.
-  let parsed = parseMediaJobPayload(raw)
-  if (!parsed && raw && typeof raw === 'object') {
-    const envelope = raw as Record<string, unknown>
-    parsed = parseMediaJobPayload(envelope.media_job ?? envelope.mediaJob)
-  }
-  if (parsed) {
-    message.mediaJob = parsed
-  }
-}
-
-/**
- * Pick the correct inline "generating…" placeholder token for a media job so a
- * type-less complete event never mislabels (e.g. showing "Generating your
- * video…" for an image request). Falls back to video for an unknown type.
- */
-function generatingTokenForMediaJob(raw: unknown): string {
-  let parsed = parseMediaJobPayload(raw)
-  if (!parsed && raw && typeof raw === 'object') {
-    const envelope = raw as Record<string, unknown>
-    parsed = parseMediaJobPayload(envelope.media_job ?? envelope.mediaJob)
-  }
-  switch (parsed?.type) {
-    case 'image':
-      return '__IMAGE_GENERATING__'
-    case 'audio':
-      return '__AUDIO_GENERATING__'
-    default:
-      return '__VIDEO_GENERATING__'
-  }
-}
 
 function handleMediaJobCompleted(message: Message, payload: { url: string; type: string }): void {
   // Shared with the realtime mediaJobs store so the poll and push completion
@@ -2873,127 +2576,10 @@ function handleMediaJobCompleted(message: Message, payload: { url: string; type:
   }
 }
 
+/** Called from the smoother's frame and from the flush on 'complete'. */
 function renderStreamingContent(content: string, msgId: string): void {
-  // Hide the raw generation envelope even when the model prepends prose.
-  if (looksLikeFileGenerationEnvelope(content)) {
-    if (processingStatus.value !== 'generating_file') {
-      processingStatus.value = 'generating_file'
-      processingMetadata.value = { customMessage: t('processing.generatingFile') }
-    }
-    const message = historyStore.messages.find((m) => m.id === msgId)
-    if (message) {
-      // Issue #625: structural wipe must not drop in-flight media. The
-      // SSE `file` event for image / video / audio can land before
-      // this branch (e.g. a MEDIAMAKER turn whose JSON markup arrives
-      // after the media was already uploaded) — preserving them here
-      // keeps the audio player visible in the live bubble.
-      message.parts = extractMediaParts(message.parts)
-    }
-    return
-  }
-
-  // Extract thinking blocks
-  const thinkingMatches = content.match(/<think>([\s\S]*?)(<\/think>|$)/g)
-  const desiredThinking: Part[] = []
-
-  if (thinkingMatches) {
-    thinkingMatches.forEach((match) => {
-      const inner = match.replace(/<think>|<\/think>/g, '').trim()
-      if (inner) {
-        desiredThinking.push({ type: 'thinking', content: inner })
-      }
-    })
-  }
-
-  const displayContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
-  const parsed = parseAIResponse(displayContent)
-
   const message = historyStore.messages.find((m) => m.id === msgId)
-  if (!message) return
-
-  // Build the desired ordered list of structural parts.
-  const desired: Part[] = [...desiredThinking]
-  parsed.parts.forEach((part) => {
-    if (part.type === 'text') {
-      desired.push({ type: 'text', content: part.content })
-    } else if (part.type === 'json') {
-      desired.push({ type: 'json', content: part.content, language: part.language ?? 'json' })
-    } else if (part.type === 'code') {
-      desired.push({ type: 'code', content: part.content, language: part.language })
-    } else if (part.type === 'links' && part.links) {
-      desired.push({
-        type: 'links',
-        items: part.links.map((l) => {
-          try {
-            return {
-              title: l.title,
-              url: l.url,
-              desc: l.description,
-              host: new URL(l.url).hostname,
-            }
-          } catch {
-            return { title: l.title, url: l.url, desc: l.description, host: l.url }
-          }
-        }),
-      })
-    }
-  })
-
-  // Split current parts into (structural, media). Media parts (image / video
-  // / audio) are pushed by separate SSE events and not part of `desired`;
-  // we keep them appended after the structural section.
-  const existingStructural = message.parts.filter(
-    (p) =>
-      p.type === 'thinking' ||
-      p.type === 'text' ||
-      p.type === 'code' ||
-      p.type === 'json' ||
-      p.type === 'links'
-  )
-  const existingMedia = extractMediaParts(message.parts)
-
-  // Reconcile in-place so existing partIds (and therefore Vue keys) stay
-  // stable. For each desired slot:
-  //   - if the existing slot has the same `type`, mutate its content fields
-  //     in-place (no new object — Vue's reactivity on the field still fires)
-  //   - otherwise, build a fresh part with a new partId
-  const reconciled: Part[] = []
-  for (let i = 0; i < desired.length; i++) {
-    const want = desired[i]
-    const have = existingStructural[i]
-
-    if (have && have.type === want.type) {
-      if (!have.partId) {
-        have.partId = generatePartId()
-      }
-      switch (want.type) {
-        case 'text':
-        case 'thinking':
-          if (have.content !== want.content) {
-            have.content = want.content
-          }
-          break
-        case 'code':
-        case 'json':
-          if (have.content !== want.content) have.content = want.content
-          if (have.language !== want.language) have.language = want.language
-          if (have.filename !== want.filename) have.filename = want.filename
-          break
-        case 'links':
-          // Replace items wholesale only when changed (cheap JSON compare).
-          if (JSON.stringify(have.items ?? []) !== JSON.stringify(want.items ?? [])) {
-            have.items = want.items
-          }
-          break
-      }
-      reconciled.push(have)
-    } else {
-      want.partId = generatePartId()
-      reconciled.push(want)
-    }
-  }
-
-  message.parts = [...reconciled, ...existingMedia]
+  if (message) paintStreamedAnswer(message, content, processingIndicator, translate)
 }
 
 const handleContinueResponse = async (message: Message) => {
@@ -3020,6 +2606,16 @@ const handleContinueResponse = async (message: Message) => {
     onRender: (text) => renderStreamingContent(text, message.id),
   })
 
+  const onUpdate = createContinueStreamHandler({
+    message,
+    text: { content: fullContent, thinkOpen: false },
+    smoother: continueSmoother,
+    history: historyStore,
+    usage: usageTaximeterStore,
+    renderContent: (content) => renderStreamingContent(content, message.id),
+    showError: (text) => showErrorToast(text),
+    t: translate,
+  })
   const stopStreaming = chatApi.streamMessage({
     userId,
     message: '',
@@ -3028,64 +2624,7 @@ const handleContinueResponse = async (message: Message) => {
     language: locale.value,
     continueMessageId: message.backendMessageId,
     agentId: outgoingAgentId(),
-    onUpdate: (data) => {
-      if (data.status === 'data' && data.chunk) {
-        fullContent += data.chunk
-        continueSmoother.push(fullContent)
-      } else if (data.status === 'reasoning' && data.chunk) {
-        const msg = historyStore.messages.find((m) => m.id === message.id)
-        if (msg) {
-          let reasoningPart = msg.parts.find((p) => p.type === 'thinking' && p.isStreaming)
-          if (!reasoningPart) {
-            // #1058: record wall-clock start so we can show real duration.
-            reasoningPart = {
-              type: 'thinking',
-              content: '',
-              isStreaming: true,
-              thinkingStartedAt: Date.now(),
-            }
-            msg.parts.push(reasoningPart)
-          }
-          reasoningPart.content += data.chunk
-        }
-      } else if (data.status === 'complete') {
-        continueSmoother.flush()
-        renderStreamingContent(fullContent, message.id)
-
-        if (data.truncated) {
-          message.truncated = true
-        }
-
-        applyDocsToMessage(message, data.docs)
-
-        message.isStreaming = false
-        historyStore.finishStreamingMessage(message.id)
-
-        // Usage taximeter: a continued response is a billed turn like any
-        // other — adopt its usage + live day totals.
-        if (usageTaximeterStore.active) {
-          usageTaximeterStore.applyComplete(
-            (data.usage ?? null) as Message['usage'],
-            (data.usage_totals ?? null) as UsageTotals | null,
-            (data.usage_extra ?? null) as Message['usageExtra']
-          )
-          usageTaximeterStore.refreshAfterSettlement()
-        }
-
-        // Issue #1070: reconcile against the persisted message so files /
-        // media / metadata reflect the authoritative backend state.
-        if (message.backendMessageId) {
-          void historyStore.reconcileMessage(message.id, message.backendMessageId)
-        }
-      } else if (data.status === 'error') {
-        continueSmoother.flush()
-        continueSmoother.cancel()
-        message.truncated = true
-        message.isStreaming = false
-        historyStore.finishStreamingMessage(message.id)
-        showErrorToast(t('chat.continueFailed'))
-      }
-    },
+    onUpdate,
   })
 
   stopStreamingFn = () => {
@@ -3328,10 +2867,7 @@ const handleSendMessage = async (
   // badge). Without this the only visible artifact of a voice upload was
   // the transcribed text — there was no way to replay the original
   // recording from the web chat.
-  const optimisticParts: import('@/stores/history').Part[] = parseContentWithThinking(
-    displayContent,
-    'user'
-  )
+  const optimisticParts: Part[] = parseContentWithThinking(displayContent, 'user')
   if (files && files.length > 0) {
     for (const file of files) {
       if (!isAudioFileType(file.fileType, file.fileMime)) continue
@@ -3384,84 +2920,6 @@ const handleSendMessage = async (
 
   // Stream to backend - use backendContent which may differ from displayContent
   await streamAIResponse(backendContent, { ...options, agentId: pinnedForTurn })
-}
-
-/**
- * Populate the clickable model footer live so it matches what a page reload
- * would show.
- *
- * Prefers the nested `aiModels` payload (chat + sorting) when the backend
- * sends it on the SSE `complete` event — this is what makes the sorting-model
- * badge appear without a refresh (issue #603). Falls back to synthesising
- * `aiModels.chat` from the flat `provider`/`model` fields for backward
- * compatibility with older backends / error paths that don't ship a nested
- * shape.
- */
-function applyAssistantChatModelFooter(
-  message: Message,
-  data: {
-    provider?: string
-    model?: string
-    model_id?: number | null
-    aiModels?: Message['aiModels'] | null
-  },
-  streamFallback: { provider?: string; model?: string; model_id?: number | null }
-) {
-  const isBadModelToken = (m: unknown) =>
-    m === undefined ||
-    m === null ||
-    String(m).toLowerCase() === 'error' ||
-    // Reject channel/source tokens (`WHATSAPP`, `EMAIL`, …) — they
-    // leak in from inbound-message `provider_index` and would otherwise
-    // surface as the AI model label in the chat footer (issue #653).
-    isChannelSource(typeof m === 'string' ? m : null)
-  const isBadProviderToken = (p: unknown) =>
-    p === undefined ||
-    p === null ||
-    String(p).toLowerCase() === 'system' ||
-    isChannelSource(typeof p === 'string' ? p : null)
-
-  const resolvedModel = !isBadModelToken(data.model)
-    ? String(data.model)
-    : streamFallback.model || message.modelLabel
-  const resolvedProvider = !isBadProviderToken(data.provider)
-    ? String(data.provider)
-    : streamFallback.provider || message.provider
-
-  const resolvedId =
-    data.model_id !== undefined && data.model_id !== null
-      ? data.model_id
-      : (streamFallback.model_id ?? null)
-
-  const nestedChat = data.aiModels?.chat
-  const nestedSorting = data.aiModels?.sorting
-  // Audio (TTS) model is independent of the chat model — pass it
-  // through whenever the backend ships it so the voice-reply badge
-  // appears live (no page reload required). See issue #583.
-  const nestedAudio = data.aiModels?.audio
-  const nestedVoice = data.aiModels?.voice
-
-  if (resolvedModel && resolvedProvider) {
-    message.modelLabel = resolvedModel
-    message.provider = resolvedProvider
-    message.aiModels = {
-      chat: nestedChat ?? {
-        provider: resolvedProvider,
-        model: resolvedModel,
-        model_id: resolvedId,
-      },
-      ...(nestedSorting ? { sorting: nestedSorting } : {}),
-      ...(nestedAudio ? { audio: nestedAudio } : {}),
-      ...(nestedVoice ? { voice: nestedVoice } : {}),
-    }
-  } else if (nestedChat || nestedSorting || nestedAudio || nestedVoice) {
-    message.aiModels = {
-      ...(nestedChat ? { chat: nestedChat } : {}),
-      ...(nestedSorting ? { sorting: nestedSorting } : {}),
-      ...(nestedAudio ? { audio: nestedAudio } : {}),
-      ...(nestedVoice ? { voice: nestedVoice } : {}),
-    }
-  }
 }
 
 /**
@@ -3536,36 +2994,332 @@ function recordVersionLink(
   })()
 }
 
-const streamAIResponse = async (
-  userMessage: string,
-  options?: {
-    includeReasoning?: boolean
-    reasoningEffort?: string
-    webSearch?: boolean
-    modelId?: number
-    fileIds?: number[]
-    voiceReply?: boolean
-    isAgain?: boolean
-    /** Record this answer as a version once the server has saved it. */
-    linkVersion?: { kind: 'again' | 'edit'; previousId: number }
-    ragGroupKey?: string
-    quotedText?: string
-    quotedMessageId?: number
-    language?: string
-    /** Assistant for this turn, captured before the optimistic user row exists. */
-    agentId?: number | null
-    /**
-     * Re-attach to a turn already generating on the server instead of starting
-     * a new one. `userMessage` is then irrelevant — nothing is sent, the client
-     * only subscribes to the turn's buffered events. `trackId` is the turn's
-     * existing id, so an explicit Stop can still cancel it server-side.
-     */
-    attach?: { runId: string; partialText: string; trackId?: number }
+interface StreamTurnOptions {
+  includeReasoning?: boolean
+  reasoningEffort?: string
+  webSearch?: boolean
+  modelId?: number
+  fileIds?: number[]
+  voiceReply?: boolean
+  isAgain?: boolean
+  /** Record this answer as a version once the server has saved it. */
+  linkVersion?: { kind: 'again' | 'edit'; previousId: number }
+  ragGroupKey?: string
+  quotedText?: string
+  quotedMessageId?: number
+  language?: string
+  /** Assistant for this turn, captured before the optimistic user row exists. */
+  agentId?: number | null
+  /**
+   * Re-attach to a turn already generating on the server instead of starting
+   * a new one. `userMessage` is then irrelevant — nothing is sent, the client
+   * only subscribes to the turn's buffered events. `trackId` is the turn's
+   * existing id, so an explicit Stop can still cancel it server-side.
+   */
+  attach?: { runId: string; partialText: string; trackId?: number }
+}
+
+/** The answer bubble a turn streams into, and the painter that keeps it from shrinking. */
+interface StreamCanvas {
+  messageId: string
+  signal: AbortSignal
+  smoother: SmoothStream
+  fallbackModel: StreamModelFallback
+  render: (text: string) => void
+}
+
+const translate = (key: string, params?: Record<string, unknown>): string =>
+  params ? t(key, params) : t(key)
+
+const processingIndicator: ProcessingIndicator = {
+  set: (status, metadata = {}) => {
+    processingStatus.value = status
+    processingMetadata.value = metadata
+  },
+  clear: () => {
+    processingStatus.value = ''
+    processingMetadata.value = {}
+  },
+  current: () => processingStatus.value,
+  metadata: () => processingMetadata.value,
+}
+
+/** The turn is over for this view: Stop has nothing left to cancel. */
+function releaseStreamingTurn(): void {
+  streamingAbortController = null
+  stopStreamingFn = null
+  currentTrackId = undefined
+  currentStreamingChatId = undefined
+}
+
+const streamRun: StreamRun = {
+  ingestTimeline,
+  noteStarted: noteRunStarted,
+  noteTerminal: noteRunTerminal,
+  trackId: () => currentTrackId,
+  release: releaseStreamingTurn,
+}
+
+/**
+ * Re-attaching paints the answer-so-far right away, and the bubble never
+ * shrinks: the replay restarts from the first chunk, far shorter than the
+ * text on screen, so the painted prefix holds until the replay grows past it.
+ * Stop keeps every character that already arrived.
+ */
+function streamCanvasFor(
+  messageId: string,
+  paintedPrefix: string,
+  signal: AbortSignal,
+  fallbackModel: StreamModelFallback
+): StreamCanvas {
+  if (paintedPrefix) {
+    historyStore.updateStreamingMessage(messageId, paintedPrefix)
   }
-) => {
-  streamingAbortController = new AbortController()
+  const render = (text: string) =>
+    renderStreamingContent(text.length >= paintedPrefix.length ? text : paintedPrefix, messageId)
+  const smoother = createSmoothStream({ onRender: render, initialShown: paintedPrefix })
+  signal.addEventListener('abort', () => {
+    smoother.flush()
+    smoother.cancel()
+  })
+
+  return { messageId, signal, smoother, fallbackModel, render }
+}
+
+function streamTurnFor(canvas: StreamCanvas): StreamTurn {
+  return {
+    messageId: canvas.messageId,
+    text: { content: '', thinkOpen: false },
+    smoother: canvas.smoother,
+    fallbackModel: canvas.fallbackModel,
+    status: processingIndicator,
+    history: historyStore,
+    run: streamRun,
+    usage: usageTaximeterStore,
+    message: () => historyStore.messages.find((m) => m.id === canvas.messageId),
+    isAborted: () => streamingAbortController?.signal.aborted === true,
+    render: canvas.render,
+    renderContent: (content) => renderStreamingContent(content, canvas.messageId),
+    ingestApprovalRequired,
+    scrollToBottom,
+    t: translate,
+  }
+}
+
+function guestTurnFor(canvas: StreamCanvas): GuestTurn {
+  return {
+    ...streamTurnFor(canvas),
+    guest: {
+      updateCount: (remaining, max, reached) => guestStore.updateCount(remaining, max, reached),
+      showBanner: () => guestStore.showBanner(),
+      offerSignup: () => {
+        // Without a purchase channel the upgrade sheet is not eligible.
+        if (!openPaywall('guest_limit')) {
+          showGuestSignupModal.value = true
+        }
+      },
+    },
+  }
+}
+
+function memberTurnFor(
+  canvas: StreamCanvas,
+  turn: {
+    chatId: number | undefined
+    incognito: boolean
+    linkVersion: StreamTurnOptions['linkVersion']
+    voice: VoiceReplyStream
+  }
+): MemberTurn {
+  const { chatId, linkVersion } = turn
+  return {
+    ...streamTurnFor(canvas),
+    chatId,
+    incognito: turn.incognito,
+    voice: turn.voice,
+    memory: {
+      memories: memoriesStore,
+      feedbacks: feedbackStore,
+      digests: messageDigestsStore,
+      suggest: (memory) =>
+        activeMemoryToasts.value.push({ ...memory, toastId: memoryToastIdCounter++ }),
+      offerDelete: (memory) =>
+        openMemoryDeleteDialog({ ...memory, toastId: memoryToastIdCounter++ }),
+    },
+    chats: {
+      applyChatTitle: (id, title) => chatsStore.applyChatTitle(id, title),
+      bumpChatActivity: (id) => chatsStore.bumpChatActivity(id),
+      clearLocalTurnFinished: (id) => chatsStore.clearLocalTurnFinished(id),
+      streamingChatId: () => currentStreamingChatId,
+    },
+    outcome: {
+      recordVersion: (backendMessageId) => recordVersionLink(linkVersion, backendMessageId, chatId),
+      restoreUnpersistedEdit: () => {
+        if (linkVersion?.kind === 'edit') void reloadEditedTranscript(chatId)
+      },
+      scheduleMemoryPoll,
+      showError: (message, durationMs) => showErrorToast(message, durationMs),
+      showLimit: (notice) => showLimitOrPaywall(notice),
+      userLevel: () => authStore.user?.level || 'NEW',
+    },
+    registerIncognitoFile: (fileId) => incognitoStore.registerFile(fileId),
+  }
+}
+
+/** A spoken answer: barge-in listens while it plays, a read-aloud failure is shown on the answer. */
+function startVoiceReply(messageId: string): void {
+  currentAudioStreamer = new AudioStreamer()
+  isAudioStreaming.value = true
+  currentAudioStreamer.setOnPlaybackStart(() => {
+    stopBargeIn?.()
+    stopBargeIn = startBargeInMonitor(() => {
+      stopBargeIn?.()
+      stopBargeIn = null
+      currentAudioStreamer?.stop()
+      void chatInputRef.value?.startDictation()
+    })
+  })
+  currentAudioStreamer.setOnFinished(() => {
+    stopBargeIn?.()
+    stopBargeIn = null
+    isAudioStreaming.value = false
+    currentAudioStreamer = null
+  })
+  currentAudioStreamer.setOnFailure(() => {
+    const message = historyStore.messages.find((m) => m.id === messageId)
+    if (message) {
+      applyReadAloudFailed(message)
+    }
+    isAudioStreaming.value = false
+    currentAudioStreamer = null
+  })
+}
+
+async function streamMockAnswer(messageId: string): Promise<void> {
+  const mockResponse =
+    'This is a mock response for development. The actual streaming is handled by the backend API.'
+  for (let i = 0; i < mockResponse.length; i += 3) {
+    if (streamingAbortController?.signal.aborted) break
+    historyStore.updateStreamingMessage(messageId, mockResponse.slice(0, i + 3))
+    await new Promise((resolve) => setTimeout(resolve, 30))
+  }
+  historyStore.finishStreamingMessage(messageId)
+}
+
+async function startGuestTurn(
+  userMessage: string,
+  options: StreamTurnOptions | undefined,
+  canvas: StreamCanvas
+): Promise<void> {
+  const guestChatId = await guestStore.ensureChat()
+  if (!guestChatId || !guestStore.sessionId) {
+    console.error('Guest chat or session not available')
+    historyStore.finishStreamingMessage(canvas.messageId)
+    return
+  }
 
   const attach = options?.attach
+  // A re-attach adopts the running turn's id; only a NEW turn mints one.
+  const trackId = attach?.trackId ?? Date.now()
+  currentTrackId = trackId
+  processingIndicator.set('started')
+
+  // One handler for both transports: a turn picked up after a reload renders through identical logic.
+  const onUpdate = createGuestStreamHandler(guestTurnFor(canvas))
+  stopStreamingFn = attach
+    ? chatApi.attachStream({ runId: attach.runId, guestSessionId: guestStore.sessionId, onUpdate })
+    : chatApi.streamGuestMessage({
+        guestSessionId: guestStore.sessionId,
+        message: userMessage,
+        chatId: guestChatId,
+        trackId,
+        quotedText: options?.quotedText,
+        quotedMessageId: options?.quotedMessageId,
+        onUpdate,
+      })
+}
+
+/** Incognito turns belong to no chat: the backend gets the context from the history payload. */
+function memberStreamRequest(
+  userMessage: string,
+  options: StreamTurnOptions | undefined,
+  turn: { trackId: number; chatId: number | undefined; incognito: boolean }
+) {
+  const { incognito } = turn
+  return {
+    userId: authStore.user?.id || 1,
+    message: userMessage,
+    trackId: turn.trackId,
+    chatId: turn.chatId,
+    incognito,
+    history: incognito ? buildIncognitoHistorySnapshot() : [],
+    disableMemories: incognito && !incognitoStore.useSavedContext,
+    disableKnowledge: incognito && !incognitoStore.useSavedContext,
+    includeReasoning: options?.includeReasoning ?? false,
+    reasoningEffort: options?.reasoningEffort,
+    webSearch: options?.webSearch ?? false,
+    language: options?.language ?? locale.value,
+    // Only an explicit model (Again): otherwise the backend classifies the turn.
+    modelId: options?.modelId,
+    fileIds: options?.fileIds || [],
+    voiceReply: options?.voiceReply,
+    isAgain: options?.isAgain,
+    ragGroupKey: options?.ragGroupKey,
+    quotedText: options?.quotedText,
+    quotedMessageId: options?.quotedMessageId,
+    agentId: outgoingAgentId(options?.agentId),
+  }
+}
+
+function startMemberTurn(
+  userMessage: string,
+  options: StreamTurnOptions | undefined,
+  canvas: StreamCanvas,
+  chatId: number | undefined
+): void {
+  const incognito = incognitoStore.active
+  const attach = options?.attach
+  // A re-attach adopts the running turn's id; only a NEW turn mints one.
+  const trackId = attach?.trackId ?? Date.now()
+  currentTrackId = trackId
+  currentStreamingChatId = chatId ?? undefined
+
+  if (currentAudioStreamer) {
+    currentAudioStreamer.stop()
+    currentAudioStreamer = null
+  }
+  if (options?.voiceReply) {
+    startVoiceReply(canvas.messageId)
+  }
+  // The UI locale picks the voice until the classifier names the reply language (#2283).
+  const voice = new VoiceReplyStream(
+    () => currentAudioStreamer,
+    () => {
+      currentAudioStreamer = null
+      isAudioStreaming.value = false
+    },
+    locale.value || 'en'
+  )
+
+  // One handler for both transports: a turn picked up after a reload renders through identical logic.
+  const onUpdate = createMemberStreamHandler(
+    memberTurnFor(canvas, { chatId, incognito, linkVersion: options?.linkVersion, voice })
+  )
+  const stopStreaming = attach
+    ? chatApi.attachStream({ runId: attach.runId, onUpdate })
+    : chatApi.streamMessage({
+        ...memberStreamRequest(userMessage, options, { trackId, chatId, incognito }),
+        onUpdate,
+      })
+  stopStreamingFn = stopStreaming
+  canvas.signal.addEventListener('abort', () => {
+    stopStreaming()
+    stopStreamingFn = null
+  })
+}
+
+const streamAIResponse = async (userMessage: string, options?: StreamTurnOptions) => {
+  streamingAbortController = new AbortController()
   processingTimeline.value = createTimelineState()
 
   const currentModel =
@@ -3581,1849 +3335,38 @@ const streamAIResponse = async (
     return
   }
 
-  // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
-
-  // Paint what the turn already produced right away, so returning to a running
-  // chat shows the answer-so-far instead of an empty bubble.
-  const paintedPrefix = attach?.partialText ?? ''
-  if (paintedPrefix) {
-    historyStore.updateStreamingMessage(messageId, paintedPrefix)
-  }
-
-  /**
-   * Render streamed text without ever letting the bubble shrink.
-   *
-   * The re-attach replays the turn from sequence 0 (which is what rebuilds the
-   * task cards and memory badges, so shortening the replay is not an option),
-   * meaning the first replayed chunks are far SHORTER than the answer-so-far
-   * already on screen. Rendering them verbatim would visibly rewind a long
-   * answer back to its first word and then re-type it. Holding the painted
-   * prefix until the replay grows past it keeps the text moving forward only;
-   * from there the replay is longer and takes over on its own.
-   */
-  const renderStreamingText = (text: string) => {
-    renderStreamingContent(text.length >= paintedPrefix.length ? text : paintedPrefix, messageId)
-  }
-
-  const textSmoother = createSmoothStream({
-    onRender: renderStreamingText,
-    initialShown: paintedPrefix,
-  })
-  // Stop keeps every character that already arrived; only later chunks are dropped.
-  streamingAbortController.signal.addEventListener('abort', () => {
-    textSmoother.flush()
-    textSmoother.cancel()
-  })
+  const canvas = streamCanvasFor(
+    messageId,
+    options?.attach?.partialText ?? '',
+    streamingAbortController.signal,
+    { provider, model: modelLabel, model_id: currentModel?.id ?? null }
+  )
 
   let editedChatIdForRestore: number | undefined
-
   try {
     if (useMockData) {
-      // Mock streaming for development (simple text streaming)
-      const mockResponse =
-        'This is a mock response for development. The actual streaming is handled by the backend API.'
-
-      // Simple character-by-character streaming
-      for (let i = 0; i < mockResponse.length; i += 3) {
-        if (streamingAbortController.signal.aborted) {
-          break
-        }
-        const chunk = mockResponse.slice(0, i + 3)
-        historyStore.updateStreamingMessage(messageId, chunk)
-        await new Promise((resolve) => setTimeout(resolve, 30))
-      }
-
-      historyStore.finishStreamingMessage(messageId)
+      await streamMockAnswer(messageId)
     } else if (isGuestMode.value) {
-      // Guest mode streaming — mirrors the authenticated handler for full feature parity
-      const guestChatId = await guestStore.ensureChat()
-      if (!guestChatId || !guestStore.sessionId) {
-        console.error('Guest chat or session not available')
-        historyStore.finishStreamingMessage(messageId)
-        return
-      }
-
-      // A re-attach adopts the running turn's id; only a NEW turn mints one.
-      const trackId = attach?.trackId ?? Date.now()
-      currentTrackId = trackId
-      let fullContent = ''
-      let insideThink = false
-
-      processingStatus.value = 'started'
-      processingMetadata.value = {}
-
-      // The handler lives on an options object rather than inline at the call
-      // site so the re-attach transport can reuse the exact same one — a turn
-      // picked back up after a reload must render through identical logic.
-      const guestStreamOptions = {
-        guestSessionId: guestStore.sessionId,
-        message: userMessage,
-        chatId: guestChatId,
-        trackId,
-        quotedText: options?.quotedText,
-        quotedMessageId: options?.quotedMessageId,
-        onUpdate: (data: StreamUpdatePayload) => {
-          if (streamingAbortController?.signal.aborted) return
-
-          ingestTimeline(data)
-
-          // Recognised here rather than in each terminal branch below, which
-          // exist per error kind and would each need their own reset.
-          if (data.status === 'complete' || data.status === 'error') {
-            noteRunTerminal(data)
-          }
-
-          if (data.status === 'guest_limit_reached') {
-            textSmoother.cancel()
-            // #1128: drop the empty assistant placeholder — same as the
-            // authenticated rate-limit path (removeMessage), otherwise the
-            // guest sees a blank bubble above the signup modal.
-            historyStore.removeMessage(messageId)
-            // The trial is over, so the upgrade sheet is the useful next step.
-            // Without a purchase channel (billing off / custom server) it is not
-            // eligible and the plain signup modal takes over.
-            if (!openPaywall('guest_limit')) {
-              showGuestSignupModal.value = true
-            }
-            processingStatus.value = ''
-            processingMetadata.value = {}
-            streamingAbortController = null
-            stopStreamingFn = null
-            currentTrackId = undefined
-            currentStreamingChatId = undefined
-            return
-          }
-
-          if (data.status === 'guest_remaining') {
-            const remaining = (data as Record<string, unknown>).remaining as number
-            const max = (data as Record<string, unknown>).maxMessages as number
-            const reached = (data as Record<string, unknown>).limitReached as boolean
-            guestStore.updateCount(remaining, max, reached)
-            guestStore.showBanner()
-            return
-          }
-
-          if (data.status === 'run_started') {
-            noteRunStarted(data.runId)
-            return
-          }
-
-          if (data.status === 'started') {
-            processingStatus.value = 'started'
-            processingMetadata.value = {}
-          } else if (data.status === 'preprocessing') {
-            processingStatus.value = 'preprocessing'
-            processingMetadata.value = { customMessage: data.message }
-          } else if (data.status === 'analyzing') {
-            processingStatus.value = 'analyzing'
-            processingMetadata.value = { customMessage: data.message }
-          } else if (data.status === 'editing') {
-            // Media edit of a picture from earlier in the conversation — name
-            // the source so the user can see WHICH image is being changed.
-            processingStatus.value = 'editing'
-            processingMetadata.value = data.metadata || {}
-          } else if (isPipelineProgressStatus(data.status)) {
-            processingStatus.value = data.status
-            processingMetadata.value = {}
-          } else if (data.status === 'classifying') {
-            processingStatus.value = 'classifying'
-            processingMetadata.value = data.metadata || {}
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.metadata) {
-              const prov = data.metadata.provider
-              const mname = data.metadata.model_name
-              if (typeof prov === 'string') message.provider = prov
-              if (typeof mname === 'string') message.modelLabel = mname
-            }
-          } else if (data.status === 'classified') {
-            const meta = data.metadata || {}
-            processingMetadata.value = meta
-            processingStatus.value = 'classified'
-          } else if (data.status === 'searching') {
-            processingStatus.value = 'searching'
-            processingMetadata.value = { customMessage: data.message }
-          } else if (data.status === 'search_complete') {
-            processingStatus.value = 'search_complete'
-            processingMetadata.value = data.metadata || {}
-            // Surface the sources immediately (they arrive seconds before the
-            // answer) so the "sources" box renders now, with the generating
-            // indicator acting as the placeholder above the soon-to-stream text.
-            const earlySources = data.metadata?.results
-            if (Array.isArray(earlySources) && earlySources.length > 0) {
-              const searchMsg = historyStore.messages.find((m) => m.id === messageId)
-              if (searchMsg) {
-                searchMsg.searchResults = earlySources as NonNullable<Message['searchResults']>
-                searchMsg.webSearch = {
-                  query: typeof data.metadata?.query === 'string' ? data.metadata.query : '',
-                  resultsCount: earlySources.length,
-                }
-              }
-            }
-          } else if (applyResearchStatus(messageId, data)) {
-            // handled: linked pages / result pages being read
-          } else if (data.status === 'generating') {
-            processingStatus.value = 'generating'
-            processingMetadata.value = {
-              customMessage: data.message || undefined,
-              ...(data.metadata || {}),
-            }
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.metadata) {
-              const prov = data.metadata.provider
-              const mname = data.metadata.model_name
-              if (typeof prov === 'string') message.provider = prov
-              if (typeof mname === 'string') message.modelLabel = mname
-              applyMediaJobToMessage(message, data.metadata)
-            }
-          } else if (data.status === 'generating_file') {
-            // Staged document generation progress (officemaker): the backend
-            // announces `writing` while the model produces the document text
-            // and `converting` while the office file is built.
-            processingStatus.value = 'generating_file'
-            processingMetadata.value = data.metadata || {}
-          } else if (data.status === 'document_step') {
-            applyDocumentStep(messageId, data)
-          } else if (data.status === 'thinking') {
-            // Reasoning models: same live "thinking" phase as the
-            // authenticated handler, so guests are not left on "generating".
-            processingStatus.value = 'thinking'
-            processingMetadata.value = {}
-          } else if (data.status === 'processing') {
-            // Processing/routing — no UI update needed
-          } else if (data.status === 'plan') {
-            // Multitask routing: a multi-node plan was recognized. Render a task
-            // card per node. Mirrors the authenticated handler so anonymous
-            // (guest) users see the exact same DAG surface — e.g. the generated
-            // video card (issue: guest media rendered as text-only because these
-            // events were dropped). Single-node turns never emit this.
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const tasks = data.metadata?.plan
-            if (message && Array.isArray(tasks) && tasks.length > 0) {
-              processingStatus.value = ''
-              processingMetadata.value = {}
-              message.wasMultitask = true
-              message.taskPlan = {
-                active: true,
-                trackId: currentTrackId,
-                replyNode:
-                  typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
-                cards: tasks.map((tk) => ({
-                  nodeId: tk.node_id,
-                  capability: tk.capability,
-                  kind: isTaskCardKind(tk.kind) ? tk.kind : 'text',
-                  state: 'pending' as const,
-                })),
-              }
-            }
-          } else if (data.status === 'plan_discarded') {
-            // The DAG failed entirely; the backend falls back to a single-bubble
-            // answer. Retract the now-misleading failed cards.
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              message.taskPlan = null
-              message.wasMultitask = false
-            }
-          } else if (data.status === 'task_update') {
-            ingestApprovalRequired(data)
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && card.state === 'cancelled') {
-              // keep cancelled — a user-cancelled step is terminal on the client
-            } else if (card && isTaskCardState(data.metadata?.state)) {
-              card.state = data.metadata.state
-              if (typeof data.metadata?.error === 'string' && data.metadata.error) {
-                card.error = data.metadata.error
-              }
-              if (typeof data.metadata?.text === 'string' && data.metadata.text) {
-                card.text = data.metadata.text
-              }
-              if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
-                card.prompt = data.metadata.prompt
-              }
-              if (typeof data.metadata?.query === 'string' && data.metadata.query) {
-                card.query = data.metadata.query
-              }
-              if (typeof data.metadata?.results_count === 'number') {
-                card.resultsCount = data.metadata.results_count
-              }
-              if (data.metadata?.used_workspace === true) {
-                card.usedWorkspace = true
-              }
-              if (typeof data.metadata?.step_input === 'string') {
-                card.stepInput = data.metadata.step_input
-              }
-              if (typeof data.metadata?.step_output === 'string') {
-                card.stepOutput = data.metadata.step_output
-              }
-              if (data.metadata?.step_output_truncated === true) {
-                card.stepOutputTruncated = true
-              }
-              if (typeof data.metadata?.duration_ms === 'number') {
-                card.durationMs = data.metadata.duration_ms
-              }
-              if (isAskUserPayload(data.metadata?.ask_user)) {
-                card.askUser = data.metadata.ask_user
-              }
-            }
-          } else if (data.status === 'task_chunk') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && typeof data.metadata?.chunk === 'string') {
-              card.text = (card.text ?? '') + data.metadata.chunk
-            }
-          } else if (data.status === 'task_file') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && typeof data.metadata?.url === 'string') {
-              card.url = normalizeMediaUrl(data.metadata.url)
-              card.mediaType =
-                typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
-            }
-          } else if (data.status === 'task_progress') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && card.state !== 'cancelled') {
-              if (typeof data.metadata?.percent === 'number') {
-                card.progressPercent = data.metadata.percent
-              }
-              if (typeof data.metadata?.provider_status === 'string') {
-                card.providerStatus = data.metadata.provider_status
-              }
-              if (typeof data.metadata?.elapsed_seconds === 'number') {
-                card.elapsedSeconds = data.metadata.elapsed_seconds
-              }
-            }
-          } else if (
-            data.status === 'data' &&
-            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
-          ) {
-            // Multitask mode: the task cards are the live surface. Still
-            // accumulate the assembled reply text (compose_reply is hidden and
-            // has no card) so the 'complete' flush renders the answer body.
-            if (data.chunk) {
-              fullContent += data.chunk
-            }
-          } else if (
-            isTaskPlanSuppressedMediaStatus(data.status) &&
-            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
-          ) {
-            // Multitask: task cards are the live media surface for file/links.
-            // Voice-reply audio and TTS status must still attach live (#2282).
-          } else if (data.status === 'data' && data.chunk) {
-            // First visible answer token: the live thinking panel folds away.
-            // A buffered `<think>` block, including one split across chunks,
-            // is not the answer.
-            const visible = consumeVisibleAnswer(data.chunk, insideThink)
-            insideThink = visible.insideThink
-            if (visible.text.trim() !== '') {
-              if (processingStatus.value) {
-                processingStatus.value = ''
-                processingMetadata.value = {}
-              }
-              historyStore.finishLiveThinking(messageId)
-            }
-            fullContent += data.chunk
-            textSmoother.push(fullContent)
-          } else if (data.status === 'reasoning' && data.chunk) {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              let reasoningPart = message.parts.find((p) => p.type === 'thinking' && p.isStreaming)
-              if (!reasoningPart) {
-                // #1058
-                reasoningPart = {
-                  type: 'thinking',
-                  content: '',
-                  isStreaming: true,
-                  thinkingStartedAt: Date.now(),
-                }
-                message.parts.unshift(reasoningPart)
-              }
-              reasoningPart.content += data.chunk
-            }
-          } else if (data.status === 'file') {
-            // Single-capability media (image / video / audio) delivered outside a
-            // DAG. Without this branch the generated file never rendered for
-            // guests — they only saw the "Generated image:" text chunk.
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.url) {
-              const absoluteUrl = normalizeMediaUrl(data.url)
-              if (data.type === 'image' || data.type === 'video' || data.type === 'audio') {
-                pushMediaPart(message, data.type, absoluteUrl)
-              }
-            }
-          } else if (data.status === 'tts_generating') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              message.parts.push({ type: 'tts_loading' })
-            }
-          } else if (data.status === 'audio') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.url) {
-              attachVoiceReplyAudio(message, normalizeMediaUrl(data.url))
-            }
-          } else if (data.status === 'voice_reply_failed') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && isVoiceReplyFailedReason(data.reason)) {
-              applyVoiceReplyFailed(message, data.reason)
-            }
-          } else if (data.status === 'links') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.links) {
-              message.parts.push({
-                type: 'links',
-                items: data.links.map((l) => {
-                  try {
-                    return {
-                      title: l.title || l.url,
-                      url: l.url,
-                      desc: l.description,
-                      host: new URL(l.url).hostname,
-                    }
-                  } catch {
-                    return {
-                      title: l.title || l.url,
-                      url: l.url,
-                      desc: l.description,
-                      host: l.url,
-                    }
-                  }
-                }),
-              })
-            }
-          } else if (data.status === 'docs_loaded') {
-            const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
-            if (streamingMessage) {
-              applyDocsToMessage(streamingMessage, data.metadata?.docs)
-            }
-          } else if (data.status === 'complete') {
-            if (data.truncated) {
-              fullContent += '\n\n---\n\n⚠️ *' + t('message.truncated') + '*'
-            }
-
-            textSmoother.flush()
-
-            if (fullContent) {
-              renderStreamingText(fullContent)
-            } else if (data.mediaJob || data.media_job) {
-              renderStreamingContent(
-                generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
-                messageId
-              )
-            }
-
-            processingStatus.value = ''
-            processingMetadata.value = {}
-
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
-
-              // Multitask: the DAG finished — freeze the task cards (video/image/
-              // audio already carry their url via task_file) so they render as
-              // final rather than actively animating. Guests cannot reconcile
-              // against the persisted message (that endpoint is auth-only), so the
-              // terminal card states already streamed via task_update are
-              // authoritative here.
-              if (message.taskPlan) {
-                message.taskPlan.active = false
-              }
-
-              if (data.messageId) {
-                message.backendMessageId = data.messageId
-              }
-
-              // Generated file (e.g. officemaker Word document): attach the
-              // download badge and replace the raw JSON / marker with the
-              // translated confirmation — mirrors the authenticated handler.
-              if (data.generatedFile) {
-                if (!message.files) {
-                  message.files = []
-                }
-                message.files.push({
-                  id: data.generatedFile.id,
-                  filename: data.generatedFile.filename,
-                  filePath: data.generatedFile.path,
-                  fileSize: data.generatedFile.size,
-                  fileType: data.generatedFile.type,
-                  fileMime: data.generatedFile.mime,
-                })
-
-                const hasJsonOrMarker =
-                  message.parts.length === 0 ||
-                  (message.parts[0].type === 'code' &&
-                    message.parts[0].content?.includes('BFILEPATH')) ||
-                  (message.parts[0].type === 'text' &&
-                    message.parts[0].content?.includes('__FILE_GENERATED__'))
-
-                if (hasJsonOrMarker) {
-                  message.parts = [
-                    {
-                      type: 'text',
-                      content: t('message.fileGenerated', {
-                        filename: data.generatedFile.filename,
-                      }),
-                    },
-                  ]
-                }
-              }
-
-              applyDocumentComplete(message, data)
-
-              if (
-                data.searchResults &&
-                Array.isArray(data.searchResults) &&
-                data.searchResults.length > 0
-              ) {
-                message.searchResults = data.searchResults as NonNullable<Message['searchResults']>
-                message.webSearch = {
-                  query: data.searchResults[0]?.query || '',
-                  resultsCount: data.searchResults.length,
-                }
-              }
-
-              if (Array.isArray(data.ragSources) && data.ragSources.length > 0) {
-                message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
-              }
-
-              const sent = data.providerMessages as
-                { messages?: Message['providerMessages']; truncated?: boolean } | undefined
-              if (sent && Array.isArray(sent.messages)) {
-                message.providerMessages = sent.messages
-                message.providerMessagesTruncated = sent.truncated === true
-              }
-
-              applyDocsToMessage(message, data.docs)
-
-              applyAssistantChatModelFooter(
-                message,
-                {
-                  provider: data.provider,
-                  model: data.model,
-                  model_id: data.model_id ?? null,
-                  aiModels: data.aiModels ?? null,
-                },
-                { provider, model: modelLabel, model_id: currentModel?.id ?? null }
-              )
-
-              // Usage taximeter: attach the per-message usage (for the badge)
-              // and fold it into the session store, adopting today's live
-              // totals. Gated so a disabled/guest session is a no-op.
-              if (usageTaximeterStore.active) {
-                const usage = (data.usage ?? null) as Message['usage']
-                const usageExtra = (data.usage_extra ?? null) as Message['usageExtra']
-                const totals = (data.usage_totals ?? null) as UsageTotals | null
-                if (usage) {
-                  message.usage = usage
-                }
-                if (usageExtra && usageExtra.length > 0) {
-                  message.usageExtra = usageExtra
-                }
-                usageTaximeterStore.applyComplete(usage, totals, usageExtra)
-                // Reconcile against the summary endpoint only when the SSE
-                // payload carried no `usage_totals` (the backend computes the
-                // totals after every billing row of the turn, so when present
-                // they are already server-accurate — no extra GET needed).
-                if (!totals) {
-                  void usageTaximeterStore.loadSummary()
-                }
-              }
-            }
-
-            historyStore.finishStreamingMessage(messageId)
-            scrollToBottom()
-          } else if (data.status === 'error') {
-            textSmoother.flush()
-            textSmoother.cancel()
-            processingStatus.value = ''
-            processingMetadata.value = {}
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message?.taskPlan) {
-              message.taskPlan.active = false
-            }
-            historyStore.finishStreamingMessage(messageId)
-          }
-        },
-      }
-
-      const stopStreaming = attach
-        ? chatApi.attachStream({
-            runId: attach.runId,
-            guestSessionId: guestStore.sessionId,
-            onUpdate: guestStreamOptions.onUpdate,
-          })
-        : chatApi.streamGuestMessage(guestStreamOptions)
-
-      stopStreamingFn = stopStreaming
+      await startGuestTurn(userMessage, options, canvas)
     } else {
-      // Use real Backend API with SSE streaming
-      const userId = authStore.user?.id || 1
-      const incognito = incognitoStore.active
-      // Incognito turns belong to no chat — the backend processes them fully
-      // in-memory and gets the conversation context from the history payload.
-      const chatId = incognito ? undefined : (chatsStore.activeChatId ?? undefined)
-      editedChatIdForRestore = chatId
-
-      const restoreUnpersistedEdit = () => {
-        if (options?.linkVersion?.kind !== 'edit') return
-        void reloadEditedTranscript(chatId)
-      }
-
-      // Snapshot the in-memory transcript for the backend (prior turns only:
-      // the current user message is sent separately, and the just-created
-      // assistant placeholder is still streaming).
-      const incognitoHistory: IncognitoHistoryEntry[] = incognito
-        ? buildIncognitoHistorySnapshot()
-        : []
-
-      // A re-attach adopts the running turn's id; only a NEW turn mints one.
-      const trackId = attach?.trackId ?? Date.now()
-      currentTrackId = trackId // Store for stop functionality
-      currentStreamingChatId = chatId ?? undefined // Store chatId for stop functionality
-      let fullContent = ''
-
-      const includeReasoning = options?.includeReasoning ?? false
-      const webSearch = options?.webSearch ?? false
-      // IMPORTANT: Only pass modelId if explicitly provided (e.g., "Again" function)
-      // For normal requests, let backend do classification/sorting to determine the right handler
-      const finalModelId = options?.modelId // Don't fallback to current model!
-      const fileIds = options?.fileIds || [] // Array of fileIds
-
-      // Initialize AudioStreamer if voice reply is requested
-      if (currentAudioStreamer) {
-        currentAudioStreamer.stop()
-        currentAudioStreamer = null
-      }
-
-      let spokenLength = 0
-      let audioText = ''
-      let insideThinkBlock = false
-      let answerThinkOpen = false
-      // Frontend language selects the Piper voice. Seed with the UI locale, then
-      // adopt the backend-detected reply language (meta.language) when it arrives.
-      // Always send language on /api/v1/tts/stream (#2283).
-      let detectedLanguage = locale.value || 'en'
-
-      if (options?.voiceReply) {
-        currentAudioStreamer = new AudioStreamer()
-        isAudioStreaming.value = true
-        currentAudioStreamer.setOnPlaybackStart(() => {
-          stopBargeIn?.()
-          stopBargeIn = startBargeInMonitor(() => {
-            stopBargeIn?.()
-            stopBargeIn = null
-            currentAudioStreamer?.stop()
-            void chatInputRef.value?.startDictation()
-          })
-        })
-        currentAudioStreamer.setOnFinished(() => {
-          stopBargeIn?.()
-          stopBargeIn = null
-          isAudioStreaming.value = false
-          currentAudioStreamer = null
-        })
-        currentAudioStreamer.setOnFailure(() => {
-          const message = historyStore.messages.find((m) => m.id === messageId)
-          if (message) {
-            applyReadAloudFailed(message)
-          }
-          isAudioStreaming.value = false
-          currentAudioStreamer = null
-        })
-      }
-
-      // The handler lives on an options object rather than inline at the call
-      // site so the re-attach transport can reuse the exact same one — a turn
-      // picked back up after a reload must render through identical logic.
-      const streamOptions = {
-        userId,
-        message: userMessage,
-        trackId,
-        chatId,
-        incognito,
-        history: incognitoHistory,
-        disableMemories: incognito && !incognitoStore.useSavedContext,
-        disableKnowledge: incognito && !incognitoStore.useSavedContext,
-        includeReasoning,
-        reasoningEffort: options?.reasoningEffort,
-        webSearch,
-        language: options?.language ?? locale.value,
-        modelId: finalModelId,
-        fileIds,
-        voiceReply: options?.voiceReply,
-        isAgain: options?.isAgain,
-        ragGroupKey: options?.ragGroupKey,
-        quotedText: options?.quotedText,
-        quotedMessageId: options?.quotedMessageId,
-        agentId: outgoingAgentId(options?.agentId),
-        onUpdate: (data: StreamUpdatePayload) => {
-          // CRITICAL: Check abort signal at the very beginning
-          if (streamingAbortController?.signal.aborted) {
-            return
-          }
-
-          ingestTimeline(data)
-
-          if (data.status === 'run_started') {
-            noteRunStarted(data.runId)
-            return
-          }
-
-          // Recognised here rather than in each terminal branch below, which
-          // exist per error kind and would each need their own reset.
-          if (data.status === 'complete' || data.status === 'error') {
-            noteRunTerminal(data)
-          }
-
-          // [i2v-debug] Opt-in multitask/media tracing: a task card stuck at
-          // "Rendering… 95%" gives no clue whether the worker ever finishes. Log
-          // the plan + task lifecycle (progress, terminal state, produced file) so
-          // we can see in the browser console if the closing task_update/task_file
-          // actually reaches the client over the realtime channel. Gated behind
-          // `localStorage.setItem('synaplanDebug', '1')` (same pattern as the
-          // 'perf' tracing) so production consoles stay quiet and no internal
-          // metadata (file URLs/errors) leaks unless a developer opts in.
-          try {
-            if (
-              typeof window !== 'undefined' &&
-              window.localStorage?.getItem('synaplanDebug') &&
-              typeof data.status === 'string' &&
-              (data.status === 'plan' ||
-                data.status === 'plan_discarded' ||
-                data.status.startsWith('task_'))
-            ) {
-              console.debug('[i2v-debug]', data.status, {
-                node_id: data.metadata?.node_id,
-                state: data.metadata?.state,
-                percent: data.metadata?.percent,
-                provider_status: data.metadata?.provider_status,
-                elapsed_seconds: data.metadata?.elapsed_seconds,
-                url: data.metadata?.url,
-                error: data.metadata?.error,
-              })
-            }
-          } catch {
-            // never let debug tracing break the stream handler
-          }
-
-          // Handle different status events for UI feedback
-          if (data.status === 'started') {
-            processingStatus.value = 'started'
-            processingMetadata.value = {}
-          } else if (data.status === 'preprocessing') {
-            processingStatus.value = 'preprocessing'
-            processingMetadata.value = { customMessage: data.message }
-          } else if (data.status === 'analyzing') {
-            // Analyzing phase (e.g., understanding media generation request)
-            processingStatus.value = 'analyzing'
-            processingMetadata.value = { customMessage: data.message }
-          } else if (data.status === 'editing') {
-            // Media edit of a picture from earlier in the conversation — name
-            // the source so the user can see WHICH image is being changed.
-            processingStatus.value = 'editing'
-            processingMetadata.value = data.metadata || {}
-          } else if (isPipelineProgressStatus(data.status)) {
-            processingStatus.value = data.status
-            processingMetadata.value = {}
-          } else if (data.status === 'classifying') {
-            processingStatus.value = 'classifying'
-            processingMetadata.value = data.metadata || {}
-
-            // Update message with sorting model from backend (instead of store model)
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.metadata) {
-              const prov = data.metadata.provider
-              const mname = data.metadata.model_name
-              if (typeof prov === 'string') {
-                message.provider = prov
-              }
-              if (typeof mname === 'string') {
-                message.modelLabel = mname
-              }
-            }
-          } else if (data.status === 'classified') {
-            const meta = data.metadata || {}
-            processingMetadata.value = meta
-            processingStatus.value = 'classified'
-            // Capture language for TTS streaming
-            if (typeof meta.language === 'string') {
-              detectedLanguage = meta.language
-            }
-          } else if (data.status === 'searching') {
-            processingStatus.value = 'searching'
-            processingMetadata.value = { customMessage: data.message }
-          } else if (data.status === 'search_complete') {
-            processingStatus.value = 'search_complete'
-            processingMetadata.value = data.metadata || {}
-            // Surface the sources immediately (they arrive seconds before the
-            // answer) so the "sources" box renders now, with the generating
-            // indicator acting as the placeholder above the soon-to-stream text.
-            const earlySources = data.metadata?.results
-            if (Array.isArray(earlySources) && earlySources.length > 0) {
-              const searchMsg = historyStore.messages.find((m) => m.id === messageId)
-              if (searchMsg) {
-                searchMsg.searchResults = earlySources as NonNullable<Message['searchResults']>
-                searchMsg.webSearch = {
-                  query: typeof data.metadata?.query === 'string' ? data.metadata.query : '',
-                  resultsCount: earlySources.length,
-                }
-              }
-            }
-          } else if (applyResearchStatus(messageId, data)) {
-            // handled: linked pages / result pages being read
-          } else if (data.status === 'generating') {
-            processingStatus.value = 'generating'
-            // Use custom message from backend if available, otherwise default
-            processingMetadata.value = {
-              customMessage: data.message || undefined,
-              ...(data.metadata || {}),
-            }
-
-            // Update message with real model from backend (instead of store model)
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.metadata) {
-              const prov = data.metadata.provider
-              const mname = data.metadata.model_name
-              if (typeof prov === 'string') {
-                message.provider = prov
-              }
-              if (typeof mname === 'string') {
-                message.modelLabel = mname
-              }
-              applyMediaJobToMessage(message, data.metadata)
-            }
-          } else if (data.status === 'generating_file') {
-            // Staged document generation progress (officemaker): the backend
-            // announces `writing` while the model produces the document text
-            // and `converting` while the office file is built.
-            processingStatus.value = 'generating_file'
-            processingMetadata.value = data.metadata || {}
-          } else if (data.status === 'document_step') {
-            applyDocumentStep(messageId, data)
-          } else if (data.status === 'processing') {
-            // Processing/routing messages - improved logging
-          } else if (data.status === 'thinking') {
-            // Phase 1e: surface model "thinking" reasoning so the bubble
-            // doesn't sit empty for 5-8 s on Gemini Pro.
-            processingStatus.value = 'thinking'
-            processingMetadata.value = { customMessage: data.message || undefined }
-          } else if (data.status === 'analyzing_memories') {
-            // 🎯 Memory analysis started
-            processingStatus.value = 'analyzing_memories'
-            processingMetadata.value = { customMessage: data.message || undefined }
-          } else if (data.status === 'saving_memories') {
-            // 🎯 Saving memories
-            processingStatus.value = 'saving_memories'
-            processingMetadata.value = { customMessage: data.message || undefined }
-          } else if (data.status === 'memories_complete') {
-            // 🎯 Memory analysis complete
-            processingStatus.value = 'memories_complete'
-            processingMetadata.value = { customMessage: data.message || undefined }
-            // Clear processing status after a short delay
-            setTimeout(() => {
-              if (processingStatus.value === 'memories_complete') {
-                processingStatus.value = ''
-                processingMetadata.value = {}
-              }
-            }, 2000)
-          } else if (data.status === 'status') {
-            // Generic status message
-          } else if (data.status === 'plan') {
-            // Multitask routing: a multi-node plan was recognized. Render a task
-            // card per node. Single-node turns never emit this, so normal chat
-            // is unaffected.
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const tasks = data.metadata?.plan
-            if (message && Array.isArray(tasks) && tasks.length > 0) {
-              processingStatus.value = ''
-              processingMetadata.value = {}
-              message.wasMultitask = true
-              message.taskPlan = {
-                active: true,
-                // Persist the turn id on the plan so the per-card Stop button can
-                // always reach the backend even if currentTrackId is cleared by a
-                // racing handler (issue #1141).
-                trackId: currentTrackId,
-                replyNode:
-                  typeof data.metadata?.reply_node === 'string' ? data.metadata.reply_node : '',
-                cards: tasks.map((t) => ({
-                  nodeId: t.node_id,
-                  capability: t.capability,
-                  kind: isTaskCardKind(t.kind) ? t.kind : 'text',
-                  state: 'pending' as const,
-                })),
-              }
-            }
-          } else if (data.status === 'plan_discarded') {
-            // The DAG failed entirely and the backend is falling back to a normal
-            // single-bubble answer. Retract the (now misleading) failed task cards
-            // so the clean reply below isn't sitting under a "step failed" box.
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              message.taskPlan = null
-              message.wasMultitask = false
-            }
-          } else if (data.status === 'task_update') {
-            ingestApprovalRequired(data)
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            // A user-cancelled step is terminal on the client: ignore the
-            // backend 'failed' that follows the abort so the card stays
-            // 'cancelled' (neutral) instead of flipping to a scary error.
-            if (card && card.state === 'cancelled') {
-              // keep cancelled
-            } else if (card && isTaskCardState(data.metadata?.state)) {
-              card.state = data.metadata.state
-              // Failure details: specific error text + (for media nodes) the
-              // resolved prompt powering the per-task retry button.
-              if (typeof data.metadata?.error === 'string' && data.metadata.error) {
-                card.error = data.metadata.error
-              }
-              if (typeof data.metadata?.text === 'string' && data.metadata.text) {
-                card.text = data.metadata.text
-              }
-              if (typeof data.metadata?.prompt === 'string' && data.metadata.prompt) {
-                card.prompt = data.metadata.prompt
-              }
-              // Web search card compact summary — populated by DagExecutor on done.
-              if (typeof data.metadata?.query === 'string' && data.metadata.query) {
-                card.query = data.metadata.query
-              }
-              if (typeof data.metadata?.results_count === 'number') {
-                card.resultsCount = data.metadata.results_count
-              }
-              if (data.metadata?.used_workspace === true) {
-                card.usedWorkspace = true
-              }
-              if (typeof data.metadata?.step_input === 'string') {
-                card.stepInput = data.metadata.step_input
-              }
-              if (typeof data.metadata?.step_output === 'string') {
-                card.stepOutput = data.metadata.step_output
-              }
-              if (data.metadata?.step_output_truncated === true) {
-                card.stepOutputTruncated = true
-              }
-              if (typeof data.metadata?.duration_ms === 'number') {
-                card.durationMs = data.metadata.duration_ms
-              }
-              if (isAskUserPayload(data.metadata?.ask_user)) {
-                card.askUser = data.metadata.ask_user
-              }
-            }
-          } else if (data.status === 'task_chunk') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && typeof data.metadata?.chunk === 'string') {
-              card.text = (card.text ?? '') + data.metadata.chunk
-            }
-          } else if (data.status === 'task_file') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && typeof data.metadata?.url === 'string') {
-              card.url = normalizeMediaUrl(data.metadata.url)
-              card.mediaType =
-                typeof data.metadata?.type === 'string' ? data.metadata.type : card.kind
-            }
-          } else if (data.status === 'task_progress') {
-            // Live media render progress: feed a moving bar on the running card.
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
-            if (card && card.state !== 'cancelled') {
-              if (typeof data.metadata?.percent === 'number') {
-                card.progressPercent = data.metadata.percent
-              }
-              if (typeof data.metadata?.provider_status === 'string') {
-                card.providerStatus = data.metadata.provider_status
-              }
-              if (typeof data.metadata?.elapsed_seconds === 'number') {
-                card.elapsedSeconds = data.metadata.elapsed_seconds
-              }
-            }
-          } else if (
-            data.status === 'data' &&
-            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
-          ) {
-            // Multitask mode: no live single-bubble rendering (the task cards
-            // are the streaming surface), but the assembled answer text — the
-            // executor streams it once after the DAG finishes, and the reply
-            // node has no card of its own (compose_reply is hidden) — must
-            // still accumulate so the 'complete' flush renders it. Dropping it
-            // left the bubble without any answer text until a reload re-fetched
-            // the persisted message (#1057).
-            if (data.chunk) {
-              fullContent += data.chunk
-            }
-          } else if (
-            isTaskPlanSuppressedMediaStatus(data.status) &&
-            historyStore.messages.find((m) => m.id === messageId)?.taskPlan?.active
-          ) {
-            // Multitask: task cards are the live media surface for file/links.
-            // Voice-reply audio and TTS status must still attach live (#2282).
-          } else if (data.status === 'data' && data.chunk) {
-            // First visible answer token: the live thinking panel folds away.
-            // A buffered `<think>` block, including one split across chunks,
-            // is not the answer.
-            const visible = consumeVisibleAnswer(data.chunk, answerThinkOpen)
-            answerThinkOpen = visible.insideThink
-            if (visible.text.trim() !== '') {
-              if (processingStatus.value) {
-                processingStatus.value = ''
-                processingMetadata.value = {}
-              }
-              historyStore.finishLiveThinking(messageId)
-            }
-
-            fullContent += data.chunk
-
-            if (currentAudioStreamer) {
-              let audioChunk = data.chunk.replace(/<think>[\s\S]*?<\/think>/gi, '')
-
-              if (insideThinkBlock) {
-                const closeMatch = audioChunk.match(/<\/think>/i)
-                if (closeMatch && closeMatch.index !== undefined) {
-                  audioChunk = audioChunk.substring(closeMatch.index + closeMatch[0].length)
-                  insideThinkBlock = false
-                } else {
-                  audioChunk = ''
-                }
-              }
-
-              if (!insideThinkBlock) {
-                const openMatch = audioChunk.match(/<think>/i)
-                if (openMatch && openMatch.index !== undefined) {
-                  audioChunk = audioChunk.substring(0, openMatch.index)
-                  insideThinkBlock = true
-                }
-              }
-
-              audioText += audioChunk
-
-              while (true) {
-                const currentUnprocessed = audioText.slice(spokenLength)
-                const boundaryMatch = currentUnprocessed.match(/([.?!]+)(\s+|$)|(\n+)/)
-
-                if (!boundaryMatch || boundaryMatch.index === undefined) break
-
-                const endIdx = boundaryMatch.index + boundaryMatch[0].length
-                const sentence = currentUnprocessed.substring(0, endIdx)
-
-                if (sentence.trim()) {
-                  currentAudioStreamer.streamText(sentence, undefined, detectedLanguage)
-                }
-
-                spokenLength += endIdx
-              }
-            }
-
-            // Reveal the chunk across frames. Parsing still happens at most
-            // once per frame; a large provider chunk no longer lands as a block.
-            textSmoother.push(fullContent)
-          } else if (data.status === 'reasoning' && data.chunk) {
-            // Reasoning chunks from OpenAI o-series / GPT-5 models
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              // Find existing reasoning part or create new one
-              let reasoningPart = message.parts.find((p) => p.type === 'thinking' && p.isStreaming)
-
-              if (!reasoningPart) {
-                // Create new reasoning part at the beginning (#1058)
-                reasoningPart = {
-                  type: 'thinking',
-                  content: '',
-                  isStreaming: true,
-                  thinkingStartedAt: Date.now(),
-                }
-                message.parts.unshift(reasoningPart)
-              }
-
-              // Append reasoning content
-              reasoningPart.content += data.chunk
-            }
-          } else if (data.status === 'file') {
-            // Handle file attachments (images, videos, audio, etc.)
-            //
-            // Issue #625: the live MEDIAMAKER audio player used to go
-            // missing whenever this push raced the streaming text
-            // reconciler. {@link pushMediaPart} now assigns a stable
-            // `partId` and re-assigns `message.parts` so we always
-            // mutate the current reactive proxy (a stale closure
-            // reference from a sibling handler would otherwise
-            // silently drop the push).
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.url) {
-              const absoluteUrl = normalizeMediaUrl(data.url)
-              if (data.type === 'image' || data.type === 'video' || data.type === 'audio') {
-                pushMediaPart(message, data.type, absoluteUrl)
-              }
-            }
-          } else if (data.status === 'tts_generating') {
-            // TTS synthesis started — show loading animation in message
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              message.parts.push({ type: 'tts_loading' })
-            }
-          } else if (data.status === 'audio') {
-            // Handle TTS audio response (voice reply)
-            // Incognito: the backend ships the ephemeral file id so the
-            // session-end cleanup can delete the synthesized audio.
-            if (incognito && typeof data.file_id === 'number') {
-              incognitoStore.registerFile(data.file_id)
-            }
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.url) {
-              const absoluteUrl = normalizeMediaUrl(data.url)
-              // Play the stored spoken reply unless sentence streaming already
-              // has answer text. A streamer object alone is not enough: a task
-              // plan never feeds it, and a finished stream is no longer active.
-              const shouldAutoplay = shouldAutoplayVoiceReply(
-                message.parts.some((part) => part.type === 'tts_loading'),
-                audioText
-              )
-              attachVoiceReplyAudio(message, absoluteUrl, { autoplay: shouldAutoplay })
-            }
-          } else if (data.status === 'voice_reply_failed') {
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && isVoiceReplyFailedReason(data.reason)) {
-              applyVoiceReplyFailed(message, data.reason)
-            }
-            if (currentAudioStreamer) {
-              currentAudioStreamer.stop()
-              currentAudioStreamer = null
-              isAudioStreaming.value = false
-            }
-          } else if (data.status === 'links') {
-            // Handle web search results
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message && data.links) {
-              message.parts.push({
-                type: 'links',
-                items: data.links.map((l) => {
-                  try {
-                    return {
-                      title: l.title || l.url,
-                      url: l.url,
-                      desc: l.description,
-                      host: new URL(l.url).hostname,
-                    }
-                  } catch {
-                    return {
-                      title: l.title || l.url,
-                      url: l.url,
-                      desc: l.description,
-                      host: l.url,
-                    }
-                  }
-                }),
-              })
-            }
-          } else if (data.status === 'memory_suggested') {
-            // Handle memory suggestions from backend
-            // Memory data is in metadata
-            const memoryData = data.metadata
-
-            if (!memoryData || !memoryData.id) {
-              console.warn('⚠️ Invalid memory data received:', data)
-              return
-            }
-
-            const toastMemory = {
-              id: memoryData.id,
-              category: memoryData.category ?? '',
-              key: memoryData.key ?? '',
-              value: memoryData.value ?? '',
-              source: (memoryData.source ?? 'auto_detected') as UserMemory['source'],
-              messageId: memoryData.messageId ?? null,
-              created: memoryData.created ?? Date.now(),
-              updated: memoryData.updated ?? Date.now(),
-              toastId: memoryToastIdCounter++,
-            } as UserMemory & { toastId: number }
-
-            if (memoryData.action === 'delete') {
-              openMemoryDeleteDialog(toastMemory)
-              return
-            }
-
-            // Create toast for the suggested memory
-            activeMemoryToasts.value.push(toastMemory)
-          } else if (data.status === 'memories_loaded') {
-            // Memories loaded event - store in memoriesStore for badge rendering
-            const memories = data.metadata?.memories
-            if (memories && Array.isArray(memories)) {
-              // Collect memory IDs for the message
-              const memoryIds: number[] = []
-
-              // Update the memory store with loaded memories so badges can resolve
-              for (const mem of memories) {
-                memoryIds.push(mem.id)
-                const existing = memoriesStore.memories.find((m) => m.id === mem.id)
-                if (!existing) {
-                  // Add to store for badge rendering
-                  memoriesStore.memories.push({
-                    id: mem.id,
-                    category: mem.category || 'personal',
-                    key: mem.key || '',
-                    value: mem.value || '',
-                    source: (mem.source || 'auto_detected') as UserMemory['source'],
-                    messageId: mem.messageId ?? null,
-                    created: mem.created || 0,
-                    updated: mem.updated || 0,
-                  })
-                }
-              }
-
-              // Attach memory IDs to the current streaming message
-              const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
-              if (streamingMessage && memoryIds.length > 0) {
-                streamingMessage.memoryIds = memoryIds
-              }
-            }
-          } else if (data.status === 'docs_loaded') {
-            const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
-            if (streamingMessage) {
-              applyDocsToMessage(streamingMessage, data.metadata?.docs)
-            }
-          } else if (data.status === 'feedback_loaded') {
-            // Feedback examples loaded - store in feedbackStore for badge rendering
-            const feedbacks = data.metadata?.feedbacks
-            if (feedbacks && Array.isArray(feedbacks)) {
-              // Collect feedback IDs for the message
-              const feedbackIds: number[] = []
-
-              // Update the feedback store with loaded feedbacks so badges can resolve
-              for (const fb of feedbacks) {
-                feedbackIds.push(fb.id)
-                const existing = feedbackStore.getFeedbackById(fb.id)
-                if (!existing) {
-                  // Add to store temporarily for badge rendering
-                  feedbackStore.feedbacks.push({
-                    id: fb.id,
-                    type: fb.type as 'false_positive' | 'positive',
-                    value: fb.value ?? '',
-                    messageId: null,
-                    created: 0,
-                    updated: 0,
-                  })
-                }
-              }
-
-              // Attach feedback IDs to the current streaming message
-              const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
-              if (streamingMessage && feedbackIds.length > 0) {
-                streamingMessage.feedbackIds = feedbackIds
-              }
-            }
-          } else if (data.status === 'digests_loaded') {
-            // Deep-memory references loaded - store for [Message:ID] badge rendering
-            const digests = data.metadata?.digests
-            if (digests && Array.isArray(digests)) {
-              messageDigestsStore.addReferences(
-                digests
-                  .filter((d) => d && typeof d.message_id === 'number')
-                  .map((d) => ({
-                    messageId: d.message_id,
-                    chatId: d.chat_id ?? 0,
-                    title: d.title ?? '',
-                    channel: d.channel ?? '',
-                    sourceDate: d.source_date ?? 0,
-                  }))
-              )
-            }
-          } else if (data.status === 'memory_deleted') {
-            // Legacy backend event - remove from local store only
-            const memoryId = data.metadata?.id
-            if (memoryId) {
-              memoriesStore.memories = memoriesStore.memories.filter((m) => m.id !== memoryId)
-            }
-          } else if (data.status === 'perf') {
-            // Phase 0 instrumentation — only log when the user opts in via
-            // `localStorage.setItem('synaplanDebug', '1')`. Keeps prod consoles
-            // quiet but lets us inspect every phase in dev / on demand.
-            try {
-              if (typeof window !== 'undefined' && window.localStorage?.getItem('synaplanDebug')) {
-                console.groupCollapsed(
-                  `[synaplan perf] ${data.total_ms ?? '?'} ms total — message ${messageId}`
-                )
-                console.table(data.phases ?? {})
-                if (data.marks && Object.keys(data.marks).length > 0) {
-                  console.table(data.marks)
-                }
-                console.groupEnd()
-              }
-            } catch {
-              // localStorage can throw in private mode — don't let perf logging break the stream.
-            }
-          } else if (data.status === 'complete') {
-            // Phase 3f (corrected): do the final render + state cleanup
-            // synchronously so they all land in the same Vue render tick.
-            //
-            // The earlier rAF-wrapped variant deferred renderStreamingContent
-            // by one frame, which let `historyStore.finishStreamingMessage`
-            // (further below) flip `isStreaming = false` first. The DOM
-            // commit triggered by that flip showed `data-testid="message-done"`
-            // BEFORE message.parts had been filled with the final accumulated
-            // text — Playwright's `waitForAnswer` then read a stale partial
-            // bubble (e.g. "ollama" instead of "ollama stub response").
-            //
-            // Sync ordering avoids the race entirely: Vue batches the sync
-            // mutations (parts updated, processingStatus cleared, isStreaming
-            // toggled) into one paint, preserving the smooth single-frame
-            // transition this phase was originally targeting.
-            textSmoother.flush()
-
-            if (fullContent) {
-              renderStreamingText(fullContent)
-            } else if (data.mediaJob || data.media_job) {
-              renderStreamingContent(
-                generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
-                messageId
-              )
-            }
-
-            if (currentAudioStreamer) {
-              const remaining = audioText.slice(spokenLength)
-              if (remaining.trim()) {
-                currentAudioStreamer.streamText(remaining, undefined, detectedLanguage)
-              }
-              currentAudioStreamer.markComplete()
-            }
-
-            processingStatus.value = ''
-            processingMetadata.value = {}
-
-            // Update message metadata
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            if (message) {
-              applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
-
-              // Multitask: the DAG finished — freeze the task cards so the plan
-              // renders as final and the schedule clock appears immediately
-              // (canSchedule requires !plan.active), without a page reload.
-              if (message.taskPlan) {
-                message.taskPlan.active = false
-              }
-
-              // Mark as truncated so the Continue button appears
-              if (data.truncated) {
-                message.truncated = true
-              }
-              // Clean up any leftover tts_loading indicator (TTS may have failed silently)
-              message.parts = message.parts.filter((p) => p.type !== 'tts_loading')
-              // ✨ NEW: Handle generated file from backend
-              if (data.generatedFile) {
-                // Incognito: the generated document is ephemeral — track it so
-                // the session-end cleanup deletes it.
-                if (incognito) {
-                  incognitoStore.registerFile(data.generatedFile.id)
-                }
-                // Add file to message FIRST
-                if (!message.files) {
-                  message.files = []
-                }
-
-                const fileData: import('@/stores/history').MessageFile = {
-                  id: data.generatedFile.id,
-                  filename: data.generatedFile.filename,
-                  filePath: data.generatedFile.path,
-                  fileSize: data.generatedFile.size,
-                  fileType: data.generatedFile.type,
-                  fileMime: data.generatedFile.mime,
-                }
-
-                message.files.push(fileData)
-
-                // Replace JSON content or special markers with translated message
-                const hasJsonOrMarker =
-                  message.parts.length === 0 ||
-                  (message.parts[0].type === 'code' &&
-                    message.parts[0].content?.includes('BFILEPATH')) ||
-                  (message.parts[0].type === 'text' &&
-                    message.parts[0].content?.includes('__FILE_GENERATED__'))
-
-                if (hasJsonOrMarker) {
-                  // Use translation with filename parameter
-                  const translatedMessage = t('message.fileGenerated', {
-                    filename: data.generatedFile.filename,
-                  })
-                  message.parts = [
-                    {
-                      type: 'text',
-                      content: translatedMessage,
-                    },
-                  ]
-                }
-
-                // Force Vue reactivity with multiple strategies
-                nextTick(() => {
-                  // Strategy 1: Update the message object with a new id to force key-based re-render
-                  const messageIndex = historyStore.messages.findIndex((m) => m.id === message.id)
-                  if (messageIndex !== -1) {
-                    // Create completely new message object
-                    // FIXME: This entire block is cargo-cult reactivity code - message is already a store reference,
-                    // Vue 3 Proxy detects mutations automatically. The ternary is unnecessary (files already mutated above),
-                    // and spreading parts/files just wastes CPU creating shallow copies of already-mutated arrays.
-                    const updatedMessage = {
-                      ...message,
-                      files: message.files ? [...message.files] : undefined,
-                      parts: [...message.parts],
-                      timestamp: new Date(message.timestamp),
-                    }
-
-                    // Replace in store
-                    historyStore.messages.splice(messageIndex, 1, updatedMessage)
-                  }
-                })
-              }
-
-              applyDocumentComplete(message, data)
-
-              // ✨ NEW: Parse JSON response if AI responded in JSON format
-              // NOTE: againData is now generated by frontend in ChatMessage.vue
-              // based on available models and message type (image/video/audio)
-
-              if (data.messageId) {
-                message.backendMessageId = data.messageId
-              }
-
-              // Store search results if provided
-              if (
-                data.searchResults &&
-                Array.isArray(data.searchResults) &&
-                data.searchResults.length > 0
-              ) {
-                message.searchResults = data.searchResults as NonNullable<Message['searchResults']>
-
-                // Also set webSearch metadata for assistant message
-                message.webSearch = {
-                  query: data.searchResults[0]?.query || '',
-                  resultsCount: data.searchResults.length,
-                }
-              }
-
-              // Store memory IDs if provided (full memories loaded from store)
-              if (data.memoryIds && Array.isArray(data.memoryIds) && data.memoryIds.length > 0) {
-                message.memoryIds = data.memoryIds
-              }
-
-              if (Array.isArray(data.ragSources) && data.ragSources.length > 0) {
-                message.ragSources = data.ragSources as NonNullable<Message['ragSources']>
-              }
-
-              const sent = data.providerMessages as
-                { messages?: Message['providerMessages']; truncated?: boolean } | undefined
-              if (sent && Array.isArray(sent.messages)) {
-                message.providerMessages = sent.messages
-                message.providerMessagesTruncated = sent.truncated === true
-              }
-
-              applyDocsToMessage(message, data.docs)
-
-              // Store feedback IDs if provided
-              if (
-                data.feedbackIds &&
-                Array.isArray(data.feedbackIds) &&
-                data.feedbackIds.length > 0
-              ) {
-                message.feedbackIds = data.feedbackIds
-              }
-
-              // Provider/model + clickable footer (aiModels) — match persisted API shape
-              applyAssistantChatModelFooter(
-                message,
-                {
-                  provider: data.provider,
-                  model: data.model,
-                  model_id: data.model_id ?? null,
-                  aiModels: data.aiModels ?? null,
-                },
-                { provider, model: modelLabel, model_id: currentModel?.id ?? null }
-              )
-
-              // Usage taximeter: attach this turn's usage (badge + session
-              // model list) and adopt the live day totals from the server.
-              // The settlement refresh covers costs recorded moments after
-              // the stream (media renders billed by the worker).
-              if (usageTaximeterStore.active) {
-                const turnUsage = (data.usage ?? null) as Message['usage']
-                const turnUsageExtra = (data.usage_extra ?? null) as Message['usageExtra']
-                const turnTotals = (data.usage_totals ?? null) as UsageTotals | null
-                if (turnUsage) {
-                  message.usage = turnUsage
-                }
-                if (turnUsageExtra && turnUsageExtra.length > 0) {
-                  message.usageExtra = turnUsageExtra
-                }
-                usageTaximeterStore.applyComplete(turnUsage, turnTotals, turnUsageExtra)
-                usageTaximeterStore.refreshAfterSettlement()
-              }
-
-              // Store topic from classification
-              if (data.topic) {
-                message.topic = data.topic
-              }
-
-              // Store original topic (preserved on error messages for correct "Again" model selection)
-              if (data.originalTopic !== undefined) {
-                message.originalTopic = data.originalTopic
-              }
-              if (data.originalMediaType !== undefined) {
-                message.originalMediaType = data.originalMediaType
-              }
-              if (typeof data.errorReason === 'string' && data.errorReason !== '') {
-                message.errorReason = data.errorReason
-                message.canRetryModel =
-                  data.canRetryModel !== false && chatErrorSuggestsOtherModel(data.errorReason)
-                message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
-                if (typeof data.error === 'string' && data.error.trim() !== '') {
-                  message.errorMessage = data.error
-                }
-              }
-
-              if (data.error_hint === 'vision_model_required') {
-                const hint =
-                  '\n\n---\n\n' +
-                  '**💡 ' +
-                  t('aiProvider.error.visionModelHint') +
-                  '**\n\n' +
-                  t('aiProvider.error.visionModelHintDetail')
-                message.parts.push({ type: 'text', content: hint })
-              }
-
-              // Mark reasoning parts as complete (remove streaming flag)
-              message.parts.forEach((part) => {
-                if (part.type === 'thinking' && part.isStreaming) {
-                  delete part.isStreaming
-                }
-              })
-            } else {
-              console.error('❌ Could not find message with id:', messageId)
-            }
-
-            // Incognito: nothing was persisted — no chat title, no sidebar
-            // bump, no reconcile against a stored message, no memory-
-            // extraction poll (extraction is skipped server-side).
-            if (!incognito && chatId) {
-              // The server names the chat after the first exchange (#1500) and
-              // sends the title on the turn that produced it. Until then the
-              // sidebar shows the first-message preview, so there is nothing to
-              // do when the field is absent.
-              if (data.chatTitle) {
-                chatsStore.applyChatTitle(chatId, data.chatTitle)
-              }
-
-              // Bump chat activity so the sidebar reflects the assistant message
-              // landing without waiting for a full reload. The streaming
-              // bubble already marked this turn, so the matching realtime
-              // event does not count it a second time.
-              chatsStore.bumpChatActivity(chatId)
-            }
-
-            historyStore.finishStreamingMessage(messageId)
-            if (typeof data.messageId === 'number') {
-              recordVersionLink(options?.linkVersion, data.messageId, chatId)
-            } else {
-              restoreUnpersistedEdit()
-            }
-
-            // Issue #1070: the streamed state is only a live preview — the
-            // persisted message is the single source of truth for files,
-            // media and metadata. Re-fetch it once so anything the SSE
-            // accumulation missed (e.g. TTS audio in a multitask turn,
-            // where the `audio` event is suppressed while task cards
-            // stream) renders without a page reload.
-            if (data.messageId && !incognito) {
-              void historyStore.reconcileMessage(messageId, data.messageId)
-            }
-
-            // Phase 2c: schedule a couple of polls for backgrounded memory
-            // extraction results. The worker writes to the source message
-            // metadata; we pick it up here and surface via the same memory
-            // store dispatch the legacy SSE events used.
-            if (data.messageId && !incognito) {
-              schedulePostStreamMemoryPoll(data.messageId)
-            }
-
-            // Clean up streaming resources after successful completion
-            streamingAbortController = null
-            stopStreamingFn = null
-            currentTrackId = undefined
-            currentStreamingChatId = undefined
-          } else if (data.status === 'error') {
-            textSmoother.flush()
-            textSmoother.cancel()
-
-            const rawError = typeof data.error === 'string' ? data.error : ''
-            const classified =
-              typeof data.errorReason === 'string' && data.errorReason.trim() !== ''
-            const errorMsg =
-              classified && rawError.trim() !== '' ? rawError : t('chatError.reason.unknown')
-            console.error('Error:', errorMsg, data)
-            processingStatus.value = ''
-            processingMetadata.value = {}
-
-            // Issue #1265: a pure SSE transport drop is NOT a turn failure.
-            // Persisted chats: reconcile with the server (#1230 / #1142 / #1413).
-            // Incognito (no chat row): keep whatever already streamed. Painting
-            // "Connection interrupted" on a finished demo reply is U8-false —
-            // the in-memory draft is the only copy and it is already on screen.
-            if (isRecoverableStreamError(data)) {
-              const dropped = historyStore.messages.find((m) => m.id === messageId)
-              const canReconcile = !incognito && Boolean(chatId)
-              if (shouldFinishWithoutErrorOnTransportDrop({ canReconcile, message: dropped })) {
-                historyStore.finishStreamingMessage(messageId)
-                if (canReconcile && chatId) {
-                  void historyStore.recoverInterruptedTurn(chatId)
-                }
-                streamingAbortController = null
-                stopStreamingFn = null
-                currentTrackId = undefined
-                currentStreamingChatId = undefined
-                return
-              }
-            }
-
-            // Update message metadata from error event so status/provider/topic
-            // are visible in real-time without requiring a page refresh
-            {
-              const message = historyStore.messages.find((m) => m.id === messageId)
-              if (message) {
-                // Multitask: stop the cards from animating on a failed turn.
-                if (message.taskPlan) {
-                  message.taskPlan.active = false
-                }
-                if (data.messageId) {
-                  message.backendMessageId = data.messageId
-                }
-                if (data.topic) {
-                  message.topic = data.topic
-                }
-                if (data.originalTopic !== undefined) {
-                  message.originalTopic = data.originalTopic
-                }
-                if (data.originalMediaType !== undefined) {
-                  message.originalMediaType = data.originalMediaType
-                }
-                applyAssistantChatModelFooter(
-                  message,
-                  {
-                    provider: data.provider,
-                    model: data.model,
-                    model_id: data.model_id ?? null,
-                    aiModels: data.aiModels ?? null,
-                  },
-                  { provider, model: modelLabel, model_id: currentModel?.id ?? null }
-                )
-              }
-            }
-
-            // Match control-flow on the raw SSE string. Unclassified events
-            // (chat-not-found, rate-limit) have no errorReason, so errorMsg
-            // is the translated unknown copy and must not hide those branches.
-            const rawErrorLower = rawError.toLowerCase()
-            if (
-              rawErrorLower.includes('chat not found') ||
-              rawErrorLower.includes('access denied')
-            ) {
-              // Remove the empty assistant message
-              historyStore.removeMessage(messageId)
-
-              // Show toast notification
-              showErrorToast(t('chat.notFound'), 5000)
-
-              // Clean up streaming resources
-              streamingAbortController = null
-              stopStreamingFn = null
-              currentTrackId = undefined
-              currentStreamingChatId = undefined
-              restoreUnpersistedEdit()
-              return
-            }
-
-            // Handle rate limit errors with modal
-            if (rawErrorLower.includes('rate limit')) {
-              // Remove the empty assistant message
-              historyStore.removeMessage(messageId)
-
-              // Find and mark the previous user message as rate_limited (don't delete it!)
-              const userMessages = historyStore.messages.filter((m) => m.role === 'user')
-              const lastUserMessage = userMessages[userMessages.length - 1]
-              if (lastUserMessage) {
-                historyStore.setMessageStatus(lastUserMessage.id, 'rate_limited', 'rate_limit', {
-                  limitType:
-                    data.limit_type === 'hourly' ||
-                    data.limit_type === 'monthly' ||
-                    data.limit_type === 'lifetime'
-                      ? data.limit_type
-                      : 'lifetime',
-                  actionType: data.action_type || 'MESSAGES',
-                  used: data.used || 0,
-                  limit: data.limit || 0,
-                  remaining: data.remaining || 0,
-                  resetAt: data.reset_at || null,
-                  userLevel: data.user_level || authStore.user?.level || 'NEW',
-                })
-              }
-
-              showLimitOrPaywall({
-                allowed: false,
-                limitType:
-                  data.limit_type === 'hourly' ||
-                  data.limit_type === 'monthly' ||
-                  data.limit_type === 'lifetime'
-                    ? data.limit_type
-                    : 'lifetime',
-                actionType: data.action_type || 'MESSAGES',
-                used: data.used || 0,
-                limit: data.limit || 0,
-                remaining: data.remaining || 0,
-                resetTime: data.reset_at || null,
-                userLevel: data.user_level || authStore.user?.level || 'NEW',
-                phoneVerified: data.phone_verified || false,
-              })
-
-              // Clean up streaming resources
-              streamingAbortController = null
-              stopStreamingFn = null
-              currentTrackId = undefined
-              currentStreamingChatId = undefined
-              restoreUnpersistedEdit()
-              return
-            }
-
-            // Handle monthly cost-budget exceeded → offer a one-time top-up.
-            // Branch on the stable machine-readable `code` (set by the backend),
-            // not on the human-readable error text which changes with i18n /
-            // rewording. Keep the structured-field check as a defensive fallback.
-            if (
-              data.code === 'COST_BUDGET_EXCEEDED' ||
-              (data.limit_type === 'monthly' && data.topup_available === true)
-            ) {
-              historyStore.removeMessage(messageId)
-
-              showLimitOrPaywall({
-                allowed: false,
-                limitType: 'monthly',
-                actionType: data.action_type || 'MESSAGES',
-                used: Number(data.used) || 0,
-                limit: Number(data.limit) || 0,
-                remaining: Number(data.remaining) || 0,
-                resetTime: null,
-                userLevel: data.user_level || authStore.user?.level || 'NEW',
-                phoneVerified: data.phone_verified || false,
-                topupAvailable: data.topup_available === true,
-              })
-
-              streamingAbortController = null
-              stopStreamingFn = null
-              currentTrackId = undefined
-              currentStreamingChatId = undefined
-              restoreUnpersistedEdit()
-              return
-            }
-
-            // A user-initiated cancellation is not a failure: render the same
-            // lightweight, translated notice as the Stop button (handleUserStop)
-            // instead of the big `## ⚠️` heading. This keeps every cancellation
-            // notice identical in size/wording and avoids leaking the raw
-            // English backend message ('Stream cancelled by user').
-            if (isCancellationError(data)) {
-              const message = historyStore.messages.find((m) => m.id === messageId)
-              const hasContent = message?.parts.some(
-                (p) => p.type === 'text' && p.content && p.content.trim() !== ''
-              )
-              if (!(message && hasContent)) {
-                historyStore.updateStreamingMessage(messageId, t('message.cancelledByUser'))
-              }
-              historyStore.finishStreamingMessage(messageId)
-              if (currentStreamingChatId) {
-                chatsStore.clearLocalTurnFinished(currentStreamingChatId)
-              }
-
-              streamingAbortController = null
-              stopStreamingFn = null
-              currentTrackId = undefined
-              currentStreamingChatId = undefined
-              restoreUnpersistedEdit()
-              return
-            }
-
-            const message = historyStore.messages.find((m) => m.id === messageId)
-            const hasContent = message?.parts.some(
-              (p) => p.type === 'text' && p.content && p.content.trim() !== ''
-            )
-            if (message) {
-              message.errorReason =
-                typeof data.errorReason === 'string' && data.errorReason !== ''
-                  ? data.errorReason
-                  : 'unknown'
-              message.canRetryModel =
-                data.canRetryModel !== false && chatErrorSuggestsOtherModel(message.errorReason)
-              message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
-              // Only the backend-classified sentence is user-safe. Transport
-              // strings ("Connection failed (HTTP 500)") stay off the notice.
-              if (
-                typeof data.errorReason === 'string' &&
-                data.errorReason !== '' &&
-                typeof data.error === 'string' &&
-                data.error.trim() !== ''
-              ) {
-                message.errorMessage = data.error
-              }
-            }
-            if (!hasContent) {
-              // `errorMsg` is the localized text the backend also persists as the
-              // message body, so the live bubble and the reloaded row match.
-              historyStore.updateStreamingMessage(messageId, errorMsg)
-            }
-            historyStore.finishStreamingMessage(messageId)
-            if (typeof data.messageId === 'number') {
-              recordVersionLink(options?.linkVersion, data.messageId, chatId)
-            } else {
-              restoreUnpersistedEdit()
-            }
-
-            // Clean up streaming resources after error
-            streamingAbortController = null
-            stopStreamingFn = null
-            currentTrackId = undefined
-            currentStreamingChatId = undefined
-          } else {
-            console.warn('⚠️ Unknown status:', data.status, data)
-          }
-        },
-      }
-
-      const stopStreaming = attach
-        ? chatApi.attachStream({ runId: attach.runId, onUpdate: streamOptions.onUpdate })
-        : chatApi.streamMessage(streamOptions)
-
-      // Store EventSource cleanup function globally
-      stopStreamingFn = stopStreaming
-
-      // Store cleanup function
-      streamingAbortController.signal.addEventListener('abort', () => {
-        stopStreaming()
-        stopStreamingFn = null
-      })
+      editedChatIdForRestore = incognitoStore.active
+        ? undefined
+        : (chatsStore.activeChatId ?? undefined)
+      startMemberTurn(userMessage, options, canvas, editedChatIdForRestore)
     }
   } catch (error) {
     console.error('❌ Streaming error:', error)
-
-    textSmoother.cancel()
-
+    canvas.smoother.cancel()
     historyStore.updateStreamingMessage(messageId, t('chatError.reason.unknown'))
     historyStore.finishStreamingMessage(messageId)
     if (currentStreamingChatId) {
       chatsStore.clearLocalTurnFinished(currentStreamingChatId)
     }
-    streamingAbortController = null
-    stopStreamingFn = null
-    currentTrackId = undefined
-    currentStreamingChatId = undefined
+    releaseStreamingTurn()
     if (options?.linkVersion?.kind === 'edit') void reloadEditedTranscript(editedChatIdForRestore)
   }
-  // NOTE: Don't clean up in finally block! The streaming is async and still running.
-  // Cleanup happens in the 'complete' event handler or in handleUserStop()
+  // No cleanup here: the stream is still running. Its terminal event or handleUserStop() ends it.
 }
 
 // Explicit Stop button (issue #1225): the user WANTS to cancel the turn. Tell
@@ -5853,16 +3796,6 @@ function finishStreamingTurnLocally() {
   streamingAbortController = null
   currentTrackId = undefined
   currentStreamingChatId = undefined
-}
-
-function isAskUserPayload(
-  value: unknown
-): value is NonNullable<import('@/stores/history').TaskCard['askUser']> {
-  return (
-    !!value &&
-    typeof value === 'object' &&
-    typeof (value as { question?: unknown }).question === 'string'
-  )
 }
 
 async function answerAskUser(

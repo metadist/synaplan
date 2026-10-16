@@ -1,0 +1,977 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ChatView stream transcripts > Stop in the middle of an answer 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Tell me a long story",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "Once upon a time
+
+⚠️ Cancelled by user",
+          "type": "text",
+        },
+      ],
+      "processingModel": {
+        "name": "GPT Answer",
+        "provider": "openai",
+      },
+      "processingSteps": [
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "understand",
+          "metadata": {
+            "language": "en",
+            "model_name": "Sorter",
+            "provider": "openai",
+            "topic": "general",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "classified",
+        },
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "generate",
+          "metadata": {
+            "model_name": "GPT Answer",
+            "provider": "openai",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "generating",
+        },
+      ],
+      "provider": "openai",
+      "role": "assistant",
+    },
+  ],
+  "transports": [
+    "member",
+    "member:closed",
+    "stop-stream",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > a discarded plan 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Summarize and translate",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "A single answer instead.",
+          "type": "text",
+        },
+      ],
+      "processingModel": {},
+      "processingSteps": [],
+      "provider": "openai",
+      "role": "assistant",
+      "taskPlan": null,
+      "topic": "general",
+      "wasMultitask": false,
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > a file analysis 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "What does the PDF say?",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "The PDF lists three risks.",
+          "type": "text",
+        },
+      ],
+      "processingModel": {},
+      "processingSteps": [
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "analyzing",
+          "message": "Reading the file",
+          "metadata": {},
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "analyzing",
+        },
+      ],
+      "provider": "openai",
+      "role": "assistant",
+      "topic": "analyzefile",
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > a generated file 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Write a report",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "files": [
+        {
+          "fileMime": "application/msword",
+          "filePath": "u/7/report.docx",
+          "fileSize": 2048,
+          "fileType": "docx",
+          "filename": "report.docx",
+        },
+      ],
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "I've created the file 'report.docx' for you. You can now download it.",
+          "type": "text",
+        },
+      ],
+      "processingModel": {},
+      "processingSteps": [
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "file",
+          "metadata": {
+            "stage": "writing",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "generating_file",
+        },
+      ],
+      "provider": "openai",
+      "role": "assistant",
+      "topic": "officemaker",
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > a generated image 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Draw a lighthouse",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "Generated image:",
+          "type": "text",
+        },
+        {
+          "type": "image",
+          "url": "http://localhost:3000/api/v1/files/uploads/lighthouse.png",
+        },
+      ],
+      "processingModel": {
+        "name": "Imagen",
+        "provider": "google",
+      },
+      "processingSteps": [
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "generate",
+          "metadata": {
+            "model_name": "Imagen",
+            "provider": "google",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "generating",
+        },
+      ],
+      "provider": "openai",
+      "role": "assistant",
+      "topic": "mediamaker",
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > a guest answer with the remaining count 1`] = `
+{
+  "guest": {
+    "remaining": 3,
+  },
+  "transcript": {
+    "memories": [],
+    "messages": [
+      {
+        "agentId": null,
+        "parts": [
+          {
+            "content": "Hello as a guest",
+            "type": "text",
+          },
+        ],
+        "quotedMessageId": null,
+        "quotedText": null,
+        "role": "user",
+        "tool": null,
+        "webSearch": null,
+      },
+      {
+        "aiModels": {
+          "chat": {
+            "model": "GPT Answer",
+            "model_id": 5,
+            "provider": "openai",
+          },
+        },
+        "backendMessageId": 601,
+        "isStreaming": false,
+        "modelLabel": "GPT Answer",
+        "parts": [
+          {
+            "content": "Welcome, guest.",
+            "type": "text",
+          },
+        ],
+        "processingModel": {
+          "name": "GPT Answer",
+          "provider": "openai",
+        },
+        "processingSteps": [
+          {
+            "afterAnswer": false,
+            "endedAt": "<time>",
+            "key": "understand",
+            "metadata": {
+              "language": "en",
+              "model_name": "Sorter",
+              "provider": "openai",
+              "topic": "general",
+            },
+            "startedAt": "<time>",
+            "state": "done",
+            "status": "classified",
+          },
+          {
+            "afterAnswer": false,
+            "endedAt": "<time>",
+            "key": "generate",
+            "metadata": {
+              "model_name": "GPT Answer",
+              "provider": "openai",
+            },
+            "startedAt": "<time>",
+            "state": "done",
+            "status": "generating",
+          },
+        ],
+        "provider": "openai",
+        "role": "assistant",
+      },
+    ],
+    "transports": [
+      "guest",
+    ],
+  },
+}
+`;
+
+exports[`ChatView stream transcripts > a guest at the limit 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "One more question",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+  ],
+  "transports": [
+    "guest",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > a multi-step task plan 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Summarize and translate",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "Here is the summary in German.",
+          "type": "text",
+        },
+      ],
+      "processingModel": {},
+      "processingSteps": [],
+      "provider": "openai",
+      "role": "assistant",
+      "taskPlan": {
+        "active": false,
+        "cards": [
+          {
+            "capability": "summarize",
+            "durationMs": 1200,
+            "kind": "text",
+            "nodeId": "n1",
+            "state": "done",
+            "text": "Short summary",
+          },
+          {
+            "capability": "translate",
+            "elapsedSeconds": 3,
+            "kind": "text",
+            "nodeId": "n2",
+            "progressPercent": 40,
+            "providerStatus": "queued",
+            "state": "done",
+            "text": "Kurze Zusammenfassung",
+          },
+        ],
+        "replyNode": "n3",
+      },
+      "topic": "general",
+      "wasMultitask": true,
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > a plain answer 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Hello there",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "Hello world.",
+          "type": "text",
+        },
+      ],
+      "processingModel": {
+        "name": "GPT Answer",
+        "provider": "openai",
+      },
+      "processingSteps": [
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "understand",
+          "metadata": {
+            "language": "en",
+            "model_name": "Sorter",
+            "provider": "openai",
+            "topic": "general",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "classified",
+        },
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "generate",
+          "metadata": {
+            "model_name": "GPT Answer",
+            "provider": "openai",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "generating",
+        },
+      ],
+      "provider": "openai",
+      "role": "assistant",
+      "topic": "general",
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > a provider error 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Hello",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": null,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 509,
+      "canRetryModel": true,
+      "errorDebug": null,
+      "errorMessage": "The provider did not answer.",
+      "errorReason": "provider_error",
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "The provider did not answer.",
+          "type": "text",
+        },
+      ],
+      "processingModel": {
+        "name": "GPT Answer",
+        "provider": "openai",
+      },
+      "processingSteps": [
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "understand",
+          "metadata": {
+            "language": "en",
+            "model_name": "Sorter",
+            "provider": "openai",
+            "topic": "general",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "classified",
+        },
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "generate",
+          "metadata": {
+            "model_name": "GPT Answer",
+            "provider": "openai",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "generating",
+        },
+      ],
+      "provider": "openai",
+      "role": "assistant",
+      "topic": "general",
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > a web search with links 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Search the web",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "MariaDB stores vectors.",
+          "type": "text",
+        },
+      ],
+      "processingModel": {},
+      "processingSteps": [
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "web",
+          "message": "Searching the web",
+          "metadata": {
+            "query": "mariadb vector",
+            "results": [
+              {
+                "query": "mariadb vector",
+                "title": "MariaDB Vector",
+                "url": "https://mariadb.org/vector",
+              },
+            ],
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "search_complete",
+        },
+      ],
+      "provider": "openai",
+      "role": "assistant",
+      "searchResults": [
+        {
+          "query": "mariadb vector",
+          "title": "MariaDB Vector",
+          "url": "https://mariadb.org/vector",
+        },
+      ],
+      "topic": "general",
+      "webSearch": {
+        "query": "mariadb vector",
+        "resultsCount": 1,
+      },
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > an answer with reasoning 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Think first",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "Option B.",
+          "type": "text",
+        },
+      ],
+      "processingModel": {},
+      "processingSteps": [
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "thinking",
+          "message": "Thinking",
+          "metadata": {},
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "thinking",
+        },
+      ],
+      "provider": "openai",
+      "role": "assistant",
+      "topic": "general",
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > continuing a truncated answer 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Write a long list",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "1. First
+2. Second",
+          "type": "text",
+        },
+      ],
+      "processingModel": {
+        "name": "GPT Answer",
+        "provider": "openai",
+      },
+      "processingSteps": [
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "understand",
+          "metadata": {
+            "language": "en",
+            "model_name": "Sorter",
+            "provider": "openai",
+            "topic": "general",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "classified",
+        },
+        {
+          "afterAnswer": false,
+          "endedAt": "<time>",
+          "key": "generate",
+          "metadata": {
+            "model_name": "GPT Answer",
+            "provider": "openai",
+          },
+          "startedAt": "<time>",
+          "state": "done",
+          "status": "generating",
+        },
+      ],
+      "provider": "openai",
+      "role": "assistant",
+      "topic": "general",
+      "truncated": false,
+    },
+  ],
+  "transports": [
+    "member",
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > memories loaded and suggested 1`] = `
+{
+  "memories": [
+    {
+      "category": "travel",
+      "created": 0,
+      "key": "city",
+      "messageId": null,
+      "source": "auto_detected",
+      "updated": 0,
+      "value": "Lisbon",
+    },
+  ],
+  "messages": [
+    {
+      "agentId": null,
+      "parts": [
+        {
+          "content": "Plan my trip",
+          "type": "text",
+        },
+      ],
+      "quotedMessageId": null,
+      "quotedText": null,
+      "role": "user",
+      "tool": null,
+      "webSearch": null,
+    },
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "feedbackIds": [
+        21,
+      ],
+      "isStreaming": false,
+      "memoryIds": [
+        11,
+      ],
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "Lisbon again [Memory:11].",
+          "type": "text",
+        },
+      ],
+      "processingModel": {},
+      "processingSteps": [],
+      "provider": "openai",
+      "role": "assistant",
+      "topic": "general",
+    },
+  ],
+  "transports": [
+    "member",
+  ],
+}
+`;
+
+exports[`ChatView stream transcripts > re-attaching to a turn after a reload 1`] = `
+{
+  "memories": [],
+  "messages": [
+    {
+      "aiModels": {
+        "chat": {
+          "model": "GPT Answer",
+          "model_id": 5,
+          "provider": "openai",
+        },
+      },
+      "backendMessageId": 501,
+      "isStreaming": false,
+      "modelLabel": "GPT Answer",
+      "parts": [
+        {
+          "content": "Already written and finished.",
+          "type": "text",
+        },
+      ],
+      "processingModel": {},
+      "processingSteps": [],
+      "provider": "openai",
+      "role": "assistant",
+      "topic": "general",
+    },
+  ],
+  "transports": [
+    "attach",
+  ],
+}
+`;
