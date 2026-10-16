@@ -44,7 +44,7 @@
         >
           <div
             v-if="showModelFilter"
-            class="shrink-0 border-b border-light-border/30 p-2 dark:border-dark-border/20"
+            class="shrink-0 border-b border-light-border/30 px-2 pb-3 pt-2 dark:border-dark-border/20"
             data-testid="section-live-voice-model-filter"
           >
             <label class="sr-only" for="live-voice-model-filter">
@@ -81,7 +81,7 @@
               </button>
             </div>
           </div>
-          <div class="min-h-0 overflow-y-auto">
+          <div class="flex min-h-0 flex-col gap-1 overflow-y-auto pt-2">
             <button
               v-for="model in visibleModels"
               :key="model.id ?? model.name"

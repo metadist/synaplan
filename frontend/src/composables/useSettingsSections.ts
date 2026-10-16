@@ -19,14 +19,12 @@ export interface SettingsSectionLink {
 export function settingsSectionLinks(
   profileLoadFailed: boolean,
   showBilling: boolean,
-  showApp: boolean,
-  showVoice = false
+  showApp: boolean
 ): SettingsSectionLink[] {
   const items: SettingsSectionLink[] = [
     { id: 'profile', slug: 'profile', labelKey: 'settings.sections.profile' },
     { id: 'appearance', slug: 'appearance', labelKey: 'settings.sections.appearance' },
     { id: 'chat', slug: 'chat', labelKey: 'settings.sections.chat' },
-    ...(showVoice ? [{ id: 'voice', slug: 'voice', labelKey: 'settings.sections.voice' }] : []),
     { id: 'data', slug: 'data', labelKey: 'settings.sections.data' },
   ]
   if (!profileLoadFailed && showBilling) {
@@ -54,12 +52,7 @@ export function useSettingsSections(profileLoadFailed: MaybeRef<boolean> = false
   const showBilling = computed(() => config.billing.enabled && purchaseAllowed)
 
   const sections = computed(() =>
-    settingsSectionLinks(
-      toValue(profileLoadFailed),
-      showBilling.value,
-      showApp,
-      config.voiceLive.enabled
-    )
+    settingsSectionLinks(toValue(profileLoadFailed), showBilling.value, showApp)
   )
 
   return { sections, showApp, showBilling }
@@ -94,8 +87,7 @@ export function settingsLocationFor(
     settingsSectionLinks(
       false,
       config.billing.enabled && isPurchaseAllowed(),
-      isNativeServerControlAvailable(),
-      config.voiceLive.enabled
+      isNativeServerControlAvailable()
     ).map((item) => item.slug)
   )
   const query: LocationQuery = { ...to.query }
@@ -116,6 +108,9 @@ export function settingsLocationFor(
 
   if (!auth.isAuthenticated) {
     slug = 'appearance'
+  } else if (slug === 'voice' && config.voiceLive.enabled) {
+    // Captions and permission now live with the voice model on AI settings.
+    return { path: '/ai/models', query: { ...query, highlight: 'VOICE_LIVE' } }
   } else if (!allowed.has(slug)) {
     slug = 'profile'
   }

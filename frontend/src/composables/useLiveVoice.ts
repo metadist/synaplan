@@ -25,7 +25,7 @@ import { voiceCompany } from '@/services/liveVoice/company'
 import { liveCueForTransition, playLiveCue } from '@/services/liveVoice/cues'
 import { nextLivePhase, type LivePhase } from '@/services/liveVoice/machine'
 import {
-  captionsPreferred,
+  captionsPreferredRef,
   preferredVoice,
   setCaptionsPreferred,
 } from '@/services/liveVoice/preferences'
@@ -63,7 +63,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   const consentOpen = ref(false)
   const reason = ref<LiveEndReason>('provider_error')
   const muted = ref(false)
-  const captions = ref(captionsPreferred())
+  const captions = captionsPreferredRef()
   const level = ref(0)
   const outLevel = ref(0)
   const secondsLeft = ref<number | null>(null)
@@ -518,8 +518,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
   }
 
   function toggleCaptions() {
-    captions.value = !captions.value
-    setCaptionsPreferred(captions.value)
+    setCaptionsPreferred(!captions.value)
   }
 
   function dismiss() {
