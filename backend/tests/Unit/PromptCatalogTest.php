@@ -282,6 +282,8 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('must be the grouping in the output', $plan['prompt']);
         // Issue #2051: an explicitly named office format must be honoured.
         $this->assertStringContainsString('A format named in the request', $plan['prompt']);
+        $this->assertStringContainsString('save it into a text file', $plan['prompt']);
+        $this->assertStringContainsString('never claim a file was written', $plan['prompt']);
     }
 
     public function testPlanPromptRequiresFetchBeforeGeneration(): void

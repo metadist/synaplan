@@ -6,6 +6,7 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\SearchResultRepository;
+use App\Service\Agent\Policy\AssistantPlanLimits;
 use App\Service\Message\ReadPagesPolicy;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\Multitask\Execution\NodeContext;
@@ -15,6 +16,7 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\Research\WebResearchService;
+use App\Service\Runtime\RuntimeProfile;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -58,6 +60,9 @@ final readonly class WebSearchRunner implements TaskRunner
 
     public function run(TaskNode $node, NodeContext $context): NodeResult
     {
+        if (AssistantPlanLimits::internetDisabled($this->profile($context))) {
+            return NodeResult::failed('This assistant is not allowed to search the web.');
+        }
         if (!$this->webSearch->isEnabled($context->userId)) {
             return NodeResult::failed('web search is not configured');
         }
@@ -138,6 +143,13 @@ final readonly class WebSearchRunner implements TaskRunner
             'search_results' => $results,
             'pages_read' => (int) ($results['pages_read'] ?? 0),
         ]);
+    }
+
+    private function profile(NodeContext $context): ?RuntimeProfile
+    {
+        $profile = $context->options['runtime_profile'] ?? $context->classification['runtime_profile'] ?? null;
+
+        return $profile instanceof RuntimeProfile ? $profile : null;
     }
 
     /**

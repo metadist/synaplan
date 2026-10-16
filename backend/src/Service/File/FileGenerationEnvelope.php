@@ -75,12 +75,36 @@ final class FileGenerationEnvelope
             'docx' => '/\b\.?docx?\b|word-dokument|word-datei|microsoft word|\bals word\b|\bas word\b|\bword document\b/i',
             'pptx' => '/\b\.?pptx?\b|powerpoint|präsentation|presentation/i',
             'csv' => '/\b\.?csv\b/i',
+            // Extension only. "text file … counter_weekday.txt" must stay one
+            // match: this loop ignores a pattern that hits more than once.
+            'txt' => '/\.txt\b/i',
+            'md' => '/\.md\b/i',
         ];
 
         $winner = null;
         $winnerPos = -1;
         foreach ($patterns as $extension => $pattern) {
             if (1 !== preg_match_all($pattern, $text, $matches, PREG_OFFSET_CAPTURE)) {
+                continue;
+            }
+            foreach ($matches[0] as [$match, $pos]) {
+                if ($pos < $winnerPos || self::isSourceMention($text, $pos)) {
+                    continue;
+                }
+                $winner = $extension;
+                $winnerPos = $pos;
+            }
+        }
+
+        // Phrases compete with extensions by position. "Convert report.txt to
+        // Markdown" elects md; "as a text file" elects txt even after a source
+        // spreadsheet mention. A source preposition still loses.
+        $phrases = [
+            'txt' => '/\btext file\b|\btextdatei\b|\bplain text\b/iu',
+            'md' => '/\bmarkdown\b/iu',
+        ];
+        foreach ($phrases as $extension => $pattern) {
+            if (false === preg_match_all($pattern, $text, $matches, PREG_OFFSET_CAPTURE)) {
                 continue;
             }
             foreach ($matches[0] as [$match, $pos]) {

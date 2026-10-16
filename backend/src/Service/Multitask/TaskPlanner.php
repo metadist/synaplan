@@ -12,6 +12,7 @@ use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\Agent\Policy\AssistantPlanLimits;
 use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Connection\PlannerChannelCatalog;
@@ -320,7 +321,30 @@ final readonly class TaskPlanner
             $text = $this->officePdfRouting->decoratePrompt($text);
         }
 
-        return $text."\n\n".$this->timeContextBlock($message, $options);
+        return $text."\n\n".$this->timeContextBlock($message, $options).$this->assistantInstructionBlock($options);
+    }
+
+    /**
+     * The assistant's own instructions, so a planned file can follow a template
+     * that exists only there. They do not add a capability the list omitted.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function assistantInstructionBlock(array $options): string
+    {
+        $profile = $options['runtime_profile'] ?? null;
+        if (!$profile instanceof RuntimeProfile) {
+            $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+            $profile = $classification['runtime_profile'] ?? null;
+        }
+        $instructions = AssistantPlanLimits::instructions($profile instanceof RuntimeProfile ? $profile : null);
+        if (null === $instructions) {
+            return '';
+        }
+
+        return "\n\n## Assistant instructions\n"
+            ."Follow these when choosing steps and when writing a file. They do not add a capability that is absent from the list above.\n\n"
+            .$instructions;
     }
 
     /**
@@ -425,7 +449,10 @@ final readonly class TaskPlanner
             return null;
         }
 
-        return AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile);
+        return AssistantPlanLimits::withoutDisabledTools(
+            AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile),
+            $profile,
+        );
     }
 
     /**

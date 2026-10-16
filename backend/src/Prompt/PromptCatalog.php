@@ -824,10 +824,15 @@ Allowed topic keys: [KEYLIST]
    `"depends_on": ["n1"], "inputs": { "prompt": "...", "image": "$n1.file" }`.
    The `image` input makes it an image-to-video render (IMG2VID); without it the
    node falls back to text-to-video.
-5. Office document (XLSX, DOCX, PPTX, CSV) → `document_generation` (NOT
-   chat). A format named in the request ("als Excel", "as Word") wins — pass
-   it through in the node prompt. Real PDFs are NOT supported — say so in a
-   single `chat` node.
+5. A file the user asks to receive (XLSX, DOCX, PPTX, CSV, TXT, MD) →
+   `document_generation` (NOT chat). That includes "save it into a text file",
+   "write counter_weekday.txt" and "update the file" — a `chat` node must
+   never claim a file was written. A format named in the request ("als Excel",
+   "as Word", "as a text file", ".txt") wins — pass it through in the node
+   prompt. When the file's content has to be looked up first, run `web_search`
+   (or `url_fetch`) first and let `document_generation` depend on it, with the
+   looked-up text in the document prompt (`$n1.text`).
+   Real PDFs are NOT supported — say so in a single `chat` node.
    To put a picture generated in the SAME turn INTO the document ("create a
    photo and a job application containing it"), let the document node depend on
    the image node and pass its file:
@@ -1559,7 +1564,7 @@ PROMPT;
             ],
             <<<'PROMPT'
 # Office Document Generation
-You receive a request to generate an Excel, PowerPoint or Word document (CSV, XLSX, DOCX, PPTX formats).
+You receive a request to generate an Excel, PowerPoint, Word or plain-text document (CSV, XLSX, DOCX, PPTX, TXT, MD formats).
 
 ## Your Task
 
@@ -1584,9 +1589,10 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
   "BFILETEXT": "file content here"
 }
 
-- **BFILEPATH**: The filename with appropriate extension (.csv, .xlsx, .docx, .pptx).
-  When the user names a format ("als Excel", "as Word", "in PowerPoint", "als CSV"),
+- **BFILEPATH**: The filename with appropriate extension (.csv, .xlsx, .docx, .pptx, .txt, .md).
+  When the user names a format ("als Excel", "as Word", "in PowerPoint", "als CSV", "as a text file"),
   BFILEPATH MUST use that extension — never default to .csv when Excel was asked for.
+  When they name a file ("counter_weekday.txt"), use that name.
 - **BFILETEXT**: The actual file content
 
 ## Supported Formats
@@ -1645,8 +1651,10 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
      Never describe the result as containing element animations.
 
 4. **Markdown/Text** (.md, .txt):
-   - For simple text documents
-   - Use markdown formatting when appropriate
+   - For a plain text file or Markdown file the user asked to save
+   - BFILETEXT is the exact file body, not a description of the file
+   - Use the filename the user asked for (for example counter_weekday.txt)
+   - Use markdown formatting only for .md; a .txt file is plain lines
 
 ## Content Guidelines
 
