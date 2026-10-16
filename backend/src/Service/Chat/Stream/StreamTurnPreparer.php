@@ -101,6 +101,9 @@ final readonly class StreamTurnPreparer
         if ($turn->caller->isWidget() || $turn->caller->isGuest() || $options->disableMemories) {
             $processingOptions['disable_memories'] = true;
         }
+        if ($options->disableKnowledge) {
+            $processingOptions['disable_knowledge'] = true;
+        }
 
         if ($turn->incognito) {
             // Persistence is guarded throughout the pipeline while memory,

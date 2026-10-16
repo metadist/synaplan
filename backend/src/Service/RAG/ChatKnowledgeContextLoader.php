@@ -104,6 +104,9 @@ final readonly class ChatKnowledgeContextLoader
         array $options,
         bool $isRagQuery,
     ): bool {
+        if (!empty($options['disable_knowledge'])) {
+            return false;
+        }
         $explicit = $options['rag_group_key'] ?? $classification['rag_group_key'] ?? null;
 
         return \App\Service\Agent\AgentKnowledgeSearchGate::shouldSearch(

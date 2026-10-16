@@ -91,6 +91,7 @@ final readonly class StreamRequestResolver
         $continueMessageId = self::optionalString($params->get('continueMessageId'));
         // Explicit opt-out from memory loading and extraction (public demo).
         $disableMemories = '1' === $params->get('disableMemories', '0');
+        $disableKnowledge = '1' === $params->get('disableKnowledge', '0');
 
         // Incognito keeps the turn in memory: nothing is stored, memories,
         // knowledge and feedback are still read. Signed-in web users only.
@@ -137,6 +138,7 @@ final readonly class StreamRequestResolver
                 webSearch: $flags['webSearch'],
                 voiceReply: $flags['voiceReply'],
                 disableMemories: $disableMemories,
+                disableKnowledge: $disableKnowledge,
                 modelId: $modelId,
                 isAgain: $flags['isAgain'],
                 fixedTaskPromptTopic: $fixedTaskPrompt,

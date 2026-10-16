@@ -61,7 +61,10 @@
         v-else
         ref="chatContainer"
         class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
-        :class="{ 'flex flex-col items-center': isEmptyLanding }"
+        :class="{
+          'flex flex-col items-center': isEmptyLanding,
+          'max-md:hidden': liveStage,
+        }"
         data-testid="section-messages"
         @scroll="handleScroll"
       >
@@ -447,14 +450,45 @@
           />
           <div
             v-else-if="incognitoStore.active"
-            class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
+            class="mb-2 rounded-lg surface-chip px-4 py-2.5 text-xs txt-secondary"
             data-testid="banner-incognito"
           >
-            <Icon icon="mdi:incognito" class="w-4 h-4 txt-brand flex-shrink-0" />
-            <span>
-              <strong class="txt-primary">{{ $t('incognito.bannerTitle') }}</strong>
-              — {{ $t('incognito.bannerText') }}
-            </span>
+            <div class="flex items-start gap-2">
+              <Icon icon="mdi:incognito" class="mt-0.5 w-4 h-4 shrink-0 txt-brand" />
+              <p>
+                <strong class="txt-primary">{{ $t('incognito.bannerTitle') }}</strong>
+                — {{ $t('incognito.bannerText') }}
+              </p>
+            </div>
+            <label
+              v-if="!incognitoHasMessages"
+              class="mt-2 flex cursor-pointer items-start gap-2"
+            >
+              <input
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0"
+                :checked="incognitoStore.useSavedContext"
+                data-testid="check-incognito-saved-context"
+                @change="onIncognitoSavedContext"
+              />
+              <span>
+                <span class="font-medium txt-primary">{{ $t('incognito.useSaved') }}</span>
+                <span class="mt-0.5 block">
+                  {{
+                    incognitoStore.useSavedContext
+                      ? $t('incognito.useSavedOn')
+                      : $t('incognito.useSavedOff')
+                  }}
+                </span>
+              </span>
+            </label>
+            <p v-else class="mt-2" data-testid="text-incognito-saved-context">
+              {{
+                incognitoStore.useSavedContext
+                  ? $t('incognito.lockedOn')
+                  : $t('incognito.lockedOff')
+              }}
+            </p>
           </div>
           <div
             v-else-if="pinnedAgentId && pinnedAssistantName"
@@ -1055,6 +1089,13 @@ const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 const messageDigestsStore = useMessageDigestsStore()
 const incognitoStore = useIncognitoStore()
+const incognitoHasMessages = computed(() => historyStore.messages.length > 0)
+
+function onIncognitoSavedContext(event: Event) {
+  const input = event.target
+  if (!(input instanceof HTMLInputElement)) return
+  incognitoStore.setUseSavedContext(input.checked)
+}
 const {
   agentId: pinnedAgentId,
   queryAgentId,
@@ -4195,6 +4236,8 @@ const streamAIResponse = async (
         chatId,
         incognito,
         history: incognitoHistory,
+        disableMemories: incognito && !incognitoStore.useSavedContext,
+        disableKnowledge: incognito && !incognitoStore.useSavedContext,
         includeReasoning,
         reasoningEffort: options?.reasoningEffort,
         webSearch,

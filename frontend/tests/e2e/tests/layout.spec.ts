@@ -348,7 +348,6 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     if (isMobileViewport(page)) {
       await page.locator(NAV.mobileDrawerToggle).click()
       await expect(page.locator(NAV.mobileDrawer)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await page.locator(NAV.mobileHistory).click()
       await expect(page.locator(NAV.mobileHistorySection)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       // The infinite-scroll sentinel is always rendered (empty or not).
       await expect(page.locator(NAV.mobileHistorySentinel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
@@ -440,7 +439,11 @@ test.describe('@ci @layout UI guard — chat surface', () => {
       }
       const summary = page.locator('[data-testid="chip-tools-summary"]')
       const badge = page.locator('[data-testid="badge-plus-tools-count"]')
-      expect((await summary.isVisible()) || (await badge.isVisible())).toBeTruthy()
+      if (width < 768) {
+        await expect(summary).toBeHidden()
+      } else {
+        expect((await summary.isVisible()) || (await badge.isVisible())).toBeTruthy()
+      }
     }
 
     const longName = await pickModel(true)

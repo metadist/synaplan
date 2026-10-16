@@ -22,6 +22,7 @@ final readonly class StreamTurnOptions
         public bool $webSearch = false,
         public bool $voiceReply = false,
         public bool $disableMemories = false,
+        public bool $disableKnowledge = false,
         public ?string $modelId = null,
         public bool $isAgain = false,
         public ?string $fixedTaskPromptTopic = null,

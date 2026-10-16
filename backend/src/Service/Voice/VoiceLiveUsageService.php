@@ -469,6 +469,11 @@ final readonly class VoiceLiveUsageService
         return $this->asBool($this->readMetadata($session)['incognito'] ?? false);
     }
 
+    public function skipsSavedContext(VoiceSession $session): bool
+    {
+        return $this->asBool($this->readMetadata($session)['skip_saved_context'] ?? false);
+    }
+
     /**
      * What the person is billed for one Synaplan answer: provider cost plus markup.
      */

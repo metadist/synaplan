@@ -92,6 +92,7 @@ final class VoiceLiveController extends AbstractController
                     new OA\Property(property: 'language', type: 'string'),
                     new OA\Property(property: 'client', type: 'string', enum: ['web', 'ios', 'android', 'carplay']),
                     new OA\Property(property: 'incognito', type: 'boolean'),
+                    new OA\Property(property: 'useSavedContext', type: 'boolean', description: 'Incognito only. False skips saved memories and knowledge. Omitted keeps them.'),
                 ]
             )
         ),

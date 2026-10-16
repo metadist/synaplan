@@ -56,6 +56,7 @@ final readonly class VoiceLiveDelegationService
         }
 
         $incognito = $this->usage->isIncognito($session);
+        $skipSavedContext = $this->usage->skipsSavedContext($session);
         $message = $incognito ? $this->transient($session, $user, $question) : $this->transcripts->record($session, [[
             'role' => 'user',
             'text' => $question,
@@ -69,6 +70,8 @@ final readonly class VoiceLiveDelegationService
         try {
             $result = $this->processor->process($message, [
                 'incognito' => $incognito,
+                'disable_memories' => $skipSavedContext,
+                'disable_knowledge' => $skipSavedContext,
                 'source' => 'live_voice',
                 // A picture or video is billed the moment the provider bills
                 // it, exactly like the typed chat.

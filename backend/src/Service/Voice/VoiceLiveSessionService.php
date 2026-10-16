@@ -127,6 +127,9 @@ final readonly class VoiceLiveSessionService
         $extra = [];
         if ($incognito) {
             $extra['incognito'] = true;
+            if (false === ($body['useSavedContext'] ?? true)) {
+                $extra['skip_saved_context'] = true;
+            }
         }
         $voice = $this->chosenVoice($model, $body['voice'] ?? null);
         if ('' !== $voice) {

@@ -56,6 +56,8 @@ export function startLiveVoiceSession(body: {
   language?: string
   client: 'web'
   incognito?: boolean
+  /** Incognito only. Omitted or true keeps saved memories and knowledge. */
+  useSavedContext?: boolean
 }): Promise<LiveVoiceSession> {
   return httpClient('/api/v1/voice/live/sessions', {
     method: 'POST',

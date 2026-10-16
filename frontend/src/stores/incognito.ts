@@ -20,6 +20,8 @@ import { httpClient, getApiBaseUrl } from '@/services/api/httpClient'
 export const useIncognitoStore = defineStore('incognito', () => {
   const active = ref(false)
   const ephemeralFileIds = ref<number[]>([])
+  /** Saved memories and knowledge stay available unless the person turns them off before the first message. */
+  const useSavedContext = ref(true)
 
   const hasEphemeralFiles = computed(() => ephemeralFileIds.value.length > 0)
 
@@ -41,8 +43,14 @@ export const useIncognitoStore = defineStore('incognito', () => {
   function startSession(): void {
     if (active.value) return
     active.value = true
+    useSavedContext.value = true
     ephemeralFileIds.value = []
     window.addEventListener('pagehide', handlePageHide)
+  }
+
+  function setUseSavedContext(on: boolean): void {
+    if (!active.value) return
+    useSavedContext.value = on
   }
 
   /** Track a file created during the session so endSession() can delete it. */
@@ -73,9 +81,11 @@ export const useIncognitoStore = defineStore('incognito', () => {
 
   return {
     active,
+    useSavedContext,
     ephemeralFileIds,
     hasEphemeralFiles,
     startSession,
+    setUseSavedContext,
     registerFile,
     endSession,
   }
