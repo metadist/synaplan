@@ -157,7 +157,7 @@ export function linksPart(links: StreamLinkItem[]): Part {
   }
 }
 
-function hostOf(url: string): string {
+export function hostOf(url: string): string {
   try {
     return new URL(url).hostname
   } catch {
