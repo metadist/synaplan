@@ -219,6 +219,34 @@ describe('PromptsView', () => {
     expect(wrapper.find('[data-testid="row-saved-prompt"]').exists()).toBe(true)
   })
 
+  it('shows the saved shortcut after the list has settled, with the form closed and no second load', async () => {
+    rows = [{ id: 1, name: 'Alpha', command: 'alpha', body: 'A', tags: [] }]
+    const wrapper = await mountView()
+    expect(calls('GET')).toHaveLength(1)
+
+    await wrapper.find('[data-testid="btn-prompt-new"]').trigger('click')
+    await wrapper.find('[data-testid="input-saved-prompt-name"]').setValue('Beta')
+    await wrapper.find('[data-testid="input-saved-prompt-command"]').setValue('beta')
+    await wrapper.find('[data-testid="input-saved-prompt-body"]').setValue('B')
+    await wrapper.find('[data-testid="form-saved-prompt"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="form-saved-prompt"]').exists()).toBe(false)
+    const row = wrapper
+      .findAll('[data-testid="row-saved-prompt"]')
+      .find((item) => item.text().includes('/beta'))
+    expect(row).toBeTruthy()
+    expect(row?.text()).toContain('Beta')
+    expect(calls('GET')).toHaveLength(1)
+    expect(calls('POST')).toHaveLength(1)
+
+    await row!.find('[data-testid="btn-saved-prompt-delete"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('/beta')
+    expect(calls('GET')).toHaveLength(1)
+  })
+
   it('lists a new prompt in name order without reloading the list', async () => {
     rows = [
       { id: 1, name: 'Alpha', command: 'alpha', body: 'A', tags: [] },
