@@ -455,6 +455,7 @@
     "whatWasSentSession": "This stays on this screen until you leave the chat. It is not saved.",
     "whatWasSentTruncated": "The rest is left out because the text is too long.",
     "whatWasSentEmpty": "Nothing was recorded for this reply.",
+    "whatWasSentExact": "Exact text",
     "infoTopic": "Topic",
     "infoModel": "Model",
     "infoAiModel": "AI Model",

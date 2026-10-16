@@ -450,6 +450,7 @@
     "whatWasSentSession": "Das bleibt auf diesem Bildschirm, bis Sie den Chat verlassen. Es wird nicht gespeichert.",
     "whatWasSentTruncated": "Der Rest fehlt, weil der Text zu lang ist.",
     "whatWasSentEmpty": "Für diese Antwort wurde nichts aufgezeichnet.",
+    "whatWasSentExact": "Wortlaut",
     "infoTopic": "Thema",
     "infoModel": "Modell",
     "infoAiModel": "KI-Modell",

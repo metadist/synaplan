@@ -7,7 +7,7 @@ import WhatWasSentRound from '@/components/chat/WhatWasSentRound.vue'
 import { groupProviderTranscript } from '@/utils/providerTranscriptView'
 
 const props = defineProps<{
-  messages: Array<{ role: string; text: string }> | null
+  messages: Array<{ role: string; text: string; request?: number }> | null
   truncated: boolean
 }>()
 

@@ -1,6 +1,8 @@
 export interface ProviderTranscriptMessage {
   role: string
   text: string
+  /** Provider-call index from the capture. Absent on older transcripts. */
+  request?: number
 }
 
 export interface ProviderTranscriptTurn {
@@ -26,22 +28,58 @@ function isTurn(message: ProviderTranscriptMessage): message is ProviderTranscri
   return message.role === 'you' || message.role === 'assistant'
 }
 
+function keptRows(messages: readonly ProviderTranscriptMessage[]): ProviderTranscriptMessage[] {
+  const rows: ProviderTranscriptMessage[] = []
+  for (const message of messages) {
+    const text = message.text.trim()
+    if (text === '' || !KNOWN_ROLES.has(message.role)) continue
+    const row: ProviderTranscriptMessage = { role: message.role, text }
+    if (typeof message.request === 'number') row.request = message.request
+    rows.push(row)
+  }
+  return rows
+}
+
 /**
- * A tool loop appends the next provider call onto the same transcript.
- * Instructions that show up again after conversation turns start that next call.
+ * Each provider call is its own request. The capture stamps that index.
+ * Instruction rows are only a fallback for transcripts recorded before the index existed:
+ * a model that rejects system messages folds instructions into the user turn, so the
+ * next tool-loop call would otherwise look like more of the same conversation.
  */
 function splitRounds(
   messages: readonly ProviderTranscriptMessage[]
+): ProviderTranscriptMessage[][] {
+  const rows = keptRows(messages)
+  if (rows.some((row) => typeof row.request === 'number')) return splitByRequest(rows)
+  return splitByInstructions(rows)
+}
+
+function splitByRequest(rows: readonly ProviderTranscriptMessage[]): ProviderTranscriptMessage[][] {
+  const rounds: ProviderTranscriptMessage[][] = []
+  let current: ProviderTranscriptMessage[] = []
+  let request: number | undefined
+
+  for (const row of rows) {
+    if (current.length > 0 && row.request !== request) {
+      rounds.push(current)
+      current = []
+    }
+    request = row.request
+    current.push(row)
+  }
+
+  if (current.length > 0) rounds.push(current)
+  return rounds
+}
+
+function splitByInstructions(
+  rows: readonly ProviderTranscriptMessage[]
 ): ProviderTranscriptMessage[][] {
   const rounds: ProviderTranscriptMessage[][] = []
   let current: ProviderTranscriptMessage[] = []
   let seenConversation = false
 
-  for (const message of messages) {
-    const text = message.text.trim()
-    if (text === '' || !KNOWN_ROLES.has(message.role)) continue
-
-    const row: ProviderTranscriptMessage = { role: message.role, text }
+  for (const row of rows) {
     if (row.role === 'instructions' && seenConversation && current.length > 0) {
       rounds.push(current)
       current = []
@@ -67,7 +105,7 @@ function uniqueInstructions(messages: readonly ProviderTranscriptMessage[]): str
 
 function toRound(messages: readonly ProviderTranscriptMessage[]): ProviderTranscriptRound | null {
   const instructions = uniqueInstructions(messages)
-  const turns = messages.filter(isTurn)
+  const turns = messages.filter(isTurn).map((turn) => ({ role: turn.role, text: turn.text }))
   let questionIndex = -1
   for (let index = turns.length - 1; index >= 0; index -= 1) {
     if (turns[index].role === 'you') {

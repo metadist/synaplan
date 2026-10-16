@@ -445,6 +445,7 @@
     "whatWasSentSession": "Sohbetten ayrılana kadar bu ekranda kalır. Kaydedilmez.",
     "whatWasSentTruncated": "Metin çok uzun olduğu için devamı gösterilmez.",
     "whatWasSentEmpty": "Bu yanıt için bir kayıt yok.",
+    "whatWasSentExact": "Birebir metin",
     "infoAiModel": "Yapay Zeka Modeli",
     "infoAudioModel": "Ses Modeli",
     "infoLiveModel": "Canlı model",

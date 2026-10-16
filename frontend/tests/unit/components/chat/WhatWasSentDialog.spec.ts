@@ -11,7 +11,7 @@ afterEach(() => {
 })
 
 const mountDialog = (props: {
-  messages: Array<{ role: string; text: string }> | null
+  messages: Array<{ role: string; text: string; request?: number }> | null
   truncated?: boolean
 }) => {
   wrapper = mount(WhatWasSentDialog, {
@@ -89,9 +89,44 @@ describe('WhatWasSentDialog', () => {
     expect(history.text()).toContain('Assistant')
 
     const instructions = view.get('[data-testid="section-what-was-sent-instructions"]')
-    expect(instructions.get('h1').text()).toBe('Rules')
-    expect(instructions.get('strong').text()).toBe('brief')
-    expect(instructions.text()).not.toContain('# Rules')
+    const preview = instructions.get('.prompt-transcript-md')
+    expect(preview.get('h1').text()).toBe('Rules')
+    expect(preview.get('strong').text()).toBe('brief')
+    expect(preview.text()).not.toContain('# Rules')
+    expect(instructions.get('[data-testid="text-what-was-sent-exact"]').text()).toContain('# Rules')
+  })
+
+  it('keeps an escaped copy of text the formatted view would hide', () => {
+    const recorded = 'Explain <script>alert(1)</script>\n<!-- hidden -->'
+    const view = mountDialog({
+      messages: [{ role: 'you', text: recorded }],
+    })
+
+    const question = view.get('[data-testid="section-what-was-sent-question"]')
+    const preview = question.get('.prompt-transcript-md')
+    expect(preview.find('script').exists()).toBe(false)
+    expect(preview.html()).not.toContain('<script')
+    expect(preview.text()).not.toContain('<!-- hidden -->')
+
+    const exact = question.get('[data-testid="text-what-was-sent-exact"]')
+    expect(exact.text()).toBe(recorded)
+    expect(exact.element.innerHTML).toContain('&lt;script&gt;')
+    expect(exact.element.innerHTML).toContain('&lt;!-- hidden --&gt;')
+  })
+
+  it('keeps earlier steps when provider calls have no instruction row', () => {
+    const view = mountDialog({
+      messages: [
+        { role: 'you', text: 'Add a total row.', request: 0 },
+        { role: 'you', text: 'Add a total row.', request: 1 },
+        { role: 'assistant', text: 'Updated A10', request: 1 },
+      ],
+    })
+
+    expect(view.get('[data-testid="section-what-was-sent-after"]').text()).toContain('Updated A10')
+    const details = view.get('[data-testid="details-what-was-sent-earlier"]')
+    expect(details.attributes('open')).toBeUndefined()
+    expect(details.text()).toContain('1 earlier step')
   })
 
   it('shows the latest request and keeps earlier steps collapsed', () => {

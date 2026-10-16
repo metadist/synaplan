@@ -53,6 +53,29 @@ describe('groupProviderTranscript', () => {
     expect(rounds[1]?.after).toEqual([{ role: 'assistant', text: 'Updated A10' }])
   })
 
+  it('splits consecutive provider calls that have no instruction row', () => {
+    const prompt = 'Edit the sheet.\n\n---\n\nAdd a total row.'
+    const rounds = groupProviderTranscript([
+      { role: 'you', text: prompt, request: 0 },
+      { role: 'you', text: prompt, request: 1 },
+      { role: 'assistant', text: 'Updated A10', request: 1 },
+    ])
+
+    expect(rounds).toHaveLength(2)
+    expect(rounds[0]).toEqual({
+      instructions: [],
+      history: [],
+      question: prompt,
+      after: [],
+    })
+    expect(rounds[1]).toEqual({
+      instructions: [],
+      history: [],
+      question: prompt,
+      after: [{ role: 'assistant', text: 'Updated A10' }],
+    })
+  })
+
   it('returns nothing when no text was recorded', () => {
     expect(groupProviderTranscript(null)).toEqual([])
     expect(groupProviderTranscript([])).toEqual([])
