@@ -124,4 +124,14 @@ class ApprovalRepository extends ServiceEntityRepository
     {
         $this->getEntityManager()->flush();
     }
+
+    public function deleteByOwner(int $ownerId): void
+    {
+        $this->createQueryBuilder('a')
+            ->delete()
+            ->where('a.ownerId = :ownerId')
+            ->setParameter('ownerId', $ownerId)
+            ->getQuery()
+            ->execute();
+    }
 }

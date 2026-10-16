@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Service\Iam;
 
-use App\Entity\Approval;
-use App\Entity\UrlWatch;
-use App\Entity\VoiceSession;
 use App\Service\Iam\Erasure\UserDataEraserInterface;
 use App\Service\Iam\UserDeletionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -21,9 +18,11 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 final class UserErasureCoverageTest extends KernelTestCase
 {
     private const ORDER = [
-        'AccessCredentialsEraser', 'ConnectionEraser', 'KnowledgeEraser', 'DesktopEraser', 'UsageLogEraser', 'WidgetEraser',
-        'ShareEraser', 'AgentEraser', 'SavedTaskEraser', 'ConversationEraser', 'FileEraser',
-        'ComputeEraser', 'InboxEraser', 'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'MemoryEraser',
+        'AccessCredentialsEraser', 'ConnectionEraser', 'KnowledgeEraser', 'DesktopEraser',
+        'UsageLogEraser', 'WidgetEraser', 'ShareEraser', 'AgentEraser',
+        'ApprovalEraser', 'SavedTaskEraser', 'UrlWatchEraser', 'ConversationEraser',
+        'VoiceSessionEraser', 'FileEraser', 'ComputeEraser', 'InboxEraser',
+        'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'MemoryEraser',
         'IdentityEraser', 'CredentialEraser',
     ];
 
@@ -34,11 +33,7 @@ final class UserErasureCoverageTest extends KernelTestCase
      * entry here. {@see UserErasureLeavesNoRowTest} expects exactly these
      * tables to keep a row.
      */
-    public const NOT_ERASED_YET = [
-        Approval::class,
-        UrlWatch::class,
-        VoiceSession::class,
-    ];
+    public const NOT_ERASED_YET = [];
 
     public function testErasersRunInTheEstablishedOrder(): void
     {
