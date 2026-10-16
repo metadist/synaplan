@@ -11,7 +11,9 @@ use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\Infrastructure\PerfTimer;
+use App\Service\Mcp\ConfluenceLinkedPageRead;
 use App\Service\Mcp\ConfluenceLinkedPageReader;
+use App\Service\Mcp\JiraLinkedIssueRead;
 use App\Service\Mcp\JiraLinkedIssueReader;
 use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\ModelConfigService;
@@ -1284,9 +1286,7 @@ final readonly class MessageProcessor
             $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $successCount;
 
             if ($successCount > 0) {
-                $public = $this->urlContentService->formatForPrompt($urlContentResults);
-                $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
-                $classification['url_content'] = '' !== $existing ? $existing."\n\n".$public : $public;
+                $classification = $this->appendUrlContent($classification, $this->urlContentService->formatForPrompt($urlContentResults));
                 $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
             }
 
@@ -1313,11 +1313,7 @@ final readonly class MessageProcessor
             return $classification;
         }
 
-        $prompt = $this->webResearch->formatMentionedUrlsForPrompt($read);
-        if ('' !== $prompt) {
-            $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
-            $classification['url_content'] = '' !== $existing ? $existing."\n\n".$prompt : $prompt;
-        }
+        $classification = $this->appendUrlContent($classification, $this->webResearch->formatMentionedUrlsForPrompt($read));
         $classification['url_pages'] = $read->toClientList();
         $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $read->successCount();
         $classification['url_page_context'] = $read->contextForQuery();
@@ -1351,24 +1347,10 @@ final readonly class MessageProcessor
             $urls,
             $message->getUserId(),
             $this->mcpServerAllowlist($promptMetadata),
-            function () use ($statusCallback): void {
-                $this->notify($statusCallback, 'fetching_urls', 'Reading the Confluence page from your connection...');
-            },
+            fn () => $this->notify($statusCallback, 'fetching_urls', 'Reading the Confluence page from your connection...'),
         );
-        if (!$read->attempted()) {
-            return $classification;
-        }
 
-        $prompt = $read->prompt();
-        if ('' !== $prompt) {
-            $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
-            $classification['url_content'] = '' !== $existing ? $existing."\n\n".$prompt : $prompt;
-        }
-        $classification['confluence_mcp_urls'] = $read->handledUrls();
-        $classification['confluence_mcp_handled'] = $read->coversAll($urls);
-        $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $read->successCount();
-
-        return $classification;
+        return $this->applyLinkedRead($classification, $read, $urls, 'confluence');
     }
 
     /**
@@ -1392,22 +1374,45 @@ final readonly class MessageProcessor
             $urls,
             $message->getUserId(),
             $this->mcpServerAllowlist($promptMetadata),
-            function () use ($statusCallback): void {
-                $this->notify($statusCallback, 'fetching_urls', 'Reading the Jira issue from your connection...');
-            },
+            fn () => $this->notify($statusCallback, 'fetching_urls', 'Reading the Jira issue from your connection...'),
         );
+
+        return $this->applyLinkedRead($classification, $read, $urls, 'jira');
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     * @param list<string>         $urls
+     *
+     * @return array<string, mixed>
+     */
+    private function applyLinkedRead(array $classification, ConfluenceLinkedPageRead|JiraLinkedIssueRead $read, array $urls, string $source): array
+    {
         if (!$read->attempted()) {
             return $classification;
         }
 
-        $prompt = $read->prompt();
-        if ('' !== $prompt) {
-            $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
-            $classification['url_content'] = '' !== $existing ? $existing."\n\n".$prompt : $prompt;
-        }
-        $classification['jira_mcp_urls'] = $read->handledUrls();
-        $classification['jira_mcp_handled'] = $read->coversAll($urls);
+        $classification = $this->appendUrlContent($classification, $read->prompt());
+        $classification[$source.'_mcp_urls'] = $read->handledUrls();
+        $classification[$source.'_mcp_handled'] = $read->coversAll($urls);
         $classification['url_pages_read'] = (int) ($classification['url_pages_read'] ?? 0) + $read->successCount();
+
+        return $classification;
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function appendUrlContent(array $classification, string $text): array
+    {
+        if ('' === $text) {
+            return $classification;
+        }
+
+        $existing = is_string($classification['url_content'] ?? null) ? $classification['url_content'] : '';
+        $classification['url_content'] = '' !== $existing ? $existing."\n\n".$text : $text;
 
         return $classification;
     }
@@ -2021,14 +2026,7 @@ final readonly class MessageProcessor
 
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
     {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'metadata' => $metadata,
-                'timestamp' => microtime(true),
-            ]);
-        }
+        ProgressCallback::notify($callback, $status, $message, $metadata);
 
         $this->logger->info('MessageProcessor status', [
             'status' => $status,

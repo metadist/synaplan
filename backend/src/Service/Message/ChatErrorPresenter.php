@@ -7,6 +7,7 @@ namespace App\Service\Message;
 use App\AI\Exception\ChatFailureClassifier;
 use App\AI\Exception\ChatFailureReason;
 use App\AI\Exception\ProviderException;
+use App\Model\AccountLanguage;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -16,14 +17,6 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 final readonly class ChatErrorPresenter
 {
     private const DOMAIN = 'ai_errors';
-
-    /**
-     * Locales we ship catalogs for. Anything else falls back to English so
-     * an unknown `BLANG` never renders as a missing-key placeholder.
-     *
-     * @var list<string>
-     */
-    private const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'tr'];
 
     public function __construct(
         private TranslatorInterface $translator,
@@ -88,11 +81,15 @@ final readonly class ChatErrorPresenter
         return $this->classifier->classify($e);
     }
 
+    /**
+     * A catalog exists for every supported locale; anything else falls back to
+     * English so an unknown `BLANG` never renders as a missing-key placeholder.
+     */
     private function normalizeLocale(string $lang): string
     {
         $normalized = strtolower(substr(trim($lang), 0, 2));
 
-        return in_array($normalized, self::SUPPORTED_LOCALES, true) ? $normalized : 'en';
+        return in_array($normalized, AccountLanguage::SUPPORTED, true) ? $normalized : 'en';
     }
 
     private function buildAdminDiagnostics(\Throwable $e, string $lang): string

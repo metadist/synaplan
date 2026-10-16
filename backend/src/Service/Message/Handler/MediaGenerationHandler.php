@@ -9,7 +9,6 @@ use App\AI\Stream\StreamChunk;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
-use App\Message\ExtractMemoriesCommand;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Destination\RequestedFolderDelivery;
 use App\Service\File\ConversationFile;
@@ -25,9 +24,10 @@ use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Media\RenderedImageSize;
+use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\MediaPromptExtractor;
-use App\Service\Message\PerfPipelineFlag;
+use App\Service\Message\ProgressCallback;
 use App\Service\Message\TtsScriptGuard;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -36,7 +36,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Media Generation Handler.
@@ -61,8 +60,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private ThumbnailService $thumbnailService,
         private RateLimitService $rateLimitService,
         private MediaErrorMessageBuilder $errorMessageBuilder,
-        private MessageBusInterface $messageBus,
-        private PerfPipelineFlag $perfPipelineFlag,
+        private PendingMemoryExtraction $pendingMemoryExtraction,
         private MediaCancellationStore $cancellationStore,
         private MediaJobConfig $mediaJobConfig,
         private MediaJobService $mediaJobService,
@@ -150,7 +148,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         array $options = [],
     ): array {
         // Send initial status based on detected media type (will be refined later)
-        $this->notify($progressCallback, 'analyzing', 'Understanding your request...');
+        ProgressCallback::notify($progressCallback, 'analyzing', 'Understanding your request...');
 
         // Background memory extraction on the user's prompt is dispatched
         // further down, once the turn is confirmed to stay on the media path
@@ -240,7 +238,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
         if (null !== $editSource) {
             $attachedImagePaths[] = $editSource->absolutePath;
-            $this->notify($progressCallback, 'editing', 'Editing '.$editSource->displayName.'…', [
+            ProgressCallback::notify($progressCallback, 'editing', 'Editing '.$editSource->displayName.'…', [
                 'edit_source_file_id' => $editSource->fileId,
                 'edit_source_name' => $editSource->displayName,
             ]);
@@ -554,7 +552,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $statusMessage = "AI is crafting your $mediaTypeLabel with $providerName $modelName";
         // Structured fields let the client narrate this in the user's language
         // ("Generating your image with …") instead of echoing the English text.
-        $this->notify($progressCallback, 'generating', $statusMessage, [
+        ProgressCallback::notify($progressCallback, 'generating', $statusMessage, [
             'provider' => $provider,
             'model_name' => $modelName,
             'media_type' => $mediaTypeLabel,
@@ -668,7 +666,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     // render a live progress bar tagged to its node.
                     'progress_callback' => function (array $progress) use ($progressCallback): void {
                         $elapsed = $progress['elapsed_seconds'] ?? 0;
-                        $this->notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)", [
+                        ProgressCallback::notify($progressCallback, 'generating', "Generating video... ({$elapsed}s)", [
                             'provider_status' => $progress['status'] ?? 'processing',
                             'elapsed_seconds' => $elapsed,
                             'percent' => $progress['percent'] ?? null,
@@ -721,7 +719,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 if ([] !== $referenceImageUrls) {
                     $videoOptions['image_url'] = $referenceImageUrls[0];
                     $videoOptions['images'] = $referenceImageUrls;
-                    $this->notify($progressCallback, 'generating', 'Preparing your image for animation...');
+                    ProgressCallback::notify($progressCallback, 'generating', 'Preparing your image for animation...');
                     $this->logger->info('MediaGenerationHandler: Image-to-video source(s) prepared', [
                         'provider' => $provider,
                         'model' => $modelName,
@@ -832,7 +830,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 $responseText = '__AUDIO_GENERATED__';
                 $streamCallback($responseText);
 
-                $this->notify($progressCallback, 'generating', 'Audio generated successfully.');
+                ProgressCallback::notify($progressCallback, 'generating', 'Audio generated successfully.');
 
                 $audioMediaUsage = [
                     'characters' => $result['text_length'] ?? mb_strlen($prompt),
@@ -946,7 +944,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 throw new \Exception("Generated {$mediaType} has no URL. Check provider response format.");
             }
 
-            $this->notify($progressCallback, 'generating', 'Saving '.$mediaTypeLabel.'...');
+            ProgressCallback::notify($progressCallback, 'generating', 'Saving '.$mediaTypeLabel.'...');
 
             $localPath = null;
 
@@ -995,7 +993,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // Generate thumbnail for video files
             $thumbnailPath = null;
             if ('video' === $mediaType) {
-                $this->notify($progressCallback, 'generating', 'Creating video thumbnail...');
+                ProgressCallback::notify($progressCallback, 'generating', 'Creating video thumbnail...');
                 $thumbnailPath = $this->thumbnailService->generateThumbnail($localPath);
                 if ($thumbnailPath) {
                     $this->logger->info('MediaGenerationHandler: Video thumbnail generated', [
@@ -1025,7 +1023,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // Stream the response
             $streamCallback($responseText);
 
-            $this->notify($progressCallback, 'generating', ucfirst($mediaType).' generated successfully.');
+            ProgressCallback::notify($progressCallback, 'generating', ucfirst($mediaType).' generated successfully.');
 
             $mediaUsage = [];
             if ('image' === $mediaType) {
@@ -1541,7 +1539,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $chatOptions = $options;
         unset($chatOptions['resolved_prompt_data']);
 
-        $this->notify($progressCallback, 'analyzing', 'Answering your request…');
+        ProgressCallback::notify($progressCallback, 'analyzing', 'Answering your request…');
 
         $result = $this->chatHandler->handleStream($message, $thread, $chatClassification, $streamCallback, $progressCallback, $chatOptions);
         $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];
@@ -1719,18 +1717,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     }
 
     /**
-     * Dispatch a background memory-extraction job for the user's prompt
-     * text, when memory extraction is enabled for this user/request.
-     *
-     * Mirrors the gating in ChatHandler so the contract stays uniform:
-     *   - Widget / `disable_memories` requests skip extraction.
-     *   - User-disabled memories (`User::isMemoriesEnabled()`) skip.
-     *   - PERF.V2_PIPELINE kill-switch skip.
-     *   - Empty user text skip (nothing to extract from).
-     *
-     * The actual extraction LLM call + Qdrant writes happen on the
-     * messenger worker — same async queue ChatHandler uses — so a failure
-     * here NEVER blocks media generation for the user.
+     * Queue the memory job for the user's prompt, gated like a chat turn
+     * (incognito, widget / `disable_memories`, the user's own setting, the
+     * PERF.V2_PIPELINE switch). A media turn's answer is the asset itself, so
+     * the extractor gets an empty answer and reads the user turns only.
      */
     private function maybeDispatchMemoryExtraction(
         Message $message,
@@ -1738,115 +1728,31 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         array $classification,
         array $options,
     ): void {
-        $userText = trim($message->getText());
-        if ('' === $userText) {
+        if ('' === trim($message->getText())) {
             return;
         }
 
-        // Incognito: memories are read-only — extraction would persist
-        // conversation content, which the mode forbids.
-        if (!empty($options['incognito'])) {
-            $this->logger->debug('MediaGenerationHandler: Skipping memory extraction (incognito)', [
-                'user_id' => $message->getUserId(),
-            ]);
-
-            return;
-        }
-
-        $memoriesDisabledByRequest = !empty($options['disable_memories'])
+        $incognito = !empty($options['incognito']);
+        $disabledByRequest = !empty($options['disable_memories'])
             || ('WIDGET' === ($options['channel'] ?? null))
             || ('widget' === ($classification['source'] ?? null))
             || !empty($classification['is_widget_mode']);
 
-        if ($memoriesDisabledByRequest) {
-            $this->logger->debug('MediaGenerationHandler: Skipping memory extraction (widget/disabled)', [
-                'user_id' => $message->getUserId(),
-            ]);
-
-            return;
+        $disabledByUser = false;
+        if (!$incognito && !$disabledByRequest) {
+            $user = $this->em->getRepository(User::class)->find($message->getUserId());
+            $disabledByUser = !$user || !$user->isMemoriesEnabled();
         }
 
-        $userId = $message->getUserId();
-        $user = $this->em->getRepository(User::class)->find($userId);
-        if (!$user || !$user->isMemoriesEnabled()) {
-            return;
-        }
-
-        if (!$this->perfPipelineFlag->isEnabled($userId)) {
-            $this->logger->debug('MediaGenerationHandler: PERF.V2_PIPELINE disabled, skipping memory extraction', [
-                'user_id' => $userId,
-            ]);
-
-            return;
-        }
-
-        try {
-            $threadSnapshot = $this->normalizeThreadForQueue($thread);
-
-            // Media generation does not produce a textual assistant
-            // response that's useful for memory extraction — the
-            // response is the generated asset itself. Pass an empty
-            // aiResponse so the extractor only looks at the user
-            // turn(s), which is exactly what we want.
-            $this->messageBus->dispatch(new ExtractMemoriesCommand(
-                messageId: $message->getId(),
-                userId: $userId,
-                aiResponse: '',
-                threadSnapshot: $threadSnapshot,
-            ));
-
-            $this->logger->info('MediaGenerationHandler: Dispatched ExtractMemoriesCommand', [
-                'message_id' => $message->getId(),
-                'user_id' => $userId,
-                'thread_length' => count($threadSnapshot),
-            ]);
-        } catch (\Throwable $e) {
-            // Never block media generation on a queue dispatch hiccup.
-            $this->logger->warning('MediaGenerationHandler: Failed to dispatch ExtractMemoriesCommand', [
-                'message_id' => $message->getId(),
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    /**
-     * Flatten the thread (Message entities + plain arrays) into a JSON-
-     * serialisable shape for the messenger queue.
-     *
-     * Doctrine entities cannot survive the queue boundary; the extractor
-     * only needs `role`+`content` so we reduce to that. Mirrors the
-     * implementation in PendingMemoryExtraction::normalizeThreadForQueue() — kept in
-     * sync but duplicated to avoid leaking a private helper across
-     * handler classes.
-     *
-     * @param array<int, mixed> $thread
-     *
-     * @return array<int, array{role: string, content: string}>
-     */
-    private function normalizeThreadForQueue(array $thread): array
-    {
-        $out = [];
-        foreach ($thread as $entry) {
-            if ($entry instanceof Message) {
-                $out[] = [
-                    'role' => 'IN' === $entry->getDirection() ? 'user' : 'assistant',
-                    'content' => $entry->getText(),
-                ];
-                continue;
-            }
-
-            if (is_array($entry)) {
-                $role = (string) ($entry['role'] ?? 'user');
-                $content = $entry['content'] ?? '';
-                if (!is_string($content)) {
-                    $encoded = json_encode($content);
-                    $content = false === $encoded ? '' : $encoded;
-                }
-                $out[] = ['role' => $role, 'content' => $content];
-            }
-        }
-
-        return $out;
+        $this->pendingMemoryExtraction->dispatch($this->pendingMemoryExtraction->build(
+            $message,
+            '',
+            $thread,
+            [],
+            $disabledByRequest,
+            $disabledByUser,
+            incognito: $incognito,
+        ));
     }
 
     /**
@@ -1921,7 +1827,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         if ($this->mediaJobService->countActiveForUser($effectiveUserId) >= $maxActive) {
             $limitMessage = $this->errorMessageBuilder->buildTooManyJobsMessage($lang);
             $streamCallback($limitMessage);
-            $this->notify($progressCallback, 'error', $limitMessage);
+            ProgressCallback::notify($progressCallback, 'error', $limitMessage);
             $this->logger->info('MediaGenerationHandler: media job rejected — per-user concurrency limit reached', [
                 'user_id' => $effectiveUserId,
                 'limit' => $maxActive,
@@ -1990,7 +1896,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $this->mediaJobMessageSync->syncTerminalState($job);
 
             $streamCallback($errorMessage);
-            $this->notify($progressCallback, 'error', $errorMessage, [
+            ProgressCallback::notify($progressCallback, 'error', $errorMessage, [
                 'media_job' => [
                     'job_id' => $job->getJobKey(),
                     'type' => $type,
@@ -2036,7 +1942,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // banner (MediaJobStatus) and persists this marker so reloads are not empty.
         $streamCallback($this->generatingTokenFor($type));
 
-        $this->notify($progressCallback, 'generating', 'Media generation started in the background.', [
+        ProgressCallback::notify($progressCallback, 'generating', 'Media generation started in the background.', [
             'media_job' => $mediaJob,
         ]);
 
@@ -2277,18 +2183,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
         // Image providers bill per generated image.
         return ['images' => 1];
-    }
-
-    private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
-    {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'metadata' => $metadata,
-                'timestamp' => time(),
-            ]);
-        }
     }
 
     /**

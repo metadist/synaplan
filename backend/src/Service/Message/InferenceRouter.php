@@ -59,7 +59,7 @@ final class InferenceRouter
     ): array {
         $intent = $classification['intent'] ?? 'chat';
 
-        $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
+        ProgressCallback::notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
         // Find the handler for this intent
         $handler = $this->getHandler($intent);
@@ -75,14 +75,14 @@ final class InferenceRouter
                     ->handle($message, $thread, $rerouted, $progressCallback, $options);
             }
 
-            $this->notify($progressCallback, 'processing', "Handler complete: {$intent}");
+            ProgressCallback::notify($progressCallback, 'processing', "Handler complete: {$intent}");
 
             return $result;
         } catch (\Exception $e) {
             $this->logger->error("Handler failed: {$e->getMessage()}");
 
             if ($this->shouldFallbackToChat($intent)) {
-                $this->notify($progressCallback, 'processing', 'Falling back to chat handler');
+                ProgressCallback::notify($progressCallback, 'processing', 'Falling back to chat handler');
 
                 return $this->handlers['chat']->handle($message, $thread, $classification, $progressCallback, $options);
             }
@@ -111,7 +111,7 @@ final class InferenceRouter
             'available_handlers' => array_keys($this->handlers),
         ]);
 
-        $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
+        ProgressCallback::notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
         // Find the handler for this intent
         $handler = $this->getHandler($intent);
@@ -133,14 +133,14 @@ final class InferenceRouter
                     ->handleStream($message, $thread, $rerouted, $streamCallback, $progressCallback, $options);
             }
 
-            $this->notify($progressCallback, 'processing', "Handler complete: {$intent}");
+            ProgressCallback::notify($progressCallback, 'processing', "Handler complete: {$intent}");
 
             return $result;
         } catch (\Exception $e) {
             $this->logger->error("Handler streaming failed: {$e->getMessage()}");
 
             if ($this->shouldFallbackToChat($intent)) {
-                $this->notify($progressCallback, 'processing', 'Falling back to chat handler');
+                ProgressCallback::notify($progressCallback, 'processing', 'Falling back to chat handler');
 
                 return $this->handlers['chat']->handleStream($message, $thread, $classification, $streamCallback, $progressCallback, $options);
             }
@@ -175,7 +175,7 @@ final class InferenceRouter
         if (RoutingDirective::TYPE_RECLASSIFY === $directive->type) {
             $this->logger->info('InferenceRouter: Routing deferral could not be honoured — reclassifying via the AI sorter');
 
-            $this->notify($progressCallback, 'processing', 'Classifying request...');
+            ProgressCallback::notify($progressCallback, 'processing', 'Classifying request...');
 
             // Transient keys the pipeline attached earlier (search results,
             // fetched URL content, prompt metadata, widget model override) are
@@ -201,7 +201,7 @@ final class InferenceRouter
             'fields' => $directive->fields,
         ]);
 
-        $this->notify($progressCallback, 'processing', "Routing to handler: {$topic}");
+        ProgressCallback::notify($progressCallback, 'processing', "Routing to handler: {$topic}");
 
         return array_merge(
             $classification,
@@ -245,16 +245,5 @@ final class InferenceRouter
         }
 
         return $this->handlers[$handlerName];
-    }
-
-    private function notify(?callable $callback, string $status, string $message): void
-    {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'timestamp' => time(),
-            ]);
-        }
     }
 }

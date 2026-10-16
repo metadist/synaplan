@@ -273,8 +273,10 @@ final class RoutingCharacterizationTest extends TestCase
             $sorter->method('classify')->willReturn($case['sorter']);
         }
 
+        $modelConfig = $this->createMock(ModelConfigService::class);
         $em = $this->createMock(EntityManagerInterface::class);
         if (isset($case['modelTag'])) {
+            $modelConfig->method('getModelTag')->willReturn($case['modelTag']);
             $model = $this->createMock(Model::class);
             $model->method('getTag')->willReturn($case['modelTag']);
             $repo = $this->createMock(EntityRepository::class);
@@ -308,7 +310,7 @@ final class RoutingCharacterizationTest extends TestCase
         $classifier = new MessageClassifier(
             $sorter,
             $metaRepo,
-            $this->createMock(ModelConfigService::class),
+            $modelConfig,
             $configRepo,
             $em,
             $this->createMock(LoggerInterface::class),

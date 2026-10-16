@@ -106,9 +106,9 @@ final readonly class MessagePreProcessor
         ]);
 
         if ($hasLegacyFile) {
-            $this->notify($progressCallback, 'preprocessing', 'Processing file...');
+            ProgressCallback::notify($progressCallback, 'preprocessing', 'Processing file...');
             $this->processFile($message);
-            $this->notify($progressCallback, 'preprocessing', 'File processing complete.');
+            ProgressCallback::notify($progressCallback, 'preprocessing', 'File processing complete.');
         }
 
         // Process new multiple files (File entities)
@@ -117,7 +117,7 @@ final readonly class MessagePreProcessor
                 'count' => $messageFiles->count(),
             ]);
 
-            $this->notify($progressCallback, 'preprocessing', "Processing {$messageFiles->count()} file(s)...");
+            ProgressCallback::notify($progressCallback, 'preprocessing', "Processing {$messageFiles->count()} file(s)...");
             $processed = 0;
             foreach ($messageFiles as $messageFile) {
                 $this->logger->info('PreProcessor: Processing file', [
@@ -127,9 +127,9 @@ final readonly class MessagePreProcessor
 
                 $this->processMessageFile($messageFile, $message);
                 ++$processed;
-                $this->notify($progressCallback, 'preprocessing', "Processed $processed/{$messageFiles->count()} files");
+                ProgressCallback::notify($progressCallback, 'preprocessing', "Processed $processed/{$messageFiles->count()} files");
             }
-            $this->notify($progressCallback, 'preprocessing', 'All files processed.');
+            ProgressCallback::notify($progressCallback, 'preprocessing', 'All files processed.');
 
             // CRITICAL: Persist changes to File entities!
             // Incognito/transient messages (id === null) must NEVER be
@@ -691,16 +691,5 @@ final readonly class MessagePreProcessor
         }
 
         $message->setMeta('ai_transcription_usage', (string) json_encode($usage));
-    }
-
-    private function notify(?callable $callback, string $status, string $message): void
-    {
-        if ($callback) {
-            $callback([
-                'status' => $status,
-                'message' => $message,
-                'timestamp' => time(),
-            ]);
-        }
     }
 }
