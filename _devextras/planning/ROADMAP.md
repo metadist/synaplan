@@ -73,6 +73,7 @@ Still finishing from before the window:
 | - | ----- | ---- | ----- |
 | 14 | **App accounts** — apps like SISmass create Synaplan accounts for their customers (AA1–AA8) | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | Plan only. |
 | 15 | **Config pyramid** | [`20260907-config-pyramid/`](./20260907-config-pyramid/STATUS.md) | §0 checklist unticked. |
+| 18 | **Out-of-process plugins** — tools and plugins in Python, Node.js and Go: MCP servers administrators add for everyone (organisation network, signed identity), then plugins that are a manifest plus a service, then isolated views (OP0–OP14, three phases) | [`20261016-out-of-process-plugins/`](./20261016-out-of-process-plugins/00_master_plan.md) | Plan only (2026-10-16); §0 unticked. The OP0 spike proved Synaplan's `McpClient` works unchanged with the official Python, Node.js and Go SDKs; what blocks a developer is the SSRF policy and packaging ([`STATUS.md`](./20261016-out-of-process-plugins/STATUS.md)). |
 
 Also open and tracked in [`20260913-use-case-research/README.md`](./20260913-use-case-research/README.md) §5,
 not as separate tracks: Q2 calendar reminders, Q3 honest "into Outlook"
@@ -132,6 +133,7 @@ mirrors this table.
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/00_master_plan.md) | Collabora epics 0–4 | queued (row 13, partner) |
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts AA1–AA8 | not started (row 14) |
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/00_master_plan.md) | Config pyramid | not started (row 15) |
+| [`20261016-out-of-process-plugins/`](./20261016-out-of-process-plugins/00_master_plan.md) | Tools and plugins in Python, Node.js and Go, out of process | not started (row 18) |
 
 ---
 
@@ -203,3 +205,4 @@ This file is the overview. It does not replace track STATUS files.
 | 2026-10-15 | `20260903_more_nextcloud/` stays live although S3 is absorbed by row 9: cloud file sharing still links to it, CF0.6 corrects its STATUS, and the pairing-code fallback stays in its S3. |
 | 2026-10-15 | **The UX contract leaves the planning directory.** Its plan parts were done (IAM-UX shipped in #1726; its §5 journeys belong to archived tracks, except J-CP and J-NC), but U1–U12 is a standing rule set that AGENTS.md cites. The rules move to `docs/UX_CONTRACT.md` with the same section numbers; the dated file and its wireframes go to the archive. Live plans that cite "UX contract §4.x / §6 / §8" keep meaning the same text; citations of §5 journeys and of a wireframe point into the archive. |
 | 2026-10-15 | **Code cleanup V3 added as row 17**, after the window closed. An audit of `main` after V2 found the chat path continuing below `ChatStreamOrchestrator` into `MessageProcessor` (2,111 lines, 21 deps) and handlers of ~2,000 lines, with the buffered / streamed twins and copied helpers V2 removed one layer up. At the owner's request V3 splits `MessageProcessor` now instead of when a feature opens it (superseding that part of the window-closed entry above), fixes three bad ideas only (copied helpers, twin pipelines, hand-wired lists) and orders the other findings as V4 (V3 §7). Implemented the same day; in review as [#2512](https://github.com/metadist/synaplan/pull/2512) → [#2513](https://github.com/metadist/synaplan/pull/2513) → [#2514](https://github.com/metadist/synaplan/pull/2514). |
+| 2026-10-16 | **Out-of-process plugins registered as row 18** (not started) from the research question "could a Python developer add a tool, written in Python, Node.js or Go?". Answer: as an MCP tool yes — the OP0 spike ran Synaplan's real `McpClient` unchanged against servers built with the official Python, Node.js and Go SDKs — but not as a plugin: the SSRF guard refuses internal addresses, MCP connections are per person, and a manifest cannot declare a service. The plan keeps PHP plugins as they are and adds an out-of-process path (MCP for tools, a manifest plus a service for plugins, isolated views); it replaces the open-plugin-platform trust model (curation only) for code in other languages. Position among rows 8–15 is the owner's call. |
