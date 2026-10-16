@@ -6,8 +6,6 @@ namespace App\Tests\Integration\Service\Iam;
 
 use App\Entity\Approval;
 use App\Entity\ChatSummary;
-use App\Entity\ComputeRun;
-use App\Entity\ComputeWorkspace;
 use App\Entity\DesktopDevice;
 use App\Entity\DesktopJob;
 use App\Entity\DocumentRevision;
@@ -29,7 +27,7 @@ final class UserErasureCoverageTest extends KernelTestCase
     private const ORDER = [
         'AccessCredentialsEraser', 'ConnectionEraser', 'KnowledgeEraser', 'UsageLogEraser', 'WidgetEraser',
         'ShareEraser', 'AgentEraser', 'SavedTaskEraser', 'ConversationEraser', 'FileEraser',
-        'InboxEraser', 'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'MemoryEraser',
+        'ComputeEraser', 'InboxEraser', 'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'MemoryEraser',
         'IdentityEraser', 'CredentialEraser',
     ];
 
@@ -43,8 +41,6 @@ final class UserErasureCoverageTest extends KernelTestCase
     public const NOT_ERASED_YET = [
         Approval::class,
         ChatSummary::class,
-        ComputeRun::class,
-        ComputeWorkspace::class,
         DesktopDevice::class,
         DesktopJob::class,
         DocumentRevision::class,

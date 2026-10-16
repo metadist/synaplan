@@ -24,6 +24,16 @@ class ComputeRunRepository extends ServiceEntityRepository
         $this->getEntityManager()->flush();
     }
 
+    public function deleteByUser(int $userId): void
+    {
+        $this->createQueryBuilder('r')
+            ->delete()
+            ->where('r.userId = :userId')
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->execute();
+    }
+
     public function findQueuedByApproval(int $approvalId): ?ComputeRun
     {
         $found = $this->findOneBy([
