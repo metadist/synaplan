@@ -241,7 +241,7 @@ final readonly class MessageClassifier
         if ($modelOverride && !$promptOverride) {
             // "Again" with model but no prompt override
             // Detect model type from model tag and set topic accordingly
-            $modelTag = $this->getModelTag($modelOverride);
+            $modelTag = $this->modelConfigService->getModelTag($modelOverride) ?? 'chat';
             $topic = $this->mapModelTagToTopic($modelTag, $message->getTopic());
             $intent = $this->mapTopicToIntent($topic);
 
@@ -841,22 +841,9 @@ final readonly class MessageClassifier
      */
     private function checkPromptOverride(?int $messageId): ?string
     {
-        // Transient (incognito) messages are never persisted, so no PROMPTID
-        // meta can exist for them — nothing to override.
-        if (null === $messageId) {
-            return null;
-        }
+        $promptId = $this->againOverride($messageId, 'PROMPTID');
 
-        $meta = $this->messageMetaRepository->findOneBy([
-            'messageId' => $messageId,
-            'metaKey' => 'PROMPTID',
-        ]);
-
-        if ($meta && !empty($meta->getMetaValue()) && 'tools:sort' !== $meta->getMetaValue()) {
-            return $meta->getMetaValue();
-        }
-
-        return null;
+        return 'tools:sort' === $promptId ? null : $promptId;
     }
 
     /**
@@ -865,22 +852,27 @@ final readonly class MessageClassifier
      */
     private function checkModelOverride(?int $messageId): ?int
     {
-        // Transient (incognito) messages are never persisted, so no MODEL_ID
-        // meta can exist for them — nothing to override.
+        $modelId = $this->againOverride($messageId, 'MODEL_ID');
+
+        return null === $modelId ? null : (int) $modelId;
+    }
+
+    /**
+     * The non-empty meta an Again request stored on the message. Transient
+     * (incognito) messages are never persisted, so they carry no override.
+     */
+    private function againOverride(?int $messageId, string $metaKey): ?string
+    {
         if (null === $messageId) {
             return null;
         }
 
-        $meta = $this->messageMetaRepository->findOneBy([
+        $value = $this->messageMetaRepository->findOneBy([
             'messageId' => $messageId,
-            'metaKey' => 'MODEL_ID',
-        ]);
+            'metaKey' => $metaKey,
+        ])?->getMetaValue();
 
-        if ($meta && !empty($meta->getMetaValue())) {
-            return (int) $meta->getMetaValue();
-        }
-
-        return null;
+        return empty($value) ? null : $value;
     }
 
     /**
@@ -1100,19 +1092,6 @@ final readonly class MessageClassifier
         ];
 
         return $aliasToIntent[$topic] ?? Capability::Chat->value;
-    }
-
-    /**
-     * Get model tag (capability) from model ID.
-     */
-    private function getModelTag(int $modelId): string
-    {
-        $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
-        if ($model) {
-            return $model->getTag();
-        }
-
-        return 'chat'; // fallback
     }
 
     /**
@@ -1618,11 +1597,11 @@ final readonly class MessageClassifier
         //     message references a document or its structure. This covers
         //     multi-message editing where normal chat is interleaved between
         //     edits ("...kannst du in der Datei den Titel ändern").
-        if ($this->lastAssistantGeneratedFile($conversationHistory)) {
+        if ($this->lastAssistantTurnIs($conversationHistory, self::isGeneratedFileMessage(...))) {
             return false;
         }
 
-        if ($this->threadHasGeneratedFile($conversationHistory)
+        if ($this->anyAssistantTurnIs($conversationHistory, self::isGeneratedFileMessage(...))
             && $this->mentionsDocumentReference($trimmed)) {
             return false;
         }
@@ -1633,11 +1612,11 @@ final readonly class MessageClassifier
         // image generation missed every trigger below and was shortcut to
         // `general`, where the chat model can only talk about the picture
         // instead of editing it.
-        if ($this->lastAssistantGeneratedMedia($conversationHistory)) {
+        if ($this->lastAssistantTurnIs($conversationHistory, self::isGeneratedMediaMessage(...))) {
             return false;
         }
 
-        if ($this->threadHasGeneratedMedia($conversationHistory)
+        if ($this->anyAssistantTurnIs($conversationHistory, self::isGeneratedMediaMessage(...))
             && $this->mentionsMediaReference($trimmed)) {
             return false;
         }
@@ -1774,38 +1753,32 @@ final readonly class MessageClassifier
     }
 
     /**
-     * Whether the most recent assistant turn in the thread produced a generated
-     * file (its stored content is the "__FILE_GENERATED__:filename" marker).
+     * Whether the most recent assistant turn passes $check. Only the latest
+     * assistant message counts, so a deferral is limited to the turn directly
+     * following the generation.
      *
-     * Only the latest assistant message is considered so the deferral is
-     * limited to the turn directly following a file generation.
-     *
-     * @param array<int, Message> $conversationHistory oldest-first thread
+     * @param array<int, Message>     $conversationHistory oldest-first thread
+     * @param callable(Message): bool $check
      */
-    private function lastAssistantGeneratedFile(array $conversationHistory): bool
+    private function lastAssistantTurnIs(array $conversationHistory, callable $check): bool
     {
         for ($i = count($conversationHistory) - 1; $i >= 0; --$i) {
-            $msg = $conversationHistory[$i];
-            if ('OUT' !== $msg->getDirection()) {
-                continue;
+            if ('OUT' === $conversationHistory[$i]->getDirection()) {
+                return $check($conversationHistory[$i]);
             }
-
-            return str_starts_with((string) $msg->getText(), '__FILE_GENERATED__:');
         }
 
         return false;
     }
 
     /**
-     * Whether any assistant turn in the thread produced a generated file.
-     *
-     * @param array<int, Message> $conversationHistory
+     * @param array<int, Message>     $conversationHistory
+     * @param callable(Message): bool $check
      */
-    private function threadHasGeneratedFile(array $conversationHistory): bool
+    private function anyAssistantTurnIs(array $conversationHistory, callable $check): bool
     {
         foreach ($conversationHistory as $msg) {
-            if ('OUT' === $msg->getDirection()
-                && str_starts_with((string) $msg->getText(), '__FILE_GENERATED__:')) {
+            if ('OUT' === $msg->getDirection() && $check($msg)) {
                 return true;
             }
         }
@@ -1813,47 +1786,17 @@ final readonly class MessageClassifier
         return false;
     }
 
-    /**
-     * Whether the most recent assistant turn produced a picture or a video.
-     *
-     * Generated media is stored on the message itself (BFILEPATH/BFILETYPE),
-     * not behind the `__FILE_GENERATED__:` marker used for office documents,
-     * so it needs its own probe. Only the latest assistant message counts, for
-     * the same reason as {@see lastAssistantGeneratedFile()}.
-     *
-     * @param array<int, Message> $conversationHistory oldest-first thread
-     */
-    private function lastAssistantGeneratedMedia(array $conversationHistory): bool
+    /** An office document: its stored content is the "__FILE_GENERATED__:filename" marker. */
+    private static function isGeneratedFileMessage(Message $message): bool
     {
-        for ($i = count($conversationHistory) - 1; $i >= 0; --$i) {
-            $msg = $conversationHistory[$i];
-            if ('OUT' !== $msg->getDirection()) {
-                continue;
-            }
-
-            return $this->isGeneratedMediaMessage($msg);
-        }
-
-        return false;
+        return str_starts_with((string) $message->getText(), '__FILE_GENERATED__:');
     }
 
     /**
-     * Whether any assistant turn in the thread produced a picture or a video.
-     *
-     * @param array<int, Message> $conversationHistory
+     * A picture or a video. Generated media rides the message's own file path
+     * (BFILEPATH/BFILETYPE), not the `__FILE_GENERATED__:` marker.
      */
-    private function threadHasGeneratedMedia(array $conversationHistory): bool
-    {
-        foreach ($conversationHistory as $msg) {
-            if ('OUT' === $msg->getDirection() && $this->isGeneratedMediaMessage($msg)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function isGeneratedMediaMessage(Message $message): bool
+    private static function isGeneratedMediaMessage(Message $message): bool
     {
         $path = $message->getFilePath();
         if ('' === $path) {
@@ -1870,7 +1813,7 @@ final readonly class MessageClassifier
      * Whether the message refers to a picture or one of its visual properties.
      *
      * The media sibling of {@see mentionsDocumentReference()}, used together
-     * with {@see threadHasGeneratedMedia()} to catch edits that span several
+     * with {@see isGeneratedMediaMessage()} earlier in the thread to catch edits that span several
      * turns ("und jetzt die Farbe ändern"). Kept deliberately visual so normal
      * chat rarely matches; a false positive costs one extra AI-sorter call.
      */
@@ -1887,7 +1830,7 @@ final readonly class MessageClassifier
     /**
      * Whether the message refers to a document or one of its structural parts.
      *
-     * Used together with {@see threadHasGeneratedFile()} to detect document
+     * Used together with {@see isGeneratedFileMessage()} earlier in the thread to detect document
      * edits that span multiple turns. The noun list is intentionally
      * document-specific to keep false positives in normal chat low; the worst
      * case of a false positive is one extra AI-sorter call.

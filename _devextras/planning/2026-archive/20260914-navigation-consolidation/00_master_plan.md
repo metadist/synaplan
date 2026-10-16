@@ -2,7 +2,7 @@
 
 > **Replaced 2026-10-09, archived 2026-10-14:** the open steps NV10–NV23
 > are superseded by
-> [`../../20261009-ux-overhaul/00_master_plan.md`](../../20261009-ux-overhaul/00_master_plan.md).
+> [`../20261009-ux-overhaul/00_master_plan.md`](../20261009-ux-overhaul/00_master_plan.md).
 > NV01–NV09 stay as shipped history.
 
 **Status:** 2026-09-16 — Sprint A NV01–NV07 **merged** on `main`
@@ -12,7 +12,7 @@ See **§8 Handoff**.
 **Input:** Confluence *20260914 - Navigation Tree (Status)* (115 rows, handles
 `W001`…`X013`, generated from `synaplan@af15fdc89`). Its §6 "Observations" is
 the cherry-pick list for this plan.
-**Binding contracts:** [`../20260907_ux_user_flows.md`](../../20260907_ux_user_flows.md)
+**Binding contracts:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 (U1–U12, §6 sprint-file contract) and AGENTS.md "Perfect UX & Stability".
 **Owner of the surface:** frontend shell (`useNavItems.ts`, `router/index.ts`,
 `SidebarV2.vue`, `MobileNav.vue`) plus the Operate pages.

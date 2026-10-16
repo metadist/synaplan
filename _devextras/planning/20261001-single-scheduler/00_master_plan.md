@@ -6,7 +6,7 @@ review (§9). **No code until §0 is ticked.**
 `_docker/backend/lib/container-runtime.sh` — on every install, including
 production. Slow jobs never hold up fast ones, a restart never repeats a
 daily job, and production alerts when jobs stop running.
-**Binding contracts:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**Binding contracts:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)
 (U1–U12) and AGENTS.md "Perfect UX & Stability".
 
 Four changes, in this order:

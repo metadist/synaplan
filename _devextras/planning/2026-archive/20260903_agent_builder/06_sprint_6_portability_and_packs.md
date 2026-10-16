@@ -7,7 +7,7 @@
 **Unlocks:** track 3 (`model_preferences` section), track 4 (`mcp_servers`, `custom_tools`, `saved_tasks` sections), the connections owner (`connections`). **This file is the reference those sprint files cite (§3.1).**
 **Repos:** `synaplan/` only. **Class:** `backend-only` + `ota-candidate`.
 **Flag:** `AGENTS.ENABLED` gates the `agents` section, the alias and the MCP tool; the bundle endpoints themselves are gated by `BUNDLE.ENABLED` (seeded `0`) so later tracks can ship sections while assistants stay off on an install.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-AB-6. Settings → Export & import is one file and one sentence of
 what is in it. Import checklist uses "needs a model" / "needs a
 key" — never catalog keys as the only text. Empty checklist ⇒

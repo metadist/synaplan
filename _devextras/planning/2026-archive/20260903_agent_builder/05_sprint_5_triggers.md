@@ -8,7 +8,7 @@ Formerly "Tasks and channels" — renamed 2026-09-07 (master plan decision 15).
 **Unlocks:** S6 (`triggers` is part of the exported definition; the `api` / `mcp` / `desktop` event kinds join the picker there), track 4 S5 (the `webhook` event kind and the workflow builder's "assistant" step).
 **Repos:** `synaplan/` only. **Class:** `backend-only` + `ota-candidate`.
 **Flag:** `AGENTS.ENABLED`; schedules and the mail **rule** additionally require the Saved Tasks flag (`SavedTaskConfig::isEnabled($ownerId)`) — off ⇒ the Schedule group and the rule option are absent (U11), stored entries stay in the definition and are not materialised.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) J-AB-5 and J-AB-7; wireframe [`../20260907_ux_user_flows/assistant-triggers.md`](../20260907_ux_user_flows/assistant-triggers.md). Words: Trigger · Event · Schedule · Runs on its own (five locales fixed there). Banned in primary copy: `cron` (outside Advanced), `binding`, `channel`, `topic`, `task template`, `webhook` (outside its own row).
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) J-AB-5 and J-AB-7; wireframe [`../20260907_ux_user_flows/assistant-triggers.md`](../20260907_ux_user_flows/assistant-triggers.md). Words: Trigger · Event · Schedule · Runs on its own (five locales fixed there). Banned in primary copy: `cron` (outside Advanced), `binding`, `channel`, `topic`, `task template`, `webhook` (outside its own row).
 
 ---
 

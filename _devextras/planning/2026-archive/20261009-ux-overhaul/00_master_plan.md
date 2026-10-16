@@ -1,8 +1,21 @@
 # UX overhaul — navigation, every sub page, guided tours
 
+> **Archived 2026-10-15.** UX01–UX14 shipped in one pull request,
+> [#2431](https://github.com/metadist/synaplan/pull/2431) (2026-10-09), on
+> top of the shell slices [#2352](https://github.com/metadist/synaplan/pull/2352)
+> and [#2375](https://github.com/metadist/synaplan/pull/2375); the tour
+> follow-up is [#2452](https://github.com/metadist/synaplan/pull/2452). The
+> rail, the Apps directory, the new routes with their redirects, tours, the
+> getting-started checklist, the wording guard and the
+> `docs/FRONTEND_CONVENTIONS.md` sections are on `main`, and J-UX-1…5 run
+> as `@ci` journeys (`frontend/tests/e2e/tests/ux-journeys.spec.ts`). The
+> track never got a `STATUS.md`, so the UX14 exit "J-UX-1 walked from a
+> fresh database" has no dated walk entry. That walk is listed with the
+> other walk leftovers in `ROADMAP.md` row 12, not here.
+
 **Status:** 2026-10-09 — opened. Replaces the open steps NV10–NV23 of
-[`../20260914-navigation-consolidation/00_master_plan.md`](../2026-archive/20260914-navigation-consolidation/00_master_plan.md).
-**Binding contracts:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+[`../20260914-navigation-consolidation/00_master_plan.md`](../20260914-navigation-consolidation/00_master_plan.md).
+**Binding contracts:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 (U1–U12, §6 sprint-file contract) and AGENTS.md "Perfect UX & Stability".
 **Class:** every step is `ota-candidate` unless marked `backend-only`.
 **Shell:** colours, the rail and the second sidebar stay. Only the tree and

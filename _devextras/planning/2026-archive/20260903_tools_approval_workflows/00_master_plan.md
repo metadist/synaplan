@@ -21,7 +21,7 @@ inbox) and Manage → Connections (custom tools live beside MCP servers).
   `AI/OpenAI/OpenAiGatewayToolLoop.php`, `Service/Document/Tool/*`
 - [`../20260903_secure_compute/00_master_plan.md`](../20260903_secure_compute/00_master_plan.md)
   — `code_run` is a write-class tool governed by this track's policy
-- [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) — binding
+- [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) — binding
   user-flow contract. Approvals and custom tools follow J-TL-1…5.
   Wireframe:
   [`../20260907_ux_user_flows/approval-and-inbox.md`](../20260907_ux_user_flows/approval-and-inbox.md).
@@ -200,7 +200,7 @@ This track asks a person to **decide** while the product is acting.
 A card nobody understands, or an inbox nobody can find after they
 close the tab, is a liability — the same class of miss as sharing
 without Incoming chats. Binding journeys J-TL-1…5 and U1–U12:
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §5.4.
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §5.4.
 
 | Surface | Change | Class |
 | ------- | ------ | ----- |

@@ -5,7 +5,7 @@ goes. Two checks keep the shape: deptrac enforces the layers, and the size
 ratchet keeps classes and methods small. Both run in `make ci-local` and CI.
 
 The request paths below were "god classes" until the code cleanup V2 sprint
-(`_devextras/planning/20261014-code-cleanup-V2/`). The runtime config and the
+(`_devextras/planning/2026-archive/20261014-code-cleanup-V2/`). The runtime config and the
 chat turn sections describe the code of [#2498](https://github.com/metadist/synaplan/pull/2498)
 and [#2499](https://github.com/metadist/synaplan/pull/2499).
 

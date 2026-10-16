@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Message;
 
+use App\Model\AccountLanguage;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -23,9 +24,6 @@ final readonly class GeneratedMediaTextRenderer
     public const MARKER_FILE_FAILED = '__FILE_GENERATION_FAILED__';
 
     private const DOMAIN = 'generated_media';
-
-    /** @var list<string> */
-    private const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'tr'];
 
     public function __construct(
         private TranslatorInterface $translator,
@@ -220,7 +218,7 @@ final readonly class GeneratedMediaTextRenderer
                 continue;
             }
             $normalized = strtolower(substr($candidate, 0, 2));
-            if (in_array($normalized, self::SUPPORTED_LOCALES, true)) {
+            if (in_array($normalized, AccountLanguage::SUPPORTED, true)) {
                 return $normalized;
             }
         }

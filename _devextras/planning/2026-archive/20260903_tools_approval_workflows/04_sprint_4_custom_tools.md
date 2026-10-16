@@ -12,7 +12,7 @@ registers. Master plan §0 rows 7, 8, 12; §4.4; §12 rows 8, 9.
 **Unlocks:** S5 (a tool is a workflow step); a plugin-free integration path for customers.
 **Repos:** `synaplan/` only.
 **Flag:** `TOOLS.CUSTOM_HTTP_ENABLED` (default off). Off ⇒ `CustomToolSource` returns `[]`, `/api/v1/tools/custom*` 404, no nav tab.
-**User-flow:** [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md)
+**User-flow:** [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md)
 J-TL-4. Empty tab: one sentence + **Add a tool** / **Import from a
 description**. Class in plain words. Try it never sends a write.
 **Share waits on IAM-UX** and uses the kind-specific consequence

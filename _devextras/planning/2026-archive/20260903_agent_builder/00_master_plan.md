@@ -19,7 +19,7 @@ replaces the current **Instructions** page; the gallery is a new child.
 - [`../20260903_iam/00_master_plan.md`](../20260903_iam/00_master_plan.md) — publishing = sharing
 - [`../20260903_tools_approval_workflows/00_master_plan.md`](../20260903_tools_approval_workflows/00_master_plan.md)
   — tool allow-lists and approval policies attach to an assistant
-- [`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) — binding
+- [`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) — binding
   user-flow contract. Publish waits on **IAM-UX** so Share is
   professional before a department has to find an assistant. Journeys
   J-AB-1…6. Wireframe:
@@ -230,7 +230,7 @@ This track is the most visible product in the roadmap. Screens without
 journeys will repeat the sharing miss: a Legal user who cannot find
 "Contract review" in ten seconds means publish failed, even if
 `BSHARES` is correct. Binding journeys J-AB-1…6 and U1–U12:
-[`../20260907_ux_user_flows.md`](../20260907_ux_user_flows.md) §5.2.
+[`../20260907_ux_user_flows/20260907_ux_user_flows.md`](../20260907_ux_user_flows/20260907_ux_user_flows.md) §5.2.
 S3 **Share** opens the IAM-UX dialog, not the S2 stacked form.
 
 **Gallery:** cards, not a table. Chips Mine / Shared with me / Archived.
