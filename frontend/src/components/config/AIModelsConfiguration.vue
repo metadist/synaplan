@@ -244,7 +244,7 @@
                   </label>
                   <div class="relative">
                     <MagnifyingGlassIcon
-                      class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 txt-secondary"
+                      class="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 txt-secondary"
                       aria-hidden="true"
                     />
                     <input
@@ -418,7 +418,8 @@
             <!-- Search / Filter -->
             <div class="relative">
               <MagnifyingGlassIcon
-                class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 txt-secondary pointer-events-none"
+                class="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 txt-secondary"
+                aria-hidden="true"
               />
               <input
                 v-model="modelSearch"
@@ -783,7 +784,7 @@ import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adm
 import { ApiError } from '@/services/api/httpClient'
 import { fetchLiveVoiceOptions, type LiveVoiceModel } from '@/services/api/liveVoiceApi'
 import { voiceCompany } from '@/services/liveVoice/company'
-import { preferredVoice, setPreferredVoice } from '@/services/liveVoice/preferences'
+import { resolveLiveVoice, setPreferredVoice } from '@/services/liveVoice/preferences'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
@@ -827,9 +828,8 @@ const showLiveVoiceChoice = computed(
 function syncLiveVoice() {
   const next = liveSelected.value
   if (!next) return
-  const stored = preferredVoice(next.provider ?? '')
   const listed = next.voices ?? []
-  liveVoice.value = stored && listed.includes(stored) ? stored : (next.voice ?? listed[0] ?? '')
+  liveVoice.value = resolveLiveVoice(next.id ?? null, next.provider ?? '', listed, next.voice ?? '')
 }
 
 async function loadLiveOptions() {
@@ -882,9 +882,9 @@ async function onLiveModelChange() {
 }
 
 function onLiveVoiceChange() {
-  const provider = liveSelected.value?.provider ?? ''
-  if (provider === '') return
-  setPreferredVoice(provider, liveVoice.value)
+  const id = liveSelected.value?.id
+  if (id == null) return
+  setPreferredVoice(id, liveVoice.value)
 }
 
 const activeTab = ref<ModelsTabId>('choice')
