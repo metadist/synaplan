@@ -123,4 +123,63 @@ final class ProviderTranscriptTest extends TestCase
         self::assertCount(5, $messages);
         self::assertSame(['role' => 'assistant', 'text' => 'Updated A10'], $messages[4]);
     }
+
+    public function testSealPreventsFollowUpProviderCallsFromOverwritingTranscript(): void
+    {
+        $capture = new ProviderTranscriptCapture();
+        $capture->enable();
+
+        $capture->record([
+            ['role' => 'system', 'content' => 'Answer the user.'],
+            ['role' => 'user', 'content' => 'Hello there'],
+        ]);
+        $capture->seal();
+
+        // A post-reply call (e.g. ChatTitleService on the first exchange) must not overwrite the reply transcript.
+        $capture->recordResponsesRequest([
+            'instructions' => 'Write a short title.',
+            'input' => [
+                ['role' => 'user', 'content' => [['type' => 'input_text', 'text' => 'User: Hello there']]],
+            ],
+        ]);
+        $capture->recordAnthropicRequest('Write a short title.', [
+            ['role' => 'user', 'content' => 'User: Hello there'],
+        ]);
+
+        self::assertSame([
+            ['role' => 'instructions', 'text' => 'Answer the user.'],
+            ['role' => 'you', 'text' => 'Hello there'],
+        ], $capture->payload()['messages'] ?? null);
+    }
+
+    public function testMapsOpenAiAndAnthropicToolResultsToAssistantRole(): void
+    {
+        $capture = new ProviderTranscriptCapture();
+        $capture->enable();
+
+        $capture->recordResponsesRequest([
+            'instructions' => 'Edit the document.',
+            'input' => [
+                ['role' => 'user', 'content' => [['type' => 'input_text', 'text' => 'Update cell A1']]],
+                ['type' => 'function_call_output', 'call_id' => 'call_1', 'output' => 'Cell A1 updated'],
+            ],
+        ]);
+
+        self::assertSame([
+            ['role' => 'instructions', 'text' => 'Edit the document.'],
+            ['role' => 'you', 'text' => 'Update cell A1'],
+            ['role' => 'assistant', 'text' => 'Cell A1 updated'],
+        ], $capture->payload()['messages'] ?? null);
+
+        $capture->recordAnthropicRequest('Edit the document.', [
+            ['role' => 'user', 'content' => 'Update cell A1'],
+            ['role' => 'user', 'content' => [['type' => 'tool_result', 'tool_use_id' => 'call_1', 'content' => 'Cell A1 updated']]],
+        ]);
+
+        self::assertSame([
+            ['role' => 'instructions', 'text' => 'Edit the document.'],
+            ['role' => 'you', 'text' => 'Update cell A1'],
+            ['role' => 'assistant', 'text' => 'Cell A1 updated'],
+        ], $capture->payload()['messages'] ?? null);
+    }
 }

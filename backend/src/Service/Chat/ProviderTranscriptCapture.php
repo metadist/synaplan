@@ -22,6 +22,8 @@ final class ProviderTranscriptCapture implements ResetInterface
 
     private bool $enabled = false;
 
+    private bool $sealed = false;
+
     private ?int $lastStart = null;
 
     public function reset(): void
@@ -30,12 +32,24 @@ final class ProviderTranscriptCapture implements ResetInterface
         $this->used = 0;
         $this->truncated = false;
         $this->enabled = false;
+        $this->sealed = false;
         $this->lastStart = null;
     }
 
     public function enable(): void
     {
         $this->enabled = true;
+        $this->sealed = false;
+    }
+
+    /**
+     * Stops further provider calls (such as chat-title generation after the
+     * reply is stored) from overwriting the reply's transcript before the
+     * complete event reads {@see payload()}.
+     */
+    public function seal(): void
+    {
+        $this->sealed = true;
     }
 
     /**
@@ -43,7 +57,7 @@ final class ProviderTranscriptCapture implements ResetInterface
      */
     public function record(array $messages): void
     {
-        if (!$this->enabled) {
+        if (!$this->enabled || $this->sealed) {
             return;
         }
         $this->lastStart = count($this->messages);
@@ -58,7 +72,7 @@ final class ProviderTranscriptCapture implements ResetInterface
      */
     public function replaceLast(array $messages): void
     {
-        if (!$this->enabled) {
+        if (!$this->enabled || $this->sealed) {
             return;
         }
         if (null === $this->lastStart) {
@@ -92,9 +106,14 @@ final class ProviderTranscriptCapture implements ResetInterface
         $input = $requestOptions['input'] ?? null;
         if (is_array($input) && array_is_list($input)) {
             foreach ($input as $row) {
-                if (is_array($row)) {
-                    $messages[] = $row;
+                if (!is_array($row)) {
+                    continue;
                 }
+                if ('function_call_output' === ($row['type'] ?? null)) {
+                    $messages[] = ['role' => 'tool', 'content' => $row['output'] ?? ''];
+                    continue;
+                }
+                $messages[] = $row;
             }
         }
 
@@ -118,10 +137,28 @@ final class ProviderTranscriptCapture implements ResetInterface
             $messages[] = ['role' => 'instructions', 'content' => $systemMessage];
         }
         foreach ($conversationMessages as $row) {
+            if ('user' === ($row['role'] ?? null) && self::isOnlyAnthropicToolResults($row['content'] ?? null)) {
+                $messages[] = ['role' => 'tool', 'content' => $row['content']];
+                continue;
+            }
             $messages[] = $row;
         }
 
         $this->replaceLast($messages);
+    }
+
+    private static function isOnlyAnthropicToolResults(mixed $content): bool
+    {
+        if (!is_array($content) || [] === $content) {
+            return false;
+        }
+        foreach ($content as $block) {
+            if (!is_array($block) || 'tool_result' !== ($block['type'] ?? null)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

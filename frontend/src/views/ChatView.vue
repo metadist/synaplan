@@ -4049,8 +4049,7 @@ const streamAIResponse = async (
               }
 
               const sent = data.providerMessages as
-                | { messages?: Message['providerMessages']; truncated?: boolean }
-                | undefined
+                { messages?: Message['providerMessages']; truncated?: boolean } | undefined
               if (sent && Array.isArray(sent.messages)) {
                 message.providerMessages = sent.messages
                 message.providerMessagesTruncated = sent.truncated === true
@@ -4971,8 +4970,7 @@ const streamAIResponse = async (
               }
 
               const sent = data.providerMessages as
-                | { messages?: Message['providerMessages']; truncated?: boolean }
-                | undefined
+                { messages?: Message['providerMessages']; truncated?: boolean } | undefined
               if (sent && Array.isArray(sent.messages)) {
                 message.providerMessages = sent.messages
                 message.providerMessagesTruncated = sent.truncated === true
