@@ -30,6 +30,12 @@ class ChatSummaryRepository extends ServiceEntityRepository
      * workers refreshing the same chat concurrently cannot race into a
      * duplicate-key failure — last write wins, which is correct here because
      * a later refresh always covers a higher (or equal) message id.
+     *
+     * The row is written only while the chat exists and belongs to the user,
+     * checked in the same statement: a refresh that outlives the chat's or
+     * the account's deletion writes nothing back.
+     *
+     * @return bool false when nothing was written
      */
     public function upsert(
         int $chatId,
@@ -38,12 +44,13 @@ class ChatSummaryRepository extends ServiceEntityRepository
         int $upToMessageId,
         int $summarizedCount,
         string $fingerprint,
-    ): void {
+    ): bool {
         $sql = <<<'SQL'
             INSERT INTO BCHATSUMMARIES
                 (BCHATID, BUSERID, BSUMMARY, BUPTOMESSAGEID, BSUMMARIZEDCOUNT, BFINGERPRINT, BUPDATED)
-            VALUES
-                (:chatId, :userId, :summary, :upToMessageId, :summarizedCount, :fingerprint, :updated)
+            SELECT c.BID, c.BUSERID, :summary, :upToMessageId, :summarizedCount, :fingerprint, :updated
+            FROM BCHATS c
+            WHERE c.BID = :chatId AND c.BUSERID = :userId
             ON DUPLICATE KEY UPDATE
                 BUSERID = VALUES(BUSERID),
                 BSUMMARY = VALUES(BSUMMARY),
@@ -61,7 +68,8 @@ class ChatSummaryRepository extends ServiceEntityRepository
         $stmt->bindValue('summarizedCount', $summarizedCount);
         $stmt->bindValue('fingerprint', $fingerprint);
         $stmt->bindValue('updated', time());
-        $stmt->executeStatement();
+
+        return $stmt->executeStatement() > 0;
     }
 
     public function deleteByChatId(int $chatId): void

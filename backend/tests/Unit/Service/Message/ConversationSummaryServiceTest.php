@@ -43,6 +43,10 @@ class ConversationSummaryServiceTest extends TestCase
     /** @var array<int, ChatSummary> */
     private array $durableRows = [];
 
+    /** Chats deleted meanwhile: the real upsert finds no chat and writes nothing. */
+    /** @var array<int, true> */
+    private array $deletedChats = [];
+
     protected function setUp(): void
     {
         $this->aiFacade = $this->createMock(AiFacade::class);
@@ -65,7 +69,10 @@ class ConversationSummaryServiceTest extends TestCase
     {
         $repo = $this->createMock(ChatSummaryRepository::class);
         $repo->method('upsert')->willReturnCallback(
-            function (int $chatId, int $userId, string $summary, int $upToMessageId, int $summarizedCount, string $fingerprint): void {
+            function (int $chatId, int $userId, string $summary, int $upToMessageId, int $summarizedCount, string $fingerprint): bool {
+                if (isset($this->deletedChats[$chatId])) {
+                    return false;
+                }
                 $this->durableRows[$chatId] = (new ChatSummary())
                     ->setChatId($chatId)
                     ->setUserId($userId)
@@ -74,6 +81,8 @@ class ConversationSummaryServiceTest extends TestCase
                     ->setSummarizedCount($summarizedCount)
                     ->setFingerprint($fingerprint)
                     ->setUpdated(time());
+
+                return true;
             },
         );
         $repo->method('findOneByChatId')->willReturnCallback(
@@ -407,6 +416,21 @@ class ConversationSummaryServiceTest extends TestCase
         self::assertSame(7, $row->getUserId());
         self::assertSame($this->defaultFingerprint(), $row->getFingerprint());
         self::assertGreaterThan(0, $row->getUpToMessageId());
+    }
+
+    public function testARefreshPausedWhileItsChatIsDeletedWritesNothingAnywhere(): void
+    {
+        $this->messageRepository->method('findAllByChatId')->willReturn($this->makeChat(40));
+        $this->aiFacade->method('chat')->willReturnCallback(function (): array {
+            $this->deletedChats[100] = true;
+
+            return ['content' => 'SUMMARY OF A DELETED CHAT', 'provider' => 'groq', 'model' => 'gpt-oss-120b'];
+        });
+
+        self::assertFalse($this->makeService()->refresh(100, 7));
+
+        self::assertArrayNotHasKey(100, $this->durableRows);
+        self::assertFalse($this->cache->getItem(sprintf('conv_summary.chat.%d.%s', 100, $this->defaultFingerprint()))->isHit());
     }
 
     /**
