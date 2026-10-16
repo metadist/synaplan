@@ -842,14 +842,12 @@
                   </div>
                 </div>
               </Transition>
-              <Teleport to="body">
-                <WhatWasSentDialog
-                  v-if="whatWasSentOpen"
-                  :messages="providerMessages ?? null"
-                  :truncated="providerMessagesTruncated === true"
-                  @close="whatWasSentOpen = false"
-                />
-              </Teleport>
+              <WhatWasSentDialog
+                v-if="whatWasSentOpen"
+                :messages="providerMessages ?? null"
+                :truncated="providerMessagesTruncated === true"
+                @close="whatWasSentOpen = false"
+              />
             </div>
 
             <!-- Usage taximeter: per-reply token/cost badge. Hover-revealed on

@@ -39,6 +39,10 @@ test.describe('@ci @smoke Chat', () => {
 
       const dialog = page.getByTestId('dialog-what-was-sent')
       await expect(dialog).toBeVisible()
+      await expect(page.getByTestId('section-what-was-sent-question')).toContainText(
+        PROMPTS.CHAT_SMOKE
+      )
+      await expect(page.getByTestId('section-what-was-sent-instructions')).toBeVisible()
       await expect(dialog).toContainText('Instructions')
       await expect(dialog).toContainText('You')
       await expect(dialog).toContainText(PROMPTS.CHAT_SMOKE)
