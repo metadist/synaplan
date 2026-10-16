@@ -334,7 +334,330 @@
       "noVoices": "Este modelo usa su voz predeterminada.",
       "withdraw": "Dejar de permitir conversaciones en vivo",
       "withdrawHint": "El chat volverá a preguntar antes de la siguiente conversación. Las conversaciones ya guardadas siguen en el chat.",
-      "withdrawn": "Las conversaciones en vivo volverán a pedir permiso."
+      "withdrawn": "Las conversaciones en vivo volverán a pedir permiso.",
+      "filterLabel": "Filtrar voces",
+      "filterPlaceholder": "Filtrar voces…",
+      "filterEmpty": "Ninguna voz coincide con «{query}».",
+      "roster": {
+        "openai": {
+          "marin": {
+            "name": "Marin",
+            "tone": "Recomendada para el mejor sonido"
+          },
+          "quartz": {
+            "name": "Quartz",
+            "tone": "Inglés australiano, femenina"
+          },
+          "ripple": {
+            "name": "Ripple",
+            "tone": "Inglés australiano, masculina"
+          },
+          "vesper": {
+            "name": "Vesper",
+            "tone": "Inglés británico, masculina"
+          },
+          "willow": {
+            "name": "Willow",
+            "tone": "Inglés irlandés, femenina"
+          },
+          "stone": {
+            "name": "Stone",
+            "tone": "Inglés irlandés, masculina"
+          },
+          "gleam": {
+            "name": "Gleam",
+            "tone": "Inglés norteamericano, femenina"
+          },
+          "meridian": {
+            "name": "Meridian",
+            "tone": "Inglés norteamericano, masculina"
+          },
+          "bossa": {
+            "name": "Bossa",
+            "tone": "Portugués brasileño, femenina"
+          },
+          "tempo": {
+            "name": "Tempo",
+            "tone": "Portugués brasileño, masculina"
+          },
+          "beacon": {
+            "name": "Beacon",
+            "tone": "Inglés filipino, masculina"
+          },
+          "delta": {
+            "name": "Delta",
+            "tone": "Inglés del sur de EE. UU., femenina"
+          },
+          "cinder": {
+            "name": "Cinder",
+            "tone": "Inglés del sur de EE. UU., masculina"
+          },
+          "alloy": {
+            "name": "Alloy"
+          },
+          "ash": {
+            "name": "Ash"
+          },
+          "ballad": {
+            "name": "Ballad"
+          },
+          "coral": {
+            "name": "Coral"
+          },
+          "echo": {
+            "name": "Echo"
+          },
+          "sage": {
+            "name": "Sage"
+          },
+          "shimmer": {
+            "name": "Shimmer"
+          },
+          "verse": {
+            "name": "Verse"
+          },
+          "cedar": {
+            "name": "Cedar",
+            "tone": "Recomendada para el mejor sonido"
+          }
+        },
+        "google": {
+          "Puck": {
+            "name": "Puck",
+            "tone": "Animada"
+          },
+          "Zephyr": {
+            "name": "Zephyr",
+            "tone": "Brillante"
+          },
+          "Kore": {
+            "name": "Kore",
+            "tone": "Firme"
+          },
+          "Orus": {
+            "name": "Orus",
+            "tone": "Firme"
+          },
+          "Autonoe": {
+            "name": "Autonoe",
+            "tone": "Brillante"
+          },
+          "Umbriel": {
+            "name": "Umbriel",
+            "tone": "Tranquila"
+          },
+          "Erinome": {
+            "name": "Erinome",
+            "tone": "Clara"
+          },
+          "Laomedeia": {
+            "name": "Laomedeia",
+            "tone": "Animada"
+          },
+          "Schedar": {
+            "name": "Schedar",
+            "tone": "Uniforme"
+          },
+          "Achird": {
+            "name": "Achird",
+            "tone": "Amable"
+          },
+          "Sadachbia": {
+            "name": "Sadachbia",
+            "tone": "Vivaz"
+          },
+          "Fenrir": {
+            "name": "Fenrir",
+            "tone": "Entusiasta"
+          },
+          "Aoede": {
+            "name": "Aoede",
+            "tone": "Ligera"
+          },
+          "Enceladus": {
+            "name": "Enceladus",
+            "tone": "Susurrante"
+          },
+          "Algieba": {
+            "name": "Algieba",
+            "tone": "Fluida"
+          },
+          "Algenib": {
+            "name": "Algenib",
+            "tone": "Áspera"
+          },
+          "Achernar": {
+            "name": "Achernar",
+            "tone": "Suave"
+          },
+          "Gacrux": {
+            "name": "Gacrux",
+            "tone": "Madura"
+          },
+          "Zubenelgenubi": {
+            "name": "Zubenelgenubi",
+            "tone": "Informal"
+          },
+          "Sadaltager": {
+            "name": "Sadaltager",
+            "tone": "Sabia"
+          },
+          "Charon": {
+            "name": "Charon",
+            "tone": "Informativa"
+          },
+          "Leda": {
+            "name": "Leda",
+            "tone": "Juvenil"
+          },
+          "Callirrhoe": {
+            "name": "Callirrhoe",
+            "tone": "Tranquila"
+          },
+          "Iapetus": {
+            "name": "Iapetus",
+            "tone": "Clara"
+          },
+          "Despina": {
+            "name": "Despina",
+            "tone": "Fluida"
+          },
+          "Rasalgethi": {
+            "name": "Rasalgethi",
+            "tone": "Informativa"
+          },
+          "Alnilam": {
+            "name": "Alnilam",
+            "tone": "Firme"
+          },
+          "Pulcherrima": {
+            "name": "Pulcherrima",
+            "tone": "Directa"
+          },
+          "Vindemiatrix": {
+            "name": "Vindemiatrix",
+            "tone": "Dulce"
+          },
+          "Sulafat": {
+            "name": "Sulafat",
+            "tone": "Cálida"
+          }
+        },
+        "xai": {
+          "eve": {
+            "name": "Eve",
+            "tone": "Enérgica y alegre, acento británico"
+          },
+          "ara": {
+            "name": "Ara",
+            "tone": "Cálida y amable"
+          },
+          "rex": {
+            "name": "Rex",
+            "tone": "Segura y clara"
+          },
+          "sal": {
+            "name": "Sal",
+            "tone": "Suave y equilibrada"
+          },
+          "leo": {
+            "name": "Leo",
+            "tone": "Firme y potente, acento británico"
+          },
+          "carina": {
+            "name": "Carina",
+            "tone": "Suave, empática y tranquilizadora"
+          },
+          "zagan": {
+            "name": "Zagan",
+            "tone": "Potente, dramática e inconfundible"
+          },
+          "helix": {
+            "name": "Helix",
+            "tone": "Audaz, dinámica e intensa"
+          },
+          "orion": {
+            "name": "Orion",
+            "tone": "Rica, cinematográfica y resonante"
+          },
+          "luna": {
+            "name": "Luna",
+            "tone": "Dulce, paciente y cuidadosa"
+          },
+          "iris": {
+            "name": "Iris",
+            "tone": "Amable, animada y encantadora"
+          },
+          "altair": {
+            "name": "Altair",
+            "tone": "Elegante, refinada y pulida"
+          },
+          "zenith": {
+            "name": "Zenith",
+            "tone": "Aguda, concentrada y decidida"
+          },
+          "perseus": {
+            "name": "Perseus",
+            "tone": "Fuerte, segura y de confianza"
+          },
+          "helios": {
+            "name": "Helios",
+            "tone": "Animada, enérgica y versátil"
+          },
+          "lux": {
+            "name": "Lux",
+            "tone": "Serena, calmada y sabia"
+          },
+          "kepler": {
+            "name": "Kepler",
+            "tone": "Inventiva, previsora y carismática"
+          },
+          "rigel": {
+            "name": "Rigel",
+            "tone": "Precisa y serenamente segura, acento australiano"
+          },
+          "cosmo": {
+            "name": "Cosmo",
+            "tone": "Brillante, curiosa y fácil de seguir"
+          },
+          "celeste": {
+            "name": "Celeste",
+            "tone": "Compasiva, segura y tranquilizadora"
+          },
+          "ursa": {
+            "name": "Ursa",
+            "tone": "Amable, cálida y constante"
+          },
+          "sirius": {
+            "name": "Sirius",
+            "tone": "Ingeniosa, lista y juguetona"
+          },
+          "lumen": {
+            "name": "Lumen",
+            "tone": "Cálida, articulada y cercana"
+          },
+          "castor": {
+            "name": "Castor",
+            "tone": "Carismática, sencilla y cercana"
+          },
+          "naksh": {
+            "name": "Naksh",
+            "tone": "Cálida, reflexiva y sabia, acento indio"
+          },
+          "atlas": {
+            "name": "Atlas",
+            "tone": "Segura, firme y tranquilizadora"
+          },
+          "aurora": {
+            "name": "Aurora",
+            "tone": "Serena, constante y radiante"
+          },
+          "liora": {
+            "name": "Liora",
+            "tone": "Calmada, estable y luminosa"
+          }
+        }
+      }
     },
     "title": "Preferencias",
     "subtitle": "Administra tus preferencias y configuración",

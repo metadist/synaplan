@@ -171,11 +171,55 @@ test('a compatible endpoint speaks realtime and picks the auth header', async ()
   server.close()
 })
 
+test('Gemini sends the chosen voice', async () => {
+  const seen = await oneShot(async (ws) => {
+    const event = JSON.parse((await nextMessage(ws)).toString())
+    assert.equal(event.setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Kore')
+    ws.send(JSON.stringify({ setupComplete: {} }))
+  })
+  const adapter = createGeminiAdapter({ url: seen.url })
+  await adapter.open({ model: 'gemini-3.8-live', instructions: 'Ask Synaplan.', voice: 'Kore' })
+  adapter.close()
+  seen.server.close()
+})
+
+test('GPT-Live forwards a voice other than the default', async () => {
+  const seen = await oneShot(async (ws) => {
+    const event = JSON.parse((await nextMessage(ws)).toString())
+    assert.equal(event.type, 'session.start')
+    assert.equal(event.session.audio.output.voice, 'quartz')
+    ws.send(JSON.stringify({ type: 'session.started', session: { id: 'sess_q' } }))
+  })
+  const adapter = createOpenAiAdapter({ url: seen.url, apiKey: 'sk-test' })
+  await adapter.open({ model: 'gpt-live-1', instructions: 'Ask Synaplan.', voice: 'quartz', audio: { inRate: 24000 } })
+  await adapter.close()
+  seen.server.close()
+})
+
+test('Realtime forwards a voice other than the default', async () => {
+  const seen = await oneShot(async (ws) => {
+    const event = JSON.parse((await nextMessage(ws)).toString())
+    assert.equal(event.type, 'session.update')
+    assert.equal(event.session.audio.output.voice, 'cedar')
+    ws.send(JSON.stringify({ type: 'session.updated' }))
+  })
+  const adapter = createOpenAiRealtimeAdapter({ url: seen.url, apiKey: 'sk-test' })
+  await adapter.open({
+    model: 'gpt-realtime-2.1',
+    instructions: 'Ask Synaplan.',
+    voice: 'cedar',
+    audio: { inRate: 24000, outRate: 24000 },
+  })
+  adapter.close()
+  seen.server.close()
+})
+
 test('Gemini extended thinking uses the same live setup', async () => {
   const seen = await oneShot(async (ws) => {
     const event = JSON.parse((await nextMessage(ws)).toString())
     assert.equal(event.setup.model, 'models/gemini-3.8-live-extended-thinking')
     assert.equal(event.setup.tools[0].functionDeclarations[0].name, 'consult_synaplan')
+    assert.equal(event.setup.generationConfig.speechConfig, undefined)
     ws.send(JSON.stringify({ setupComplete: {} }))
   })
   const adapter = createGeminiAdapter({ url: seen.url })

@@ -335,7 +335,330 @@
       "noVoices": "Bu model varsayılan sesini kullanır.",
       "withdraw": "Canlı konuşmalara izin vermeyi bırak",
       "withdrawHint": "Sohbet bir sonraki konuşmadan önce yeniden sorar. Daha önce kaydedilen konuşmalar sohbette kalır.",
-      "withdrawn": "Canlı konuşmalar yeniden izin isteyecek."
+      "withdrawn": "Canlı konuşmalar yeniden izin isteyecek.",
+      "filterLabel": "Sesleri filtrele",
+      "filterPlaceholder": "Sesleri filtrele…",
+      "filterEmpty": "“{query}” ile eşleşen ses yok.",
+      "roster": {
+        "openai": {
+          "marin": {
+            "name": "Marin",
+            "tone": "En iyi ses için önerilir"
+          },
+          "quartz": {
+            "name": "Quartz",
+            "tone": "Avustralya İngilizcesi, kadın"
+          },
+          "ripple": {
+            "name": "Ripple",
+            "tone": "Avustralya İngilizcesi, erkek"
+          },
+          "vesper": {
+            "name": "Vesper",
+            "tone": "Britanya İngilizcesi, erkek"
+          },
+          "willow": {
+            "name": "Willow",
+            "tone": "İrlanda İngilizcesi, kadın"
+          },
+          "stone": {
+            "name": "Stone",
+            "tone": "İrlanda İngilizcesi, erkek"
+          },
+          "gleam": {
+            "name": "Gleam",
+            "tone": "Kuzey Amerika İngilizcesi, kadın"
+          },
+          "meridian": {
+            "name": "Meridian",
+            "tone": "Kuzey Amerika İngilizcesi, erkek"
+          },
+          "bossa": {
+            "name": "Bossa",
+            "tone": "Brezilya Portekizcesi, kadın"
+          },
+          "tempo": {
+            "name": "Tempo",
+            "tone": "Brezilya Portekizcesi, erkek"
+          },
+          "beacon": {
+            "name": "Beacon",
+            "tone": "Filipin İngilizcesi, erkek"
+          },
+          "delta": {
+            "name": "Delta",
+            "tone": "ABD güney İngilizcesi, kadın"
+          },
+          "cinder": {
+            "name": "Cinder",
+            "tone": "ABD güney İngilizcesi, erkek"
+          },
+          "alloy": {
+            "name": "Alloy"
+          },
+          "ash": {
+            "name": "Ash"
+          },
+          "ballad": {
+            "name": "Ballad"
+          },
+          "coral": {
+            "name": "Coral"
+          },
+          "echo": {
+            "name": "Echo"
+          },
+          "sage": {
+            "name": "Sage"
+          },
+          "shimmer": {
+            "name": "Shimmer"
+          },
+          "verse": {
+            "name": "Verse"
+          },
+          "cedar": {
+            "name": "Cedar",
+            "tone": "En iyi ses için önerilir"
+          }
+        },
+        "google": {
+          "Puck": {
+            "name": "Puck",
+            "tone": "Neşeli"
+          },
+          "Zephyr": {
+            "name": "Zephyr",
+            "tone": "Parlak"
+          },
+          "Kore": {
+            "name": "Kore",
+            "tone": "Kararlı"
+          },
+          "Orus": {
+            "name": "Orus",
+            "tone": "Kararlı"
+          },
+          "Autonoe": {
+            "name": "Autonoe",
+            "tone": "Parlak"
+          },
+          "Umbriel": {
+            "name": "Umbriel",
+            "tone": "Rahat"
+          },
+          "Erinome": {
+            "name": "Erinome",
+            "tone": "Net"
+          },
+          "Laomedeia": {
+            "name": "Laomedeia",
+            "tone": "Neşeli"
+          },
+          "Schedar": {
+            "name": "Schedar",
+            "tone": "Dengeli"
+          },
+          "Achird": {
+            "name": "Achird",
+            "tone": "Samimi"
+          },
+          "Sadachbia": {
+            "name": "Sadachbia",
+            "tone": "Canlı"
+          },
+          "Fenrir": {
+            "name": "Fenrir",
+            "tone": "Heyecanlı"
+          },
+          "Aoede": {
+            "name": "Aoede",
+            "tone": "Hafif"
+          },
+          "Enceladus": {
+            "name": "Enceladus",
+            "tone": "Fısıltılı"
+          },
+          "Algieba": {
+            "name": "Algieba",
+            "tone": "Akıcı"
+          },
+          "Algenib": {
+            "name": "Algenib",
+            "tone": "Boğuk"
+          },
+          "Achernar": {
+            "name": "Achernar",
+            "tone": "Yumuşak"
+          },
+          "Gacrux": {
+            "name": "Gacrux",
+            "tone": "Olgun"
+          },
+          "Zubenelgenubi": {
+            "name": "Zubenelgenubi",
+            "tone": "Günlük"
+          },
+          "Sadaltager": {
+            "name": "Sadaltager",
+            "tone": "Bilgili"
+          },
+          "Charon": {
+            "name": "Charon",
+            "tone": "Bilgilendirici"
+          },
+          "Leda": {
+            "name": "Leda",
+            "tone": "Genç"
+          },
+          "Callirrhoe": {
+            "name": "Callirrhoe",
+            "tone": "Rahat"
+          },
+          "Iapetus": {
+            "name": "Iapetus",
+            "tone": "Net"
+          },
+          "Despina": {
+            "name": "Despina",
+            "tone": "Akıcı"
+          },
+          "Rasalgethi": {
+            "name": "Rasalgethi",
+            "tone": "Bilgilendirici"
+          },
+          "Alnilam": {
+            "name": "Alnilam",
+            "tone": "Kararlı"
+          },
+          "Pulcherrima": {
+            "name": "Pulcherrima",
+            "tone": "Direkt"
+          },
+          "Vindemiatrix": {
+            "name": "Vindemiatrix",
+            "tone": "Nazik"
+          },
+          "Sulafat": {
+            "name": "Sulafat",
+            "tone": "Sıcak"
+          }
+        },
+        "xai": {
+          "eve": {
+            "name": "Eve",
+            "tone": "Enerjik ve neşeli, Britanya aksanı"
+          },
+          "ara": {
+            "name": "Ara",
+            "tone": "Sıcak ve dostça"
+          },
+          "rex": {
+            "name": "Rex",
+            "tone": "Kendinden emin ve net"
+          },
+          "sal": {
+            "name": "Sal",
+            "tone": "Yumuşak ve dengeli"
+          },
+          "leo": {
+            "name": "Leo",
+            "tone": "Otoriter ve güçlü, Britanya aksanı"
+          },
+          "carina": {
+            "name": "Carina",
+            "tone": "Yumuşak, anlayışlı ve yatıştırıcı"
+          },
+          "zagan": {
+            "name": "Zagan",
+            "tone": "Güçlü, dramatik ve ayırt edici"
+          },
+          "helix": {
+            "name": "Helix",
+            "tone": "Cesur, dinamik ve sürükleyici"
+          },
+          "orion": {
+            "name": "Orion",
+            "tone": "Dolgun, sinematik ve yankılı"
+          },
+          "luna": {
+            "name": "Luna",
+            "tone": "Nazik, sabırlı ve ilgili"
+          },
+          "iris": {
+            "name": "Iris",
+            "tone": "Samimi, neşeli ve çekici"
+          },
+          "altair": {
+            "name": "Altair",
+            "tone": "Zarif, incelikli ve seçkin"
+          },
+          "zenith": {
+            "name": "Zenith",
+            "tone": "Keskin, odaklı ve kararlı"
+          },
+          "perseus": {
+            "name": "Perseus",
+            "tone": "Güçlü, kendinden emin ve güvenilir"
+          },
+          "helios": {
+            "name": "Helios",
+            "tone": "Neşeli, enerjik ve çok yönlü"
+          },
+          "lux": {
+            "name": "Lux",
+            "tone": "Yere basan, sakin ve bilge"
+          },
+          "kepler": {
+            "name": "Kepler",
+            "tone": "Yaratıcı, ileri görüşlü ve karizmatik"
+          },
+          "rigel": {
+            "name": "Rigel",
+            "tone": "Kesin ve sakin bir özgüvenle, Avustralya aksanı"
+          },
+          "cosmo": {
+            "name": "Cosmo",
+            "tone": "Parlak, meraklı ve takip etmesi kolay"
+          },
+          "celeste": {
+            "name": "Celeste",
+            "tone": "Şefkatli, kendinden emin ve rahatlatıcı"
+          },
+          "ursa": {
+            "name": "Ursa",
+            "tone": "Dostça, sıcak ve sadık"
+          },
+          "sirius": {
+            "name": "Sirius",
+            "tone": "Hazırcevap, zeki ve oyuncu"
+          },
+          "lumen": {
+            "name": "Lumen",
+            "tone": "Sıcak, anlaşılır ve etkileyici"
+          },
+          "castor": {
+            "name": "Castor",
+            "tone": "Karizmatik, sahici ve rahat"
+          },
+          "naksh": {
+            "name": "Naksh",
+            "tone": "Sıcak, düşünceli ve bilge, Hint aksanı"
+          },
+          "atlas": {
+            "name": "Atlas",
+            "tone": "Kendinden emin, yönlendirici ve rahatlatıcı"
+          },
+          "aurora": {
+            "name": "Aurora",
+            "tone": "Huzurlu, istikrarlı ve ışıltılı"
+          },
+          "liora": {
+            "name": "Liora",
+            "tone": "Sakin, dengeli ve aydınlık"
+          }
+        }
+      }
     },
     "title": "Tercihler",
     "subtitle": "Tercihlerinizi ve yapılandırmanızı yönetin",

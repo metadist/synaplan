@@ -95,6 +95,7 @@ class SynaplanWidget {
   private chatLoading = false
   private shouldOpenImmediately = false
   private closeEventHandler: (() => void) | null = null
+  private stopDropdownPlacement: (() => void) | null = null
 
   async init(config: WidgetConfig) {
     if (!config.widgetId) {
@@ -520,6 +521,9 @@ class SynaplanWidget {
 
       this.app.use(widgetI18n.i18n)
       this.app.mount(root)
+      this.stopDropdownPlacement?.()
+      const { installDropdownPlacement } = await import('./utils/dropdownPlacement')
+      this.stopDropdownPlacement = installDropdownPlacement(shadow)
 
       if (this.config?.detectTheme) {
         this.startThemeObserver()
@@ -592,6 +596,9 @@ class SynaplanWidget {
       window.removeEventListener('synaplan-widget-close', this.closeEventHandler)
       this.closeEventHandler = null
     }
+
+    this.stopDropdownPlacement?.()
+    this.stopDropdownPlacement = null
 
     if (this.app) {
       this.app.unmount()
