@@ -1,10 +1,10 @@
 # Code cleanup V4 — twelve sprints, one branch chain
 
-**Status:** Plan, 2026-10-16. Drafted from a re-measurement of `main` at
+**Status:** In progress, 2026-10-16. Drafted from a re-measurement of `main` at
 `9ca56ccb1`, the morning V3 merged ([#2512](https://github.com/metadist/synaplan/pull/2512) →
 [#2513](https://github.com/metadist/synaplan/pull/2513) → [#2514](https://github.com/metadist/synaplan/pull/2514)).
-Nothing is implemented. The §0 rows marked *proposed* need the owner's
-tick before the sprint that depends on them starts.
+The owner ticked D1–D3 as proposed and amended decision #2 (one stacked
+chain, no intermediate merges). Progress is in [`STATUS.md`](./STATUS.md).
 **Priority:** Row 19 of [`../ROADMAP.md`](../ROADMAP.md). S0 is a security /
 privacy fix: account deletion leaves 12 user-owned tables behind. It starts
 first. S1 lands before row 8, the prompting flow, grows `ChatView.vue`
@@ -34,7 +34,7 @@ twelve.
 | # | Decision | Agreed |
 | - | -------- | ------ |
 | 1 | **Twelve sprints, S0–S11**, numbered like V3 §7 #0–#11 and run in that order. One sprint is one branch and one pull request. Lettered pull requests (S1a, S4a, …) only when the size budget (#6) is exceeded or the release classes differ. | 2026-10-16 |
-| 2 | **One branch chain.** Each sprint branch is created from the head of the previous sprint branch, not from `main`; this plan's branch is the root. Pull requests merge strictly in order. **At most two unmerged sprint branches above `main`:** S(n+2) does not start before S(n) is merged, so a review finding never ripples through more than one child. | 2026-10-16 |
+| 2 | **One branch chain.** Each sprint branch is created from the head of the previous sprint branch, not from `main`; this plan's branch is the root. Pull requests merge strictly in order. ~~At most two unmerged sprint branches above `main`.~~ **Amended by the owner, 2026-10-16:** no WIP limit and no intermediate merges. Each pull request opens on its parent branch, so Copilot reviews that sprint alone; once the review is answered it is retargeted to `main`, so CI runs on the whole chain up to it. The last pull request carries every sprint and is the one that merges. | 2026-10-16 |
 | 3 | **Every sprint ends with a sprint test** ([loop §4](./01_vibe_coding_loop.md#4-the-sprint-test)): proof tests that fail on the parent branch or with the change reverted, the characterization snapshots, the unfiltered gates and the E2E specs on the path. A sprint without a sprint test is not done, however green it looks. | 2026-10-16 |
 | 4 | **Every sprint ends with its chore, C0–C11** ([loop §7](./01_vibe_coding_loop.md#7-the-chore-c0c11)): STATUS row, ledgers, docs, push, pull request, Copilot review answered, re-review, CI green, merge hand-off. The chore is part of the sprint, not polish after it. | 2026-10-16 |
 | 5 | **Squash merge; the pull-request title is the commit on `main`** and drives the release version. Behaviour fixes are `fix(…)`, structure `refactor(…)`, gates `test(…)`. **No `feat` in V4:** no sprint adds a user capability. | 2026-10-16 |
@@ -44,9 +44,9 @@ twelve.
 | 9 | **Erasure lives in code, not in foreign keys.** S0 closes the 12 gaps with erasers. It does not add `ON DELETE CASCADE`: several gaps carry state outside their row that a cascade cannot reach (sidecar workspaces, Redis copies, open live sessions), secrets must go through the credential vault, and FK migrations on the production Galera cluster are the riskiest kind (AGENTS.md, "Production Platform Specifics"). | 2026-10-16 |
 | 10 | **The owner merges.** The agent brings a pull request to merge-ready (loop §10). It never merges with `--admin`, never bypasses a red check, never resolves a review thread without an answer. | 2026-10-16 |
 | 11 | V3 moves to `2026-archive/` in this plan's pull request (V3 decision #8); `docs/ARCHITECTURE.md` points at the archived path. | 2026-10-16 |
-| D1 | **S2 — which processor differences align.** Proposed: align #1–#6 and the double classification; keep #7–#9 and name the reason in the stage (S02 §2). | *proposed* |
-| D2 | **S3 — one topic / intent rule.** Proposed: the classifier's semantics win, with one policy: a `chat` tag keeps the topic it is given (S03 §2). | *proposed* |
-| D3 | **S8 — one MIME-to-extension map.** Proposed: the union of both maps in `FileHelper`, parameters stripped, the caller keeps its fallback (S08 §2). | *proposed* |
+| D1 | **S2 — which processor differences align.** Align #1–#6 and the double classification; keep #7–#9 and name the reason in the stage (S02 §2). | 2026-10-16, as proposed |
+| D2 | **S3 — one topic / intent rule.** The classifier's semantics win, with one policy: a `chat` tag keeps the topic it is given (S03 §2). | 2026-10-16, as proposed |
+| D3 | **S8 — one MIME-to-extension map.** The union of both maps in `FileHelper`, parameters stripped, the caller keeps its fallback (S08 §2). | 2026-10-16, as proposed |
 
 ---
 

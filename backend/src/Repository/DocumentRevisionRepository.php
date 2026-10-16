@@ -61,6 +61,20 @@ class DocumentRevisionRepository extends ServiceEntityRepository
     }
 
     /**
+     * A revision carries its file owner's id, so this removes the history of
+     * that user's own files and nobody else's.
+     */
+    public function deleteForUser(int $userId): void
+    {
+        $this->createQueryBuilder('r')
+            ->delete()
+            ->andWhere('r.userId = :userId')
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->execute();
+    }
+
+    /**
      * @param list<int> $keepVersions
      */
     public function pruneExcept(int $fileId, array $keepVersions): void

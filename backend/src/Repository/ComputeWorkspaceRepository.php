@@ -6,6 +6,8 @@ namespace App\Repository;
 
 use App\Entity\ComputeWorkspace;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\LockMode;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -66,10 +68,49 @@ class ComputeWorkspaceRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Locking read for account erasure: it sees a workspace committed after
+     * the erasing transaction began, and a creation for the same user waits
+     * until that transaction ends.
+     *
+     * @return list<ComputeWorkspace>
+     */
+    public function findForUserLocked(int $userId): array
+    {
+        /* @var list<ComputeWorkspace> */
+        return $this->createQueryBuilder('w')
+            ->where('w.userId = :userId')
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getResult();
+    }
+
     public function save(ComputeWorkspace $workspace): void
     {
         $this->getEntityManager()->persist($workspace);
         $this->getEntityManager()->flush();
+    }
+
+    /**
+     * Saves a new workspace only while its owner exists, read under a shared
+     * lock in the same transaction, so a creation that outlives the owner's
+     * account deletion stores nothing.
+     */
+    public function saveForExistingOwner(ComputeWorkspace $workspace): bool
+    {
+        $em = $this->getEntityManager();
+
+        return $em->getConnection()->transactional(static function (Connection $db) use ($em, $workspace): bool {
+            $owner = $db->fetchOne('SELECT BID FROM BUSER WHERE BID = ? LOCK IN SHARE MODE', [$workspace->getUserId()]);
+            if (false === $owner) {
+                return false;
+            }
+            $em->persist($workspace);
+            $em->flush();
+
+            return true;
+        });
     }
 
     public function remove(ComputeWorkspace $workspace): void

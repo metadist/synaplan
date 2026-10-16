@@ -186,9 +186,19 @@ final readonly class ConversationSummaryService
             return false;
         }
 
-        $this->writeStored($chatId, $userId, $summary, $olderLastId, $olderCount);
+        return $this->writeStored($chatId, $userId, $summary, $olderLastId, $olderCount);
+    }
 
-        return true;
+    /**
+     * Drops the Redis copies of these chats' summaries; the durable rows are
+     * the caller's to delete. A copy written under an earlier config
+     * fingerprint expires with its TTL.
+     *
+     * @param list<int> $chatIds
+     */
+    public function evictCached(array $chatIds): void
+    {
+        $this->cache->deleteItems(array_map(fn (int $chatId): string => $this->storeKey($chatId), $chatIds));
     }
 
     /**
@@ -362,13 +372,17 @@ final readonly class ConversationSummaryService
         ];
     }
 
-    private function writeStored(int $chatId, int $userId, string $summary, int $upToMessageId, int $summarizedCount): void
+    /**
+     * @return bool false when nothing was stored, e.g. the chat was deleted while the summarizer ran
+     */
+    private function writeStored(int $chatId, int $userId, string $summary, int $upToMessageId, int $summarizedCount): bool
     {
         // Durable layer first: a DB failure must not leave the cache claiming
-        // more coverage than the row has. Fail-open — the Redis copy still
+        // more coverage than the row has, and a chat deleted meanwhile is not
+        // written anywhere. Fail-open on a DB error — the Redis copy still
         // carries the summary for the TTL window, like before this table.
         try {
-            $this->chatSummaryRepository->upsert(
+            $written = $this->chatSummaryRepository->upsert(
                 $chatId,
                 $userId,
                 $summary,
@@ -376,6 +390,9 @@ final readonly class ConversationSummaryService
                 $summarizedCount,
                 $this->configFingerprint(),
             );
+            if (!$written) {
+                return false;
+            }
         } catch (\Throwable $e) {
             $this->logger->warning('ConversationSummaryService: durable write failed', [
                 'chat_id' => $chatId,
@@ -384,6 +401,8 @@ final readonly class ConversationSummaryService
         }
 
         $this->writeCache($chatId, $summary, $upToMessageId, $summarizedCount);
+
+        return true;
     }
 
     private function writeCache(int $chatId, string $summary, int $upToMessageId, int $summarizedCount): void

@@ -44,6 +44,29 @@ final class UserDeletionServiceTest extends TestCase
         );
     }
 
+    public function testACleanupThatFailsAfterTheCommitIsLoggedAndTheDeletionStillCompletes(): void
+    {
+        $user = $this->user(42, 'ada@example.test');
+        $eraser = $this->eraser('first', function (UserErasure $erasure): void {
+            $erasure->afterCommit(static fn () => throw new \RuntimeException('sidecar unreachable'));
+            $erasure->afterCommit(function (): void {
+                $this->events[] = 'cleanup:second';
+            });
+        });
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error')->with(
+            'Account deletion cleanup failed after the commit',
+            self::callback(static fn (array $context): bool => 42 === $context['user_id'] && $context['exception'] instanceof \RuntimeException),
+        );
+
+        (new UserDeletionService($this->entityManager($user), [$eraser], $logger))->deleteUser($user);
+
+        self::assertSame(
+            ['begin', 'erase:first:42:ada@example.test', 'remove', 'flush', 'commit', 'cleanup:second'],
+            $this->events,
+        );
+    }
+
     public function testAFailingEraserRollsBackLogsAndRethrows(): void
     {
         $user = $this->user(42, 'ada@example.test');

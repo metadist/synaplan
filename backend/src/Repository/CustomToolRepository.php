@@ -82,4 +82,14 @@ class CustomToolRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
+
+    public function deleteByOwner(int $ownerId): void
+    {
+        $this->createQueryBuilder('t')
+            ->delete()
+            ->where('t.ownerId = :ownerId')
+            ->setParameter('ownerId', $ownerId)
+            ->getQuery()
+            ->execute();
+    }
 }

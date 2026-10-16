@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\Iam\Erasure;
 
+use App\Entity\DocumentRevision;
 use App\Entity\File;
+use App\Repository\DocumentRevisionRepository;
 use App\Repository\FileRepository;
 use App\Service\File\FileStorageService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -12,8 +14,9 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
- * The user's files: each stored file first, then its row. Once the rows are
- * committed away, the user's now-empty upload directories go too.
+ * The user's files and their document revisions. The rows go inside the
+ * transaction; the stored files and the now-empty upload directories go
+ * after the commit, because a rollback cannot bring deleted bytes back.
  */
 #[AsTaggedItem(priority: 120)]
 final readonly class FileEraser implements UserDataEraserInterface
@@ -21,6 +24,7 @@ final readonly class FileEraser implements UserDataEraserInterface
     public function __construct(
         private EntityManagerInterface $em,
         private FileRepository $files,
+        private DocumentRevisionRepository $revisions,
         private FileStorageService $fileStorage,
         private LoggerInterface $logger,
     ) {
@@ -29,46 +33,57 @@ final readonly class FileEraser implements UserDataEraserInterface
     public function erase(UserErasure $erasure): void
     {
         $userId = $erasure->userId;
-        $files = $this->files->findBy(['userId' => $userId]);
-        $deletedCount = 0;
-        $failedCount = 0;
+        $this->revisions->deleteForUser($userId);
 
-        foreach ($files as $file) {
+        $paths = [];
+        foreach ($this->files->findBy(['userId' => $userId]) as $file) {
             $filePath = $file->getFilePath();
             if ($filePath) {
-                $context = ['user_id' => $userId, 'file_id' => $file->getId(), 'path' => $filePath];
-                try {
-                    if ($this->fileStorage->deleteFile($filePath)) {
-                        ++$deletedCount;
-                        $this->logger->debug('Physical file deleted', $context);
-                    } else {
-                        ++$failedCount;
-                        $this->logger->warning('Physical file not found or already deleted', $context);
-                    }
-                } catch (\Throwable $e) {
-                    ++$failedCount;
-                    $this->logger->error('Failed to delete physical file', $context + ['exception' => $e]);
-                }
+                $paths[(int) $file->getId()] = $filePath;
             }
-
             $this->em->remove($file);
         }
 
-        if ($deletedCount > 0 || $failedCount > 0) {
-            $this->logger->info('File deletion completed', [
-                'user_id' => $userId,
-                'total_files' => count($files),
-                'deleted' => $deletedCount,
-                'failed' => $failedCount,
-            ]);
-        }
-
+        $erasure->afterCommit(fn () => $this->deleteStoredFiles($userId, $paths));
         $erasure->afterCommit(fn () => $this->removeEmptyUserDirectories($userId));
     }
 
     public static function covers(): array
     {
-        return [File::class];
+        return [File::class, DocumentRevision::class];
+    }
+
+    /**
+     * @param array<int, string> $paths file id => path relative to the upload directory
+     */
+    private function deleteStoredFiles(int $userId, array $paths): void
+    {
+        $deletedCount = 0;
+        $failedCount = 0;
+        foreach ($paths as $fileId => $filePath) {
+            $context = ['user_id' => $userId, 'file_id' => $fileId, 'path' => $filePath];
+            try {
+                if ($this->fileStorage->deleteFile($filePath)) {
+                    ++$deletedCount;
+                    $this->logger->debug('Physical file deleted', $context);
+                } else {
+                    ++$failedCount;
+                    $this->logger->warning('Physical file not found or already deleted', $context);
+                }
+            } catch (\Throwable $e) {
+                ++$failedCount;
+                $this->logger->error('Failed to delete physical file', $context + ['exception' => $e]);
+            }
+        }
+
+        if ($deletedCount > 0 || $failedCount > 0) {
+            $this->logger->info('File deletion completed', [
+                'user_id' => $userId,
+                'total_files' => count($paths),
+                'deleted' => $deletedCount,
+                'failed' => $failedCount,
+            ]);
+        }
     }
 
     /**

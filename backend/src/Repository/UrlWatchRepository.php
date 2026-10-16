@@ -40,4 +40,14 @@ class UrlWatchRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['ownerId' => $ownerId, 'urlHash' => $urlHash]);
     }
+
+    public function deleteByOwner(int $ownerId): void
+    {
+        $this->createQueryBuilder('w')
+            ->delete()
+            ->where('w.ownerId = :ownerId')
+            ->setParameter('ownerId', $ownerId)
+            ->getQuery()
+            ->execute();
+    }
 }

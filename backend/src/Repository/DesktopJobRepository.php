@@ -199,4 +199,14 @@ class DesktopJobRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
+
+    public function deleteByOwner(int $ownerId): void
+    {
+        $this->createQueryBuilder('j')
+            ->delete()
+            ->where('j.ownerId = :ownerId')
+            ->setParameter('ownerId', $ownerId)
+            ->getQuery()
+            ->execute();
+    }
 }

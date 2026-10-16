@@ -106,4 +106,14 @@ class DesktopDeviceRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
+
+    public function deleteByOwner(int $ownerId): void
+    {
+        $this->createQueryBuilder('d')
+            ->delete()
+            ->where('d.ownerId = :ownerId')
+            ->setParameter('ownerId', $ownerId)
+            ->getQuery()
+            ->execute();
+    }
 }

@@ -46,4 +46,14 @@ class VoiceSessionRepository extends ServiceEntityRepository
 
         return $sessions;
     }
+
+    public function deleteByUser(int $userId): void
+    {
+        $this->createQueryBuilder('s')
+            ->delete()
+            ->where('s.userId = :userId')
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->execute();
+    }
 }
