@@ -1,5 +1,18 @@
 # Code cleanup V3 — status
 
+> **Archived 2026-10-16.** K0–K10 merged on `main` in order:
+> [#2512](https://github.com/metadist/synaplan/pull/2512) (`f6a60ab71`),
+> [#2513](https://github.com/metadist/synaplan/pull/2513) (`bf7f1b059`),
+> [#2514](https://github.com/metadist/synaplan/pull/2514) (`6e7bff308`).
+> The ratchet stands at 57 / 69 / 147; `MessageProcessor` 303 lines / 6
+> deps, `FileAnalysisHandler` 161 / 6, `SeedAllCommand` and
+> `UserDeletionService` out of the constructor ledger. The twelve findings
+> of §7 are the plan of code cleanup V4,
+> [`../../20261016-code-cleanup-V4/`](../../20261016-code-cleanup-V4/00_master_plan.md),
+> led by the 12 user-owned tables account deletion never erases. Code
+> comments that cite `_devextras/planning/20261015-code-cleanup-V3/` mean
+> this folder.
+
 Three numbers in every row (from the V2 size ratchet): files > 800 lines,
 constructors > 10 params, methods > 100 lines. Plus the lines / params of
 the class the step works on. Start values measured 2026-10-15: 59 / 73 / 151.

@@ -1,0 +1,97 @@
+# S10 — Google and OpenAI providers split per capability
+
+| | |
+| - | - |
+| **V3 §7** | #10 |
+| **Branch** | `refactor/cleanup-v4-s10-providers`, from S9's branch |
+| **Pull request** | `refactor(ai): Google and OpenAI providers split per capability`; S10a (Google) and S10b (OpenAI) if the size budget is exceeded |
+| **Class** | backend-only |
+| **Owner decision** | — |
+| **Chore** | C10 |
+
+## 1. Goal
+
+The two largest provider adapters stop carrying every capability in one
+file. Chat, images, video and speech for a vendor each get their own
+class, sharing one API client. Every request the provider sends stays
+byte for byte the same.
+
+## 2. Measured (2026-10-16)
+
+| Provider | Lines | Ctor | Capabilities (tags in `config/services.yaml`) | Longest methods |
+| -------- | ----- | ---- | --------------------------------------------- | --------------- |
+| `AI/Provider/GoogleProvider.php` | 2,764 | 9 | chat (+ tool calling), vision, image generation, video generation (+ async), speech to text, text to speech | `chatStream()` 202, `synthesize()` 156, `convertMessagesToGeminiFormat()` 117, `transcribe()` 100 |
+| `AI/Provider/OpenAIProvider.php` | 2,079 | 7 | chat (+ tool calling), embedding, vision, image generation, speech to text, text to speech | `chatStream()` 119, `analyzeImage()` 89, `generateImageWithGptImage1()` 88 |
+
+`ProviderRegistry` resolves a provider per capability through the
+`app.ai.<capability>` tags, keyed by vendor. `AiFacade`, `ModelCatalog`,
+`GoogleAiModule`, `CostCalculationService` and `XaiProvider` name the
+provider classes directly. Tests: 6 Google and 5 OpenAI test classes
+under `tests/AI/Provider/` and `tests/Unit/AI/Provider/`.
+
+## 3. Target shape
+
+```
+AI/Provider/Google/
+  GoogleApiClient        endpoints (Gemini API / Vertex), key store, request, error and blocked-content mapping
+  GoogleChat             chat, chatStream, tool calling, message conversion, vision
+  GoogleImageGeneration  Imagen and Gemini image models
+  GoogleVideoGeneration  Veo, async operations
+  GoogleSpeech           transcribe, synthesize (WAV / MP3)
+AI/Provider/GoogleProvider   the registered façade: the same class, interfaces and tags; each method delegates
+```
+
+OpenAI follows the same shape (`OpenAIApiClient`, `OpenAIChat` with the
+Responses API, `OpenAIEmbedding`, `OpenAIImageGeneration`,
+`OpenAISpeech`).
+
+**Why a façade:** the class name, its interfaces and its tags are what the
+registry, five other classes and the module system know. Keeping them
+makes the split invisible to everything outside the folder: no wiring
+change and no `services.yaml` diff. Registering the capability classes
+directly is a later step, when no class names the façade any more (V5).
+
+## 4. Steps
+
+| Step | Commit | What |
+| ---- | ------ | ---- |
+| S10.1 | `test(ai): request snapshots for the Google and OpenAI providers` | `ProviderRequestCharacterizationTest` with `MockHttpClient`: for each capability method, the request sent (method, URL, headers without the key, JSON body) and the parsed result, from fixed inputs, streamed and buffered. Snapshots `provider_requests_google.json`, `provider_requests_openai.json`, recorded on the parent. |
+| S10.2 | `refactor(ai): one API client per vendor` | `GoogleApiClient`, `OpenAIApiClient`. |
+| S10.3 | `refactor(ai): Google capabilities in their own classes` | Chat, images, video, speech; the façade delegates. |
+| S10.4 | `refactor(ai): OpenAI capabilities in their own classes` | The same for OpenAI. |
+| C10 | `chore(planning): close V4 S10 — sprint test, status, ledgers` | Loop §7 |
+
+## 5. Sprint test
+
+- **Proof:** both request snapshots recorded on S9's head, unchanged after
+  every step. A unit test per capability class against its client double.
+  Mutation check: change one header in a client and see the snapshot fail.
+- **Regression:** the 11 existing provider test classes green with
+  unchanged assertions; `lint:container`; no `services.yaml` diff;
+  unfiltered gates.
+- **Journey:** CI has no vendor keys, so `make test-e2e` runs on the test
+  provider. With a Google and an OpenAI key on the dev stack, run one chat,
+  one image and one speech request per vendor in the browser and record
+  them in STATUS. This is not a gate: say so in the pull request when no
+  key was available.
+
+## 6. Reviewer focus
+
+Streaming: chunk parsing, reasoning chunks and the final usage chunk move
+with `chatStream()`. Error mapping: a provider error must still reach the
+user as the same `ProviderException` with the same context.
+
+## 7. Exit
+
+- `GoogleProvider` and `OpenAIProvider` < 800 lines and leave the file
+  ledger; no method in the new classes > 100 lines, so the four ledger
+  entries `GoogleProvider::chatStream` (202), `::synthesize` (156),
+  `::convertMessagesToGeminiFormat` (117) and `OpenAIProvider::chatStream`
+  (119) are gone.
+- `docs/ARCHITECTURE.md` gains "Provider adapters": the façade + capability
+  recipe that `XaiProvider` and `AnthropicProvider` follow in V5.
+
+## 8. Not in S10
+
+`XaiProvider`, `AnthropicProvider` and the smaller providers (V5). Model
+catalog, pricing and the registry.

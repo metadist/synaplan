@@ -36,3 +36,6 @@ shipped in #2431. The UX contract (`20260907_ux_user_flows.md` and its
 wireframes) is in `20260907_ux_user_flows/`; its rules U1–U12 moved to
 `docs/UX_CONTRACT.md`. Code comments that cite the old
 `_devextras/planning/<folder>/` paths mean the folder of the same name here.
+
+2026-10-16 housekeeping: `20261015-code-cleanup-V3/` merged (#2512–#2514)
+and moved here; its §7 became `_devextras/planning/20261016-code-cleanup-V4/`.
