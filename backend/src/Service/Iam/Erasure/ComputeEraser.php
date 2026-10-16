@@ -16,10 +16,11 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * The user's file-work runs and workspaces. The rows go inside the
- * transaction. Nothing finds a sidecar folder once its row is gone, so after
- * the commit each live folder is handed to a durable
- * {@see DeleteComputeWorkspaceCommand}; a busy sidecar never fails the
- * account deletion.
+ * transaction, read with a lock so a workspace created meanwhile is either
+ * seen here or refused for the deleted owner. Nothing finds a sidecar folder
+ * once its row is gone, so after the commit each live folder is handed to a
+ * durable {@see DeleteComputeWorkspaceCommand}; a busy sidecar never fails
+ * the account deletion.
  */
 #[AsTaggedItem(priority: 115)]
 final readonly class ComputeEraser implements UserDataEraserInterface
@@ -37,7 +38,7 @@ final readonly class ComputeEraser implements UserDataEraserInterface
     {
         $this->runs->deleteByUser($erasure->userId);
 
-        foreach ($this->workspaces->findBy(['userId' => $erasure->userId]) as $workspace) {
+        foreach ($this->workspaces->findForUserLocked($erasure->userId) as $workspace) {
             if (ComputeWorkspace::STATUS_DELETED !== $workspace->getStatus()) {
                 $workspaceId = $workspace->getWorkspaceId();
                 $erasure->afterCommit(fn () => $this->queueFolderDeletion($workspaceId));

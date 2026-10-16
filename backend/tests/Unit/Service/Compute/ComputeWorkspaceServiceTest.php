@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\ComputeWorkspaceRepository;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
+use App\Service\Compute\ComputeRefusedException;
 use App\Service\Compute\ComputeWorkspaceService;
 use App\Service\Compute\Contract\ComputeWorkspaceCreate;
 use App\Service\Compute\Contract\ComputeWorkspaceCreated;
@@ -44,7 +45,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
 
         $repo = $this->createMock(ComputeWorkspaceRepository::class);
         $repo->method('findAccessibleForUser')->willReturn(null);
-        $repo->expects($this->once())->method('save');
+        $repo->expects($this->once())->method('saveForExistingOwner')->willReturn(true);
         $client->expects($this->never())->method('deleteWorkspace');
 
         $limits = $this->createStub(RateLimitService::class);
@@ -67,7 +68,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
         $existing = new ComputeWorkspace(7, '01ARZ3NDEKTSV4RRFFQ69G5FAV', 256, null);
         $repo = $this->createMock(ComputeWorkspaceRepository::class);
         $repo->expects($this->exactly(2))->method('findAccessibleForUser')->willReturnOnConsecutiveCalls(null, $existing);
-        $repo->expects($this->never())->method('save');
+        $repo->expects($this->never())->method('saveForExistingOwner');
 
         $client = $this->createMock(ComputeClient::class);
         $client->expects($this->never())->method('createWorkspace');
@@ -112,7 +113,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
 
         $repo = $this->createMock(ComputeWorkspaceRepository::class);
         $repo->method('findAccessibleForUser')->willReturn(null);
-        $repo->method('save')->willThrowException(new \RuntimeException('duplicate key'));
+        $repo->method('saveForExistingOwner')->willThrowException(new \RuntimeException('duplicate key'));
 
         $limits = $this->createStub(RateLimitService::class);
         $limits->method('computeIntSetting')->willReturn(256);
@@ -129,13 +130,35 @@ final class ComputeWorkspaceServiceTest extends TestCase
         }
     }
 
+    public function testACreationThatOutlivesItsOwnersAccountDiscardsTheFolder(): void
+    {
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('createWorkspace')->willReturn(new ComputeWorkspaceCreated('01ARZ3NDEKTSV4RRFFQ69G5FAV', 256));
+        $client->expects($this->once())->method('deleteWorkspace')->with('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $repo = $this->createStub(ComputeWorkspaceRepository::class);
+        $repo->method('findAccessibleForUser')->willReturn(null);
+        $repo->method('saveForExistingOwner')->willReturn(false);
+        $limits = $this->createStub(RateLimitService::class);
+        $limits->method('computeIntSetting')->willReturn(256);
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+
+        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $limits, $this->locks());
+        try {
+            $service->ensure($user);
+            self::fail('A workspace for a deleted account must be refused.');
+        } catch (ComputeRefusedException $e) {
+            self::assertSame('account_deleted', $e->errorCode());
+        }
+    }
+
     public function testExpiredWorkspaceIsDroppedSoTheNextEnsureCreatesANewFolder(): void
     {
         $expired = new ComputeWorkspace(7, '01ARZ3NDEKTSV4RRFFQ69G5FAV', 256, new \DateTimeImmutable('-1 day'));
         $repo = $this->createMock(ComputeWorkspaceRepository::class);
         $repo->method('findAccessibleForUser')->willReturnOnConsecutiveCalls($expired, null);
         $repo->expects($this->once())->method('remove')->with($expired);
-        $repo->expects($this->once())->method('save');
+        $repo->expects($this->once())->method('saveForExistingOwner')->willReturn(true);
 
         $client = $this->createMock(ComputeClient::class);
         $client->expects($this->once())->method('deleteWorkspace')->with('01ARZ3NDEKTSV4RRFFQ69G5FAV');
@@ -162,7 +185,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
 
         $client = $this->createMock(ComputeClient::class);
         $client->method('deleteWorkspace')->willThrowException(
-            new \App\Service\Compute\ComputeRefusedException('workspace_busy', 'busy', httpStatus: 409),
+            new ComputeRefusedException('workspace_busy', 'busy', httpStatus: 409),
         );
         $client->expects($this->never())->method('createWorkspace');
 
@@ -281,7 +304,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('rejectedPaths')]
     public function testSafeRelativePathRejects(string $path): void
     {
-        $this->expectException(\App\Service\Compute\ComputeRefusedException::class);
+        $this->expectException(ComputeRefusedException::class);
         ComputeWorkspaceService::safeRelativePath($path, true);
     }
 
@@ -312,7 +335,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
 
         $repo = $this->createMock(ComputeWorkspaceRepository::class);
         $repo->method('findAccessibleForUser')->willReturn(null);
-        $repo->expects($this->once())->method('save');
+        $repo->expects($this->once())->method('saveForExistingOwner')->willReturn(true);
 
         $limits = $this->createStub(RateLimitService::class);
         $limits->method('computeIntSetting')->willReturnCallback(

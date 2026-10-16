@@ -92,17 +92,28 @@ final readonly class ComputeWorkspaceService
             (new \DateTimeImmutable())->modify('+'.$ttl.' days'),
         );
         try {
-            $this->workspaces->save($row);
+            $saved = $this->workspaces->saveForExistingOwner($row);
         } catch (\Throwable $e) {
-            try {
-                $this->client->deleteWorkspace($created->workspaceId);
-            } catch (\Throwable) {
-            }
+            $this->discardFolder($created->workspaceId);
 
             throw $e;
         }
+        if (!$saved) {
+            $this->discardFolder($created->workspaceId);
+
+            throw new ComputeRefusedException('account_deleted', 'This account was deleted while its file-work folder was being created.');
+        }
 
         return $row;
+    }
+
+    /** Best effort: the folder has no row pointing at it. */
+    private function discardFolder(string $workspaceId): void
+    {
+        try {
+            $this->client->deleteWorkspace($workspaceId);
+        } catch (\Throwable) {
+        }
     }
 
     /**

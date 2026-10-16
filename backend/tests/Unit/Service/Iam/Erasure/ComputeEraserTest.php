@@ -86,7 +86,7 @@ final class ComputeEraserTest extends TestCase
         ?LoggerInterface $logger = null,
     ): ComputeEraser {
         $repository = $this->createStub(ComputeWorkspaceRepository::class);
-        $repository->method('findBy')->willReturn($workspaces);
+        $repository->method('findForUserLocked')->willReturn($workspaces);
         if (null === $bus) {
             $bus = $this->createStub(MessageBusInterface::class);
             $bus->method('dispatch')->willReturnCallback(function (object $message): Envelope {
