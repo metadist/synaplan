@@ -14,6 +14,7 @@ use App\Service\Context\ContextCondenser;
 use App\Service\Context\ModelContextWindow;
 use App\Service\Digest\DigestSearchService;
 use App\Service\Digest\MessageDigestConfig;
+use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\Document\ChatDocumentOutput;
 use App\Service\Document\DocumentEditCoordinator;
 use App\Service\Feedback\FeedbackConfigService;
@@ -136,7 +137,7 @@ final class ChatHandlerFactory
             new ChatSystemPromptAssembler($sections, $documents, $messages, $logger),
             $messages,
             new ChatRequestOptions($structuredOutputConfig, $rateLimitService),
-            new ChatReplyGenerator($aiFacade, $documents, $logger),
+            new ChatReplyGenerator($aiFacade, $documents, $logger, new ProviderTranscriptCapture()),
             $documents,
             new RoutingHandoffResolver($toolCallingTranslator, $toolCallParser, $routingToolset, $logger),
             new PendingMemoryExtraction($memoryExtractionDispatcher, $perfPipelineFlag, $logger),

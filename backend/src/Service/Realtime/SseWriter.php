@@ -66,7 +66,11 @@ final class SseWriter
             ...self::sanitizeUtf8($data),
         ];
 
-        $this->run?->record($event);
+        // The prompt transcript is for the live frame only. The run recorder
+        // would store the whole event and replay it on resume.
+        $recorded = $event;
+        unset($recorded['providerMessages']);
+        $this->run?->record($recorded);
 
         if (connection_aborted()) {
             if (!$this->abortLogged) {

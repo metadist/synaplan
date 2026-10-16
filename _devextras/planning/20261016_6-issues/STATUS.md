@@ -15,4 +15,6 @@ A line here is the record. Chat is not.
 
 | 2026-10-16 | Sprint 05 #2504 | Playwright covers close/reopen (`@ci` `@crossbrowser`), theme, fullscreen, the 4-of-5 message limit, and removing a staged file. Chromium run of the new tests is green, including the limit test after the session history has loaded. |
 
-Next: sprint 06.
+| 2026-10-16 | Sprint 06 #2515 | Signed-in chat can open "What was sent" on a reply. The transcript is captured for that visit, redacted, capped, and stripped before the run recorder. Widget turns do not receive it. Reloading the chat has no transcript. PHPStan, deptrac, locale parity, and the dialog unit test are green. |
+
+Next: none. The CI-image repeat for #2460 is still open.

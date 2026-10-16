@@ -661,7 +661,7 @@
                  compact circular icon button — `.pill` is an unlayered class
                  that would beat `md:` Tailwind variants for the same
                  properties, so we branch the whole class list instead. -->
-            <div v-if="role === 'assistant' && hasInfoPopover && !isProcessing" class="relative">
+            <div v-if="role === 'assistant' && !isProcessing && !isGuestMode" class="relative">
               <button
                 ref="infoButtonRef"
                 type="button"
@@ -830,9 +830,23 @@
                         }}</span>
                       </div>
                     </template>
+                    <button
+                      type="button"
+                      class="btn-secondary mt-1 w-full px-4 py-2.5 text-sm font-medium"
+                      data-testid="btn-what-was-sent"
+                      @click="whatWasSentOpen = true"
+                    >
+                      {{ t('chatMessage.whatWasSent') }}
+                    </button>
                   </div>
                 </div>
               </Transition>
+              <WhatWasSentDialog
+                v-if="whatWasSentOpen"
+                :messages="providerMessages ?? null"
+                :truncated="providerMessagesTruncated === true"
+                @close="whatWasSentOpen = false"
+              />
             </div>
 
             <!-- Usage taximeter: per-reply token/cost badge. Hover-revealed on
@@ -1167,6 +1181,7 @@ import type { UserMemory } from '@/services/api/userMemoriesApi'
 import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
 import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
+import WhatWasSentDialog from '@/components/chat/WhatWasSentDialog.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
@@ -1338,6 +1353,8 @@ interface Props {
     ownerName?: string
   }> | null // Web search results
   ragSources?: RagSourceRef[] | null
+  providerMessages?: Array<{ role: string; text: string }> | null
+  providerMessagesTruncated?: boolean
   aiModels?: {
     chat?: {
       provider: string
@@ -1876,6 +1893,7 @@ const emit = defineEmits<{
 const router = useRouter()
 const modelDropdownOpen = ref(false)
 const infoPopoverOpen = ref(false)
+const whatWasSentOpen = ref(false)
 const infoButtonRef = ref<HTMLButtonElement | null>(null)
 const editing = ref(false)
 const editDraft = ref('')
@@ -1936,27 +1954,6 @@ watch(infoPopoverOpen, (open) => {
   window.removeEventListener('keydown', onInfoEscape)
   infoButtonRef.value?.focus()
 })
-
-const hasMessageMetadata = computed(() => {
-  if (props.topic) return true
-  if (
-    props.aiModels?.chat ||
-    props.aiModels?.sorting ||
-    props.aiModels?.audio ||
-    props.aiModels?.voice
-  )
-    return true
-  // Only count legacy model/provider as metadata when neither is a
-  // channel-source token, otherwise we'd light up the info popover
-  // with nothing meaningful to show (issue #653).
-  if (legacyModelLabel.value && legacyProviderLabel.value) return true
-  return false
-})
-
-// The info popover opens for model/topic metadata OR per-reply usage, so the
-// token/cost numbers stay reachable on touch devices where the inline usage
-// badge is hidden to avoid colliding with the footer actions.
-const hasInfoPopover = computed(() => hasMessageMetadata.value || usageBadge.value !== null)
 
 const closeInfoPopover = () => {
   infoPopoverOpen.value = false

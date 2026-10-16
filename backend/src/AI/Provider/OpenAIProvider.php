@@ -17,6 +17,7 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\Tool\CatalogToolUse;
 use App\AI\Tool\OpenAiToolShapes;
+use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\File\FileHelper;
 use OpenAI;
 use Psr\Log\LoggerInterface;
@@ -58,6 +59,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         private bool $storeResponses = false,
         private ?ProviderKeyStore $keyStore = null,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
+        private ?ProviderTranscriptCapture $transcripts = null,
     ) {
     }
 
@@ -604,6 +606,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         if ($hasPreviousResponse) {
             $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
         }
+        $this->rememberTranscript($requestOptions['input'] ?? [], true);
 
         try {
             return $this->client()->responses()->create($requestOptions);
@@ -622,6 +625,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 ]);
                 unset($requestOptions['previous_response_id']);
                 $requestOptions['input'] = $fullInput;
+                $this->rememberTranscript($fullInput, false);
 
                 return $this->client()->responses()->create($requestOptions);
             }
@@ -647,6 +651,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         if ($hasPreviousResponse) {
             $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
         }
+        $this->rememberTranscript($requestOptions['input'] ?? [], true);
 
         try {
             return $this->client()->responses()->createStreamed($requestOptions);
@@ -665,6 +670,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 ]);
                 unset($requestOptions['previous_response_id']);
                 $requestOptions['input'] = $fullInput;
+                $this->rememberTranscript($fullInput, false);
 
                 return $this->client()->responses()->createStreamed($requestOptions);
             }
@@ -747,6 +753,23 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * When previous_response_id is used, the API already has the conversation context.
      * Only the new user message needs to be sent.
      */
+    /**
+     * @param mixed $input
+     */
+    private function rememberTranscript(mixed $input, bool $replace): void
+    {
+        if (!$this->transcripts instanceof ProviderTranscriptCapture || !is_array($input)) {
+            return;
+        }
+        $messages = array_is_list($input) ? $input : [];
+        if ($replace) {
+            $this->transcripts->replaceLast($messages);
+
+            return;
+        }
+        $this->transcripts->record($messages);
+    }
+
     private function reduceToLastUserMessage(array $input): array
     {
         foreach (array_reverse($input) as $msg) {
