@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
@@ -19,6 +19,21 @@ const heading = (role: string) => {
   if (role === 'you') return t('chatMessage.whatWasSentYou')
   return t('chatMessage.whatWasSentAssistant')
 }
+
+const onKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <template>
@@ -40,7 +55,12 @@ const heading = (role: string) => {
         {{ t('chatMessage.whatWasSentEmpty') }}
       </p>
       <div v-else class="space-y-3">
-        <section v-for="(block, index) in blocks" :key="index" class="space-y-1">
+        <section
+          v-for="(block, index) in blocks"
+          :key="index"
+          class="rounded-xl border border-light-border/30 dark:border-dark-border/20 p-3 space-y-1"
+          data-testid="block-what-was-sent"
+        >
           <h3 class="text-xs font-medium txt-secondary">{{ heading(block.role) }}</h3>
           <p class="text-sm txt-primary whitespace-pre-wrap break-words">{{ block.text }}</p>
         </section>

@@ -116,6 +116,10 @@ final readonly class ProviderTranscript
             }
             if (is_array($part) && is_string($part['text'] ?? null)) {
                 $parts[] = $part['text'];
+                continue;
+            }
+            if (is_array($part) && is_string($part['content'] ?? null)) {
+                $parts[] = $part['content'];
             }
         }
 

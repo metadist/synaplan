@@ -32,6 +32,33 @@ test.describe('@ci @smoke Chat', () => {
     await test.step('Assert: stream ended and assistant reply non-empty', async () => {
       expect(aiText.length).toBeGreaterThan(0)
     })
+
+    await test.step('Act & Assert: open what was sent on the live reply, then after reload', async () => {
+      await page.getByTestId('btn-message-info').last().click()
+      await page.getByTestId('btn-what-was-sent').click()
+
+      const dialog = page.getByTestId('dialog-what-was-sent')
+      await expect(dialog).toBeVisible()
+      await expect(dialog).toContainText('Instructions')
+      await expect(dialog).toContainText('You')
+      await expect(dialog).toContainText(PROMPTS.CHAT_SMOKE)
+      await expect(dialog).toContainText(
+        'This stays on this screen until you leave the chat. It is not saved.'
+      )
+      await expect(page.getByTestId('text-what-was-sent-empty')).toHaveCount(0)
+
+      await page.getByTestId('btn-what-was-sent-close').click()
+      await expect(dialog).toBeHidden()
+
+      await page.reload()
+      await expect(page.getByTestId('btn-message-info').last()).toBeVisible()
+      await page.getByTestId('btn-message-info').last().click()
+      await page.getByTestId('btn-what-was-sent').click()
+      await expect(page.getByTestId('text-what-was-sent-empty')).toContainText(
+        'Nothing was recorded for this reply.'
+      )
+      await page.getByTestId('btn-what-was-sent-close').click()
+    })
   })
 })
 

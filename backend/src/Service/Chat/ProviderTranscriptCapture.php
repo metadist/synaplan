@@ -72,6 +72,59 @@ final class ProviderTranscriptCapture implements ResetInterface
     }
 
     /**
+     * Records an OpenAI Responses API request (`instructions` + `input`),
+     * replacing the pre-provider snapshot of the current round.
+     *
+     * @param array<string, mixed> $requestOptions
+     */
+    public function recordResponsesRequest(array $requestOptions): void
+    {
+        if (!$this->enabled) {
+            return;
+        }
+
+        $messages = [];
+        $instructions = $requestOptions['instructions'] ?? null;
+        if (is_string($instructions) && '' !== trim($instructions)) {
+            $messages[] = ['role' => 'instructions', 'content' => $instructions];
+        }
+
+        $input = $requestOptions['input'] ?? null;
+        if (is_array($input) && array_is_list($input)) {
+            foreach ($input as $row) {
+                if (is_array($row)) {
+                    $messages[] = $row;
+                }
+            }
+        }
+
+        $this->replaceLast($messages);
+    }
+
+    /**
+     * Records an Anthropic Messages API request after system extraction,
+     * empty-turn filtering, and consecutive-role merging.
+     *
+     * @param list<array<string, mixed>> $conversationMessages
+     */
+    public function recordAnthropicRequest(?string $systemMessage, array $conversationMessages): void
+    {
+        if (!$this->enabled) {
+            return;
+        }
+
+        $messages = [];
+        if (null !== $systemMessage && '' !== trim($systemMessage)) {
+            $messages[] = ['role' => 'instructions', 'content' => $systemMessage];
+        }
+        foreach ($conversationMessages as $row) {
+            $messages[] = $row;
+        }
+
+        $this->replaceLast($messages);
+    }
+
+    /**
      * @return array{messages: list<array{role: string, text: string}>, truncated: bool}|null
      */
     public function payload(): ?array

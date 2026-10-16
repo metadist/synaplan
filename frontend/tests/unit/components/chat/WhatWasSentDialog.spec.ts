@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import WhatWasSentDialog from '@/components/chat/WhatWasSentDialog.vue'
 
-const mountDialog = (props: { messages: Array<{ role: string; text: string }> | null; truncated?: boolean }) =>
+const mountDialog = (props: {
+  messages: Array<{ role: string; text: string }> | null
+  truncated?: boolean
+}) =>
   mount(WhatWasSentDialog, {
     props: { messages: props.messages, truncated: props.truncated ?? false },
   })
@@ -32,5 +35,20 @@ describe('WhatWasSentDialog', () => {
       'Nothing was recorded'
     )
     expect(wrapper.text()).not.toContain('Instructions')
+  })
+
+  it('shows the truncation notice when truncated is true and closes on Escape', async () => {
+    const wrapper = mountDialog({
+      messages: [{ role: 'you', text: 'Long input' }],
+      truncated: true,
+    })
+
+    expect(wrapper.get('[data-testid="text-what-was-sent-truncated"]').text()).toContain(
+      'The rest is left out'
+    )
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    wrapper.unmount()
   })
 })

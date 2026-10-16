@@ -596,50 +596,15 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     private function executeResponsesCreate(array $requestOptions): mixed
     {
-        $requestOptions = $this->applyReasoningRejectionCache($requestOptions);
-
-        $fullInput = $requestOptions['input'] ?? [];
-        $hasPreviousResponse = isset($requestOptions['previous_response_id']);
-        $hasReasoning = isset($requestOptions['reasoning']);
-        $model = (string) ($requestOptions['model'] ?? '');
-
-        if ($hasPreviousResponse) {
-            $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
-        }
-        $this->rememberTranscript($requestOptions['input'] ?? [], true);
-
-        try {
-            return $this->client()->responses()->create($requestOptions);
-        } catch (\Exception $e) {
-            if ($hasReasoning && $this->isReasoningEffortRejectedError($e)) {
-                $this->rememberReasoningRejection($model, $requestOptions['reasoning'] ?? [], $e);
-                unset($requestOptions['reasoning']);
-
-                return $this->client()->responses()->create($requestOptions);
-            }
-
-            if ($hasPreviousResponse && $this->isPreviousResponseError($e)) {
-                $this->logger->warning('OpenAI: previous_response_id invalid, retrying with full context', [
-                    'previous_response_id' => $requestOptions['previous_response_id'],
-                    'error' => $e->getMessage(),
-                ]);
-                unset($requestOptions['previous_response_id']);
-                $requestOptions['input'] = $fullInput;
-                $this->rememberTranscript($fullInput, false);
-
-                return $this->client()->responses()->create($requestOptions);
-            }
-
-            throw $e;
-        }
+        return $this->executeResponsesRequest($requestOptions, false);
     }
 
-    /**
-     * Execute responses()->createStreamed() with the same two fallbacks as
-     * {@see self::executeResponsesCreate()}: invalid `previous_response_id`,
-     * and an unsupported `reasoning.effort` value (per-model tier vocab).
-     */
     private function executeResponsesCreateStreamed(array $requestOptions): mixed
+    {
+        return $this->executeResponsesRequest($requestOptions, true);
+    }
+
+    private function executeResponsesRequest(array $requestOptions, bool $stream): mixed
     {
         $requestOptions = $this->applyReasoningRejectionCache($requestOptions);
 
@@ -651,28 +616,37 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         if ($hasPreviousResponse) {
             $requestOptions['input'] = $this->reduceToLastUserMessage($fullInput);
         }
-        $this->rememberTranscript($requestOptions['input'] ?? [], true);
+        $this->transcripts?->recordResponsesRequest($requestOptions);
+
+        $send = fn (array $opts): mixed => $stream
+            ? $this->client()->responses()->createStreamed($opts)
+            : $this->client()->responses()->create($opts);
 
         try {
-            return $this->client()->responses()->createStreamed($requestOptions);
+            return $send($requestOptions);
         } catch (\Exception $e) {
             if ($hasReasoning && $this->isReasoningEffortRejectedError($e)) {
                 $this->rememberReasoningRejection($model, $requestOptions['reasoning'] ?? [], $e);
                 unset($requestOptions['reasoning']);
 
-                return $this->client()->responses()->createStreamed($requestOptions);
+                return $send($requestOptions);
             }
 
             if ($hasPreviousResponse && $this->isPreviousResponseError($e)) {
-                $this->logger->warning('OpenAI: previous_response_id invalid for stream, retrying with full context', [
-                    'previous_response_id' => $requestOptions['previous_response_id'],
-                    'error' => $e->getMessage(),
-                ]);
+                $this->logger->warning(
+                    $stream
+                        ? 'OpenAI: previous_response_id invalid for stream, retrying with full context'
+                        : 'OpenAI: previous_response_id invalid, retrying with full context',
+                    [
+                        'previous_response_id' => $requestOptions['previous_response_id'],
+                        'error' => $e->getMessage(),
+                    ],
+                );
                 unset($requestOptions['previous_response_id']);
                 $requestOptions['input'] = $fullInput;
-                $this->rememberTranscript($fullInput, false);
+                $this->transcripts?->recordResponsesRequest($requestOptions);
 
-                return $this->client()->responses()->createStreamed($requestOptions);
+                return $send($requestOptions);
             }
 
             throw $e;
@@ -753,23 +727,6 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * When previous_response_id is used, the API already has the conversation context.
      * Only the new user message needs to be sent.
      */
-    /**
-     * @param mixed $input
-     */
-    private function rememberTranscript(mixed $input, bool $replace): void
-    {
-        if (!$this->transcripts instanceof ProviderTranscriptCapture || !is_array($input)) {
-            return;
-        }
-        $messages = array_is_list($input) ? $input : [];
-        if ($replace) {
-            $this->transcripts->replaceLast($messages);
-
-            return;
-        }
-        $this->transcripts->record($messages);
-    }
-
     private function reduceToLastUserMessage(array $input): array
     {
         foreach (array_reverse($input) as $msg) {

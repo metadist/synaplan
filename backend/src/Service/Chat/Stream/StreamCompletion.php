@@ -69,7 +69,8 @@ final readonly class StreamCompletion
         }
 
         $transcript = $this->transcripts->payload();
-        if (null !== $transcript) {
+        $this->transcripts->reset();
+        if (null !== $transcript && null === $turn->caller->widgetSession && null === $turn->caller->guestSession) {
             $event->set('providerMessages', $transcript);
         }
 

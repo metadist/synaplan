@@ -661,7 +661,7 @@
                  compact circular icon button — `.pill` is an unlayered class
                  that would beat `md:` Tailwind variants for the same
                  properties, so we branch the whole class list instead. -->
-            <div v-if="role === 'assistant' && !isProcessing && !isGuestMode" class="relative">
+            <div v-if="role === 'assistant' && hasInfoPopover && !isProcessing" class="relative">
               <button
                 ref="infoButtonRef"
                 type="button"
@@ -831,22 +831,25 @@
                       </div>
                     </template>
                     <button
+                      v-if="canSeeWhatWasSent"
                       type="button"
                       class="btn-secondary mt-1 w-full px-4 py-2.5 text-sm font-medium"
                       data-testid="btn-what-was-sent"
-                      @click="whatWasSentOpen = true"
+                      @click="openWhatWasSent"
                     >
                       {{ t('chatMessage.whatWasSent') }}
                     </button>
                   </div>
                 </div>
               </Transition>
-              <WhatWasSentDialog
-                v-if="whatWasSentOpen"
-                :messages="providerMessages ?? null"
-                :truncated="providerMessagesTruncated === true"
-                @close="whatWasSentOpen = false"
-              />
+              <Teleport to="body">
+                <WhatWasSentDialog
+                  v-if="whatWasSentOpen"
+                  :messages="providerMessages ?? null"
+                  :truncated="providerMessagesTruncated === true"
+                  @close="whatWasSentOpen = false"
+                />
+              </Teleport>
             </div>
 
             <!-- Usage taximeter: per-reply token/cost badge. Hover-revealed on
@@ -1955,8 +1958,40 @@ watch(infoPopoverOpen, (open) => {
   infoButtonRef.value?.focus()
 })
 
+const hasMessageMetadata = computed(() => {
+  if (props.topic) return true
+  if (
+    props.aiModels?.chat ||
+    props.aiModels?.sorting ||
+    props.aiModels?.audio ||
+    props.aiModels?.voice
+  )
+    return true
+  if (legacyModelLabel.value && legacyProviderLabel.value) return true
+  return false
+})
+
+const canSeeWhatWasSent = computed(
+  () =>
+    props.role === 'assistant' &&
+    !props.isGuestMode &&
+    props.canRewrite !== false &&
+    !props.foreignMemory &&
+    props.status !== 'failed' &&
+    props.status !== 'rate_limited'
+)
+
+const hasInfoPopover = computed(
+  () => hasMessageMetadata.value || usageBadge.value !== null || canSeeWhatWasSent.value
+)
+
 const closeInfoPopover = () => {
   infoPopoverOpen.value = false
+}
+
+const openWhatWasSent = () => {
+  closeInfoPopover()
+  whatWasSentOpen.value = true
 }
 
 const handleInfoModelClick = (modelType: 'chat' | 'sorting' | 'audio' | 'voice') => {

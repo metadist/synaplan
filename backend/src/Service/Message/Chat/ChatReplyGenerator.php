@@ -131,7 +131,10 @@ final readonly class ChatReplyGenerator
 
         $answer = new StreamedAnswer($streamCallback, $turn->perfTimer);
         $turn->perfTimer->start('provider_total');
-        $capture = empty($turn->classification['is_widget_mode']) && empty($turn->options['is_widget_mode']);
+        $this->transcripts->reset();
+        $capture = empty($turn->classification['is_widget_mode'])
+            && empty($turn->options['is_widget_mode'])
+            && empty($turn->options['is_guest_mode']);
         if ($capture) {
             $this->transcripts->enable();
         }
