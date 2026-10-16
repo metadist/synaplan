@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import { fetchLiveVoiceOptions, setLiveVoiceConsent } from '@/services/api/liveVoiceApi'
@@ -8,12 +8,15 @@ import { captionsPreferred, setCaptionsPreferred } from '@/services/liveVoice/pr
 const { t } = useI18n()
 const { success, error: notifyError } = useNotification()
 
-const captions = ref(true)
 const consentGiven = ref(false)
 const saving = ref(false)
 
+const captions = computed({
+  get: () => captionsPreferred(),
+  set: (on: boolean) => setCaptionsPreferred(on),
+})
+
 onMounted(async () => {
-  captions.value = captionsPreferred()
   try {
     const options = await fetchLiveVoiceOptions()
     consentGiven.value = options.consentGiven
@@ -22,12 +25,8 @@ onMounted(async () => {
   }
 })
 
-function onCaptionsChange() {
-  setCaptionsPreferred(captions.value)
-}
-
 async function withdraw() {
-  if (saving.value) return
+  if (saving.value || !consentGiven.value) return
   saving.value = true
   try {
     await setLiveVoiceConsent(false)
@@ -42,35 +41,9 @@ async function withdraw() {
 </script>
 
 <template>
-  <section id="voice" class="space-y-6 scroll-mt-24" data-testid="page-voice-settings">
-    <div>
-      <h2 class="text-lg font-medium txt-primary">{{ t('settings.voice.title') }}</h2>
-      <i18n-t
-        keypath="settings.voice.modelsHint"
-        tag="p"
-        scope="global"
-        class="mt-1 text-sm txt-secondary"
-      >
-        <template #page>
-          <RouterLink
-            to="/ai/models?highlight=VOICE_LIVE"
-            class="text-[var(--brand)] hover:underline"
-            data-testid="link-live-voice-models"
-          >
-            {{ t('nav.configAiModels') }}
-          </RouterLink>
-        </template>
-      </i18n-t>
-    </div>
-
+  <div class="space-y-4" data-testid="section-live-voice-preferences">
     <label class="flex items-center gap-2 text-sm txt-primary">
-      <input
-        v-model="captions"
-        type="checkbox"
-        class="h-4 w-4"
-        data-testid="check-live-voice-captions"
-        @change="onCaptionsChange"
-      />
+      <input v-model="captions" type="checkbox" data-testid="check-live-voice-captions" />
       {{ t('settings.voice.captions') }}
     </label>
 
@@ -78,7 +51,7 @@ async function withdraw() {
       <p class="text-sm txt-secondary">{{ t('settings.voice.withdrawHint') }}</p>
       <button
         type="button"
-        class="btn-secondary px-4 py-2.5 text-sm font-medium disabled:opacity-50"
+        class="btn-secondary px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
         :disabled="saving"
         data-testid="btn-live-voice-withdraw"
         @click="withdraw"
@@ -86,5 +59,5 @@ async function withdraw() {
         {{ t('settings.voice.withdraw') }}
       </button>
     </div>
-  </section>
+  </div>
 </template>

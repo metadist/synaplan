@@ -1,7 +1,7 @@
 {
     "_comment": "Size ratchet ledger (tests/Architecture/SizeRatchetTest.php). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_SIZE_RATCHET=1 and review the diff.",
     "recorded": "2026-10-14",
-    "updated": "2026-10-15",
+    "updated": "2026-10-16",
     "limits": {
         "fileLines": 800,
         "constructorParams": 10,

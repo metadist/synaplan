@@ -324,7 +324,6 @@
     "voice": {
       "title": "Canlı konuşmalar",
       "intro": "Canlı konuşmalar için sesi seçin. Konuşurken sesiniz {company} şirketine gider ve maliyet, sohbetle aynı aylık kullanım bütçesini kullanır.",
-      "modelsHint": "Model ve sesi {page} altında seçilir.",
       "model": "Ses modeli",
       "voice": "Ses",
       "captions": "Konuşurken altyazıları göster",
@@ -345,7 +344,6 @@
       "profile": "Profil",
       "appearance": "Dil ve görünüm",
       "chat": "Sohbet ve AI",
-      "voice": "Canlı konuşmalar",
       "data": "Veri ve gizlilik",
       "billing": "Faturalandırma",
       "security": "Güvenlik",

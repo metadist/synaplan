@@ -236,8 +236,7 @@
                 class="absolute z-50 mt-2 flex w-full max-h-[60vh] flex-col dropdown-panel"
               >
                 <div
-                  v-if="showDropdownFilter(capability as Capability)"
-                  class="shrink-0 border-b border-light-border/30 p-2 dark:border-dark-border/20"
+                  class="shrink-0 border-b border-light-border/30 px-2 pb-3 pt-2 dark:border-dark-border/20"
                   data-testid="section-model-choice-filter"
                 >
                   <label class="sr-only" :for="`model-choice-filter-${capability}`">
@@ -273,7 +272,7 @@
                     </button>
                   </div>
                 </div>
-                <div class="min-h-0 overflow-y-auto">
+                <div class="flex min-h-0 flex-col gap-1 overflow-y-auto pt-2">
                   <button
                     type="button"
                     class="dropdown-item w-full"
@@ -358,6 +357,9 @@
               @menu="liveMenuOpen = $event"
               @model-commit="onLiveModelChange"
               @voice-commit="onLiveVoiceChange"
+            />
+            <LiveVoicePreferences
+              class="mt-5 border-t border-light-border/30 pt-5 dark:border-dark-border/20"
             />
           </div>
         </div>
@@ -758,6 +760,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import AppPanelHost from '@/components/apps/AppPanelHost.vue'
 import PlannerModelCard from '@/components/config/PlannerModelCard.vue'
 import LiveVoiceDefaults from '@/components/config/LiveVoiceDefaults.vue'
+import LiveVoicePreferences from '@/components/config/LiveVoicePreferences.vue'
 import { useAccordion } from '@/composables/useAccordion'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
@@ -1080,8 +1083,6 @@ const capabilityRefs = ref<Record<Capability, HTMLElement | null>>(
   {} as Record<Capability, HTMLElement | null>
 )
 const openDropdown = ref<Capability | null>(null)
-/** Same cutoff as the chat model menu: a short list is faster to scan than to filter. */
-const DROPDOWN_FILTER_MIN = 6
 const dropdownFilter = ref('')
 const showRatings = ref(false)
 const sortBy = ref<'alphabet' | 'service' | 'rating' | 'quality' | 'purpose'>('alphabet')
@@ -1386,10 +1387,6 @@ function modelMatchesDropdownFilter(model: AIModel): boolean {
   return dropdownFilterTerms.value.every((term) => text.includes(term))
 }
 
-function showDropdownFilter(purpose: Capability): boolean {
-  return getModelsByPurpose(purpose).length >= DROPDOWN_FILTER_MIN
-}
-
 function visibleModelsFor(purpose: Capability): AIModel[] {
   return getModelsByPurpose(purpose).filter(modelMatchesDropdownFilter)
 }
@@ -1500,7 +1497,7 @@ const toggleDropdown = (capability: Capability) => {
   if (openDropdown.value) liveMenuDismiss.value += 1
   dropdownFilter.value = ''
   const opened = openDropdown.value
-  if (opened && showDropdownFilter(opened)) {
+  if (opened) {
     void nextTick(() => {
       choiceFilterInput(opened)?.focus()
     })

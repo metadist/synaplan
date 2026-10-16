@@ -250,6 +250,27 @@ describe('AIModelsConfiguration empty model row', () => {
     errorSpy.mockRestore()
   })
 
+  it('shows the search on a short model menu', async () => {
+    getModels.mockResolvedValue({
+      success: true,
+      models: {
+        MEM: [
+          { ...chatModel, id: 70, name: 'Claude Sonnet', tag: 'mem' },
+          { ...chatModel, id: 71, name: 'gpt-oss-120b', tag: 'mem' },
+        ],
+      },
+      providers: [],
+    })
+
+    await mountPage()
+    const row = wrapper!
+      .findAll('[data-testid="item-capability"]')
+      .find((item) => item.text().includes('Memory Extraction'))!
+    await row.get('[data-testid="btn-model-dropdown"]').trigger('click')
+
+    expect(row.find('[data-testid="input-model-choice-filter"]').exists()).toBe(true)
+  })
+
   it('filters a long model menu by name the way the chat menu does', async () => {
     const chatModels = [
       chatModel,
