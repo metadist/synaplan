@@ -30,7 +30,7 @@ route the same tag differently.
 | tag `text2pic` / `text2vid` / `text2sound` | `mediamaker` |
 | tag `pic2text` / `analyze` / `vision` | `general` (vision is answered by `ChatHandler`) |
 | tag `document` / `officemaker` / `text2doc` | `officemaker` |
-| tag `chat`, `vectorize`, unknown | **the topic it is given** (empty or `unknown` counts as none), else `general`. The policy: a chat model keeps a custom prompt. |
+| tag `chat`, `vectorize`, unknown | **the topic it is given**, else `general`. Empty, `unknown` and `UNKNOWN` (the default topic of a new `Message`) count as none, case-insensitively. The policy: a chat model keeps a custom prompt. |
 | topic → intent | the capability registry, then the aliases; unknown → chat |
 
 What moves:
@@ -49,6 +49,10 @@ What moves:
 - **Classifier, `vision` models:** the classifier has no `vision` row, so
   an existing topic such as `mediamaker` survives the override. The rule
   says `general` (S3.6).
+- **Classifier, unmapped tags:** the fallback `$fallbackTopic ?: 'general'`
+  keeps `UNKNOWN`, the default topic of a new `Message` (`Message.php`
+  line 63), because the string is not empty. The rule treats it as no
+  topic and answers `general` (S3.7).
 
 Alternative the owner may pick instead: the Again semantics win. That
 keeps the document route but sends `tools:pic` retries to chat. It is not
@@ -59,13 +63,14 @@ bug this sprint exists to close.
 
 | Step | Commit | What |
 | ---- | ------ | ---- |
-| S3.1 | `test(message): pin both topic and intent rules side by side` | Table test over every tag and topic above, against both private copies, on the parent. Add routing cases for a model override per tag to `RoutingCharacterizationTest`, **each with and without a topic already on the message** (a custom prompt topic, `mediamaker`). Add turn cases for Again per tag to `MessageTurnCharacterizationTest`. |
+| S3.1 | `test(message): pin both topic and intent rules side by side` | Table test over every tag and topic above, against both private copies, on the parent. Add routing cases for a model override per tag to `RoutingCharacterizationTest`, **each with and without a topic already on the message** (a custom prompt topic, `mediamaker`), and the fallback inputs: an empty topic, `unknown`, `UNKNOWN`. Add turn cases for Again per tag to `MessageTurnCharacterizationTest`. |
 | S3.2 | `refactor(message): one owner for the topic and intent tables` | `App\Service\Message\Capability\TopicIntentRule`, built on `SystemCapabilityRegistry`. It moves both copies **unchanged**: today's two policies sit side by side as named methods (`forModelOverride()`, `forAgain()`), so no snapshot moves. The private copies in both callers are deleted. |
 | S3.3 | `fix(message): Again routes by the same topic and intent rule` | Again switches to the D2 rule. `message_turn.json` diff: the Again cases only. |
 | S3.4 | `fix(message): a document model override reaches the document handler` | The classifier gets the document row. `routing_classification.json` diff: the document-override cases only. |
 | S3.5 | `fix(message): a chat model override keeps the message's topic` | The classifier's `chat` / `vectorize` row keeps a given topic. Routing diff: exactly the S3.1 cases that carry a topic. |
 | S3.6 | `fix(message): a vision model override routes to the chat answer` | The classifier has no `vision` row today, so a vision override falls back to the message's topic and keeps `mediamaker`. The rule maps it to `general`. Routing diff: the vision cases with an existing topic. |
-| S3.7 | `refactor(message): one topic and intent rule` | After S3.3–S3.6 the two policies agree on every input of the D2 table (the S3.1 table test proves it), so `forModelOverride()` / `forAgain()` collapse into the one rule and no snapshot moves. |
+| S3.7 | `fix(message): an unmapped model tag on a new message routes to general` | The classifier's fallback treats empty, `unknown` and `UNKNOWN` as no topic. Routing diff: the S3.1 fallback cases only. |
+| S3.8 | `refactor(message): one topic and intent rule` | After S3.3–S3.7 the two policies agree on every input of the D2 table, the fallback inputs included (the S3.1 table test proves it), so `forModelOverride()` / `forAgain()` collapse into the one rule and no snapshot moves. |
 | C3 | `chore(planning): close V4 S3 — sprint test, status, ledgers` | Loop §7 |
 
 ## 4. Sprint test
@@ -76,11 +81,12 @@ bug this sprint exists to close.
   image generation; a document-model override routes to the document
   handler; a chat-model override on a message with a custom prompt topic
   keeps that topic; a vision-model override on a `mediamaker` message
-  routes to `general`. Mutation check: drop the document row and see two
-  tests fail.
-- **Regression:** S3.2 and S3.7 move no snapshot. The routing diffs of
-  S3.4–S3.6 and the turn diff of S3.3 are limited to their cases and
-  quoted in the pull request
+  routes to `general`; an unmapped tag on a new (`UNKNOWN`) message routes
+  to `general`. Mutation check: drop the document row and see two tests
+  fail.
+- **Regression:** S3.1 records new cases only (additive, loop §5); S3.2 and
+  S3.8 move no snapshot. The routing diffs of S3.4–S3.7 and the turn diff
+  of S3.3 are limited to their cases and quoted in the pull request
   (`UPDATE_ROUTING_SNAPSHOTS=1` / `UPDATE_CLEANUP_V2_SNAPSHOTS=1`). Every
   other snapshot unchanged. Unfiltered gates.
 - **Journey:** `chat-again.spec.ts`, `chat.spec.ts`, `operate-topics.spec.ts`,

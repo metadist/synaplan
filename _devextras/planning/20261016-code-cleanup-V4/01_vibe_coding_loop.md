@@ -114,9 +114,17 @@ make -C frontend test-e2e-layout
 cd frontend && npm run test:e2e:firefox    # the chat specs are @crossbrowser
 ```
 
-- Snapshots are re-recorded only with their `UPDATE_*` variable, and only
-  in a `fix:` sprint. Then `git diff backend/tests/Characterization/__snapshots__/`
-  is read line by line.
+- Snapshots are recorded only with their `UPDATE_*` variable, and the diff
+  (`git diff backend/tests/Characterization/__snapshots__/`) is read line
+  by line. Two kinds of recording, two places:
+  - **Additive:** a new snapshot file, new cases, or a new field recorded
+    for existing cases (S2.1's sorter call count), on the untouched code,
+    in the sprint's characterization-only `test(…)` commit. Any sprint may
+    do this; `RoutingCharacterizationTest` fails a new case until its
+    baseline is recorded. The diff adds lines and changes no existing
+    value.
+  - **Changing an existing expectation:** only in a `fix(…)` commit, with
+    the changed lines quoted in the pull request.
 - Ledgers only shrink: `UPDATE_SIZE_RATCHET=1 php bin/phpunit tests/Architecture/SizeRatchetTest.php`
   and `make -C backend deptrac-baseline` produce removals and smaller
   numbers only. A grown entry is a design problem, not a ledger update.
