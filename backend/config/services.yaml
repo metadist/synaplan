@@ -789,10 +789,12 @@ services:
             - { name: 'app.message.handler' }
 
     App\Service\Message\Handler\FileAnalysisHandler:
-        arguments:
-            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.message.handler' }
+
+    App\Service\Message\FileAnalysis\ImageAnalysis:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
 
     # Circuit Breaker
     App\Service\Infrastructure\CircuitBreaker: ~

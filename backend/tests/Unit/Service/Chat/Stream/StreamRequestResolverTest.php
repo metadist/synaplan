@@ -14,7 +14,7 @@ use App\Service\Chat\Stream\StreamCallerResolver;
 use App\Service\Chat\Stream\StreamRequestRejected;
 use App\Service\Chat\Stream\StreamRequestResolver;
 use App\Service\Chat\Stream\StreamTurnRequest;
-use App\Service\Message\MessageProcessor;
+use App\Service\Message\Processing\TurnHistoryLoader;
 use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -67,7 +67,7 @@ final class StreamRequestResolverTest extends TestCase
 
     public function testCapsToTheNewestMessagesOfThePersistedChatWindow(): void
     {
-        $window = MessageProcessor::HISTORY_MAX_MESSAGES;
+        $window = TurnHistoryLoader::HISTORY_MAX_MESSAGES;
 
         $history = [];
         for ($i = 1; $i <= $window + 10; ++$i) {
