@@ -23,10 +23,13 @@ final class TurnWebSearchWidgetTest extends TestCase
         $webSearch->method('isEnabled')->willReturn(true);
         $webSearch->expects($this->never())->method('search');
 
-        $result = $this->turn($webSearch)->run(
+        $urls = $this->createMock(UrlContentService::class);
+        $urls->expects($this->once())->method('extractUrls')->willReturn([]);
+
+        $result = $this->turn($webSearch, null, $urls)->run(
             $this->message(),
-            ['topic' => 'general', 'is_widget_mode' => true],
-            [],
+            ['topic' => 'general', 'web_search' => true],
+            ['tool_internet' => true],
             ['is_widget_mode' => true],
             [],
             new TurnStatus(null, new NullLogger()),
@@ -61,10 +64,15 @@ final class TurnWebSearchWidgetTest extends TestCase
         self::assertNotEmpty($result['searchResults']['results']);
     }
 
-    private function turn(WebSearchGateway $webSearch, ?SearchQueryGenerator $queries = null): TurnWebSearch
-    {
-        $urls = $this->createStub(UrlContentService::class);
-        $urls->method('extractUrls')->willReturn([]);
+    private function turn(
+        WebSearchGateway $webSearch,
+        ?SearchQueryGenerator $queries = null,
+        ?UrlContentService $urls = null,
+    ): TurnWebSearch {
+        if (null === $urls) {
+            $urls = $this->createStub(UrlContentService::class);
+            $urls->method('extractUrls')->willReturn([]);
+        }
 
         return new TurnWebSearch(
             $webSearch,
