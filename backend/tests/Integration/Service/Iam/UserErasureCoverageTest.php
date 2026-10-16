@@ -6,8 +6,6 @@ namespace App\Tests\Integration\Service\Iam;
 
 use App\Entity\Approval;
 use App\Entity\ChatSummary;
-use App\Entity\DesktopDevice;
-use App\Entity\DesktopJob;
 use App\Entity\DocumentRevision;
 use App\Entity\UrlWatch;
 use App\Entity\VoiceSession;
@@ -25,7 +23,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 final class UserErasureCoverageTest extends KernelTestCase
 {
     private const ORDER = [
-        'AccessCredentialsEraser', 'ConnectionEraser', 'KnowledgeEraser', 'UsageLogEraser', 'WidgetEraser',
+        'AccessCredentialsEraser', 'ConnectionEraser', 'KnowledgeEraser', 'DesktopEraser', 'UsageLogEraser', 'WidgetEraser',
         'ShareEraser', 'AgentEraser', 'SavedTaskEraser', 'ConversationEraser', 'FileEraser',
         'ComputeEraser', 'InboxEraser', 'ConfigEraser', 'PromptEraser', 'AccountRecordsEraser', 'MemoryEraser',
         'IdentityEraser', 'CredentialEraser',
@@ -41,8 +39,6 @@ final class UserErasureCoverageTest extends KernelTestCase
     public const NOT_ERASED_YET = [
         Approval::class,
         ChatSummary::class,
-        DesktopDevice::class,
-        DesktopJob::class,
         DocumentRevision::class,
         UrlWatch::class,
         VoiceSession::class,
