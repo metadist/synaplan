@@ -15,12 +15,10 @@ use App\Entity\DesktopDevice;
 use App\Entity\DesktopJob;
 use App\Entity\DocumentRevision;
 use App\Entity\UrlWatch;
-use App\Entity\User;
 use App\Entity\VoiceSession;
 use App\Service\Iam\Erasure\UserDataEraserInterface;
 use App\Service\Iam\UserDeletionService;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Mapping\ClassMetadata;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
@@ -42,9 +40,10 @@ final class UserErasureCoverageTest extends KernelTestCase
      * User-owned tables that account deletion does not erase yet: no eraser,
      * no foreign key with ON DELETE CASCADE, no listener (found 2026-10-15,
      * code cleanup V3). The list may only shrink — erase a table, delete its
-     * entry here.
+     * entry here. {@see UserErasureLeavesNoRowTest} expects exactly these
+     * tables to keep a row.
      */
-    private const NOT_ERASED_YET = [
+    public const NOT_ERASED_YET = [
         Approval::class,
         ChatSummary::class,
         ComputeRun::class,
@@ -71,19 +70,13 @@ final class UserErasureCoverageTest extends KernelTestCase
     {
         $covered = [];
         foreach ($this->erasers() as $eraser) {
-            foreach ($eraser::covers() as $class) {
-                $covered[$class] = true;
-            }
+            array_push($covered, ...$eraser::covers());
         }
 
-        /** @var EntityManagerInterface $em */
-        $em = static::getContainer()->get(EntityManagerInterface::class);
-        $notErased = [];
-        foreach ($em->getMetadataFactory()->getAllMetadata() as $metadata) {
-            if (User::class !== $metadata->getName() && self::isUserOwned($metadata) && !isset($covered[$metadata->getName()])) {
-                $notErased[] = $metadata->getName();
-            }
-        }
+        $notErased = array_values(array_diff(
+            array_keys(UserOwnedTables::in(static::getContainer()->get(EntityManagerInterface::class))),
+            $covered,
+        ));
         sort($notErased);
         $known = self::NOT_ERASED_YET;
         sort($known);
@@ -106,24 +99,5 @@ final class UserErasureCoverageTest extends KernelTestCase
         self::assertIsIterable($erasers);
 
         return array_values([...$erasers]);
-    }
-
-    /**
-     * @param ClassMetadata<object> $metadata
-     */
-    private static function isUserOwned(ClassMetadata $metadata): bool
-    {
-        foreach (['userId', 'ownerId'] as $field) {
-            if ($metadata->hasField($field)) {
-                return true;
-            }
-        }
-        foreach ($metadata->getAssociationMappings() as $association) {
-            if (User::class === $association['targetEntity']) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
