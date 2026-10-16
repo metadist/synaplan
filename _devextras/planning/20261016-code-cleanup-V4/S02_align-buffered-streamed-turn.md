@@ -55,15 +55,16 @@ the first and loses `is_widget_mode`. K6 pinned this in
 | S2.8 | `docs(message): name the three transport differences that stay` | `MessageProcessor` docblock and `docs/ARCHITECTURE.md` "Message turn": #7–#9 with their reason, nothing else. |
 | C2 | `chore(planning): close V4 S2 — sprint test, status, ledgers` | Loop §7 |
 
-Each `fix:` commit carries its regression test (red on the parent) and the
+Each `fix:` commit carries its regression test (run red on the parent
+first and quoted in STATUS, loop step 4) and the
 `message_turn.json` diff of exactly its cases, re-recorded with
 `UPDATE_CLEANUP_V2_SNAPSHOTS=1` (the switch named in the test's header)
 and reviewed line by line.
 
 ## 4. Sprint test
 
-- **Proof:** one regression test per aligned difference, each red on S1b's
-  head. A test that counts sorter calls on a streamed widget turn (1, not
+- **Proof:** one regression test per aligned difference, each run red on
+  S1b's head and committed with its fix. A test that counts sorter calls on a streamed widget turn (1, not
   2). Mutation check: put the early widget branch back and see the count
   test fail.
 - **Regression:** `message_turn.json` diff limited to the cases of S2.2–S2.7

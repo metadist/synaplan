@@ -54,8 +54,9 @@ loudly at the entry, not become `0`.
 ## 6. Exit
 
 - Every file under `Service/Message/` that the turn runs through declares
-  strict types (`rg -L 'strict_types' backend/src/Service/Message/Processing
-  backend/src/Service/Message/MessageProcessor.php` prints nothing).
+  strict types: `rg --files-without-match 'declare\(strict_types=1\)'
+  backend/src/Service/Message/Processing
+  backend/src/Service/Message/MessageProcessor.php` prints nothing.
 - No snapshot moved.
 
 ## 7. Closing V4 (part of C11)

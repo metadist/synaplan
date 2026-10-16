@@ -43,16 +43,17 @@ decides whether it is accepted.
 
 | Step | Commit | What |
 | ---- | ------ | ---- |
-| S8.1 | `test(files): pin both MIME maps` | A table test over the union of keys, with and without parameters, against both maps; red where they disagree (recorded in STATUS). |
-| S8.2 | `fix(files): one MIME-to-extension map with parameters stripped` | `FileHelper` gets the union; the WhatsApp copy is deleted and its call passes `unknown`. |
+| S8.1 | `test(files): pin both MIME maps` | A table test over the union of keys, with and without parameters, that records **today's** answer of each map: green, and the rows where they disagree are visible side by side. |
+| S8.2 | `fix(files): one MIME-to-extension map with parameters stripped` | `FileHelper` gets the union; the WhatsApp copy is deleted and its call passes `unknown`. The table's expectations change to the one map in the same commit: that diff is the behaviour change, quoted in the pull request. |
 | C8 | `chore(planning): close V4 S8 — sprint test, status, ledgers` | Loop §7 |
 
 ## 4. Sprint test
 
-- **Proof:** the table test green on the union; regression tests red on
-  S7's head: `audio/ogg; codecs=opus` → `ogg` through `FileHelper`, and a
-  generated `audio/mp4` → `m4a`. Mutation check: drop the stripping and see
-  three rows fail.
+- **Proof:** the table test green on the union. Regression tests run red
+  on S7's head first (quoted in STATUS) and committed with S8.2:
+  `audio/ogg; codecs=opus` → `ogg` through `FileHelper`, and a generated
+  `audio/mp4` → `m4a`. Mutation check: drop the stripping and see three
+  rows fail.
 - **Regression:** `WhatsAppServiceTest` and the media tests green; every
   snapshot unchanged (`media_turn.json` included, unless a case used a
   changed type: then the diff is quoted). Unfiltered gates.

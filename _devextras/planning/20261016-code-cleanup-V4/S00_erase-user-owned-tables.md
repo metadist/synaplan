@@ -55,7 +55,7 @@ audit record and holds only an id).
 
 | Step | Commit | What |
 | ---- | ------ | ---- |
-| S0.1 | `test(iam): a deleted account leaves no row behind` | `UserErasureLeavesNoRowTest` (integration): a user with one row in every user-owned table, the 12 included, is deleted through `UserDeletionService`. Then every user-owned table (the coverage test's metadata scan) is queried for the id. **Red on the parent with exactly the 12 tables** (quote it in STATUS). |
+| S0.1 | `test(iam): a deleted account leaves no row behind` | `UserErasureLeavesNoRowTest` (integration): a user with one row in every user-owned table, the 12 included, is deleted through `UserDeletionService`. Then every user-owned table (the coverage test's metadata scan) is queried for the id. On the parent exactly the 12 tables still hold rows; quote the run in STATUS. The test is **committed green**: it asserts that the tables still holding rows are exactly `NOT_ERASED_YET`. Each fix commit shrinks that list, so the test tightens with it, and once S0.8 deletes the list it asserts that no table holds a row. |
 | S0.2 | `fix(iam): erase connections, credentials and custom tools with the account` | `ConnectionEraser` at priority 195, right after `AccessCredentialsEraser`: secrets go first. They are forgotten through the vault **inside the transaction**: `AesCredentialVault::forget()` removes the row in the database, so a failure there rolls the whole deletion back. It is never queued after the commit, and never replaced by a raw `DELETE` that bypasses the vault. |
 | S0.3 | `fix(iam): erase compute runs and workspaces with the account` | Rows in the transaction. The sidecar workspace needs a cleanup that does not depend on those rows. `ComputeWorkspaceExpirer` finds its work through the very row the eraser deletes, so it cannot be the backstop. After the commit the eraser dispatches a `DeleteComputeWorkspace` message (workspace id only) to the async Messenger transport. Its retry strategy retries a busy or unreachable sidecar; after the last attempt the message waits in the `failed` transport, visible to operators and replayable. `workspace_not_found` counts as done. A busy workspace never fails the account deletion. If the dispatch itself fails, the deletion still completes and the error log names the workspace id. That one residual gap is stated in the pull request. |
 | S0.4 | `fix(iam): erase desktop jobs and devices with the account` | Jobs, then devices. A paired desktop app gets a 401 on its next check-in and deletes its local key (desktop contract). |
@@ -73,8 +73,8 @@ the commit.
 
 ## 4. Sprint test
 
-- **Proof:** `UserErasureLeavesNoRowTest` red on the parent (12 tables),
-  green at the end. Per eraser: a unit test for its rows and its
+- **Proof:** `UserErasureLeavesNoRowTest`: on the parent, 12 tables hold
+  rows (quoted in STATUS); at the end, none does, with no exception list. Per eraser: a unit test for its rows and its
   after-commit call. Mutation check: remove one eraser's tag and see both
   the coverage test and the no-row test fail.
 - **Regression:** the pinned `ORDER` changes only by the new erasers;

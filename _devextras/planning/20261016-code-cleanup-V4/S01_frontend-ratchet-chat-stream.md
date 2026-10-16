@@ -56,9 +56,11 @@ adding a third copy.
 | A function has at most 100 lines | function declarations, function expressions and arrow functions, and object or class methods — in `.ts` files and the `<script>` blocks of `.vue` files (parsed with `@vue/compiler-sfc`, measured with the TypeScript compiler API) | `path::outer.inner`; an anonymous callback is named after its property (`streamAIResponse.onUpdate`), and a repeat gets `#2`, `#3` in source order |
 
 Every offender today is frozen at its value. An unlisted offender fails,
-and a listed one may only shrink. `UPDATE_SIZE_RATCHET=1` regenerates the
-ledger (removals and smaller numbers only), and a stale-entry test names
-entries that no longer fire. A guard asserts the scan saw more than 500
+and a listed one may only shrink. `docker compose exec -T -e
+UPDATE_SIZE_RATCHET=1 frontend npx vitest run
+tests/unit/architecture/sizeRatchet.spec.ts` regenerates the ledger
+(removals and smaller numbers only), and a stale-entry test names entries
+that no longer fire. A guard asserts the scan saw more than 500
 files, so a broken scan cannot pass vacuously.
 
 | Step | Commit | What |

@@ -50,7 +50,8 @@ Service/Message/Handler/Media/
   MediaRequestGuard        phase 4 — returns an outcome: proceed, answer as chat, or a named refusal
   MediaTurnBudget          phase 5
   MediaGenerationRun       phase 6 (sync) — detachMediaToAsyncJob() / detachVideoToAsyncJob() move here
-  GeneratedMediaStore      phase 7
+  GeneratedMediaStore      phase 7 (uses MediaDownloader, S5.1)
+  MediaDownloader          the cURL / file_get_contents transport for external media URLs, moved verbatim
   MediaTurnBilling         phase 8 billing (#1146 recorded at the provider-billed moment)
   MediaTurnRequest         final readonly value object carried between the stages
 MediaGenerationHandler     handle(), handleStream() ≤ 60 lines; ≤ 10 deps
@@ -64,18 +65,20 @@ all state merge. Write the result in "As delivered".
 
 | Step | Commit | What |
 | ---- | ------ | ---- |
-| S5.1 | `test(media): turn snapshot for media generation` | `MediaTurnCharacterizationTest` through `handle()` and `handleStream()`: the status events, what reaches `AiFacade` / the async job bus, the stream chunks, the stored file rows, the usage records, the result shape. Cases: image; image edit from an attachment; cross-turn edit; image URL in the text → video; video detached to async; audio (TTS); TTS script re-routed to chat; no default model; i2v without a reference; unreachable `APP_URL`; rate limited; over budget; provider failure; Stop mid-generation (cost recorded); retired model with successor. Provider downloads and data URLs go through a `MockHttpClient` and a temporary upload directory, and the test asserts that no request left the process. Recorded on the parent. |
-| S5.2 | `refactor(media): resolve references, prompt and model as stages` | Phases 1–3. |
-| S5.3 | `refactor(media): guards and limits as stages` | Phases 4–5. |
-| S5.4 | `refactor(media): generation, storage and billing as stages` | Phases 6–8. |
-| S5.5 | `refactor(media): the handler runs the stages` | `handleStream()` ≤ 60 lines; the existing unit tests move to the stage they test, assertions unchanged. |
+| S5.1 | `refactor(media): media downloads behind an injectable downloader` | `downloadMedia()` fetches external URLs with native cURL, with `file_get_contents()` as a fallback (lines 1,243–1,264); no HTTP-client double can intercept either. That transport moves **verbatim** (`git diff --color-moved`) into a `MediaDownloader`: the same options, timeouts, user agent, IPv4 pin and error messages. The handler gets it as a constructor dependency, so tests can replace it. Its own test fetches a fixture from a server on `127.0.0.1` inside the test container, never an external host. |
+| S5.2 | `test(media): turn snapshot for media generation` | `MediaTurnCharacterizationTest` through `handle()` and `handleStream()`: the status events, what reaches `AiFacade` / the async job bus, the stream chunks, the downloaded URLs, the stored file rows, the usage records, the result shape. Cases: image from an external URL; image as a data URL; image edit from an attachment; cross-turn edit; image URL in the text → video; video detached to async; audio (TTS); TTS script re-routed to chat; no default model; i2v without a reference; unreachable `APP_URL`; rate limited; over budget; provider failure; download failure; Stop mid-generation (cost recorded); retired model with successor. External URLs go through a recording `MediaDownloader` double that returns fixture bytes; data URLs go through `saveDataUrlAsFile()` into a temporary upload directory. The test asserts that no request left the process. Recorded after S5.1, before any stage moves. |
+| S5.3 | `refactor(media): resolve references, prompt and model as stages` | Phases 1–3. |
+| S5.4 | `refactor(media): guards and limits as stages` | Phases 4–5. |
+| S5.5 | `refactor(media): generation, storage and billing as stages` | Phases 6–8. |
+| S5.6 | `refactor(media): the handler runs the stages` | `handleStream()` ≤ 60 lines; the existing unit tests move to the stage they test, assertions unchanged. |
 | C5 | `chore(planning): close V4 S5 — sprint test, status, ledgers` | Loop §7 |
 
 ## 5. Sprint test
 
-- **Proof:** `media_turn.json` recorded on S4c's head, unchanged after
-  every step; a unit test per stage. Mutation check: move the budget check
-  after generation and see the "over budget" case fail.
+- **Proof:** `media_turn.json`, recorded after the S5.1 seam and before
+  any stage moves, unchanged after every later step; a unit test per stage
+  and for `MediaDownloader`. Mutation check: move the budget check after
+  generation and see the "over budget" case fail.
 - **Regression:** the seven existing handler tests green with unchanged
   assertions; every other snapshot unchanged; unfiltered gates.
 - **Journey:** `chat.spec.ts` (media cases), `multitask.spec.ts`,

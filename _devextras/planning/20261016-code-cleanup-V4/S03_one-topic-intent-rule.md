@@ -46,6 +46,9 @@ What moves:
   lines 1,108–1,112). Under the rule that topic is kept. This is a real
   routing change for messages that carry a topic, so it gets its own
   `fix:` commit with a reviewed routing diff (S3.5).
+- **Classifier, `vision` models:** the classifier has no `vision` row, so
+  an existing topic such as `mediamaker` survives the override. The rule
+  says `general` (S3.6).
 
 Alternative the owner may pick instead: the Again semantics win. That
 keeps the document route but sends `tools:pic` retries to chat. It is not
@@ -61,19 +64,22 @@ bug this sprint exists to close.
 | S3.3 | `fix(message): Again routes by the same topic and intent rule` | Again switches to the D2 rule. `message_turn.json` diff: the Again cases only. |
 | S3.4 | `fix(message): a document model override reaches the document handler` | The classifier gets the document row. `routing_classification.json` diff: the document-override cases only. |
 | S3.5 | `fix(message): a chat model override keeps the message's topic` | The classifier's `chat` / `vectorize` row keeps a given topic. Routing diff: exactly the S3.1 cases that carry a topic. |
-| S3.6 | `refactor(message): one topic and intent rule` | `forModelOverride()` / `forAgain()` collapse into the one rule; no snapshot moves. |
+| S3.6 | `fix(message): a vision model override routes to the chat answer` | The classifier has no `vision` row today, so a vision override falls back to the message's topic and keeps `mediamaker`. The rule maps it to `general`. Routing diff: the vision cases with an existing topic. |
+| S3.7 | `refactor(message): one topic and intent rule` | After S3.3–S3.6 the two policies agree on every input of the D2 table (the S3.1 table test proves it), so `forModelOverride()` / `forAgain()` collapse into the one rule and no snapshot moves. |
 | C3 | `chore(planning): close V4 S3 — sprint test, status, ledgers` | Loop §7 |
 
 ## 4. Sprint test
 
 - **Proof:** `TopicIntentRuleTest`, one row per line of the D2 table.
-  Regression tests red on S2's head: an Again of a `tools:pic` message
-  routes to image generation; a document-model override routes to the
-  document handler; a chat-model override on a message with a custom
-  prompt topic keeps that topic. Mutation check: drop the document row and
-  see two tests fail.
-- **Regression:** S3.2 and S3.6 move no snapshot. The routing diff of
-  S3.4 / S3.5 and the turn diff of S3.3 are limited to their cases and
+  Regression tests, each run red on S2's head first (quoted in STATUS) and
+  committed with its fix: an Again of a `tools:pic` message routes to
+  image generation; a document-model override routes to the document
+  handler; a chat-model override on a message with a custom prompt topic
+  keeps that topic; a vision-model override on a `mediamaker` message
+  routes to `general`. Mutation check: drop the document row and see two
+  tests fail.
+- **Regression:** S3.2 and S3.7 move no snapshot. The routing diffs of
+  S3.4–S3.6 and the turn diff of S3.3 are limited to their cases and
   quoted in the pull request
   (`UPDATE_ROUTING_SNAPSHOTS=1` / `UPDATE_CLEANUP_V2_SNAPSHOTS=1`). Every
   other snapshot unchanged. Unfiltered gates.
