@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Message\Routing\EmbeddingRouterConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the global embedding-router flags (BCONFIG, ownerId=0).
@@ -24,11 +25,22 @@ use Doctrine\DBAL\Connection;
  * needed {@see \DoctrineMigrations\Version20260901000000} to reach installs
  * the seeder alone cannot touch.
  */
-final readonly class EmbeddingRouterConfigSeeder
+#[AsTaggedItem(priority: 100)]
+final readonly class EmbeddingRouterConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'embedding-router';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=EMBEDDING_ROUTER, ownerId=0 — default OFF';
     }
 
     public function seed(): SeedResult

@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\Tool\ToolsConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for TOOLS.* flags (BCONFIG, ownerId=0).
@@ -13,11 +14,22 @@ use Doctrine\DBAL\Connection;
  * Insert-if-missing only. Registry, approvals and custom HTTP seed ON since
  * 4.8; System configuration → Features or `FEATURE_TOOLS_*=false` turns them off.
  */
-final readonly class ToolsConfigSeeder
+#[AsTaggedItem(priority: 50)]
+final readonly class ToolsConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'tools';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=TOOLS, ownerId=0';
     }
 
     public function seed(): SeedResult

@@ -1,8 +1,9 @@
 # Code cleanup V3 — three bad ideas, three fixes
 
-**Status:** Drafted 2026-10-15 from a measurement of `main` at `eef29b5ac`.
-§0 agreed in chat the same day ("fix 3 things in V3, not perfection in one
-go").
+**Status:** Implemented 2026-10-15 (K0–K10, see `STATUS.md`); exit met, in
+review as one pull request per fix, merged in order: [#2512](https://github.com/metadist/synaplan/pull/2512) → [#2513](https://github.com/metadist/synaplan/pull/2513) → [#2514](https://github.com/metadist/synaplan/pull/2514).
+Drafted the same day from a measurement of `main` at `eef29b5ac`; §0 agreed
+in chat ("fix 3 things in V3, not perfection in one go").
 **Priority:** Row 17 of [`../ROADMAP.md`](../ROADMAP.md): the cleanup follow-up
 that lands before row 8, the prompting flow. V1 and V2 closed the cleanup
 window and were archived in #2510; V3 does not reopen it.
@@ -172,6 +173,33 @@ named by one eraser or listed in the test as "removed by cascade" / "kept,
 with reason". A new user-owned table without an eraser fails CI — the account
 deletion path cannot silently leave data behind.
 
+### As delivered (K1–K10)
+
+- **Fix 1** as planned. The divergent topic / intent rules stay recorded, not
+  merged (§0 #2).
+- **Fix 2, file analysis:** two more small types than drawn —
+  `AnalysisContext` (message, classification, status, reply for one turn) and
+  `AnalysisModel` (the model choice and result metadata that were repeated in
+  documents, voice and images) — and the routing decision is the pure
+  `FileAnalysisRoute`, its three identical ready / pending / failed blocks
+  folded into one. Handler 161 lines, 6 deps.
+- **Fix 2, processor:** `TurnStatus` replaces the private `notify()`; the
+  prompt lookup lives in `TurnClassificationResolver` beside the topic it
+  resolves. Processor 303 lines, 6 deps. The moved code keeps weak typing
+  (no `strict_types`), exactly like the file it came from: with strict types
+  the first snapshot run failed on an int tracking id the old code coerced,
+  and prompt-metadata flags read from the database may do the same (V4 #11).
+- **Fix 3:** 15 erasers instead of 13, because the erase order is pinned and
+  configs, prompts and the remaining account records sit at three different
+  places in it (`ConfigEraser`, `PromptEraser`, `AccountRecordsEraser`). The
+  after-commit cleanups run in eraser order; each already contains its own
+  failures. The coverage test found **12 user-owned tables that are not
+  erased** — the first item of V4 (§7 #0).
+- Built on one branch in commit order K0–K5, K8, K9, K6, K7, K10
+  (`STATUS.md`), then split by fix into #2512 → #2513 → #2514. `main`
+  gained #2510 (V1 / V2 archived, cleanup window closed) meanwhile; V3 is
+  row 17 of the roadmap and lands before the prompting flow.
+
 ---
 
 ## 4. Step table
@@ -190,10 +218,11 @@ deletion path cannot silently leave data behind.
 | K9 | `refactor(iam): erase user data through tagged erasers` | 3 | K0 |
 | K10 | `docs(planning): close V3 and the cleanup window` | — | K1–K9 |
 
-Delivery: one branch, `refactor/code-cleanup-v3`, one commit per step, each
-commit green on the gate below. The three fixes are independent; the branch
-can be split into one pull request per fix before review if that is easier
-to read (each fix touches its own ledger entries).
+Delivery: one commit per step, each commit green on the gate below, built on
+one branch and split by fix for review: [#2512](https://github.com/metadist/synaplan/pull/2512) (K0–K3),
+[#2513](https://github.com/metadist/synaplan/pull/2513) (K4–K7), [#2514](https://github.com/metadist/synaplan/pull/2514) (K8–K10). Fix 2 builds on Fix 1's
+consolidated helpers, so the three merge in order; the size ledger is
+regenerated on each branch.
 
 Commit types: every step is `refactor:`, `test:` or `docs:` — none raises
 the minor version. A step that turns out to change behaviour is split and
@@ -258,8 +287,9 @@ that V3 can finish.
 
 | # | What | Measured | Why it waits |
 | - | ---- | -------- | ------------ |
+| 0 | **Erase the 12 user-owned tables account deletion misses** (found by K9's coverage test) | Approval, ChatSummary, ComputeRun, ComputeWorkspace, Connection, Credential, CustomTool, DesktopDevice, DesktopJob, DocumentRevision, UrlWatch, VoiceSession: no eraser, no `ON DELETE CASCADE`, no listener — the rows (stored credentials, chat summaries, document revisions among them) survive the account | Security / privacy, so first. Behaviour: a `fix(iam):` per domain, each with files on disk, external sessions and connections revoked where they exist; every closed table leaves `UserErasureCoverageTest::NOT_ERASED_YET` |
 | 1 | **Frontend size ratchet**, then `ChatView.vue`'s stream handling | `ChatView.vue` 6,481 lines; `streamAIResponse()` 1,873 lines; three `onUpdate` handlers, 337 of the guest handler's 396 code lines repeated in the signed-in one; no frontend size gate (29 files > 800 lines, 39 functions > 100) | Needs its own characterization, a browser walk and the app's SSE device check (`ota-candidate`). First item after V3, before row 8 grows the file further. |
-| 2 | Align the processor's buffered and streamed turn | the nine differences in §3 | Behaviour: one `fix:` per difference with its snapshot diff |
+| 2 | Align the processor's buffered and streamed turn | the nine differences in §3, plus a speed bug K6 pinned: a streamed widget turn without a fixed prompt runs the AI sorter twice (once without history, once with) and the second run drops `is_widget_mode` | Behaviour: one `fix:` per difference with its `message_turn.json` diff; the double classification first (one paid sorter call per such turn) |
 | 3 | One topic / intent rule | the table in §3 | Routing change; owner decides which semantics win |
 | 4 | Channel turns | `WidgetPublicController::message()` 735 lines (27 deps, own copy of `SseWriter`), `WhatsAppService::handleIncomingMessage()` 601, `WebhookController::email()` 606 | Each needs its own reply snapshot first |
 | 5 | `MediaGenerationHandler::handleStream()` | 1,010 lines, the longest method on the chat path | Split after K2 removed its copied helpers |
@@ -268,6 +298,7 @@ that V3 can finish.
 | 8 | Two MIME-to-extension maps that disagree | `WhatsAppService` vs `FileHelper` | Merging changes file extensions: a `fix:` |
 | 9 | Controller rules | 115 of 809 controller methods > 50 lines; 25 controllers inject `EntityManagerInterface`, 9 inject `AiFacade` | A deptrac rule with a shrinking baseline |
 | 10 | Provider adapters | `GoogleProvider` 2,764, `OpenAIProvider` 2,079, `XaiProvider` 1,791, `AnthropicProvider` 1,744 | Split per capability when touched; the registry resolves by capability |
+| 11 | Strict types in `Message\Processing\` and `MessageProcessor` | the moved code has no `strict_types`, like the file it came from: prompt-metadata flags and tracking ids still rely on PHP's coercion | Type the boundaries (classification and prompt metadata as value objects), then turn strict types on; a runtime `TypeError` there is a failed turn |
 
 Carried from V2 §7: domain-first layout, the `AI` ↔ `Service` split,
 domain-to-domain deptrac rules, the `Plugin\Sdk` namespace, PHPStan 5 → 8,

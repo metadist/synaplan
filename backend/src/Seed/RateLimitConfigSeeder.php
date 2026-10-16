@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Seed;
 
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for rate-limit configuration in BCONFIG (ownerId=0).
@@ -24,7 +25,8 @@ use Doctrine\DBAL\Connection;
  * migration that deletes the legacy NEW/PRO/TEAM/BUSINESS rows (BCONFIG defaults
  * are bootstrap-only).
  */
-final readonly class RateLimitConfigSeeder
+#[AsTaggedItem(priority: 310)]
+final readonly class RateLimitConfigSeeder implements SeederInterface
 {
     /**
      * @var list<array{ownerId: int, group: string, setting: string, value: string}>
@@ -118,6 +120,16 @@ final readonly class RateLimitConfigSeeder
 
     public function __construct(private Connection $connection)
     {
+    }
+
+    public function label(): string
+    {
+        return 'rate-limits';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=RATELIMITS_*/SYSTEM_FLAGS';
     }
 
     public function seed(): SeedResult

@@ -6,6 +6,7 @@ namespace App\Seed;
 
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the Anthropic Messages gateway flags (BCONFIG, ownerId=0).
@@ -14,11 +15,22 @@ use Doctrine\DBAL\Connection;
  * SESSION_SUMMARY_ENABLED (both only take effect once the gateway itself is
  * enabled). Existing operator rows are never overwritten (INSERT IGNORE).
  */
-final readonly class MessagesGatewayConfigSeeder
+#[AsTaggedItem(priority: 200)]
+final readonly class MessagesGatewayConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'messages-gateway';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=MESSAGES_GATEWAY, ownerId=0 — default OFF';
     }
 
     public function seed(): SeedResult

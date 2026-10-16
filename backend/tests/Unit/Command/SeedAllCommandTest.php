@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Command;
 
 use App\Command\SeedAllCommand;
-use App\Seed\ModelRetirementSeeder;
-use App\Seed\ModelSeeder;
-use App\Seed\ModuleGateSeeder;
+use App\Seed\SeederInterface;
 use App\Seed\SeedResult;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -23,56 +21,42 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 final class SeedAllCommandTest extends TestCase
 {
-    /** @var list<class-string> seeders in the order they ran */
+    private const STEPS = ['models', 'model-retirements', 'prompts', 'module-gates'];
+
+    /** @var list<string> labels of the steps that ran, in order */
     private array $ran = [];
 
     /**
-     * Builds the command with one double per seeder, read from the constructor
-     * so a newly added step is covered without touching this test.
-     *
-     * @param array<class-string, \Throwable> $failing seeder class => what its seed() throws
+     * @param array<string, \Throwable> $failing step label => what its seed() throws
      */
     private function command(array $failing = [], ?LoggerInterface $logger = null): SeedAllCommand
     {
-        $class = new \ReflectionClass(SeedAllCommand::class);
-        $constructor = $class->getConstructor();
-        self::assertNotNull($constructor);
-
-        $arguments = [];
-        foreach ($constructor->getParameters() as $parameter) {
-            $type = $parameter->getType();
-            self::assertInstanceOf(\ReflectionNamedType::class, $type);
-            /** @var class-string $dependency */
-            $dependency = $type->getName();
-
-            if (LoggerInterface::class === $dependency) {
-                $arguments[] = $logger ?? new NullLogger();
-                continue;
-            }
-
-            $seeder = $this->createStub($dependency);
-            $seeder->method('seed')->willReturnCallback(function () use ($dependency, $failing): SeedResult {
-                $this->ran[] = $dependency;
-                if (isset($failing[$dependency])) {
-                    throw $failing[$dependency];
+        $seeders = [];
+        foreach (self::STEPS as $label) {
+            $seeder = $this->createStub(SeederInterface::class);
+            $seeder->method('label')->willReturn($label);
+            $seeder->method('description')->willReturn('BCONFIG');
+            $seeder->method('seed')->willReturnCallback(function () use ($label, $failing): SeedResult {
+                $this->ran[] = $label;
+                if (isset($failing[$label])) {
+                    throw $failing[$label];
                 }
 
-                return new SeedResult($dependency, 0, skipped: 1);
+                return new SeedResult($label, 0, skipped: 1);
             });
-            $arguments[] = $seeder;
+            $seeders[] = $seeder;
         }
 
-        return $class->newInstanceArgs($arguments);
+        return new SeedAllCommand($seeders, $logger ?? new NullLogger());
     }
 
-    public function testEveryStepRunsAndTheCommandSucceeds(): void
+    public function testEveryStepRunsInOrderAndTheCommandSucceeds(): void
     {
         $tester = new CommandTester($this->command());
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         self::assertStringContainsString('All seed steps completed.', $tester->getDisplay());
-        self::assertContains(ModelRetirementSeeder::class, $this->ran);
-        self::assertContains(ModuleGateSeeder::class, $this->ran);
+        self::assertSame(self::STEPS, $this->ran);
     }
 
     public function testAFailingStepDoesNotStopTheOthersButFailsTheCommand(): void
@@ -83,19 +67,28 @@ final class SeedAllCommandTest extends TestCase
             ->with('Seed step failed', self::callback(static fn (array $context): bool => 'models' === $context['step']));
 
         $tester = new CommandTester($this->command(
-            [ModelSeeder::class => new \RuntimeException('Deadlock found when trying to get lock')],
+            ['models' => new \RuntimeException('Deadlock found when trying to get lock')],
             $logger,
         ));
 
         self::assertSame(Command::FAILURE, $tester->execute([]));
 
-        self::assertContains(ModelRetirementSeeder::class, $this->ran, 'Retirements must still be applied');
-        self::assertContains(ModuleGateSeeder::class, $this->ran, 'Later steps must still run');
+        self::assertContains('model-retirements', $this->ran, 'Retirements must still be applied');
+        self::assertContains('module-gates', $this->ran, 'Later steps must still run');
 
         // SymfonyStyle wraps error blocks at the terminal width.
         $display = (string) preg_replace('/\s+/', ' ', $tester->getDisplay());
         self::assertStringContainsString('Deadlock found when trying to get lock', $display);
-        self::assertStringContainsString('seed steps failed: models.', $display);
+        self::assertStringContainsString('1 of 4 seed steps failed: models.', $display);
         self::assertStringNotContainsString('All seed steps completed.', $display);
+    }
+
+    public function testHelpListsEveryStepWithWhatItWrites(): void
+    {
+        $help = $this->command()->getHelp();
+
+        self::assertStringContainsString('   1. models', $help);
+        self::assertStringContainsString('   4. module-gates', $help);
+        self::assertSame(4, substr_count($help, 'BCONFIG'));
     }
 }

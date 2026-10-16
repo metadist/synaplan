@@ -10,6 +10,7 @@ use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\ModelConfigService;
 use App\Service\Stt\SpeechFailure;
 use App\Service\Stt\WhisperService;
+use App\Tests\Support\FileAnalysisHandlerFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -42,7 +43,7 @@ class FileAnalysisHandlerAudioTest extends TestCase
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
-        $this->handler = new FileAnalysisHandler(
+        $this->handler = FileAnalysisHandlerFactory::create(
             $this->aiFacade,
             $this->modelConfigService,
             $this->logger,
@@ -293,7 +294,7 @@ class FileAnalysisHandlerAudioTest extends TestCase
             )
             ->willReturn('Diese Aufnahme konnte nicht transkribiert werden. Richte unter Einstellungen einen Sprache-zu-Text-Dienst ein.');
 
-        $this->handler = new FileAnalysisHandler(
+        $this->handler = FileAnalysisHandlerFactory::create(
             $this->aiFacade,
             $this->modelConfigService,
             $this->logger,
@@ -326,7 +327,7 @@ class FileAnalysisHandlerAudioTest extends TestCase
         $whisper->method('unavailableReason')->willReturn(SpeechFailure::SPEECH_OFF);
         $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
 
-        $this->handler = new FileAnalysisHandler(
+        $this->handler = FileAnalysisHandlerFactory::create(
             $this->aiFacade,
             $this->modelConfigService,
             $this->logger,
@@ -362,7 +363,7 @@ class FileAnalysisHandlerAudioTest extends TestCase
         $whisper->expects($this->never())->method('isAvailable');
         $this->aiFacade->method('hasConfiguredSttProvider')->willReturn(false);
 
-        $this->handler = new FileAnalysisHandler(
+        $this->handler = FileAnalysisHandlerFactory::create(
             $this->aiFacade,
             $this->modelConfigService,
             $this->logger,

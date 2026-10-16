@@ -7,7 +7,7 @@ namespace App\Service\Chat\Stream;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Service\Billing\PremiumFeatureGate;
-use App\Service\Message\MessageProcessor;
+use App\Service\Message\Processing\TurnHistoryLoader;
 use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -39,11 +39,11 @@ final readonly class StreamRequestResolver
 
     /**
      * The incognito history the client sends gets the same window as a
-     * persisted chat ({@see MessageProcessor::HISTORY_MAX_MESSAGES}), so a
+     * persisted chat ({@see TurnHistoryLoader::HISTORY_MAX_MESSAGES}), so a
      * crafted request cannot bloat the prompt.
      */
-    private const MAX_INCOGNITO_HISTORY_MESSAGES = MessageProcessor::HISTORY_MAX_MESSAGES;
-    private const MAX_INCOGNITO_HISTORY_CHARS = MessageProcessor::HISTORY_MAX_CHARS;
+    private const MAX_INCOGNITO_HISTORY_MESSAGES = TurnHistoryLoader::HISTORY_MAX_MESSAGES;
+    private const MAX_INCOGNITO_HISTORY_CHARS = TurnHistoryLoader::HISTORY_MAX_CHARS;
 
     private const REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 

@@ -7,6 +7,7 @@ namespace App\Seed;
 use App\Entity\PlatformInstance;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for platform links: the global flag (BCONFIG, ownerId=0)
@@ -19,11 +20,22 @@ use Doctrine\DBAL\Connection;
  * it here restores it after `doctrine:fixtures:load` purged the table
  * (dev/test) and heals an install where the row went missing.
  */
-final readonly class PlatformLinksConfigSeeder
+#[AsTaggedItem(priority: 130)]
+final readonly class PlatformLinksConfigSeeder implements SeederInterface
 {
     public function __construct(
         private Connection $connection,
     ) {
+    }
+
+    public function label(): string
+    {
+        return 'platform-links';
+    }
+
+    public function description(): string
+    {
+        return 'BCONFIG, group=PLATFORM_LINKS, ownerId=0 — default ON';
     }
 
     public function seed(): SeedResult

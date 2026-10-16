@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Seed;
 
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
  * Idempotent seeder for the BSUBSCRIPTIONS plan catalogue.
@@ -19,7 +20,8 @@ use Doctrine\DBAL\Connection;
  *    but still have zero budgets. Guard logic preserves operator customisations:
  *    each budget column is only written when its current value is <= 0.
  */
-final readonly class SubscriptionPlanSeeder
+#[AsTaggedItem(priority: 300)]
+final readonly class SubscriptionPlanSeeder implements SeederInterface
 {
     /**
      * @var array<string, array{
@@ -60,6 +62,16 @@ final readonly class SubscriptionPlanSeeder
 
     public function __construct(private Connection $connection)
     {
+    }
+
+    public function label(): string
+    {
+        return 'subscriptions';
+    }
+
+    public function description(): string
+    {
+        return 'BSUBSCRIPTIONS — cost budgets';
     }
 
     public function seed(): SeedResult

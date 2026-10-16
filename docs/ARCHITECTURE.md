@@ -4,10 +4,13 @@ How the Symfony backend in `backend/` is put together, and where new code
 goes. Two checks keep the shape: deptrac enforces the layers, and the size
 ratchet keeps classes and methods small. Both run in `make ci-local` and CI.
 
-The request paths below were "god classes" until the code cleanup V2 sprint
-(`_devextras/planning/2026-archive/20261014-code-cleanup-V2/`). The runtime config and the
+The request paths below were "god classes" until the code cleanup V2 and V3
+sprints (`_devextras/planning/2026-archive/20261014-code-cleanup-V2/`,
+`_devextras/planning/20261015-code-cleanup-V3/`). The runtime config and the
 chat turn sections describe the code of [#2498](https://github.com/metadist/synaplan/pull/2498)
-and [#2499](https://github.com/metadist/synaplan/pull/2499).
+and [#2499](https://github.com/metadist/synaplan/pull/2499); the message turn,
+file analysis and tagged-list sections the V3 pull requests
+[#2512](https://github.com/metadist/synaplan/pull/2512)–[#2514](https://github.com/metadist/synaplan/pull/2514).
 
 ## Layers
 
@@ -138,6 +141,48 @@ flowchart LR
 ordered event names and payload shapes of six turns; a split that changes a
 frame fails it.
 
+## Message turn — `MessageProcessor`
+
+Below the stream (and below email, MCP, Saved Tasks and webhooks),
+`App\Service\Message\MessageProcessor` runs one turn. `process()` is the
+buffered turn, `processStream()` the streamed one; both run the same stages
+in `App\Service\Message\Processing\`:
+
+| Stage | Does |
+| ----- | ---- |
+| `TurnClassificationResolver` | fixed prompt, Again, forced image description or the AI sorter; the `classifying` / `classified` statuses; the prompt behind the topic |
+| `TurnHistoryLoader` | incognito, chat or legacy history; the rolling summary of older turns |
+| `TurnWebSearch` + `LinkedContentReader` | pasted links first (Confluence and Jira through the user's connection), then the search decision, the search and the page reads |
+| `TurnDispatcher` | the `generating` status, then the task plan executor or the inference router; the handler's effective classification |
+| `TurnStatus` | one turn's statuses, to the caller's callback and the log |
+
+Where the two turns still differ (fixed-prompt language, RAG scope keys, where
+search results travel, who emits `complete`, cancellation) the resolver has a
+buffered and a streamed method; `MessageTurnCharacterizationTest` pins both.
+The moved code keeps weak typing (no `strict_types`) until its boundaries are
+typed.
+
+## File analysis — `FileAnalysisHandler`
+
+`FileAnalysisHandler` answers about the files of a turn on one path for both
+pipelines; `AnalysisReply` is the only difference (content returned, or
+streamed through the callback). `AnalysisFileResolver` finds the files
+(message, conversation, thread), `FileAnalysisRoute` picks the path,
+`DocumentAnalysis`, `VoiceMessageReply` and `ImageAnalysis` answer, and
+`FileAnalysisFailureCopy` writes what the user reads when a file cannot be
+used. `FileAnalysisCharacterizationTest` pins 25 attachment mixes on both
+pipelines.
+
+## Lists are tagged collections
+
+A list of collaborators is a tag, not a constructor: runtime config
+contributors (`app.runtime_config.contributor`), `app:seed` steps
+(`SeederInterface`, `app.seeder`) and account erasure
+(`UserDataEraserInterface`, `app.user_data_eraser`). The order is the tag
+priority and a test pins it. `UserErasureCoverageTest` also requires every
+user-owned entity to be named by an eraser; the tables not erased yet are
+listed there and the list may only shrink.
+
 ## Where new code goes
 
 - A controller method validates and delegates. Business logic lives in a
@@ -147,5 +192,8 @@ frame fails it.
 - State that several steps of one request share is a value object (immutable
   where possible) passed from step to step, not a growing list of parameters.
 - Database queries live in repositories; entities do not import services.
+- A helper another class already owns is called, not copied
+  (`ProgressCallback` for statuses, `PendingMemoryExtraction` for the memory
+  job, `AccountLanguage::SUPPORTED` for the UI locales).
 - See `AGENTS.md` for the merge gate and `docs/PHP_CONVENTIONS.md` for code
   style.

@@ -19,6 +19,7 @@ use App\Service\Context\TokenEstimator;
 use App\Service\Message\Handler\FileAnalysisHandler;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Tests\Support\FileAnalysisHandlerFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -147,7 +148,7 @@ final class FileAnalysisHandlerContextFitTest extends TestCase
             new NullLogger(),
         );
 
-        return new FileAnalysisHandler(
+        return FileAnalysisHandlerFactory::create(
             $this->aiFacade,
             $this->modelConfigService,
             new NullLogger(),

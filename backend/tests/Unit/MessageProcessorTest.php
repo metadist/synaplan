@@ -16,6 +16,7 @@ use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
+use App\Service\Message\Processing\TurnHistoryLoader;
 use App\Service\Message\RollingSummaryResult;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
@@ -30,6 +31,7 @@ use App\Service\Research\UrlContentService;
 use App\Service\Research\WebResearchService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\Search\BraveSearchService;
+use App\Tests\Support\MessageProcessorFactory;
 use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -64,7 +66,7 @@ class MessageProcessorTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->conversationSummaryService = $this->createMock(ConversationSummaryService::class);
 
-        $this->processor = new MessageProcessor(
+        $this->processor = MessageProcessorFactory::create(
             $this->messageRepository,
             $this->searchResultRepository,
             $this->preProcessor,
@@ -854,7 +856,7 @@ class MessageProcessorTest extends TestCase
         $this->preProcessor->method('process')->willReturn($message);
         $this->messageRepository->expects($this->once())
             ->method('findChatHistory')
-            ->with(1, 500, MessageProcessor::HISTORY_MAX_MESSAGES * 8, MessageProcessor::HISTORY_MAX_CHARS * 8, 99)
+            ->with(1, 500, TurnHistoryLoader::HISTORY_MAX_MESSAGES * 8, TurnHistoryLoader::HISTORY_MAX_CHARS * 8, 99)
             ->willReturn([]);
         $this->messageRepository->method('countByChatId')->willReturn(40);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
@@ -1340,7 +1342,7 @@ class MessageProcessorTest extends TestCase
 
     private function processorWith(UrlContentService $urlContent, ?WebResearchService $research = null, ?ConfluenceLinkedPageReader $confluence = null): MessageProcessor
     {
-        return new MessageProcessor(
+        return MessageProcessorFactory::create(
             $this->messageRepository,
             $this->searchResultRepository,
             $this->preProcessor,
@@ -1384,7 +1386,7 @@ class MessageProcessorTest extends TestCase
             ->willReturn([]);
         $urlContent->expects($this->never())->method('formatForPrompt');
 
-        $processor = new MessageProcessor(
+        $processor = MessageProcessorFactory::create(
             $this->messageRepository,
             $this->searchResultRepository,
             $this->preProcessor,
@@ -1494,7 +1496,7 @@ class MessageProcessorTest extends TestCase
         $taskPlanner = $this->createMock(TaskPlanner::class);
         $taskPlanner->expects($this->never())->method('plan');
 
-        $processor = new MessageProcessor(
+        $processor = MessageProcessorFactory::create(
             $this->messageRepository,
             $this->searchResultRepository,
             $this->preProcessor,

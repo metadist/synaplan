@@ -81,6 +81,11 @@ A test pins the label order. `--help` is built from `label()` +
 
 ### `UserDeletionService` — 27 erase calls + 5 after-commit purges
 
+> Delivered with 15 erasers: the planned `SettingsEraser` became
+> `ConfigEraser`, `PromptEraser` and `AccountRecordsEraser` to keep the
+> pinned erase order, and the memory / digest vector purges moved to
+> `MemoryEraser`. The real list is `UserErasureCoverageTest::ORDER`.
+
 | Eraser (`App\Service\Iam\Erasure\`) | In the transaction (today's order) | After commit |
 | ----------------------------------- | ---------------------------------- | ------------ |
 | `AccessCredentialsEraser` | verification tokens, auth tokens, API keys, sessions | — |
