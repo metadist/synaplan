@@ -143,7 +143,6 @@ function onPointerDown(event: PointerEvent): void {
   axis = 'undecided'
   suppressClick = false
   travelPx.value = rootEl.value?.offsetWidth || 280
-  capturePointer(event)
 }
 
 function onPointerMove(event: PointerEvent): void {
@@ -155,9 +154,11 @@ function onPointerMove(event: PointerEvent): void {
     // Only a rightward swipe dismisses. Vertical movement stays a scroll.
     axis = dx > SWIPE_SLOP_PX && Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical'
     if (axis !== 'horizontal') {
-      releasePointer(event)
       return
     }
+    // Capture only once the gesture is a swipe, so a click on the action
+    // still reaches the button.
+    capturePointer(event)
     dragging.value = true
     settling.value = true
     suppressClick = true

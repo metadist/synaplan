@@ -68,6 +68,17 @@ describe('NotificationItem swipe to dismiss', () => {
     expect(el.getAttribute('style')).toBeNull()
   })
 
+  it('still runs the action after a press that does not move', async () => {
+    const { wrapper, onClick, el } = mountToast()
+
+    pointer(el, 'pointerdown', 20, 20)
+    pointer(el, 'pointerup', 20, 20)
+    await wrapper.get('[data-testid="btn-notification-action"]').trigger('click')
+
+    expect(onClick).toHaveBeenCalledOnce()
+    expect(wrapper.emitted('close')).toHaveLength(1)
+  })
+
   it('still closes from the close button', async () => {
     const { wrapper } = mountToast()
 
