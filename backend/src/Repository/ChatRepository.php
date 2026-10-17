@@ -135,6 +135,12 @@ class ChatRepository extends ServiceEntityRepository
         ]);
     }
 
+    public function save(Chat $chat): void
+    {
+        $this->getEntityManager()->persist($chat);
+        $this->getEntityManager()->flush();
+    }
+
     /**
      * Remove a chat entity.
      */

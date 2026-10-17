@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Service\Message\MessageVersionService;
 use App\Tests\Trait\AuthenticatedTestTrait;
+use App\Tests\Trait\CreatesTestEntities;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -21,12 +22,9 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 final class MessageVersionControllerTest extends WebTestCase
 {
     use AuthenticatedTestTrait;
+    use CreatesTestEntities;
 
     private KernelBrowser $client;
-    private EntityManagerInterface $em;
-
-    /** @var list<object> in creation order */
-    private array $created = [];
 
     protected function setUp(): void
     {
@@ -37,20 +35,13 @@ final class MessageVersionControllerTest extends WebTestCase
 
     protected function tearDown(): void
     {
-        $this->em->clear();
-        foreach (array_reverse($this->created) as $entity) {
-            $found = $this->em->find($entity::class, $entity->getId());
-            if (null !== $found) {
-                $this->em->remove($found);
-            }
-        }
-        $this->em->flush();
+        $this->removeCreatedEntities();
         parent::tearDown();
     }
 
     public function testAnAgainAnswerJoinsTheTurnAndThePickedVersionIsStored(): void
     {
-        $owner = $this->user('owner');
+        $owner = $this->createUser('versions-owner');
         [$first, $again] = $this->twoAnswers($owner);
         $this->authenticateClient($this->client, $owner);
 
@@ -71,8 +62,8 @@ final class MessageVersionControllerTest extends WebTestCase
 
     public function testAMessageOfAnotherAccountIsNotFound(): void
     {
-        [$first, $again] = $this->twoAnswers($this->user('owner'));
-        $this->authenticateClient($this->client, $this->user('stranger'));
+        [$first, $again] = $this->twoAnswers($this->createUser('versions-owner'));
+        $this->authenticateClient($this->client, $this->createUser('versions-stranger'));
 
         $this->post('/api/v1/messages/'.$again->getId().'/turn-link', ['kind' => 'again', 'previousId' => $first->getId()]);
         self::assertResponseStatusCodeSame(404);
@@ -91,31 +82,19 @@ final class MessageVersionControllerTest extends WebTestCase
         $this->client->request('POST', $uri, [], [], ['CONTENT_TYPE' => 'application/json'], (string) json_encode($body));
     }
 
-    private function user(string $name): User
-    {
-        $user = (new User())
-            ->setMail($name.'-'.bin2hex(random_bytes(4)).'@versions.test')
-            ->setCreated(date('YmdHis'))
-            ->setType('WEB')
-            ->setProviderId('local')
-            ->setUserLevel('NEW');
-
-        return $this->persist($user);
-    }
-
     /**
      * @return array{Message, Message} an answer and its Again, in one chat
      */
     private function twoAnswers(User $owner): array
     {
-        $chat = $this->persist((new Chat())->setUserId((int) $owner->getId())->setSource('web')->setTitle('Versions'));
+        $chat = $this->persistEntity((new Chat())->setUserId((int) $owner->getId())->setSource('web')->setTitle('Versions'));
 
         return [$this->answer($owner, $chat, 'The first answer'), $this->answer($owner, $chat, 'The answer again')];
     }
 
     private function answer(User $owner, Chat $chat, string $text): Message
     {
-        return $this->persist((new Message())
+        return $this->persistEntity((new Message())
             ->setUserId((int) $owner->getId())
             ->setChat($chat)
             ->setTrackingId(1)
@@ -129,21 +108,5 @@ final class MessageVersionControllerTest extends WebTestCase
             ->setText($text)
             ->setDirection('OUT')
             ->setStatus('complete'));
-    }
-
-    /**
-     * @template T of object
-     *
-     * @param T $entity
-     *
-     * @return T
-     */
-    private function persist(object $entity): object
-    {
-        $this->em->persist($entity);
-        $this->em->flush();
-        $this->created[] = $entity;
-
-        return $entity;
     }
 }
