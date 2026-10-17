@@ -44,6 +44,13 @@ final class MediaUploadStoreTest extends TestCase
         self::assertNull($this->store()->saveDataUrlAsFile('not a data url', 31, 7, 'openai'));
     }
 
+    public function testGeneratedMp4AudioIsStoredAsM4a(): void
+    {
+        $path = $this->store()->saveDataUrlAsFile('data:audio/mp4;base64,'.base64_encode('mp4 audio'), 31, 7, 'openai');
+
+        self::assertStringEndsWith('.m4a', (string) $path);
+    }
+
     public function testADownloadIsSavedWithTheExtensionOfItsContent(): void
     {
         $path = $this->store(fetched: base64_decode(self::PIXEL))->downloadMedia('https://cdn.example.com/out', 31, 7, 'openai', 'image');

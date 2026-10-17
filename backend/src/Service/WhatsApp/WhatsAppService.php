@@ -7,6 +7,7 @@ use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Message\SpokenInput;
@@ -780,8 +781,8 @@ final class WhatsAppService
                 return null;
             }
 
-            // Determine file extension from content type
-            $extension = $this->getExtensionFromMimeType($contentType);
+            // An unmapped type gets "unknown", which the allow-list rejects.
+            $extension = FileHelper::getExtensionFromMimeType($contentType, 'unknown');
 
             // Validate file extension
             if (!in_array($extension, self::ALLOWED_EXTENSIONS, true)) {
@@ -839,47 +840,6 @@ final class WhatsAppService
 
             return null;
         }
-    }
-
-    /**
-     * Get file extension from MIME type.
-     * Returns the extension or 'unknown' for unmapped MIME types.
-     * Note: Unknown types will be rejected by the ALLOWED_EXTENSIONS check.
-     */
-    private function getExtensionFromMimeType(string $mimeType): string
-    {
-        // Strip MIME parameters (e.g., "audio/ogg; codecs=opus" → "audio/ogg")
-        $baseMimeType = trim(explode(';', $mimeType)[0]);
-
-        $mimeMap = [
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            'audio/ogg' => 'ogg',
-            'audio/mpeg' => 'mp3',
-            'audio/mp4' => 'm4a',
-            'audio/amr' => 'amr',
-            'audio/opus' => 'opus',
-            'audio/wav' => 'wav',
-            'audio/webm' => 'webm',
-            'video/mp4' => 'mp4',
-            'video/3gpp' => '3gp',
-            'video/webm' => 'webm',
-            'application/pdf' => 'pdf',
-            'application/vnd.ms-powerpoint' => 'ppt',
-            'application/msword' => 'doc',
-            'application/vnd.ms-excel' => 'xls',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
-            'text/plain' => 'txt',
-            'text/csv' => 'csv',
-            'text/markdown' => 'md',
-        ];
-
-        // Return 'unknown' for unmapped types - will be caught by ALLOWED_EXTENSIONS check
-        return $mimeMap[$baseMimeType] ?? 'unknown';
     }
 
     /**
