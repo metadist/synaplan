@@ -7,6 +7,20 @@ namespace App\Tests\Support;
 use App\AI\Credential\ProviderKeyStore;
 use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
+use App\Service\Admin\SystemConfig\SystemConfigSchema;
+use App\Service\Admin\SystemConfig\Tab\AiTab;
+use App\Service\Admin\SystemConfig\Tab\AuthTab;
+use App\Service\Admin\SystemConfig\Tab\BrandingTab;
+use App\Service\Admin\SystemConfig\Tab\ChannelsTab;
+use App\Service\Admin\SystemConfig\Tab\EmailTab;
+use App\Service\Admin\SystemConfig\Tab\FeaturesTab;
+use App\Service\Admin\SystemConfig\Tab\GuestLandingTab;
+use App\Service\Admin\SystemConfig\Tab\InterfaceTab;
+use App\Service\Admin\SystemConfig\Tab\MobileTab;
+use App\Service\Admin\SystemConfig\Tab\ProcessingTab;
+use App\Service\Admin\SystemConfig\Tab\RoutingTab;
+use App\Service\Admin\SystemConfig\Tab\SharingTab;
+use App\Service\Admin\SystemConfig\Tab\VectorDbTab;
 use App\Service\Admin\SystemConfigService;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Chat\ChatArtifactsConfig;
@@ -56,10 +70,32 @@ final class SystemConfigServiceFactory
             registrationConfig: new RegistrationConfig($repository),
             guestChatConfig: new GuestChatConfig($repository),
             featureFlagEnv: $doubles['featureFlagEnv'] ?? new FeatureFlagEnv(),
-            modules: $doubles['modules'] ?? null,
+            schema: self::schema($repository, $doubles['modules'] ?? null),
             layeredConfigResolver: $doubles['layeredConfigResolver'] ?? null,
             computeClient: $doubles['computeClient'] ?? null,
             chatArtifactsConfig: $doubles['chatArtifactsConfig'] ?? null,
         );
+    }
+
+    /**
+     * The thirteen tabs in the order the container collects them.
+     */
+    public static function schema(ConfigRepository $repository, ?ModuleRegistry $modules = null): SystemConfigSchema
+    {
+        return new SystemConfigSchema([
+            new AiTab(self::TTS_URL),
+            new EmailTab(),
+            new BrandingTab(),
+            new MobileTab(),
+            new AuthTab(),
+            new ChannelsTab(),
+            new ProcessingTab(),
+            new FeaturesTab($modules),
+            new SharingTab(new RegistrationConfig($repository)),
+            new RoutingTab(),
+            new InterfaceTab(),
+            new GuestLandingTab(),
+            new VectorDbTab(),
+        ]);
     }
 }

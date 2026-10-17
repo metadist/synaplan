@@ -32,23 +32,21 @@ final readonly class FieldDefinition
     }
 
     /**
-     * @param FieldArray $field
+     * The same field shown on tab $tab, in section $section.
      */
-    public static function fromArray(array $field): self
+    public function placedIn(string $tab, string $section): self
     {
         return new self(
-            type: $field['type'],
-            description: $field['description'],
-            default: $field['default'],
-            sensitive: $field['sensitive'],
-            row: 'database' === ($field['source'] ?? null)
-                ? new DatabaseRow($field['dbGroup'] ?? null, $field['dbKey'] ?? null, $field['encrypted'] ?? false)
-                : null,
-            options: $field['options'] ?? null,
-            placeholder: $field['placeholder'] ?? null,
-            managedBy: $field['managedBy'] ?? null,
-            tab: $field['tab'],
-            section: $field['section'],
+            $this->type,
+            $this->description,
+            $this->default,
+            $this->sensitive,
+            $this->row,
+            $this->options,
+            $this->placeholder,
+            $this->managedBy,
+            $tab,
+            $section,
         );
     }
 
