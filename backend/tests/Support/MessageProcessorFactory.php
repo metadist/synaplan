@@ -11,6 +11,8 @@ use App\Service\Agent\AgentConfig;
 use App\Service\Mcp\ConfluenceLinkedPageReader;
 use App\Service\Mcp\JiraLinkedIssueReader;
 use App\Service\Message\AttachmentSearchContextResolver;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\ConversationSummaryService;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
@@ -63,7 +65,7 @@ final class MessageProcessorFactory
     ): MessageProcessor {
         return new MessageProcessor(
             $preProcessor,
-            new TurnClassificationResolver($classifier, $modelConfigService, $agentConfig, $promptService, $logger),
+            new TurnClassificationResolver($classifier, $modelConfigService, $agentConfig, $promptService, new TopicIntentRule(new SystemCapabilityRegistry()), $logger),
             new TurnHistoryLoader($messageRepository, $conversationSummaryService, $logger),
             new TurnWebSearch(
                 $webSearch,

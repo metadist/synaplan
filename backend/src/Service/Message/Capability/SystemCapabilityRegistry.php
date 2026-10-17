@@ -10,7 +10,7 @@ namespace App\Service\Message\Capability;
  *
  * Replaces four independently hand-maintained mappings that had to stay in
  * sync by convention alone:
- *  - topic → intent ({@see \App\Service\Message\MessageClassifier::mapTopicToIntent()})
+ *  - topic → intent ({@see TopicIntentRule::intentFor()})
  *  - intent → handler ({@see \App\Service\Message\InferenceRouter})
  *  - the BMEDIA/BINPUTMODE/BRESOLUTION enums duplicated in
  *    {@see \App\AI\StructuredOutput\Schema\SortClassificationSchema} and

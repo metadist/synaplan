@@ -6,6 +6,7 @@ use App\Entity\Agent;
 use App\Entity\Message;
 use App\Service\Agent\AgentConfig;
 use App\Service\Infrastructure\PerfTimer;
+use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\MessageClassifier;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\PromptService;
@@ -30,6 +31,7 @@ final readonly class TurnClassificationResolver
         private ModelConfigService $modelConfigService,
         private AgentConfig $agentConfig,
         private PromptService $promptService,
+        private TopicIntentRule $topicIntents,
         private LoggerInterface $logger,
     ) {
     }
@@ -368,28 +370,20 @@ final readonly class TurnClassificationResolver
     private function again(Message $message, array $options): array
     {
         $language = self::language($message, $options, 'en');
-        $topic = strtolower($message->getTopic() ?: '');
-        if ('' === $topic || 'unknown' === $topic) {
-            $topic = 'chat';
-        }
-        if (!empty($options['model_id'])) {
-            $modelTag = $this->modelConfigService->getModelTag((int) $options['model_id']);
-            if ($modelTag) {
-                $topic = self::topicForModelTag($modelTag, $topic);
-            }
-        }
+        $modelTag = !empty($options['model_id']) ? $this->modelConfigService->getModelTag((int) $options['model_id']) : null;
+        $routed = $this->topicIntents->forAgain($modelTag, $message->getTopic());
 
         $this->logger->info('MessageProcessor: Skipping classification (Again request)', [
             'specified_model_id' => $options['model_id'],
-            'topic' => $topic,
+            'topic' => $routed->topic,
             'language' => $language,
         ]);
 
         return [
-            'topic' => $topic,
+            'topic' => $routed->topic,
             'language' => $language,
             'source' => 'again',
-            'intent' => self::intentForAgainTopic($topic),
+            'intent' => $routed->intent,
             'model_id' => $options['model_id'],
         ];
     }
@@ -446,25 +440,5 @@ final readonly class TurnClassificationResolver
         }
 
         return $summary;
-    }
-
-    private static function intentForAgainTopic(string $topic): string
-    {
-        return match ($topic) {
-            'mediamaker', 'text2pic', 'text2vid', 'text2sound' => 'image_generation',
-            'pic2text', 'analyze', 'analyzefile' => 'file_analysis',
-            'officemaker' => 'document_generation',
-            default => 'chat',
-        };
-    }
-
-    private static function topicForModelTag(string $modelTag, string $fallback): string
-    {
-        return match (strtolower($modelTag)) {
-            'text2pic', 'text2vid', 'text2sound' => 'mediamaker',
-            'pic2text', 'analyze', 'vision' => 'general',
-            'document', 'officemaker', 'text2doc' => 'officemaker',
-            default => $fallback ?: 'chat',
-        };
     }
 }

@@ -13,6 +13,7 @@ use App\Repository\MessageMetaRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Agent\AgentPinResolver;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Processing\TurnClassificationResolver;
@@ -132,7 +133,7 @@ final class OverrideAndAgainRoutingTest extends TestCase
             $config,
             $em,
             new NullLogger(),
-            new SystemCapabilityRegistry(),
+            new TopicIntentRule(new SystemCapabilityRegistry()),
             $this->createStub(EmbeddingRouterService::class),
             new EmbeddingRouterConfig($config),
             new NativeToolRoutingConfig($config),
@@ -148,6 +149,7 @@ final class OverrideAndAgainRoutingTest extends TestCase
             $this->modelConfig($tag),
             $this->createStub(AgentConfig::class),
             $this->createStub(PromptService::class),
+            new TopicIntentRule(new SystemCapabilityRegistry()),
             new NullLogger(),
         );
     }

@@ -14,6 +14,7 @@ use App\Repository\MessageMetaRepository;
 use App\Service\Agent\AgentPinResolver;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
@@ -361,7 +362,7 @@ final class RoutingCharacterizationTest extends TestCase
             $configRepo,
             $em,
             $this->createMock(LoggerInterface::class),
-            new SystemCapabilityRegistry(),
+            new TopicIntentRule(new SystemCapabilityRegistry()),
             $this->createMock(EmbeddingRouterService::class),
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
