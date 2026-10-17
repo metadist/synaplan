@@ -379,6 +379,7 @@ lists in `agent.rs`):
 
 | Today | Replacement |
 | ----- | ----------- |
+| File tools only when a skill is enabled (`ChatView.vue`: `agentMode = enabledSkillCount > 0`) | A turn also uses the agent loop when the latest message names a file by its extension, a file is attached or dropped, or it refers to the project folder. `list_files`, `read_file` and `write_file` need no skill; `run_program` still needs an enabled skill and execution consent. The decision is a pure, tested function (`src/lib/turnRouting.ts`); `ChatView.vue` changes one line. |
 | "asked to write a file" = English verb + extension | A filename with a known extension in the latest user message that does **not** exist in the readable folders or the out-box is a requested output; one that exists is an input. Works in every language. |
 | "asked for source URLs" = English words | The turn used `web_search` or `web_fetch` (server tool observed) and the final text and written files contain no `https://` link → one nudge: "You used web search but named no source. Add the https links of the pages you used." |
 | `REWRITE_SOURCES_INSTRUCTION` ("at least three https URLs") | Removed. Source quality is measured by `06`, not by counting links. |

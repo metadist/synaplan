@@ -12,7 +12,7 @@ done; the agent reports each one with the command it ran. A step starts only
 when the §0 rows it names are ticked. RD steps are pull requests in
 `synaplan-desktop`; all others in `synaplan`.
 
-UI steps (RD3–RD9, RW1, RW2) carry a **User-flow** line and the five exit
+UI steps (RD1, RD3–RD9, RW1, RW2) carry a **User-flow** line and the five exit
 bullets of `05` §10 (UX contract §6).
 
 ---
@@ -170,15 +170,19 @@ unit tests for the scorer.
   Synaplan inside the caller's scopes, offered when a knowledge folder is pinned
   (`x-synaplan-rag-group-key`) or an assistant has knowledge scopes; BCONFIG
   `MESSAGES_GATEWAY.KNOWLEDGE_TOOLS` (on for paired desktop keys).
-- Do not: change `MessagesContextInjector::sessionBlock` (frozen); widen scopes.
+- Do not: grow `MessagesContextInjector::sessionBlock` (frozen at 109 lines —
+  moving its search call into the shared helper shrinks it); change what the
+  injection returns; widen scopes.
 
 ### Brief
 
-> Add two gateway-owned tools that search and read the pinned knowledge folder
-> with `VectorSearchService` and `RagScope` exactly as the injector does. Results
-> carry file name, file id, chunk id and score. Never return another person's
-> passages; a folder shared at "Can use" is allowed. Tests for scopes, limits
-> and flag off.
+> Add two gateway-owned tools that search and read the pinned knowledge folder.
+> Extract the injector's search call (`semanticSearchByVector` with explicit
+> `RagScope`s) into one helper that both `MessagesContextInjector` and
+> `KnowledgeSearchTool` use — no third retrieval path next to MCP `rag_search`
+> (`03` §12). Results carry file name, file id, chunk id and score. Never
+> return another person's passages; a folder shared at "Can use" is allowed.
+> Tests for scopes, limits and flag off.
 
 ### Exit criteria
 
@@ -208,10 +212,18 @@ unit tests for the scorer.
 
 ---
 
-## RD1 — A stronger agent prompt and full-length answers (synaplan-desktop)
+## RD1 — File tools in every chat, a stronger agent prompt and full-length answers (synaplan-desktop, §0 #26)
+
+**User-flow:** J-RQ-1 (`05` §4).
 
 ### Goal
 
+- Do: file tools without a skill — a turn uses the agent loop when the latest
+  message names a file by its extension, a file is attached or dropped, or it
+  refers to the project folder (`04` §6); the decision in
+  `src/lib/turnRouting.ts` with a Vitest table (de, en, es, fr, tr; with and
+  without skills); `ChatView.vue` changes one line; `run_program` still needs a
+  skill and consent.
 - Do: `build_system_prompt` as in `04` §6 (date, time zone, language, method,
   web and project-file blocks); language-neutral file and source checks;
   remove `REWRITE_SOURCES_INSTRUCTION` and the English verb lists; plain-chat
@@ -224,8 +236,11 @@ unit tests for the scorer.
 
 ### Exit criteria
 
-1. `make ci-local` green; quick set incl. the German variants green.
+1. `make ci-local` green (incl. the routing table); quick set incl. the German
+   variants green.
 2. B1 before and after on the smoke set in this STATUS.
+3. J-RQ-1 walked in a project without any enabled skill; the five bullets of
+   `05` §10.
 
 ---
 

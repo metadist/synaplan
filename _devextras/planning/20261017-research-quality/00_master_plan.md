@@ -40,8 +40,8 @@ per turn with no way to ask for more (§1).
 **Binding UX:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) (U1–U12)
 and, for Desktop, the copy rules of
 `synaplan-desktop/_extras/planning/20260910-desktop-project-companion/05_ux_and_i18n.md`
-(forbidden words, five questions, no sixth rail item). Surfaces in RD3–RD9,
-RW1–RW2.
+(forbidden words, five questions, no sixth rail item). Surfaces in RD1,
+RD3–RD9, RW1–RW2.
 **Class:** RQ0, RQ2 `no-app-impact`; RQ3, RS*, RW3 `backend-only`; RW1–RW2
 `ota-candidate`; RQ1 and RD* are pull requests in `synaplan-desktop` (its own
 `make ci-local` gate, no mobile class).
@@ -81,7 +81,8 @@ chip in Chat; the web chat gets the same engine and the same card later.
 Before the engine, Phase B removes today's ceilings, because most questions
 will keep going through normal chat: the two-sentence web wrap-up, page reading
 only on Anthropic, a single five-passage knowledge injection, the 1,024-token
-Desktop chat budget and English-only intent checks.
+Desktop chat budget, file tools that appear only when a skill is enabled, and
+language-bound intent checks.
 
 **Where it lives:**
 
@@ -175,6 +176,7 @@ what the sentence claims is worse than no research feature.
 | 23 | **Eval first.** No default flips, no preset change and no prompt change without numbers from `06`. The targets table in `06` §5 is the gate for seeding the flag on. | Proposed | |
 | 24 | **App only.** No research mode in the chat widget and no research runs over WhatsApp or mail in v1. | Proposed | |
 | 25 | **Plan limits.** A rate-limit action `RESEARCH` counts runs per day by subscription level (`RateLimitConfigSeeder`), seeded conservatively (free level: 3 Standard and 0 Thorough runs per day). Limits for paid levels and for `web.synaplan.com` are the owner's call. | Ask (business) | |
+| 26 | **Desktop: file tools without a skill.** A turn whose message names a file by its extension, carries an attached or dropped file, or refers to the project folder uses the agent loop even when no skill is enabled. That turn is answered without token streaming (the activity feed shows each step), as agent turns are today; `run_program` still needs an enabled skill and execution consent. | Proposed | |
 
 ---
 
@@ -198,10 +200,15 @@ Full write-up with references in [`01_baseline_and_gaps.md`](./01_baseline_and_g
    gpt-oss-120b) and the DAG runs once; the web chat answers once from
    pre-fetched snippets and up to three read pages (`READ_PAGES_MAX = 3`,
    PDFs and office files skipped).
-5. **Desktop prompts are thin and English-only.** `build_system_prompt` has no
-   date, no method and no language rule; `user_asked_to_write_a_file` checks the
-   English verbs *write / create / save*, so a German "Schreib die Quellen in
-   quellen.md" never gets the file nudge. Plain chat sends `max_tokens: 1024`.
+5. **Desktop works with files only when a skill is on, and its checks are
+   language-bound.** The agent loop — the only path with `list_files`,
+   `read_file` and `write_file` — runs only when the project has at least one
+   enabled skill (`ChatView.vue`: `agentMode = enabledSkillCount > 0`);
+   otherwise every turn is plain streaming chat with `max_tokens: 1024`. Inside
+   the loop, `user_asked_to_write_a_file` needs the English verbs *write /
+   create / save*; plain chat's document detector is a five-language phrase
+   list. A German "Schreib die Quellen in quellen.md" gets no file on either
+   path. `build_system_prompt` has no date, no method and no language rule.
 6. **One model does everything on Desktop.** The project's Chat model searches,
    reads, decides and writes. The server already splits roles by slot (SORT /
    PLAN / MEM on gpt-oss-120b, CHAT / ANALYZE on Claude Sonnet 5) and
@@ -255,7 +262,7 @@ Details, wireframes and copy in [`05_journeys_and_ui.md`](./05_journeys_and_ui.m
 
 | Journey | Who | Walked in |
 | ------- | --- | --------- |
-| **J-RQ-1** — Ask with Web on gets a full, sourced answer (normal chat, after the quick wins) | Ada | RD1 |
+| **J-RQ-1** — Ask with Web on gets a full, sourced answer, and a named file without any skill enabled (normal chat, after the quick wins) | Ada | RD1 |
 | **J-RQ-2** — First research from an empty project: question, plan, progress, report, find it again | Ada | RD3, RD5 |
 | **J-RQ-3** — Research over my own documents (a folder of PDFs, Web off) | Ben | RD7 |
 | **J-RQ-4** — Thorough research: a clarifying question, plan review, close the window, notification, fact-check | Chris | RD4, RD9 |
@@ -277,6 +284,7 @@ Details, wireframes and copy in [`05_journeys_and_ui.md`](./05_journeys_and_ui.m
 | Question-aware condensing, map-reduce for long text | `ContextCondenser::fit()` |
 | Thread-aware search query rewrite | `SearchQueryGenerator` (`tools:search`) |
 | Knowledge search with owner scopes and sharing | `VectorSearchService`, `RagScope` |
+| Knowledge search for MCP clients | MCP `rag_search` (`McpServerFactory::ragSearchHandler`; the caller's own documents only). RS3's `knowledge_search` is its gateway-owned twin and shares one search helper with `MessagesContextInjector` — no third retrieval path |
 | Rerank with latency budget and fallback | `RerankStage`, `RerankRegistry`, `tools:rerank_listwise` |
 | RRF fusion of keyword and meaning tiers | `SmartSearchService` |
 | Text extraction for PDF and office files | `FileProcessor`, extraction chain `PLUGS.EXTRACTION.CHAIN.document` |
@@ -317,7 +325,7 @@ Details, wireframes and copy in [`05_journeys_and_ui.md`](./05_journeys_and_ui.m
 | RS2 | `feat(messages): read web pages on every model, not only on Anthropic` | backend-only | RQ1 |
 | RS3 | `feat(messages): search the pinned knowledge folder as a tool` | backend-only | RQ1 |
 | RS4 | `feat(search): read PDFs and office files that web search finds` | backend-only | RQ2, §0 #12 |
-| RD1 | `feat(chat): a stronger agent prompt and full-length answers` (in `synaplan-desktop`) | desktop | RQ1 |
+| RD1 | `feat(chat): file tools in every chat, a stronger agent prompt and full-length answers` (in `synaplan-desktop`) | desktop | RQ1, §0 #26 |
 | **Phase C — the research engine** | | | |
 | RS5 | `feat(models): model slots for reading sources and fact-checking` | backend-only | §0 #4 |
 | RS6 | `feat(research): research runs that plan, read and write a cited report` | backend-only | RS5, RQ2, §0 #1–#3, #7–#9, #19 |

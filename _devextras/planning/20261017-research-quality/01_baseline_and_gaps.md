@@ -37,7 +37,7 @@ them into a loop with a division of labour.
 | # | Factor | What produces quality in Cursor | Synaplan web chat today | Synaplan Desktop today | Closed by |
 | - | ------ | ------------------------------- | ----------------------- | ---------------------- | --------- |
 | 1 | A strong model drives | Frontier model with thinking, long output, many rounds | The pipeline decides (sorter vote → search → answer); the answering model calls no research tools | Project Chat model in an agent loop (40 rounds, 8,192 tokens per round, non-streaming); plain chat 1,024 tokens | RS6–RS7, RD1 |
-| 2 | Tools called again and again | Semantic search, exact search, read range, list, web search, fetch | None for research; `ChatToolLoop` exists for document edits only | `list_files`, `read_file`, `write_file`, `run_program`; `web_search` capped at 2 rounds then a two-sentence wrap-up; `web_fetch` only on Anthropic; knowledge injected once | RS1–RS3, RS6 |
+| 2 | Tools called again and again | Semantic search, exact search, read range, list, web search, fetch | None for research; `ChatToolLoop` exists for document edits only | Only when a skill is enabled: `list_files`, `read_file`, `write_file`, `run_program`; `web_search` capped at 2 rounds then a two-sentence wrap-up; `web_fetch` only on Anthropic; knowledge injected once | RS1–RS3, RS6, RD1 |
 | 3 | Plan and track | To-do list the user sees | `TaskPlanner` plans once, never re-plans | No plan | RS6, RD3–RD4 |
 | 4 | Look again | Re-searches, re-reads, retries | No reflection anywhere | The loop continues while the model calls tools; nudges are English-only heuristics | RS7 |
 | 5 | Context engineering | Rules files, date, environment, attached files, history summaries | Strong honesty rules in `general`; search block + knowledge block; capabilities block | 15-line system prompt: no date, no method, no language rule | RS6 prompts, RD1 |
@@ -128,7 +128,10 @@ again.**
 - Two chat modes (`src-tauri/src/commands/mod.rs`): **plain stream**
   (`send_chat`, `max_tokens 1024`) and **agent loop** (`send_agent_chat` →
   `agent::run_agent_turn`, `MAX_ITERATIONS = 40`, `MAX_TOKENS = 8192`,
-  non-streaming, wrap-up at the cap).
+  non-streaming, wrap-up at the cap). The UI uses the agent loop only when the
+  project has at least one enabled skill (`src/views/ChatView.vue`:
+  `agentMode = enabledSkillCount > 0`); without a skill, chat has no file tools
+  at all, although `list_files`, `read_file` and `write_file` need no skill.
 - Agent tools: `list_files`, `read_file` (UTF-8; office files via a skill's
   `read` command), `write_file` (out-box only), `run_program` (allowlisted
   interpreters, no shell); with Web on, the server tools `web_search` and
@@ -139,7 +142,10 @@ again.**
 - File intent heuristics (`agent.rs`): `user_asked_to_write_a_file` needs one of
   the English verbs `write / create / save` plus an extension;
   `user_asked_for_source_urls` looks for English words. Other languages get no
-  nudge.
+  nudge. Plain chat has its own five-language phrase list for document
+  requests (`generation::classify`, mirrored in `src/lib/classifyGeneration.ts`)
+  and saves the reply as a text file named after the request; a request that
+  names its file ("… in quellen.md") matches neither list.
 - Projects: local chats, notes, a knowledge folder `DESKTOP:{projectId}`
   (upload, process, status), eight model slots (Chat, Dictation, Read aloud,
   Images understand / create, Video, Embed locked to the workspace index model,
@@ -197,7 +203,8 @@ Defaults on this stack (`BCONFIG` group `DEFAULTMODEL`, owner 0):
 | Keyword search in chat RAG | none | `ChatKnowledgeContextLoader` | Names, numbers, article codes missed | RS9 |
 | Planner | once, ≤ 24 nodes, no reflection | `TaskPlanner`, `DagExecutor` | No gap filling | RS7 |
 | Desktop plain chat output | 1,024 tokens | `send_chat` | Truncated long answers (now shown as cut off) | RD1 |
-| Desktop file intent | English verbs only | `agent.rs` `WRITE_VERBS` | German, Spanish, French, Turkish users lose the file nudge | RD1 |
+| Desktop file tools | only when ≥ 1 skill is enabled | `ChatView.vue` `agentMode` | Without a skill, the assistant can neither read nor write a file | RD1 |
+| Desktop file intent | English verbs (agent loop); a five-language phrase list (plain chat) | `agent.rs` `WRITE_VERBS`, `classifyGeneration.ts` | Requests in other wording or languages lose the file | RD1 |
 | Desktop model use | one model for every step | `TurnContext.model` | Expensive reading or weak thinking | RS5, RD8 |
 
 ---
