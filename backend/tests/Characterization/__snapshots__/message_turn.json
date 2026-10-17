@@ -840,6 +840,19 @@
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
+                            "source": "ai_sorting",
+                            "topic": "general",
+                            "web_search": true
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            },
                             "search_results": {
                                 "results": [
                                     {
@@ -853,19 +866,6 @@
                                         "url": "https://example.org/blog"
                                     }
                                 ]
-                            },
-                            "source": "ai_sorting",
-                            "topic": "general",
-                            "web_search": true
-                        },
-                        "history": 1,
-                        "method": "route",
-                        "options": {
-                            "resolved_prompt_data": {
-                                "metadata": {
-                                    "aiModel": 0
-                                },
-                                "prompt": null
                             }
                         }
                     }
@@ -1229,6 +1229,18 @@
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
+                            "source": "ai_sorting",
+                            "topic": "general"
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            },
                             "search_results": {
                                 "results": [
                                     {
@@ -1242,18 +1254,6 @@
                                         "url": "https://example.org/blog"
                                     }
                                 ]
-                            },
-                            "source": "ai_sorting",
-                            "topic": "general"
-                        },
-                        "history": 1,
-                        "method": "route",
-                        "options": {
-                            "resolved_prompt_data": {
-                                "metadata": {
-                                    "aiModel": 0
-                                },
-                                "prompt": null
                             },
                             "web_search": true
                         }

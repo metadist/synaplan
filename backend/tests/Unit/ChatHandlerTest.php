@@ -498,9 +498,8 @@ class ChatHandlerTest extends TestCase
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFileText')->willReturn('');
 
-        $classification = [
-            'topic' => 'CHAT',
-            'language' => 'de',
+        $classification = ['topic' => 'CHAT', 'language' => 'de'];
+        $options = [
             'search_results' => [
                 'query' => 'Wetter Münster heute',
                 'results' => [
@@ -525,7 +524,7 @@ class ChatHandlerTest extends TestCase
                 return ['content' => 'Sonnig.', 'provider' => 'test', 'model' => 'test'];
             });
 
-        $this->handler->handle($message, [], $classification);
+        $this->handler->handle($message, [], $classification, null, $options);
 
         $this->assertIsArray($capturedMessages);
         $this->assertSame('system', $capturedMessages[0]['role']);

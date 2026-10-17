@@ -42,6 +42,8 @@ final class TurnAlignmentTest extends TestCase
 
     private const PROMPT = ['prompt' => null, 'metadata' => ['aiModel' => 0]];
 
+    private const SEARCH_QUESTION = 'What is the latest Synaplan release?';
+
     /** Turns that skip the AI sorter, so the language comes from the caller or the message. */
     private const SKIPPED_SORTER = [
         'again' => ['is_again' => true, 'model_id' => 42],
@@ -59,6 +61,9 @@ final class TurnAlignmentTest extends TestCase
 
     /** @var array<string, mixed> what the last turn returned to its caller */
     private array $result = [];
+
+    /** @var array<string, mixed>|null what the web search finds; null keeps it off */
+    private ?array $webResults = null;
 
     public function testAStreamedWidgetTurnIsClassifiedOnceWithItsHistory(): void
     {
@@ -133,6 +138,17 @@ final class TurnAlignmentTest extends TestCase
         self::assertSame(['de', 'de'], $this->promptLookups);
     }
 
+    public function testBothTurnsHandTheWebResultsToTheHandlerInItsOptions(): void
+    {
+        $this->webResults = ['results' => [['title' => 'Release notes', 'url' => 'https://example.org/releases', 'description' => 'Latest release']]];
+        $vote = ['web_search' => true];
+
+        foreach (['buffered' => $this->buffered([], $vote, 'en', self::SEARCH_QUESTION), 'streamed' => $this->streamed([], $vote, 'en', self::SEARCH_QUESTION)] as $turn => $routed) {
+            self::assertSame('Release notes', $routed['options']['search_results']['results'][0]['title'] ?? null, $turn);
+            self::assertArrayNotHasKey('search_results', $routed['classification'], $turn);
+        }
+    }
+
     public function testTheCallerGetsTheVerdictWithoutThePromptSettings(): void
     {
         $this->buffered(self::FIXED_PROMPT);
@@ -163,9 +179,9 @@ final class TurnAlignmentTest extends TestCase
      *
      * @return array{classification: array<string, mixed>, options: array<string, mixed>}
      */
-    private function buffered(array $options, array $verdict = [], string $language = 'en'): array
+    private function buffered(array $options, array $verdict = [], string $language = 'en', string $text = 'Hello, how are you?'): array
     {
-        $this->result = $this->processor($verdict)->process($this->message($language), $options);
+        $this->result = $this->processor($verdict)->process($this->message($language, $text), $options);
 
         return $this->lastRouted();
     }
@@ -176,9 +192,9 @@ final class TurnAlignmentTest extends TestCase
      *
      * @return array{classification: array<string, mixed>, options: array<string, mixed>}
      */
-    private function streamed(array $options, array $verdict = [], string $language = 'en'): array
+    private function streamed(array $options, array $verdict = [], string $language = 'en', string $text = 'Hello, how are you?'): array
     {
-        $this->result = $this->processor($verdict)->processStream($this->message($language), static function (): void {}, null, $options);
+        $this->result = $this->processor($verdict)->processStream($this->message($language, $text), static function (): void {}, null, $options);
 
         return $this->lastRouted();
     }
@@ -236,6 +252,12 @@ final class TurnAlignmentTest extends TestCase
         $urls = $this->createStub(UrlContentService::class);
         $urls->method('extractUrls')->willReturn([]);
 
+        $brave = $this->createStub(BraveSearchService::class);
+        $brave->method('isEnabled')->willReturn(null !== $this->webResults);
+        $brave->method('search')->willReturn($this->webResults ?? []);
+        $queries = $this->createStub(SearchQueryGenerator::class);
+        $queries->method('generate')->willReturnArgument(0);
+
         return MessageProcessorFactory::create(
             $messages,
             null,
@@ -244,8 +266,8 @@ final class TurnAlignmentTest extends TestCase
             $router,
             $this->createStub(ModelConfigService::class),
             $prompts,
-            WebSearchGatewayFactory::fromBrave($this->createStub(BraveSearchService::class)),
-            $this->createStub(SearchQueryGenerator::class),
+            WebSearchGatewayFactory::fromBrave($brave),
+            $queries,
             $this->createStub(AttachmentSearchContextResolver::class),
             $urls,
             new NullLogger(),
@@ -258,12 +280,12 @@ final class TurnAlignmentTest extends TestCase
         );
     }
 
-    private function message(string $language): Message
+    private function message(string $language, string $text = 'Hello, how are you?'): Message
     {
         $message = $this->createStub(Message::class);
         $message->method('getId')->willReturn(101);
         $message->method('getUserId')->willReturn(7);
-        $message->method('getText')->willReturn('Hello, how are you?');
+        $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn($language);
         $message->method('getTopic')->willReturn('general');
         $message->method('getChatId')->willReturn(5);

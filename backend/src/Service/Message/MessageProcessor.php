@@ -95,13 +95,13 @@ final readonly class MessageProcessor
 
             ['classification' => $classification, 'searchResults' => $searchResults]
                 = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status, $perfTimer);
+            if ($searchResults) {
+                $options['search_results'] = $searchResults;
+            }
 
             [$options, $conversationHistory] = $this->history->applyRollingSummary($message, $classification, $options, $conversationHistory, $perfTimer);
 
             $this->dispatcher->announce($message, $status);
-            if ($searchResults) {
-                $options['search_results'] = $searchResults;
-            }
 
             $perfTimer->start('handler_total');
             $response = $this->dispatcher->dispatchStreamed($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
@@ -185,7 +185,7 @@ final readonly class MessageProcessor
             ['classification' => $classification, 'searchResults' => $searchResults]
                 = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status);
             if ($searchResults) {
-                $classification['search_results'] = $searchResults;
+                $options['search_results'] = $searchResults;
             }
 
             // The same read-only summary as the stream, so email, MCP and
@@ -200,7 +200,6 @@ final readonly class MessageProcessor
             ]);
 
             $classification = self::verdictForCaller($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting);
-            unset($classification['search_results']);
 
             return [
                 'success' => true,
