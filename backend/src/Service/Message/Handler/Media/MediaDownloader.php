@@ -32,7 +32,6 @@ final readonly class MediaDownloader
             $content = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $curlError = curl_error($ch);
-            curl_close($ch);
 
             if (false === $content || 200 !== $httpCode) {
                 throw new \Exception("cURL download failed (HTTP {$httpCode}): {$curlError}");
