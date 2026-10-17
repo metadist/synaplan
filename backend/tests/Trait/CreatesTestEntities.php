@@ -49,7 +49,9 @@ trait CreatesTestEntities
     {
         $this->em->clear();
         foreach (array_reverse($this->createdEntities) as $entity) {
-            $found = $this->em->find($entity::class, $entity->getId());
+            // A row the test deleted through the API has lost its id.
+            $id = $entity->getId();
+            $found = null === $id ? null : $this->em->find($entity::class, $id);
             if (null !== $found) {
                 $this->em->remove($found);
             }

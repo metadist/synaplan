@@ -37,6 +37,17 @@ class WidgetSessionRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param iterable<WidgetSession> $sessions removed in one flush
+     */
+    public function removeAll(iterable $sessions): void
+    {
+        foreach ($sessions as $session) {
+            $this->getEntityManager()->remove($session);
+        }
+        $this->getEntityManager()->flush();
+    }
+
+    /**
      * Find session by widget ID and session ID.
      */
     public function findByWidgetAndSession(string $widgetId, string $sessionId): ?WidgetSession
