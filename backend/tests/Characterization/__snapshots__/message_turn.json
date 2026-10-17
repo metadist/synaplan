@@ -110,7 +110,7 @@
                 "classifier": [],
                 "prompt": [
                     {
-                        "language": "de",
+                        "language": "fr",
                         "topic": "mediamaker"
                     }
                 ],
@@ -118,7 +118,7 @@
                     {
                         "classification": {
                             "intent": "image_generation",
-                            "language": "de",
+                            "language": "fr",
                             "model_id": 42,
                             "source": "again",
                             "topic": "mediamaker"
@@ -148,7 +148,7 @@
             "result": {
                 "classification": {
                     "intent": "image_generation",
-                    "language": "de",
+                    "language": "fr",
                     "model_id": 42,
                     "sorting_model_id": null,
                     "sorting_model_name": null,
@@ -2785,7 +2785,7 @@
                 "classifier": [],
                 "prompt": [
                     {
-                        "language": "de",
+                        "language": "fr",
                         "topic": "general"
                     }
                 ],
@@ -2793,7 +2793,7 @@
                     {
                         "classification": {
                             "intent": "chat",
-                            "language": "de",
+                            "language": "fr",
                             "source": "forced_image_description",
                             "topic": "general"
                         },
@@ -2821,7 +2821,7 @@
             "result": {
                 "classification": {
                     "intent": "chat",
-                    "language": "de",
+                    "language": "fr",
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -2863,10 +2863,10 @@
                     "status": "classifying"
                 },
                 {
-                    "message": "Topic: general, Language: de, Source: forced_image_description",
+                    "message": "Topic: general, Language: fr, Source: forced_image_description",
                     "metadata": {
                         "intent": "chat",
-                        "language": "de",
+                        "language": "fr",
                         "sorting_model_id": null,
                         "sorting_model_name": null,
                         "sorting_provider": null,
@@ -3117,7 +3117,7 @@
                     {
                         "classification": {
                             "intent": "chat",
-                            "language": "en",
+                            "language": "de",
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
@@ -3141,7 +3141,7 @@
             "result": {
                 "classification": {
                     "intent": "chat",
-                    "language": "en",
+                    "language": "de",
                     "prompt_metadata": {
                         "aiModel": 0
                     },
@@ -3188,7 +3188,7 @@
                 {
                     "message": "Forced image description mode",
                     "metadata": {
-                        "language": "en",
+                        "language": "de",
                         "source": "forced_image_description",
                         "topic": "general"
                     },

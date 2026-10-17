@@ -38,6 +38,12 @@ final class TurnAlignmentTest extends TestCase
 {
     private const SORTER_VERDICT = ['topic' => 'general', 'language' => 'en', 'source' => 'ai_sorting', 'intent' => 'chat'];
 
+    /** Turns that skip the AI sorter, so the language comes from the caller or the message. */
+    private const SKIPPED_SORTER = [
+        'again' => ['is_again' => true, 'model_id' => 42],
+        'forced image description' => ['force_image_description' => true],
+    ];
+
     /** @var list<int> history size per classifier call */
     private array $classifierCalls = [];
 
@@ -63,6 +69,36 @@ final class TurnAlignmentTest extends TestCase
 
         foreach (['buffered' => $this->buffered($scope), 'streamed' => $this->streamed($scope)] as $turn => $routed) {
             self::assertSame($scope, array_intersect_key($routed['classification'], $scope), $turn);
+        }
+    }
+
+    public function testTheCallersLanguageWinsOverTheMessageLanguage(): void
+    {
+        $this->assertTurnLanguage('fr', self::SKIPPED_SORTER, ['language' => 'fr'], 'de');
+    }
+
+    public function testTheMessageLanguageAnswersWhenTheCallerNamesNone(): void
+    {
+        $this->assertTurnLanguage('de', self::SKIPPED_SORTER, [], 'de');
+    }
+
+    public function testAnUnknownMessageLanguageFallsBackToEnglish(): void
+    {
+        $this->assertTurnLanguage('en', self::SKIPPED_SORTER, [], 'NN');
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $kinds   options per kind of turn
+     * @param array<string, mixed>                $options
+     */
+    private function assertTurnLanguage(string $expected, array $kinds, array $options, string $messageLanguage): void
+    {
+        foreach ($kinds as $kind => $kindOptions) {
+            $buffered = $this->buffered($kindOptions + $options, [], $messageLanguage);
+            $streamed = $this->streamed($kindOptions + $options, [], $messageLanguage);
+
+            self::assertSame($expected, $buffered['classification']['language'], "$kind, buffered");
+            self::assertSame($expected, $streamed['classification']['language'], "$kind, streamed");
         }
     }
 

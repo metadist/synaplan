@@ -77,7 +77,7 @@ final readonly class MessageProcessor
 
             if (!$isAgainRequest && !$hasFixedPrompt) {
                 if (!empty($options['force_image_description'])) {
-                    $classification = $this->classifications->forcedImageForStreamedTurn($message);
+                    $classification = $this->classifications->forcedImage($message, $options);
                 } else {
                     $perfTimer->start('classify');
                     $classification = $this->classifications->classify($message, $conversationHistory, $options);
@@ -168,7 +168,7 @@ final readonly class MessageProcessor
             if ($hasFixedPrompt) {
                 $classification = $this->classifications->fixedPromptForBufferedTurn($options, $status);
             } elseif (!empty($options['force_image_description'])) {
-                $classification = $this->classifications->forcedImageForBufferedTurn($options, $status);
+                $classification = $this->classifications->forcedImageForBufferedTurn($message, $options, $status);
             } elseif ($isAgainRequest) {
                 $classification = $this->classifications->againForBufferedTurn($message, $options, $status);
             } else {

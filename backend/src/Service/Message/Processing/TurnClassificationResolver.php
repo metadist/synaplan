@@ -23,6 +23,8 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class TurnClassificationResolver
 {
+    private const AGAIN_STATUS = 'Using previously selected model (skipped classification)';
+
     public function __construct(
         private MessageClassifier $classifier,
         private ModelConfigService $modelConfigService,
@@ -208,8 +210,7 @@ final readonly class TurnClassificationResolver
     }
 
     /**
-     * Again skips the sorter: the stored topic and language route the turn;
-     * a model picked for the retry decides the topic when its tag says so.
+     * Streamed, the classified status names no verdict.
      *
      * @param array<string, mixed> $options
      *
@@ -217,43 +218,40 @@ final readonly class TurnClassificationResolver
      */
     public function againForStreamedTurn(Message $message, array $options, TurnStatus $status): array
     {
-        $language = $message->getLanguage();
-        $classification = $this->againClassification($message, $options, ($language && 'NN' !== $language) ? $language : 'en');
-        $status->report('classified', 'Using previously selected model (skipped classification)');
+        $classification = $this->again($message, $options);
+        $status->report('classified', self::AGAIN_STATUS);
 
         return $classification;
     }
 
     /**
+     * Buffered, the classified status carries the verdict.
+     *
      * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
      */
     public function againForBufferedTurn(Message $message, array $options, TurnStatus $status): array
     {
-        $language = $options['language'] ?? ($message->getLanguage() && 'NN' !== $message->getLanguage() ? $message->getLanguage() : 'en');
-        $classification = $this->againClassification($message, $options, $language);
-        $status->report('classified', 'Using previously selected model (skipped classification)', [
-            'topic' => $classification['topic'],
-            'language' => $classification['language'],
-            'source' => $classification['source'],
-            'model_id' => $classification['model_id'],
-        ]);
+        $classification = $this->again($message, $options);
+        $status->report('classified', self::AGAIN_STATUS, self::verdict($classification) + ['model_id' => $classification['model_id']]);
 
         return $classification;
     }
 
     /**
      * WhatsApp images: ChatHandler handles vision, so the topic is `general`.
-     * Streamed, the result still runs through {@see finish()}.
+     * A streamed turn reports it through {@see finish()}.
+     *
+     * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
      */
-    public function forcedImageForStreamedTurn(Message $message): array
+    public function forcedImage(Message $message, array $options): array
     {
         $this->logger->info('MessageProcessor: Forcing image description mode');
 
-        return self::forcedImageClassification($message->getLanguage() ?: 'en');
+        return ['topic' => 'general', 'language' => self::language($message, $options, 'en'), 'source' => 'forced_image_description', 'intent' => 'chat'];
     }
 
     /**
@@ -261,15 +259,10 @@ final readonly class TurnClassificationResolver
      *
      * @return array<string, mixed>
      */
-    public function forcedImageForBufferedTurn(array $options, TurnStatus $status): array
+    public function forcedImageForBufferedTurn(Message $message, array $options, TurnStatus $status): array
     {
-        $classification = self::forcedImageClassification($options['language'] ?? 'en');
-        $this->logger->info('MessageProcessor: Forcing image description mode (non-streaming)');
-        $status->report('classified', 'Forced image description mode', [
-            'topic' => $classification['topic'],
-            'language' => $classification['language'],
-            'source' => $classification['source'],
-        ]);
+        $classification = $this->forcedImage($message, $options);
+        $status->report('classified', 'Forced image description mode', self::verdict($classification));
 
         return $classification;
     }
@@ -404,12 +397,16 @@ final readonly class TurnClassificationResolver
     }
 
     /**
+     * Again skips the sorter: the stored topic routes the turn, and a model
+     * picked for the retry decides the topic when its tag says so.
+     *
      * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
      */
-    private function againClassification(Message $message, array $options, string $language): array
+    private function again(Message $message, array $options): array
     {
+        $language = self::language($message, $options, 'en');
         $topic = strtolower($message->getTopic() ?: '');
         if ('' === $topic || 'unknown' === $topic) {
             $topic = 'chat';
@@ -437,11 +434,32 @@ final readonly class TurnClassificationResolver
     }
 
     /**
+     * The answer language when the sorter does not run: an explicit caller
+     * language wins, then the message's own, then `$unknown`.
+     *
+     * @param array<string, mixed> $options
+     */
+    private static function language(Message $message, array $options, string $unknown): string
+    {
+        $caller = $options['language'] ?? null;
+        if (is_string($caller) && '' !== $caller) {
+            return $caller;
+        }
+        $own = $message->getLanguage();
+
+        return '' !== $own && 'NN' !== $own ? $own : $unknown;
+    }
+
+    /**
+     * The verdict a buffered turn's classified status carries.
+     *
+     * @param array<string, mixed> $classification
+     *
      * @return array<string, mixed>
      */
-    private static function forcedImageClassification(string $language): array
+    private static function verdict(array $classification): array
     {
-        return ['topic' => 'general', 'language' => $language, 'source' => 'forced_image_description', 'intent' => 'chat'];
+        return ['topic' => $classification['topic'], 'language' => $classification['language'], 'source' => $classification['source']];
     }
 
     /**
