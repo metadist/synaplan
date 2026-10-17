@@ -10,6 +10,7 @@ use App\AI\Provider\OpenAIProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Tests\Characterization\Support\CleanupSnapshot;
 use App\Tests\Characterization\Support\OfflineHttpGuard;
+use App\Tests\Characterization\Support\OpenAIFixtures;
 use App\Tests\Characterization\Support\OpenAISdkRecorder;
 use App\Tests\Characterization\Support\ProviderHttpRecorder;
 use GuzzleHttp\Psr7\Response;
@@ -20,8 +21,6 @@ use OpenAI\Responses\Embeddings\CreateResponse as EmbeddingResponse;
 use OpenAI\Responses\Images\CreateResponse as ImageResponse;
 use OpenAI\Responses\Images\EditResponse;
 use OpenAI\Responses\Images\VariationResponse;
-use OpenAI\Responses\Models\RetrieveResponse as ModelResponse;
-use OpenAI\Responses\Responses\CreateResponse;
 use OpenAI\Testing\Enums\OverrideStrategy;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -47,7 +46,6 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
     private const SNAPSHOT = __DIR__.'/__snapshots__/provider_requests_openai.json';
     private const KEY = 'test-openai-key';
     private const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==';
-    private const USAGE = ['input_tokens' => 21, 'input_tokens_details' => ['cached_tokens' => 4], 'output_tokens' => 9, 'output_tokens_details' => ['reasoning_tokens' => 3], 'total_tokens' => 30];
 
     private const TOOLS = [[
         'type' => 'function',
@@ -157,32 +155,32 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
 
         return [
             'chat.text' => [
-                'sdk' => [self::model('gpt-4o'), self::response([self::message('Berlin is sunny.')])],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), OpenAIFixtures::response([OpenAIFixtures::message('Berlin is sunny.')])],
                 'call' => $chat([['role' => 'system', 'content' => 'You are terse.'], ['role' => 'user', 'content' => 'Weather in Berlin?']], ['model' => 'gpt-4o', 'temperature' => 0.3, 'max_tokens' => 200]),
             ],
             'chat.reasoning_tools' => [
-                'sdk' => [self::model('gpt-5.5'), self::response([self::message('Let me check.'), self::functionCall('get_weather', '{"city":"Berlin"}', 'call_w2')])],
+                'sdk' => [OpenAIFixtures::model('gpt-5.5'), OpenAIFixtures::response([OpenAIFixtures::message('Let me check.'), OpenAIFixtures::functionCall('get_weather', '{"city":"Berlin"}', 'call_w2')])],
                 'call' => $chat(self::conversation(), ['model' => 'gpt-5.5', 'reasoning_effort' => 'low', 'tools' => self::TOOLS, 'tool_choice' => ['type' => 'function', 'function' => ['name' => 'get_weather']], 'parallel_tool_calls' => false]),
             ],
             'chat.stored_structured_previous_response' => [
                 'provider' => 'stored',
-                'sdk' => [self::model('gpt-4o'), self::response([self::message('{"topic":"weather"}')], ['id' => 'resp_stored_1'])],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), OpenAIFixtures::response([OpenAIFixtures::message('{"topic":"weather"}')], ['id' => 'resp_stored_1'])],
                 'call' => $chat([['role' => 'user', 'content' => 'Earlier question'], ['role' => 'assistant', 'content' => 'Earlier answer'], ['role' => 'user', 'content' => 'Sort this.']], ['model' => 'gpt-4o', 'previous_response_id' => 'resp_prev_1', 'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object', 'properties' => ['topic' => ['type' => 'string']], 'required' => ['topic']])]),
             ],
             'chat.reasoning_tier_rejected' => [
-                'sdk' => [self::model('gpt-5'), self::error400("Unsupported value: 'none' is not supported with the 'gpt-5' model. Supported values are: 'minimal', 'low', 'medium', and 'high'."), self::response([self::message('Done.')])],
+                'sdk' => [OpenAIFixtures::model('gpt-5'), OpenAIFixtures::error(400, "Unsupported value: 'none' is not supported with the 'gpt-5' model. Supported values are: 'minimal', 'low', 'medium', and 'high'."), OpenAIFixtures::response([OpenAIFixtures::message('Done.')])],
                 'call' => $chat([['role' => 'user', 'content' => 'Quick one']], ['model' => 'gpt-5', 'reasoning_effort' => 'none']),
             ],
             'chat.previous_response_expired' => [
-                'sdk' => [self::model('gpt-4o'), self::error400("Previous response with id 'resp_gone' not found."), self::response([self::message('Fresh start.')])],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), OpenAIFixtures::error(400, "Previous response with id 'resp_gone' not found."), OpenAIFixtures::response([OpenAIFixtures::message('Fresh start.')])],
                 'call' => $chat([['role' => 'user', 'content' => 'First'], ['role' => 'assistant', 'content' => 'Reply'], ['role' => 'user', 'content' => 'Second']], ['model' => 'gpt-4o', 'previous_response_id' => 'resp_gone']),
             ],
             'chat.model_lookup_fails' => [
-                'sdk' => [self::sdkError(404, 'The model does not exist.'), self::response([self::message('Hi.')])],
+                'sdk' => [OpenAIFixtures::error(404, 'The model does not exist.'), OpenAIFixtures::response([OpenAIFixtures::message('Hi.')])],
                 'call' => $chat([['role' => 'user', 'content' => 'Hi']], ['model' => 'o3-mini']),
             ],
             'chat.http_error' => [
-                'sdk' => [self::model('gpt-4o'), self::sdkError(500, 'The server had an error.', 'server_error')],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), OpenAIFixtures::error(500, 'The server had an error.', 'server_error')],
                 'call' => $chat([['role' => 'user', 'content' => 'Hi']], ['model' => 'gpt-4o']),
             ],
             'chat.no_model' => [
@@ -201,36 +199,36 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
     private static function streamCases(): array
     {
         $stream = static fn (array $messages, array $options): \Closure => static fn (OpenAIProvider $p, \Closure $onEvent): array => $p->chatStream($messages, $onEvent, $options);
-        $created = ['type' => 'response.created', 'response' => self::responseArray([], ['id' => 'resp_s1', 'status' => 'in_progress', 'usage' => null])];
-        $completed = static fn (string $status = 'completed', array $output = []): array => ['type' => 'response.completed', 'response' => self::responseArray($output, ['id' => 'resp_s1', 'status' => $status])];
+        $created = ['type' => 'response.created', 'response' => OpenAIFixtures::responseArray([], ['id' => 'resp_s1', 'status' => 'in_progress', 'usage' => null])];
+        $completed = static fn (string $status = 'completed', array $output = []): array => ['type' => 'response.completed', 'response' => OpenAIFixtures::responseArray($output, ['id' => 'resp_s1', 'status' => $status])];
         $text = static fn (string $delta): array => ['type' => 'response.output_text.delta', 'item_id' => 'msg_s1', 'output_index' => 0, 'content_index' => 0, 'delta' => $delta];
 
         return [
             'stream.text_and_reasoning' => [
-                'sdk' => [self::model('gpt-5.5'), self::sse($created, ['type' => 'response.reasoning_summary_text.delta', 'item_id' => 'rs_1', 'output_index' => 0, 'summary_index' => 0, 'delta' => 'Checking the sky.'], $text('Berlin is '), $text('sunny.'), $completed())],
+                'sdk' => [OpenAIFixtures::model('gpt-5.5'), OpenAIFixtures::sse($created, ['type' => 'response.reasoning_summary_text.delta', 'item_id' => 'rs_1', 'output_index' => 0, 'summary_index' => 0, 'delta' => 'Checking the sky.'], $text('Berlin is '), $text('sunny.'), $completed())],
                 'call' => $stream([['role' => 'user', 'content' => 'Weather in Berlin?']], ['model' => 'gpt-5.5', 'reasoning_effort' => 'high']),
             ],
             'stream.tool_call' => [
-                'sdk' => [self::model('gpt-4o'), self::sse(
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), OpenAIFixtures::sse(
                     $created,
-                    ['type' => 'response.output_item.added', 'output_index' => 1, 'item' => self::functionCall('get_weather', '', 'call_s1')],
+                    ['type' => 'response.output_item.added', 'output_index' => 1, 'item' => OpenAIFixtures::functionCall('get_weather', '', 'call_s1')],
                     ['type' => 'response.function_call_arguments.delta', 'item_id' => 'fc_1', 'output_index' => 1, 'delta' => '{"city":'],
                     ['type' => 'response.function_call_arguments.delta', 'item_id' => 'fc_1', 'output_index' => 1, 'delta' => '"Paris"}'],
-                    ['type' => 'response.output_item.done', 'output_index' => 1, 'item' => self::functionCall('get_weather', '{"city":"Paris"}', 'call_s1')],
+                    ['type' => 'response.output_item.done', 'output_index' => 1, 'item' => OpenAIFixtures::functionCall('get_weather', '{"city":"Paris"}', 'call_s1')],
                     $completed(),
                 )],
                 'call' => $stream(self::conversation(), ['model' => 'gpt-4o', 'tools' => self::TOOLS, 'tool_choice' => 'required']),
             ],
             'stream.refusal_incomplete' => [
-                'sdk' => [self::model('gpt-4o'), self::sse($created, ['type' => 'response.refusal.delta', 'item_id' => 'msg_s1', 'output_index' => 0, 'content_index' => 0, 'delta' => 'I cannot help.'], ['type' => 'response.incomplete', 'response' => self::responseArray([], ['id' => 'resp_s1', 'status' => 'incomplete', 'incomplete_details' => ['reason' => 'max_output_tokens']])])],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), OpenAIFixtures::sse($created, ['type' => 'response.refusal.delta', 'item_id' => 'msg_s1', 'output_index' => 0, 'content_index' => 0, 'delta' => 'I cannot help.'], ['type' => 'response.incomplete', 'response' => OpenAIFixtures::responseArray([], ['id' => 'resp_s1', 'status' => 'incomplete', 'incomplete_details' => ['reason' => 'max_output_tokens']])])],
                 'call' => $stream([['role' => 'user', 'content' => 'Something odd']], ['model' => 'gpt-4o', 'max_tokens' => 16]),
             ],
             'stream.failed' => [
-                'sdk' => [self::model('gpt-4o'), self::sse($created, ['type' => 'response.failed', 'response' => self::responseArray([], ['id' => 'resp_s1', 'status' => 'failed', 'error' => ['code' => 'server_error', 'message' => 'The model crashed.']])])],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), OpenAIFixtures::sse($created, ['type' => 'response.failed', 'response' => OpenAIFixtures::responseArray([], ['id' => 'resp_s1', 'status' => 'failed', 'error' => ['code' => 'server_error', 'message' => 'The model crashed.']])])],
                 'call' => $stream([['role' => 'user', 'content' => 'Hi']], ['model' => 'gpt-4o']),
             ],
             'stream.http_error' => [
-                'sdk' => [self::model('gpt-4o'), self::sdkError(429, 'Rate limit reached.', 'rate_limit_error')],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), OpenAIFixtures::error(429, 'Rate limit reached.', 'rate_limit_error')],
                 'call' => $stream([['role' => 'user', 'content' => 'Hi']], ['model' => 'gpt-4o']),
             ],
             'stream.no_key' => [
@@ -245,7 +243,7 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
      */
     private static function embeddingCases(): array
     {
-        $vectors = static fn (int $count): Response => self::sdkJson(EmbeddingResponse::fake(['data' => array_map(static fn (int $i): array => ['object' => 'embedding', 'index' => $i, 'embedding' => [0.1 * ($i + 1), -0.2, 0.3]], range(0, $count - 1)), 'usage' => ['prompt_tokens' => 5, 'total_tokens' => 5]], null, OverrideStrategy::Replace)->toArray());
+        $vectors = static fn (int $count): Response => OpenAIFixtures::json(EmbeddingResponse::fake(['data' => array_map(static fn (int $i): array => ['object' => 'embedding', 'index' => $i, 'embedding' => [0.1 * ($i + 1), -0.2, 0.3]], range(0, $count - 1)), 'usage' => ['prompt_tokens' => 5, 'total_tokens' => 5]], null, OverrideStrategy::Replace)->toArray());
 
         return [
             'embedding.single_with_dimensions' => [
@@ -257,7 +255,7 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
                 'call' => static fn (OpenAIProvider $p): array => $p->embedBatch(['Hello', 'World'], ['model' => 'text-embedding-ada-002', 'dimensions' => 256]),
             ],
             'embedding.http_error' => [
-                'sdk' => [self::sdkError(400, 'Invalid input.')],
+                'sdk' => [OpenAIFixtures::error(400, 'Invalid input.')],
                 'call' => static fn (OpenAIProvider $p): array => $p->embed('Hello', ['model' => 'text-embedding-3-small']),
             ],
             'embedding.no_model' => [
@@ -279,15 +277,15 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
 
         return [
             'image.dalle3' => [
-                'sdk' => [self::sdkJson(ImageResponse::fake(['data' => [['url' => 'https://example.test/dalle.png', 'revised_prompt' => 'A red bicycle', 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
+                'sdk' => [OpenAIFixtures::json(ImageResponse::fake(['data' => [['url' => 'https://example.test/dalle.png', 'revised_prompt' => 'A red bicycle', 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
                 'call' => static fn (OpenAIProvider $p): array => $p->generateImage('A red bicycle'),
             ],
             'image.dalle2_size' => [
-                'sdk' => [self::sdkJson(ImageResponse::fake(['data' => [['url' => 'https://example.test/one.png', 'revised_prompt' => null, 'b64_json' => null], ['url' => 'https://example.test/two.png', 'revised_prompt' => null, 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
+                'sdk' => [OpenAIFixtures::json(ImageResponse::fake(['data' => [['url' => 'https://example.test/one.png', 'revised_prompt' => null, 'b64_json' => null], ['url' => 'https://example.test/two.png', 'revised_prompt' => null, 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
                 'call' => static fn (OpenAIProvider $p): array => $p->generateImage('Two cats', ['model' => 'dall-e-2', 'n' => 2, 'size' => '512x512']),
             ],
             'image.content_policy' => [
-                'sdk' => [self::sdkError(400, 'Your request was rejected as a result of our safety system.', 'invalid_request_error', 'content_policy_violation')],
+                'sdk' => [OpenAIFixtures::error(400, 'Your request was rejected as a result of our safety system.', 'invalid_request_error', 'content_policy_violation')],
                 'call' => static fn (OpenAIProvider $p): array => $p->generateImage('Something forbidden', ['model' => 'dall-e-3']),
             ],
             'image.gpt_image' => [
@@ -327,11 +325,11 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
                 'call' => static fn (OpenAIProvider $p, \Closure $onEvent, string $uploads): array => $p->generateImage('Edit', ['model' => 'gpt-5.5', 'images' => [$uploads.'/car.png']]),
             ],
             'image.variations' => [
-                'sdk' => [self::sdkJson(VariationResponse::fake(['data' => [['url' => 'https://example.test/var1.png', 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
+                'sdk' => [OpenAIFixtures::json(VariationResponse::fake(['data' => [['url' => 'https://example.test/var1.png', 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
                 'call' => static fn (OpenAIProvider $p, \Closure $onEvent, string $uploads): array => $p->createVariations($uploads.'/photo.png', 1),
             ],
             'image.edit' => [
-                'sdk' => [self::sdkJson(EditResponse::fake(['data' => [['url' => 'https://example.test/edited.png', 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
+                'sdk' => [OpenAIFixtures::json(EditResponse::fake(['data' => [['url' => 'https://example.test/edited.png', 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
                 'call' => static fn (OpenAIProvider $p, \Closure $onEvent, string $uploads): string => $p->editImage($uploads.'/photo.png', $uploads.'/mask.png', 'Add a hat'),
             ],
             'image.edit_missing_file' => [
@@ -349,31 +347,31 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
      */
     private static function visionCases(): array
     {
-        $chatAnswer = static fn (string $text): Response => self::sdkJson(ChatResponse::fake(['choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => $text, 'function_call' => null, 'tool_calls' => []], 'logprobs' => null, 'finish_reason' => 'stop']]])->toArray());
+        $chatAnswer = static fn (string $text): Response => OpenAIFixtures::json(ChatResponse::fake(['choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => $text, 'function_call' => null, 'tool_calls' => []], 'logprobs' => null, 'finish_reason' => 'stop']]])->toArray());
 
         return [
             'vision.chat_completions' => [
-                'sdk' => [self::model('gpt-4o'), $chatAnswer('A single pixel.')],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), $chatAnswer('A single pixel.')],
                 'call' => static fn (OpenAIProvider $p): string => $p->analyzeImage('photo.png', 'What is this?', ['max_tokens' => 300]),
             ],
             'vision.explain_default_prompt' => [
-                'sdk' => [self::model('gpt-4o'), $chatAnswer('A tiny image.')],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), $chatAnswer('A tiny image.')],
                 'call' => static fn (OpenAIProvider $p): string => $p->explainImage('/photo.png'),
             ],
             'vision.extract_text' => [
-                'sdk' => [self::model('gpt-4o'), $chatAnswer('')],
+                'sdk' => [OpenAIFixtures::model('gpt-4o'), $chatAnswer('')],
                 'call' => static fn (OpenAIProvider $p): string => $p->extractTextFromImage('photo.png'),
             ],
             'vision.responses_for_reasoning_models' => [
-                'sdk' => [self::model('gpt-5.5'), self::response([self::message('INVOICE 42')])],
+                'sdk' => [OpenAIFixtures::model('gpt-5.5'), OpenAIFixtures::response([OpenAIFixtures::message('INVOICE 42')])],
                 'call' => static fn (OpenAIProvider $p): string => $p->analyzeImage('photo.png', 'Read the text.', ['model' => 'gpt-5.5', 'max_tokens' => 9000]),
             ],
             'vision.responses_without_text' => [
-                'sdk' => [self::model('gpt-5.5-pro'), self::response([], ['status' => 'incomplete', 'incomplete_details' => ['reason' => 'max_output_tokens']])],
+                'sdk' => [OpenAIFixtures::model('gpt-5.5-pro'), OpenAIFixtures::response([], ['status' => 'incomplete', 'incomplete_details' => ['reason' => 'max_output_tokens']])],
                 'call' => static fn (OpenAIProvider $p): string => $p->analyzeImage('photo.png', 'Read the text.', ['model' => 'gpt-5.5-pro']),
             ],
             'vision.not_a_chat_model' => [
-                'sdk' => [self::model('gpt-4.1-pro'), self::error400('This is not a chat model and thus not supported in the v1/chat/completions endpoint. Did you mean to use v1/completions?'), self::response([self::message('Recovered.')])],
+                'sdk' => [OpenAIFixtures::model('gpt-4.1-pro'), OpenAIFixtures::error(400, 'This is not a chat model and thus not supported in the v1/chat/completions endpoint. Did you mean to use v1/completions?'), OpenAIFixtures::response([OpenAIFixtures::message('Recovered.')])],
                 'call' => static fn (OpenAIProvider $p): string => $p->analyzeImage('photo.png', 'What is this?', ['model' => 'gpt-4.1-pro']),
             ],
             'vision.compare' => [
@@ -384,7 +382,7 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
                 'call' => static fn (OpenAIProvider $p): string => $p->analyzeImage('missing.png', 'What is this?'),
             ],
             'vision.http_error' => [
-                'sdk' => [self::sdkError(403, 'Permission denied.', 'permission_error')],
+                'sdk' => [OpenAIFixtures::error(403, 'Permission denied.', 'permission_error')],
                 'call' => static fn (OpenAIProvider $p): array => $p->compareImages('photo.png', 'car.png'),
             ],
         ];
@@ -397,18 +395,18 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
     {
         return [
             'speech.transcribe' => [
-                'sdk' => [self::sdkJson(TranscriptionResponse::fake(['task' => 'transcribe', 'language' => 'german', 'duration' => 2.5, 'text' => 'Hallo Welt', 'segments' => []], null, OverrideStrategy::Replace)->toArray())],
+                'sdk' => [OpenAIFixtures::json(TranscriptionResponse::fake(['task' => 'transcribe', 'language' => 'german', 'duration' => 2.5, 'text' => 'Hallo Welt', 'segments' => []], null, OverrideStrategy::Replace)->toArray())],
                 'call' => static fn (OpenAIProvider $p): array => $p->transcribe('voice.mp3', ['language' => 'de']),
             ],
             'speech.transcribe_absolute_path' => [
-                'sdk' => [self::sdkJson(TranscriptionResponse::fake(['task' => 'transcribe', 'language' => 'english', 'duration' => 1.0, 'text' => 'Hello', 'segments' => []], null, OverrideStrategy::Replace)->toArray())],
+                'sdk' => [OpenAIFixtures::json(TranscriptionResponse::fake(['task' => 'transcribe', 'language' => 'english', 'duration' => 1.0, 'text' => 'Hello', 'segments' => []], null, OverrideStrategy::Replace)->toArray())],
                 'call' => static fn (OpenAIProvider $p, \Closure $onEvent, string $uploads): array => $p->transcribe($uploads.'/voice.mp3', ['model' => 'gpt-4o-transcribe']),
             ],
             'speech.transcribe_missing_file' => [
                 'call' => static fn (OpenAIProvider $p): array => $p->transcribe('missing.mp3'),
             ],
             'speech.translate' => [
-                'sdk' => [self::sdkJson(TranslationResponse::fake(['task' => 'translate', 'language' => 'german', 'duration' => 2.5, 'text' => 'Hello world', 'segments' => []], null, OverrideStrategy::Replace)->toArray())],
+                'sdk' => [OpenAIFixtures::json(TranslationResponse::fake(['task' => 'translate', 'language' => 'german', 'duration' => 2.5, 'text' => 'Hello world', 'segments' => []], null, OverrideStrategy::Replace)->toArray())],
                 'call' => static fn (OpenAIProvider $p): string => $p->translateAudio('voice.mp3', 'en'),
             ],
             'speech.synthesize' => [
@@ -416,7 +414,7 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
                 'call' => static fn (OpenAIProvider $p, \Closure $onEvent, string $uploads): array => self::audioFile($uploads, $p->synthesize('Hallo Welt', ['voice' => 'nova', 'format' => 'opus', 'speed' => 1.2, 'model' => 'tts-1-hd'])),
             ],
             'speech.synthesize_error' => [
-                'sdk' => [self::sdkError(401, 'Incorrect API key provided.', 'invalid_request_error', 'invalid_api_key')],
+                'sdk' => [OpenAIFixtures::error(401, 'Incorrect API key provided.', 'invalid_request_error', 'invalid_api_key')],
                 'call' => static fn (OpenAIProvider $p): string => $p->synthesize('Hallo Welt'),
             ],
             'speech.synthesize_stream' => [
@@ -475,78 +473,6 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
             ['role' => 'tool', 'tool_call_id' => 'call_w1', 'content' => ['temp' => 18]],
             ['role' => 'user', 'content' => [['type' => 'text', 'text' => 'And this photo?'], ['type' => 'image_url', 'image_url' => ['url' => 'data:image/png;base64,'.self::PIXEL]], ['type' => 'input_file', 'file_id' => 'file_1']]],
         ];
-    }
-
-    private static function model(string $id): Response
-    {
-        return self::sdkJson(ModelResponse::fake(['id' => $id])->toArray());
-    }
-
-    /**
-     * @param list<array<string, mixed>> $output
-     * @param array<string, mixed>       $override
-     *
-     * @return array<string, mixed>
-     */
-    private static function responseArray(array $output, array $override = []): array
-    {
-        return CreateResponse::fake(['id' => 'resp_1', 'output' => $output, 'tools' => [], 'usage' => self::USAGE] + $override, null, OverrideStrategy::Replace)->toArray();
-    }
-
-    /**
-     * @param list<array<string, mixed>> $output
-     * @param array<string, mixed>       $override
-     */
-    private static function response(array $output, array $override = []): Response
-    {
-        return self::sdkJson(self::responseArray($output, $override));
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function message(string $text): array
-    {
-        return ['type' => 'message', 'id' => 'msg_1', 'status' => 'completed', 'role' => 'assistant', 'content' => [['type' => 'output_text', 'text' => $text, 'annotations' => []]]];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private static function functionCall(string $name, string $arguments, string $callId): array
-    {
-        return ['type' => 'function_call', 'id' => 'fc_1', 'call_id' => $callId, 'name' => $name, 'arguments' => $arguments, 'status' => 'completed'];
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     */
-    private static function sdkJson(array $data, int $status = 200): Response
-    {
-        return new Response($status, ['Content-Type' => 'application/json'], (string) json_encode($data));
-    }
-
-    private static function sdkError(int $status, string $message, string $type = 'invalid_request_error', ?string $code = null): Response
-    {
-        return self::sdkJson(['error' => ['message' => $message, 'type' => $type, 'param' => null, 'code' => $code]], $status);
-    }
-
-    private static function error400(string $message): Response
-    {
-        return self::sdkError(400, $message);
-    }
-
-    /**
-     * @param array<string, mixed> ...$events
-     */
-    private static function sse(array ...$events): Response
-    {
-        $body = '';
-        foreach ($events as $number => $event) {
-            $body .= 'data: '.json_encode($event + ['sequence_number' => $number + 1])."\n\n";
-        }
-
-        return new Response(200, ['Content-Type' => 'text/event-stream'], $body);
     }
 
     /**
