@@ -57,20 +57,24 @@ final readonly class MediaRequestGuard
 
     public function refusal(MediaTurnRequest $request): ?MediaRefusal
     {
+        return $this->withoutModel($request)
+            ?? $this->textToVideoOnAnImageToVideoModel($request)
+            ?? $this->imageToVideoBehindAPrivateAppUrl($request);
+    }
+
+    /**
+     * No model resolved: the operator has no default configured for this
+     * media capability (TEXT2PIC/TEXT2VID/TEXT2SOUND/…). Return an
+     * actionable error instead of silently routing to a hardcoded OpenAI
+     * model, which would bill an unconfigured vendor and break for installs
+     * that don't use OpenAI (#1320).
+     */
+    private function withoutModel(MediaTurnRequest $request): ?MediaRefusal
+    {
         $mediaType = $request->mediaType;
         $modelId = $request->model->id;
         $provider = $request->model->provider;
-        $modelName = $request->model->name;
-        $modelConfig = $request->model->config;
-        $hasVideoReferenceImage = $request->references->hasVideoReferenceImage();
-        $attachedImagePaths = $request->references->attachedImagePaths;
-        $imageUrlsInText = $request->references->imageUrlsInText;
 
-        // No model resolved: the operator has no default configured for this
-        // media capability (TEXT2PIC/TEXT2VID/TEXT2SOUND/…). Return an
-        // actionable error instead of silently routing to a hardcoded OpenAI
-        // model, which would bill an unconfigured vendor and break for installs
-        // that don't use OpenAI (#1320).
         if (!$provider) {
             $this->logger->warning('MediaGenerationHandler: No model configured for media generation', [
                 'media_type' => $mediaType,
@@ -88,12 +92,26 @@ final readonly class MediaRequestGuard
             ]);
         }
 
-        // Guard: a text-to-video request (no attached image) must never be sent
-        // to an image-to-video model. i2v models (Higgsfield DoP/Kling/etc.)
-        // require a reference frame and the provider rejects the request with
-        // "'image_url' is a required property". This happens when an i2v model is
-        // configured as the TEXT2VID default. Return an actionable message
-        // instead of leaking a raw provider 400 to the user.
+        return null;
+    }
+
+    /**
+     * Guard: a text-to-video request (no attached image) must never be sent
+     * to an image-to-video model. i2v models (Higgsfield DoP/Kling/etc.)
+     * require a reference frame and the provider rejects the request with
+     * "'image_url' is a required property". This happens when an i2v model is
+     * configured as the TEXT2VID default. Return an actionable message
+     * instead of leaking a raw provider 400 to the user.
+     */
+    private function textToVideoOnAnImageToVideoModel(MediaTurnRequest $request): ?MediaRefusal
+    {
+        $mediaType = $request->mediaType;
+        $modelId = $request->model->id;
+        $provider = $request->model->provider;
+        $modelName = $request->model->name;
+        $modelConfig = $request->model->config;
+        $hasVideoReferenceImage = $request->references->hasVideoReferenceImage();
+
         if ('video' === $mediaType && !$hasVideoReferenceImage) {
             $requiresReferenceImage = !empty($modelConfig['requires_reference_image'])
                 || (!empty($modelConfig['features']) && in_array('image2video', $modelConfig['features'], true));
@@ -117,20 +135,33 @@ final readonly class MediaRequestGuard
             }
         }
 
+        return null;
+    }
+
+    /**
+     * Guard: image-to-video requires the remote provider to FETCH the
+     * attached source frame from a public http(s) URL (we republish it at
+     * APP_URL/api/v1/files/uploads/...). When APP_URL points at a
+     * local/private host — the default in local dev (http://localhost:8000)
+     * — that URL is unreachable from the provider's servers and the request
+     * is rejected with a confusing raw "invalid_image_url" 400. Detect this
+     * up front and return an actionable message instead of burning a
+     * provider call (and credits) on a request that cannot succeed.
+     */
+    private function imageToVideoBehindAPrivateAppUrl(MediaTurnRequest $request): ?MediaRefusal
+    {
+        $mediaType = $request->mediaType;
+        $provider = $request->model->provider;
+        $modelName = $request->model->name;
+        $attachedImagePaths = $request->references->attachedImagePaths;
+        $imageUrlsInText = $request->references->imageUrlsInText;
+
         // Providers implementing SupportsInlineReferenceImage take the reference
         // frame as inline bytes, so they need neither a republished file nor a
         // publicly reachable APP_URL.
         $inlineReferenceImage = 'video' === $mediaType
             && $this->aiFacade->supportsInlineReferenceImage($provider);
 
-        // Guard: image-to-video requires the remote provider to FETCH the
-        // attached source frame from a public http(s) URL (we republish it at
-        // APP_URL/api/v1/files/uploads/...). When APP_URL points at a
-        // local/private host — the default in local dev (http://localhost:8000)
-        // — that URL is unreachable from the provider's servers and the request
-        // is rejected with a confusing raw "invalid_image_url" 400. Detect this
-        // up front and return an actionable message instead of burning a
-        // provider call (and credits) on a request that cannot succeed.
         if ('video' === $mediaType && !$inlineReferenceImage && [] !== $attachedImagePaths && [] === $imageUrlsInText && !$this->uploadStore->isPublicBaseUrlReachable()) {
             $base = rtrim($this->publicBaseUrl, '/');
             $this->logger->warning('MediaGenerationHandler: image-to-video blocked — APP_URL is not internet-reachable so the provider cannot fetch the source image', [
