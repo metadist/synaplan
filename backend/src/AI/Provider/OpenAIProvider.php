@@ -12,6 +12,7 @@ use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\OpenAI\OpenAIApiClient;
 use App\AI\Provider\OpenAI\OpenAICurlTransport;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
@@ -28,10 +29,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 {
     private const DEFAULT_MAX_TOKENS = 4096;
 
-    private ?OpenAI\Client $client = null;
-
-    /** Key the cached client was built with (rebuild on key change). */
-    private ?string $clientKey = null;
+    private readonly OpenAIApiClient $api;
 
     private array $modelCapabilities = [];
 
@@ -59,48 +57,17 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     public function __construct(
         private LoggerInterface $logger,
-        private HttpClientInterface $httpClient,
-        private ?string $apiKey = null,
+        HttpClientInterface $httpClient,
+        ?string $apiKey = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private bool $storeResponses = false,
-        private ?ProviderKeyStore $keyStore = null,
+        ?ProviderKeyStore $keyStore = null,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
         private ?ProviderTranscriptCapture $transcripts = null,
-        private ?\Closure $sdkFactory = null,
-        private ?OpenAICurlTransport $curl = null,
+        ?\Closure $sdkFactory = null,
+        ?OpenAICurlTransport $curl = null,
     ) {
-        $this->curl ??= new OpenAICurlTransport();
-    }
-
-    private function resolveApiKey(): ?string
-    {
-        if (null !== $this->apiKey && '' !== $this->apiKey) {
-            return $this->apiKey;
-        }
-
-        return $this->keyStore?->getKey($this->getName());
-    }
-
-    /**
-     * Lazily build the API client with the CURRENT key; rebuilt when the key
-     * changes at runtime (admin UI save / env import).
-     */
-    private function client(): ?OpenAI\Client
-    {
-        $key = $this->resolveApiKey();
-        if (null === $key || '' === $key) {
-            $this->client = null;
-            $this->clientKey = null;
-
-            return null;
-        }
-
-        if (null === $this->client || $this->clientKey !== $key) {
-            $this->client = null !== $this->sdkFactory ? ($this->sdkFactory)($key) : \OpenAI::client($key);
-            $this->clientKey = $key;
-        }
-
-        return $this->client;
+        $this->api = new OpenAIApiClient($httpClient, $curl ?? new OpenAICurlTransport(), $apiKey, $keyStore, $sdkFactory);
     }
 
     public function getName(): string
@@ -130,7 +97,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function getStatus(): array
     {
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             return [
                 'healthy' => false,
                 'error' => 'API key not configured',
@@ -147,7 +114,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function isAvailable(): bool
     {
-        return null !== $this->client();
+        return null !== $this->api->sdk();
     }
 
     public function supportsToolCalling(string $model): bool
@@ -186,7 +153,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
         // Try to fetch model details from OpenAI API
         try {
-            $modelInfo = $this->client()->models()->retrieve($model);
+            $modelInfo = $this->api->sdk()->models()->retrieve($model);
             // The SDK's sealed RetrieveResponse shape has no capabilities key,
             // but some gateways add one — inspect the raw payload instead.
             /** @var array<string, mixed> $modelData */
@@ -229,7 +196,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             throw new ProviderException('Model must be specified in options', 'openai');
         }
 
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -275,7 +242,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             throw new ProviderException('Model must be specified in options', 'openai');
         }
 
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -628,8 +595,8 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         $this->transcripts?->recordResponsesRequest($requestOptions);
 
         $send = fn (array $opts): mixed => $stream
-            ? $this->client()->responses()->createStreamed($opts)
-            : $this->client()->responses()->create($opts);
+            ? $this->api->sdk()->responses()->createStreamed($opts)
+            : $this->api->sdk()->responses()->create($opts);
 
         try {
             return $send($requestOptions);
@@ -977,14 +944,14 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             throw new ProviderException('Embedding model must be specified in options', 'openai');
         }
 
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
         try {
             $params = $this->buildEmbeddingParams($options['model'], $text, $options);
 
-            $response = $this->client()->embeddings()->create($params);
+            $response = $this->api->sdk()->embeddings()->create($params);
             $usage = $response->usage;
 
             return [
@@ -1005,14 +972,14 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             throw new ProviderException('Embedding model must be specified in options', 'openai');
         }
 
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
         try {
             $params = $this->buildEmbeddingParams($options['model'], $texts, $options);
 
-            $response = $this->client()->embeddings()->create($params);
+            $response = $this->api->sdk()->embeddings()->create($params);
             $usage = $response->usage;
 
             return [
@@ -1083,7 +1050,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function generateImage(string $prompt, array $options = []): array
     {
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -1117,7 +1084,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'prompt_length' => strlen($prompt),
             ]);
 
-            $response = $this->client()->images()->create($requestOptions);
+            $response = $this->api->sdk()->images()->create($requestOptions);
 
             $images = [];
             foreach ($response['data'] as $image) {
@@ -1172,9 +1139,9 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 $requestBody['background'] = $options['background'];
             }
 
-            $key = $this->resolveApiKey();
+            $key = $this->api->key();
 
-            [$responseBody, $httpCode, $curlError] = $this->curl->postJson('https://api.openai.com/v1/images/generations', $key, json_encode($requestBody), 120);
+            [$responseBody, $httpCode, $curlError] = $this->api->curlPostJson('https://api.openai.com/v1/images/generations', $key, json_encode($requestBody), 120);
 
             if ($curlError) {
                 throw new \Exception('cURL error: '.$curlError);
@@ -1297,15 +1264,9 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'quality' => $requestBody['tools'][0]['quality'] ?? null,
             ]);
 
-            $key = $this->resolveApiKey();
+            $key = $this->api->key();
 
-            $response = $this->httpClient->request('POST', 'https://api.openai.com/v1/responses', [
-                'headers' => [
-                    'Authorization' => 'Bearer '.$key,
-                ],
-                'json' => $requestBody,
-                'timeout' => 180,
-            ]);
+            $response = $this->api->postJson('https://api.openai.com/v1/responses', $requestBody, $key, 180);
             $httpCode = $response->getStatusCode();
             $responseBody = $response->getContent(false);
 
@@ -1476,7 +1437,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function createVariations(string $imageUrl, int $count = 1): array
     {
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -1491,7 +1452,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             fwrite($tmpFile, $imageContent);
             $tmpPath = stream_get_meta_data($tmpFile)['uri'];
 
-            $response = $this->client()->images()->variation([
+            $response = $this->api->sdk()->images()->variation([
                 'image' => fopen($tmpPath, 'r'),
                 'n' => $count,
                 'size' => '1024x1024',
@@ -1515,7 +1476,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
     {
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -1536,7 +1497,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $tmpImagePath = stream_get_meta_data($tmpImage)['uri'];
             $tmpMaskPath = stream_get_meta_data($tmpMask)['uri'];
 
-            $response = $this->client()->images()->edit([
+            $response = $this->api->sdk()->images()->edit([
                 'image' => fopen($tmpImagePath, 'r'),
                 'mask' => fopen($tmpMaskPath, 'r'),
                 'prompt' => $prompt,
@@ -1570,7 +1531,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function compareImages(string $imageUrl1, string $imageUrl2): array
     {
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -1591,7 +1552,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $mimeType1 = mime_content_type($fullPath1);
             $mimeType2 = mime_content_type($fullPath2);
 
-            $response = $this->client()->chat()->create([
+            $response = $this->api->sdk()->chat()->create([
                 'model' => 'gpt-4o',
                 'messages' => [[
                     'role' => 'user',
@@ -1631,7 +1592,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function analyzeImage(string $imagePath, string $prompt, array $options = []): string
     {
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -1700,7 +1661,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'max_tokens' => $options['max_tokens'] ?? 1000,
             ];
 
-            $response = $this->client()->chat()->create($payload);
+            $response = $this->api->sdk()->chat()->create($payload);
 
             return $response['choices'][0]['message']['content'] ?? '';
         } catch (\Exception $e) {
@@ -1801,7 +1762,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function transcribe(string $audioPath, array $options = []): array
     {
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -1841,7 +1802,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                     $requestParams['language'] = $options['language'];
                 }
 
-                $response = $this->client()->audio()->transcribe($requestParams);
+                $response = $this->api->sdk()->audio()->transcribe($requestParams);
 
                 return [
                     'text' => $response['text'] ?? '',
@@ -1861,7 +1822,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function translateAudio(string $audioPath, string $targetLang): string
     {
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -1888,7 +1849,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
             try {
                 // Whisper's translate endpoint translates to English only
-                $response = $this->client()->audio()->translate([
+                $response = $this->api->sdk()->audio()->translate([
                     'model' => 'whisper-1',
                     'file' => $fileHandle,
                 ]);
@@ -1908,7 +1869,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function synthesize(string $text, array $options = []): string
     {
-        if (null === $this->client()) {
+        if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
 
@@ -1922,7 +1883,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'text_length' => strlen($text),
             ]);
 
-            $response = $this->client()->audio()->speech([
+            $response = $this->api->sdk()->audio()->speech([
                 'model' => $model,
                 'voice' => $voice,
                 'input' => $text,
@@ -1952,7 +1913,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function synthesizeStream(string $text, array $options = []): \Generator
     {
-        $key = $this->resolveApiKey();
+        $key = $this->api->key();
         if (!$key) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
         }
@@ -1969,27 +1930,19 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             'text_length' => strlen($text),
         ]);
 
-        $response = $this->httpClient->request('POST', 'https://api.openai.com/v1/audio/speech', [
-            'headers' => [
-                'Authorization' => 'Bearer '.$key,
-                'Content-Type' => 'application/json',
-            ],
-            'json' => [
-                'model' => $model,
-                'voice' => $voice,
-                'input' => $text,
-                'response_format' => $format,
-                'speed' => $speed,
-            ],
-            'buffer' => false,
-            'timeout' => 120,
-        ]);
+        $response = $this->api->postJson('https://api.openai.com/v1/audio/speech', [
+            'model' => $model,
+            'voice' => $voice,
+            'input' => $text,
+            'response_format' => $format,
+            'speed' => $speed,
+        ], $key, 120, ['Content-Type' => 'application/json'], ['buffer' => false]);
 
         if (200 !== $response->getStatusCode()) {
             throw new ProviderException('OpenAI TTS stream HTTP '.$response->getStatusCode().': '.substr($response->getContent(false), 0, 500), 'openai');
         }
 
-        foreach ($this->httpClient->stream($response) as $chunk) {
+        foreach ($this->api->stream($response) as $chunk) {
             $content = $chunk->getContent();
             if ('' !== $content) {
                 yield $content;
