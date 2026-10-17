@@ -133,3 +133,10 @@ had merged. Where the result differs from the plan:
   model on a copy of the message, topic included. The web Again menu
   offers models of the answer's own kind, so a chat model is offered on a
   chat answer only.
+- **Review round 1 added two rules.** The placeholders `CHAT` and
+  `CONTINUE`, which entry points store before a message is classified,
+  count as no topic: the web Again's message always carries `CHAT`, so a
+  chat-model retry now answers on the general prompt instead of the
+  built-in default. A media route takes a media model: a chat model kept
+  on a media topic no longer reaches the image provider, and the media
+  handler picks its default.
