@@ -17,7 +17,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 /**
  * The model health writes an admin makes: pausing and resuming automatic
  * disabling is stored, a traffic verdict is reset to unknown, and a user
- * who is not an admin is refused without a write.
+ * who is not an admin is refused without a write. The tests run on a model
+ * of their own, so no catalog model's health row is touched.
  */
 final class AdminModelHealthControllerTest extends WebTestCase
 {
@@ -26,30 +27,23 @@ final class AdminModelHealthControllerTest extends WebTestCase
 
     private KernelBrowser $client;
     private int $modelId;
-    private ?ModelHealth $previous = null;
 
     protected function setUp(): void
     {
         self::ensureKernelShutdown();
         $this->client = static::createClient();
         $this->em = static::getContainer()->get(EntityManagerInterface::class);
-        $model = $this->em->getRepository(Model::class)->findOneBy([], ['id' => 'ASC']);
-        self::assertInstanceOf(Model::class, $model, 'The test database has no model.');
-        $this->modelId = (int) $model->getId();
-        $existing = $this->health();
-        $this->previous = null === $existing ? null : clone $existing;
+        $model = (new Model())->setService('test')->setName('Health test model')->setTag('chat')->setProviderId('health-test-'.bin2hex(random_bytes(4)));
+        $this->modelId = (int) $this->persistEntity($model)->getId();
     }
 
     protected function tearDown(): void
     {
-        $this->em->clear();
         $health = $this->health();
-        if (null !== $health && null === $this->previous) {
+        if (null !== $health) {
             $this->em->remove($health);
-        } elseif (null !== $health) {
-            $health->setSuppressUntil($this->previous->getSuppressUntil())->setState($this->previous->getState())->setSource($this->previous->getSource());
+            $this->em->flush();
         }
-        $this->em->flush();
         $this->removeCreatedEntities();
         parent::tearDown();
     }
@@ -69,9 +63,7 @@ final class AdminModelHealthControllerTest extends WebTestCase
 
     public function testATrafficVerdictIsResetToUnknown(): void
     {
-        $health = $this->health() ?? (new ModelHealth())->setModelId($this->modelId);
-        $health->setSource(ModelHealth::SOURCE_TRAFFIC)->setState(ModelHealthState::Degraded);
-        $this->em->persist($health);
+        $this->em->persist((new ModelHealth())->setModelId($this->modelId)->setSource(ModelHealth::SOURCE_TRAFFIC)->setState(ModelHealthState::Degraded));
         $this->em->flush();
         $this->authenticateClient($this->client, $this->admin());
 
@@ -88,7 +80,7 @@ final class AdminModelHealthControllerTest extends WebTestCase
         $this->postJson('/exempt', ['exempt' => true]);
 
         self::assertResponseStatusCodeSame(403);
-        self::assertSame($this->previous?->getSuppressUntil() ?? 0, $this->health()?->getSuppressUntil() ?? 0);
+        self::assertNull($this->health());
     }
 
     /**
