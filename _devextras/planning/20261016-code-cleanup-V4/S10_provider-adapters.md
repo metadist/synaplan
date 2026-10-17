@@ -101,3 +101,75 @@ user as the same `ProviderException` with the same context.
 
 `XaiProvider`, `AnthropicProvider` and the smaller providers (V5). Model
 catalog, pricing and the registry.
+
+## 9. As delivered — S10a, Google (2026-10-17)
+
+The size budget (master plan #6) splits the sprint: S10a is Google, S10b
+is OpenAI (the SDK and cURL seams of S10.1, its snapshot, its client and
+its classes). S10a starts from S9's head (`59b0c2882`). Where it differs
+from the plan:
+
+- **More classes than the target shape.** The planned `GoogleChat` also
+  held the message conversion and vision, and `GoogleVideoGeneration` the
+  Omni clips; each would have passed 800 lines. `GoogleMessageFormat`
+  (pure static translations, like `OpenAiToolShapes`), `GoogleVision` and
+  `GoogleOmniVideo` are classes of their own. The largest new class is
+  `GoogleVideoGeneration` (546 lines), the longest new method
+  `GoogleChat::readStream()` (91).
+- **Three methods were cut, not only moved:** `chatStream()` into the
+  payload, the reading of the stream and the failure mapping;
+  `synthesize()` into finding the audio part and saving it; the message
+  conversion into the turns, the tool result and the content parts. The
+  snapshot pins all three.
+- **No seam step for Google.** Google already sent every request through
+  the injected Symfony client, so S10.1 is OpenAI's alone (S10b).
+- **One cleanup on the way.** The TTS decode check loses its dead
+  `false ===` half (`base64_decode()` in non-strict mode never fails), and
+  with it a PHPStan baseline entry.
+- **The weak typing stays.** The new classes keep `GoogleProvider`'s weak
+  typing, as the media stages kept their handler's.
+- **Found, pinned, not fixed.** A streamed Gemini chat that Google answers
+  with an HTTP error other than a transient 503 ends with no text, no
+  finish event and zero usage instead of an error: Symfony's stream does
+  not throw on a status code (checked against the cURL client), so
+  `streamFailure()` and its "overloaded" message are unreachable. The fix
+  (check the status after the retry, map it through `streamFailure()`)
+  changes behaviour, so it is a pull request of its own for the owner.
+- **Journey.** With the dev stack's Google key, one chat, one stream, one
+  image (the default model) and one speech request ran through the
+  refactored provider on Symfony's real HTTP client, from a script in the
+  backend container rather than the browser; all four answered. Not a
+  gate.
+
+## 10. As delivered — S10b, OpenAI (2026-10-17)
+
+S10b starts from S10a's head (`77cf162ff`, after the S4b merge came
+down the chain). It follows the plan's steps: the seams (S10.1), the
+snapshot (S10.2), the client (S10.3) and the capabilities (S10.5).
+Where it differs:
+
+- **The no-network test catches a bypass precisely.** `OfflineHttpGuard`
+  makes PSR-18 discovery, which the SDK uses when no client is injected,
+  hand out a client that refuses to send and records the attempt. The
+  plan's mutation (embeddings on `\OpenAI::client()`) fails with "A
+  request tried to leave the process: POST …/v1/embeddings".
+- **Chat is three classes.** Chat and its helpers were about 800 lines.
+  `OpenAIResponses` holds the Responses API call that chat and vision
+  share (the reasoning tiers, the two retries, the model lookup and their
+  caches), `OpenAIResponsesFormat` the pure translations under their old
+  names, and `OpenAIChat` the chat. `chatStream()` (119) is cut at its
+  stream loop. The largest new class is `OpenAIImageGeneration` (488
+  lines), the longest new method `OpenAIChat::readStream()` (95).
+- **Five existing test classes retargeted.** They reached private methods
+  by reflection; they now reach them on their new classes, with their
+  assertions unchanged. `OpenAIFixtures` builds the API answers from the
+  SDK's own fixtures for the snapshot and the unit tests.
+- **Found, not fixed.** `curl_close()` is deprecated on PHP 8.5 (a no-op
+  since PHP 8.0). The gpt-image call, moved verbatim, logs the deprecation
+  on every request, and so do three other classes. One cleanup pull
+  request for all four.
+- **Journey.** With the dev stack's OpenAI key, one chat, one stream, one
+  embedding, one gpt-image request (low quality, over the cURL path) and
+  one speech request ran through the refactored provider on its
+  production defaults, from a script in the backend container rather than
+  the browser; all five answered. Not a gate.

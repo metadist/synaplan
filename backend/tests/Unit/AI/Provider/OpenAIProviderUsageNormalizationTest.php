@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Provider;
 
-use App\AI\Provider\OpenAIProvider;
+use App\AI\Provider\OpenAI\OpenAIResponsesFormat;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -85,14 +85,6 @@ final class OpenAIProviderUsageNormalizationTest extends TestCase
      */
     private function invokeNormalize(array $responseData): array
     {
-        $reflection = new \ReflectionClass(OpenAIProvider::class);
-        $method = $reflection->getMethod('normalizeResponsesUsage');
-        $method->setAccessible(true);
-
-        // We need a constructed instance to satisfy ReflectionMethod::invoke,
-        // but normalizeResponsesUsage doesn't touch any state.
-        $instance = $reflection->newInstanceWithoutConstructor();
-
-        return $method->invoke($instance, $responseData);
+        return OpenAIResponsesFormat::normalizeResponsesUsage($responseData);
     }
 }

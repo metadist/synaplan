@@ -18,6 +18,7 @@ use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
 use App\Service\Runtime\RuntimeProfile;
+use App\Tests\Support\MessageClassifierFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -38,20 +39,20 @@ final class MessageClassifierAgentPinTest extends TestCase
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturn('0');
 
-        $this->classifier = new MessageClassifier(
-            $this->sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            new NativeToolRoutingConfig($configRepo),
-            new ToolCallingCapability(),
-            $this->agentPin,
-        );
+        $this->classifier = MessageClassifierFactory::build([
+            'messageSorter' => $this->sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => new NativeToolRoutingConfig($configRepo),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->agentPin,
+        ]);
     }
 
     public function testAPinnedTurnWithoutInternetSkipsTheSorterAndCarriesOnlyTheProfile(): void

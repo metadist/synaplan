@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Provider;
 
+use App\AI\Provider\OpenAI\OpenAIApiClient;
+use App\AI\Provider\OpenAI\OpenAICurlTransport;
+use App\AI\Provider\OpenAI\OpenAIEmbedding;
 use App\AI\Provider\OpenAIProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\MockHttpClient;
 
 /**
  * Issue #985 — OpenAIProvider used to hard-code
@@ -96,19 +101,15 @@ final class OpenAIProviderEmbeddingDimensionsTest extends TestCase
      */
     private function invokeBuildEmbeddingParams(string $model, string $text, array $options): array
     {
-        $reflection = new \ReflectionClass(OpenAIProvider::class);
-        $method = $reflection->getMethod('buildEmbeddingParams');
-        $method->setAccessible(true);
-        $instance = $reflection->newInstanceWithoutConstructor();
+        $embedding = new OpenAIEmbedding(new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport()));
 
-        return $method->invoke($instance, $model, $text, $options);
+        return (new \ReflectionMethod($embedding, 'buildEmbeddingParams'))->invoke($embedding, $model, $text, $options);
     }
 
     private function makeProvider(): OpenAIProvider
     {
-        // OpenAIProvider's getDimensions() is a pure static-style
-        // lookup that doesn't read any state; constructing without
-        // the API key path keeps the test hermetic.
-        return (new \ReflectionClass(OpenAIProvider::class))->newInstanceWithoutConstructor();
+        // getDimensions() is a pure lookup; without a key no SDK client is
+        // built, so the test stays hermetic.
+        return new OpenAIProvider(new NullLogger(), new MockHttpClient());
     }
 }

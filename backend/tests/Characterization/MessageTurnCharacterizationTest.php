@@ -114,6 +114,31 @@ final class MessageTurnCharacterizationTest extends TestCase
                 'text' => 'What is the latest Synaplan release?',
             ],
             ...self::againCases(),
+            ...self::callerTypeCases(),
+        ];
+    }
+
+    /**
+     * The turn inputs in the types callers really send: ids from query
+     * parameters and message meta as numeric strings, prompt-metadata flags
+     * as '0' / '1', and a language the message does not know.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function callerTypeCases(): array
+    {
+        return [
+            'again_model_id_as_string' => ['options' => ['is_again' => true, 'model_id' => '42']],
+            'override_model_id_as_string' => ['options' => ['override_model_id' => '31']],
+            'widget_model_id_as_string' => ['options' => ['fixed_task_prompt' => 'support', 'is_widget_mode' => true, 'widget_model_id' => '77', 'rag_group_key' => 'kb']],
+            'saved_task_id_as_string' => ['options' => ['fixed_task_prompt' => 'digest', 'saved_task' => true, 'saved_task_id' => '9']],
+            'rag_options_as_strings' => ['options' => ['rag_group_key' => 'kb', 'rag_limit' => '4', 'rag_min_score' => '0.4']],
+            'classifier_flags_as_strings' => [
+                'verdict' => ['web_search' => true, 'prompt_metadata' => ['aiModel' => '33', 'tool_internet' => '0']],
+                'text' => 'What is the latest Synaplan release?',
+            ],
+            'prompt_flags_as_strings' => ['text' => 'Summarize https://example.com/page please', 'prompt_metadata' => ['tool_url_screenshot' => '1', 'tool_internet' => '0']],
+            'unknown_message_language' => ['message_language' => 'NN', 'options' => ['fixed_task_prompt' => 'support', 'language' => '']],
         ];
     }
 

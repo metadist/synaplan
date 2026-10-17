@@ -18,10 +18,10 @@ use App\Service\File\FileStorageService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
+use App\Service\Message\InputEnhancer;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Message\MessageEnqueueService;
 use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -74,7 +74,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
             $this->em,
             $this->createMock(AiFacade::class),
             $this->createMock(AgainHandler::class),
-            $this->createMock(PromptService::class),
+            $this->createStub(InputEnhancer::class),
             $this->createMock(ModelConfigService::class),
             $this->createMock(MessageEnqueueService::class),
             $this->createMock(RateLimitService::class),

@@ -1,0 +1,2301 @@
+{
+    "chat.http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "error_code": null,
+                "error_type": null,
+                "stage": "chat",
+                "status_code": 0
+            },
+            "message": "Openai chat error: Server error (HTTP 500) occurred.",
+            "previous": "ServerException",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Hi",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-4o",
+                    "store": false,
+                    "temperature": 0.7
+                },
+                "body_sha1": "95dbfa479f8337248e1dbed86243ce113f169fb6",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 147",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "chat.model_lookup_fails": {
+        "result": {
+            "content": "Hi.",
+            "response_id": null,
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 9,
+                "prompt_tokens": 21,
+                "total_tokens": 30
+            }
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/o3-mini"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Hi",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "o3-mini",
+                    "store": false
+                },
+                "body_sha1": "63427f8cfdd905c49ba14494f6973376969cb191",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 130",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "chat.no_key": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "env_var": "OPENAI_API_KEY",
+                "provider_type": "external",
+                "setup_instructions": "Add OPENAI_API_KEY=your-api-key to your .env.local file"
+            },
+            "message": "API key not configured for provider 'openai'. Please set the OPENAI_API_KEY environment variable.",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "chat.no_model": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Model must be specified in options",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "chat.previous_response_expired": {
+        "result": {
+            "content": "Fresh start.",
+            "response_id": null,
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 9,
+                "prompt_tokens": 21,
+                "total_tokens": 30
+            }
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Second",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-4o",
+                    "previous_response_id": "resp_gone",
+                    "store": false,
+                    "temperature": 0.7
+                },
+                "body_sha1": "1d58b64be8aff584ca75a0f5bb6de37fe12d3919",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 186",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "First",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        },
+                        {
+                            "content": [
+                                {
+                                    "text": "Reply",
+                                    "type": "output_text"
+                                }
+                            ],
+                            "role": "assistant"
+                        },
+                        {
+                            "content": [
+                                {
+                                    "text": "Second",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-4o",
+                    "store": false,
+                    "temperature": 0.7
+                },
+                "body_sha1": "b526a0486a4336bd4c22c6d7623f44fdf4213589",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 287",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "chat.reasoning_tier_rejected": {
+        "result": {
+            "content": "Done.",
+            "response_id": null,
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 9,
+                "prompt_tokens": 21,
+                "total_tokens": 30
+            }
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-5"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Quick one",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-5",
+                    "reasoning": {
+                        "effort": "minimal"
+                    },
+                    "store": false
+                },
+                "body_sha1": "1a915a8438252fecd0092b134f651c52d2e85888",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 168",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Quick one",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-5",
+                    "store": false
+                },
+                "body_sha1": "5c698e2033e700afac0fdce46720e66e14e18b39",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 135",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "chat.reasoning_tools": {
+        "result": {
+            "content": "Let me check.",
+            "finish_reason": "tool_calls",
+            "response_id": null,
+            "tool_calls": [
+                {
+                    "function": {
+                        "arguments": "{\"city\":\"Berlin\"}",
+                        "name": "get_weather"
+                    },
+                    "id": "call_w2",
+                    "type": "function"
+                }
+            ],
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 9,
+                "prompt_tokens": 21,
+                "total_tokens": 30
+            }
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-5.5"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "What is the weather in Berlin?",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        },
+                        {
+                            "arguments": "{\"city\":\"Berlin\"}",
+                            "call_id": "call_w1",
+                            "name": "get_weather",
+                            "type": "function_call"
+                        },
+                        {
+                            "call_id": "call_w1",
+                            "output": "{\"temp\":18}",
+                            "type": "function_call_output"
+                        },
+                        {
+                            "content": [
+                                {
+                                    "text": "And this photo?",
+                                    "type": "input_text"
+                                },
+                                {
+                                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                    "type": "input_image"
+                                },
+                                {
+                                    "file_id": "file_1",
+                                    "type": "input_file"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "instructions": "You are terse.",
+                    "max_output_tokens": 4096,
+                    "model": "gpt-5.5",
+                    "parallel_tool_calls": false,
+                    "reasoning": {
+                        "effort": "low"
+                    },
+                    "store": false,
+                    "tool_choice": {
+                        "name": "get_weather",
+                        "type": "function"
+                    },
+                    "tools": [
+                        {
+                            "description": "Current weather for a city",
+                            "name": "get_weather",
+                            "parameters": {
+                                "properties": {
+                                    "city": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "city"
+                                ],
+                                "type": "object"
+                            },
+                            "strict": false,
+                            "type": "function"
+                        }
+                    ]
+                },
+                "body_sha1": "25cbf2f3a4f63a65ad51e9fe59926357195ec4d8",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 950",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "chat.stored_structured_previous_response": {
+        "result": {
+            "content": "{\"topic\":\"weather\"}",
+            "response_id": "resp_stored_1",
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 9,
+                "prompt_tokens": 21,
+                "total_tokens": 30
+            }
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Sort this.",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-4o",
+                    "previous_response_id": "resp_prev_1",
+                    "store": true,
+                    "temperature": 0.7,
+                    "text": {
+                        "format": {
+                            "name": "sort_result",
+                            "schema": {
+                                "properties": {
+                                    "topic": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "topic"
+                                ],
+                                "type": "object"
+                            },
+                            "strict": false,
+                            "type": "json_schema"
+                        }
+                    }
+                },
+                "body_sha1": "c095d79b372bd998df0745aced474027c291d440",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 357",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "chat.text": {
+        "result": {
+            "content": "Berlin is sunny.",
+            "response_id": null,
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 9,
+                "prompt_tokens": 21,
+                "total_tokens": 30
+            }
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Weather in Berlin?",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "instructions": "You are terse.",
+                    "max_output_tokens": 200,
+                    "model": "gpt-4o",
+                    "store": false,
+                    "temperature": 0.3
+                },
+                "body_sha1": "5004cca24690eab0b07f4001b7b932faf15d1484",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 194",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "embedding.batch_dimensions_ignored": {
+        "result": {
+            "embeddings": [
+                [
+                    0.1,
+                    -0.2,
+                    0.3
+                ],
+                [
+                    0.2,
+                    -0.2,
+                    0.3
+                ]
+            ],
+            "usage": {
+                "prompt_tokens": 5,
+                "total_tokens": 5
+            }
+        },
+        "sdk": [
+            {
+                "body": {
+                    "input": [
+                        "Hello",
+                        "World"
+                    ],
+                    "model": "text-embedding-ada-002"
+                },
+                "body_sha1": "a1c1f150102ca3e18586d037dd27326a1d26353b",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 60",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/embeddings"
+            }
+        ]
+    },
+    "embedding.dimensions": {
+        "result": {
+            "other": 1536,
+            "text-embedding-3-large": 3072,
+            "text-embedding-3-small": 1536,
+            "text-embedding-ada-002": 1536
+        }
+    },
+    "embedding.http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI embedding error: Invalid input.",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "sdk": [
+            {
+                "body": {
+                    "input": "Hello",
+                    "model": "text-embedding-3-small"
+                },
+                "body_sha1": "303a18948e126549a3d8771d22c062c2d1ffbae2",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 50",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/embeddings"
+            }
+        ]
+    },
+    "embedding.no_model": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Embedding model must be specified in options",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "embedding.single_with_dimensions": {
+        "result": {
+            "embedding": [
+                0.1,
+                -0.2,
+                0.3
+            ],
+            "usage": {
+                "prompt_tokens": 5,
+                "total_tokens": 5
+            }
+        },
+        "sdk": [
+            {
+                "body": {
+                    "dimensions": 1024,
+                    "input": "Hello world",
+                    "model": "text-embedding-3-large"
+                },
+                "body_sha1": "38cd33340638a18fc0bfbdad281f6546d46d6fd6",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 74",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/embeddings"
+            }
+        ]
+    },
+    "image.content_policy": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "prompt": "Something forbidden"
+            },
+            "message": "Content policy violation: The prompt was rejected by OpenAI safety system",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "sdk": [
+            {
+                "body": {
+                    "model": "dall-e-3",
+                    "n": 1,
+                    "prompt": "Something forbidden",
+                    "quality": "standard",
+                    "size": "1024x1024",
+                    "style": "vivid"
+                },
+                "body_sha1": "e73c1be549c89147a33eedb104e6755ede7b036e",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 113",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/images/generations"
+            }
+        ]
+    },
+    "image.dalle2_size": {
+        "result": [
+            {
+                "b64_json": null,
+                "revised_prompt": null,
+                "url": "https://example.test/one.png"
+            },
+            {
+                "b64_json": null,
+                "revised_prompt": null,
+                "url": "https://example.test/two.png"
+            }
+        ],
+        "sdk": [
+            {
+                "body": {
+                    "model": "dall-e-2",
+                    "n": 2,
+                    "prompt": "Two cats",
+                    "size": "512x512"
+                },
+                "body_sha1": "fc5861823af7c4093d279ed79fffa45750101ea8",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 63",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/images/generations"
+            }
+        ]
+    },
+    "image.dalle3": {
+        "result": [
+            {
+                "b64_json": null,
+                "revised_prompt": "A red bicycle",
+                "url": "https://example.test/dalle.png"
+            }
+        ],
+        "sdk": [
+            {
+                "body": {
+                    "model": "dall-e-3",
+                    "n": 1,
+                    "prompt": "A red bicycle",
+                    "quality": "standard",
+                    "size": "1024x1024",
+                    "style": "vivid"
+                },
+                "body_sha1": "b765dcd42925f36258591be66f4821830953ae64",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 107",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/images/generations"
+            }
+        ]
+    },
+    "image.edit": {
+        "result": "https://example.test/edited.png",
+        "sdk": [
+            {
+                "body": {
+                    "image": {
+                        "bytes": 67,
+                        "filename": "<tmpfile>",
+                        "sha1": "c530c06cf89c410c0355d7852644a73fc3ec8c04"
+                    },
+                    "mask": {
+                        "bytes": 67,
+                        "filename": "<tmpfile>",
+                        "sha1": "c530c06cf89c410c0355d7852644a73fc3ec8c04"
+                    },
+                    "n": "1",
+                    "prompt": "Add a hat",
+                    "size": "1024x1024"
+                },
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 632",
+                    "Content-Type: multipart/form-data; boundary=<boundary>",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/images/edits"
+            }
+        ]
+    },
+    "image.edit_missing_file": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI image edit error: Failed to download image or mask",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "image.gpt_image": {
+        "curl": [
+            {
+                "body": {
+                    "background": "transparent",
+                    "model": "gpt-image-1",
+                    "n": 1,
+                    "prompt": "A red bicycle",
+                    "quality": "high",
+                    "size": "1536x1024"
+                },
+                "body_sha1": "99c2f8e313f330c8e83272a32c473ead76a29c6f",
+                "key": "<secret>",
+                "timeout": 120,
+                "url": "https://api.openai.com/v1/images/generations"
+            }
+        ],
+        "result": [
+            {
+                "b64_json": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                "revised_prompt": "A red bicycle, studio light",
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+            }
+        ]
+    },
+    "image.gpt_image_2_5_quality": {
+        "curl": [
+            {
+                "body": {
+                    "model": "gpt-image-2.5-flare",
+                    "n": 1,
+                    "prompt": "A lighthouse",
+                    "quality": "max",
+                    "size": "1024x1024"
+                },
+                "body_sha1": "463099f479bacb9403d9e017e697e25a4c5b718e",
+                "key": "<secret>",
+                "timeout": 120,
+                "url": "https://api.openai.com/v1/images/generations"
+            }
+        ],
+        "result": [
+            {
+                "b64_json": null,
+                "revised_prompt": null,
+                "url": "https://example.test/flare.png"
+            }
+        ]
+    },
+    "image.gpt_image_curl_error": {
+        "curl": [
+            {
+                "body": {
+                    "model": "gpt-image-1",
+                    "n": 1,
+                    "prompt": "A red bicycle",
+                    "size": "1024x1024"
+                },
+                "body_sha1": "347433c8d21e0b83dd8d520ad0833773ed6cbdc5",
+                "key": "<secret>",
+                "timeout": 120,
+                "url": "https://api.openai.com/v1/images/generations"
+            }
+        ],
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI gpt-image-1 error: cURL error: Could not resolve host: api.openai.com",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "image.gpt_image_http_error": {
+        "curl": [
+            {
+                "body": {
+                    "model": "gpt-image-1",
+                    "n": 1,
+                    "prompt": "A red bicycle",
+                    "size": "1024x1024"
+                },
+                "body_sha1": "347433c8d21e0b83dd8d520ad0833773ed6cbdc5",
+                "key": "<secret>",
+                "timeout": 120,
+                "url": "https://api.openai.com/v1/images/generations"
+            }
+        ],
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI gpt-image-1 error: HTTP 400: {\"error\":{\"message\":\"Billing hard limit reached\"}}",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "image.gpt_image_no_images": {
+        "curl": [
+            {
+                "body": {
+                    "model": "gpt-image-1",
+                    "n": 1,
+                    "prompt": "A red bicycle",
+                    "size": "1024x1024"
+                },
+                "body_sha1": "347433c8d21e0b83dd8d520ad0833773ed6cbdc5",
+                "key": "<secret>",
+                "timeout": 120,
+                "url": "https://api.openai.com/v1/images/generations"
+            }
+        ],
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "gpt-image-1 returned no images. Response format may have changed.",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "image.gpt_image_unsupported_quality": {
+        "curl": [
+            {
+                "body": {
+                    "model": "gpt-image-1",
+                    "n": 1,
+                    "prompt": "A red bicycle",
+                    "quality": "high",
+                    "size": "1024x1024"
+                },
+                "body_sha1": "06aaf2a1fb8d89f61862d544be47d1d3dabc3db9",
+                "key": "<secret>",
+                "timeout": 120,
+                "url": "https://api.openai.com/v1/images/generations"
+            }
+        ],
+        "result": [
+            {
+                "b64_json": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                "revised_prompt": "A red bicycle, studio light",
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+            }
+        ]
+    },
+    "image.no_key": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "env_var": "OPENAI_API_KEY",
+                "provider_type": "external",
+                "setup_instructions": "Add OPENAI_API_KEY=your-api-key to your .env.local file"
+            },
+            "message": "API key not configured for provider 'openai'. Please set the OPENAI_API_KEY environment variable.",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "image.responses_http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI Responses API pic2pic error: HTTP 400: {\"error\":{\"message\":\"Invalid image\"}}",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "http": [
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Edit",
+                                    "type": "input_text"
+                                },
+                                {
+                                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                    "type": "input_image"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "model": "gpt-5.5",
+                    "tools": [
+                        {
+                            "model": "gpt-5.5",
+                            "type": "image_generation"
+                        }
+                    ]
+                },
+                "body_sha1": "761c812876c018d782c8f10d71c27914147ff003",
+                "headers": [
+                    "Accept: */*",
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 302",
+                    "Content-Type: application/json"
+                ],
+                "method": "POST",
+                "timeout": 180,
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "image.responses_pic2pic": {
+        "http": [
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Make the car blue",
+                                    "type": "input_text"
+                                },
+                                {
+                                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                    "type": "input_image"
+                                },
+                                {
+                                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                    "type": "input_image"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "model": "gpt-5.6-terra",
+                    "tools": [
+                        {
+                            "model": "gpt-image-2.5-flare",
+                            "quality": "medium",
+                            "type": "image_generation"
+                        }
+                    ]
+                },
+                "body_sha1": "15050710da5ba703d2e78312cab31dfd46d50345",
+                "headers": [
+                    "Accept: */*",
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 505",
+                    "Content-Type: application/json"
+                ],
+                "method": "POST",
+                "timeout": 180,
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ],
+        "result": [
+            {
+                "b64_json": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                "revised_prompt": "A blue car",
+                "size": "1536x1024",
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+            }
+        ]
+    },
+    "image.responses_prose": {
+        "error": {
+            "class": "NoImageException",
+            "context": {
+                "finish_reason": null,
+                "model": "gpt-image-1",
+                "text_response": "I would rather describe it: a car."
+            },
+            "message": "OpenAI returned text instead of an image (gpt-image-1): \"I would rather describe it: a car.\"",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "http": [
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "What is it?",
+                                    "type": "input_text"
+                                },
+                                {
+                                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                    "type": "input_image"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "model": "gpt-5.6-terra",
+                    "tools": [
+                        {
+                            "model": "gpt-image-1",
+                            "type": "image_generation"
+                        }
+                    ]
+                },
+                "body_sha1": "eccaec4df70cc3f9a760647c1fe814aa2c5edacc",
+                "headers": [
+                    "Accept: */*",
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 319",
+                    "Content-Type: application/json"
+                ],
+                "method": "POST",
+                "timeout": 180,
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "image.variations": {
+        "result": [
+            {
+                "b64_json": null,
+                "url": "https://example.test/var1.png"
+            }
+        ],
+        "sdk": [
+            {
+                "body": {
+                    "image": {
+                        "bytes": 67,
+                        "filename": "<tmpfile>",
+                        "sha1": "c530c06cf89c410c0355d7852644a73fc3ec8c04"
+                    },
+                    "n": "1",
+                    "size": "1024x1024"
+                },
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 367",
+                    "Content-Type: multipart/form-data; boundary=<boundary>",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/images/variations"
+            }
+        ]
+    },
+    "meta.with_key": {
+        "result": {
+            "available": true,
+            "capabilities": [
+                "chat",
+                "embedding",
+                "vision",
+                "image_generation",
+                "speech_to_text",
+                "text_to_speech"
+            ],
+            "default_models": [],
+            "description": "GPT models for chat, vision, and content generation",
+            "display_name": "OpenAI",
+            "name": "openai",
+            "required_env": {
+                "OPENAI_API_KEY": {
+                    "hint": "Get your API key from https://platform.openai.com/",
+                    "required": true
+                }
+            },
+            "status": {
+                "active_connections": 0,
+                "error_rate": 0,
+                "healthy": true,
+                "latency_ms": 50
+            },
+            "stream_content_types": {
+                "aac": "audio/aac",
+                "flac": "audio/flac",
+                "mp3": "audio/mpeg",
+                "opus": "audio/ogg",
+                "wav": "audio/mpeg"
+            },
+            "streams_speech": true,
+            "tool_calling": {
+                "gpt-5.4": true,
+                "not-in-catalog": true
+            },
+            "voices": [
+                {
+                    "description": "Neutral and balanced voice",
+                    "id": "alloy",
+                    "name": "Alloy"
+                },
+                {
+                    "description": "Male voice",
+                    "id": "echo",
+                    "name": "Echo"
+                },
+                {
+                    "description": "British accent",
+                    "id": "fable",
+                    "name": "Fable"
+                },
+                {
+                    "description": "Deep male voice",
+                    "id": "onyx",
+                    "name": "Onyx"
+                },
+                {
+                    "description": "Female voice",
+                    "id": "nova",
+                    "name": "Nova"
+                },
+                {
+                    "description": "Warm female voice",
+                    "id": "shimmer",
+                    "name": "Shimmer"
+                }
+            ]
+        }
+    },
+    "meta.without_key": {
+        "result": {
+            "available": false,
+            "capabilities": [
+                "chat",
+                "embedding",
+                "vision",
+                "image_generation",
+                "speech_to_text",
+                "text_to_speech"
+            ],
+            "default_models": [],
+            "description": "GPT models for chat, vision, and content generation",
+            "display_name": "OpenAI",
+            "name": "openai",
+            "required_env": {
+                "OPENAI_API_KEY": {
+                    "hint": "Get your API key from https://platform.openai.com/",
+                    "required": true
+                }
+            },
+            "status": {
+                "error": "API key not configured",
+                "healthy": false
+            },
+            "stream_content_types": {
+                "aac": "audio/aac",
+                "flac": "audio/flac",
+                "mp3": "audio/mpeg",
+                "opus": "audio/ogg",
+                "wav": "audio/mpeg"
+            },
+            "streams_speech": true,
+            "tool_calling": {
+                "gpt-5.4": true,
+                "not-in-catalog": true
+            },
+            "voices": [
+                {
+                    "description": "Neutral and balanced voice",
+                    "id": "alloy",
+                    "name": "Alloy"
+                },
+                {
+                    "description": "Male voice",
+                    "id": "echo",
+                    "name": "Echo"
+                },
+                {
+                    "description": "British accent",
+                    "id": "fable",
+                    "name": "Fable"
+                },
+                {
+                    "description": "Deep male voice",
+                    "id": "onyx",
+                    "name": "Onyx"
+                },
+                {
+                    "description": "Female voice",
+                    "id": "nova",
+                    "name": "Nova"
+                },
+                {
+                    "description": "Warm female voice",
+                    "id": "shimmer",
+                    "name": "Shimmer"
+                }
+            ]
+        }
+    },
+    "speech.no_key": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "env_var": "OPENAI_API_KEY",
+                "provider_type": "external",
+                "setup_instructions": "Add OPENAI_API_KEY=your-api-key to your .env.local file"
+            },
+            "message": "API key not configured for provider 'openai'. Please set the OPENAI_API_KEY environment variable.",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "speech.synthesize": {
+        "result": {
+            "bytes": 15,
+            "filename": "tts_<unique>.mp3",
+            "sha1": "ea74175b3dc826e42137ebc146a77f3d8ebd8fa6"
+        },
+        "sdk": [
+            {
+                "body": {
+                    "input": "Hallo Welt",
+                    "model": "tts-1-hd",
+                    "response_format": "opus",
+                    "speed": 1.2,
+                    "voice": "nova"
+                },
+                "body_sha1": "612ed1b1b7ef5adce80137ea7d0db2ad8e764c33",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 93",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/audio/speech"
+            }
+        ]
+    },
+    "speech.synthesize_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI TTS error: Incorrect API key provided.",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "sdk": [
+            {
+                "body": {
+                    "input": "Hallo Welt",
+                    "model": "tts-1",
+                    "response_format": "mp3",
+                    "speed": 1,
+                    "voice": "alloy"
+                },
+                "body_sha1": "297d5bb2b85c4f54b889011a5307323c7889471c",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 88",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/audio/speech"
+            }
+        ]
+    },
+    "speech.synthesize_stream": {
+        "http": [
+            {
+                "body": {
+                    "input": "Hallo Welt",
+                    "model": "tts-1",
+                    "response_format": "aac",
+                    "speed": 1,
+                    "voice": "echo"
+                },
+                "body_sha1": "75552b2f5d215a947f3c255429ce68ab0db6e68e",
+                "headers": [
+                    "Accept: */*",
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 89",
+                    "Content-Type: application/json"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://api.openai.com/v1/audio/speech"
+            }
+        ],
+        "result": [
+            "ID3-",
+            "streamed"
+        ]
+    },
+    "speech.synthesize_stream_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI TTS stream HTTP 401: {\"error\":{\"message\":\"Incorrect API key provided.\"}}",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "http": [
+            {
+                "body": {
+                    "input": "Hallo Welt",
+                    "model": "tts-1",
+                    "response_format": "mp3",
+                    "speed": 1,
+                    "voice": "alloy"
+                },
+                "body_sha1": "2a71f64fa92ecd3da484c7cc471aaae5a9c1483c",
+                "headers": [
+                    "Accept: */*",
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 90",
+                    "Content-Type: application/json"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://api.openai.com/v1/audio/speech"
+            }
+        ]
+    },
+    "speech.transcribe": {
+        "result": {
+            "duration": 2.5,
+            "language": "german",
+            "segments": [],
+            "text": "Hallo Welt"
+        },
+        "sdk": [
+            {
+                "body": {
+                    "file": {
+                        "bytes": 14,
+                        "filename": "voice.mp3",
+                        "sha1": "e7d15c3acc2c5fb95bbe75afcd84b712975b2f3d"
+                    },
+                    "language": "de",
+                    "model": "whisper-1",
+                    "response_format": "verbose_json"
+                },
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 434",
+                    "Content-Type: multipart/form-data; boundary=<boundary>",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/audio/transcriptions"
+            }
+        ]
+    },
+    "speech.transcribe_absolute_path": {
+        "result": {
+            "duration": 1,
+            "language": "english",
+            "segments": [],
+            "text": "Hello"
+        },
+        "sdk": [
+            {
+                "body": {
+                    "file": {
+                        "bytes": 14,
+                        "filename": "voice.mp3",
+                        "sha1": "e7d15c3acc2c5fb95bbe75afcd84b712975b2f3d"
+                    },
+                    "model": "gpt-4o-transcribe",
+                    "response_format": "verbose_json"
+                },
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 360",
+                    "Content-Type: multipart/form-data; boundary=<boundary>",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/audio/transcriptions"
+            }
+        ]
+    },
+    "speech.transcribe_missing_file": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI transcription error: Audio file not found: <uploads>/missing.mp3",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "speech.translate": {
+        "result": "Hello world",
+        "sdk": [
+            {
+                "body": {
+                    "file": {
+                        "bytes": 14,
+                        "filename": "voice.mp3",
+                        "sha1": "e7d15c3acc2c5fb95bbe75afcd84b712975b2f3d"
+                    },
+                    "model": "whisper-1"
+                },
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 253",
+                    "Content-Type: multipart/form-data; boundary=<boundary>",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/audio/translations"
+            }
+        ]
+    },
+    "stream.failed": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI Responses API failed: The model crashed.",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Hi",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-4o",
+                    "store": false,
+                    "stream": true,
+                    "temperature": 0.7
+                },
+                "body_sha1": "7f4b2b12b3475024073a48e7cee8bf8c2675a3bc",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 161",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "stream.http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "error_code": null,
+                "error_type": "rate_limit_error",
+                "stage": "chat_stream",
+                "status_code": 429
+            },
+            "message": "OpenAI streaming error: Rate limit reached.",
+            "previous": "ErrorException",
+            "provider": "openai",
+            "upstream_status": 429
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Hi",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-4o",
+                    "store": false,
+                    "stream": true,
+                    "temperature": 0.7
+                },
+                "body_sha1": "7f4b2b12b3475024073a48e7cee8bf8c2675a3bc",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 161",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "stream.no_key": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "env_var": "OPENAI_API_KEY",
+                "provider_type": "external",
+                "setup_instructions": "Add OPENAI_API_KEY=your-api-key to your .env.local file"
+            },
+            "message": "API key not configured for provider 'openai'. Please set the OPENAI_API_KEY environment variable.",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "stream.refusal_incomplete": {
+        "events": [
+            {
+                "content": "I cannot help.",
+                "type": "content"
+            },
+            {
+                "finish_reason": "length",
+                "type": "finish"
+            }
+        ],
+        "result": {
+            "response_id": null,
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 9,
+                "prompt_tokens": 21,
+                "total_tokens": 30
+            }
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Something odd",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 16,
+                    "model": "gpt-4o",
+                    "store": false,
+                    "stream": true,
+                    "temperature": 0.7
+                },
+                "body_sha1": "7da12c0e8970ef45126120916528a601fa9c1721",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 170",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "stream.text_and_reasoning": {
+        "events": [
+            {
+                "content": "Checking the sky.",
+                "type": "reasoning"
+            },
+            {
+                "content": "Berlin is ",
+                "type": "content"
+            },
+            {
+                "content": "sunny.",
+                "type": "content"
+            },
+            {
+                "finish_reason": "stop",
+                "type": "finish"
+            }
+        ],
+        "result": {
+            "response_id": null,
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 9,
+                "prompt_tokens": 21,
+                "total_tokens": 30
+            }
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-5.5"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Weather in Berlin?",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-5.5",
+                    "reasoning": {
+                        "effort": "high",
+                        "summary": "auto"
+                    },
+                    "store": false,
+                    "stream": true
+                },
+                "body_sha1": "41708228efc40ce6c662c6d936b8a7da2b2112b7",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 207",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "stream.tool_call": {
+        "events": [
+            {
+                "arguments": "",
+                "id": "call_s1",
+                "index": 1,
+                "name": "get_weather",
+                "type": "tool_call_delta"
+            },
+            {
+                "arguments": "{\"city\":",
+                "id": null,
+                "index": 1,
+                "name": null,
+                "type": "tool_call_delta"
+            },
+            {
+                "arguments": "\"Paris\"}",
+                "id": null,
+                "index": 1,
+                "name": null,
+                "type": "tool_call_delta"
+            },
+            {
+                "finish_reason": "tool_calls",
+                "type": "finish"
+            }
+        ],
+        "result": {
+            "response_id": null,
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 9,
+                "prompt_tokens": 21,
+                "total_tokens": 30
+            }
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "What is the weather in Berlin?",
+                                    "type": "input_text"
+                                }
+                            ],
+                            "role": "user"
+                        },
+                        {
+                            "arguments": "{\"city\":\"Berlin\"}",
+                            "call_id": "call_w1",
+                            "name": "get_weather",
+                            "type": "function_call"
+                        },
+                        {
+                            "call_id": "call_w1",
+                            "output": "{\"temp\":18}",
+                            "type": "function_call_output"
+                        },
+                        {
+                            "content": [
+                                {
+                                    "text": "And this photo?",
+                                    "type": "input_text"
+                                },
+                                {
+                                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                    "type": "input_image"
+                                },
+                                {
+                                    "file_id": "file_1",
+                                    "type": "input_file"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "instructions": "You are terse.",
+                    "max_output_tokens": 4096,
+                    "model": "gpt-4o",
+                    "store": false,
+                    "stream": true,
+                    "temperature": 0.7,
+                    "tool_choice": "required",
+                    "tools": [
+                        {
+                            "description": "Current weather for a city",
+                            "name": "get_weather",
+                            "parameters": {
+                                "properties": {
+                                    "city": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "city"
+                                ],
+                                "type": "object"
+                            },
+                            "strict": false,
+                            "type": "function"
+                        }
+                    ]
+                },
+                "body_sha1": "94cede7e721e2c77941976a8dc7c26349d7a1971",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 894",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "vision.chat_completions": {
+        "result": "A single pixel.",
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "max_tokens": 300,
+                    "messages": [
+                        {
+                            "content": [
+                                {
+                                    "text": "What is this?",
+                                    "type": "text"
+                                },
+                                {
+                                    "image_url": {
+                                        "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+                                    },
+                                    "type": "image_url"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "model": "gpt-4o"
+                },
+                "body_sha1": "0691021bba985c0042086e13e726bc60fa6e76fe",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 274",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/chat/completions"
+            }
+        ]
+    },
+    "vision.compare": {
+        "result": {
+            "comparison": "Both are single pixels.",
+            "image1": "photo.png",
+            "image2": "car.png"
+        },
+        "sdk": [
+            {
+                "body": {
+                    "max_tokens": 1000,
+                    "messages": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Compare these two images and describe the similarities and differences.",
+                                    "type": "text"
+                                },
+                                {
+                                    "image_url": {
+                                        "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+                                    },
+                                    "type": "image_url"
+                                },
+                                {
+                                    "image_url": {
+                                        "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+                                    },
+                                    "type": "image_url"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "model": "gpt-4o"
+                },
+                "body_sha1": "d6c17459c3c143faa378a672ed134d127f24a8c4",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 492",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/chat/completions"
+            }
+        ]
+    },
+    "vision.explain_default_prompt": {
+        "result": "A tiny image.",
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "max_tokens": 1000,
+                    "messages": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Describe what you see in this image in detail.",
+                                    "type": "text"
+                                },
+                                {
+                                    "image_url": {
+                                        "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+                                    },
+                                    "type": "image_url"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "model": "gpt-4o"
+                },
+                "body_sha1": "aa655fe1f1c0bb479b6384538a37963b9042f0af",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 308",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/chat/completions"
+            }
+        ]
+    },
+    "vision.extract_text": {
+        "result": "",
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4o"
+            },
+            {
+                "body": {
+                    "max_tokens": 1000,
+                    "messages": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Extract all text from this image. Return only the text, nothing else.",
+                                    "type": "text"
+                                },
+                                {
+                                    "image_url": {
+                                        "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+                                    },
+                                    "type": "image_url"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "model": "gpt-4o"
+                },
+                "body_sha1": "85fab5cf47d26bb8431d0424f11ebfa9a4f6381c",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 331",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/chat/completions"
+            }
+        ]
+    },
+    "vision.http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI image comparison error: Permission denied.",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "sdk": [
+            {
+                "body": {
+                    "max_tokens": 1000,
+                    "messages": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Compare these two images and describe the similarities and differences.",
+                                    "type": "text"
+                                },
+                                {
+                                    "image_url": {
+                                        "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+                                    },
+                                    "type": "image_url"
+                                },
+                                {
+                                    "image_url": {
+                                        "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+                                    },
+                                    "type": "image_url"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "model": "gpt-4o"
+                },
+                "body_sha1": "d6c17459c3c143faa378a672ed134d127f24a8c4",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 492",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/chat/completions"
+            }
+        ]
+    },
+    "vision.missing_file": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI vision error: Image file not found: missing.png",
+            "provider": "openai",
+            "upstream_status": null
+        }
+    },
+    "vision.not_a_chat_model": {
+        "result": "Recovered.",
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-4.1-pro"
+            },
+            {
+                "body": {
+                    "max_tokens": 1000,
+                    "messages": [
+                        {
+                            "content": [
+                                {
+                                    "text": "What is this?",
+                                    "type": "text"
+                                },
+                                {
+                                    "image_url": {
+                                        "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+                                    },
+                                    "type": "image_url"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "model": "gpt-4.1-pro"
+                },
+                "body_sha1": "eb80ffd15638ee0df4b99d286770856c1d335db5",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 280",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/chat/completions"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "What is this?",
+                                    "type": "input_text"
+                                },
+                                {
+                                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                    "type": "input_image"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-4.1-pro",
+                    "reasoning": {
+                        "effort": "low"
+                    },
+                    "store": false
+                },
+                "body_sha1": "7a301261bc2db7c6ad9c62104c43f60c142c6184",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 327",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "vision.responses_for_reasoning_models": {
+        "result": "INVOICE 42",
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-5.5"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Read the text.",
+                                    "type": "input_text"
+                                },
+                                {
+                                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                    "type": "input_image"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 9000,
+                    "model": "gpt-5.5",
+                    "reasoning": {
+                        "effort": "none"
+                    },
+                    "store": false
+                },
+                "body_sha1": "7b239fafe5198e006dff48aaf85aa8759833ca0a",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 325",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    },
+    "vision.responses_without_text": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "OpenAI vision returned no text (model=gpt-5.5-pro, status=incomplete, reason=max_output_tokens). Reasoning-heavy models such as the \"pro\" tiers are a poor fit for synchronous OCR; select a non-pro vision model (e.g. gpt-5.5).",
+            "provider": "openai",
+            "upstream_status": null
+        },
+        "sdk": [
+            {
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "GET",
+                "url": "https://api.openai.com/v1/models/gpt-5.5-pro"
+            },
+            {
+                "body": {
+                    "input": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Read the text.",
+                                    "type": "input_text"
+                                },
+                                {
+                                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                    "type": "input_image"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "max_output_tokens": 4096,
+                    "model": "gpt-5.5-pro",
+                    "reasoning": {
+                        "effort": "medium",
+                        "summary": "auto"
+                    },
+                    "store": false
+                },
+                "body_sha1": "fa24c97bfd90fed209c37d28b6fd8b0d72bb9d87",
+                "headers": [
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 348",
+                    "Content-Type: application/json",
+                    "Host: api.openai.com"
+                ],
+                "method": "POST",
+                "url": "https://api.openai.com/v1/responses"
+            }
+        ]
+    }
+}

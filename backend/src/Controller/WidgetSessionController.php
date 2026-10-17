@@ -14,7 +14,6 @@ use App\Service\Chat\ChatDeletionService;
 use App\Service\Message\AiResponseSanitizer;
 use App\Service\Widget\WidgetService;
 use App\Service\Widget\WidgetSessionService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -40,7 +39,6 @@ class WidgetSessionController extends AbstractController
         private ChatDeletionService $chatDeletionService,
         private MessageRepository $messageRepository,
         private LoggerInterface $logger,
-        private EntityManagerInterface $em,
         private WidgetService $widgetService,
         private WidgetSessionService $sessionService,
     ) {
@@ -680,13 +678,7 @@ class WidgetSessionController extends AbstractController
                 $this->chatDeletionService->deleteOwnedChats($user->getId(), array_map('intval', $chatIds));
             }
 
-            // Delete sessions
-            foreach ($sessions as $session) {
-                $this->sessionRepository->remove($session);
-            }
-
-            // Flush all changes
-            $this->em->flush();
+            $this->sessionRepository->removeAll($sessions);
 
             return $this->json([
                 'success' => true,
@@ -762,7 +754,7 @@ class WidgetSessionController extends AbstractController
         // human-takeover or already-internal session.
         if ($session->isAiMode()) {
             $session->setMode(WidgetSession::MODE_INTERNAL);
-            $this->em->flush();
+            $this->sessionRepository->save($session, true);
         }
 
         return $this->json([

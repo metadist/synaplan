@@ -2,13 +2,12 @@
 
 namespace App\Controller;
 
-use App\AI\Service\AiFacade;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\PromptRepository;
-use App\Service\ModelConfigService;
-use App\Service\RateLimitService;
-use App\Service\Summary\SummaryOptions;
+use App\Service\Summary\DocumentSummarizer;
+use App\Service\Summary\SummaryCall;
+use App\Service\Summary\SummaryRequest;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,11 +22,9 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 class SummaryController extends AbstractController
 {
     public function __construct(
-        private AiFacade $aiFacade,
         private PromptRepository $promptRepository,
-        private ModelConfigService $modelConfigService,
-        private RateLimitService $rateLimitService,
         private FileRepository $fileRepository,
+        private DocumentSummarizer $summarizer,
         private LoggerInterface $logger,
     ) {
     }
@@ -136,237 +133,36 @@ class SummaryController extends AbstractController
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
-
         $startTime = microtime(true);
-        $data = json_decode($request->getContent(), true);
-        if (!is_array($data)) {
-            $data = [];
-        }
-
-        // Resolve the text to summarize. Callers must provide exactly one of
-        // "text" (raw string) or "fileId" (reference to a previously uploaded
-        // file). The fileId path lets the caller skip a wasteful round-trip
-        // through /api/v1/files/{id}/content — we pull the extracted text
-        // directly from the database here.
-        $textProvided = isset($data['text']) && is_string($data['text']) && '' !== trim($data['text']);
-        $fileId = null;
-        if (isset($data['fileId'])) {
-            $raw = $data['fileId'];
-            if (is_int($raw)) {
-                $fileId = $raw;
-            } elseif (is_string($raw) && ctype_digit($raw)) {
-                $fileId = (int) $raw;
-            }
-            // Everything else (bool, array, float, null, non-digit string)
-            // falls through as "not provided" and gets caught by the
-            // "either text or fileId is required" check below.
-        }
-        $fileIdProvided = null !== $fileId;
-
-        if (!$textProvided && !$fileIdProvided) {
-            return $this->json([
-                'success' => false,
-                'error' => 'Either text or fileId is required',
-            ], Response::HTTP_BAD_REQUEST);
-        }
-        if ($textProvided && $fileIdProvided) {
-            return $this->json([
-                'success' => false,
-                'error' => 'Provide either text or fileId, not both',
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        if ($fileIdProvided) {
-            $file = $this->fileRepository->find($fileId);
-            // Collapse "not found" and "wrong owner" into the same 404 so
-            // the endpoint doesn't leak which file IDs exist.
-            if (!$file || $file->getUserId() !== $user->getId()) {
-                return $this->json([
-                    'success' => false,
-                    'error' => 'File not found',
-                ], Response::HTTP_NOT_FOUND);
-            }
-            $extracted = $file->getFileText();
-            if ('' === trim($extracted)) {
-                return $this->json([
-                    'success' => false,
-                    'error' => sprintf(
-                        'File has no extracted text yet (status: %s). Upload with process_level=extract or higher.',
-                        $file->getStatus()
-                    ),
-                ], Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-            $text = $extracted;
-        } else {
-            $text = trim($data['text']);
-        }
-
-        $summaryType = $data['summaryType'] ?? 'abstractive';
-        $length = $data['length'] ?? 'medium';
-        $customLength = $data['customLength'] ?? null;
-        $outputLanguage = $data['outputLanguage'] ?? 'en';
-        $focusAreas = $data['focusAreas'] ?? ['main-ideas', 'key-facts'];
-
-        // Validate summary type
-        if (!in_array($summaryType, SummaryOptions::TYPES, true)) {
-            return $this->json([
-                'success' => false,
-                'error' => 'Invalid summary type. Must be: '.implode(', ', SummaryOptions::TYPES),
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Validate length
-        if (!in_array($length, SummaryOptions::LENGTHS, true)) {
-            return $this->json([
-                'success' => false,
-                'error' => 'Invalid length. Must be: '.implode(', ', SummaryOptions::LENGTHS),
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Get word count for length specification
-        $targetWordCount = match ($length) {
-            'short' => '50-150',
-            'medium' => '200-500',
-            'long' => '500-1000',
-            'custom' => (string) ($customLength ?? 300),
-            default => '200-500',
-        };
-
-        // Document summaries use Text Analytics (ANALYZE → CHAT).
-        $provider = null;
-        $modelName = null;
-        $modelId = null;
 
         try {
-            $summaryConfig = $this->modelConfigService->getSummaryModelConfig($user->getId());
-            $modelId = $summaryConfig['model_id'];
-            $provider = $summaryConfig['provider'];
-            $modelName = $summaryConfig['model'];
-        } catch (\Exception $e) {
-            $this->logger->warning('Could not get Text Analytics model, will use provider default', [
-                'user_id' => $user->getId(),
-                'error' => $e->getMessage(),
-            ]);
+            $summaryRequest = SummaryRequest::fromPayload(json_decode($request->getContent(), true));
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+        $text = $summaryRequest->text ?? $this->ownedFileText((int) $summaryRequest->fileId, $user);
+        if ($text instanceof JsonResponse) {
+            return $text;
+        }
+        $optionsError = $summaryRequest->optionsError();
+        if (null !== $optionsError) {
+            return $this->json(['success' => false, 'error' => $optionsError], Response::HTTP_BAD_REQUEST);
         }
 
-        $this->logger->info('Summary generation request', [
-            'user_id' => $user->getId(),
-            'file_id' => $fileId,
-            'text_length' => strlen($text),
-            'summary_type' => $summaryType,
-            'length' => $length,
-            'output_language' => $outputLanguage,
-            'focus_areas' => implode(', ', $focusAreas),
-            'model_id' => $modelId,
-            'provider' => $provider,
-            'model' => $modelName,
-        ]);
+        $this->logRequest($summaryRequest, $text, (int) $user->getId());
 
         try {
-            // Load the docsummary system prompt
-            $systemPrompt = $this->promptRepository->findOneBy([
-                'topic' => 'docsummary',
-                'language' => 'en',
-                'ownerId' => 0,
-            ]);
-
+            $systemPrompt = $this->promptRepository->findOneBy(['topic' => 'docsummary', 'language' => 'en', 'ownerId' => 0]);
             if (!$systemPrompt) {
                 $this->logger->error('Doc summary prompt not found in database');
 
-                return $this->json([
-                    'success' => false,
-                    'error' => 'Summary service not configured. Please load fixtures.',
-                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                return $this->json(['success' => false, 'error' => 'Summary service not configured. Please load fixtures.'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
-            // Build the user prompt with configuration and document
-            $configText = "Configuration:\n";
-            $configText .= "- Summary Type: {$summaryType}\n";
-            $configText .= "- Target Length: {$targetWordCount} words\n";
-            $configText .= "- Output Language: {$outputLanguage}\n";
-            $configText .= '- Focus Areas: '.implode(', ', $focusAreas)."\n\n";
-            $configText .= "Document to summarize:\n\n{$text}";
+            // A lower temperature keeps summaries consistent.
+            $result = $this->summarizer->summarize($user, new SummaryCall($systemPrompt->getPrompt(), $summaryRequest->message($text), 0.5, 'DOC_SUMMARY', $text, $startTime));
 
-            // Build messages array for AI
-            $messages = [
-                [
-                    'role' => 'system',
-                    'content' => $systemPrompt->getPrompt(),
-                ],
-                [
-                    'role' => 'user',
-                    'content' => $configText,
-                ],
-            ];
-
-            // Build AI options
-            $aiOptions = [
-                'temperature' => 0.5, // Lower temperature for more consistent summaries
-            ];
-
-            // Add model configuration if available
-            if ($provider) {
-                $aiOptions['provider'] = $provider;
-            }
-            if ($modelName) {
-                $aiOptions['model'] = $modelName;
-            }
-
-            // Call AI with streaming disabled (we want full response)
-            $response = $this->aiFacade->chat(
-                $messages,
-                $user->getId(),
-                $aiOptions
-            );
-
-            $summary = trim($response['content']);
-            $processingTime = (int) ((microtime(true) - $startTime) * 1000);
-
-            $this->rateLimitService->recordUsage($user, 'DOC_SUMMARY', [
-                'provider' => $response['provider'] ?? 'unknown',
-                'model' => $response['model'] ?? 'unknown',
-                'model_id' => $modelId,
-                'usage' => $response['usage'] ?? [],
-                'latency' => $processingTime,
-                'response_text' => $summary,
-                'input_text' => $text,
-            ]);
-
-            // Calculate statistics
-            $originalWordCount = str_word_count($text);
-            $summaryWordCount = str_word_count($summary);
-            $compressionRatio = $originalWordCount > 0
-                ? round($summaryWordCount / $originalWordCount, 3)
-                : 0;
-
-            $this->logger->info('Summary generated successfully', [
-                'user_id' => $user->getId(),
-                'original_words' => $originalWordCount,
-                'summary_words' => $summaryWordCount,
-                'compression_ratio' => $compressionRatio,
-                'processing_time_ms' => $processingTime,
-                'provider' => $response['provider'],
-                'model' => $response['model'],
-            ]);
-
-            return $this->json([
-                'success' => true,
-                'summary' => $summary,
-                'metadata' => [
-                    'original_length' => $originalWordCount,
-                    'summary_length' => $summaryWordCount,
-                    'compression_ratio' => $compressionRatio,
-                    'processing_time_ms' => $processingTime,
-                    'model' => $response['model'],
-                    'provider' => $response['provider'],
-                    'configuration' => [
-                        'summary_type' => $summaryType,
-                        'length' => $length,
-                        'output_language' => $outputLanguage,
-                        'focus_areas' => $focusAreas,
-                    ],
-                ],
-            ]);
+            return $this->json($this->summaryPayload($summaryRequest, $text, $result, $startTime, (int) $user->getId()));
         } catch (\Throwable $e) {
             $this->logger->error('Summary generation failed', [
                 'user_id' => $user->getId(),
@@ -374,10 +170,88 @@ class SummaryController extends AbstractController
                 'trace' => $e->getTraceAsString(),
             ]);
 
+            return $this->json(['success' => false, 'error' => 'Failed to generate summary: '.$e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private function logRequest(SummaryRequest $summaryRequest, string $text, int $userId): void
+    {
+        $this->logger->info('Summary generation request', [
+            'user_id' => $userId,
+            'file_id' => $summaryRequest->fileId,
+            'text_length' => strlen($text),
+            'summary_type' => $summaryRequest->summaryType,
+            'length' => $summaryRequest->length,
+            'output_language' => $summaryRequest->outputLanguage,
+            'focus_areas' => implode(', ', $summaryRequest->focusAreas),
+        ]);
+    }
+
+    /**
+     * The extracted text of a file of the user, or the answer when there is none.
+     */
+    private function ownedFileText(int $fileId, User $user): string|JsonResponse
+    {
+        $file = $this->fileRepository->find($fileId);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['success' => false, 'error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $extracted = $file->getFileText();
+        if ('' === trim($extracted)) {
             return $this->json([
                 'success' => false,
-                'error' => 'Failed to generate summary: '.$e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                'error' => sprintf(
+                    'File has no extracted text yet (status: %s). Upload with process_level=extract or higher.',
+                    $file->getStatus()
+                ),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
+
+        return $extracted;
+    }
+
+    /**
+     * @param array{summary: string, provider: ?string, model: ?string} $result
+     *
+     * @return array<string, mixed>
+     */
+    private function summaryPayload(SummaryRequest $summaryRequest, string $text, array $result, float $startTime, int $userId): array
+    {
+        $processingTime = (int) ((microtime(true) - $startTime) * 1000);
+        $originalWordCount = str_word_count($text);
+        $summaryWordCount = str_word_count($result['summary']);
+        $compressionRatio = $originalWordCount > 0
+            ? round($summaryWordCount / $originalWordCount, 3)
+            : 0;
+
+        $this->logger->info('Summary generated successfully', [
+            'user_id' => $userId,
+            'original_words' => $originalWordCount,
+            'summary_words' => $summaryWordCount,
+            'compression_ratio' => $compressionRatio,
+            'processing_time_ms' => $processingTime,
+            'provider' => $result['provider'],
+            'model' => $result['model'],
+        ]);
+
+        return [
+            'success' => true,
+            'summary' => $result['summary'],
+            'metadata' => [
+                'original_length' => $originalWordCount,
+                'summary_length' => $summaryWordCount,
+                'compression_ratio' => $compressionRatio,
+                'processing_time_ms' => $processingTime,
+                'model' => $result['model'],
+                'provider' => $result['provider'],
+                'configuration' => [
+                    'summary_type' => $summaryRequest->summaryType,
+                    'length' => $summaryRequest->length,
+                    'output_language' => $summaryRequest->outputLanguage,
+                    'focus_areas' => $summaryRequest->focusAreas,
+                ],
+            ],
+        ];
     }
 }

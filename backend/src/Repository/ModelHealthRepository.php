@@ -50,6 +50,12 @@ class ModelHealthRepository extends ServiceEntityRepository
         return $indexed;
     }
 
+    public function save(ModelHealth $health): void
+    {
+        $this->getEntityManager()->persist($health);
+        $this->getEntityManager()->flush();
+    }
+
     /**
      * Get the row for a model, creating an unsaved one when it does not exist
      * yet. The caller decides when to persist and flush.

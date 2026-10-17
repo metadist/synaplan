@@ -1601,6 +1601,206 @@
             ]
         }
     },
+    "again_model_id_as_string": {
+        "buffered": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "mediamaker"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "image_generation",
+                            "language": "en",
+                            "model_id": "42",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "again",
+                            "topic": "mediamaker"
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "is_again": true,
+                            "model_id": "42",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": []
+            },
+            "result": {
+                "classification": {
+                    "intent": "image_generation",
+                    "language": "en",
+                    "model_id": "42",
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "again",
+                    "topic": "mediamaker"
+                },
+                "preprocessing": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Using previously selected model (skipped classification)",
+                    "metadata": {
+                        "language": "en",
+                        "model_id": "42",
+                        "source": "again",
+                        "topic": "mediamaker"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                },
+                {
+                    "message": "Response generated",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    },
+                    "status": "complete"
+                }
+            ]
+        },
+        "streamed": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "mediamaker"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "image_generation",
+                            "language": "en",
+                            "model_id": "42",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "again",
+                            "topic": "mediamaker"
+                        },
+                        "history": 1,
+                        "method": "routeStream",
+                        "options": {
+                            "is_again": true,
+                            "model_id": "42",
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": [
+                    "Answer"
+                ]
+            },
+            "result": {
+                "classification": {
+                    "intent": "image_generation",
+                    "language": "en",
+                    "model_id": "42",
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "again",
+                    "topic": "mediamaker"
+                },
+                "preprocessed": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Using previously selected model (skipped classification)",
+                    "metadata": [],
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                }
+            ]
+        }
+    },
     "again_tag_analyze": {
         "buffered": {
             "calls": {
@@ -4128,6 +4328,222 @@
                             "prompt_metadata": {
                                 "aiModel": 33,
                                 "tool_internet": false
+                            },
+                            "source": "ai_sorting",
+                            "topic": "general",
+                            "web_search": true
+                        },
+                        "history": 1,
+                        "method": "routeStream",
+                        "options": {
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer"
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": [
+                    "Answer"
+                ]
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "sorting_model_id": 5,
+                    "sorting_model_name": "sorter-model",
+                    "sorting_provider": "groq",
+                    "source": "ai_sorting",
+                    "topic": "general",
+                    "web_search": true
+                },
+                "preprocessed": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 1,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Analyzing message intent...",
+                    "metadata": {
+                        "model_id": 5,
+                        "model_name": "model-5",
+                        "provider": "openai"
+                    },
+                    "status": "classifying"
+                },
+                {
+                    "message": "Topic: general, Language: en, Source: ai_sorting",
+                    "metadata": {
+                        "intent": "chat",
+                        "language": "en",
+                        "sorting_model_id": 5,
+                        "sorting_model_name": "sorter-model",
+                        "sorting_provider": "groq",
+                        "source": "ai_sorting",
+                        "topic": "general",
+                        "web_search": true
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                }
+            ]
+        }
+    },
+    "classifier_flags_as_strings": {
+        "buffered": {
+            "calls": {
+                "classifier": [
+                    {
+                        "history": 1,
+                        "options": []
+                    }
+                ],
+                "prompt": [],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": "33",
+                                "tool_internet": "0"
+                            },
+                            "source": "ai_sorting",
+                            "topic": "general",
+                            "web_search": true
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": []
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": []
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "sorting_model_id": 5,
+                    "sorting_model_name": "sorter-model",
+                    "sorting_provider": "groq",
+                    "source": "ai_sorting",
+                    "topic": "general",
+                    "web_search": true
+                },
+                "preprocessing": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 1,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Analyzing message intent...",
+                    "metadata": {
+                        "model_id": 5,
+                        "model_name": "model-5",
+                        "provider": "openai"
+                    },
+                    "status": "classifying"
+                },
+                {
+                    "message": "Topic: general, Language: en, Source: ai_sorting",
+                    "metadata": {
+                        "intent": "chat",
+                        "language": "en",
+                        "sorting_model_id": 5,
+                        "sorting_model_name": "sorter-model",
+                        "sorting_provider": "groq",
+                        "source": "ai_sorting",
+                        "topic": "general",
+                        "web_search": true
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                },
+                {
+                    "message": "Response generated",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    },
+                    "status": "complete"
+                }
+            ]
+        },
+        "streamed": {
+            "calls": {
+                "classifier": [
+                    {
+                        "history": 1,
+                        "options": []
+                    }
+                ],
+                "prompt": [],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": "33",
+                                "tool_internet": "0"
                             },
                             "source": "ai_sorting",
                             "topic": "general",
@@ -7595,6 +8011,243 @@
             ]
         }
     },
+    "override_model_id_as_string": {
+        "buffered": {
+            "calls": {
+                "classifier": [
+                    {
+                        "history": 1,
+                        "options": []
+                    }
+                ],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "general"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "override_model_id": 31,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "ai_sorting",
+                            "topic": "general"
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "override_model_id": "31",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": []
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "override_model_id": 31,
+                    "sorting_model_id": 5,
+                    "sorting_model_name": "sorter-model",
+                    "sorting_provider": "groq",
+                    "source": "ai_sorting",
+                    "topic": "general"
+                },
+                "preprocessing": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 1,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Analyzing message intent...",
+                    "metadata": {
+                        "model_id": 5,
+                        "model_name": "model-5",
+                        "provider": "openai"
+                    },
+                    "status": "classifying"
+                },
+                {
+                    "message": "Topic: general, Language: en, Source: ai_sorting",
+                    "metadata": {
+                        "intent": "chat",
+                        "language": "en",
+                        "sorting_model_id": 5,
+                        "sorting_model_name": "sorter-model",
+                        "sorting_provider": "groq",
+                        "source": "ai_sorting",
+                        "topic": "general"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                },
+                {
+                    "message": "Response generated",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    },
+                    "status": "complete"
+                }
+            ]
+        },
+        "streamed": {
+            "calls": {
+                "classifier": [
+                    {
+                        "history": 1,
+                        "options": []
+                    }
+                ],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "general"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "override_model_id": 31,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "ai_sorting",
+                            "topic": "general"
+                        },
+                        "history": 1,
+                        "method": "routeStream",
+                        "options": {
+                            "override_model_id": "31",
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": [
+                    "Answer"
+                ]
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "override_model_id": 31,
+                    "sorting_model_id": 5,
+                    "sorting_model_name": "sorter-model",
+                    "sorting_provider": "groq",
+                    "source": "ai_sorting",
+                    "topic": "general"
+                },
+                "preprocessed": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 1,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Analyzing message intent...",
+                    "metadata": {
+                        "model_id": 5,
+                        "model_name": "model-5",
+                        "provider": "openai"
+                    },
+                    "status": "classifying"
+                },
+                {
+                    "message": "Topic: general, Language: en, Source: ai_sorting",
+                    "metadata": {
+                        "intent": "chat",
+                        "language": "en",
+                        "sorting_model_id": 5,
+                        "sorting_model_name": "sorter-model",
+                        "sorting_provider": "groq",
+                        "source": "ai_sorting",
+                        "topic": "general"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                }
+            ]
+        }
+    },
     "plain_chat": {
         "buffered": {
             "calls": {
@@ -7826,6 +8479,273 @@
             ]
         }
     },
+    "prompt_flags_as_strings": {
+        "buffered": {
+            "calls": {
+                "classifier": [
+                    {
+                        "history": 1,
+                        "options": []
+                    }
+                ],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "general"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0,
+                                "tool_internet": "0",
+                                "tool_url_screenshot": "1"
+                            },
+                            "source": "ai_sorting",
+                            "topic": "general",
+                            "url_content": "=== PAGE ===",
+                            "url_pages_read": 1
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0,
+                                    "tool_internet": "0",
+                                    "tool_url_screenshot": "1"
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": []
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "sorting_model_id": 5,
+                    "sorting_model_name": "sorter-model",
+                    "sorting_provider": "groq",
+                    "source": "ai_sorting",
+                    "topic": "general",
+                    "url_content": "=== PAGE ===",
+                    "url_pages_read": 1
+                },
+                "preprocessing": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 1,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Analyzing message intent...",
+                    "metadata": {
+                        "model_id": 5,
+                        "model_name": "model-5",
+                        "provider": "openai"
+                    },
+                    "status": "classifying"
+                },
+                {
+                    "message": "Topic: general, Language: en, Source: ai_sorting",
+                    "metadata": {
+                        "intent": "chat",
+                        "language": "en",
+                        "sorting_model_id": 5,
+                        "sorting_model_name": "sorter-model",
+                        "sorting_provider": "groq",
+                        "source": "ai_sorting",
+                        "topic": "general"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Fetching content from 1 URL(s)...",
+                    "metadata": [],
+                    "status": "fetching_urls"
+                },
+                {
+                    "message": "Extracted content from 1 URL(s)",
+                    "metadata": [],
+                    "status": "urls_fetched"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                },
+                {
+                    "message": "Response generated",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    },
+                    "status": "complete"
+                }
+            ]
+        },
+        "streamed": {
+            "calls": {
+                "classifier": [
+                    {
+                        "history": 1,
+                        "options": []
+                    }
+                ],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "general"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0,
+                                "tool_internet": "0",
+                                "tool_url_screenshot": "1"
+                            },
+                            "source": "ai_sorting",
+                            "topic": "general",
+                            "url_content": "=== PAGE ===",
+                            "url_pages_read": 1
+                        },
+                        "history": 1,
+                        "method": "routeStream",
+                        "options": {
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0,
+                                    "tool_internet": "0",
+                                    "tool_url_screenshot": "1"
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": [
+                    "Answer"
+                ]
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "sorting_model_id": 5,
+                    "sorting_model_name": "sorter-model",
+                    "sorting_provider": "groq",
+                    "source": "ai_sorting",
+                    "topic": "general",
+                    "url_content": "=== PAGE ===",
+                    "url_pages_read": 1
+                },
+                "preprocessed": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 1,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Analyzing message intent...",
+                    "metadata": {
+                        "model_id": 5,
+                        "model_name": "model-5",
+                        "provider": "openai"
+                    },
+                    "status": "classifying"
+                },
+                {
+                    "message": "Topic: general, Language: en, Source: ai_sorting",
+                    "metadata": {
+                        "intent": "chat",
+                        "language": "en",
+                        "sorting_model_id": 5,
+                        "sorting_model_name": "sorter-model",
+                        "sorting_provider": "groq",
+                        "source": "ai_sorting",
+                        "topic": "general"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Fetching content from 1 URL(s)...",
+                    "metadata": [],
+                    "status": "fetching_urls"
+                },
+                {
+                    "message": "Extracted content from 1 URL(s)",
+                    "metadata": [],
+                    "status": "urls_fetched"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                }
+            ]
+        }
+    },
     "provider_error": {
         "buffered": {
             "calls": {
@@ -7995,6 +8915,255 @@
                 "exception": "App\\AI\\Exception\\ProviderException",
                 "provider": "openai",
                 "success": false
+            },
+            "sorter_calls": 1,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Analyzing message intent...",
+                    "metadata": {
+                        "model_id": 5,
+                        "model_name": "model-5",
+                        "provider": "openai"
+                    },
+                    "status": "classifying"
+                },
+                {
+                    "message": "Topic: general, Language: en, Source: ai_sorting",
+                    "metadata": {
+                        "intent": "chat",
+                        "language": "en",
+                        "sorting_model_id": 5,
+                        "sorting_model_name": "sorter-model",
+                        "sorting_provider": "groq",
+                        "source": "ai_sorting",
+                        "topic": "general"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                }
+            ]
+        }
+    },
+    "rag_options_as_strings": {
+        "buffered": {
+            "calls": {
+                "classifier": [
+                    {
+                        "history": 1,
+                        "options": []
+                    }
+                ],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "general"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "rag_group_key": "kb",
+                            "rag_limit": 4,
+                            "rag_min_score": 0.4,
+                            "source": "ai_sorting",
+                            "topic": "general"
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "rag_group_key": "kb",
+                            "rag_limit": "4",
+                            "rag_min_score": "0.4",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": []
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "rag_group_key": "kb",
+                    "rag_limit": 4,
+                    "rag_min_score": 0.4,
+                    "sorting_model_id": 5,
+                    "sorting_model_name": "sorter-model",
+                    "sorting_provider": "groq",
+                    "source": "ai_sorting",
+                    "topic": "general"
+                },
+                "preprocessing": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 1,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Analyzing message intent...",
+                    "metadata": {
+                        "model_id": 5,
+                        "model_name": "model-5",
+                        "provider": "openai"
+                    },
+                    "status": "classifying"
+                },
+                {
+                    "message": "Topic: general, Language: en, Source: ai_sorting",
+                    "metadata": {
+                        "intent": "chat",
+                        "language": "en",
+                        "sorting_model_id": 5,
+                        "sorting_model_name": "sorter-model",
+                        "sorting_provider": "groq",
+                        "source": "ai_sorting",
+                        "topic": "general"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                },
+                {
+                    "message": "Response generated",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    },
+                    "status": "complete"
+                }
+            ]
+        },
+        "streamed": {
+            "calls": {
+                "classifier": [
+                    {
+                        "history": 1,
+                        "options": []
+                    }
+                ],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "general"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "rag_group_key": "kb",
+                            "rag_limit": 4,
+                            "rag_min_score": 0.4,
+                            "source": "ai_sorting",
+                            "topic": "general"
+                        },
+                        "history": 1,
+                        "method": "routeStream",
+                        "options": {
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer",
+                            "rag_group_key": "kb",
+                            "rag_limit": "4",
+                            "rag_min_score": "0.4",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": [
+                    "Answer"
+                ]
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "rag_group_key": "kb",
+                    "rag_limit": 4,
+                    "rag_min_score": 0.4,
+                    "sorting_model_id": 5,
+                    "sorting_model_name": "sorter-model",
+                    "sorting_provider": "groq",
+                    "source": "ai_sorting",
+                    "topic": "general"
+                },
+                "preprocessed": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
             },
             "sorter_calls": 1,
             "statuses": [
@@ -8279,6 +9448,406 @@
                         "source": "ai_sorting",
                         "topic": "general"
                     },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                }
+            ]
+        }
+    },
+    "saved_task_id_as_string": {
+        "buffered": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "digest"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "is_widget_mode": false,
+                            "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "saved_task",
+                            "topic": "digest"
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "fixed_task_prompt": "digest",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            },
+                            "saved_task": true,
+                            "saved_task_id": "9"
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": []
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "is_widget_mode": false,
+                    "language": "en",
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "saved_task",
+                    "topic": "digest"
+                },
+                "preprocessing": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Using saved_task task prompt (skipped classification)",
+                    "metadata": {
+                        "language": "en",
+                        "source": "saved_task",
+                        "topic": "digest"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                },
+                {
+                    "message": "Response generated",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    },
+                    "status": "complete"
+                }
+            ]
+        },
+        "streamed": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "digest"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "is_widget_mode": false,
+                            "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "saved_task",
+                            "topic": "digest"
+                        },
+                        "history": 1,
+                        "method": "routeStream",
+                        "options": {
+                            "fixed_task_prompt": "digest",
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            },
+                            "saved_task": true,
+                            "saved_task_id": "9"
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": [
+                    "Answer"
+                ]
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "is_widget_mode": false,
+                    "language": "en",
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "saved_task",
+                    "topic": "digest"
+                },
+                "preprocessed": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Saved_task: Using fixed prompt",
+                    "metadata": [],
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                }
+            ]
+        }
+    },
+    "unknown_message_language": {
+        "buffered": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "auto",
+                        "topic": "support"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "is_widget_mode": false,
+                            "language": "auto",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "api",
+                            "topic": "support"
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "fixed_task_prompt": "support",
+                            "language": "",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": []
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "is_widget_mode": false,
+                    "language": "auto",
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "api",
+                    "topic": "support"
+                },
+                "preprocessing": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Using api task prompt (skipped classification)",
+                    "metadata": {
+                        "language": "auto",
+                        "source": "api",
+                        "topic": "support"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                },
+                {
+                    "message": "Response generated",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    },
+                    "status": "complete"
+                }
+            ]
+        },
+        "streamed": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "auto",
+                        "topic": "support"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "is_widget_mode": false,
+                            "language": "auto",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "api",
+                            "topic": "support"
+                        },
+                        "history": 1,
+                        "method": "routeStream",
+                        "options": {
+                            "fixed_task_prompt": "support",
+                            "language": "",
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": [
+                    "Answer"
+                ]
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "is_widget_mode": false,
+                    "language": "auto",
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "api",
+                    "topic": "support"
+                },
+                "preprocessed": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Api: Using fixed prompt",
+                    "metadata": [],
                     "status": "classified"
                 },
                 {
@@ -8757,6 +10326,217 @@
                         "source": "ai_sorting",
                         "topic": "general"
                     },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                }
+            ]
+        }
+    },
+    "widget_model_id_as_string": {
+        "buffered": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "support"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "is_widget_mode": true,
+                            "language": "en",
+                            "override_model_id": 77,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "rag_group_key": "kb",
+                            "source": "widget",
+                            "topic": "support"
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "fixed_task_prompt": "support",
+                            "is_widget_mode": true,
+                            "rag_group_key": "kb",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            },
+                            "widget_model_id": "77"
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": []
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "is_widget_mode": true,
+                    "language": "en",
+                    "override_model_id": 77,
+                    "rag_group_key": "kb",
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "widget",
+                    "topic": "support"
+                },
+                "preprocessing": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Using widget task prompt (skipped classification)",
+                    "metadata": {
+                        "language": "en",
+                        "source": "widget",
+                        "topic": "support"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                },
+                {
+                    "message": "Response generated",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    },
+                    "status": "complete"
+                }
+            ]
+        },
+        "streamed": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "support"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "is_widget_mode": true,
+                            "language": "en",
+                            "override_model_id": 77,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "rag_group_key": "kb",
+                            "source": "widget",
+                            "topic": "support"
+                        },
+                        "history": 1,
+                        "method": "routeStream",
+                        "options": {
+                            "fixed_task_prompt": "support",
+                            "is_widget_mode": true,
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer",
+                            "rag_group_key": "kb",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            },
+                            "widget_model_id": "77"
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": [
+                    "Answer"
+                ]
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "is_widget_mode": true,
+                    "language": "en",
+                    "override_model_id": 77,
+                    "rag_group_key": "kb",
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "widget",
+                    "topic": "support"
+                },
+                "preprocessed": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Widget: Using fixed prompt",
+                    "metadata": [],
                     "status": "classified"
                 },
                 {

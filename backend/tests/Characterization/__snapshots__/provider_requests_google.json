@@ -1,0 +1,2557 @@
+{
+    "chat.conversation_with_tools": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "You are terse."
+                                },
+                                {
+                                    "text": "What is the weather in Berlin?"
+                                }
+                            ],
+                            "role": "user"
+                        },
+                        {
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "args": {
+                                            "city": "Berlin"
+                                        },
+                                        "name": "get_weather"
+                                    }
+                                }
+                            ],
+                            "role": "model"
+                        },
+                        {
+                            "parts": [
+                                {
+                                    "functionResponse": {
+                                        "name": "get_weather",
+                                        "response": {
+                                            "content": "{\"temp\":18}"
+                                        }
+                                    }
+                                },
+                                {
+                                    "text": "And this photo?"
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                },
+                                {
+                                    "text": "Thanks."
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    },
+                    "toolConfig": {
+                        "functionCallingConfig": {
+                            "mode": "AUTO"
+                        }
+                    },
+                    "tools": [
+                        {
+                            "functionDeclarations": [
+                                {
+                                    "description": "Current weather for a city",
+                                    "name": "get_weather",
+                                    "parametersJsonSchema": {
+                                        "properties": {
+                                            "city": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "city"
+                                        ],
+                                        "type": "object"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "body_sha1": "19da0c7a39eebaaf845ca178d0e2b7f40d356ef5",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 851",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            }
+        ],
+        "result": {
+            "content": "Let me check.",
+            "finish_reason": "tool_calls",
+            "tool_calls": [
+                {
+                    "function": {
+                        "arguments": "{\"city\":\"Berlin\"}",
+                        "name": "get_weather"
+                    },
+                    "id": "call_<random>",
+                    "type": "function"
+                }
+            ],
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 2,
+                "completion_tokens": 5,
+                "prompt_tokens": 12,
+                "total_tokens": 17
+            }
+        }
+    },
+    "chat.finish_safety": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "block_reason": "SAFETY",
+                "text_response": "I cannot help with that."
+            },
+            "message": "Content blocked by google (SAFETY)",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Something unsafe"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "fbf5d765656095043bbb0519fc87db18d8875a6b",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 152",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            }
+        ]
+    },
+    "chat.http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "error_code": 400,
+                "error_type": null,
+                "stage": "chat",
+                "status_code": 400
+            },
+            "message": "Google chat error: HTTP 400 returned for \"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent\".",
+            "previous": "ClientException",
+            "provider": "google",
+            "upstream_status": 400
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hello"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "23fcf4849a54f013bc2ec336eb4e397849290cea",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 141",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            }
+        ]
+    },
+    "chat.no_key": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "env_var": "GOOGLE_GEMINI_API_KEY",
+                "provider_type": "external",
+                "setup_instructions": "Add GOOGLE_GEMINI_API_KEY=your-api-key to your .env.local file"
+            },
+            "message": "API key not configured for provider 'google'. Please set the GOOGLE_GEMINI_API_KEY environment variable.",
+            "provider": "google",
+            "upstream_status": null
+        }
+    },
+    "chat.no_model": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Model must be specified in options",
+            "provider": "google",
+            "upstream_status": null
+        }
+    },
+    "chat.prompt_blocked": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "block_reason": "PROHIBITED_CONTENT",
+                "text_response": null
+            },
+            "message": "Content blocked by google (PROHIBITED_CONTENT)",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Something prohibited"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "bb883245e757de5e537a6c441dc953d5cb8c7c12",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 156",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            }
+        ]
+    },
+    "chat.structured_output": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Sort this."
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "responseJsonSchema": {
+                            "properties": {
+                                "topic": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "topic"
+                            ],
+                            "type": "object"
+                        },
+                        "responseMimeType": "application/json",
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "d49b0754d0198abce519cbaa9f588c185246e587",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 286",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            }
+        ],
+        "result": {
+            "content": "{\"topic\":\"weather\"}",
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 0,
+                "prompt_tokens": 0,
+                "total_tokens": 0
+            }
+        }
+    },
+    "chat.text": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "You are terse."
+                                },
+                                {
+                                    "text": "Weather in Berlin?"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 256,
+                        "temperature": 0.2,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "0ef6bfd592d20e115cdff5beea1837b248541aa3",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 179",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            }
+        ],
+        "result": {
+            "content": "Berlin is sunny.",
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 2,
+                "completion_tokens": 5,
+                "prompt_tokens": 12,
+                "total_tokens": 17
+            }
+        }
+    },
+    "image.edit": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Edit this image: Add a hat"
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ]
+                },
+                "body_sha1": "bb120fa173f8e98e7ba334784247ccf429841b13",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 223",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent"
+            }
+        ],
+        "result": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+    },
+    "image.edit_no_image": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google image edit error: No image returned from Google",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Edit this image: Add a hat"
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ]
+                },
+                "body_sha1": "bb120fa173f8e98e7ba334784247ccf429841b13",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 223",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent"
+            }
+        ]
+    },
+    "image.explicit_imagen_api": {
+        "error": {
+            "class": "NoImageException",
+            "context": {
+                "finish_reason": null,
+                "model": "gemini-2.5-flash-image",
+                "text_response": null
+            },
+            "message": "Google returned no image (gemini-2.5-flash-image)",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "instances": [
+                        {
+                            "prompt": "A lighthouse"
+                        }
+                    ],
+                    "parameters": {
+                        "aspectRatio": "1:1",
+                        "sampleCount": 1
+                    }
+                },
+                "body_sha1": "1bc00a56b9f415ab1dbd1c151bbc4db37cc6f604",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 92",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:predict"
+            }
+        ]
+    },
+    "image.gemini_default_model": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "A red bicycle"
+                                }
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "imageConfig": {
+                            "aspectRatio": "16:9"
+                        },
+                        "responseModalities": [
+                            "TEXT",
+                            "IMAGE"
+                        ]
+                    }
+                },
+                "body_sha1": "2644976ea87f90f2f7274c0c9301b3fdd76c883b",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 147",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent"
+            }
+        ],
+        "result": [
+            {
+                "revised_prompt": "A red bicycle",
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+            }
+        ]
+    },
+    "image.gemini_pic2pic": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Make it blue"
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "imageConfig": {
+                            "aspectRatio": "1:1"
+                        },
+                        "responseModalities": [
+                            "TEXT",
+                            "IMAGE"
+                        ]
+                    }
+                },
+                "body_sha1": "34d99ae72ecba1253e4dd7b1376dc7e5dc29d809",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 435",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent"
+            }
+        ],
+        "result": [
+            {
+                "revised_prompt": "Make it blue",
+                "url": "data:image/webp;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+            }
+        ]
+    },
+    "image.gemini_text_only": {
+        "error": {
+            "class": "NoImageException",
+            "context": {
+                "finish_reason": "STOP",
+                "model": "gemini-2.5-flash-image",
+                "text_response": "The photo shows a cat."
+            },
+            "message": "Google returned text instead of an image (gemini-2.5-flash-image): \"The photo shows a cat.\"",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "What is in the photo?"
+                                }
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseModalities": [
+                            "TEXT",
+                            "IMAGE"
+                        ]
+                    }
+                },
+                "body_sha1": "edccd81099e5b985a5007cd0bed1795217fd6468",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 118",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent"
+            }
+        ]
+    },
+    "image.http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google Gemini image generation error: HTTP 404 returned for \"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent\".",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "A red bicycle"
+                                }
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseModalities": [
+                            "TEXT",
+                            "IMAGE"
+                        ]
+                    }
+                },
+                "body_sha1": "4fe916d3b782604535ff984a0b6fb87522a03932",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 110",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent"
+            }
+        ]
+    },
+    "image.imagen_filtered": {
+        "error": {
+            "class": "NoImageException",
+            "context": {
+                "block_reason": "SAFETY",
+                "model": "imagen-4.0-generate-001",
+                "text_response": "The prompt names a real person."
+            },
+            "message": "Google filtered the generated image (imagen-4.0-generate-001): \"The prompt names a real person.\"",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "instances": [
+                        {
+                            "prompt": "A famous actor"
+                        }
+                    ],
+                    "parameters": {
+                        "aspectRatio": "1:1",
+                        "sampleCount": 1
+                    }
+                },
+                "body_sha1": "f98d10d8cc2562799ce3a04b3a9a4af608892a9e",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 94",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict"
+            }
+        ]
+    },
+    "image.imagen_gemini_api": {
+        "requests": [
+            {
+                "body": {
+                    "instances": [
+                        {
+                            "prompt": "A lighthouse"
+                        }
+                    ],
+                    "parameters": {
+                        "aspectRatio": "1:1",
+                        "sampleCount": 2
+                    }
+                },
+                "body_sha1": "49e5fb5d80e6afc32b636a95c5746c251229491f",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 92",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict"
+            }
+        ],
+        "result": [
+            {
+                "revised_prompt": null,
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+            },
+            {
+                "revised_prompt": null,
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+            }
+        ]
+    },
+    "image.imagen_vertex": {
+        "requests": [
+            {
+                "body": {
+                    "instances": [
+                        {
+                            "prompt": "A lighthouse"
+                        }
+                    ],
+                    "parameters": {
+                        "aspectRatio": "4:3",
+                        "sampleCount": 1
+                    }
+                },
+                "body_sha1": "5cd1ca808799f6f3f9477b367314e3a717113562",
+                "headers": [
+                    "Accept: */*",
+                    "Authorization: Bearer <secret>",
+                    "Content-Length: 92",
+                    "Content-Type: application/json"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://europe-west4-aiplatform.googleapis.com/v1/projects/synaplan-test/locations/europe-west4/publishers/google/models/imagen-4.0-generate-001:predict"
+            }
+        ],
+        "result": [
+            {
+                "revised_prompt": null,
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+            },
+            {
+                "revised_prompt": null,
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=="
+            }
+        ]
+    },
+    "image.no_key": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "env_var": "GOOGLE_GEMINI_API_KEY",
+                "provider_type": "external",
+                "setup_instructions": "Add GOOGLE_GEMINI_API_KEY=your-api-key to your .env.local file"
+            },
+            "message": "API key not configured for provider 'google'. Please set the GOOGLE_GEMINI_API_KEY environment variable.",
+            "provider": "google",
+            "upstream_status": null
+        }
+    },
+    "image.variations": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Image variations not supported by Google Imagen",
+            "provider": "google",
+            "upstream_status": null
+        }
+    },
+    "meta.with_key": {
+        "result": {
+            "available": true,
+            "capabilities": [
+                "chat",
+                "embedding",
+                "vision",
+                "image_generation",
+                "video_generation",
+                "speech_to_text",
+                "text_to_speech"
+            ],
+            "default_models": [],
+            "description": "Gemini models with multimodal capabilities including video",
+            "display_name": "Google AI",
+            "name": "google",
+            "required_env": {
+                "GOOGLE_GEMINI_API_KEY": {
+                    "any_of": [
+                        "GOOGLE_GEMINI_API_KEY",
+                        "GEMINI_API_KEY",
+                        "GOOGLE_API_KEY"
+                    ],
+                    "hint": "Get your API key from https://aistudio.google.com/app/apikey",
+                    "required": true
+                }
+            },
+            "status": {
+                "active_connections": 0,
+                "error_rate": 0,
+                "healthy": true,
+                "latency_ms": 100
+            },
+            "stream_content_type": "audio/wav",
+            "streams_speech": false,
+            "tool_calling": {
+                "gemini-2.5-flash": true,
+                "not-in-catalog": true
+            },
+            "voices": []
+        }
+    },
+    "meta.without_key": {
+        "result": {
+            "available": false,
+            "capabilities": [
+                "chat",
+                "embedding",
+                "vision",
+                "image_generation",
+                "video_generation",
+                "speech_to_text",
+                "text_to_speech"
+            ],
+            "default_models": [],
+            "description": "Gemini models with multimodal capabilities including video",
+            "display_name": "Google AI",
+            "name": "google",
+            "required_env": {
+                "GOOGLE_GEMINI_API_KEY": {
+                    "any_of": [
+                        "GOOGLE_GEMINI_API_KEY",
+                        "GEMINI_API_KEY",
+                        "GOOGLE_API_KEY"
+                    ],
+                    "hint": "Get your API key from https://aistudio.google.com/app/apikey",
+                    "required": true
+                }
+            },
+            "status": {
+                "error": "API key not configured",
+                "healthy": false
+            },
+            "stream_content_type": "audio/wav",
+            "streams_speech": false,
+            "tool_calling": {
+                "gemini-2.5-flash": true,
+                "not-in-catalog": true
+            },
+            "voices": []
+        }
+    },
+    "speech.no_key": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "env_var": "GOOGLE_GEMINI_API_KEY",
+                "provider_type": "external",
+                "setup_instructions": "Add GOOGLE_GEMINI_API_KEY=your-api-key to your .env.local file"
+            },
+            "message": "API key not configured for provider 'google'. Please set the GOOGLE_GEMINI_API_KEY environment variable.",
+            "provider": "google",
+            "upstream_status": null
+        }
+    },
+    "speech.synthesize_http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google TTS error: Google Gemini TTS API error (HTTP 429): {\"error\":{\"code\":429,\"message\":\"Rate limited.\"}}",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hallo Welt"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseModalities": [
+                            "AUDIO"
+                        ],
+                        "speechConfig": {
+                            "voiceConfig": {
+                                "prebuiltVoiceConfig": {
+                                    "voiceName": "Kore"
+                                }
+                            }
+                        }
+                    }
+                },
+                "body_sha1": "0b8a9e07c6125b5793ce73eec522a896f557cd19",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 190",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "max_duration": 300,
+                "method": "POST",
+                "timeout": 240,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+            }
+        ]
+    },
+    "speech.synthesize_mp3_snake_case": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hallo Welt"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseModalities": [
+                            "AUDIO"
+                        ],
+                        "speechConfig": {
+                            "voiceConfig": {
+                                "prebuiltVoiceConfig": {
+                                    "voiceName": "Kore"
+                                }
+                            }
+                        }
+                    }
+                },
+                "body_sha1": "0b8a9e07c6125b5793ce73eec522a896f557cd19",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 190",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "max_duration": 300,
+                "method": "POST",
+                "timeout": 240,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+            }
+        ],
+        "result": {
+            "bytes": 13,
+            "filename": "tts_<unique>.mp3",
+            "head": "4944332d6d70332d62797465",
+            "sha1": "e9cff817fa6965e16c75ecf339c585bc9a3dd9bc"
+        }
+    },
+    "speech.synthesize_no_audio": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google TTS error: No audio data returned from Gemini TTS",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hallo Welt"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseModalities": [
+                            "AUDIO"
+                        ],
+                        "speechConfig": {
+                            "voiceConfig": {
+                                "prebuiltVoiceConfig": {
+                                    "voiceName": "Kore"
+                                }
+                            }
+                        }
+                    }
+                },
+                "body_sha1": "0b8a9e07c6125b5793ce73eec522a896f557cd19",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 190",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "max_duration": 300,
+                "method": "POST",
+                "timeout": 240,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+            }
+        ]
+    },
+    "speech.synthesize_pcm": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hallo Welt"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseModalities": [
+                            "AUDIO"
+                        ],
+                        "speechConfig": {
+                            "voiceConfig": {
+                                "prebuiltVoiceConfig": {
+                                    "voiceName": "Puck"
+                                }
+                            }
+                        }
+                    }
+                },
+                "body_sha1": "ed2b4891302aa5a25f25ed260dbbacbeb7b72040",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 190",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "max_duration": 300,
+                "method": "POST",
+                "timeout": 240,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent"
+            }
+        ],
+        "result": {
+            "bytes": 364,
+            "filename": "tts_<unique>.wav",
+            "head": "524946466401000057415645",
+            "sha1": "3c4efa727ec30b821879d504c8bc5ccbfa4b6248"
+        }
+    },
+    "speech.synthesize_stream": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hallo Welt"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseModalities": [
+                            "AUDIO"
+                        ],
+                        "speechConfig": {
+                            "voiceConfig": {
+                                "prebuiltVoiceConfig": {
+                                    "voiceName": "Kore"
+                                }
+                            }
+                        }
+                    }
+                },
+                "body_sha1": "0b8a9e07c6125b5793ce73eec522a896f557cd19",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 190",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "max_duration": 300,
+                "method": "POST",
+                "timeout": 240,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+            }
+        ],
+        "result": {
+            "chunks": [
+                8192,
+                3852
+            ],
+            "files_left": 0,
+            "sha1": "025644135036f36d4aee6212580488306feaff44"
+        }
+    },
+    "speech.transcribe_audio_tokens": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "data": "UklGRmQGAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YUAGAAABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEA",
+                                        "mimeType": "audio/wav"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ]
+                },
+                "body_sha1": "9e922babba5bf3b947dcbef54119191816e52f9c",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 2283",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 180,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-transcribe:generateContent"
+            }
+        ],
+        "result": {
+            "duration": 2,
+            "language": "de",
+            "segments": [],
+            "text": "Hallo Welt"
+        }
+    },
+    "speech.transcribe_http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google Gemini Transcribe API error (HTTP 500): {\"error\":{\"code\":500,\"message\":\"Internal error.\"}}",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "data": "UklGRmQGAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YUAGAAABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEA",
+                                        "mimeType": "audio/wav"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ]
+                },
+                "body_sha1": "9e922babba5bf3b947dcbef54119191816e52f9c",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 2283",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 180,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-transcribe:generateContent"
+            }
+        ]
+    },
+    "speech.transcribe_missing_file": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Audio file not found: <uploads>/missing.wav",
+            "provider": "google",
+            "upstream_status": null
+        }
+    },
+    "speech.transcribe_mp3_without_usage": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google Gemini Transcribe response omitted audio token usage, and local duration fallback is not implemented for non-WAV format: voice.mp3",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "data": "SUQzLXRlc3QtYXVkaW8=",
+                                        "mimeType": "audio/mpeg"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ]
+                },
+                "body_sha1": "661be5df515ab36bd691b0bf8a09fb7577421f5d",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 112",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 180,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-transcribe:generateContent"
+            }
+        ]
+    },
+    "speech.transcribe_wav_duration": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "data": "UklGRmQGAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YUAGAAABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEAAQABAAEA",
+                                        "mimeType": "audio/wav"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ]
+                },
+                "body_sha1": "9e922babba5bf3b947dcbef54119191816e52f9c",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 2283",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 180,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-transcribe:generateContent"
+            }
+        ],
+        "result": {
+            "duration": 0.05,
+            "language": "unknown",
+            "segments": [],
+            "text": "Hallo Welt"
+        }
+    },
+    "speech.translate": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google Gemini Transcribe has no dedicated translate mode. Use transcribe() and translate the text with a chat model instead.",
+            "provider": "google",
+            "upstream_status": null
+        }
+    },
+    "stream.blocked_mid_stream": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "block_reason": "RECITATION",
+                "text_response": ""
+            },
+            "message": "Content blocked by google (RECITATION)",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "events": [
+            "Here is"
+        ],
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Recite a song."
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "c589365b775136d0e897995831a2b941b2d11b41",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 150",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+            }
+        ]
+    },
+    "stream.http_error": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hello"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "23fcf4849a54f013bc2ec336eb4e397849290cea",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 141",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+            }
+        ],
+        "result": {
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 0,
+                "prompt_tokens": 0,
+                "total_tokens": 0
+            }
+        }
+    },
+    "stream.legacy_reasoning_flag": {
+        "events": [
+            "Done.",
+            {
+                "finish_reason": "stop",
+                "type": "finish"
+            }
+        ],
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Think."
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 1,
+                        "thinkingConfig": {
+                            "thinkingBudget": 8192
+                        },
+                        "topK": 10,
+                        "topP": 0.5
+                    }
+                },
+                "body_sha1": "d6d020c962898f772b722f012f45b7bfe54c69aa",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 182",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+            }
+        ],
+        "result": {
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 0,
+                "prompt_tokens": 0,
+                "total_tokens": 0
+            }
+        }
+    },
+    "stream.no_key": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "env_var": "GOOGLE_GEMINI_API_KEY",
+                "provider_type": "external",
+                "setup_instructions": "Add GOOGLE_GEMINI_API_KEY=your-api-key to your .env.local file"
+            },
+            "message": "API key not configured for provider 'google'. Please set the GOOGLE_GEMINI_API_KEY environment variable.",
+            "provider": "google",
+            "upstream_status": null
+        }
+    },
+    "stream.overloaded": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hello"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "23fcf4849a54f013bc2ec336eb4e397849290cea",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 141",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+            },
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hello"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "23fcf4849a54f013bc2ec336eb4e397849290cea",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 141",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+            }
+        ],
+        "result": {
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 0,
+                "prompt_tokens": 0,
+                "total_tokens": 0
+            }
+        }
+    },
+    "stream.pro_thinking_off_structured_max_tokens": {
+        "events": [
+            "{\"topic\":",
+            {
+                "finish_reason": "length",
+                "type": "finish"
+            }
+        ],
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Sort this."
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 64,
+                        "responseJsonSchema": {
+                            "type": "object"
+                        },
+                        "responseMimeType": "application/json",
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "3c141403bd5150fd8f21984ca7308f0ecb8bbffc",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 222",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse"
+            }
+        ],
+        "result": {
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 0,
+                "prompt_tokens": 0,
+                "total_tokens": 0
+            }
+        }
+    },
+    "stream.retry_once_on_503": {
+        "events": [
+            "Back again.",
+            {
+                "finish_reason": "stop",
+                "type": "finish"
+            }
+        ],
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hello"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "23fcf4849a54f013bc2ec336eb4e397849290cea",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 141",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+            },
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Hello"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "23fcf4849a54f013bc2ec336eb4e397849290cea",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 141",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+            }
+        ],
+        "result": {
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 0,
+                "prompt_tokens": 0,
+                "total_tokens": 0
+            }
+        }
+    },
+    "stream.text_reasoning_usage": {
+        "events": [
+            {
+                "content": "Thinking about the sky.",
+                "type": "reasoning"
+            },
+            "Berlin is ",
+            "sunny.",
+            {
+                "finish_reason": "stop",
+                "type": "finish"
+            }
+        ],
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Weather in Berlin?"
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "thinkingConfig": {
+                            "thinkingBudget": 512
+                        },
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "9a37038ee5160cd9da65e4ca3c6faabd802796a6",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 194",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+            }
+        ],
+        "result": {
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 7,
+                "prompt_tokens": 20,
+                "total_tokens": 27
+            }
+        }
+    },
+    "stream.thinking_budget_passthrough": {
+        "events": [
+            "Done.",
+            {
+                "finish_reason": "stop",
+                "type": "finish"
+            }
+        ],
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Think hard."
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "thinkingConfig": {
+                            "thinkingBudget": 2048
+                        },
+                        "topK": 40,
+                        "topP": 0.95
+                    }
+                },
+                "body_sha1": "3e69c1ddf1ae8edd6a3253acccdc69e4a0342c49",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 188",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent?alt=sse"
+            }
+        ],
+        "result": {
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 0,
+                "completion_tokens": 0,
+                "prompt_tokens": 0,
+                "total_tokens": 0
+            }
+        }
+    },
+    "stream.tool_call": {
+        "events": [
+            {
+                "arguments": "{\"city\":\"Paris\"}",
+                "id": "call_<random>",
+                "index": 0,
+                "name": "get_weather",
+                "type": "tool_call_delta"
+            },
+            {
+                "finish_reason": "tool_calls",
+                "type": "finish"
+            }
+        ],
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "You are terse."
+                                },
+                                {
+                                    "text": "What is the weather in Berlin?"
+                                }
+                            ],
+                            "role": "user"
+                        },
+                        {
+                            "parts": [
+                                {
+                                    "functionCall": {
+                                        "args": {
+                                            "city": "Berlin"
+                                        },
+                                        "name": "get_weather"
+                                    }
+                                }
+                            ],
+                            "role": "model"
+                        },
+                        {
+                            "parts": [
+                                {
+                                    "functionResponse": {
+                                        "name": "get_weather",
+                                        "response": {
+                                            "content": "{\"temp\":18}"
+                                        }
+                                    }
+                                },
+                                {
+                                    "text": "And this photo?"
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                },
+                                {
+                                    "text": "Thanks."
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 4096,
+                        "temperature": 0.7,
+                        "topK": 40,
+                        "topP": 0.95
+                    },
+                    "toolConfig": {
+                        "functionCallingConfig": {
+                            "mode": "ANY"
+                        }
+                    },
+                    "tools": [
+                        {
+                            "functionDeclarations": [
+                                {
+                                    "description": "Current weather for a city",
+                                    "name": "get_weather",
+                                    "parametersJsonSchema": {
+                                        "properties": {
+                                            "city": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "city"
+                                        ],
+                                        "type": "object"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "body_sha1": "824e09e64a15f303f7e2667416ec9bc925cbef98",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 850",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse"
+            }
+        ],
+        "result": {
+            "usage": {
+                "cache_creation_tokens": 0,
+                "cached_tokens": 4,
+                "completion_tokens": 7,
+                "prompt_tokens": 20,
+                "total_tokens": 27
+            }
+        }
+    },
+    "video.cancel_omni_failed": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "DELETE",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/interactions/int-77"
+            }
+        ],
+        "result": null
+    },
+    "video.cancel_veo": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview/operations/op-1:cancel"
+            }
+        ],
+        "result": null
+    },
+    "video.download": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 120,
+                "url": "https://generativelanguage.googleapis.com/v1beta/files/vid-1:download?alt=media"
+            }
+        ],
+        "result": "data:video/mp4;base64,bXA0LWJ5dGVz"
+    },
+    "video.download_raw_inline": {
+        "result": "inline-bytes"
+    },
+    "video.generate_cancelled": {
+        "error": {
+            "class": "ProviderCancelledException",
+            "context": {
+                "operation": "models/veo-3.1-generate-preview/operations/op-9"
+            },
+            "message": "Google Veo video generation cancelled",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "instances": [
+                        {
+                            "prompt": "A drone shot"
+                        }
+                    ],
+                    "parameters": {
+                        "aspectRatio": "16:9",
+                        "durationSeconds": 8,
+                        "resolution": "1080p"
+                    }
+                },
+                "body_sha1": "45952226005b3430d0a817647812061f78515fb2",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 118",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning"
+            },
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview/operations/op-9:cancel"
+            }
+        ]
+    },
+    "video.no_key": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "env_var": "GOOGLE_GEMINI_API_KEY",
+                "provider_type": "external",
+                "setup_instructions": "Add GOOGLE_GEMINI_API_KEY=your-api-key to your .env.local file"
+            },
+            "message": "API key not configured for provider 'google'. Please set the GOOGLE_GEMINI_API_KEY environment variable.",
+            "provider": "google",
+            "upstream_status": null
+        }
+    },
+    "video.omni_poll_done": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/interactions/int-77"
+            }
+        ],
+        "result": {
+            "done": true,
+            "error": null,
+            "videoUri": "https://example.test/final.mp4"
+        }
+    },
+    "video.omni_poll_failed": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/interactions/int-77"
+            }
+        ],
+        "result": {
+            "done": true,
+            "error": "Quota exhausted.",
+            "videoUri": null
+        }
+    },
+    "video.omni_poll_inline": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/interactions/int-77"
+            }
+        ],
+        "result": {
+            "done": true,
+            "error": null,
+            "videoUri": "data:video/mp4;base64,b21uaS1ieXRlcw=="
+        }
+    },
+    "video.omni_poll_running": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/interactions/int-77"
+            }
+        ],
+        "result": {
+            "done": false,
+            "error": null,
+            "videoUri": null
+        }
+    },
+    "video.omni_start": {
+        "requests": [
+            {
+                "body": {
+                    "background": true,
+                    "input": "A cat on a skateboard",
+                    "model": "gemini-omni-flash",
+                    "response_format": {
+                        "aspect_ratio": "16:9",
+                        "duration": "10s",
+                        "resolution": "720p",
+                        "type": "video"
+                    },
+                    "store": true
+                },
+                "body_sha1": "2631c99dd2c70ad7b680e350d5e436a53658a8c8",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 186",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/interactions"
+            }
+        ],
+        "result": {
+            "duration": 10,
+            "model": "gemini-omni-flash",
+            "operationName": "interactions/int-77",
+            "resolution": "720p"
+        }
+    },
+    "video.veo_poll_done": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview/operations/op-1"
+            }
+        ],
+        "result": {
+            "done": true,
+            "error": null,
+            "videoUri": "https://generativelanguage.googleapis.com/v1beta/files/vid-1:download?alt=media"
+        }
+    },
+    "video.veo_poll_failed": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview/operations/op-1"
+            }
+        ],
+        "result": {
+            "done": true,
+            "error": "Invalid argument. (code: 3)",
+            "videoUri": null
+        }
+    },
+    "video.veo_poll_no_uri": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview/operations/op-1"
+            }
+        ],
+        "result": {
+            "done": true,
+            "error": "No video URI in completed operation response",
+            "videoUri": null
+        }
+    },
+    "video.veo_poll_rai_filtered": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "block_reason": "SAFETY",
+                "text_response": "We can't create videos with real people's likenesses."
+            },
+            "message": "Content blocked by google (SAFETY)",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview/operations/op-1"
+            }
+        ]
+    },
+    "video.veo_poll_running": {
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview/operations/op-1"
+            }
+        ],
+        "result": {
+            "done": false,
+            "error": null,
+            "videoUri": null
+        }
+    },
+    "video.veo_poll_safety_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": {
+                "block_reason": "SAFETY",
+                "text_response": "Blocked by safety filters."
+            },
+            "message": "Content blocked by google (SAFETY)",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "headers": [
+                    "Accept: */*",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "GET",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview/operations/op-1"
+            }
+        ]
+    },
+    "video.veo_start": {
+        "requests": [
+            {
+                "body": {
+                    "instances": [
+                        {
+                            "prompt": "A drone shot over a lake"
+                        }
+                    ],
+                    "parameters": {
+                        "aspectRatio": "9:16",
+                        "durationSeconds": 4,
+                        "resolution": "4k"
+                    }
+                },
+                "body_sha1": "36072f8e4f4284bc1386daa1d935b6d28798b969",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 127",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning"
+            }
+        ],
+        "result": {
+            "duration": 4,
+            "model": "veo-3.1-generate-preview",
+            "operationName": "models/veo-3.1-generate-preview/operations/op-1",
+            "resolution": "4K"
+        }
+    },
+    "video.veo_start_disallowed_resolution": {
+        "requests": [
+            {
+                "body": {
+                    "instances": [
+                        {
+                            "prompt": "A drone shot"
+                        }
+                    ],
+                    "parameters": {
+                        "aspectRatio": "16:9",
+                        "durationSeconds": 6,
+                        "resolution": "720p"
+                    }
+                },
+                "body_sha1": "7b6757db36ebaba4fbd22db6ffb0cf18be6fa05c",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 117",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning"
+            }
+        ],
+        "result": {
+            "duration": 6,
+            "model": "veo-3.1-generate-preview",
+            "operationName": "models/veo-3.1-generate-preview/operations/op-2",
+            "resolution": "720p"
+        }
+    },
+    "video.veo_start_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google Veo API error (HTTP 400): {\"error\":{\"code\":400,\"message\":\"Unsupported aspect ratio.\"}}",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "instances": [
+                        {
+                            "prompt": "A drone shot"
+                        }
+                    ],
+                    "parameters": {
+                        "aspectRatio": "1:1",
+                        "durationSeconds": 8,
+                        "resolution": "1080p"
+                    }
+                },
+                "body_sha1": "37d1d69a0deef178c7a062416b5620876196a81a",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 117",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 30,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning"
+            }
+        ]
+    },
+    "vision.analyze": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "What is this?"
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 1024
+                    }
+                },
+                "body_sha1": "d2eda09f0f5399ca11adccef4f9e752bbc660dc3",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 254",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            }
+        ],
+        "result": "A single pixel."
+    },
+    "vision.compare": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Compare these two images and describe the similarities and differences."
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ]
+                },
+                "body_sha1": "5479dbcfbbe59d16bf97957c42bfa73607c9b958",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 413",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+            }
+        ],
+        "result": {
+            "comparison": "Both are single pixels.",
+            "image1": "photo.png",
+            "image2": "car.png"
+        }
+    },
+    "vision.explain_default_prompt": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Describe what you see in this image in detail."
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 8192
+                    }
+                },
+                "body_sha1": "0ec28030d3846ff2d50d769bf955d16079cb4f42",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 287",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+            }
+        ],
+        "result": "A tiny image."
+    },
+    "vision.extract_text": {
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Extract all text from this image. Return only the text, nothing else."
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ],
+                    "generationConfig": {
+                        "maxOutputTokens": 8192
+                    }
+                },
+                "body_sha1": "b73e54c1858225ffa458af92f9b6d0c76e81c73b",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 310",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+            }
+        ],
+        "result": ""
+    },
+    "vision.http_error": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google image comparison error: HTTP 403 returned for \"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent\".",
+            "provider": "google",
+            "upstream_status": null
+        },
+        "requests": [
+            {
+                "body": {
+                    "contents": [
+                        {
+                            "parts": [
+                                {
+                                    "text": "Compare these two images and describe the similarities and differences."
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                },
+                                {
+                                    "inline_data": {
+                                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                                        "mime_type": "image/png"
+                                    }
+                                }
+                            ],
+                            "role": "user"
+                        }
+                    ]
+                },
+                "body_sha1": "5479dbcfbbe59d16bf97957c42bfa73607c9b958",
+                "headers": [
+                    "Accept: */*",
+                    "Content-Length: 413",
+                    "Content-Type: application/json",
+                    "x-goog-api-key: <secret>"
+                ],
+                "method": "POST",
+                "timeout": 60,
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
+            }
+        ]
+    },
+    "vision.missing_file": {
+        "error": {
+            "class": "ProviderException",
+            "context": null,
+            "message": "Google vision error: Image file not found: <uploads>/missing.png",
+            "provider": "google",
+            "upstream_status": null
+        }
+    }
+}
