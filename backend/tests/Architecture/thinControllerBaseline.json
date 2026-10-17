@@ -6,7 +6,7 @@
         "methodLines": 50
     },
     "counts": {
-        "methodLines": 106,
+        "methodLines": 105,
         "entityManager": 17,
         "aiFacade": 5
     },
@@ -28,7 +28,6 @@
         "src/Controller/AuthController.php::AuthController::register": 73,
         "src/Controller/AuthController.php::AuthController::resendVerification": 97,
         "src/Controller/ChatController.php::ChatController::getMessages": 79,
-        "src/Controller/ChatController.php::ChatController::update": 53,
         "src/Controller/DesktopController.php::DesktopController::enqueueJob": 75,
         "src/Controller/FileController.php::FileController::checkStale": 69,
         "src/Controller/FileController.php::FileController::indexPrompt": 52,

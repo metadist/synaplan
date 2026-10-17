@@ -559,12 +559,7 @@ class ChatController extends AbstractController
             if (!\is_bool($data['pinned'])) {
                 return $this->json(['error' => 'pinned must be a boolean'], Response::HTTP_BAD_REQUEST);
             }
-            // Pinning is list placement, not activity: updatedAt stays, so an
-            // unpinned chat returns to where it was in the history.
-            if ($data['pinned'] !== $chat->isPinned()) {
-                $chat->setPinned($data['pinned']);
-                $chat->setPinnedAt($data['pinned'] ? new \DateTime() : null);
-            }
+            $chat->pin($data['pinned']);
         }
 
         $this->chatRepository->save($chat);
