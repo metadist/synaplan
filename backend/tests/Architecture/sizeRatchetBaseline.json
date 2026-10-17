@@ -8,9 +8,9 @@
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 54,
-        "constructorParams": 66,
-        "methodLines": 136
+        "fileLines": 53,
+        "constructorParams": 65,
+        "methodLines": 134
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -46,7 +46,6 @@
         "src/Controller/WidgetSessionController.php": 896,
         "src/Mcp/McpServerFactory.php": 1426,
         "src/Repository/MessageRepository.php": 1079,
-        "src/Service/Admin/SystemConfigService.php": 1102,
         "src/Service/Email/InboundEmailHandlerService.php": 1037,
         "src/Service/Feedback/FeedbackExampleService.php": 1225,
         "src/Service/File/FileProcessor.php": 1786,
@@ -98,7 +97,6 @@
         "src/Mcp/McpServerFactory.php::McpServerFactory": 21,
         "src/MessageHandler/AdvanceMediaJobCommandHandler.php::AdvanceMediaJobCommandHandler": 12,
         "src/MessageHandler/ResumeApprovalCommandHandler.php::ResumeApprovalCommandHandler": 11,
-        "src/Service/Admin/SystemConfigService.php::SystemConfigService": 13,
         "src/Service/Agent/AgentCascadeCleanup.php::AgentCascadeCleanup": 11,
         "src/Service/Agent/AgentService.php::AgentService": 11,
         "src/Service/Auth/OidcTokenService.php::OidcTokenService": 12,
@@ -200,8 +198,6 @@
         "src/Mcp/McpServerFactory.php::McpServerFactory::build": 158,
         "src/MessageHandler/ExtractMemoriesCommandHandler.php::ExtractMemoriesCommandHandler::__invoke": 278,
         "src/MessageHandler/ReVectorizeMessageHandler.php::ReVectorizeMessageHandler::__invoke": 107,
-        "src/Service/Admin/SystemConfigService.php::SystemConfigService::getValues": 136,
-        "src/Service/Admin/SystemConfigService.php::SystemConfigService::setValue": 101,
         "src/Service/Config/FeatureStatusReporter.php::FeatureStatusReporter::build": 334,
         "src/Service/Context/ContextCondenser.php::ContextCondenser::fit": 103,
         "src/Service/Digest/DigestSearchService.php::DigestSearchService::search": 108,

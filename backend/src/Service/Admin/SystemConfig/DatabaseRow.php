@@ -12,6 +12,7 @@ namespace App\Service\Admin\SystemConfig;
  */
 final readonly class DatabaseRow
 {
+    public const OWNER = 0;
     public const DEFAULT_GROUP = 'QDRANT_SEARCH';
 
     public function __construct(

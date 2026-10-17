@@ -7,7 +7,11 @@ namespace App\Tests\Support;
 use App\AI\Credential\ProviderKeyStore;
 use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
+use App\Service\Admin\SystemConfig\ComputeSettingGuard;
+use App\Service\Admin\SystemConfig\EnvSettings;
 use App\Service\Admin\SystemConfig\SystemConfigSchema;
+use App\Service\Admin\SystemConfig\SystemConfigValues;
+use App\Service\Admin\SystemConfig\SystemConfigWriter;
 use App\Service\Admin\SystemConfig\Tab\AiTab;
 use App\Service\Admin\SystemConfig\Tab\AuthTab;
 use App\Service\Admin\SystemConfig\Tab\BrandingTab;
@@ -58,22 +62,35 @@ final class SystemConfigServiceFactory
     public static function build(array $doubles): SystemConfigService
     {
         $repository = $doubles['configRepository'];
+        $logger = $doubles['logger'] ?? new NullLogger();
         $encryption = $doubles['encryption'] ?? new EncryptionService('test-secret', new NullLogger());
+        $schema = self::schema($repository, $doubles['modules'] ?? null);
+        $env = new EnvSettings($doubles['projectDir'] ?? sys_get_temp_dir(), $logger);
 
         return new SystemConfigService(
-            projectDir: $doubles['projectDir'] ?? sys_get_temp_dir(),
-            logger: $doubles['logger'] ?? new NullLogger(),
-            configRepository: $repository,
+            schema: $schema,
+            values: new SystemConfigValues(
+                $schema,
+                $repository,
+                $doubles['providerKeyStore'] ?? new ProviderKeyStore($repository, $encryption, new NullLogger()),
+                $env,
+                new RegistrationConfig($repository),
+                new GuestChatConfig($repository),
+                $doubles['featureFlagEnv'] ?? new FeatureFlagEnv(),
+                $doubles['chatArtifactsConfig'] ?? null,
+            ),
+            writer: new SystemConfigWriter(
+                $schema,
+                $repository,
+                $encryption,
+                $env,
+                new ComputeSettingGuard($repository, $doubles['computeClient'] ?? null),
+                $logger,
+                $doubles['layeredConfigResolver'] ?? null,
+            ),
+            env: $env,
+            logger: $logger,
             defaultTtsUrl: self::TTS_URL,
-            providerKeyStore: $doubles['providerKeyStore'] ?? new ProviderKeyStore($repository, $encryption, new NullLogger()),
-            encryption: $encryption,
-            registrationConfig: new RegistrationConfig($repository),
-            guestChatConfig: new GuestChatConfig($repository),
-            featureFlagEnv: $doubles['featureFlagEnv'] ?? new FeatureFlagEnv(),
-            schema: self::schema($repository, $doubles['modules'] ?? null),
-            layeredConfigResolver: $doubles['layeredConfigResolver'] ?? null,
-            computeClient: $doubles['computeClient'] ?? null,
-            chatArtifactsConfig: $doubles['chatArtifactsConfig'] ?? null,
         );
     }
 
