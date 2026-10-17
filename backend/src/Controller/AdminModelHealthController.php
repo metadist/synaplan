@@ -13,7 +13,6 @@ use App\Entity\ModelHealth;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -47,7 +46,6 @@ final class AdminModelHealthController extends AbstractController
         private readonly ModelHealthConfig $config,
         private readonly ModelRepository $modelRepository,
         private readonly ModelConfigService $modelConfigService,
-        private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -268,8 +266,7 @@ final class AdminModelHealthController extends AbstractController
         $health = $this->healthRepository->findOrCreate($id);
         $until = $payload['exempt'] ? time() + $this->config->suppressionSeconds() : 0;
         $health->setSuppressUntil($until)->setUpdated(time());
-
-        $this->entityManager->flush();
+        $this->healthRepository->save($health);
         $this->modelConfigService->invalidateModelHealth();
 
         $this->logger->info('Automatic disabling exemption changed', [
@@ -326,7 +323,7 @@ final class AdminModelHealthController extends AbstractController
                 ->setKind(null)
                 ->setMessage(null)
                 ->setUpdated(time());
-            $this->entityManager->flush();
+            $this->healthRepository->save($health);
         }
 
         $this->modelConfigService->invalidateModelHealth();
