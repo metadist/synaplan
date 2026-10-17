@@ -744,6 +744,24 @@ final class SystemConfigServiceTest extends TestCase
         }
     }
 
+    /**
+     * Reading a secret returns the mask, so a form submitted unchanged sends
+     * it back. Storing that would destroy a working secret, in BCONFIG or in
+     * .env alike.
+     */
+    public function testTheMaskSentBackForASecretIsRefusedAndNothingIsStored(): void
+    {
+        $this->configRepository->expects($this->never())->method('setValue');
+        $this->configRepository->expects($this->never())->method('deleteValue');
+
+        foreach (['M365_CLIENT_SECRET', 'RECAPTCHA_SECRET_KEY'] as $key) {
+            $result = $this->service->setValue($key, '••••••••');
+
+            $this->assertFalse($result['success'], $key);
+            $this->assertStringContainsString('masked placeholder', $result['message'] ?? '', $key);
+        }
+    }
+
     public function testEmptyBrandColorDeletesTheStoredRow(): void
     {
         $this->configRepository->expects($this->once())

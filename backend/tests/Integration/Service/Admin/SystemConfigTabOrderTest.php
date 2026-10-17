@@ -7,13 +7,15 @@ namespace App\Tests\Integration\Service\Admin;
 use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfig\SystemConfigSchema;
+use App\Service\Admin\SystemConfig\SystemConfigValues;
+use App\Service\Admin\SystemConfigService;
 use App\Tests\Support\SystemConfigServiceFactory;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * The settings tabs as the container collects them: in the established
- * order, every field in exactly one section, and the same tabs the test
- * factory builds.
+ * The settings as the container wires them: the tabs in the established
+ * order, every field in exactly one section, the same tabs the test factory
+ * builds, and a service that shows every field and no secret.
  */
 final class SystemConfigTabOrderTest extends KernelTestCase
 {
@@ -46,6 +48,21 @@ final class SystemConfigTabOrderTest extends KernelTestCase
         $built = SystemConfigServiceFactory::schema($container->get(ConfigRepository::class), $container->get(ModuleRegistry::class));
 
         self::assertSame(array_keys($this->schema()->fields()), array_keys($built->fields()));
+    }
+
+    public function testTheContainersServiceShowsEveryFieldAndNoSecret(): void
+    {
+        $service = static::getContainer()->get(SystemConfigService::class);
+        $fields = $service->getSchema()['fields'];
+        $values = $service->getValues();
+
+        self::assertSame(array_keys($this->schema()->fields()), array_keys($fields));
+        self::assertSame(array_keys($fields), array_keys($values));
+        foreach ($fields as $key => $field) {
+            if ($field['sensitive']) {
+                self::assertContains($values[$key]['value'], [SystemConfigValues::MASK, $field['default']], $key);
+            }
+        }
     }
 
     private function schema(): SystemConfigSchema
