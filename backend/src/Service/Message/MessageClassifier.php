@@ -37,23 +37,23 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Message Classifier.
+ * Decides where a message goes, as a cascade in the order it runs:
  *
- * High-level classifier that handles:
- * 1. Check for "Again" function (user-selected AI/prompt via BMESSAGEMETA)
- * 2. Check for tool commands (e.g., /pic, /vid, /search)
- * 3. Document or audio attachment → analyzefile / file_analysis (skip sorting, #595)
- * 4. Embedding-router cascade match against the four SYSTEM topics (Phase 8,
- *    skip sorting when confident — see {@see EmbeddingRouterService})
- * 5. Defer the decision to the answering call itself (Phase 9, default OFF —
- *    see {@see NativeToolRoutingConfig} and {@see Routing\RoutingToolset})
- * 6. Use MessageSorter for AI-based classification
+ * 1. slash commands — a bare /pic, /vid or /search answers with its usage
+ *    hint, even for a pinned assistant (#2280);
+ * 2. an agent pin — the assistant's topic, with only the sorter's web vote;
+ * 3. /docs <query> without a pin — knowledge search;
+ * 4. the fast path (CLASSIFIER.FAST_PATH_ENABLED, off by default);
+ * 5. Again — a prompt or a model the user picked (BMESSAGEMETA);
+ * 6. document, audio and video attachments — file analysis (#595, #722);
+ * 7. the embedding router (Phase 8, off by default);
+ * 8. the deferral to the answering call (Phase 9, off by default);
+ * 9. the AI sorter (DEFAULTMODEL.SORT), then the overlays on its verdict:
+ *    media type, the describe reroute, code execution, spoken output, forced
+ *    web search, duration, resolution, input mode.
  *
- * Workflow from legacy:
- * - If BMESSAGEMETA has PROMPTID set → use that directly (skip sorting)
- * - If message starts with "/" → tool command
- * - If attached document/audio → analyzefile
- * - Otherwise → use AI sorting
+ * A step that decides returns before the sorter, which costs a model call
+ * per message.
  */
 final readonly class MessageClassifier
 {
