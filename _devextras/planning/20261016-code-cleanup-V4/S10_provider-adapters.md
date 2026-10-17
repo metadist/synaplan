@@ -140,3 +140,36 @@ from the plan:
   refactored provider on Symfony's real HTTP client, from a script in the
   backend container rather than the browser; all four answered. Not a
   gate.
+
+## 10. As delivered — S10b, OpenAI (2026-10-17)
+
+S10b starts from S10a's head (`77cf162ff`, after the S4b merge came
+down the chain). It follows the plan's steps: the seams (S10.1), the
+snapshot (S10.2), the client (S10.3) and the capabilities (S10.5).
+Where it differs:
+
+- **The no-network test catches a bypass precisely.** `OfflineHttpGuard`
+  makes PSR-18 discovery, which the SDK uses when no client is injected,
+  hand out a client that refuses to send and records the attempt. The
+  plan's mutation (embeddings on `\OpenAI::client()`) fails with "A
+  request tried to leave the process: POST …/v1/embeddings".
+- **Chat is three classes.** Chat and its helpers were about 800 lines.
+  `OpenAIResponses` holds the Responses API call that chat and vision
+  share (the reasoning tiers, the two retries, the model lookup and their
+  caches), `OpenAIResponsesFormat` the pure translations under their old
+  names, and `OpenAIChat` the chat. `chatStream()` (119) is cut at its
+  stream loop. The largest new class is `OpenAIImageGeneration` (488
+  lines), the longest new method `OpenAIChat::readStream()` (95).
+- **Five existing test classes retargeted.** They reached private methods
+  by reflection; they now reach them on their new classes, with their
+  assertions unchanged. `OpenAIFixtures` builds the API answers from the
+  SDK's own fixtures for the snapshot and the unit tests.
+- **Found, not fixed.** `curl_close()` is deprecated on PHP 8.5 (a no-op
+  since PHP 8.0). The gpt-image call, moved verbatim, logs the deprecation
+  on every request, and so do three other classes. One cleanup pull
+  request for all four.
+- **Journey.** With the dev stack's OpenAI key, one chat, one stream, one
+  embedding, one gpt-image request (low quality, over the cURL path) and
+  one speech request ran through the refactored provider on its
+  production defaults, from a script in the backend container rather than
+  the browser; all five answered. Not a gate.
