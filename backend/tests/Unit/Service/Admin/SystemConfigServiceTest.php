@@ -13,13 +13,12 @@ use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Seed\ModuleGateSeeder;
 use App\Service\Admin\SystemConfigService;
-use App\Service\Auth\RegistrationConfig;
-use App\Service\Chat\GuestChatConfig;
 use App\Service\Digest\MessageDigestConfig;
 use App\Service\Feature\FeatureFlagEnv;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\Security\EncryptionService;
+use App\Tests\Support\SystemConfigServiceFactory;
 use App\Tests\Unit\Module\Fixture\BuildsAllModules;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -41,26 +40,7 @@ final class SystemConfigServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->configRepository = $this->createMock(ConfigRepository::class);
-
-        // ProviderKeyStore is final (not mockable); a real instance over the
-        // same repository mock is inert for these multitask-focused tests.
-        $encryption = new EncryptionService('test-secret', new NullLogger());
-        $providerKeyStore = new ProviderKeyStore(
-            $this->configRepository,
-            $encryption,
-            new NullLogger(),
-        );
-
-        $this->service = new SystemConfigService(
-            projectDir: sys_get_temp_dir(),
-            logger: new NullLogger(),
-            configRepository: $this->configRepository,
-            defaultTtsUrl: 'http://localhost:10200',
-            providerKeyStore: $providerKeyStore,
-            encryption: $encryption,
-            registrationConfig: new RegistrationConfig($this->configRepository),
-            guestChatConfig: new GuestChatConfig($this->configRepository),
-        );
+        $this->service = SystemConfigServiceFactory::build(['configRepository' => $this->configRepository]);
     }
 
     /**
@@ -471,17 +451,10 @@ final class SystemConfigServiceTest extends TestCase
         $this->configRepository->method('getValue')->willReturnCallback(
             static fn (int $owner, string $group, string $setting): ?string => 'WORKFLOWS' === $group ? '1' : null
         );
-        $service = new SystemConfigService(
-            projectDir: sys_get_temp_dir(),
-            logger: new NullLogger(),
-            configRepository: $this->configRepository,
-            defaultTtsUrl: 'http://localhost:10200',
-            providerKeyStore: new ProviderKeyStore($this->configRepository, new EncryptionService('test-secret', new NullLogger()), new NullLogger()),
-            encryption: new EncryptionService('test-secret', new NullLogger()),
-            registrationConfig: new RegistrationConfig($this->configRepository),
-            guestChatConfig: new GuestChatConfig($this->configRepository),
-            featureFlagEnv: new FeatureFlagEnv(['FEATURE_WORKFLOWS_BUILDER_ENABLED' => 'false']),
-        );
+        $service = SystemConfigServiceFactory::build([
+            'configRepository' => $this->configRepository,
+            'featureFlagEnv' => new FeatureFlagEnv(['FEATURE_WORKFLOWS_BUILDER_ENABLED' => 'false']),
+        ]);
 
         $values = $service->getValues();
 
@@ -721,16 +694,11 @@ final class SystemConfigServiceTest extends TestCase
             ['higgsfield' => 'hf-key-from-env'],
             ['higgsfield' => 'hf-secret-from-env'],
         );
-        $service = new SystemConfigService(
-            projectDir: sys_get_temp_dir(),
-            logger: new NullLogger(),
-            configRepository: $this->configRepository,
-            defaultTtsUrl: 'http://localhost:10200',
-            providerKeyStore: $store,
-            encryption: $encryption,
-            registrationConfig: new RegistrationConfig($this->configRepository),
-            guestChatConfig: new GuestChatConfig($this->configRepository),
-        );
+        $service = SystemConfigServiceFactory::build([
+            'configRepository' => $this->configRepository,
+            'providerKeyStore' => $store,
+            'encryption' => $encryption,
+        ]);
 
         $values = $service->getValues();
         self::assertTrue($values['HIGGSFIELD_API_KEY']['isSet']);
@@ -760,21 +728,10 @@ final class SystemConfigServiceTest extends TestCase
             $factories[$id] = static fn (): FeatureModuleInterface => $module;
         }
 
-        $service = new SystemConfigService(
-            projectDir: sys_get_temp_dir(),
-            logger: new NullLogger(),
-            configRepository: $this->configRepository,
-            defaultTtsUrl: 'http://localhost:10200',
-            providerKeyStore: new ProviderKeyStore(
-                $this->configRepository,
-                new EncryptionService('test-secret', new NullLogger()),
-                new NullLogger(),
-            ),
-            encryption: new EncryptionService('test-secret', new NullLogger()),
-            registrationConfig: new RegistrationConfig($this->configRepository),
-            guestChatConfig: new GuestChatConfig($this->configRepository),
-            modules: new ModuleRegistry(new ServiceLocator($factories)),
-        );
+        $service = SystemConfigServiceFactory::build([
+            'configRepository' => $this->configRepository,
+            'modules' => new ModuleRegistry(new ServiceLocator($factories)),
+        ]);
 
         $fields = $service->getSchema()['fields'];
         foreach (array_keys($modules) as $id) {
