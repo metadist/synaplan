@@ -106,5 +106,5 @@ per model, cost per run, queue wait on `async_ai_high`.
 Registered in the same commit: `ROADMAP.md` row 21 (§1, not started), its §3
 line and the §6 decision of 2026-10-17, and the planning `README.md` live-tracks
 table. The plan was committed from a separate worktree on
-`docs/research-quality-plan`, because another session had the V4 S3 branch
+`planning/research-quality`, because another session had the V4 S3 branch
 checked out in the shared working tree.
