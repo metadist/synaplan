@@ -1978,7 +1978,7 @@
                 "classifier": [],
                 "prompt": [
                     {
-                        "language": "de",
+                        "language": "fr",
                         "topic": "support"
                     }
                 ],
@@ -1987,7 +1987,7 @@
                         "classification": {
                             "intent": "chat",
                             "is_widget_mode": false,
-                            "language": "de",
+                            "language": "fr",
                             "source": "api",
                             "topic": "support"
                         },
@@ -2016,7 +2016,7 @@
                 "classification": {
                     "intent": "chat",
                     "is_widget_mode": false,
-                    "language": "de",
+                    "language": "fr",
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -2080,7 +2080,7 @@
                         "classification": {
                             "intent": "chat",
                             "is_widget_mode": false,
-                            "language": "en",
+                            "language": "de",
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
@@ -2105,7 +2105,7 @@
                 "classification": {
                     "intent": "chat",
                     "is_widget_mode": false,
-                    "language": "en",
+                    "language": "de",
                     "prompt_metadata": {
                         "aiModel": 0
                     },
@@ -2143,7 +2143,7 @@
                 {
                     "message": "Using api task prompt (skipped classification)",
                     "metadata": {
-                        "language": "en",
+                        "language": "de",
                         "source": "api",
                         "topic": "support"
                     },

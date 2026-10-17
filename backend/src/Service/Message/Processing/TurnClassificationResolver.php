@@ -15,11 +15,11 @@ use Psr\Log\LoggerInterface;
 /**
  * What a turn is about and which prompt answers it.
  *
- * Fixed-prompt turns (widget, API, Saved Task) and Again skip the AI sorter;
- * everything else is classified. The buffered and the streamed turn still
- * differ here — fixed-prompt language, RAG scope keys, prompt metadata, the
- * forced image description — so each difference has a buffered and a
- * streamed method of its own (code cleanup V3, master plan §3).
+ * Fixed-prompt turns (widget, API, Saved Task), Again and the forced image
+ * description skip the AI sorter; everything else is classified. Both
+ * transports decide alike: one language rule, one method per kind of turn.
+ * Per transport only the classified status differs (a buffered turn's
+ * carries the verdict), and the prompt is still resolved per transport.
  */
 final readonly class TurnClassificationResolver
 {
@@ -161,8 +161,7 @@ final readonly class TurnClassificationResolver
     }
 
     /**
-     * Streamed: the language is the message's own (`auto` when unknown), so
-     * the answer follows whatever the user writes.
+     * Streamed, the classified status names the source only.
      *
      * @param array<string, mixed> $options
      *
@@ -170,41 +169,23 @@ final readonly class TurnClassificationResolver
      */
     public function fixedPromptForStreamedTurn(Message $message, array $options, TurnStatus $status): array
     {
-        [$isWidget, $source] = self::fixedPromptSource($options);
-        $language = $message->getLanguage();
-        if (!$language || 'NN' === $language) {
-            $language = 'auto';
-        }
-
-        $classification = self::fixedPromptClassification($options, $language, $source, $isWidget);
-        $this->logger->info('MessageProcessor: Using fixed prompt (skipped AI classification)', [
-            'language' => $language,
-            'fixed_topic' => $options['fixed_task_prompt'],
-            'source' => $source,
-            'widget_model_id' => $options['widget_model_id'] ?? null,
-        ]);
-        $status->report('classified', sprintf('%s: Using fixed prompt', ucfirst($source)));
+        $classification = $this->fixedPrompt($message, $options);
+        $status->report('classified', sprintf('%s: Using fixed prompt', ucfirst($classification['source'])));
 
         return $classification;
     }
 
     /**
-     * Buffered: the language override from the caller, else `en`.
+     * Buffered, the classified status carries the verdict.
      *
      * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
      */
-    public function fixedPromptForBufferedTurn(array $options, TurnStatus $status): array
+    public function fixedPromptForBufferedTurn(Message $message, array $options, TurnStatus $status): array
     {
-        [$isWidget, $source] = self::fixedPromptSource($options);
-        $classification = self::fixedPromptClassification($options, $options['language'] ?? 'en', $source, $isWidget);
-        $this->logger->info('MessageProcessor: Using fixed task prompt', ['task_prompt' => $options['fixed_task_prompt'], 'source' => $source]);
-        $status->report('classified', sprintf('Using %s task prompt (skipped classification)', $source), [
-            'topic' => $classification['topic'],
-            'language' => $classification['language'],
-            'source' => $classification['source'],
-        ]);
+        $classification = $this->fixedPrompt($message, $options);
+        $status->report('classified', sprintf('Using %s task prompt (skipped classification)', $classification['source']), self::verdict($classification));
 
         return $classification;
     }
@@ -359,32 +340,22 @@ final readonly class TurnClassificationResolver
     }
 
     /**
-     * Saved Task runs get their own source: they skip the sorter like widget
-     * and API turns, but the executor must still plan them, or a multi-step
-     * task silently degrades to a chat answer.
+     * A fixed prompt answers without the sorter. Without a caller or message
+     * language it answers `auto`, following whatever the user writes. Saved
+     * Task runs get a source of their own: the executor must still plan them,
+     * or a multi-step task silently degrades to a chat answer.
      *
-     * @param array<string, mixed> $options
-     *
-     * @return array{0: bool, 1: string}
-     */
-    private static function fixedPromptSource(array $options): array
-    {
-        $isWidget = !empty($options['is_widget_mode']);
-
-        return [$isWidget, $isWidget ? 'widget' : (!empty($options['saved_task']) ? 'saved_task' : 'api')];
-    }
-
-    /**
      * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
      */
-    private static function fixedPromptClassification(array $options, string $language, string $source, bool $isWidget): array
+    private function fixedPrompt(Message $message, array $options): array
     {
+        $isWidget = !empty($options['is_widget_mode']);
         $classification = [
             'topic' => $options['fixed_task_prompt'],
-            'language' => $language,
-            'source' => $source,
+            'language' => self::language($message, $options, 'auto'),
+            'source' => $isWidget ? 'widget' : (!empty($options['saved_task']) ? 'saved_task' : 'api'),
             'intent' => 'chat',
             'is_widget_mode' => $isWidget,
         ];
@@ -392,6 +363,13 @@ final readonly class TurnClassificationResolver
         if (!empty($options['widget_model_id'])) {
             $classification['override_model_id'] = (int) $options['widget_model_id'];
         }
+
+        $this->logger->info('MessageProcessor: Using fixed prompt (skipped AI classification)', [
+            'language' => $classification['language'],
+            'fixed_topic' => $classification['topic'],
+            'source' => $classification['source'],
+            'widget_model_id' => $options['widget_model_id'] ?? null,
+        ]);
 
         return $classification;
     }
@@ -447,7 +425,7 @@ final readonly class TurnClassificationResolver
         }
         $own = $message->getLanguage();
 
-        return '' !== $own && 'NN' !== $own ? $own : $unknown;
+        return '' !== $own && Message::UNKNOWN_LANGUAGE !== $own ? $own : $unknown;
     }
 
     /**

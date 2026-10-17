@@ -87,6 +87,15 @@ final class TurnAlignmentTest extends TestCase
         $this->assertTurnLanguage('en', self::SKIPPED_SORTER, [], 'NN');
     }
 
+    public function testAFixedPromptAnswersInTheCallersThenTheMessagesLanguageElseFollowsTheUser(): void
+    {
+        $fixedPrompt = ['fixed prompt' => ['fixed_task_prompt' => 'support']];
+
+        $this->assertTurnLanguage('fr', $fixedPrompt, ['language' => 'fr'], 'de');
+        $this->assertTurnLanguage('de', $fixedPrompt, [], 'de');
+        $this->assertTurnLanguage('auto', $fixedPrompt, [], 'NN');
+    }
+
     /**
      * @param array<string, array<string, mixed>> $kinds   options per kind of turn
      * @param array<string, mixed>                $options

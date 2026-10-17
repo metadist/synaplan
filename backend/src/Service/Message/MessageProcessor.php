@@ -166,7 +166,7 @@ final readonly class MessageProcessor
             $conversationHistory = $this->history->load($message, $options);
 
             if ($hasFixedPrompt) {
-                $classification = $this->classifications->fixedPromptForBufferedTurn($options, $status);
+                $classification = $this->classifications->fixedPromptForBufferedTurn($message, $options, $status);
             } elseif (!empty($options['force_image_description'])) {
                 $classification = $this->classifications->forcedImageForBufferedTurn($message, $options, $status);
             } elseif ($isAgainRequest) {

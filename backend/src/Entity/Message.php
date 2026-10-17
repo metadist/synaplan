@@ -20,6 +20,9 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BSTATUS', 'BUNIXTIMES'], name: 'idx_message_status_unix')]
 class Message
 {
+    /** The language code of a message whose language is not known. */
+    public const UNKNOWN_LANGUAGE = 'NN';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
@@ -62,8 +65,8 @@ class Message
     #[ORM\Column(name: 'BTOPIC', length: 255, options: ['default' => 'UNKNOWN'])]
     private string $topic = 'UNKNOWN';
 
-    #[ORM\Column(name: 'BLANG', length: 2, options: ['default' => 'NN'])]
-    private string $language = 'NN';
+    #[ORM\Column(name: 'BLANG', length: 2, options: ['default' => self::UNKNOWN_LANGUAGE])]
+    private string $language = self::UNKNOWN_LANGUAGE;
 
     #[ORM\Column(name: 'BTEXT', type: 'text')]
     private string $text = '';
@@ -202,9 +205,13 @@ class Message
         return $this->language;
     }
 
+    /**
+     * BLANG holds a two-letter code: a turn that follows whatever the user
+     * writes (`auto`) is stored as unknown.
+     */
     public function setLanguage(string $language): self
     {
-        $this->language = $language;
+        $this->language = strlen($language) > 2 ? self::UNKNOWN_LANGUAGE : $language;
 
         return $this;
     }
