@@ -120,6 +120,29 @@ class ProfileControllerTest extends WebTestCase
         $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
+    public function testClearingTheEmailKeywordRemovesItFromTheProfile(): void
+    {
+        $this->user->setUserDetails([...$this->user->getUserDetails(), 'email_keyword' => 'sales']);
+        $this->em->flush();
+
+        $this->client->request(
+            'PUT',
+            '/api/v1/profile/email-keyword',
+            [],
+            [],
+            [
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+                'CONTENT_TYPE' => 'application/json',
+            ],
+            json_encode(['keyword' => ''])
+        );
+
+        $this->assertResponseIsSuccessful();
+        $this->em->refresh($this->user);
+        $this->assertArrayNotHasKey('email_keyword', $this->user->getUserDetails());
+        $this->assertSame('John', $this->user->getUserDetails()['firstName'] ?? null);
+    }
+
     public function testUpdateProfileWithAuth(): void
     {
         $this->client->request(

@@ -206,8 +206,8 @@ fast_path_heuristic`) never reaches the planner — `TaskPlanExecutor` only
 plans for `ai_sorting` / `attachment_document_or_audio`. Short messages that
 reference the user's own knowledge base or a connected system ("search my
 knowledge base…", "look up X in our CRM", "meine Wissensdatenbank…")
-therefore defer to the AI sorter via the `$dataSourceTriggers` list in
-`MessageClassifier::canFastPathClassify()`; otherwise a connected MCP server
+therefore defer to the AI sorter via the `DATA_SOURCE_TRIGGERS` list in
+`FastPathClassifier::canFastPathClassify()`; otherwise a connected MCP server
 could silently never be consulted while the fast-path flag is on.
 
 ## Testing instruments
