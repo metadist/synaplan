@@ -64,14 +64,14 @@ final class OverrideAndAgainRoutingTest extends TestCase
             ['text2doc', 'mediamaker', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
             ['chat', '', ['general', 'chat'], ['general', 'chat']],
             ['chat', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
-            ['chat', 'legal-review', ['general', 'chat'], ['legal-review', 'chat']],
-            ['chat', 'mediamaker', ['general', 'chat'], ['mediamaker', 'image_generation']],
-            ['chat', 'tools:pic', ['general', 'chat'], ['tools:pic', 'image_generation']],
+            ['chat', 'legal-review', ['legal-review', 'chat'], ['legal-review', 'chat']],
+            ['chat', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
+            ['chat', 'tools:pic', ['tools:pic', 'image_generation'], ['tools:pic', 'image_generation']],
             ['vectorize', '', ['general', 'chat'], ['general', 'chat']],
             ['vectorize', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
-            ['vectorize', 'legal-review', ['general', 'chat'], ['legal-review', 'chat']],
-            ['vectorize', 'mediamaker', ['general', 'chat'], ['mediamaker', 'image_generation']],
-            ['vectorize', 'tools:pic', ['general', 'chat'], ['tools:pic', 'image_generation']],
+            ['vectorize', 'legal-review', ['legal-review', 'chat'], ['legal-review', 'chat']],
+            ['vectorize', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
+            ['vectorize', 'tools:pic', ['tools:pic', 'image_generation'], ['tools:pic', 'image_generation']],
             ['rerank', '', ['general', 'chat'], ['general', 'chat']],
             ['rerank', 'unknown', ['general', 'chat'], ['general', 'chat']],
             ['rerank', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
@@ -79,7 +79,7 @@ final class OverrideAndAgainRoutingTest extends TestCase
             ['rerank', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
             ['rerank', 'tools:pic', ['tools:pic', 'image_generation'], ['tools:pic', 'image_generation']],
             [null, '', ['general', 'chat'], ['general', 'chat']],
-            [null, 'legal-review', ['general', 'chat'], ['legal-review', 'chat']],
+            [null, 'legal-review', ['legal-review', 'chat'], ['legal-review', 'chat']],
         ];
 
         foreach ($rows as $row) {
@@ -120,6 +120,13 @@ final class OverrideAndAgainRoutingTest extends TestCase
         $byOverride = $this->classifier('rerank')->classify($this->message('UNKNOWN'));
 
         self::assertSame(['general', 'chat'], [$byOverride['topic'], $byOverride['intent']]);
+    }
+
+    public function testAChatModelOverrideKeepsTheCustomPromptTopic(): void
+    {
+        $byOverride = $this->classifier('chat')->classify($this->message('legal-review'));
+
+        self::assertSame(['legal-review', 'chat'], [$byOverride['topic'], $byOverride['intent']]);
     }
 
     private function classifier(?string $tag): MessageClassifier

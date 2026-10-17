@@ -44,10 +44,10 @@ final class TopicIntentRuleTest extends TestCase
         self::assertSame(['legal-review' => 'chat', 'UNKNOWN' => 'chat'], $this->intents(['legal-review', 'UNKNOWN']));
     }
 
-    public function testAModelOverrideDropsTheMessageTopicForAChatModel(): void
+    public function testAModelOverrideKeepsTheMessageTopicForAChatModel(): void
     {
         self::assertEquals(new TopicIntent('mediamaker', 'image_generation'), $this->rule->forModelOverride('text2pic', 'legal-review'));
-        self::assertEquals(new TopicIntent('general', 'chat'), $this->rule->forModelOverride('chat', 'legal-review'));
+        self::assertEquals(new TopicIntent('legal-review', 'chat'), $this->rule->forModelOverride('chat', 'legal-review'));
         self::assertEquals(new TopicIntent('legal-review', 'chat'), $this->rule->forModelOverride('rerank', 'legal-review'));
     }
 

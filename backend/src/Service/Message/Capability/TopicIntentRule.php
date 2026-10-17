@@ -37,8 +37,6 @@ final readonly class TopicIntentRule
         'document' => 'officemaker',
         'officemaker' => 'officemaker',
         'text2doc' => 'officemaker',
-        'chat' => 'general',
-        'vectorize' => 'general',
     ];
 
     /** Spellings that route like a capability without being one (tool commands, model-tag topics). */
@@ -61,9 +59,9 @@ final readonly class TopicIntentRule
     }
 
     /**
-     * A model override in the classifier: media tags make media, analysis and
-     * chat tags a chat answer, document tags a document; any other tag keeps
-     * the message's topic, else `general`.
+     * A model override in the classifier: media tags make media, analysis
+     * tags a chat answer, document tags a document; any other tag (a chat
+     * model among them) keeps the message's topic, else `general`.
      */
     public function forModelOverride(string $modelTag, ?string $messageTopic): TopicIntent
     {
