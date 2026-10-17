@@ -17,9 +17,9 @@ use Psr\Log\LoggerInterface;
  *
  * Fixed-prompt turns (widget, API, Saved Task), Again and the forced image
  * description skip the AI sorter; everything else is classified. Both
- * transports decide alike: one language rule, one method per kind of turn.
- * Per transport only the classified status differs (a buffered turn's
- * carries the verdict), and the prompt is still resolved per transport.
+ * transports decide alike: one language rule, one method per kind of turn,
+ * one prompt lookup. Per transport only the classified status differs: a
+ * buffered turn's carries the verdict.
  */
 final readonly class TurnClassificationResolver
 {
@@ -291,52 +291,35 @@ final readonly class TurnClassificationResolver
     }
 
     /**
-     * Streamed: the prompt bundle is resolved once, in the turn's language,
-     * and handed to ChatHandler as `resolved_prompt_data`.
-     *
-     * @param array<string, mixed> $classification
-     * @param array<string, mixed> $options
-     *
-     * @return array{0: array<string, mixed>, 1: array<string, mixed>} [$options, $promptMetadata]
-     */
-    public function promptForStreamedTurn(Message $message, array $classification, array $options, PerfTimer $perfTimer): array
-    {
-        $perfTimer->start('prompt');
-        $promptData = $this->promptService->getPromptWithMetadata($classification['topic'] ?? 'general', $message->getUserId(), $classification['language'] ?? 'en');
-        $perfTimer->stop('prompt');
-
-        if (null !== $promptData) {
-            $options['resolved_prompt_data'] = $promptData;
-        }
-
-        return [$options, $promptData['metadata'] ?? []];
-    }
-
-    /**
-     * Buffered: the classifier's prompt metadata when it carries one, else a
-     * lookup by topic; handed on as `prompt_metadata`.
+     * The prompt that answers the turn, looked up once in the turn's language
+     * unless the classifier already carries its metadata. The metadata goes
+     * on the classification (media generation and file analysis read the
+     * prompt's `aiModel` there), the whole bundle into `resolved_prompt_data`,
+     * which ChatHandler reuses.
      *
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options
      *
      * @return array{0: array<string, mixed>, 1: array<string, mixed>, 2: array<string, mixed>} [$classification, $options, $promptMetadata]
      */
-    public function promptForBufferedTurn(Message $message, array $classification, array $options): array
+    public function prompt(Message $message, array $classification, array $options, ?PerfTimer $perfTimer = null): array
     {
-        $promptMetadata = is_array($classification['prompt_metadata'] ?? null) ? $classification['prompt_metadata'] : [];
-        if ([] === $promptMetadata && !empty($classification['topic'])) {
-            $promptData = $this->promptService->getPromptWithMetadata($classification['topic'], $message->getUserId());
-            if ($promptData) {
-                $promptMetadata = $promptData['metadata'] ?? [];
-                $classification['prompt_metadata'] = $promptMetadata;
-            }
+        $carried = $classification['prompt_metadata'] ?? null;
+        if (is_array($carried) && [] !== $carried) {
+            return [$classification, $options, $carried];
         }
 
-        if (!empty($promptMetadata)) {
-            $options['prompt_metadata'] = $promptMetadata;
+        $perfTimer?->start('prompt');
+        $promptData = $this->promptService->getPromptWithMetadata($classification['topic'] ?? 'general', $message->getUserId(), $classification['language'] ?? 'en');
+        $perfTimer?->stop('prompt');
+        if (null === $promptData) {
+            return [$classification, $options, []];
         }
 
-        return [$classification, $options, $promptMetadata];
+        $options['resolved_prompt_data'] = $promptData;
+        $classification['prompt_metadata'] = $promptData['metadata'] ?? [];
+
+        return [$classification, $options, $classification['prompt_metadata']];
     }
 
     /**

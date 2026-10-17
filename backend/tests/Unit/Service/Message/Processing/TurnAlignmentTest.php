@@ -38,6 +38,10 @@ final class TurnAlignmentTest extends TestCase
 {
     private const SORTER_VERDICT = ['topic' => 'general', 'language' => 'en', 'source' => 'ai_sorting', 'intent' => 'chat'];
 
+    private const FIXED_PROMPT = ['fixed_task_prompt' => 'support'];
+
+    private const PROMPT = ['prompt' => null, 'metadata' => ['aiModel' => 0]];
+
     /** Turns that skip the AI sorter, so the language comes from the caller or the message. */
     private const SKIPPED_SORTER = [
         'again' => ['is_again' => true, 'model_id' => 42],
@@ -49,6 +53,12 @@ final class TurnAlignmentTest extends TestCase
 
     /** @var list<array{classification: array<string, mixed>, options: array<string, mixed>}> */
     private array $routed = [];
+
+    /** @var list<string> the language of each prompt lookup */
+    private array $promptLookups = [];
+
+    /** @var array<string, mixed> what the last turn returned to its caller */
+    private array $result = [];
 
     public function testAStreamedWidgetTurnIsClassifiedOnceWithItsHistory(): void
     {
@@ -96,6 +106,42 @@ final class TurnAlignmentTest extends TestCase
         $this->assertTurnLanguage('auto', $fixedPrompt, [], 'NN');
     }
 
+    public function testBothTurnsReuseThePromptMetadataTheClassifierCarries(): void
+    {
+        $carried = ['verdict' => ['prompt_metadata' => ['aiModel' => 33]]];
+
+        foreach (['buffered' => $this->buffered([], $carried['verdict']), 'streamed' => $this->streamed([], $carried['verdict'])] as $turn => $routed) {
+            self::assertSame(['aiModel' => 33], $routed['classification']['prompt_metadata'] ?? null, $turn);
+        }
+        self::assertSame([], $this->promptLookups);
+    }
+
+    public function testBothTurnsHandTheHandlerTheLookedUpPromptInTheSameKeys(): void
+    {
+        foreach (['buffered' => $this->buffered(self::FIXED_PROMPT), 'streamed' => $this->streamed(self::FIXED_PROMPT)] as $turn => $routed) {
+            self::assertSame(['aiModel' => 0], $routed['classification']['prompt_metadata'] ?? null, $turn);
+            self::assertSame(self::PROMPT, $routed['options']['resolved_prompt_data'] ?? null, $turn);
+            self::assertArrayNotHasKey('prompt_metadata', $routed['options'], $turn);
+        }
+    }
+
+    public function testThePromptIsLookedUpOnceInTheTurnLanguage(): void
+    {
+        $this->buffered(self::FIXED_PROMPT, [], 'de');
+        $this->streamed(self::FIXED_PROMPT, [], 'de');
+
+        self::assertSame(['de', 'de'], $this->promptLookups);
+    }
+
+    public function testTheCallerGetsTheVerdictWithoutThePromptSettings(): void
+    {
+        $this->buffered(self::FIXED_PROMPT);
+        self::assertArrayNotHasKey('prompt_metadata', $this->result['classification'], 'buffered');
+
+        $this->streamed(self::FIXED_PROMPT);
+        self::assertArrayNotHasKey('prompt_metadata', $this->result['classification'], 'streamed');
+    }
+
     /**
      * @param array<string, array<string, mixed>> $kinds   options per kind of turn
      * @param array<string, mixed>                $options
@@ -119,7 +165,7 @@ final class TurnAlignmentTest extends TestCase
      */
     private function buffered(array $options, array $verdict = [], string $language = 'en'): array
     {
-        $this->processor($verdict)->process($this->message($language), $options);
+        $this->result = $this->processor($verdict)->process($this->message($language), $options);
 
         return $this->lastRouted();
     }
@@ -132,7 +178,7 @@ final class TurnAlignmentTest extends TestCase
      */
     private function streamed(array $options, array $verdict = [], string $language = 'en'): array
     {
-        $this->processor($verdict)->processStream($this->message($language), static function (): void {}, null, $options);
+        $this->result = $this->processor($verdict)->processStream($this->message($language), static function (): void {}, null, $options);
 
         return $this->lastRouted();
     }
@@ -178,7 +224,11 @@ final class TurnAlignmentTest extends TestCase
         $preProcessor->method('process')->willReturnArgument(0);
 
         $prompts = $this->createStub(PromptService::class);
-        $prompts->method('getPromptWithMetadata')->willReturn(['prompt' => null, 'metadata' => ['aiModel' => 0]]);
+        $prompts->method('getPromptWithMetadata')->willReturnCallback(function (string $topic, int $userId = 0, string $language = 'en'): array {
+            $this->promptLookups[] = $language;
+
+            return self::PROMPT;
+        });
 
         $summaries = $this->createStub(ConversationSummaryService::class);
         $summaries->method('buildRollingContext')->willReturnCallback(static fn (array $window): RollingSummaryResult => RollingSummaryResult::notApplied($window));

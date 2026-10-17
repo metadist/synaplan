@@ -91,7 +91,7 @@ final readonly class MessageProcessor
             $classification = TurnClassificationResolver::withWidgetMode($classification ?? [], $options);
             $classification = TurnClassificationResolver::withRagScope($classification, $options);
             $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
-            [$options, $promptMetadata] = $this->classifications->promptForStreamedTurn($message, $classification, $options, $perfTimer);
+            [$classification, $options, $promptMetadata] = $this->classifications->prompt($message, $classification, $options, $perfTimer);
 
             ['classification' => $classification, 'searchResults' => $searchResults]
                 = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status, $perfTimer);
@@ -109,7 +109,7 @@ final readonly class MessageProcessor
 
             return [
                 'success' => true,
-                'classification' => self::withSorting($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting),
+                'classification' => self::verdictForCaller($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting),
                 'response' => $response,
                 'preprocessed' => $preprocessed,
                 'search_results' => $searchResults,
@@ -180,7 +180,7 @@ final readonly class MessageProcessor
             $classification = TurnClassificationResolver::withWidgetMode($classification, $options);
             $classification = TurnClassificationResolver::withRagScope($classification, $options);
             $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
-            [$classification, $options, $promptMetadata] = $this->classifications->promptForBufferedTurn($message, $classification, $options);
+            [$classification, $options, $promptMetadata] = $this->classifications->prompt($message, $classification, $options);
 
             ['classification' => $classification, 'searchResults' => $searchResults]
                 = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status);
@@ -199,7 +199,7 @@ final readonly class MessageProcessor
                 'model' => $response['metadata']['model'] ?? 'unknown',
             ]);
 
-            $classification = self::withSorting($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting);
+            $classification = self::verdictForCaller($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting);
             unset($classification['search_results']);
 
             return [
@@ -280,16 +280,18 @@ final readonly class MessageProcessor
     }
 
     /**
-     * The sorting model goes back on the result (StreamController stores it),
-     * never to the handler.
+     * The verdict the caller gets back: with the sorting model, which
+     * StreamController stores and the handler never sees, and without the
+     * prompt settings, which a public widget would hand to its visitor.
      *
      * @param array<string, mixed>                $classification
      * @param array{0: mixed, 1: mixed, 2: mixed} $sorting
      *
      * @return array<string, mixed>
      */
-    private static function withSorting(array $classification, array $sorting): array
+    private static function verdictForCaller(array $classification, array $sorting): array
     {
+        unset($classification['prompt_metadata']);
         $classification['sorting_model_id'] = $sorting[0];
         $classification['sorting_provider'] = $sorting[1];
         $classification['sorting_model_name'] = $sorting[2];

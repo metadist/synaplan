@@ -5,7 +5,7 @@
                 "classifier": [],
                 "prompt": [
                     {
-                        "language": "en",
+                        "language": "fr",
                         "topic": "mediamaker"
                     }
                 ],
@@ -27,8 +27,11 @@
                             "is_again": true,
                             "language": "fr",
                             "model_id": 42,
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -42,9 +45,6 @@
                     "intent": "image_generation",
                     "language": "fr",
                     "model_id": 42,
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -120,6 +120,9 @@
                             "intent": "image_generation",
                             "language": "fr",
                             "model_id": 42,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "again",
                             "topic": "mediamaker"
                         },
@@ -204,7 +207,7 @@
                 "classifier": [],
                 "prompt": [
                     {
-                        "language": "en",
+                        "language": "de",
                         "topic": "mediamaker"
                     }
                 ],
@@ -225,8 +228,11 @@
                         "options": {
                             "is_again": true,
                             "model_id": 42,
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -240,9 +246,6 @@
                     "intent": "image_generation",
                     "language": "de",
                     "model_id": 42,
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -318,6 +321,9 @@
                             "intent": "image_generation",
                             "language": "de",
                             "model_id": 42,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "again",
                             "topic": "mediamaker"
                         },
@@ -422,8 +428,11 @@
                         "options": {
                             "is_again": true,
                             "model_id": 42,
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -437,9 +446,6 @@
                     "intent": "image_generation",
                     "language": "en",
                     "model_id": 42,
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -515,6 +521,9 @@
                             "intent": "image_generation",
                             "language": "en",
                             "model_id": 42,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "again",
                             "topic": "mediamaker"
                         },
@@ -617,12 +626,7 @@
                         },
                         "history": 1,
                         "method": "route",
-                        "options": {
-                            "prompt_metadata": {
-                                "aiModel": 33,
-                                "tool_internet": false
-                            }
-                        }
+                        "options": []
                     }
                 ],
                 "saved_results": [],
@@ -633,10 +637,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 33,
-                        "tool_internet": false
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -719,12 +719,7 @@
                         "options": []
                     }
                 ],
-                "prompt": [
-                    {
-                        "language": "en",
-                        "topic": "general"
-                    }
-                ],
+                "prompt": [],
                 "router": [
                     {
                         "classification": {
@@ -741,45 +736,12 @@
                         "history": 1,
                         "method": "routeStream",
                         "options": {
-                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer",
-                            "resolved_prompt_data": {
-                                "metadata": {
-                                    "aiModel": 0
-                                },
-                                "prompt": null
-                            },
-                            "search_results": {
-                                "results": [
-                                    {
-                                        "description": "Latest release",
-                                        "title": "Release notes",
-                                        "url": "https://example.org/releases"
-                                    },
-                                    {
-                                        "description": "Announcement",
-                                        "title": "Blog",
-                                        "url": "https://example.org/blog"
-                                    }
-                                ]
-                            }
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer"
                         }
                     }
                 ],
-                "saved_results": [
-                    {
-                        "count": 2,
-                        "query": "optimized: What is the latest Synaplan release?"
-                    }
-                ],
-                "search": [
-                    {
-                        "options": {
-                            "country": "en",
-                            "search_lang": "en"
-                        },
-                        "query": "optimized: What is the latest Synaplan release?"
-                    }
-                ],
+                "saved_results": [],
+                "search": [],
                 "stream_chunks": [
                     "Answer"
                 ]
@@ -788,10 +750,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 33,
-                        "tool_internet": false
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -809,20 +767,7 @@
                         "provider": "openai"
                     }
                 },
-                "search_results": {
-                    "results": [
-                        {
-                            "description": "Latest release",
-                            "title": "Release notes",
-                            "url": "https://example.org/releases"
-                        },
-                        {
-                            "description": "Announcement",
-                            "title": "Blog",
-                            "url": "https://example.org/blog"
-                        }
-                    ]
-                },
+                "search_results": null,
                 "success": true
             },
             "sorter_calls": 1,
@@ -859,41 +804,6 @@
                         "web_search": true
                     },
                     "status": "classified"
-                },
-                {
-                    "message": "Searching the web...",
-                    "metadata": [],
-                    "status": "searching"
-                },
-                {
-                    "message": "Found 2 web results",
-                    "metadata": {
-                        "query": "optimized: What is the latest Synaplan release?",
-                        "results": [
-                            {
-                                "description": "Latest release",
-                                "fetched": false,
-                                "final_url": null,
-                                "published": null,
-                                "source": null,
-                                "thumbnail": null,
-                                "title": "Release notes",
-                                "url": "https://example.org/releases"
-                            },
-                            {
-                                "description": "Announcement",
-                                "fetched": false,
-                                "final_url": null,
-                                "published": null,
-                                "source": null,
-                                "thumbnail": null,
-                                "title": "Blog",
-                                "url": "https://example.org/blog"
-                            }
-                        ],
-                        "results_count": 2
-                    },
-                    "status": "search_complete"
                 },
                 {
                     "message": "Generating response...",
@@ -951,8 +861,11 @@
                         "history": 1,
                         "method": "route",
                         "options": {
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -978,9 +891,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -1122,6 +1032,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general",
                             "web_search": true
@@ -1336,8 +1249,11 @@
                         "history": 1,
                         "method": "route",
                         "options": {
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             },
                             "web_search": true
                         }
@@ -1364,9 +1280,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -1508,6 +1421,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general"
                         },
@@ -1701,8 +1617,11 @@
                         "method": "route",
                         "options": {
                             "fixed_task_prompt": "support",
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -1716,9 +1635,6 @@
                     "intent": "chat",
                     "is_widget_mode": false,
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -1793,6 +1709,9 @@
                             "intent": "chat",
                             "is_widget_mode": false,
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "api",
                             "topic": "support"
                         },
@@ -1875,7 +1794,7 @@
                 "classifier": [],
                 "prompt": [
                     {
-                        "language": "en",
+                        "language": "fr",
                         "topic": "support"
                     }
                 ],
@@ -1896,8 +1815,11 @@
                         "options": {
                             "fixed_task_prompt": "support",
                             "language": "fr",
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -1911,9 +1833,6 @@
                     "intent": "chat",
                     "is_widget_mode": false,
                     "language": "fr",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -1988,6 +1907,9 @@
                             "intent": "chat",
                             "is_widget_mode": false,
                             "language": "fr",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "api",
                             "topic": "support"
                         },
@@ -2071,7 +1993,7 @@
                 "classifier": [],
                 "prompt": [
                     {
-                        "language": "en",
+                        "language": "de",
                         "topic": "support"
                     }
                 ],
@@ -2091,8 +2013,11 @@
                         "method": "route",
                         "options": {
                             "fixed_task_prompt": "support",
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -2106,9 +2031,6 @@
                     "intent": "chat",
                     "is_widget_mode": false,
                     "language": "de",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -2183,6 +2105,9 @@
                             "intent": "chat",
                             "is_widget_mode": false,
                             "language": "de",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "api",
                             "topic": "support"
                         },
@@ -2286,8 +2211,11 @@
                         "method": "route",
                         "options": {
                             "fixed_task_prompt": "digest",
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             },
                             "saved_task": true,
                             "saved_task_id": 9
@@ -2303,9 +2231,6 @@
                     "intent": "chat",
                     "is_widget_mode": false,
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "saved_task_id": 9,
                     "sorting_model_id": null,
                     "sorting_model_name": null,
@@ -2381,6 +2306,9 @@
                             "intent": "chat",
                             "is_widget_mode": false,
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "saved_task_id": 9,
                             "source": "saved_task",
                             "topic": "digest"
@@ -2490,10 +2418,13 @@
                         "options": {
                             "fixed_task_prompt": "support",
                             "is_widget_mode": true,
-                            "prompt_metadata": {
-                                "aiModel": 0
-                            },
                             "rag_group_key": "kb",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            },
                             "widget_model_id": 77
                         }
                     }
@@ -2508,9 +2439,6 @@
                     "is_widget_mode": true,
                     "language": "en",
                     "override_model_id": 77,
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "rag_group_key": "kb",
                     "sorting_model_id": null,
                     "sorting_model_name": null,
@@ -2587,6 +2515,9 @@
                             "is_widget_mode": true,
                             "language": "en",
                             "override_model_id": 77,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "rag_group_key": "kb",
                             "source": "widget",
                             "topic": "support"
@@ -2675,7 +2606,7 @@
                 "classifier": [],
                 "prompt": [
                     {
-                        "language": "en",
+                        "language": "fr",
                         "topic": "general"
                     }
                 ],
@@ -2695,8 +2626,11 @@
                         "options": {
                             "force_image_description": true,
                             "language": "fr",
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -2709,9 +2643,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "fr",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "model-5",
                     "sorting_provider": "openai",
@@ -2794,6 +2725,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "fr",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "forced_image_description",
                             "topic": "general"
                         },
@@ -2912,8 +2846,11 @@
                         "method": "route",
                         "options": {
                             "force_image_description": true,
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -2926,9 +2863,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "model-5",
                     "sorting_provider": "openai",
@@ -3011,6 +2945,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "forced_image_description",
                             "topic": "general"
                         },
@@ -3109,7 +3046,7 @@
                 "classifier": [],
                 "prompt": [
                     {
-                        "language": "en",
+                        "language": "de",
                         "topic": "general"
                     }
                 ],
@@ -3128,8 +3065,11 @@
                         "method": "route",
                         "options": {
                             "force_image_description": true,
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -3142,9 +3082,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "de",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "model-5",
                     "sorting_provider": "openai",
@@ -3227,6 +3164,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "de",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "forced_image_description",
                             "topic": "general"
                         },
@@ -3348,8 +3288,11 @@
                         "history": 1,
                         "method": "route",
                         "options": {
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -3448,6 +3391,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general"
                         },
@@ -3472,6 +3418,9 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
+                    "prompt_metadata": {
+                        "aiModel": 0
+                    },
                     "source": "ai_sorting",
                     "topic": "general"
                 },
@@ -3565,8 +3514,11 @@
                                     "role": "assistant"
                                 }
                             ],
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -3579,9 +3531,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -3673,6 +3622,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general"
                         },
@@ -3804,8 +3756,11 @@
                         "history": 2,
                         "method": "route",
                         "options": {
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -3818,9 +3773,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -3912,6 +3864,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general"
                         },
@@ -4034,8 +3989,11 @@
                         "method": "route",
                         "options": {
                             "override_model_id": 31,
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -4049,9 +4007,6 @@
                     "intent": "chat",
                     "language": "en",
                     "override_model_id": 31,
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -4144,6 +4099,9 @@
                             "intent": "chat",
                             "language": "en",
                             "override_model_id": 31,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general"
                         },
@@ -4266,8 +4224,11 @@
                         "history": 1,
                         "method": "route",
                         "options": {
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -4280,9 +4241,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -4374,6 +4332,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general"
                         },
@@ -4494,8 +4455,11 @@
                         "history": 1,
                         "method": "route",
                         "options": {
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -4591,6 +4555,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general"
                         },
@@ -4615,6 +4582,9 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
+                    "prompt_metadata": {
+                        "aiModel": 0
+                    },
                     "source": "ai_sorting",
                     "topic": "general"
                 },
@@ -4705,12 +4675,15 @@
                         "method": "route",
                         "options": {
                             "language": "de",
-                            "prompt_metadata": {
-                                "aiModel": 0
-                            },
                             "rag_group_key": "kb",
                             "rag_limit": 4,
-                            "rag_min_score": 0.4
+                            "rag_min_score": 0.4,
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
                         }
                     }
                 ],
@@ -4722,9 +4695,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "rag_group_key": "kb",
                     "rag_limit": 4,
                     "rag_min_score": 0.4,
@@ -4819,6 +4789,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "rag_group_key": "kb",
                             "rag_limit": 4,
                             "rag_min_score": 0.4,
@@ -4952,9 +4925,12 @@
                         "history": 1,
                         "method": "route",
                         "options": {
-                            "prompt_metadata": {
-                                "aiModel": 0,
-                                "tool_url_screenshot": true
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0,
+                                    "tool_url_screenshot": true
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -4967,10 +4943,6 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0,
-                        "tool_url_screenshot": true
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -5074,6 +5046,10 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0,
+                                "tool_url_screenshot": true
+                            },
                             "source": "ai_sorting",
                             "topic": "general",
                             "url_content": "=== PAGE ===",
@@ -5209,8 +5185,11 @@
                         "history": 1,
                         "method": "route",
                         "options": {
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -5309,6 +5288,9 @@
                         "classification": {
                             "intent": "chat",
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general"
                         },
@@ -5334,6 +5316,9 @@
                 "classification": {
                     "intent": "chat",
                     "language": "en",
+                    "prompt_metadata": {
+                        "aiModel": 0
+                    },
                     "source": "ai_sorting",
                     "topic": "general"
                 },
@@ -5417,8 +5402,11 @@
                         "method": "route",
                         "options": {
                             "is_widget_mode": true,
-                            "prompt_metadata": {
-                                "aiModel": 0
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
                             }
                         }
                     }
@@ -5432,9 +5420,6 @@
                     "intent": "chat",
                     "is_widget_mode": true,
                     "language": "en",
-                    "prompt_metadata": {
-                        "aiModel": 0
-                    },
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",
@@ -5527,6 +5512,9 @@
                             "intent": "chat",
                             "is_widget_mode": true,
                             "language": "en",
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
                             "source": "ai_sorting",
                             "topic": "general"
                         },
