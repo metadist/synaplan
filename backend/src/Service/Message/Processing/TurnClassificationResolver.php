@@ -276,6 +276,24 @@ final readonly class TurnClassificationResolver
     }
 
     /**
+     * A widget turn stays one, whichever path classified it: the handlers
+     * answer it without a task plan, memories or a web search.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    public static function withWidgetMode(array $classification, array $options): array
+    {
+        if (!empty($options['is_widget_mode'])) {
+            $classification['is_widget_mode'] = true;
+        }
+
+        return $classification;
+    }
+
+    /**
      * The knowledge-base folder picked in the composer scopes this turn's
      * retrieval, whichever path classified it.
      *

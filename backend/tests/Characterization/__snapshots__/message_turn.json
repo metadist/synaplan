@@ -5397,6 +5397,7 @@
                     {
                         "classification": {
                             "intent": "chat",
+                            "is_widget_mode": true,
                             "language": "en",
                             "prompt_metadata": {
                                 "aiModel": 0
@@ -5421,6 +5422,7 @@
             "result": {
                 "classification": {
                     "intent": "chat",
+                    "is_widget_mode": true,
                     "language": "en",
                     "prompt_metadata": {
                         "aiModel": 0
@@ -5501,10 +5503,6 @@
             "calls": {
                 "classifier": [
                     {
-                        "history": 0,
-                        "options": []
-                    },
-                    {
                         "history": 1,
                         "options": []
                     }
@@ -5519,6 +5517,7 @@
                     {
                         "classification": {
                             "intent": "chat",
+                            "is_widget_mode": true,
                             "language": "en",
                             "source": "ai_sorting",
                             "topic": "general"
@@ -5546,6 +5545,7 @@
             "result": {
                 "classification": {
                     "intent": "chat",
+                    "is_widget_mode": true,
                     "language": "en",
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
@@ -5566,7 +5566,7 @@
                 "search_results": null,
                 "success": true
             },
-            "sorter_calls": 2,
+            "sorter_calls": 1,
             "statuses": [
                 {
                     "message": "Message processing started",
@@ -5577,6 +5577,15 @@
                     "message": "Downloading and parsing files...",
                     "metadata": [],
                     "status": "preprocessing"
+                },
+                {
+                    "message": "Analyzing message intent...",
+                    "metadata": {
+                        "model_id": 5,
+                        "model_name": "model-5",
+                        "provider": "openai"
+                    },
+                    "status": "classifying"
                 },
                 {
                     "message": "Topic: general, Language: en, Source: ai_sorting",

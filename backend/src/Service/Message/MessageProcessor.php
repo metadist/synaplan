@@ -65,13 +65,6 @@ final readonly class MessageProcessor
 
             if ($hasFixedPrompt) {
                 $classification = $this->classifications->fixedPromptForStreamedTurn($message, $options, $status);
-            } elseif (!empty($options['is_widget_mode'])) {
-                // Classified before the history is loaded; the turn is
-                // classified again below (a V4 alignment item).
-                $perfTimer->start('classify');
-                $classification = $this->classifications->afterClassify($this->classifications->classify($message, [], $options), $options);
-                $perfTimer->stop('classify');
-                $classification['is_widget_mode'] = true;
             } elseif ($isAgainRequest) {
                 $classification = $this->classifications->againForStreamedTurn($message, $options, $status);
             } else {
@@ -95,7 +88,8 @@ final readonly class MessageProcessor
                 $this->dispatcher->shadowPlan($message, $conversationHistory, $perfTimer, $classification);
             }
 
-            $classification = TurnClassificationResolver::withRagScope($classification ?? [], $options);
+            $classification = TurnClassificationResolver::withWidgetMode($classification ?? [], $options);
+            $classification = TurnClassificationResolver::withRagScope($classification, $options);
             $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
             [$options, $promptMetadata] = $this->classifications->promptForStreamedTurn($message, $classification, $options, $perfTimer);
 
@@ -183,6 +177,7 @@ final readonly class MessageProcessor
                 $this->dispatcher->shadowPlan($message, $conversationHistory, null, $classification);
             }
 
+            $classification = TurnClassificationResolver::withWidgetMode($classification, $options);
             $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
             [$classification, $options, $promptMetadata] = $this->classifications->promptForBufferedTurn($message, $classification, $options);
 
