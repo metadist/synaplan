@@ -12,6 +12,7 @@ use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\OpenAI\OpenAICurlTransport;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
@@ -50,6 +51,11 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * $apiKey is an explicit override (tests, custom wiring) that wins over
      * the ProviderKeyStore. Production wiring passes only the store, so keys
      * saved in the admin UI (or imported from env) apply without a restart.
+     * $sdkFactory builds the SDK client for a key (`\OpenAI::client()` when
+     * absent) and $curl sends the gpt-image request; tests pass doubles of
+     * both, so no request leaves the process.
+     *
+     * @param (\Closure(string): OpenAI\Client)|null $sdkFactory
      */
     public function __construct(
         private LoggerInterface $logger,
@@ -60,7 +66,10 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         private ?ProviderKeyStore $keyStore = null,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
         private ?ProviderTranscriptCapture $transcripts = null,
+        private ?\Closure $sdkFactory = null,
+        private ?OpenAICurlTransport $curl = null,
     ) {
+        $this->curl ??= new OpenAICurlTransport();
     }
 
     private function resolveApiKey(): ?string
@@ -87,7 +96,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         }
 
         if (null === $this->client || $this->clientKey !== $key) {
-            $this->client = \OpenAI::client($key);
+            $this->client = null !== $this->sdkFactory ? ($this->sdkFactory)($key) : \OpenAI::client($key);
             $this->clientKey = $key;
         }
 
@@ -1165,22 +1174,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
             $key = $this->resolveApiKey();
 
-            $ch = curl_init('https://api.openai.com/v1/images/generations');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer '.$key,
-                ],
-                CURLOPT_POSTFIELDS => json_encode($requestBody),
-                CURLOPT_TIMEOUT => 120,
-            ]);
-
-            $responseBody = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
+            [$responseBody, $httpCode, $curlError] = $this->curl->postJson('https://api.openai.com/v1/images/generations', $key, json_encode($requestBody), 120);
 
             if ($curlError) {
                 throw new \Exception('cURL error: '.$curlError);
