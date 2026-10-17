@@ -30,6 +30,43 @@ final class FileHelper
     public const FILE_GROUP = 'www-data';
 
     /**
+     * The extension a stored file gets for its MIME type, the same on every
+     * path that stores one: generated media, data URLs, WhatsApp downloads.
+     * Curated rather than symfony/mime, whose first extension for audio/webm
+     * is "weba".
+     */
+    private const EXTENSION_BY_MIME_TYPE = [
+        'image/png' => 'png',
+        'image/jpeg' => 'jpg',
+        'image/jpg' => 'jpg',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+        'image/heic' => 'heic',
+        'image/heif' => 'heic',
+        'video/mp4' => 'mp4',
+        'video/webm' => 'webm',
+        'video/3gpp' => '3gp',
+        'audio/mpeg' => 'mp3',
+        'audio/mp3' => 'mp3',
+        'audio/wav' => 'wav',
+        'audio/ogg' => 'ogg',
+        'audio/mp4' => 'm4a',
+        'audio/amr' => 'amr',
+        'audio/opus' => 'opus',
+        'audio/webm' => 'webm',
+        'application/pdf' => 'pdf',
+        'application/msword' => 'doc',
+        'application/vnd.ms-excel' => 'xls',
+        'application/vnd.ms-powerpoint' => 'ppt',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+        'text/plain' => 'txt',
+        'text/csv' => 'csv',
+        'text/markdown' => 'md',
+    ];
+
+    /**
      * Write content to file with proper permissions and ownership.
      *
      * For NFS environments, this also flushes the file to ensure it's
@@ -126,22 +163,12 @@ final class FileHelper
     }
 
     /**
-     * Get file extension from MIME type.
+     * The extension for a MIME type; its parameters ("audio/ogg;
+     * codecs=opus") are ignored. The caller names what an unmapped type gets.
      */
     public static function getExtensionFromMimeType(string $mimeType, string $fallback = 'bin'): string
     {
-        return match ($mimeType) {
-            'image/png' => 'png',
-            'image/jpeg', 'image/jpg' => 'jpg',
-            'image/gif' => 'gif',
-            'image/webp' => 'webp',
-            'image/heic', 'image/heif' => 'heic',
-            'video/mp4' => 'mp4',
-            'video/webm' => 'webm',
-            'audio/mpeg', 'audio/mp3' => 'mp3',
-            'audio/wav' => 'wav',
-            default => $fallback,
-        };
+        return self::EXTENSION_BY_MIME_TYPE[trim(explode(';', $mimeType)[0])] ?? $fallback;
     }
 
     /**

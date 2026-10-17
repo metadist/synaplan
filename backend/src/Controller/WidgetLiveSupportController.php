@@ -11,7 +11,6 @@ use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\File\FileStorageService;
 use App\Service\Widget\HumanTakeoverService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -38,7 +37,6 @@ class WidgetLiveSupportController extends AbstractController
         private HumanTakeoverService $takeoverService,
         private FileStorageService $fileStorageService,
         private FileRepository $fileRepository,
-        private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
     }
@@ -257,8 +255,7 @@ class WidgetLiveSupportController extends AbstractController
             $file->setFileType($this->getFileTypeFromMime($storageResult['mime']));
             $file->setStatus('pending'); // Will be 'attached' when message is sent
 
-            $this->em->persist($file);
-            $this->em->flush();
+            $this->fileRepository->save($file);
 
             return $this->json([
                 'success' => true,

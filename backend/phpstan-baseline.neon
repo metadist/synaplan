@@ -79,12 +79,6 @@ parameters:
 			path: src/AI/Provider/AnthropicProvider.php
 
 		-
-			message: '#^Strict comparison using \=\=\= between false and string will always evaluate to false\.$#'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: src/AI/Provider/GoogleProvider.php
-
-		-
 			message: '#^Offset ''model'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 2
@@ -263,12 +257,6 @@ parameters:
 			identifier: nullCoalesce.expr
 			count: 1
 			path: src/Service/Message/Chat/ChatMessageAssembler.php
-
-		-
-			message: '#^Offset ''prompt'' on array\{prompt\: string, media_type\: string\|null, raw\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Service/Message/Handler/MediaGenerationHandler.php
 
 		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'

@@ -113,3 +113,48 @@ call per message.
 
 The sorter prompt and `MessageSorter`. The decision-routing track (row 11)
 builds on this cascade later.
+
+## 9. As delivered (2026-10-17)
+
+`MessageClassifier` leaves all three size ledgers: 1,962 → 130 lines,
+21 → 9 constructor parameters, `classify()` 574 → 51 lines, and
+`canFastPathClassify()` 208 → 69 in `FastPathClassifier`. The branch starts
+from S5's head (`01d14a180`). Where the result differs from the plan:
+
+- **The overrides are two classes.** §3 named one `ClassificationOverrides`
+  for the overrides, Again and the agent pin. The pin is step 2 and Again
+  step 5, with a different reason to change each, so they are
+  `AgentPinRoute` (which also attaches the profile of a published assistant
+  the sorter picked) and `AgainOverride`.
+- **The last three steps are classes too.** Nine collaborators were only
+  reachable with the embedding router, the deferral and the sorter out of
+  the classifier: `EmbeddingRoute` answers with an `EmbeddingVerdict`, so a
+  match declined for its language still keeps the deferral off;
+  `RoutingDeferral` owns the provider pre-check; `SorterVerdict` holds the
+  sorter call and its overlays, in their order. `SorterInput` (the message
+  as the sorter reads it, shared with the pin's web vote),
+  `SelfAwareQuestion` (the guard of every sorter-skipping step) and
+  `SlashOutcome` are the other new types.
+- **The heuristic shrank as it moved.** The follow-up checks on generated
+  work became a method of their own and the three trigger lists constants
+  behind one check, so it is 69 lines, not just under the limit. The
+  sorter's overlays split the same way: the three that hand the turn to the
+  planner are one method, called where they ran.
+- **The tests build through a factory first.** Twenty-one constructions in
+  four test files passed the classifier's arguments positionally; a first
+  `test:` commit moved them to `MessageClassifierFactory`, so each step
+  rewired the factory and no assertion changed. The constructor could not grow at any commit, so
+  each new class took over dependencies the classifier had (21 → 19 → 16 →
+  15 → 9).
+- **Thirty routing cases, recorded additively.** S6.1 recorded them on the
+  untouched classifier (124 cases in all); `routing_classification.json` did
+  not move after that. The harness comment that called a missing fast-path
+  setting "on" was wrong: it means off, and the new cases switch it on.
+- **Found, carried; the snapshot pins it.** With the fast path switched on
+  (off by default), it runs before Again. `POST /api/v1/messages/again`
+  hands the turn no options and relies on the message's `MODEL_ID` /
+  `PROMPTID` meta, so a short plain message regenerated there is fast-pathed
+  to the default chat model, and the user's pick is lost
+  (`fastpath_on_wins_over_an_again_override`). The streamed web Again
+  (`is_again`) never asks the classifier. Moving Again ahead of the fast
+  path is a routing change, so it is the owner's call for V5.

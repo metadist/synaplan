@@ -5,17 +5,12 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\AI\Exception\ProviderException;
-use App\AI\Service\AiFacade;
-use App\AI\StructuredOutput\JsonResponseDecoder;
-use App\AI\StructuredOutput\Schema\UserMemoryActionSchema;
-use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
 use App\Service\Digest\LongTermMemoryService;
 use App\Service\Exception\MemoryServiceUnavailableException;
+use App\Service\Memory\MemoryInputParser;
+use App\Service\Memory\MemoryParseResult;
 use App\Service\Memory\UserMemoryService;
-use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
-use App\Service\RateLimitService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -48,13 +43,8 @@ class UserMemoryController extends AbstractController
 
     public function __construct(
         private readonly UserMemoryService $memoryService,
-        private readonly AiFacade $aiFacade,
-        private readonly PromptService $promptService,
-        private readonly ModelConfigService $modelConfigService,
-        private readonly RateLimitService $rateLimitService,
-        private readonly StructuredOutputConfig $structuredOutputConfig,
+        private readonly MemoryInputParser $memoryParser,
         private readonly LongTermMemoryService $longTermMemory,
-        private readonly JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -280,21 +270,8 @@ class UserMemoryController extends AbstractController
             return $this->json([
                 'memory' => $memory->toArray(),
             ], Response::HTTP_CREATED);
-        } catch (MemoryServiceUnavailableException $e) {
-            return $this->memoryServiceUnavailableResponse($user, $e);
-        } catch (\InvalidArgumentException $e) {
-            return $this->json([
-                'error' => $e->getMessage(),
-            ], Response::HTTP_BAD_REQUEST);
-        } catch (ProviderException $e) {
-            // AI provider not available (e.g., Ollama not running, model not loaded)
-            // Only show technical details to admins
-            $response = ['error' => 'Memory service temporarily unavailable'];
-            if ($user->isAdmin()) {
-                $response['debug'] = $e->getMessage();
-            }
-
-            return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
+        } catch (MemoryServiceUnavailableException|\InvalidArgumentException|ProviderException $e) {
+            return $this->memoryFailure($e, $user);
         }
     }
 
@@ -393,20 +370,8 @@ class UserMemoryController extends AbstractController
             return $this->json([
                 'memory' => $memory->toArray(),
             ]);
-        } catch (MemoryServiceUnavailableException $e) {
-            return $this->memoryServiceUnavailableResponse($user, $e);
-        } catch (\InvalidArgumentException $e) {
-            return $this->json([
-                'error' => $e->getMessage(),
-            ], Response::HTTP_BAD_REQUEST);
-        } catch (ProviderException $e) {
-            // Only show technical details to admins
-            $response = ['error' => 'Memory service temporarily unavailable'];
-            if ($user->isAdmin()) {
-                $response['debug'] = $e->getMessage();
-            }
-
-            return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
+        } catch (MemoryServiceUnavailableException|\InvalidArgumentException|ProviderException $e) {
+            return $this->memoryFailure($e, $user);
         }
     }
 
@@ -655,7 +620,6 @@ class UserMemoryController extends AbstractController
     ): JsonResponse {
         $data = $request->toArray();
         $input = $data['input'] ?? '';
-        $suggestedCategory = $data['suggestedCategory'] ?? null;
 
         if (empty(trim($input))) {
             return $this->json([
@@ -664,305 +628,58 @@ class UserMemoryController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        // Resolve memory model up front so we can fail fast with a clear, actionable
-        // error code when no model is configured. Without this pre-check the request
-        // would either reach the provider with an empty model (provider-dependent
-        // behaviour) or fail later inside the AI stack with a confusing message.
-        //
-        // IMPORTANT: this MUST use the same MEM → CHAT fallback chain as the async
-        // MemoryExtractionService — otherwise the "New Memory" UI silently runs on
-        // the expensive CHAT model (e.g. Claude Opus) instead of the dedicated MEM
-        // model (e.g. Groq gpt-oss-120b). See issue #973.
-        $memoryModelConfig = $this->modelConfigService->getMemoryModelConfig($user->getId());
+        $result = $this->memoryParser->parse($user, $input, $data['suggestedCategory'] ?? null);
 
-        if (null === $memoryModelConfig['model'] || null === $memoryModelConfig['provider']) {
-            $response = [
-                'error' => 'No memory model configured for AI structuring',
-                'code' => self::ERROR_CODE_AI_NO_CHAT_MODEL,
-            ];
-            if ($user->isAdmin()) {
-                $response['debug'] = 'No default MEM or CHAT model configured for this user. Set one under Profile → AI Models, or as global default.';
-            }
-
-            return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
-        }
-
-        // Search for similar memories using Qdrant
-        $similarMemories = [];
-        $qdrantError = null;
-        try {
-            $similarMemories = $this->memoryService->searchMemories($user, $input, null, 10);
-        } catch (\Exception $e) {
-            $qdrantError = $e->getMessage();
-            // Continue without context but log for debugging
-        }
-
-        // Load prompt from database
-        $promptData = $this->promptService->getPromptWithMetadata('tools:memory_parse', $user->getId());
-        $promptEntity = $promptData['prompt'] ?? null;
-
-        if (!$promptEntity) {
-            // Fallback: use a hardcoded prompt so the feature works even without fixtures
-            $systemPrompt = 'Parse the user input into a structured memory. Return valid JSON with: action (create/update/delete), memory (object with category, key, value), and optionally existingId and reason. Categories: personal, work, preferences, health, finance, education, relationships, goals, other.';
-        } else {
-            $systemPrompt = $promptEntity->getPrompt();
-        }
-
-        // Build user message with context
-        $userMessage = "User input: \"{$input}\"";
-
-        if ($suggestedCategory) {
-            $userMessage .= "\nSuggested category: {$suggestedCategory}";
-        }
-
-        if (!empty($similarMemories)) {
-            $userMessage .= "\n\nExisting memories that might be related:\n";
-            foreach ($similarMemories as $mem) {
-                $userMessage .= sprintf(
-                    "- ID: %d, Key: %s, Value: %s\n",
-                    $mem['id'] ?? 0,
-                    $mem['key'] ?? '',
-                    $mem['value'] ?? ''
-                );
-            }
-        } else {
-            $userMessage .= "\n\nNo existing memories found.";
-        }
-
-        try {
-            $aiOptions = array_filter([
-                'model' => $memoryModelConfig['model'],
-                'provider' => $memoryModelConfig['provider'],
-                'temperature' => 0.3, // Low temperature for consistent JSON output
-            ]);
-
-            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
-                $aiOptions['structured_output'] = UserMemoryActionSchema::build();
-            }
-
-            $response = $this->aiFacade->chat(
-                messages: [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $userMessage],
-                ],
-                userId: $user->getId(),
-                options: $aiOptions
-            );
-
-            $content = $response['content'] ?? '';
-
-            $this->rateLimitService->recordUsage($user, 'MEMORY_PARSE', [
-                'provider' => $response['provider'] ?? 'unknown',
-                'model' => $response['model'] ?? 'unknown',
-                'model_id' => $memoryModelConfig['model_id'] ?? null,
-                'usage' => $response['usage'] ?? [],
-                'response_text' => $content,
-                'input_text' => $userMessage,
-            ]);
-
-            // Get ALL valid memory IDs for this user to validate AI suggestions
-            // We need all user memories, not just similar ones, because AI might reference any
-            $allUserMemories = $this->memoryService->getUserMemories($user->getId());
-            $validMemoryIds = array_map(fn ($m) => $m->id, $allUserMemories);
-
-            // Parse AI response - support multiple formats
-            $actions = $this->parseAiResponse($content, $input, $validMemoryIds);
-
-            if (empty($actions)) {
-                $response = [
-                    'error' => 'AI could not parse the input',
-                    'code' => self::ERROR_CODE_AI_PARSE_FAILED,
-                ];
-                if ($user->isAdmin()) {
-                    $response['debug'] = 'AI response missing valid actions: '.$content;
-                }
-
-                return $this->json($response, Response::HTTP_UNPROCESSABLE_ENTITY);
-            }
-
-            $result = [
-                'actions' => $actions,
-                'similarMemories' => $similarMemories,
-            ];
-
-            // Add debug info for admins
-            if ($user->isAdmin()) {
-                $result['_debug'] = [
-                    'similarMemoriesCount' => count($similarMemories),
-                    'qdrantError' => $qdrantError,
-                    'aiResponse' => $content,
-                ];
-            }
-
-            return $this->json($result);
-        } catch (ProviderException $e) {
-            // AI provider unreachable / model not loaded / network failure.
-            // The frontend uses the `code` field to offer a graceful fallback
-            // (save as plain note for create, switch to manual edit for update)
-            // since Qdrant is still reachable at this point.
-            $response = [
-                'error' => 'AI service unavailable',
-                'code' => self::ERROR_CODE_AI_PARSER_UNAVAILABLE,
-            ];
-            if ($user->isAdmin()) {
-                $response['debug'] = $e->getMessage();
-            }
-
-            return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
-        }
+        return match ($result->outcome) {
+            MemoryParseResult::NO_MODEL => $this->parseFailure($user, 'No memory model configured for AI structuring', self::ERROR_CODE_AI_NO_CHAT_MODEL, 'No default MEM or CHAT model configured for this user. Set one under Profile → AI Models, or as global default.', Response::HTTP_SERVICE_UNAVAILABLE),
+            MemoryParseResult::NOT_UNDERSTOOD => $this->parseFailure($user, 'AI could not parse the input', self::ERROR_CODE_AI_PARSE_FAILED, 'AI response missing valid actions: '.$result->answer, Response::HTTP_UNPROCESSABLE_ENTITY),
+            // The frontend uses the code to offer a fallback (save as a plain
+            // note, or edit by hand): the memory store is still reachable.
+            MemoryParseResult::PROVIDER_UNAVAILABLE => $this->parseFailure($user, 'AI service unavailable', self::ERROR_CODE_AI_PARSER_UNAVAILABLE, $result->providerError, Response::HTTP_SERVICE_UNAVAILABLE),
+            default => $this->json([
+                'actions' => $result->actions,
+                'similarMemories' => $result->similarMemories,
+            ] + ($user->isAdmin() ? ['_debug' => [
+                'similarMemoriesCount' => count($result->similarMemories),
+                'qdrantError' => $result->searchError,
+                'aiResponse' => $result->answer,
+            ]] : [])),
+        };
     }
 
     /**
-     * Parse AI response supporting multiple formats.
-     *
-     * Supports:
-     * 1. Standard format: {"actions": [...]}
-     * 2. Legacy single action: {"action": "create", "memory": {...}}
-     * 3. NDJSON format: Multiple JSON objects on separate lines
-     *
-     * @param string $content        Raw AI response content
-     * @param string $input          Original user input
-     * @param int[]  $validMemoryIds Valid memory IDs for validation
-     *
-     * @return array Parsed actions
+     * A memory write that failed: the store unreachable, the input refused
+     * (400), or the AI provider down (503; only an admin sees the details).
      */
-    private function parseAiResponse(string $content, string $input, array $validMemoryIds): array
+    private function memoryFailure(MemoryServiceUnavailableException|\InvalidArgumentException|ProviderException $e, User $user): JsonResponse
     {
-        // Formats 1 and 2 arrive as ONE JSON document, possibly fenced,
-        // prose-wrapped or truncated — all of which the shared decoder
-        // handles.
-        $decoded = $this->jsonDecoder->decode($content);
-        if ($decoded->success) {
-            $actions = $this->actionsFromDocument($decoded->data, $input, $validMemoryIds);
-            if (null !== $actions) {
-                return $actions;
-            }
+        if ($e instanceof MemoryServiceUnavailableException) {
+            return $this->memoryServiceUnavailableResponse($user, $e);
+        }
+        if ($e instanceof \InvalidArgumentException) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
-        // Format 3: NDJSON — one action object per line, which is not a single
-        // JSON document, so the decoder runs per line instead. Fence lines and
-        // prose lines simply fail to decode and are skipped.
-        $actions = [];
-        foreach (preg_split('/\r?\n/', trim($content)) ?: [] as $line) {
-            $lineResult = $this->jsonDecoder->decode($line);
-            if (!$lineResult->success || !isset($lineResult->data['action'])) {
-                continue;
-            }
-
-            $action = $this->parseActionData($lineResult->data, $input, $validMemoryIds);
-            if ($action) {
-                $actions[] = $action;
-            }
+        $response = ['error' => 'Memory service temporarily unavailable'];
+        if ($user->isAdmin()) {
+            $response['debug'] = $e->getMessage();
         }
 
-        return $actions;
+        return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
     }
 
     /**
-     * Read the two single-document shapes out of a decoded response.
-     *
-     * @param array<string, mixed> $parsed
-     * @param int[]                $validMemoryIds
-     *
-     * @return array<int, array<string, mixed>>|null null when the document is
-     *                                               neither shape, so the caller can fall through to NDJSON
+     * A parse that produced no actions: the error and its code, and for an
+     * admin what went wrong.
      */
-    private function actionsFromDocument(array $parsed, string $input, array $validMemoryIds): ?array
+    private function parseFailure(User $user, string $error, string $code, string $debug, int $status): JsonResponse
     {
-        $actions = [];
-
-        // Format 1: {"actions": [...]} — also what UserMemoryActionSchema
-        // constrains the schema path to.
-        if (isset($parsed['actions']) && is_array($parsed['actions'])) {
-            foreach ($parsed['actions'] as $actionData) {
-                if (!is_array($actionData)) {
-                    continue;
-                }
-
-                $action = $this->parseActionData($actionData, $input, $validMemoryIds);
-                if ($action) {
-                    $actions[] = $action;
-                }
-            }
-
-            return $actions;
+        $response = ['error' => $error, 'code' => $code];
+        if ($user->isAdmin()) {
+            $response['debug'] = $debug;
         }
 
-        // Format 2: single action {"action": "create", "memory": {...}}
-        if (isset($parsed['action'])) {
-            $action = $this->parseActionData($parsed, $input, $validMemoryIds);
-            if ($action) {
-                $actions[] = $action;
-            }
-
-            return $actions;
-        }
-
-        return null;
-    }
-
-    /**
-     * Parse a single action from AI response.
-     *
-     * @param array  $actionData     The action data from AI
-     * @param string $input          Original user input
-     * @param int[]  $validMemoryIds Valid memory IDs from similar memories search
-     *
-     * @return array|null Parsed action or null if invalid
-     */
-    private function parseActionData(array $actionData, string $input, array $validMemoryIds = []): ?array
-    {
-        $action = $actionData['action'] ?? null;
-
-        if (!in_array($action, ['create', 'update', 'delete'], true)) {
-            return null;
-        }
-
-        // Validate existingId if provided - it must be a valid memory ID
-        $existingId = null;
-        if (isset($actionData['existingId'])) {
-            $proposedId = (int) $actionData['existingId'];
-            // Only accept the ID if it's in our list of valid memories
-            if (in_array($proposedId, $validMemoryIds, true)) {
-                $existingId = $proposedId;
-            }
-        }
-
-        // For update/delete, we need a valid existingId
-        // If AI suggested update/delete but the ID is invalid, convert to create
-        if (in_array($action, ['update', 'delete'], true) && null === $existingId) {
-            if ('delete' === $action) {
-                // Can't delete without a valid ID, skip this action
-                return null;
-            }
-            // Convert invalid update to create
-            $action = 'create';
-        }
-
-        $result = ['action' => $action];
-
-        // For create/update, memory field is required
-        if (in_array($action, ['create', 'update'], true)) {
-            if (!isset($actionData['memory'])) {
-                return null;
-            }
-
-            $result['memory'] = [
-                'category' => (string) ($actionData['memory']['category'] ?? 'preferences'),
-                'key' => (string) ($actionData['memory']['key'] ?? 'note'),
-                'value' => (string) ($actionData['memory']['value'] ?? trim($input)),
-            ];
-        }
-
-        if (null !== $existingId) {
-            $result['existingId'] = $existingId;
-        }
-
-        if (isset($actionData['reason'])) {
-            $result['reason'] = (string) $actionData['reason'];
-        }
-
-        return $result;
+        return $this->json($response, $status);
     }
 
     /**

@@ -4,16 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Admin;
 
-use App\AI\Credential\ProviderKeyStore;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
-use App\Service\Auth\RegistrationConfig;
-use App\Service\Chat\GuestChatConfig;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\Contract\ComputeHealth;
-use App\Service\Security\EncryptionService;
+use App\Tests\Support\SystemConfigServiceFactory;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 final class SystemConfigServiceComputeTest extends TestCase
 {
@@ -27,18 +23,10 @@ final class SystemConfigServiceComputeTest extends TestCase
 
         $repo = $this->createMock(ConfigRepository::class);
         $repo->expects($this->never())->method('setValue');
-        $encryption = new EncryptionService('test-secret', new NullLogger());
-        $service = new SystemConfigService(
-            projectDir: sys_get_temp_dir(),
-            logger: new NullLogger(),
-            configRepository: $repo,
-            defaultTtsUrl: 'http://localhost:10200',
-            providerKeyStore: new ProviderKeyStore($repo, $encryption, new NullLogger()),
-            encryption: $encryption,
-            registrationConfig: new RegistrationConfig($repo),
-            guestChatConfig: new GuestChatConfig($repo),
-            computeClient: $client,
-        );
+        $service = SystemConfigServiceFactory::build([
+            'configRepository' => $repo,
+            'computeClient' => $client,
+        ]);
 
         $result = $service->setValue('COMPUTE_DEFAULT_TIMEOUT_SEC', '999');
 
@@ -96,18 +84,10 @@ final class SystemConfigServiceComputeTest extends TestCase
         $repo->expects($this->never())->method('setValue');
         $client = $this->createStub(ComputeClient::class);
         $client->method('health')->willThrowException(new \RuntimeException('sidecar down'));
-        $encryption = new EncryptionService('test-secret', new NullLogger());
-        $service = new SystemConfigService(
-            projectDir: sys_get_temp_dir(),
-            logger: new NullLogger(),
-            configRepository: $repo,
-            defaultTtsUrl: 'http://localhost:10200',
-            providerKeyStore: new ProviderKeyStore($repo, $encryption, new NullLogger()),
-            encryption: $encryption,
-            registrationConfig: new RegistrationConfig($repo),
-            guestChatConfig: new GuestChatConfig($repo),
-            computeClient: $client,
-        );
+        $service = SystemConfigServiceFactory::build([
+            'configRepository' => $repo,
+            'computeClient' => $client,
+        ]);
 
         $result = $service->setValue('COMPUTE_WORKSPACES_ENABLED', 'true');
 
@@ -172,18 +152,10 @@ final class SystemConfigServiceComputeTest extends TestCase
         ));
         $client = $this->createStub(ComputeClient::class);
         $client->method('health')->willReturn($health);
-        $encryption = new EncryptionService('test-secret', new NullLogger());
 
-        return new SystemConfigService(
-            projectDir: sys_get_temp_dir(),
-            logger: new NullLogger(),
-            configRepository: $repo,
-            defaultTtsUrl: 'http://localhost:10200',
-            providerKeyStore: new ProviderKeyStore($repo, $encryption, new NullLogger()),
-            encryption: $encryption,
-            registrationConfig: new RegistrationConfig($repo),
-            guestChatConfig: new GuestChatConfig($repo),
-            computeClient: $client,
-        );
+        return SystemConfigServiceFactory::build([
+            'configRepository' => $repo,
+            'computeClient' => $client,
+        ]);
     }
 }

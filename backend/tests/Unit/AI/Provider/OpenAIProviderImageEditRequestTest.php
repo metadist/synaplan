@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Provider;
 
-use App\AI\Provider\OpenAIProvider;
+use App\AI\Provider\OpenAI\OpenAIApiClient;
+use App\AI\Provider\OpenAI\OpenAICurlTransport;
+use App\AI\Provider\OpenAI\OpenAIImageGeneration;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -14,7 +16,7 @@ use Symfony\Component\HttpClient\MockHttpClient;
  * Issue #2404: image edits through the Responses API sent the image tool
  * without the requested `quality`, while billing recorded `high` at
  * 1024x1024. These cases pin the body that
- * {@see OpenAIProvider::generateImageWithResponsesApi()} sends.
+ * {@see OpenAIImageGeneration::generateImageWithResponsesApi()} sends.
  */
 final class OpenAIProviderImageEditRequestTest extends TestCase
 {
@@ -99,11 +101,11 @@ final class OpenAIProviderImageEditRequestTest extends TestCase
      */
     private function build(string $prompt, string $model, array $images, array $options): array
     {
-        $provider = new OpenAIProvider(new NullLogger(), new MockHttpClient());
-        $method = new \ReflectionMethod(OpenAIProvider::class, 'buildImageEditRequest');
+        $generation = new OpenAIImageGeneration(new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport()), new NullLogger());
+        $method = new \ReflectionMethod(OpenAIImageGeneration::class, 'buildImageEditRequest');
 
         /** @var array{model: string, input: list<array<string, mixed>>, tools: list<array<string, mixed>>} $body */
-        $body = $method->invoke($provider, $prompt, $model, $images, $options);
+        $body = $method->invoke($generation, $prompt, $model, $images, $options);
 
         return $body;
     }

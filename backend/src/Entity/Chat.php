@@ -209,6 +209,21 @@ class Chat
         return $this;
     }
 
+    /**
+     * Pins or unpins the chat. Pinning is list placement, not activity: the
+     * last activity stays, so an unpinned chat returns to where it was in
+     * the history, and a chat pinned again keeps its first pin time.
+     */
+    public function pin(bool $pinned): self
+    {
+        if ($pinned !== $this->pinned) {
+            $this->pinned = $pinned;
+            $this->pinnedAt = $pinned ? new \DateTime() : null;
+        }
+
+        return $this;
+    }
+
     public function getMessages(): Collection
     {
         return $this->messages;

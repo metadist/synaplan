@@ -10,7 +10,6 @@ use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
 use App\Service\Widget\WidgetSummaryService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -33,7 +32,6 @@ class WidgetSummaryController extends AbstractController
         private WidgetRepository $widgetRepository,
         private WidgetSummaryService $summaryService,
         private PromptRepository $promptRepository,
-        private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
     }
@@ -540,8 +538,7 @@ class WidgetSummaryController extends AbstractController
 
         $prompt->setPrompt($promptText);
         $prompt->setShortDescription($modelId > 0 ? (string) $modelId : '');
-        $this->em->persist($prompt);
-        $this->em->flush();
+        $this->promptRepository->save($prompt);
 
         return $this->json(['success' => true]);
     }
@@ -599,8 +596,7 @@ class WidgetSummaryController extends AbstractController
         ]);
 
         if ($prompt) {
-            $this->em->remove($prompt);
-            $this->em->flush();
+            $this->promptRepository->remove($prompt);
         }
 
         return $this->json(['success' => true]);

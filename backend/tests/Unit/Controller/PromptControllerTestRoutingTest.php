@@ -26,6 +26,7 @@ use App\Service\Prompt\PromptService;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
+use App\Service\Summary\DocumentSummarizer;
 use App\Tests\Support\SkillCatalogFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -61,13 +62,11 @@ final class PromptControllerTestRoutingTest extends TestCase
             $this->promptRepository,
             $this->createMock(PromptMetaRepository::class),
             $this->createMock(PromptService::class),
-            $this->createMock(RateLimitService::class),
             $this->em,
             new NullLogger(),
-            $this->createMock(AiFacade::class),
+            $this->createStub(DocumentSummarizer::class),
             $this->createMock(MessageRepository::class),
             $this->createMock(FileRepository::class),
-            $this->createMock(ModelConfigService::class),
             $this->createMock(VectorStorageFacade::class),
             $this->createMock(PromptModelEligibilityValidator::class),
             new TaskPlanner(

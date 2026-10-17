@@ -6,6 +6,9 @@ namespace App\Tests\Unit\AI\Provider;
 
 use App\AI\Exception\NoImageException;
 use App\AI\Exception\ProviderException;
+use App\AI\Provider\OpenAI\OpenAIApiClient;
+use App\AI\Provider\OpenAI\OpenAICurlTransport;
+use App\AI\Provider\OpenAI\OpenAIImageGeneration;
 use App\AI\Provider\OpenAIProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -85,10 +88,10 @@ final class OpenAIProviderResponsesMessageTextTest extends TestCase
      */
     private function messageText(array $output): ?string
     {
-        $provider = new OpenAIProvider(new NullLogger(), new MockHttpClient());
-        $method = new \ReflectionMethod(OpenAIProvider::class, 'responsesMessageText');
+        $generation = new OpenAIImageGeneration(new OpenAIApiClient(new MockHttpClient(), new OpenAICurlTransport()), new NullLogger());
+        $method = new \ReflectionMethod(OpenAIImageGeneration::class, 'responsesMessageText');
 
-        $text = $method->invoke($provider, $output);
+        $text = $method->invoke($generation, $output);
 
         return is_string($text) ? $text : null;
     }

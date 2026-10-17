@@ -2,29 +2,26 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Controller;
+namespace App\Tests\Unit\Service\Memory;
 
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
-use App\Controller\UserMemoryController;
 use App\Entity\User;
-use App\Service\Digest\LongTermMemoryService;
+use App\Service\Memory\MemoryInputParser;
 use App\Service\Memory\UserMemoryService;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\DependencyInjection\Container;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Focused unit coverage for `UserMemoryController::parseMemory`'s
- * structured-output wiring — mirrors the sibling *StructuredOutputTest
- * classes for the other JSON-returning AI call sites.
+ * Focused unit coverage for `MemoryInputParser::parse`'s structured-output
+ * wiring — mirrors the sibling *StructuredOutputTest classes for the other
+ * JSON-returning AI call sites.
  */
-final class UserMemoryControllerStructuredOutputTest extends TestCase
+final class MemoryInputParserStructuredOutputTest extends TestCase
 {
     private AiFacade&MockObject $aiFacade;
     private UserMemoryService&MockObject $memoryService;
@@ -42,31 +39,19 @@ final class UserMemoryControllerStructuredOutputTest extends TestCase
         $this->memoryService->method('getUserMemories')->willReturn([]);
     }
 
-    private function buildController(StructuredOutputConfig $structuredOutputConfig): UserMemoryController
+    private function buildParser(StructuredOutputConfig $structuredOutputConfig): MemoryInputParser
     {
         $promptService = $this->createMock(PromptService::class);
         $promptService->method('getPromptWithMetadata')->willReturn(['prompt' => null]);
 
-        $controller = new UserMemoryController(
+        return new MemoryInputParser(
             $this->memoryService,
             $this->aiFacade,
             $promptService,
             $this->modelConfigService,
             $this->createMock(RateLimitService::class),
             $structuredOutputConfig,
-            $this->createStub(LongTermMemoryService::class),
         );
-
-        $container = new Container();
-        $container->set('serializer', new class {
-            public function serialize(mixed $data, string $format): string
-            {
-                return json_encode($data, \JSON_THROW_ON_ERROR);
-            }
-        });
-        $controller->setContainer($container);
-
-        return $controller;
     }
 
     private function makeUser(int $id = 1): User&MockObject
@@ -82,7 +67,7 @@ final class UserMemoryControllerStructuredOutputTest extends TestCase
     {
         $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
         $structuredOutputConfig->method('isEnabled')->willReturn(true);
-        $controller = $this->buildController($structuredOutputConfig);
+        $parser = $this->buildParser($structuredOutputConfig);
 
         $options = null;
         $this->aiFacade->method('chat')->willReturnCallback(
@@ -93,8 +78,7 @@ final class UserMemoryControllerStructuredOutputTest extends TestCase
             }
         );
 
-        $request = new Request([], [], [], [], [], [], json_encode(['input' => 'I like Python'], \JSON_THROW_ON_ERROR));
-        $controller->parseMemory($request, $this->makeUser());
+        $parser->parse($this->makeUser(), 'I like Python', null);
 
         self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
         self::assertSame('user_memory_actions', $options['structured_output']->name);
@@ -104,7 +88,7 @@ final class UserMemoryControllerStructuredOutputTest extends TestCase
     {
         $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
         $structuredOutputConfig->method('isEnabled')->willReturn(false);
-        $controller = $this->buildController($structuredOutputConfig);
+        $parser = $this->buildParser($structuredOutputConfig);
 
         $options = null;
         $this->aiFacade->method('chat')->willReturnCallback(
@@ -115,8 +99,7 @@ final class UserMemoryControllerStructuredOutputTest extends TestCase
             }
         );
 
-        $request = new Request([], [], [], [], [], [], json_encode(['input' => 'I like Python'], \JSON_THROW_ON_ERROR));
-        $controller->parseMemory($request, $this->makeUser());
+        $parser->parse($this->makeUser(), 'I like Python', null);
 
         self::assertArrayNotHasKey('structured_output', $options ?? []);
     }
