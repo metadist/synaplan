@@ -56,12 +56,12 @@ final class OverrideAndAgainRoutingTest extends TestCase
             ['analyze', 'mediamaker', ['general', 'chat'], ['general', 'chat']],
             ['vision', '', ['general', 'chat'], ['general', 'chat']],
             ['vision', 'mediamaker', ['mediamaker', 'image_generation'], ['general', 'chat']],
-            ['document', '', ['general', 'chat'], ['officemaker', 'document_generation']],
-            ['document', 'mediamaker', ['mediamaker', 'image_generation'], ['officemaker', 'document_generation']],
-            ['officemaker', '', ['general', 'chat'], ['officemaker', 'document_generation']],
-            ['officemaker', 'mediamaker', ['mediamaker', 'image_generation'], ['officemaker', 'document_generation']],
-            ['text2doc', '', ['general', 'chat'], ['officemaker', 'document_generation']],
-            ['text2doc', 'mediamaker', ['mediamaker', 'image_generation'], ['officemaker', 'document_generation']],
+            ['document', '', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
+            ['document', 'mediamaker', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
+            ['officemaker', '', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
+            ['officemaker', 'mediamaker', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
+            ['text2doc', '', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
+            ['text2doc', 'mediamaker', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
             ['chat', '', ['general', 'chat'], ['general', 'chat']],
             ['chat', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
             ['chat', 'legal-review', ['general', 'chat'], ['legal-review', 'chat']],
@@ -106,6 +106,13 @@ final class OverrideAndAgainRoutingTest extends TestCase
         $byAgain = $this->resolver('chat')->againForBufferedTurn($this->message('tools:pic'), ['is_again' => true, 'model_id' => 42], new TurnStatus(null, new NullLogger()));
 
         self::assertSame(['tools:pic', 'image_generation'], [$byAgain['topic'], $byAgain['intent']]);
+    }
+
+    public function testADocumentModelOverrideReachesTheDocumentHandler(): void
+    {
+        $byOverride = $this->classifier('document')->classify($this->message(''));
+
+        self::assertSame(['officemaker', 'document_generation'], [$byOverride['topic'], $byOverride['intent']]);
     }
 
     private function classifier(?string $tag): MessageClassifier

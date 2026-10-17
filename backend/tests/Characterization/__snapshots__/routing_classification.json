@@ -430,7 +430,7 @@
         "topic": "general"
     },
     "override_document_custom_topic": {
-        "intent": "chat",
+        "intent": "document_generation",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -438,10 +438,10 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "legal-review"
+        "topic": "officemaker"
     },
     "override_document_mediamaker": {
-        "intent": "image_generation",
+        "intent": "document_generation",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -449,10 +449,10 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "mediamaker"
+        "topic": "officemaker"
     },
     "override_document_no_topic": {
-        "intent": "chat",
+        "intent": "document_generation",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -460,10 +460,10 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "general"
+        "topic": "officemaker"
     },
     "override_officemaker_custom_topic": {
-        "intent": "chat",
+        "intent": "document_generation",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -471,10 +471,10 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "legal-review"
+        "topic": "officemaker"
     },
     "override_officemaker_mediamaker": {
-        "intent": "image_generation",
+        "intent": "document_generation",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -482,10 +482,10 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "mediamaker"
+        "topic": "officemaker"
     },
     "override_officemaker_no_topic": {
-        "intent": "chat",
+        "intent": "document_generation",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -493,7 +493,7 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "general"
+        "topic": "officemaker"
     },
     "override_pic2text_custom_topic": {
         "intent": "chat",
@@ -584,7 +584,7 @@
         "topic": "unknown"
     },
     "override_text2doc_custom_topic": {
-        "intent": "chat",
+        "intent": "document_generation",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -592,10 +592,10 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "legal-review"
+        "topic": "officemaker"
     },
     "override_text2doc_mediamaker": {
-        "intent": "image_generation",
+        "intent": "document_generation",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -603,10 +603,10 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "mediamaker"
+        "topic": "officemaker"
     },
     "override_text2doc_no_topic": {
-        "intent": "chat",
+        "intent": "document_generation",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -614,7 +614,7 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "general"
+        "topic": "officemaker"
     },
     "override_text2pic_custom_topic": {
         "intent": "image_generation",
