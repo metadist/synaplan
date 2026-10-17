@@ -11,9 +11,6 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Destination\RequestedFolderDelivery;
-use App\Service\File\ConversationFile;
-use App\Service\File\ConversationFileCatalog;
-use App\Service\File\FileHelper;
 use App\Service\File\ThumbnailService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
@@ -25,11 +22,12 @@ use App\Service\Media\MediaJobService;
 use App\Service\Media\RenderedImageSize;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\GeneratedMediaTextRenderer;
+use App\Service\Message\Handler\Media\MediaModelResolver;
+use App\Service\Message\Handler\Media\MediaPromptResolver;
+use App\Service\Message\Handler\Media\MediaReferenceResolver;
 use App\Service\Message\Handler\Media\MediaUploadStore;
-use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\ProgressCallback;
 use App\Service\Message\TtsScriptGuard;
-use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -52,10 +50,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
     public function __construct(
         private AiFacade $aiFacade,
-        private ModelConfigService $modelConfigService,
+        private MediaModelResolver $modelResolver,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private MediaPromptExtractor $promptExtractor,
+        private MediaPromptResolver $promptResolver,
         private MediaUploadStore $uploadStore,
         private ThumbnailService $thumbnailService,
         private RateLimitService $rateLimitService,
@@ -68,7 +66,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MediaJobMessageSync $mediaJobMessageSync,
         private GeneratedFileRegistrar $generatedFileRegistrar,
         private PremiumFeatureGate $premiumFeatureGate,
-        private ConversationFileCatalog $conversationFileCatalog,
+        private MediaReferenceResolver $referenceResolver,
         private string $uploadDir = '/var/www/backend/var/uploads',
         // Public base URL that serves /api/v1/files/uploads/* (same value used
         // by OgImageService / shared chat pages). Needed for image-to-video:
@@ -159,239 +157,35 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // "ich liebe Hunde". A turn handed to ChatHandler instead is extracted
         // there — dispatching here as well would queue the same message twice.
 
-        // Collect attached image paths for pic2pic. Besides the message's own
-        // uploads we also accept reference images passed explicitly via options
-        // (issue #1144: multitask media-to-media chains, where an upstream node's
-        // generated image is the reference for this video/edit node).
-        $referenceImagePaths = is_array($options['reference_image_paths'] ?? null) ? $options['reference_image_paths'] : [];
-        $attachedImagePaths = $this->collectAttachedImagePaths($message, $referenceImagePaths);
+        $references = $this->referenceResolver->resolve($message, $thread, $classification, $options);
+        $mediaPrompt = $this->promptResolver->resolve($message, $thread, $classification, $references, $progressCallback);
+        $choice = $this->modelResolver->choose($message, $classification, $mediaPrompt);
+        if (null === $choice) {
+            $lang = $classification['language'] ?? 'en';
+            $clarification = 'de' === $lang
+                ? 'Ich konnte nicht erkennen, welche Art von Medium du erstellen möchtest. '
+                    .'Bitte verwende einen der folgenden Befehle: `/pic` für Bilder, `/vid` für Videos, `/tts` für Audio.'
+                : 'I couldn\'t determine what type of media you want to generate. '
+                    .'Please use one of the following commands: `/pic` for images, `/vid` for videos, `/tts` for audio.';
 
-        // Detect public image URLs the user pasted directly into their message
-        // text. A request like "make a video from https://…/photo.jpg where the
-        // sun sets over the sea" carries NO file attachment, so pic2pic is
-        // false and the request would wrongly route to text-to-video (issue:
-        // public image-URL → Veo text2vid). Treat an image URL in the text as an
-        // image-to-video reference: it is already provider-fetchable, so it is
-        // the ideal i2v source — no republish and no internet-reachable APP_URL
-        // required (unlike a locally-attached file).
-        $imageUrlsInText = FileHelper::extractImageUrls($message->getText());
+            $streamCallback($clarification);
+            $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
 
-        // The multitask DAG runner feeds the handler a synthetic message built
-        // from the planner's CLEANED prompt (URL stripped) plus the original
-        // user message's file attachments only. When the image was supplied as a
-        // URL in the original text, it never reaches us via the synthetic
-        // message — so the runner forwards those URLs explicitly here.
-        foreach ($this->referenceImageUrlsFromOptions($options) as $optionImageUrl) {
-            if (!in_array($optionImageUrl, $imageUrlsInText, true)) {
-                $imageUrlsInText[] = $optionImageUrl;
-            }
+            return [
+                'metadata' => [
+                    'error' => 'media_type_not_determined',
+                ],
+            ];
         }
 
-        // Cross-turn edit: the user asks to change a picture that exists in the
-        // conversation but attached nothing to this message ("mach das Auto
-        // blau"). Without this the request fell through to a fresh text2pic and
-        // produced a completely different image — the composition the user was
-        // working on was simply lost. Only reached when nothing else supplied a
-        // reference, so attachments and multitask chains (#1144) keep priority.
-        // Resolved BEFORE prompt extraction so the mediamaker prompt can be told
-        // it is editing an existing picture and must describe only the CHANGE.
-        $editSource = null;
-        if ([] === $attachedImagePaths && [] === $imageUrlsInText) {
-            $editSource = $this->resolveConversationEditSource($message, $thread, $classification);
-        }
-
-        // Extract media prompt via AI (mediamaker prompt)
-        $promptData = $this->promptExtractor->extract(
-            $message,
-            $thread,
-            $classification,
-            null !== $editSource ? ['media_edit_source_name' => $editSource->displayName] : [],
-        );
-        $promptMediaType = $promptData['media_type'] ?? null;
-
-        // The extractor has the final say on the media type. If it turns out
-        // this is a video or audio request after all, the picture must be
-        // dropped — otherwise a text-to-video turn would silently become
-        // image-to-video off an unrelated old image. The prompt above was
-        // written under "you are editing <file>, describe only the change", so
-        // it is unusable here and gets re-extracted without that context
-        // instead of carrying edit-only wording into a video or audio prompt.
-        if (null !== $editSource && null !== $promptMediaType && 'image' !== $promptMediaType) {
-            $this->logger->info('MediaGenerationHandler: dropping conversation edit source, extractor asked for a different media type', [
-                'media_type' => $promptMediaType,
-                'edit_source' => $editSource->reference,
-            ]);
-            $editSource = null;
-            $promptData = $this->promptExtractor->extract($message, $thread, $classification);
-            $promptMediaType = $promptData['media_type'] ?? null;
-        }
-
-        $prompt = trim($promptData['prompt'] ?? '');
-
-        if ('' === $prompt) {
-            $prompt = $message->getText();
-        }
-
-        if ('' === $prompt) {
-            throw new \RuntimeException('Unable to determine media prompt text');
-        }
-
-        if (null !== $editSource) {
-            $attachedImagePaths[] = $editSource->absolutePath;
-            ProgressCallback::notify($progressCallback, 'editing', 'Editing '.$editSource->displayName.'…', [
-                'edit_source_file_id' => $editSource->fileId,
-                'edit_source_name' => $editSource->displayName,
-            ]);
-        }
-
-        $isPic2Pic = !empty($attachedImagePaths);
-        $hasVideoReferenceImage = $isPic2Pic || [] !== $imageUrlsInText;
-
-        $this->logger->info('MediaGenerationHandler: Starting media generation', [
-            'user_id' => $message->getUserId(),
-            'prompt' => substr($prompt, 0, 100),
-            'media_hint' => $promptMediaType,
-            'is_pic2pic' => $isPic2Pic,
-            'attached_images' => count($attachedImagePaths),
-            'image_urls_in_text' => count($imageUrlsInText),
-            'edit_source' => $editSource?->reference,
-        ]);
-
-        // Get media generation model - detect type from model tag if specified
-        $modelId = null;
-        $provider = null;
-        $modelName = null;
-        $mediaType = 'image'; // default
-
-        // Check if this is a slash command (e.g., /pic, /vid)
-        $topic = $classification['topic'] ?? null;
-        $isSlashCommand = false;
-        if ('tools:pic' === $topic) {
-            $mediaType = 'image';
-            $isSlashCommand = true;
-            $this->logger->info('MediaGenerationHandler: Detected /pic command, forcing image generation');
-        } elseif ('tools:vid' === $topic) {
-            $mediaType = 'video';
-            $isSlashCommand = true;
-            $this->logger->info('MediaGenerationHandler: Detected /vid command, forcing video generation');
-        } elseif ('tools:tts' === $topic) {
-            $mediaType = 'audio';
-            $isSlashCommand = true;
-            $this->logger->info('MediaGenerationHandler: Detected /tts command, forcing audio generation');
-        }
-
-        // Priority: Again model_id > Task-prompt aiModel > DB default
-        $promptMetadata = $classification['prompt_metadata'] ?? [];
-        $promptAiModel = (isset($promptMetadata['aiModel']) && (int) $promptMetadata['aiModel'] > 0)
-            ? (int) $promptMetadata['aiModel']
-            : null;
-
-        if (isset($classification['model_id']) && $classification['model_id']) {
-            $modelId = $classification['model_id'];
-            $this->logger->info('MediaGenerationHandler: Using classification override model', [
-                'model_id' => $modelId,
-            ]);
-            [$mediaType, $provider, $modelName] = $this->resolveMediaTypeFromModelId($modelId, $isSlashCommand, $mediaType, $provider, $modelName);
-        } elseif ($promptAiModel) {
-            $modelId = $promptAiModel;
-            $this->logger->info('MediaGenerationHandler: Using task-prompt aiModel override', [
-                'model_id' => $modelId,
-            ]);
-            [$mediaType, $provider, $modelName] = $this->resolveMediaTypeFromModelId($modelId, $isSlashCommand, $mediaType, $provider, $modelName);
-        } else {
-            $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
-
-            if ($isSlashCommand) {
-                if ('video' === $mediaType) {
-                    // `/vid` with an image reference is an image-to-video request
-                    // (animate the photo) → use the IMG2VID default; otherwise a
-                    // text-to-video request → TEXT2VID. The reference can be an
-                    // attached file OR a public image URL pasted in the text.
-                    $modelId = $hasVideoReferenceImage
-                        ? $this->modelConfigService->getDefaultModel('IMG2VID', $effectiveUserId)
-                        : $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
-                } elseif ('audio' === $mediaType) {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $effectiveUserId);
-                } else {
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
-                }
-                $this->logger->info('MediaGenerationHandler: Using default model for slash command', [
-                    'media_type' => $mediaType,
-                    'is_pic2pic' => $isPic2Pic,
-                    'model_id' => $modelId,
-                ]);
-            } elseif ($hasVideoReferenceImage && 'video' === $promptMediaType) {
-                // Image-to-video: the user supplied an image (attached file OR a
-                // public image URL in the text) AND asked for a video/animation.
-                // This MUST win over the pic2pic-image branch below (an image
-                // reference alone would otherwise force an image edit). Routes to
-                // the IMG2VID default (an image-to-video model); the reference is
-                // published/forwarded as image_url in the video generation block.
-                $modelId = $this->modelConfigService->getDefaultModel('IMG2VID', $effectiveUserId);
-                $mediaType = 'video';
-                $this->logger->info('MediaGenerationHandler: Image-to-video detected, using IMG2VID default model', [
-                    'model_id' => $modelId,
-                    'attached_images' => count($attachedImagePaths),
-                    'image_urls_in_text' => count($imageUrlsInText),
-                ]);
-            } elseif ($isPic2Pic) {
-                $modelId = $this->modelConfigService->getDefaultModel('PIC2PIC', $effectiveUserId);
-                $mediaType = 'image';
-
-                // The reference came from the conversation, not from the user.
-                // An install without a PIC2PIC default would answer "no model
-                // configured" for a request that used to produce a picture, so
-                // drop the reference and generate from text instead: degraded,
-                // never broken. An ATTACHED image keeps the hard error — there
-                // the user explicitly asked for an edit.
-                if (!$modelId && null !== $editSource) {
-                    $this->logger->warning('MediaGenerationHandler: no PIC2PIC model configured, falling back to text2pic for the conversation edit', [
-                        'edit_source' => $editSource->reference,
-                    ]);
-                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
-                    $attachedImagePaths = [];
-                    $isPic2Pic = false;
-                    $editSource = null;
-                }
-
-                $this->logger->info('MediaGenerationHandler: Pic2pic detected, using PIC2PIC default model', [
-                    'model_id' => $modelId,
-                    'image_count' => count($attachedImagePaths),
-                ]);
-            } elseif ('video' === $promptMediaType) {
-                $modelId = $this->modelConfigService->getDefaultModel('TEXT2VID', $effectiveUserId);
-                $mediaType = 'video';
-                $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (video)');
-            } elseif ('audio' === $promptMediaType) {
-                $modelId = $this->modelConfigService->getDefaultModel('TEXT2SOUND', $effectiveUserId);
-                $mediaType = 'audio';
-                $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (audio)');
-            } elseif ('image' === $promptMediaType) {
-                $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
-                $mediaType = 'image';
-                $this->logger->info('MediaGenerationHandler: Using media type hint from extractor (image)');
-            } else {
-                $this->logger->warning('MediaGenerationHandler: Media type not determined from extractor, asking user to clarify', [
-                    'prompt_preview' => substr($prompt, 0, 100),
-                ]);
-
-                $lang = $classification['language'] ?? 'en';
-                $clarification = 'de' === $lang
-                    ? 'Ich konnte nicht erkennen, welche Art von Medium du erstellen möchtest. '
-                        .'Bitte verwende einen der folgenden Befehle: `/pic` für Bilder, `/vid` für Videos, `/tts` für Audio.'
-                    : 'I couldn\'t determine what type of media you want to generate. '
-                        .'Please use one of the following commands: `/pic` for images, `/vid` for videos, `/tts` for audio.';
-
-                $streamCallback($clarification);
-                $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
-
-                return [
-                    'metadata' => [
-                        'error' => 'media_type_not_determined',
-                    ],
-                ];
-            }
-        }
+        $prompt = $mediaPrompt->text;
+        $mediaType = $choice->mediaType;
+        $isSlashCommand = $choice->isSlashCommand;
+        $attachedImagePaths = $choice->references->attachedImagePaths;
+        $imageUrlsInText = $choice->references->imageUrlsInText;
+        $editSource = $choice->references->editSource;
+        $isPic2Pic = $choice->references->isPic2Pic();
+        $hasVideoReferenceImage = $choice->references->hasVideoReferenceImage();
 
         // A sorter-routed audio turn whose "script" is just the user's request
         // ("teach me the Persian numbers with a children's song") has nothing
@@ -411,41 +205,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // the note at the top of this method).
         $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
 
-        // Resolve model ID to provider + model name + config
-        $modelConfig = [];
-        if ($modelId) {
-            $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
-
-            // An "Again" pick or a task prompt's pinned aiModel is a stored copy
-            // of a BID and is read ahead of the default chain, so a retired one
-            // must follow its successor here or it reaches a provider that has
-            // shut the model down.
-            if ($model?->isRetired()) {
-                $replacementId = $this->modelConfigService->replacementForRetiredModel(
-                    (int) $modelId,
-                    $this->capabilityForMediaRequest($mediaType, $isPic2Pic, $hasVideoReferenceImage),
-                    $this->modelConfigService->getEffectiveUserIdForMessage($message),
-                );
-                $model = null !== $replacementId ? $this->em->getRepository(\App\Entity\Model::class)->find($replacementId) : null;
-                $modelId = null !== $model ? $replacementId : null;
-                if (null === $model) {
-                    $provider = null;
-                    $modelName = null;
-                }
-            }
-
-            if ($model) {
-                $provider = strtolower($model->getService());
-                $modelName = $model->getProviderId() ?: $model->getName();
-                $modelConfig = $model->getJson();
-            }
-
-            $this->logger->info('MediaGenerationHandler: Resolved model', [
-                'model_id' => $modelId,
-                'provider' => $provider,
-                'model' => $modelName,
-            ]);
-        }
+        $resolved = $this->modelResolver->resolve($message, $choice);
+        $modelId = $resolved->id;
+        $provider = $resolved->provider;
+        $modelName = $resolved->name;
+        $modelConfig = $resolved->config;
 
         // No model resolved: the operator has no default configured for this
         // media capability (TEXT2PIC/TEXT2VID/TEXT2SOUND/…). Return an
@@ -729,7 +493,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     ]);
                 }
 
-                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+                $effectiveUserId = $this->modelResolver->effectiveUserId($message);
                 if ($this->asyncJobsAllowed($effectiveUserId, $options)
                     && $this->aiFacade->supportsAsyncVideo($provider)) {
                     return $this->detachVideoToAsyncJob(
@@ -761,7 +525,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     'text_length' => strlen($prompt),
                 ]);
 
-                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+                $effectiveUserId = $this->modelResolver->effectiveUserId($message);
                 if ($this->asyncJobsAllowed($effectiveUserId, $options)) {
                     return $this->detachMediaToAsyncJob(
                         MediaJob::TYPE_AUDIO,
@@ -877,7 +641,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     ]);
                 }
 
-                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+                $effectiveUserId = $this->modelResolver->effectiveUserId($message);
                 if ($this->asyncJobsAllowed($effectiveUserId, $options)) {
                     $inputRef = $attachedImagePaths[0] ?? null;
 
@@ -1151,47 +915,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     }
 
     /**
-     * Resolve the picture an attachment-less edit request refers to.
-     *
-     * Deliberately conservative: reusing an old image on a "draw me something
-     * new" request is worse than the bug this fixes, so the edit has to be
-     * voted for by the sorter (BINPUTMODE=reference_images). New-image phrasing
-     * ("another one", "neues Bild") maps to text_only there and never reaches
-     * this method. The target is the newest picture of the conversation — the
-     * one the user was just looking at.
-     *
-     * @param array<int, Message|array{role: string, content: string}> $thread
-     * @param array<string, mixed>                                     $classification
-     */
-    private function resolveConversationEditSource(
-        Message $message,
-        array $thread,
-        array $classification,
-    ): ?ConversationFile {
-        if ('reference_images' !== ($classification['input_mode'] ?? null)) {
-            return null;
-        }
-
-        // A video/audio request must never pick up an old picture: that would
-        // silently turn text-to-video into image-to-video.
-        $requestedMediaType = $classification['media_type'] ?? null;
-        if (null !== $requestedMediaType && 'image' !== $requestedMediaType) {
-            return null;
-        }
-
-        // `/vid` and `/tts` say the same thing, but the sorter does not always
-        // fill media_type for a slash command — the topic is the reliable
-        // signal there.
-        if (in_array($classification['topic'] ?? null, ['tools:vid', 'tools:tts'], true)) {
-            return null;
-        }
-
-        $catalog = $this->conversationFileCatalog->build($message, $thread, [], ConversationFile::CATEGORY_IMAGE);
-
-        return $this->conversationFileCatalog->latestImage($catalog);
-    }
-
-    /**
      * Route a misclassified "audio" turn to the general chat answer.
      *
      * The mediamaker classification (topic, BMEDIA, model override, the
@@ -1267,164 +990,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $result['metadata'] = $metadata;
 
         return $result;
-    }
-
-    /**
-     * Collect absolute paths of image attachments from the message.
-     *
-     * @param list<string> $extraImagePaths reference images supplied by the caller
-     *                                      (issue #1144) — relative to the upload
-     *                                      dir, an absolute path, or a public
-     *                                      `/api/v1/files/uploads/...` display URL
-     *
-     * @return list<string> absolute, on-disk image paths to attached images
-     */
-    private function collectAttachedImagePaths(Message $message, array $extraImagePaths = []): array
-    {
-        $paths = [];
-        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-
-        foreach ($message->getFiles() as $file) {
-            $ext = strtolower(pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
-            if (in_array($ext, $imageExtensions, true)) {
-                $absolutePath = $this->uploadDir.'/'.$file->getFilePath();
-                if (file_exists($absolutePath)) {
-                    $paths[] = $absolutePath;
-                }
-            }
-        }
-
-        if (empty($paths)) {
-            $legacyPath = $message->getFilePath();
-            if ($legacyPath) {
-                $ext = strtolower(pathinfo($legacyPath, PATHINFO_EXTENSION));
-                if (in_array($ext, $imageExtensions, true)) {
-                    $absolutePath = $this->uploadDir.'/'.$legacyPath;
-                    if (file_exists($absolutePath)) {
-                        $paths[] = $absolutePath;
-                    }
-                }
-            }
-        }
-
-        // Merge caller-supplied reference images (multitask media-to-media chains).
-        // Each candidate is normalised to an absolute on-disk path and filtered by
-        // image extension + existence, exactly like the message's own uploads.
-        foreach ($extraImagePaths as $candidate) {
-            if ('' === $candidate) {
-                continue;
-            }
-            $absolutePath = $this->normalizeReferenceImagePath($candidate);
-            if (null === $absolutePath) {
-                continue;
-            }
-            $ext = strtolower(pathinfo($absolutePath, PATHINFO_EXTENSION));
-            if (in_array($ext, $imageExtensions, true) && !in_array($absolutePath, $paths, true)) {
-                $paths[] = $absolutePath;
-            }
-        }
-
-        return $paths;
-    }
-
-    /**
-     * Normalise caller-supplied reference image URLs (multitask path: the URL
-     * lives in the original user message, not the synthetic node prompt). Each
-     * candidate is run through the same allowlist as
-     * {@see FileHelper::extractImageUrls()}, so only http(s) URLs ending in a
-     * known image extension survive — these values are handed to providers as
-     * `image_url`/`images`, so a non-image / non-http(s) target must never pass.
-     * De-duplicated in first-seen order.
-     *
-     * @param array<string, mixed> $options
-     *
-     * @return list<string>
-     */
-    private function referenceImageUrlsFromOptions(array $options): array
-    {
-        $candidates = $options['reference_image_urls'] ?? null;
-        if (!is_array($candidates)) {
-            return [];
-        }
-
-        $urls = [];
-        foreach ($candidates as $candidate) {
-            if (!is_string($candidate)) {
-                continue;
-            }
-            foreach (FileHelper::extractImageUrls($candidate) as $url) {
-                if (!in_array($url, $urls, true)) {
-                    $urls[] = $url;
-                }
-            }
-        }
-
-        return $urls;
-    }
-
-    /**
-     * Resolve a caller-supplied reference image reference to an absolute on-disk
-     * path (issue #1144). Accepts an absolute path, a path relative to the upload
-     * dir, or a public `/api/v1/files/uploads/...` display URL. Returns null when
-     * the file cannot be found.
-     */
-    private function normalizeReferenceImagePath(string $candidate): ?string
-    {
-        // Strip the public display prefix so a `$nX.file` `path` resolves to the
-        // same relative key the upload dir uses.
-        $relative = preg_replace('#^/?api/v1/files/uploads/#', '', $candidate);
-        $relative = null === $relative ? $candidate : $relative;
-
-        // Already an absolute, existing path.
-        if (str_starts_with($candidate, '/') && file_exists($candidate)) {
-            return $candidate;
-        }
-
-        $absolute = $this->uploadDir.'/'.ltrim($relative, '/');
-        if (file_exists($absolute)) {
-            return $absolute;
-        }
-
-        $this->logger->warning('MediaGenerationHandler: reference image not found on disk', [
-            'candidate' => $candidate,
-        ]);
-
-        return null;
-    }
-
-    private function capabilityForMediaRequest(string $mediaType, bool $isPic2Pic, bool $hasVideoReferenceImage): string
-    {
-        return match ($mediaType) {
-            'video' => $hasVideoReferenceImage ? 'IMG2VID' : 'TEXT2VID',
-            'audio' => 'TEXT2SOUND',
-            default => $isPic2Pic ? 'PIC2PIC' : 'TEXT2PIC',
-        };
-    }
-
-    /**
-     * Resolve media type, provider, and model name from a model ID.
-     *
-     * @return array{string, ?string, ?string} [$mediaType, $provider, $modelName]
-     */
-    private function resolveMediaTypeFromModelId(int $modelId, bool $isSlashCommand, string $mediaType, ?string $provider, ?string $modelName): array
-    {
-        if ($isSlashCommand) {
-            return [$mediaType, $provider, $modelName];
-        }
-
-        $model = $this->em->getRepository(\App\Entity\Model::class)->find($modelId);
-        if ($model) {
-            $tag = $model->getTag();
-            if ('text2vid' === $tag) {
-                $mediaType = 'video';
-            } elseif ('text2sound' === $tag) {
-                $mediaType = 'audio';
-            }
-            $provider = $model->getService();
-            $modelName = $model->getName();
-        }
-
-        return [$mediaType, $provider, $modelName];
     }
 
     /**
@@ -1525,7 +1090,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         callable $streamCallback,
         ?callable $progressCallback,
     ): array {
-        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
+        $effectiveUserId = $this->modelResolver->effectiveUserId($message);
         $mediaOptions['lang'] = is_string($classification['language'] ?? null)
             ? $classification['language']
             : ($message->getLanguage() ?: 'en');

@@ -265,12 +265,6 @@ parameters:
 			path: src/Service/Message/Chat/ChatMessageAssembler.php
 
 		-
-			message: '#^Offset ''prompt'' on array\{prompt\: string, media_type\: string\|null, raw\: string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: src/Service/Message/Handler/MediaGenerationHandler.php
-
-		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1

@@ -19,6 +19,9 @@ use App\Service\Media\MediaJobService;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\Media\MediaDownloader;
+use App\Service\Message\Handler\Media\MediaModelResolver;
+use App\Service\Message\Handler\Media\MediaPromptResolver;
+use App\Service\Message\Handler\Media\MediaReferenceResolver;
 use App\Service\Message\Handler\Media\MediaUploadStore;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
@@ -63,10 +66,10 @@ final class MediaGenerationHandlerFactory
 
         return new MediaGenerationHandler(
             $doubles['ai'],
-            $doubles['models'],
+            new MediaModelResolver($doubles['models'], $doubles['em'], $logger),
             $doubles['em'],
             $logger,
-            $doubles['extractor'],
+            new MediaPromptResolver($doubles['extractor'], $logger),
             new MediaUploadStore(new UserUploadPathBuilder(), $doubles['downloader'], $logger, $doubles['uploadDir'], $doubles['publicBaseUrl']),
             $doubles['thumbnails'],
             $doubles['limits'],
@@ -79,7 +82,7 @@ final class MediaGenerationHandlerFactory
             $doubles['jobSync'],
             $doubles['registrar'],
             $doubles['gate'],
-            $doubles['catalog'],
+            new MediaReferenceResolver($doubles['catalog'], $logger, $doubles['uploadDir']),
             $doubles['uploadDir'],
             $doubles['publicBaseUrl'],
             $doubles['folders'],

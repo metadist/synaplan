@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Service\Message\Handler;
 use App\Entity\Message;
 use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
-use App\Service\Message\Handler\MediaGenerationHandler;
+use App\Service\Message\Handler\Media\MediaReferenceResolver;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -94,11 +94,11 @@ final class MediaGenerationHandlerConversationEditTest extends TestCase
      */
     private function resolve(ConversationFileCatalog $catalog, array $classification): ?ConversationFile
     {
-        $handler = (new \ReflectionClass(MediaGenerationHandler::class))->newInstanceWithoutConstructor();
-        (new \ReflectionProperty(MediaGenerationHandler::class, 'conversationFileCatalog'))
+        $handler = (new \ReflectionClass(MediaReferenceResolver::class))->newInstanceWithoutConstructor();
+        (new \ReflectionProperty(MediaReferenceResolver::class, 'conversationFileCatalog'))
             ->setValue($handler, $catalog);
 
-        $method = new \ReflectionMethod(MediaGenerationHandler::class, 'resolveConversationEditSource');
+        $method = new \ReflectionMethod(MediaReferenceResolver::class, 'resolveConversationEditSource');
 
         return $method->invoke($handler, new Message(), [], $classification);
     }
