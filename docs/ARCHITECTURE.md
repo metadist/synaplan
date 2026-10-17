@@ -208,6 +208,18 @@ array.
 frames, stored rows, realtime events, Slack, Discord, usage, generated
 media, the run and the flush count — over nineteen cases.
 
+**Inbound email** — `WebhookController::email()`, `App\Service\Email\Turn\`:
+
+| Stage | Does |
+| ----- | ---- |
+| `InboundEmailIntake` | accepts the relay's email as an `InboundEmail` (with its `EmailThread`) or answers it without a turn (`InboundEmailAnswered`): the payload, a raw MIME body read as its text, the keyword, the idempotency check (a redelivery is a duplicate, never answered twice), the sender's account and its limit; a refused sender and a spent limit are told by mail |
+| `EmailConversation` | stores the email in the sender's email chat (`StoredInboundEmail`) with its metadata and attachments; an audio attachment asks for a spoken reply |
+| `EmailReply` | answers by mail: the usage and the stored answer (`EmailAnswerStore`), the spoken reply (`EmailVoiceReply`), the reply in the same thread with its files (`EmailReplyAttachments`) and doc links; a failed answer still mails the sender |
+
+`EmailTurnCharacterizationTest` pins the answer to the relay, the mail each
+delivery sends, the stored rows, the account, speech, usage, the summary
+refresh, the attachment store and Discord over fourteen cases.
+
 ## File analysis — `FileAnalysisHandler`
 
 `FileAnalysisHandler` answers about the files of a turn on one path for both
