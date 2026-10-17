@@ -727,14 +727,21 @@ services:
     # Uses cache + lock for atomic duplicate message detection (WhatsApp webhook retries)
     App\Service\WhatsApp\WhatsAppService:
         arguments:
-            $cache: '@cache.app'
-            $lockFactory: '@lock.factory'
             $whatsappAccessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
             $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
             $uploadsDir: '%kernel.project_dir%/var/uploads'
-            $whatsappUserId: 2  # WhatsApp messages use User ID 2 for model selection
-            $appUrl: '%env(APP_URL)%'
             $whatsappGraphApiBaseUrl: '%env(default::WHATSAPP_GRAPH_API_BASE_URL)%'
+
+    App\Service\WhatsApp\Turn\WhatsAppIntake:
+        arguments:
+            $cache: '@cache.app'
+            $lockFactory: '@lock.factory'
+            $whatsappUserId: 2  # WhatsApp messages use User ID 2 for model selection
+
+    App\Service\WhatsApp\Turn\WhatsAppReplyDelivery:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+            $uploadsDir: '%kernel.project_dir%/var/uploads'
 
     # Webhook Controller - Bind WhatsApp Verify Token
     App\Controller\WebhookController:
@@ -783,8 +790,6 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
     App\Service\Message\Handler\MediaGenerationHandler:
-        arguments:
-            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.message.handler' }
 
@@ -1482,11 +1487,6 @@ services:
     # No manual plugin entries needed — drop plugin into /plugins/ and restart.
 
     # System Configuration Service (Admin .env editor)
-    App\Service\Admin\SystemConfigService:
-        arguments:
-            $projectDir: '%kernel.project_dir%'
-            $defaultTtsUrl: '%synaplan_tts_url_default%'
-
     # System Info Service (Admin server diagnostics: PHP / memory / disk)
     App\Service\Admin\SystemInfoService:
         arguments:

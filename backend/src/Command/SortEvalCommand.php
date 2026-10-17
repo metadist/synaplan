@@ -362,7 +362,7 @@ final class SortEvalCommand extends Command
     }
 
     /**
-     * Build the same message-data shape MessageClassifier::buildMessageData()
+     * Build the same message-data shape SorterInput::for()
      * sends to the sorter, from a corpus case.
      *
      * @param array<string, mixed> $case

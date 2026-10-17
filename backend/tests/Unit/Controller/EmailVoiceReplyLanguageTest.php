@@ -23,7 +23,7 @@ use App\Service\ModelConfigService;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
-use App\Service\WhatsApp\WhatsAppService;
+use App\Service\WhatsApp\Turn\WhatsAppTurn;
 use App\Tests\Support\EmailWebhookControllerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -198,7 +198,7 @@ final class EmailVoiceReplyLanguageTest extends TestCase
             'summaries' => $this->createStub(ConversationSummaryRefreshDispatcher::class),
             'errors' => $this->createStub(ChatErrorPresenter::class),
             'references' => $references,
-            'whatsApp' => $this->createStub(WhatsAppService::class),
+            'whatsApp' => $this->createStub(WhatsAppTurn::class),
             'uploadDir' => '/tmp/var/uploads',
         ]);
 
