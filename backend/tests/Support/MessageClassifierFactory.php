@@ -16,6 +16,7 @@ use App\Service\Context\AttachmentDigest;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\TopicIntentRule;
+use App\Service\Message\Classification\AttachmentIntent;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
@@ -65,7 +66,7 @@ final class MessageClassifierFactory
             $doubles['messageMetaRepository'],
             $doubles['modelConfigService'],
             $doubles['configRepository'],
-            $doubles['em'],
+            new AttachmentIntent($doubles['em'], $doubles['logger'], $doubles['officeConverter'] ?? null, $doubles['documentToolsConfig'] ?? null, $doubles['multitaskConfig'] ?? null),
             $doubles['logger'],
             $doubles['topicIntents'],
             $doubles['embeddingRouter'],
@@ -75,8 +76,6 @@ final class MessageClassifierFactory
             $doubles['agentPin'],
             $doubles['selfAwareConfig'] ?? null,
             $doubles['officeConverter'] ?? null,
-            $doubles['documentToolsConfig'] ?? null,
-            $doubles['multitaskConfig'] ?? null,
             $doubles['agentConfig'] ?? null,
             $doubles['agentService'] ?? null,
             $doubles['agentRuntimeResolver'] ?? null,
