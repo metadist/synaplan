@@ -62,7 +62,10 @@ and its open Q8 for research runs.
 | [`04_prompting.md`](./04_prompting.md) | Prompting principles, the `tools:research_*` prompt set (drafts), the Desktop agent prompt rewrite, prompt tests |
 | [`05_journeys_and_ui.md`](./05_journeys_and_ui.md) | Journeys J-RQ-1…10, wireframes, copy in five locales, the five questions, empty / error / flag-off states |
 | [`06_evaluation.md`](./06_evaluation.md) | The quality harness: corpus, metrics, judges, baselines, targets, the use cases UC-11…UC-16 |
-| [`07_sprints.md`](./07_sprints.md) | One brief per step: goal, files, brief to paste, exit criteria |
+| [`07_sprints.md`](./07_sprints.md) | One brief per step: goal, reads, touches, tests first, brief to paste, docs, exit criteria |
+| [`08_review.md`](./08_review.md) | The 2026-10-17 plan review: gaps, forgotten work, regression risks with their guards, installation findings, what changed |
+| [`09_installations.md`](./09_installations.md) | Every way Synaplan is installed — dev, CI, single-node cloud, air-gapped, EU, minimal, Kubernetes, three-node production — what research does there, the degradation copy, the tests per profile, upgrade / rollback, the documentation matrix |
+| [`10_contracts.md`](./10_contracts.md) | The shapes to code against: six schemas, endpoints, events, execution units, every BCONFIG key, PHP / Rust / Vue contracts, fixtures, log and usage fields |
 | [`STATUS.md`](./STATUS.md) | Step log and measured numbers |
 
 ---
@@ -144,6 +147,20 @@ what the sentence claims is worse than no research feature.
   a step needs one that is not ticked.
 - Flag off ⇒ `RoutingCharacterizationTest` snapshots unchanged, research routes
   404, no UI anywhere (U11).
+- Do not touch `frontend/src/stores/config.ts` or any `*RuntimeConfig*` file
+  under `frontend/src` (store-required in the mobile policy): capabilities come
+  from the research endpoint (§0 #30).
+- CI never reaches the live web: the `test` search adapter, the fixture source
+  reader and the `TestProvider` mocks (§0 #27) are the only sources in PHPUnit
+  and Playwright. Real providers are for the eval command and the desktop quick
+  set on the dev stack.
+- A long piece of work is a chain of short Messenger units (§0 #8), never one
+  handler that runs for minutes.
+- Every step's brief in `07` starts with **Reads** and **Tests first**; code
+  comes after the red test, and the exit criteria are reported one by one with
+  the command that proved them.
+- Build against [`10_contracts.md`](./10_contracts.md); a contract change is
+  made in that file in the same PR, and a wire change bumps the fixtures.
 
 ---
 
@@ -158,7 +175,7 @@ what the sentence claims is worse than no research feature.
 | 5 | **People choose how thorough, not which models.** Two depths in the UI: **Standard** (default, about 3 minutes) and **Thorough** (about 15 minutes); after a Standard report, **Go deeper** continues with the Thorough budget on the same evidence. An internal `quick` depth serves follow-up questions and Saved Task steps. Normal chat ("Ask") stays the fast path. Budgets in BCONFIG `RESEARCH.BUDGET.<depth>.*` (`03` §4). | Proposed | |
 | 6 | **World rule (sovereignty for the whole run).** Desktop sends the role models it allows; roles it leaves to "auto" are picked only among providers the project already uses. The web resolves slots inside the person's group allow-lists. A role that cannot be filled inside the world fails closed with one sentence — never a silent fallback to another provider. Every run lists every model it used. | Proposed | |
 | 7 | **Run state in Redis, no table in v1.** `ChatRunBuffer` pattern, 48-hour TTL; Desktop persists the result in the project, the web as the chat message and its file. Alternative: table `BRESEARCHRUNS` (runs listed across devices, survive a Redis flush). **Schema change — ask first**; it would also join account erasure (code cleanup V4 S0). | Proposed | |
-| 8 | **Runs execute in Messenger on `async_ai_high`**, at most one active Thorough run per person (BCONFIG). A dedicated transport and worker is a **Docker change — ask first**, only if the measured queue wait needs it. | Proposed | |
+| 8 | **Runs execute as short units on `async_ai_high`** — one Messenger message per unit of work (brief + plan, one reflect round, one section, the check), each ≤ `RESEARCH.UNIT_SECONDS` (120), re-dispatching the next; so the single worker process every install runs today (`messenger:consume async_ai_high async_extract async_index --time-limit=3600 --memory-limit=512M`) keeps serving saved tasks, media and indexing between units, checkpoints come for free, and a memory-limit restart loses at most one unit. `RESEARCH.MAX_ACTIVE_RUNS` per install (5), at most one active Thorough run per person. A dedicated transport and worker stays a **Docker / Helm change — ask first**, only if RQ3 measures a queue wait people notice. | Proposed | |
 | 9 | **API:** `/v1/research*` for paired keys (covered by `desktop:messages` — no new scope, no re-pair) and `/api/v1/research*` for the web session, both thin controllers over one service; complete OpenAPI; Desktop vendors `research-contract/` fixtures with a checksum test. `protocol: 1` untouched. | Proposed | |
 | 10 | **Plan review and questions.** Standard starts at once with the plan visible and stoppable. Thorough shows the plan and waits for **Start research**. At most three clarifying questions, multiple choice with **Skip** — in Thorough, and in Standard only when the brief marks the question as ambiguous. Reuse the ask-the-user card pattern. | Proposed | |
 | 11 | **Citations and fact-check.** Every factual sentence cites evidence; every evidence quote must be found verbatim in its source (deterministic check, no model); a second model checks each cited statement; unsupported statements are removed or moved to **Not confirmed**; the report states the result in one sentence ("35 of 37 statements are backed by a source. 2 were removed."). | Proposed | |
@@ -169,14 +186,22 @@ what the sentence claims is worse than no research feature.
 | 16 | **Creation reuses what exists:** Desktop turns a report into Word, PowerPoint, Excel, an email draft or a web page with the bundled skills through its agent loop; the web uses officemaker and the document tools. No new document generator. | Proposed | |
 | 17 | **Gateway quick wins keep today's behaviour as the fallback:** a wrap-up that no longer limits the answer to two sentences; an executable `web_fetch` that Synaplan runs on non-Anthropic routes (Anthropic keeps its own server tool); `knowledge_search` and `read_document` when a knowledge folder is pinned; Desktop's plain-chat output budget from the model's `max_output`. Each lands with its use case turning green. | Proposed | |
 | 18 | **Prompts are `tools:research_*` topics in `PromptCatalog`** (internal, excluded from routing per AGENTS.md), with rendered-prompt snapshot tests and JSON-schema tests. A prompt change merges only with an eval run that is not worse than the last recorded one. | Proposed | |
-| 19 | **Flag:** FeatureModule `ResearchModule` (`backend/src/Module/Chat/`) with BCONFIG `RESEARCH.ENABLED`, code default off, decisive config in `.env.minimal` / `docker-compose.minimal.yml`. Seeded on for new installs only after RQ3 meets the targets in `06` §5. | Locked (AGENTS.md) | |
+| 19 | **Flag:** FeatureModule `ResearchModule` (`backend/src/Module/Chat/`) with BCONFIG `RESEARCH.ENABLED` and env pin `FEATURE_RESEARCH_ENABLED`, code default off. The module convention requires its decisive config in `backend/.env.minimal` **and** two lines in `docker-compose.minimal.yml` (`RESEARCH_ENABLED: ""`, `FEATURE_MODULES_GATE_RESEARCH: "true"`) — that compose edit is the one Docker change this plan needs and is listed here so it is ticked, not discovered. Seeded on for new installs only after RQ3 meets the targets in `06` §5. | Locked (AGENTS.md); compose lines: Ask | |
 | 20 | **Costs are visible and capped.** Thorough shows an estimate before it starts; every run shows what it cost. A per-run cap per depth; `RateLimitService::checkCostBudget()` before each phase; usage recorded per role with source `RESEARCH`. | Proposed | |
 | 21 | **No new composer, npm or cargo dependency in Phases A–D.** Desktop already renders Markdown (`useChatMarkdown.ts`, `MessageText.vue`). | Proposed | |
 | 22 | **Copy:** one term per concept in five locales (`05` §4) — Research, Standard, Thorough, Sources, Fact-check, Not confirmed, Research team. Desktop forbidden words stay forbidden; native-speaker review before RD3 merges. | Locked (UX contract) | |
 | 23 | **Eval first.** No default flips, no preset change and no prompt change without numbers from `06`. The targets table in `06` §5 is the gate for seeding the flag on. | Proposed | |
 | 24 | **App only.** No research mode in the chat widget and no research runs over WhatsApp or mail in v1. | Proposed | |
 | 25 | **Plan limits.** A rate-limit action `RESEARCH` counts runs per day by subscription level (`RateLimitConfigSeeder`), seeded conservatively (free level: 3 Standard and 0 Thorough runs per day). Limits for paid levels and for `web.synaplan.com` are the owner's call. | Ask (business) | |
-| 26 | **Desktop: file tools without a skill.** A turn whose message names a file by its extension, carries an attached or dropped file, or refers to the project folder uses the agent loop even when no skill is enabled. That turn is answered without token streaming (the activity feed shows each step), as agent turns are today; `run_program` still needs an enabled skill and execution consent. | Proposed | |
+| 26 | **Desktop: file tools without a skill.** A turn uses the agent loop even when no skill is enabled if the latest message names a file by a known extension (one that exists in a readable folder or the project `out/` folder is an input; one that does not exist after a request is an output) or refers to the project folder or out-box. Attached and dropped files are **not** a signal — both upload to the knowledge folder (`knowledge.add`) and stay on the streaming path with server-side search. That agent turn is answered without token streaming (the activity feed shows each step), as agent turns are today; `run_program` still needs an enabled skill and execution consent. | Proposed | |
+| 27 | **Test doubles instead of the live web in CI.** In the `test` environment a `test` web-search adapter answers from fixtures, a `FixtureSourceReader` serves fixture pages for the host `fixture.synaplan.test` without a network call, and `TestProvider` mocks the `tools:research_*` prompts schema-aware. The SSRF guard is never relaxed. The desktop quick set keeps running against real providers on the dev stack. | Proposed | |
+| 28 | **A sweeper, so nothing stays "running".** `app:research:reap` in the scheduler's `tick` lane: a run whose last checkpoint is older than 3 × `UNIT_SECONDS` with no unit queued ends as `failed_interrupted` with what was found; waiting states past their limit end as `stopped_waiting`. | Proposed | |
+| 29 | **The world rule has five legs, not one.** Models (as #6); the **web search provider** — only SearXNG is self-hosted, the others are US-hosted — is disclosed on the plan card ("Web search goes through {provider}, hosted in {country}") or refused with `RESEARCH.STRICT_WORLD=1`; **document extraction** from the web runs `extractionChain('document', allowCloud: false)` in local and EU worlds (no `pdf_vision` on a cloud model); the **condenser** uses the run's reader model, not its own order; **embeddings** use the operator's index model, named in Details, skipped under strict mode when outside the world; rerank skipped when outside. | Proposed (disclose by default) | |
+| 30 | **No change to `frontend/src/stores/config.ts` or any `*RuntimeConfig*` frontend file** (store-required in `.github/mobile-impact-policy.json`). The web reads capabilities from `GET /api/v1/research/capabilities`. | Locked (mobile policy) | |
+| 31 | **Input budgets come from the model's context window.** Per call: min(role cap, 60 % of `meta.context_window` − the role's output cap); the lead's ledger summary is compacted to fit; local worlds read fewer sources per round and run readers with `RESEARCH.LOCAL_PARALLEL` (1). | Proposed | |
+| 32 | **Prompt caching is built, not assumed.** `AnthropicProvider` gets a `cache_system` option (one `cache_control` breakpoint after the stable prefix) for the lead and writer; OpenAI and Gemini cache long prefixes by themselves; Mistral and local models do not. RQ3 records the measured hit rate; `02` §6 shows the cost with and without. | Ask (small provider change) | |
+| 33 | **Idempotent start, listing, deletion.** `Idempotency-Key` on `POST /v1/research` (24 h), `GET /v1/research?active=1` for reattach, `DELETE /v1/research/{id}`; Desktop's "Delete report" deletes the server state too. | Proposed | |
+| 34 | **Documentation is part of every step.** Each step names its in-repo docs; user docs ship as three `synaplan-docs` pull requests (RX1–RX3) per the matrix in `09` §6; the Helm README note rides with RX2. | Proposed | |
 
 ---
 
@@ -319,7 +344,7 @@ Details, wireframes and copy in [`05_journeys_and_ui.md`](./05_journeys_and_ui.m
 | RQ0 | `docs(planning): research quality — agentic research with a model team` | no-app-impact | — |
 | **Phase A — measure** | | | |
 | RQ1 | `test(usecases): re-baseline the desktop use cases against main` (in `synaplan-desktop`) | desktop | — |
-| RQ2 | `test(research): research eval corpus, judges and baseline report` | no-app-impact | RQ0 |
+| RQ2 | `test(research): research eval corpus, judges, baseline and test doubles` | no-app-impact | RQ0, §0 #27 |
 | **Phase B — quick wins on today's paths** | | | |
 | RS1 | `fix(messages): the web search wrap-up answers fully and keeps every source` | backend-only | RQ1 |
 | RS2 | `feat(messages): read web pages on every model, not only on Anthropic` | backend-only | RQ1 |
@@ -328,7 +353,7 @@ Details, wireframes and copy in [`05_journeys_and_ui.md`](./05_journeys_and_ui.m
 | RD1 | `feat(chat): file tools in every chat, a stronger agent prompt and full-length answers` (in `synaplan-desktop`) | desktop | RQ1, §0 #26 |
 | **Phase C — the research engine** | | | |
 | RS5 | `feat(models): model slots for reading sources and fact-checking` | backend-only | §0 #4 |
-| RS6 | `feat(research): research runs that plan, read and write a cited report` | backend-only | RS5, RQ2, §0 #1–#3, #7–#9, #19 |
+| RS6 | `feat(research): research runs that plan, read and write a cited report` | backend-only | RS5, RQ2, §0 #1–#3, #7–#9, #19, #27–#28, #30–#32 |
 | RS7 | `feat(research): search again until every point of the plan is covered` | backend-only | RS6, §0 #10 |
 | RS8 | `feat(research): fact-check every cited statement with a second model` | backend-only | RS6, §0 #11 |
 | RS9 | `feat(rag): keyword plus meaning search for research and knowledge_search` | backend-only | RS6, §0 #14 |
@@ -347,10 +372,16 @@ Details, wireframes and copy in [`05_journeys_and_ui.md`](./05_journeys_and_ui.m
 | RW1 | `feat(chat): research mode in the web chat` | ota-candidate | RS8, RS10 |
 | RW2 | `feat(admin): research team and budgets under AI infrastructure` | ota-candidate | RS5, RQ3 |
 | RW3 | `feat(tasks): research as a Saved Task step` | backend-only | RS7 |
+| **User docs** (in `synaplan-docs`, §0 #34) | | | |
+| RX1 | `docs: full web answers, page reading on every model, file tools without a skill` | docs | RS1–RS3, RD1 |
+| RX2 | `docs: research in Synaplan Desktop, the research team, research without the internet` | docs | RD5, RQ3 |
+| RX3 | `docs: research in the web chat and its administration` | docs | RW1, RW2 |
 
 Phase B is useful on its own: normal chat answers fully, reads pages on every
 model and can search a knowledge folder more than once. Phase D starts when
-RS6 is merged behind the flag; RD2 and RD7 can start at once.
+RS6 is merged behind the flag; RD2 and RD7 can start at once. The
+installation profiles each step must hold on are in
+[`09_installations.md`](./09_installations.md) §2 and §4.
 
 **Desktop plan of record.** When RD1 or RD2 starts, vendor this folder into
 `synaplan-desktop/_extras/planning/20261017-research-quality/`; the source of
@@ -393,6 +424,11 @@ cd src-tauri && cargo run -p synaplan-core --example usecases -- --quick   # plu
   apps; no ledger additions.
 - The research contract fixtures in Synaplan and their vendored copy in
   Desktop match byte for byte (checksum test).
+- PHPUnit and Playwright use only the test doubles (§0 #27); a test that needs
+  a provider key or the live web is not a gate test.
+- Each step's exit names the installation profiles of `09` §4 it was checked
+  on; RS6 and RQ3 include the minimal profile walk; RQ3 includes the local and
+  EU presets.
 
 ### Track exit
 
@@ -401,6 +437,10 @@ cd src-tauri && cargo run -p synaplan-core --example usecases -- --quick   # plu
 - RQ3 report meets `06` §5 for Standard and Thorough; `RESEARCH.ENABLED`
   seeded on for new installs with a migration note for existing ones.
 - Desktop use cases UC-02…UC-05 and UC-11…UC-16 green on the quick set.
+- The profile table of `09` §4 has a dated entry for every row, including the
+  first three-node deploy.
+- RX1–RX3 merged in `synaplan-docs`; the documentation matrix of `09` §6 has
+  no open row.
 - Plan archived with a dated note when the last step ships.
 
 ---
@@ -417,7 +457,14 @@ cd src-tauri && cargo run -p synaplan-core --example usecases -- --quick   # plu
 | Sovereignty leak through an "auto" role | World rule (§0 #6), explicit models from Desktop, fail closed, models listed on every run |
 | Condensing drops the decisive detail | Quotes with locations, `reread` action with a sharper question, writer can request a source again |
 | Redis flush loses a running run | Honest failure with the sources already streamed kept by the client; "Start again" seeds them (`03` §6) |
-| Worker starvation by long runs | One Thorough run per person; queue wait measured in RQ3; dedicated transport is an ask-first row |
+| A long run blocks the install's only worker process | Units of ≤ 120 s on `async_ai_high` (§0 #8); `MAX_ACTIVE_RUNS`; a `queued` event and honest copy when a unit waits; queue wait measured in RQ3; dedicated transport is an ask-first row |
+| A run stays "running" after a worker dies | Checkpoint per unit; duplicate-unit guard; `app:research:reap` in the tick lane (§0 #28) |
+| CI depends on the live web or provider keys | Test doubles (§0 #27); the SSRF guard untouched |
+| A local or EU project leaks through a side channel | Five-leg world rule (§0 #29): search provider disclosed or refused, cloud extraction steps off, condenser on the reader model, index model named, rerank skipped |
+| A local model's context is too small | Budgets from `meta.context_window` (§0 #31); fewer sources per round; "read the first part of {host}" in Details |
+| The gateway quick wins change answers for Claude Code and Synamail | Documented in `docs/ANTHROPIC_COMPATIBLE_API.md` and `claude-code.md` (RX1); `WEB_FETCH_MAX_PER_TURN`; UC timings before / after in STATUS |
+| Adding slots breaks seeding or health checks | Test defaults first; the three `CAPABILITY_TAGS` iterators run with unbound slots; production keys only in RQ3 |
+| A minimal install shows a dead research feature | Composer lines with reasons; the chip exists only when the module is on; P-MIN walk in RS6 and RQ3 |
 | Search provider quotas | Per-run search caps, query dedupe, the plug's fallback provider, SearXNG for self-hosters |
 | Large components grow further | RD2 splits Desktop `ChatView.vue` first; web steps add components, the size ratchet guards `ChatView.vue` / `ChatInput.vue` |
 | Promotional prices change the best preset | Presets are seeded catalog keys, admin-editable; RQ3 is a command that can be re-run; the daily price sync keeps costs honest |

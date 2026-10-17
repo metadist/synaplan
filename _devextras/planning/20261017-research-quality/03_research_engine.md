@@ -53,8 +53,11 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
 
 ### 2.3 Gather (sorter + search)
 
-- Web: `WebSearchGateway::search()` per query with language and freshness;
-  results deduplicated by canonical URL and host; at most N per host.
+- Web: `WebSearchGateway::search()` per query with language and freshness —
+  always Synaplan's own provider, never a model's built-in search tool, so every
+  model sees the same results; results deduplicated by canonical URL and host;
+  at most N per host. In a local or EU world a hosted provider is disclosed on
+  the plan card or refused under strict mode (§0 #29).
 - Knowledge: hybrid search over the selected folders (§10) inside the person's
   owner scopes (`RagScope`) — the same scopes chat uses, never wider.
 - Triage (sorter, `ResearchTriageSchema`): for each result — relevant to which
@@ -78,11 +81,26 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
   lens → an **evidence card** per useful finding (§5). Readers have no tools;
   the source text is wrapped and labelled as untrusted data (`04` §3).
 - **Quote check (deterministic):** each quote is normalised (whitespace,
-  quotes, hyphenation) and searched in the extracted source text. A quote that
-  is not found is dropped; a finding with no verified quote is dropped. This
-  check is free and is the floor of citation integrity.
-- Long sources: `ContextCondenser::fit()` first narrows the text to the parts
-  relevant to the points (extractive, fast model), then the reader reads.
+  quotes, hyphenation, decimal and thousands separators) and searched in the
+  **raw extracted text** of the source — never in a condensed version. A quote
+  that is not found is dropped; a finding with no verified quote is dropped.
+  This check is free and is the floor of citation integrity.
+- Long sources: `ContextCondenser` first narrows the text to the parts
+  relevant to the points (extractive, then the **run's reader model** — the
+  engine hands the model in; the condenser's own SORT → ANALYZE → CHAT order is
+  not used), then the reader reads. Input per call is bounded by the reader
+  model's context window (`00` §0 #31); a source that does not fit is read in
+  its first part and the Details say so.
+- **Politeness and caching:** at most `FETCH_PER_HOST` (1) in-flight fetch per
+  host per run, `Retry-After` honoured, robots.txt as today; the extracted text
+  of a URL is cached for `FETCH_CACHE_MINUTES` (60) keyed by URL only, never by
+  question or person.
+- **Retention:** the raw text of every source stays in the run's Redis state
+  (so `reread` and the check can use it) and is deleted at `deliver` after the
+  check, or with the run's TTL — it is never stored as the person's file.
+- **Titles are data:** titles and snippets from search results are truncated
+  (120 / 300 characters), control characters stripped, and shown to the lead
+  inside the same data wrapper as source text.
 - Events `source` with status `reading`, `read` (cards count) or `blocked`
   (reason: login wall, robots, timeout, too large, no text).
 
@@ -144,8 +162,11 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
 
 1. **Deterministic:** every cited id exists; every cited card has at least one
    verified quote; numbers and dates in the sentence appear in the cited quotes
-   (normalised); sentences that state facts carry a citation (a sentence with a
-   number, a date or a proper name and no citation is flagged).
+   after normalisation (`12,40` = `12.40`, `1.234,5` = `1,234.5`, units and
+   percent signs stripped, dates to ISO); sentences that state facts carry a
+   citation (a sentence with a number, a date or a proper name and no citation
+   is flagged); a revision that introduces a fact without a citation is
+   rejected and the pre-revision text kept.
 2. **Checker model** (`ResearchCheckSchema`), batched: each cited statement
    with its quotes → `supported`, `partial` (which part is not), `unsupported`,
    `contradicted`.
@@ -205,12 +226,13 @@ BCONFIG group `RESEARCH`, global, admin-tunable; seeded insert-if-missing.
 | Fact-check | deterministic only | deterministic + checker | deterministic + checker + one revision |
 | Report length | ≤ 300 words | ≤ 1,500 words | ≤ 6,000 words, section by section |
 
-Keys: `RESEARCH.BUDGET.<DEPTH>.<NAME>` (for example
-`RESEARCH.BUDGET.THOROUGH.SEARCHES`), `RESEARCH.MAX_ACTIVE_THOROUGH_PER_USER`
-(1), `RESEARCH.READ_DOCUMENTS_MAX_MB` (20), `RESEARCH.VERIFY_CANDIDATES`,
-`RESEARCH.PRESET.<WORLD>.<DEPTH>.<ROLE>`.
+Two more hard stops per depth: `MAX_ACTIONS` per reflect decision (6 / 10)
+and `MAX_MODEL_CALLS` per run (quick 6, Standard 60, Thorough 200) — the
+latter ends a pathological loop as `complete_partial` whatever the other
+counters say. The full key table with defaults and ranges is `10` §4.
 
-Local-world runs use the same counts with a wall clock first: when the
+Local-world runs use the same counts with a wall clock first: readers run with
+`RESEARCH.LOCAL_PARALLEL` (1) because one GPU serialises them anyway; when the
 estimate from the first two reader calls exceeds the wall clock, the engine
 lowers the number of sources and says so in Details.
 
@@ -274,15 +296,32 @@ with the role and source `RESEARCH`; searches record `WEB_SEARCH`, rerank
 
 ## 6. Durability
 
-- **State:** Redis `research:run:{id}` (ledger + phase checkpoint),
-  `research:events:{id}` (sequenced events), `research:active:{userId}`
-  (concurrency cap). TTL 48 hours from the last change (§0 #7).
-- **Execution:** `RunResearchCommand` on `async_ai_high`; the handler runs the
-  phases and writes a checkpoint after each phase and after each source read.
-  A retried message resumes from the checkpoint instead of starting over
-  (retry once). Cancel is a flag checked between sources and between phases.
+- **State:** Redis `research:run:{id}` (ledger + checkpoint + expected unit
+  sequence), `research:events:{id}` (sequenced events),
+  `research:text:{id}:{sourceId}` (raw source text, dropped at `deliver`),
+  `research:active:{userId}` and `research:active` (concurrency caps),
+  `research:idem:{userId}:{key}` (24 h). TTL `STATE_TTL_HOURS` (48) from the
+  last change (§0 #7). Rough size: 1–3 MB per Thorough run while it runs,
+  a few hundred KB after `deliver`.
+- **Execution in units (§0 #8):** `RunResearchUnit { runId, unit, seq }` on
+  `async_ai_high`. One message does one bounded unit — `brief_plan`, one
+  `round` (execute the previous decision's actions, then one reflect call),
+  one `write` call or section, `check`, `deliver` — within `UNIT_SECONDS`
+  (120), writes the checkpoint, advances `seq`, dispatches the next unit and
+  returns. The handler ignores a message whose `seq` is not the expected one
+  (a Messenger retry or a double dispatch), so a unit never runs twice. The
+  worker process every install runs today therefore serves other jobs between
+  units. Cancel and budget are checked at every unit start and between sources.
+- **Queue wait:** when the next unit has not started 20 s after dispatch, the
+  state emits `queued { since_seconds }` every 20 s; after 5 minutes the module
+  status says "No worker has picked up research units for 5 minutes."
 - **Waiting:** a run waiting for an answer or plan approval holds no worker;
-  `input` re-dispatches it.
+  `input` dispatches the next unit.
+- **Sweeper (§0 #28):** `app:research:reap` runs in the scheduler's `tick`
+  lane: a run whose checkpoint is older than 3 × `UNIT_SECONDS` with no unit
+  queued ends as `failed_interrupted` with the report of what was found (the
+  `write` unit runs once on the ledger as it is); `waiting_answer` past
+  10 minutes and `waiting_plan` past 24 hours end as `stopped_waiting`.
 - **Resume:** events carry `id: <seq>`; `GET …/events` with `Last-Event-ID`
   (or `?after=`) replays from there, then streams live — the `ChatRunBuffer`
   pattern.
@@ -306,13 +345,19 @@ generated Zod schemas for the web; `research-contract/` fixtures for Desktop
 
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
-| `GET` | `/v1/research/capabilities` | `enabled`, depths, `web_search_available`, `knowledge_available`, `read_documents`, `max_active_thorough`. **404 when the flag is off** — the client hides the feature |
-| `POST` | `/v1/research` | Start a run → `202 { id, status, events }` |
+| `GET` | `/v1/research/capabilities` | `enabled`, `research_protocol`, depths, `web_search_available` and the provider's hosting, `knowledge_available` and the index model, `read_documents`, `strict_world`, `max_active_thorough`, plan limits (`10` §2.2). **404 when the flag is off** — the client hides the feature |
+| `POST` | `/v1/research` | Start a run → `202 { id, status, events, research_protocol: 1 }`; header `Idempotency-Key` (≤ 64 chars, 24 h) returns the same `id` for a retried start (§0 #33) |
+| `GET` | `/v1/research?active=1` | The caller's runs of the last 48 h (id, status, depth, question, created_at) — Desktop reattaches from it |
 | `GET` | `/v1/research/{id}` | Current state (§7.3) |
 | `GET` | `/v1/research/{id}/events` | SSE, resumable (`Last-Event-ID`, `?after=`) |
 | `POST` | `/v1/research/{id}/input` | Answer a question, approve or edit the plan, add a note or a source, write now |
 | `POST` | `/v1/research/{id}/cancel` | Stop; terminal `stopped` |
 | `POST` | `/v1/research/{id}/followups` | Follow-up question, revision, go deeper, refresh → a new run with `parent` |
+| `DELETE` | `/v1/research/{id}` | Removes state, events and cached source texts at once (Desktop's "Delete report" calls it) |
+
+An id that is not the caller's answers 404, never 403. Full API keys reach
+these routes like paired keys; the `RESEARCH` rate-limit action applies to
+every caller.
 
 ### 7.2 Start request
 
@@ -334,8 +379,11 @@ generated Zod schemas for the web; `research-contract/` fixtures for Desktop
 
 Validation: question 1–4,000 characters; `instructions` ≤ 4,000; `context`
 ≤ 6 turns, 2,000 characters each; `knowledge` group keys must belong to the
-caller's scopes; model keys must be active `chat` rows inside `world`; unknown
-fields are rejected with the field named.
+caller's scopes; model keys must be active `chat` rows inside `world`;
+`seed_sources` ≤ 50 and every URL passes the SSRF guard; unknown fields are
+rejected with the field named. An optional `assistant_id` (the web's pinned
+assistant or Desktop's bound one) sets the source defaults: web off when the
+assistant's `tools.internet` is off, its knowledge scopes added to `knowledge`.
 
 ### 7.3 State
 
@@ -362,10 +410,11 @@ outcome, models used, budget used, cost (`estimate`, `spent`), `created_at`,
 
 | Event | Data |
 | ----- | ---- |
-| `run` | id, depth, status |
+| `run` | id, depth, status, `research_protocol: 1` (first frame after every attach; clients ignore unknown event names) |
+| `queued` | `since_seconds` — the next unit waits for a worker, every 20 s |
 | `brief` | goal, language, output, time frame |
 | `question` | id, text, options, `allow_text` |
-| `plan` | points (id, title), outline, estimate (minutes, cost) |
+| `plan` | points (id, title), outline, estimate (minutes, cost), disclosures (world rule, §0 #29) |
 | `plan_waiting` | — |
 | `search` | point, query, scope, results |
 | `source` | id, kind, title, host or file, status (`found`, `reading`, `read`, `blocked`), reason |
@@ -391,9 +440,12 @@ English sentence is a fallback):
 | `failed_no_sources` | Web off or unavailable and no files | "There was nothing to research: turn on the web or add files to this project." |
 | `failed_role_unavailable` | A role cannot be filled in the world | "The {role} model of this project is not available, and no other model in this project can stand in. Nothing was charged." |
 | `failed_model_error` | A role kept failing after retries | "The {role} model stopped answering. Nothing else was charged; try again or pick another model." |
-| `failed_interrupted` | State lost | "The research was interrupted on the server. Start it again — the sources found so far are kept here." |
+| `failed_interrupted` | State lost, or the sweeper found no live unit | "The research was interrupted on the server. Start it again — the sources found so far are kept here." |
+| `stopped_by_admin` | The module was turned off while the run was active | "Research was turned off on your Synaplan workspace. What was found so far is kept." |
 
 No outcome ever contains an HTTP code, a provider message or a stack trace.
+"Nothing was charged" is only said when no model call ran after the event in
+question; otherwise the sentence says "Nothing else was charged".
 
 ---
 
@@ -401,15 +453,17 @@ No outcome ever contains an HTTP code, a provider message or a stack trace.
 
 | Concern | Rule |
 | ------- | ---- |
-| Prompt injection from sources | Readers only; no tools; delimited data; lead, writer and checker see evidence cards only; actions validated against a closed schema (§0 #3) |
-| Network | Every fetch through `UrlContentService` / `SsrfGuard`; robots.txt and noindex respected; social and login-walled hosts skipped (existing lists) |
-| Documents from the web | Size and time caps; extracted in the run and discarded — never stored as the person's file unless they save the report with it |
-| Knowledge | Only the caller's owner scopes and folders shared at "Can use" (`RagScope`), as in chat |
+| Prompt injection from sources | Readers only; no tools; delimited data; titles and snippets sanitised and wrapped as data too; lead, writer and checker see evidence cards only; actions validated against a closed schema (§0 #3) |
+| Network | Every fetch through `UrlContentService` / `SsrfGuard` (also `add_source` and `seed_sources`); robots.txt and noindex respected; social and login-walled hosts skipped (existing lists); one in-flight fetch per host per run |
+| Documents from the web | Size and time caps; extracted in the run, kept in the run's Redis state for `reread` and the check, dropped at `deliver` — never stored as the person's file unless they save the report with it |
+| Knowledge | Only the caller's owner scopes and folders shared at "Can use" (`RagScope`), as in chat; an assistant's knowledge scopes when one is pinned |
 | Writes | None. Saving, mailing, uploading are separate actions under `ToolExecutionGate` / Approvals (§0 #13) |
-| Logs | Ids, counts, timings, model keys — never question, source text, quotes or report |
-| Retention | Run state expires 48 h after its last change; nothing persists server-side unless the client saves it |
-| Account deletion | `UserDeletionService` deletes `research:*` keys of the user (code cleanup V4 S0: every user-owned store is erased) |
-| Sovereignty | World rule (`02` §7.2); models listed on every run |
+| Logs | Channel `research`, JSON: ids, unit, role, model key, durations, token counts, outcome — never question, title, source text, quotes or report (`10` §8) |
+| Status | `ResearchModule::status()`: active, queued and failed-in-24h counts, "no worker picked up units for N minutes"; a row on the system status page |
+| Retention | Run state expires `STATE_TTL_HOURS` after its last change; `DELETE` removes it at once; nothing persists server-side unless the client saves it |
+| Account deletion | `UserDeletionService` deletes `research:*` keys of the user (code cleanup V4 S0 erases every user-owned table; Redis needs this explicit step and its own unit test) |
+| Sovereignty | The five-leg world rule (§0 #29): models (`02` §7.2), search provider disclosed or refused, document extraction without cloud steps, condenser on the reader model, index model named or knowledge skipped under strict mode; every leg's decision is a `disclosures` entry on the plan and in Details; models listed on every run |
+| Ownership | Every route answers 404 for an id the caller does not own |
 
 ---
 
@@ -426,16 +480,25 @@ backend/src/Service/Research/Run/
   ResearchOutcome.php           closed codes + params
   Ledger/  EvidenceLedger.php · Source.php · EvidenceCard.php · QuoteVerifier.php
   Stage/   BriefStage · PlanStage · GatherStage · ReadStage · ReflectStage · WriteStage · CheckStage
-  Source/  ResearchSourceReader.php (HTML via UrlContentService, documents via the extraction chain, knowledge chunks)
-backend/src/Message/RunResearchCommand.php
-backend/src/MessageHandler/RunResearchCommandHandler.php
+  Source/  ResearchSourceReaderInterface.php · ResearchSourceReader.php (HTML via UrlContentService, documents via extractionChain('document', allowCloud), knowledge chunks)
+           FixtureSourceReader.php (test environment only — fixture.synaplan.test)
+backend/src/Service/RAG/KnowledgeSearchHelper.php   shared by MessagesContextInjector, KnowledgeSearchTool and GatherStage (RS3, RS9)
+backend/src/Message/RunResearchUnit.php             { runId, unit, seq }
+backend/src/MessageHandler/RunResearchUnitHandler.php
+backend/src/Command/ReapResearchRunsCommand.php     app:research:reap (ScheduledJobs::LANE_TICK)
 backend/src/Controller/ResearchApiController.php    /v1/research*
 backend/src/Controller/ResearchController.php       /api/v1/research*
 backend/src/AI/StructuredOutput/Schema/Research{Brief,Plan,Triage,Evidence,Decision,Check}Schema.php
 backend/src/Module/Chat/ResearchModule.php
 backend/src/Seed/ResearchConfigSeeder.php
+backend/src/Plug/WebSearch/Adapter/TestWebSearchAdapter.php   test environment only
+backend/src/Plug/WebSearch/WebSearchHosting.php     provider → self-hosted / country (world disclosure)
 backend/src/Prompt/PromptCatalog.php                + tools:research_* (catalog data, exempt from the size ratchet)
+_devextras/testing/research/fixtures/               wire fixtures, vendored by Desktop
+backend/tests/Fixtures/research/{search,pages,injection}/   fixtures for the doubles
 ```
+
+Signatures for every class are in [`10_contracts.md`](./10_contracts.md) §5.
 
 - Controllers stay under 50 lines per method; all logic in services.
 - Stages share one `StageContext` (run, ledger, budget, roles, emitter) so no

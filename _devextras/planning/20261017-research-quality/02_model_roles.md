@@ -52,7 +52,7 @@ and writes"; the engine keeps them separate so an admin can split them.
 | Role | Calls per Thorough run | Typical input → output | Must have | Nice to have | Reasoning level | Output cap |
 | ---- | ---------------------- | ---------------------- | --------- | ------------ | --------------- | ---------- |
 | Sorter | 20–40 | 1–4k → 0.2–1k tokens | Reliable JSON, low latency, low price | Multilingual queries | low / minimal | 1,000 |
-| Reader | 20–60 | 5–60k → 0.5–1.5k | Long context (≥ 128k), faithful extraction, low input price | 1M context for whole documents; cache pricing | low | 1,500 |
+| Reader | 20–60 | 5–60k → 0.5–1.5k (bounded by the model's context, §0 #31) | Faithful extraction, low input price, ≥ 32k context (128k+ for whole documents) | 1M context for whole documents; cache pricing | low | 1,500 |
 | Indexer | per chunk | — | Multilingual embeddings in one vector space with the workspace | Local reranker for EU / local worlds | — | — |
 | Lead | 5–15 | 10–80k → 1–4k | Judgement over many rounds, reliable JSON, prompt caching | Large context, reasoning effort control | medium (Standard), high (Thorough) | 4,000 |
 | Writer | 2–8 | 15–60k → 3–16k | Long output (≥ 32k), language quality in five locales, citation discipline | 128k output for long reports | medium | 8,000 per section |
@@ -192,8 +192,14 @@ checker 15,000 / 1,000.
 | Standard | gpt-oss-120b · Gemini 3.8 Flash · Sonnet 5.5 · Sonnet 5.5 · Gemini 3.8 Flash | 0.01 | 0.15 | 0.12 | 0.09 | 0.02 | **≈ 0.38** |
 | Standard | gpt-oss-120b · GPT-6 Luna · Sonnet 5.5 · Sonnet 5.5 · Gemini 3.8 Flash | 0.01 | 0.02 | 0.12 | 0.09 | 0.02 | **≈ 0.25** |
 
-All amounts in US dollars as the catalog stores them. Without prompt caching
-the Opus lead costs about 1.80 instead of 0.84.
+All amounts in US dollars as the catalog stores them. **Caching is not free in
+the code today:** `cache_control` exists only in the gateway's Anthropic
+passthrough translator, not in `AnthropicProvider` for `AiFacade` calls, so
+the lead rows above assume §0 #32 lands. Without it the Opus lead costs about
+1.80 instead of 0.84 and the Sonnet lead about 0.90 instead of 0.42 — the
+Thorough team totals become ≈ 3.5 / 3.1 / 1.7 instead of 2.58 / 2.17 / 1.21.
+OpenAI and Gemini cache long prefixes without a flag; Mistral and local models
+do not cache. RQ3 records the measured hit rate per provider.
 
 **Reading the table:** the team cuts the estimated cost of a Thorough run by
 about half against a single top model, and the choice of reader moves the total
@@ -230,7 +236,20 @@ the research resolver adds the order above and the two rules below.
 - **Web** fills roles inside the person's group allow-lists.
 - Embeddings and rerank obey the same rule: a local project never sends
   passages to a cloud reranker; if no allowed reranker exists, rerank is
-  skipped and Details says so.
+  skipped and Details says so. Query embeddings use the operator's index model
+  (the one the knowledge folder was indexed with — there is no other vector
+  space); its key is named in Details, and under `RESEARCH.STRICT_WORLD`
+  knowledge search is skipped when that model's provider is outside the world.
+- **The search provider and the extraction chain are part of the world** (§0
+  #29): only SearXNG is self-hosted; Brave, Tavily, Exa, Firecrawl and
+  Perplexity are US-hosted. Outside the world the plan card discloses it or
+  strict mode refuses the web source; documents from the web are extracted
+  with `extractionChain('document', allowCloud: false)` so no `pdf_vision`
+  call reaches a cloud vision model; the condenser runs on the reader model.
+- **Input budgets follow the model** (§0 #31): per call min(role cap, 60 % of
+  `meta.context_window` − output cap). A 33k local model reads a page in its
+  first 15k tokens and the Details say so; the lead's ledger summary is
+  compacted to its budget.
 - A role that cannot be filled fails closed (`role_unavailable`, with the role
   name). There is no silent fallback to another provider.
 

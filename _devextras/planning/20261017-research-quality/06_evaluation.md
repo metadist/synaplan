@@ -201,4 +201,23 @@ recorded in the desktop use-case STATUS, quick set before every Desktop PR.
 | UC-16 | World rule | A model outside `world.providers` → 400 naming the field; a role that cannot be filled → `failed_role_unavailable` | RD8 |
 
 Each case asserts the copy the person would read (U8) — never a provider
-message, an HTTP code or an empty card.
+message, an HTTP code or an empty card. `--profile local` runs the same ids
+against the local preset and expects the local degradations of `09` §3.
+
+---
+
+## 8. What runs in CI, and with what
+
+CI never reaches the live web or a provider (§0 #27). The doubles:
+
+| Double | Replaces | Lives | Fixtures |
+| ------ | -------- | ----- | -------- |
+| `TestWebSearchAdapter` | the web search provider | `test` env, or `WEB_SEARCH.PROVIDER = test` | `backend/tests/Fixtures/research/search/<slug>.json` — query → results with `https://fixture.synaplan.test/<page>` URLs |
+| `FixtureSourceReader` | `ResearchSourceReader` | `test` env | `backend/tests/Fixtures/research/pages/<page>.html|.pdf` — served without a network call; any other host is "blocked: not a fixture" |
+| `TestProvider` mocks | the six `tools:research_*` prompts | always (it is the test provider) | schema-aware canned answers keyed by the prompt topic and by markers in the question (the `websearch:` prefix pattern of `multitask.spec.ts`) |
+
+With these, PHPUnit replays whole runs (every stage, every outcome, the
+injection page, five languages, erasure, the sweeper, idempotency) and
+Playwright walks J-RQ-8 as an `@ci` journey. The SSRF guard is never relaxed;
+a test that wants a real page or a real key is an eval or a desktop quick-set
+case, not a gate test.
