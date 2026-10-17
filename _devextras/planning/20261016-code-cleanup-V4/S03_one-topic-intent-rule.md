@@ -108,3 +108,28 @@ from the old copies.
 
 The classifier split (S6). The fast-path heuristic and the sorter prompt
 (unchanged).
+
+## 8. As delivered (2026-10-17)
+
+Every exit line holds. The branch starts from `origin/main`, because S2
+had merged. Where the result differs from the plan:
+
+- **S3.7 ran before S3.5 and S3.6.** With the fallback fixed first, the
+  chat-model change never sends a new message to the topic `UNKNOWN`. The
+  commits run S3.3, S3.4, S3.7, S3.5, S3.6, S3.8.
+- **The one rule is `forModel()`.** S3.2 moved the Again's copy as
+  `forAgain()`; S3.3 replaced it with the D2 rule under the name both
+  callers now use, and S3.8 removed `forModelOverride()` with its table.
+- **The table test is `OverrideAndAgainRoutingTest`.** It runs the
+  classifier and the resolver through their public entries on 36 rows of
+  tag and topic. On S2's head 23 rows disagreed; now each row has one
+  expectation both entries must answer.
+- **A tag matches in any case on both paths**, as the Again's did.
+  Catalog tags are lower case, so no route moves.
+- **Where the change reaches users.** The web chat's Again streams with
+  `isAgain` and classifies in `TurnClassificationResolver` (S3.3), as does
+  Telegram's. The classifier's model override (S3.4–S3.7) runs for
+  `POST /api/v1/messages/again` (`AgainHandler`), which stores the picked
+  model on a copy of the message, topic included. The web Again menu
+  offers models of the answer's own kind, so a chat model is offered on a
+  chat answer only.
