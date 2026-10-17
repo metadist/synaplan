@@ -113,7 +113,28 @@ final class MessageTurnCharacterizationTest extends TestCase
                 'verdict' => ['web_search' => true, 'prompt_metadata' => ['aiModel' => 33, 'tool_internet' => false]],
                 'text' => 'What is the latest Synaplan release?',
             ],
+            ...self::againCases(),
         ];
+    }
+
+    /**
+     * An Again with a model of each tag on a `general` message, and with a
+     * chat model on the topics a message may carry instead.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private static function againCases(): array
+    {
+        $again = ['is_again' => true, 'model_id' => 42];
+        $cases = [];
+        foreach (['text2vid', 'text2sound', 'pic2text', 'analyze', 'vision', 'document', 'officemaker', 'text2doc', 'chat', 'vectorize', 'rerank'] as $tag) {
+            $cases["again_tag_{$tag}"] = ['options' => $again, 'model_tag' => $tag];
+        }
+        foreach (['tools_pic' => 'tools:pic', 'custom_topic' => 'legal-review', 'mediamaker' => 'mediamaker', 'unknown_topic' => 'UNKNOWN', 'no_topic' => ''] as $id => $topic) {
+            $cases["again_chat_tag_on_{$id}"] = ['options' => $again, 'model_tag' => 'chat', 'message_topic' => $topic];
+        }
+
+        return $cases;
     }
 
     /**
@@ -132,7 +153,7 @@ final class MessageTurnCharacterizationTest extends TestCase
             $this->preProcessor(),
             $this->classifier($case['verdict'] ?? []),
             $this->router($case['router_throws'] ?? null),
-            $this->modelConfig(),
+            $this->modelConfig((string) ($case['model_tag'] ?? 'text2pic')),
             $this->promptService($case['prompt_metadata'] ?? []),
             WebSearchGatewayFactory::fromBrave($this->brave()),
             $this->queryGenerator(),
@@ -151,6 +172,7 @@ final class MessageTurnCharacterizationTest extends TestCase
             (string) ($case['text'] ?? 'Hello, how are you?'),
             array_key_exists('chat_id', $case) ? $case['chat_id'] : 5,
             (string) ($case['message_language'] ?? 'en'),
+            (string) ($case['message_topic'] ?? 'general'),
         );
         $options = $case['options'] ?? [];
         $status = static function (array $update) use (&$statuses): void {
@@ -171,14 +193,14 @@ final class MessageTurnCharacterizationTest extends TestCase
         ];
     }
 
-    private function message(string $text, ?int $chatId, string $language): Message
+    private function message(string $text, ?int $chatId, string $language, string $topic): Message
     {
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(101);
         $message->method('getUserId')->willReturn(7);
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn($language);
-        $message->method('getTopic')->willReturn('general');
+        $message->method('getTopic')->willReturn($topic);
         $message->method('getChatId')->willReturn($chatId);
         $message->method('getTrackingId')->willReturn(555);
         $message->method('getFile')->willReturn(0);
@@ -262,7 +284,7 @@ final class MessageTurnCharacterizationTest extends TestCase
         return $router;
     }
 
-    private function modelConfig(): ModelConfigService
+    private function modelConfig(string $modelTag): ModelConfigService
     {
         $config = $this->createMock(ModelConfigService::class);
         $config->method('getDefaultModel')->willReturnCallback(static fn (string $capability): ?int => match ($capability) {
@@ -272,7 +294,7 @@ final class MessageTurnCharacterizationTest extends TestCase
         });
         $config->method('getProviderForModel')->willReturn('openai');
         $config->method('getModelName')->willReturnCallback(static fn (int $id): string => 'model-'.$id);
-        $config->method('getModelTag')->willReturn('text2pic');
+        $config->method('getModelTag')->willReturn($modelTag);
         $config->method('getEffectiveUserIdForMessage')->willReturn(7);
 
         return $config;
