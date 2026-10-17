@@ -33,53 +33,53 @@ use Psr\Log\NullLogger;
  * Where a model the user picked sends a message, through both entries that
  * ask: a model override in MessageClassifier and an Again in
  * TurnClassificationResolver. One row per model tag (null: no tag) and topic
- * already on the message, with the topic and intent each entry answers.
+ * already on the message, with the topic and intent both entries answer.
  */
 final class OverrideAndAgainRoutingTest extends TestCase
 {
     /**
-     * @return iterable<string, array{0: ?string, 1: string, 2: array{0: string, 1: string}, 3: array{0: string, 1: string}}>
+     * @return iterable<string, array{0: ?string, 1: string, 2: array{0: string, 1: string}}>
      */
     public static function rows(): iterable
     {
         $rows = [
-            // model tag, topic on the message, model override [topic, intent], Again [topic, intent]
-            ['text2pic', '', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['text2pic', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['text2vid', '', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['text2vid', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['text2sound', '', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['text2sound', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['pic2text', '', ['general', 'chat'], ['general', 'chat']],
-            ['pic2text', 'mediamaker', ['general', 'chat'], ['general', 'chat']],
-            ['analyze', '', ['general', 'chat'], ['general', 'chat']],
-            ['analyze', 'mediamaker', ['general', 'chat'], ['general', 'chat']],
-            ['vision', '', ['general', 'chat'], ['general', 'chat']],
-            ['vision', 'mediamaker', ['general', 'chat'], ['general', 'chat']],
-            ['document', '', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
-            ['document', 'mediamaker', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
-            ['officemaker', '', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
-            ['officemaker', 'mediamaker', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
-            ['text2doc', '', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
-            ['text2doc', 'mediamaker', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
-            ['chat', '', ['general', 'chat'], ['general', 'chat']],
-            ['chat', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
-            ['chat', 'legal-review', ['legal-review', 'chat'], ['legal-review', 'chat']],
-            ['chat', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['chat', 'tools:pic', ['tools:pic', 'image_generation'], ['tools:pic', 'image_generation']],
-            ['vectorize', '', ['general', 'chat'], ['general', 'chat']],
-            ['vectorize', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
-            ['vectorize', 'legal-review', ['legal-review', 'chat'], ['legal-review', 'chat']],
-            ['vectorize', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['vectorize', 'tools:pic', ['tools:pic', 'image_generation'], ['tools:pic', 'image_generation']],
-            ['rerank', '', ['general', 'chat'], ['general', 'chat']],
-            ['rerank', 'unknown', ['general', 'chat'], ['general', 'chat']],
-            ['rerank', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
-            ['rerank', 'legal-review', ['legal-review', 'chat'], ['legal-review', 'chat']],
-            ['rerank', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['rerank', 'tools:pic', ['tools:pic', 'image_generation'], ['tools:pic', 'image_generation']],
-            [null, '', ['general', 'chat'], ['general', 'chat']],
-            [null, 'legal-review', ['legal-review', 'chat'], ['legal-review', 'chat']],
+            // model tag, topic on the message, [topic, intent] both entries answer
+            ['text2pic', '', ['mediamaker', 'image_generation']],
+            ['text2pic', 'mediamaker', ['mediamaker', 'image_generation']],
+            ['text2vid', '', ['mediamaker', 'image_generation']],
+            ['text2vid', 'mediamaker', ['mediamaker', 'image_generation']],
+            ['text2sound', '', ['mediamaker', 'image_generation']],
+            ['text2sound', 'mediamaker', ['mediamaker', 'image_generation']],
+            ['pic2text', '', ['general', 'chat']],
+            ['pic2text', 'mediamaker', ['general', 'chat']],
+            ['analyze', '', ['general', 'chat']],
+            ['analyze', 'mediamaker', ['general', 'chat']],
+            ['vision', '', ['general', 'chat']],
+            ['vision', 'mediamaker', ['general', 'chat']],
+            ['document', '', ['officemaker', 'document_generation']],
+            ['document', 'mediamaker', ['officemaker', 'document_generation']],
+            ['officemaker', '', ['officemaker', 'document_generation']],
+            ['officemaker', 'mediamaker', ['officemaker', 'document_generation']],
+            ['text2doc', '', ['officemaker', 'document_generation']],
+            ['text2doc', 'mediamaker', ['officemaker', 'document_generation']],
+            ['chat', '', ['general', 'chat']],
+            ['chat', 'UNKNOWN', ['general', 'chat']],
+            ['chat', 'legal-review', ['legal-review', 'chat']],
+            ['chat', 'mediamaker', ['mediamaker', 'image_generation']],
+            ['chat', 'tools:pic', ['tools:pic', 'image_generation']],
+            ['vectorize', '', ['general', 'chat']],
+            ['vectorize', 'UNKNOWN', ['general', 'chat']],
+            ['vectorize', 'legal-review', ['legal-review', 'chat']],
+            ['vectorize', 'mediamaker', ['mediamaker', 'image_generation']],
+            ['vectorize', 'tools:pic', ['tools:pic', 'image_generation']],
+            ['rerank', '', ['general', 'chat']],
+            ['rerank', 'unknown', ['general', 'chat']],
+            ['rerank', 'UNKNOWN', ['general', 'chat']],
+            ['rerank', 'legal-review', ['legal-review', 'chat']],
+            ['rerank', 'mediamaker', ['mediamaker', 'image_generation']],
+            ['rerank', 'tools:pic', ['tools:pic', 'image_generation']],
+            [null, '', ['general', 'chat']],
+            [null, 'legal-review', ['legal-review', 'chat']],
         ];
 
         foreach ($rows as $row) {
@@ -88,17 +88,16 @@ final class OverrideAndAgainRoutingTest extends TestCase
     }
 
     /**
-     * @param array{0: string, 1: string} $override
-     * @param array{0: string, 1: string} $again
+     * @param array{0: string, 1: string} $routed
      */
     #[DataProvider('rows')]
-    public function testAModelOverrideAndAnAgainRouteTheTagAndTopicAsPinned(?string $tag, string $topic, array $override, array $again): void
+    public function testAModelOverrideAndAnAgainRouteTheTagAndTopicAlike(?string $tag, string $topic, array $routed): void
     {
         $byOverride = $this->classifier($tag)->classify($this->message($topic));
-        self::assertSame($override, [$byOverride['topic'], $byOverride['intent']], 'model override');
+        self::assertSame($routed, [$byOverride['topic'], $byOverride['intent']], 'model override');
 
         $byAgain = $this->resolver($tag)->againForBufferedTurn($this->message($topic), ['is_again' => true, 'model_id' => 42], new TurnStatus(null, new NullLogger()));
-        self::assertSame($again, [$byAgain['topic'], $byAgain['intent']], 'Again');
+        self::assertSame($routed, [$byAgain['topic'], $byAgain['intent']], 'Again');
     }
 
     public function testAnAgainOfAPicMessageRegeneratesTheImage(): void

@@ -7,28 +7,14 @@ namespace App\Service\Message\Capability;
 use App\Service\Multitask\Plan\Capability;
 
 /**
- * Which topic and intent a message gets when the user picked a model: a
- * model override in MessageClassifier and an Again both ask. An Again
- * follows forModel(); the model override keeps its own tag table until it
- * agrees.
+ * Which topic and intent a message gets when the user picked a model, for
+ * a model override in MessageClassifier and an Again in
+ * TurnClassificationResolver alike, and which intent a topic routes to.
  */
 final readonly class TopicIntentRule
 {
     /** The kind of answer a model tag names; any other tag keeps the message's topic. */
     private const TOPIC_FOR_TAG = [
-        'text2pic' => 'mediamaker',
-        'text2vid' => 'mediamaker',
-        'text2sound' => 'mediamaker',
-        'pic2text' => 'general', // Vision is handled by ChatHandler
-        'analyze' => 'general',
-        'vision' => 'general',
-        'document' => 'officemaker',
-        'officemaker' => 'officemaker',
-        'text2doc' => 'officemaker',
-    ];
-
-    /** The model override's tag table; any other tag keeps the message's topic. */
-    private const MODEL_OVERRIDE_TOPICS = [
         'text2pic' => 'mediamaker',
         'text2vid' => 'mediamaker',
         'text2sound' => 'mediamaker',
@@ -60,22 +46,10 @@ final readonly class TopicIntentRule
     }
 
     /**
-     * A model override in the classifier: media tags make media, analysis
-     * tags a chat answer, document tags a document; any other tag (a chat
-     * model among them) keeps the message's topic, else `general`.
-     */
-    public function forModelOverride(string $modelTag, ?string $messageTopic): TopicIntent
-    {
-        $topic = self::MODEL_OVERRIDE_TOPICS[$modelTag] ?? self::topicOrGeneral($messageTopic);
-
-        return new TopicIntent($topic, $this->intentFor($topic));
-    }
-
-    /**
      * The tag names the kind of answer when it can: media, a chat answer for
-     * vision, a document. Any other tag (a chat model, no tag) keeps the
-     * topic the message has, so a custom prompt survives; without one the
-     * message goes to `general`.
+     * vision and analysis, a document. Any other tag (a chat model, no tag)
+     * keeps the topic the message has, so a custom prompt survives; without
+     * one the message goes to `general`.
      */
     public function forModel(?string $modelTag, ?string $messageTopic): TopicIntent
     {

@@ -242,7 +242,7 @@ final readonly class MessageClassifier
             // "Again" with model but no prompt override
             // Detect model type from model tag and set topic accordingly
             $modelTag = $this->modelConfigService->getModelTag($modelOverride) ?? 'chat';
-            $routed = $this->topicIntents->forModelOverride($modelTag, $message->getTopic());
+            $routed = $this->topicIntents->forModel($modelTag, $message->getTopic());
 
             $this->logger->info('MessageClassifier: Using model override with auto-detected topic', [
                 'message_id' => $messageId,
