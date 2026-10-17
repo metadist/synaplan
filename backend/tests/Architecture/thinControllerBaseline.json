@@ -6,7 +6,7 @@
         "methodLines": 50
     },
     "counts": {
-        "methodLines": 107,
+        "methodLines": 106,
         "entityManager": 18,
         "aiFacade": 5
     },
@@ -93,7 +93,6 @@
         "src/Controller/SubscriptionController.php::SubscriptionController::createTopupSession": 101,
         "src/Controller/SubscriptionController.php::SubscriptionController::syncFromStripe": 115,
         "src/Controller/TtsController.php::TtsController::streamAudio": 58,
-        "src/Controller/UserMemoryController.php::UserMemoryController::updateMemory": 58,
         "src/Controller/VectorStatsController.php::VectorStatsController::admin": 51,
         "src/Controller/WebhookController.php::WebhookController::generic": 130,
         "src/Controller/WebhookController.php::WebhookController::whatsapp": 73,

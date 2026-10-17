@@ -270,21 +270,8 @@ class UserMemoryController extends AbstractController
             return $this->json([
                 'memory' => $memory->toArray(),
             ], Response::HTTP_CREATED);
-        } catch (MemoryServiceUnavailableException $e) {
-            return $this->memoryServiceUnavailableResponse($user, $e);
-        } catch (\InvalidArgumentException $e) {
-            return $this->json([
-                'error' => $e->getMessage(),
-            ], Response::HTTP_BAD_REQUEST);
-        } catch (ProviderException $e) {
-            // AI provider not available (e.g., Ollama not running, model not loaded)
-            // Only show technical details to admins
-            $response = ['error' => 'Memory service temporarily unavailable'];
-            if ($user->isAdmin()) {
-                $response['debug'] = $e->getMessage();
-            }
-
-            return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
+        } catch (MemoryServiceUnavailableException|\InvalidArgumentException|ProviderException $e) {
+            return $this->memoryFailure($e, $user);
         }
     }
 
@@ -383,20 +370,8 @@ class UserMemoryController extends AbstractController
             return $this->json([
                 'memory' => $memory->toArray(),
             ]);
-        } catch (MemoryServiceUnavailableException $e) {
-            return $this->memoryServiceUnavailableResponse($user, $e);
-        } catch (\InvalidArgumentException $e) {
-            return $this->json([
-                'error' => $e->getMessage(),
-            ], Response::HTTP_BAD_REQUEST);
-        } catch (ProviderException $e) {
-            // Only show technical details to admins
-            $response = ['error' => 'Memory service temporarily unavailable'];
-            if ($user->isAdmin()) {
-                $response['debug'] = $e->getMessage();
-            }
-
-            return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
+        } catch (MemoryServiceUnavailableException|\InvalidArgumentException|ProviderException $e) {
+            return $this->memoryFailure($e, $user);
         }
     }
 
@@ -670,6 +645,27 @@ class UserMemoryController extends AbstractController
                 'aiResponse' => $result->answer,
             ]] : [])),
         };
+    }
+
+    /**
+     * A memory write that failed: the store unreachable, the input refused
+     * (400), or the AI provider down (503; only an admin sees the details).
+     */
+    private function memoryFailure(MemoryServiceUnavailableException|\InvalidArgumentException|ProviderException $e, User $user): JsonResponse
+    {
+        if ($e instanceof MemoryServiceUnavailableException) {
+            return $this->memoryServiceUnavailableResponse($user, $e);
+        }
+        if ($e instanceof \InvalidArgumentException) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        $response = ['error' => 'Memory service temporarily unavailable'];
+        if ($user->isAdmin()) {
+            $response['debug'] = $e->getMessage();
+        }
+
+        return $this->json($response, Response::HTTP_SERVICE_UNAVAILABLE);
     }
 
     /**
