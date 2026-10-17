@@ -21,6 +21,7 @@ use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\SelfAware\SelfAwareConfig;
+use App\Tests\Support\MessageClassifierFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -53,20 +54,20 @@ class MessageClassifierTest extends TestCase
 
         $this->configRepository->method('getValue')->willReturn('0');
 
-        $this->service = new MessageClassifier(
-            $this->messageSorter,
-            $this->messageMetaRepository,
-            $this->modelConfigService,
-            $this->configRepository,
-            $this->em,
-            $this->logger,
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($this->configRepository),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $this->service = MessageClassifierFactory::build([
+            'messageSorter' => $this->messageSorter,
+            'messageMetaRepository' => $this->messageMetaRepository,
+            'modelConfigService' => $this->modelConfigService,
+            'configRepository' => $this->configRepository,
+            'em' => $this->em,
+            'logger' => $this->logger,
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($this->configRepository),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
     }
 
     public function testClassifyWithPromptOverride(): void
@@ -778,20 +779,20 @@ class MessageClassifierTest extends TestCase
         $sorter = $this->createMock(MessageSorter::class);
         $sorter->expects($this->never())->method('classify');
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(101);
@@ -826,20 +827,20 @@ class MessageClassifierTest extends TestCase
             ->method('classify')
             ->willReturn(['topic' => 'mediamaker', 'language' => 'en']);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(102);
@@ -998,20 +999,20 @@ class MessageClassifierTest extends TestCase
         // web_search via the project-wide policy.
         $sorter->expects($this->never())->method('classify');
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(974);
@@ -1072,20 +1073,20 @@ class MessageClassifierTest extends TestCase
             ->method('classify')
             ->willReturn(['topic' => 'mediamaker', 'language' => $lang, 'media_type' => 'image']);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(209);
@@ -1149,20 +1150,20 @@ class MessageClassifierTest extends TestCase
             ->method('classify')
             ->willReturn(['topic' => 'general', 'language' => $lang]);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(301);
@@ -1198,20 +1199,20 @@ class MessageClassifierTest extends TestCase
             ->method('classify')
             ->willReturn(['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image']);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(203);
@@ -1268,20 +1269,20 @@ class MessageClassifierTest extends TestCase
             ->method('classify')
             ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(204);
@@ -1323,20 +1324,20 @@ class MessageClassifierTest extends TestCase
             ->method('classify')
             ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $previousFileMessage = $this->createMock(Message::class);
         $previousFileMessage->method('getDirection')->willReturn('OUT');
@@ -1380,20 +1381,20 @@ class MessageClassifierTest extends TestCase
         $sorter = $this->createMock(MessageSorter::class);
         $sorter->expects($this->never())->method('classify');
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $previousReply = $this->createMock(Message::class);
         $previousReply->method('getDirection')->willReturn('OUT');
@@ -1432,20 +1433,20 @@ class MessageClassifierTest extends TestCase
             ->method('classify')
             ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $fileTurn = $this->createMock(Message::class);
         $fileTurn->method('getDirection')->willReturn('OUT');
@@ -1494,20 +1495,20 @@ class MessageClassifierTest extends TestCase
         $sorter = $this->createMock(MessageSorter::class);
         $sorter->expects($this->never())->method('classify');
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+        ]);
 
         $fileTurn = $this->createMock(Message::class);
         $fileTurn->method('getDirection')->willReturn('OUT');
@@ -1706,7 +1707,7 @@ class MessageClassifierTest extends TestCase
 
         // Deliberately gibberish text: no local-language heuristic anchor
         // fires for any of the five supported languages, so
-        // resolveConfidentLanguage() falls back to the 'de' already pinned
+        // ConfidentLanguage::of() falls back to the 'de' already pinned
         // on the message by plainMessage() rather than guessing.
         $result = $classifier->classify($this->plainMessage(401, 'zzzqx foobar wibble 12345'));
 
@@ -2019,21 +2020,21 @@ class MessageClassifierTest extends TestCase
         $modelConfig = $this->createMock(ModelConfigService::class);
         $modelConfig->method('getDefaultProvider')->willReturn($chatProvider);
 
-        return new MessageClassifier(
-            $sorter,
-            $this->messageMetaRepository,
-            $modelConfig,
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            new NativeToolRoutingConfig($configRepo),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-            new SelfAwareConfig($configRepo),
-        );
+        return MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->messageMetaRepository,
+            'modelConfigService' => $modelConfig,
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => new NativeToolRoutingConfig($configRepo),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+            'selfAwareConfig' => new SelfAwareConfig($configRepo),
+        ]);
     }
 
     /**
@@ -2065,21 +2066,21 @@ class MessageClassifierTest extends TestCase
         $modelConfig = $this->createMock(ModelConfigService::class);
         $modelConfig->method('getDefaultProvider')->willReturn('anthropic');
 
-        return new MessageClassifier(
-            $sorter,
-            $this->messageMetaRepository,
-            $modelConfig,
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $embeddingRouter,
-            new EmbeddingRouterConfig($configRepo),
-            new NativeToolRoutingConfig($configRepo),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-            new SelfAwareConfig($configRepo),
-        );
+        return MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->messageMetaRepository,
+            'modelConfigService' => $modelConfig,
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $embeddingRouter,
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => new NativeToolRoutingConfig($configRepo),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+            'selfAwareConfig' => new SelfAwareConfig($configRepo),
+        ]);
     }
 
     /**
@@ -2112,21 +2113,21 @@ class MessageClassifierTest extends TestCase
             return null;
         });
 
-        return new MessageClassifier(
-            $sorter,
-            $this->messageMetaRepository,
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $embeddingRouter,
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-            new SelfAwareConfig($configRepo),
-        );
+        return MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->messageMetaRepository,
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $embeddingRouter,
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+            'selfAwareConfig' => new SelfAwareConfig($configRepo),
+        ]);
     }
 
     /**
@@ -2210,22 +2211,22 @@ class MessageClassifierTest extends TestCase
         $converter = $this->createMock(OfficeConverterClient::class);
         $converter->method('isEnabled')->willReturn($officeEngineOn);
 
-        return new MessageClassifier(
-            $sorter,
-            $this->createMock(MessageMetaRepository::class),
-            $this->createMock(ModelConfigService::class),
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-            new SelfAwareConfig($configRepo),
-            $converter,
-        );
+        return MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->createMock(MessageMetaRepository::class),
+            'modelConfigService' => $this->createMock(ModelConfigService::class),
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+            'selfAwareConfig' => new SelfAwareConfig($configRepo),
+            'officeConverter' => $converter,
+        ]);
     }
 
     /**
@@ -2249,22 +2250,22 @@ class MessageClassifierTest extends TestCase
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
         $this->messageSorter->expects($this->never())->method('classify');
 
-        return new MessageClassifier(
-            $this->messageSorter,
-            $this->messageMetaRepository,
-            $this->modelConfigService,
-            $configRepo,
-            $this->em,
-            $this->logger,
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-            officeConverter: $converter,
-            multitaskConfig: new MultitaskRoutingConfig($configRepo),
-        );
+        return MessageClassifierFactory::build([
+            'messageSorter' => $this->messageSorter,
+            'messageMetaRepository' => $this->messageMetaRepository,
+            'modelConfigService' => $this->modelConfigService,
+            'configRepository' => $configRepo,
+            'em' => $this->em,
+            'logger' => $this->logger,
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+            'officeConverter' => $converter,
+            'multitaskConfig' => new MultitaskRoutingConfig($configRepo),
+        ]);
     }
 
     /**
@@ -2695,21 +2696,21 @@ class MessageClassifierTest extends TestCase
             'sorting_model_name' => 'llama3',
         ]);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $this->messageMetaRepository,
-            $modelConfig,
-            $configRepo,
-            $this->createMock(EntityManagerInterface::class),
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            new NativeToolRoutingConfig($configRepo),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-            new SelfAwareConfig($configRepo),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $this->messageMetaRepository,
+            'modelConfigService' => $modelConfig,
+            'configRepository' => $configRepo,
+            'em' => $this->createMock(EntityManagerInterface::class),
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => new NativeToolRoutingConfig($configRepo),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+            'selfAwareConfig' => new SelfAwareConfig($configRepo),
+        ]);
         $result = $classifier->classify($this->attachedMessage(
             'Mach daraus ein Balkendiagramm nach Region.',
             fileType: 'csv',

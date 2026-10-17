@@ -1,0 +1,1473 @@
+{
+    "duplicate_webhook": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "message_id": "wamid.duplicate_webhook",
+                            "response_sent": true,
+                            "response_type": "text",
+                            "success": true
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            },
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "duplicate": true,
+                            "message_id": "wamid.duplicate_webhook",
+                            "response_sent": false,
+                            "success": true
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [
+            [
+                "IN",
+                "Hallo?"
+            ]
+        ],
+        "discord": [
+            "notifyWhatsAppSuccess text"
+        ],
+        "graph": [
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.duplicate_webhook",
+                    "messaging_product": "whatsapp",
+                    "status": "read",
+                    "typing_indicator": {
+                        "type": "text"
+                    }
+                }
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "text": {
+                        "body": "Samstags von 9 bis 14 Uhr.",
+                        "preview_url": true
+                    },
+                    "to": "491513371174",
+                    "type": "text"
+                }
+            ]
+        ],
+        "processor": [
+            {
+                "files": 0,
+                "options": [],
+                "status": "processing",
+                "text": "Hallo?"
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "level": "ANONYMOUS",
+                "type": "WHATSAPP"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "en",
+                    "meta": {
+                        "channel": "whatsapp",
+                        "external_id": "wamid.duplicate_webhook",
+                        "from_phone": "491513371174",
+                        "message_type": "text",
+                        "original_user_id": "<the message account>",
+                        "profile_name": "Ada",
+                        "to_display_phone": "4930123456",
+                        "to_phone_number_id": "1098765",
+                        "whatsapp_input_type": "text",
+                        "whatsapp_should_send_audio": "0"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "processing",
+                    "text": "Hallo?",
+                    "topic": "CHAT",
+                    "type": "WTSP"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "de",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"total\":7}",
+                        "channel": "whatsapp",
+                        "external_id": "wamid.reply.2",
+                        "from_display_phone": "4930123456",
+                        "from_phone_number_id": "1098765",
+                        "to_phone": "491513371174"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "sent",
+                    "text": "Samstags von 9 bis 14 Uhr.",
+                    "topic": "general",
+                    "type": "WTSP"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "transcriptions": [],
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Hallo?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Samstags von 9 bis 14 Uhr.",
+                    "source": "WHATSAPP",
+                    "usage": {
+                        "total": 7
+                    }
+                }
+            }
+        ]
+    },
+    "generated_image": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "message_id": "wamid.generated_image",
+                            "response_sent": true,
+                            "response_type": "audio",
+                            "success": true
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [
+            [
+                "IN",
+                "Mal mir eine Katze"
+            ]
+        ],
+        "discord": [
+            "notifyWhatsAppSuccess image"
+        ],
+        "graph": [
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.generated_image",
+                    "messaging_product": "whatsapp",
+                    "status": "read",
+                    "typing_indicator": {
+                        "type": "text"
+                    }
+                }
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "image": {
+                        "caption": "Hier ist deine Katze.",
+                        "link": "https://app.characterization.test/api/v1/files/uploads/2/generated/cat.png"
+                    },
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "to": "491512308544",
+                    "type": "image"
+                }
+            ]
+        ],
+        "processor": [
+            {
+                "files": 0,
+                "options": [],
+                "status": "processing",
+                "text": "Mal mir eine Katze"
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "level": "ANONYMOUS",
+                "type": "WHATSAPP"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "en",
+                    "meta": {
+                        "channel": "whatsapp",
+                        "external_id": "wamid.generated_image",
+                        "from_phone": "491512308544",
+                        "message_type": "text",
+                        "original_user_id": "<the message account>",
+                        "profile_name": "Ada",
+                        "to_display_phone": "4930123456",
+                        "to_phone_number_id": "1098765",
+                        "whatsapp_input_type": "text",
+                        "whatsapp_should_send_audio": "0"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "processing",
+                    "text": "Mal mir eine Katze",
+                    "topic": "CHAT",
+                    "type": "WTSP"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        1,
+                        "/api/v1/files/uploads/2/generated/cat.png",
+                        "image"
+                    ],
+                    "files": [],
+                    "language": "de",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"total\":7}",
+                        "channel": "whatsapp",
+                        "external_id": "wamid.reply.2",
+                        "from_display_phone": "4930123456",
+                        "from_phone_number_id": "1098765",
+                        "to_phone": "491512308544"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "sent",
+                    "text": "Hier ist deine Katze.",
+                    "topic": "general",
+                    "type": "WTSP"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "transcriptions": [],
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Mal mir eine Katze",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hier ist deine Katze.",
+                    "source": "WHATSAPP",
+                    "usage": {
+                        "total": 7
+                    }
+                }
+            },
+            {
+                "action": "IMAGES",
+                "metadata": {
+                    "media_usage": {
+                        "images": 1
+                    },
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "source": "WHATSAPP"
+                }
+            }
+        ]
+    },
+    "image_with_caption": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "message_id": "wamid.image_with_caption",
+                            "response_sent": true,
+                            "response_type": "text",
+                            "success": true
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [
+            [
+                "IN",
+                "Was ist das?"
+            ]
+        ],
+        "discord": [
+            "notifyWhatsAppSuccess text"
+        ],
+        "graph": [
+            [
+                "GET",
+                "/media.image",
+                null
+            ],
+            [
+                "GET",
+                "/media.image",
+                null
+            ],
+            [
+                "GET",
+                "lookaside/media.image",
+                null
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.image_with_caption",
+                    "messaging_product": "whatsapp",
+                    "status": "read",
+                    "typing_indicator": {
+                        "type": "text"
+                    }
+                }
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "text": {
+                        "body": "Samstags von 9 bis 14 Uhr.",
+                        "preview_url": true
+                    },
+                    "to": "491516582378",
+                    "type": "text"
+                }
+            ]
+        ],
+        "processor": [
+            {
+                "files": 1,
+                "options": [],
+                "status": "processing",
+                "text": "Was ist das?"
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "level": "ANONYMOUS",
+                "type": "WHATSAPP"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        1,
+                        "",
+                        ""
+                    ],
+                    "files": [
+                        [
+                            "jpg",
+                            "image/jpeg",
+                            "uploaded"
+                        ]
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "whatsapp",
+                        "external_id": "wamid.image_with_caption",
+                        "from_phone": "491516582378",
+                        "media_id": "media.image",
+                        "media_url": "https://lookaside.example/media.image",
+                        "message_type": "image",
+                        "original_user_id": "<the message account>",
+                        "profile_name": "Ada",
+                        "to_display_phone": "4930123456",
+                        "to_phone_number_id": "1098765",
+                        "whatsapp_input_type": "image",
+                        "whatsapp_should_send_audio": "0"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "processing",
+                    "text": "Was ist das?",
+                    "topic": "CHAT",
+                    "type": "WTSP"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "de",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"total\":7}",
+                        "channel": "whatsapp",
+                        "external_id": "wamid.reply.5",
+                        "from_display_phone": "4930123456",
+                        "from_phone_number_id": "1098765",
+                        "to_phone": "491516582378"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "sent",
+                    "text": "Samstags von 9 bis 14 Uhr.",
+                    "topic": "general",
+                    "type": "WTSP"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "transcriptions": [],
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Was ist das?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Samstags von 9 bis 14 Uhr.",
+                    "source": "WHATSAPP",
+                    "usage": {
+                        "total": 7
+                    }
+                }
+            }
+        ]
+    },
+    "image_without_caption": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "message_id": "wamid.image_without_caption",
+                            "response_sent": true,
+                            "response_type": "text",
+                            "success": true
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [
+            [
+                "IN",
+                "Describe what you see in this image."
+            ]
+        ],
+        "discord": [
+            "notifyWhatsAppSuccess text"
+        ],
+        "graph": [
+            [
+                "GET",
+                "/media.image",
+                null
+            ],
+            [
+                "GET",
+                "/media.image",
+                null
+            ],
+            [
+                "GET",
+                "lookaside/media.image",
+                null
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.image_without_caption",
+                    "messaging_product": "whatsapp",
+                    "status": "read",
+                    "typing_indicator": {
+                        "type": "text"
+                    }
+                }
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "text": {
+                        "body": "Samstags von 9 bis 14 Uhr.",
+                        "preview_url": true
+                    },
+                    "to": "491510175175",
+                    "type": "text"
+                }
+            ]
+        ],
+        "processor": [
+            {
+                "files": 1,
+                "options": {
+                    "force_image_description": true
+                },
+                "status": "processing",
+                "text": "Describe what you see in this image."
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "level": "ANONYMOUS",
+                "type": "WHATSAPP"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        1,
+                        "",
+                        ""
+                    ],
+                    "files": [
+                        [
+                            "jpg",
+                            "image/jpeg",
+                            "uploaded"
+                        ]
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "whatsapp",
+                        "external_id": "wamid.image_without_caption",
+                        "from_phone": "491510175175",
+                        "media_id": "media.image",
+                        "media_url": "https://lookaside.example/media.image",
+                        "message_type": "image",
+                        "original_user_id": "<the message account>",
+                        "profile_name": "Ada",
+                        "to_display_phone": "4930123456",
+                        "to_phone_number_id": "1098765",
+                        "whatsapp_input_type": "image",
+                        "whatsapp_should_send_audio": "0"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "processing",
+                    "text": "Describe what you see in this image.",
+                    "topic": "CHAT",
+                    "type": "WTSP"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "de",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"total\":7}",
+                        "channel": "whatsapp",
+                        "external_id": "wamid.reply.5",
+                        "from_display_phone": "4930123456",
+                        "from_phone_number_id": "1098765",
+                        "to_phone": "491510175175"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "sent",
+                    "text": "Samstags von 9 bis 14 Uhr.",
+                    "topic": "general",
+                    "type": "WTSP"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "transcriptions": [],
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Describe what you see in this image.",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Samstags von 9 bis 14 Uhr.",
+                    "source": "WHATSAPP",
+                    "usage": {
+                        "total": 7
+                    }
+                }
+            }
+        ]
+    },
+    "media_download_failure": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "error": "Failed to retrieve media URL from WhatsApp",
+                            "message_id": "wamid.media_download_failure",
+                            "success": false
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [
+            [
+                "IN",
+                "[Image]"
+            ]
+        ],
+        "discord": [
+            "notifyWhatsAppError media_download"
+        ],
+        "graph": [
+            [
+                "GET",
+                "/media.missing",
+                null
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "text": {
+                        "body": "⚠️ _Fehler bei der Verarbeitung_\n\nDeine Nachricht konnte nicht verarbeitet werden. Bitte versuche es erneut.",
+                        "preview_url": true
+                    },
+                    "to": "491513702577",
+                    "type": "text"
+                }
+            ]
+        ],
+        "processor": [],
+        "speech": [],
+        "stored": {
+            "account": {
+                "level": "ANONYMOUS",
+                "type": "WHATSAPP"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "en",
+                    "meta": {
+                        "channel": "whatsapp",
+                        "external_id": "wamid.media_download_failure",
+                        "from_phone": "491513702577",
+                        "media_id": "media.missing",
+                        "message_type": "image",
+                        "original_user_id": "<the message account>",
+                        "profile_name": "Ada",
+                        "to_display_phone": "4930123456",
+                        "to_phone_number_id": "1098765",
+                        "whatsapp_input_type": "image",
+                        "whatsapp_should_send_audio": "0"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "processing",
+                    "text": "[Image]",
+                    "topic": "CHAT",
+                    "type": "WTSP"
+                }
+            ]
+        },
+        "summary_refreshes": 0,
+        "transcriptions": [],
+        "usage": []
+    },
+    "processor_failure": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "error": "Something went wrong while answering this request. Please try again.\n\nYou can try again with a different model that fits this request.",
+                            "message_id": "wamid.processor_failure",
+                            "success": false
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [
+            [
+                "IN",
+                "Hallo"
+            ]
+        ],
+        "discord": [
+            "notifyWhatsAppError processing"
+        ],
+        "graph": [
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.processor_failure",
+                    "messaging_product": "whatsapp",
+                    "status": "read",
+                    "typing_indicator": {
+                        "type": "text"
+                    }
+                }
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "text": {
+                        "body": "Something went wrong while answering this request. Please try again.\n\nYou can try again with a different model that fits this request.",
+                        "preview_url": true
+                    },
+                    "to": "491515812088",
+                    "type": "text"
+                }
+            ]
+        ],
+        "processor": [
+            {
+                "files": 0,
+                "options": [],
+                "status": "processing",
+                "text": "Hallo"
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "level": "ANONYMOUS",
+                "type": "WHATSAPP"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "en",
+                    "meta": {
+                        "channel": "whatsapp",
+                        "external_id": "wamid.processor_failure",
+                        "from_phone": "491515812088",
+                        "message_type": "text",
+                        "original_user_id": "<the message account>",
+                        "profile_name": "Ada",
+                        "to_display_phone": "4930123456",
+                        "to_phone_number_id": "1098765",
+                        "whatsapp_input_type": "text",
+                        "whatsapp_should_send_audio": "0"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "processing",
+                    "text": "Hallo",
+                    "topic": "CHAT",
+                    "type": "WTSP"
+                }
+            ]
+        },
+        "summary_refreshes": 0,
+        "transcriptions": [],
+        "usage": []
+    },
+    "rate_limited": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "error": "Rate limit exceeded",
+                            "message_id": "wamid.rate_limited",
+                            "success": false
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [],
+        "discord": [],
+        "graph": [
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "text": {
+                        "body": "⚠️ _Nachrichtenlimit erreicht_\n\nDu hast dein Nachrichtenlimit von 5 Nachrichten erreicht.\n\nUm weiterhin Synaplan zu nutzen, verifiziere deine Nummer oder upgrade zu einem kostenpflichtigen Plan.",
+                        "preview_url": true
+                    },
+                    "to": "491519983558",
+                    "type": "text"
+                }
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.rate_limited",
+                    "messaging_product": "whatsapp",
+                    "status": "read"
+                }
+            ]
+        ],
+        "processor": [],
+        "speech": [],
+        "stored": {
+            "account": null,
+            "chats": 0,
+            "messages": []
+        },
+        "summary_refreshes": 0,
+        "transcriptions": [],
+        "usage": []
+    },
+    "text": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "message_id": "wamid.text",
+                            "response_sent": true,
+                            "response_type": "text",
+                            "success": true
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [
+            [
+                "IN",
+                "Wann habt ihr am Samstag offen?"
+            ]
+        ],
+        "discord": [
+            "notifyWhatsAppSuccess text"
+        ],
+        "graph": [
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.text",
+                    "messaging_product": "whatsapp",
+                    "status": "read",
+                    "typing_indicator": {
+                        "type": "text"
+                    }
+                }
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "text": {
+                        "body": "Samstags von 9 bis 14 Uhr.",
+                        "preview_url": true
+                    },
+                    "to": "491519008199",
+                    "type": "text"
+                }
+            ]
+        ],
+        "processor": [
+            {
+                "files": 0,
+                "options": [],
+                "status": "processing",
+                "text": "Wann habt ihr am Samstag offen?"
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "level": "ANONYMOUS",
+                "type": "WHATSAPP"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "en",
+                    "meta": {
+                        "channel": "whatsapp",
+                        "external_id": "wamid.text",
+                        "from_phone": "491519008199",
+                        "message_type": "text",
+                        "original_user_id": "<the message account>",
+                        "profile_name": "Ada",
+                        "to_display_phone": "4930123456",
+                        "to_phone_number_id": "1098765",
+                        "whatsapp_input_type": "text",
+                        "whatsapp_should_send_audio": "0"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "processing",
+                    "text": "Wann habt ihr am Samstag offen?",
+                    "topic": "CHAT",
+                    "type": "WTSP"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "de",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"total\":7}",
+                        "channel": "whatsapp",
+                        "external_id": "wamid.reply.2",
+                        "from_display_phone": "4930123456",
+                        "from_phone_number_id": "1098765",
+                        "to_phone": "491519008199"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "sent",
+                    "text": "Samstags von 9 bis 14 Uhr.",
+                    "topic": "general",
+                    "type": "WTSP"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "transcriptions": [],
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Wann habt ihr am Samstag offen?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Samstags von 9 bis 14 Uhr.",
+                    "source": "WHATSAPP",
+                    "usage": {
+                        "total": 7
+                    }
+                }
+            }
+        ]
+    },
+    "unsupported_type": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "message_id": "wamid.unsupported_type",
+                            "reason": "unsupported_type",
+                            "response_sent": false,
+                            "skipped": true,
+                            "success": true,
+                            "type": "reaction"
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [],
+        "discord": [],
+        "graph": [
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.unsupported_type",
+                    "messaging_product": "whatsapp",
+                    "status": "read"
+                }
+            ]
+        ],
+        "processor": [],
+        "speech": [],
+        "stored": {
+            "account": null,
+            "chats": 0,
+            "messages": []
+        },
+        "summary_refreshes": 0,
+        "transcriptions": [],
+        "usage": []
+    },
+    "verification_code": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "message_id": "wamid.verification_code",
+                            "success": true,
+                            "user_id": "<user>",
+                            "verified": true
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [],
+        "discord": [],
+        "graph": [
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "text": {
+                        "body": "✅ Erfolgreich verifiziert!",
+                        "preview_url": true
+                    },
+                    "to": "491514526879",
+                    "type": "text"
+                }
+            ]
+        ],
+        "processor": [],
+        "speech": [],
+        "stored": {
+            "account": null,
+            "chats": 0,
+            "messages": []
+        },
+        "summary_refreshes": 0,
+        "transcriptions": [],
+        "usage": []
+    },
+    "voice_message": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "message_id": "wamid.voice_message",
+                            "response_sent": true,
+                            "response_type": "tts",
+                            "success": true
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [
+            [
+                "IN",
+                "Wann habt ihr offen?"
+            ]
+        ],
+        "discord": [
+            "notifyWhatsAppSuccess tts"
+        ],
+        "graph": [
+            [
+                "GET",
+                "/media.voice",
+                null
+            ],
+            [
+                "GET",
+                "/media.voice",
+                null
+            ],
+            [
+                "GET",
+                "lookaside/media.voice",
+                null
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.voice_message",
+                    "messaging_product": "whatsapp",
+                    "status": "read",
+                    "typing_indicator": {
+                        "type": "text"
+                    }
+                }
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "audio": {
+                        "link": "https://app.characterization.test/api/v1/files/uploads/2/tts/answer.mp3"
+                    },
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "to": "491512979564",
+                    "type": "audio"
+                }
+            ]
+        ],
+        "processor": [
+            {
+                "files": 1,
+                "options": [],
+                "status": "processing",
+                "text": "Wann habt ihr offen?"
+            }
+        ],
+        "speech": [
+            {
+                "format": "mp3",
+                "language": "en",
+                "text": "Samstags von 9 bis 14 Uhr."
+            }
+        ],
+        "stored": {
+            "account": {
+                "level": "ANONYMOUS",
+                "type": "WHATSAPP"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        1,
+                        "",
+                        ""
+                    ],
+                    "files": [
+                        [
+                            "ogg",
+                            "audio/ogg",
+                            "extracted"
+                        ]
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "whatsapp",
+                        "external_id": "wamid.voice_message",
+                        "from_phone": "491512979564",
+                        "media_id": "media.voice",
+                        "media_url": "https://lookaside.example/media.voice",
+                        "message_type": "audio",
+                        "original_user_id": "<the message account>",
+                        "profile_name": "Ada",
+                        "text_source": "transcript",
+                        "to_display_phone": "4930123456",
+                        "to_phone_number_id": "1098765",
+                        "whatsapp_input_type": "audio",
+                        "whatsapp_should_send_audio": "1"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "processing",
+                    "text": "Wann habt ihr offen?",
+                    "topic": "CHAT",
+                    "type": "WTSP"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        1,
+                        "/api/v1/files/uploads/2/tts/answer.mp3",
+                        "audio"
+                    ],
+                    "files": [],
+                    "language": "de",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"total\":7}",
+                        "channel": "whatsapp",
+                        "external_id": "wamid.reply.5",
+                        "from_display_phone": "4930123456",
+                        "from_phone_number_id": "1098765",
+                        "to_phone": "491512979564"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "sent",
+                    "text": "Samstags von 9 bis 14 Uhr.",
+                    "topic": "general",
+                    "type": "WTSP"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "transcriptions": [
+            "ogg"
+        ],
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Wann habt ihr offen?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Samstags von 9 bis 14 Uhr.",
+                    "source": "WHATSAPP",
+                    "usage": {
+                        "total": 7
+                    }
+                }
+            }
+        ]
+    },
+    "web_search_citations": {
+        "answers": [
+            {
+                "json": {
+                    "processed": 1,
+                    "responses": [
+                        {
+                            "message_id": "wamid.web_search_citations",
+                            "response_sent": true,
+                            "response_type": "text",
+                            "success": true
+                        }
+                    ],
+                    "success": true
+                },
+                "status": 200
+            }
+        ],
+        "chat_activity": [
+            [
+                "IN",
+                "Was gibt es Neues?"
+            ]
+        ],
+        "discord": [
+            "notifyWhatsAppSuccess text"
+        ],
+        "graph": [
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "message_id": "wamid.web_search_citations",
+                    "messaging_product": "whatsapp",
+                    "status": "read",
+                    "typing_indicator": {
+                        "type": "text"
+                    }
+                }
+            ],
+            [
+                "POST",
+                "/1098765/messages",
+                {
+                    "messaging_product": "whatsapp",
+                    "recipient_type": "individual",
+                    "text": {
+                        "body": "Hier ist das Neueste.\n\n🔗 _Quellen:_\n_[1] News_\nhttps://news.example/today",
+                        "preview_url": true
+                    },
+                    "to": "491518439294",
+                    "type": "text"
+                }
+            ]
+        ],
+        "processor": [
+            {
+                "files": 0,
+                "options": [],
+                "status": "processing",
+                "text": "Was gibt es Neues?"
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "level": "ANONYMOUS",
+                "type": "WHATSAPP"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "en",
+                    "meta": {
+                        "channel": "whatsapp",
+                        "external_id": "wamid.web_search_citations",
+                        "from_phone": "491518439294",
+                        "message_type": "text",
+                        "original_user_id": "<the message account>",
+                        "profile_name": "Ada",
+                        "to_display_phone": "4930123456",
+                        "to_phone_number_id": "1098765",
+                        "web_search_query": "news today",
+                        "web_search_results_count": "1",
+                        "whatsapp_input_type": "text",
+                        "whatsapp_should_send_audio": "0"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "processing",
+                    "text": "Was gibt es Neues?",
+                    "topic": "CHAT",
+                    "type": "WTSP"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "files": [],
+                    "language": "de",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"total\":7}",
+                        "channel": "whatsapp",
+                        "external_id": "wamid.reply.2",
+                        "from_display_phone": "4930123456",
+                        "from_phone_number_id": "1098765",
+                        "to_phone": "491518439294",
+                        "web_search_query": "news today",
+                        "web_search_results_count": "1"
+                    },
+                    "provider": "WHATSAPP",
+                    "status": "sent",
+                    "text": "Hier ist das Neueste.",
+                    "topic": "general",
+                    "type": "WTSP"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "transcriptions": [],
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Was gibt es Neues?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hier ist das Neueste.",
+                    "source": "WHATSAPP",
+                    "usage": {
+                        "total": 7
+                    }
+                }
+            }
+        ]
+    }
+}

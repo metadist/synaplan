@@ -12,17 +12,22 @@ use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\Agent\AgentPinResolver;
+use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
+use App\Service\Message\Routing\EmbeddingRouterMatch;
 use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\Runtime\RuntimeProfile;
+use App\Service\SelfAware\SelfAwareConfig;
 use App\Tests\Characterization\Support\RoutingSnapshot;
+use App\Tests\Support\MessageClassifierFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -51,6 +56,27 @@ use Psr\Log\LoggerInterface;
  * plan: custom user topic, analyzefile, mediamaker params, override paths.
  *
  * Record/refresh the baseline with: UPDATE_ROUTING_SNAPSHOTS=1
+ *
+ * @phpstan-type RoutingCase array{
+ *     id: string,
+ *     text: string,
+ *     language?: string,
+ *     topic?: string,
+ *     fastPath?: bool,
+ *     files?: list<array{type?: string, name?: string, mime?: string, text?: string}>,
+ *     textSource?: string,
+ *     meta?: array<string, string>,
+ *     modelTag?: string,
+ *     sorter?: array<string, mixed>,
+ *     config?: array<string, array<string, string>>,
+ *     chatProvider?: string,
+ *     pin?: array{internet: bool},
+ *     embedding?: array{topic: string, score: float},
+ *     selfAware?: bool,
+ *     documentTools?: bool,
+ *     history?: list<array{direction: string, text?: string, filePath?: string}>,
+ *     legacyFile?: array{type: string, path: string}
+ * }
  */
 final class RoutingCharacterizationTest extends TestCase
 {
@@ -104,18 +130,7 @@ final class RoutingCharacterizationTest extends TestCase
     /**
      * The golden corpus. Each case is one inbound message scenario.
      *
-     * @return list<array{
-     *     id: string,
-     *     text: string,
-     *     language?: string,
-     *     topic?: string,
-     *     fastPath?: bool,
-     *     files?: list<array{type?: string, name?: string, mime?: string, text?: string}>,
-     *     textSource?: string,
-     *     meta?: array<string, string>,
-     *     modelTag?: string,
-     *     sorter?: array<string, mixed>
-     * }>
+     * @return list<RoutingCase>
      */
     private function corpus(): array
     {
@@ -145,18 +160,7 @@ final class RoutingCharacterizationTest extends TestCase
     }
 
     /**
-     * @return list<array{
-     *     id: string,
-     *     text: string,
-     *     language?: string,
-     *     topic?: string,
-     *     fastPath?: bool,
-     *     files?: list<array{type?: string, name?: string, mime?: string, text?: string}>,
-     *     textSource?: string,
-     *     meta?: array<string, string>,
-     *     modelTag?: string,
-     *     sorter?: array<string, mixed>
-     * }>
+     * @return list<RoutingCase>
      */
     private static function fixedCorpus(): array
     {
@@ -285,26 +289,65 @@ final class RoutingCharacterizationTest extends TestCase
             // A user-authored BPROMPTS topic (BOWNERID>0) is NOT in the canonical
             // map, so today it falls back to the chat intent. This baseline proves
             // the planner adapter must carry the topic/prompt id to preserve it.
+            // ---- Every seam of the cascade, and where two steps compete (V4 S6) ----
+            // The agent pin: after the slash commands, before everything else.
+            ['id' => 'pin_chat', 'text' => 'Where is my order?', 'language' => 'en', 'pin' => ['internet' => false]],
+            ['id' => 'pin_asks_the_sorter_only_for_the_web', 'text' => 'What does the new tariff cost?', 'language' => 'en', 'pin' => ['internet' => true], 'sorter' => ['topic' => 'general', 'language' => 'en', 'web_search' => true, 'read_pages' => 2]],
+            ['id' => 'pin_bare_pic_gets_the_usage_hint', 'text' => '/pic', 'language' => 'en', 'pin' => ['internet' => true]],
+            ['id' => 'pin_search_keeps_the_pin_and_forces_search', 'text' => '/search weather in Bonn', 'language' => 'en', 'pin' => ['internet' => true]],
+            ['id' => 'pin_docs_keeps_the_pin_and_queries_the_knowledge', 'text' => '/docs vacation policy', 'language' => 'en', 'pin' => ['internet' => false]],
+            // The fast path, switched on.
+            ['id' => 'fastpath_on_plain_chat', 'text' => 'Hello, how are you today?', 'language' => 'en', 'config' => ['CLASSIFIER' => ['FAST_PATH_ENABLED' => '1']]],
+            ['id' => 'fastpath_on_search_command', 'text' => '/search php', 'language' => 'en', 'config' => ['CLASSIFIER' => ['FAST_PATH_ENABLED' => '1']]],
+            ['id' => 'fastpath_on_uses_the_message_language', 'text' => 'ok', 'language' => 'de', 'config' => ['CLASSIFIER' => ['FAST_PATH_ENABLED' => '1']]],
+            ['id' => 'fastpath_on_declines_an_unknown_language', 'text' => 'ok', 'language' => 'NN', 'config' => ['CLASSIFIER' => ['FAST_PATH_ENABLED' => '1']], 'sorter' => ['topic' => 'general', 'language' => 'de']],
+            ['id' => 'fastpath_on_declines_media_words', 'text' => 'zeichne eine katze', 'language' => 'de', 'config' => ['CLASSIFIER' => ['FAST_PATH_ENABLED' => '1']], 'sorter' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image']],
+            ['id' => 'fastpath_on_declines_after_a_generated_file', 'text' => 'mach den Titel fett', 'language' => 'de', 'config' => ['CLASSIFIER' => ['FAST_PATH_ENABLED' => '1']], 'history' => [['direction' => 'IN', 'text' => 'schreib einen Bericht als docx'], ['direction' => 'OUT', 'text' => '__FILE_GENERATED__:bericht.docx']], 'sorter' => ['topic' => 'officemaker', 'language' => 'de']],
+            ['id' => 'fastpath_on_declines_after_generated_media', 'text' => 'mach es blau', 'language' => 'de', 'config' => ['CLASSIFIER' => ['FAST_PATH_ENABLED' => '1']], 'history' => [['direction' => 'OUT', 'text' => '__IMAGE_GENERATED__', 'filePath' => '7/2026/10/1001_openai.png']], 'sorter' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image', 'input_mode' => 'reference_images']],
+            ['id' => 'fastpath_on_declines_a_later_document_edit', 'text' => 'ändere den Titel in der Datei', 'language' => 'de', 'config' => ['CLASSIFIER' => ['FAST_PATH_ENABLED' => '1']], 'history' => [['direction' => 'OUT', 'text' => '__FILE_GENERATED__:bericht.docx'], ['direction' => 'IN', 'text' => 'danke'], ['direction' => 'OUT', 'text' => 'Gern geschehen!']], 'sorter' => ['topic' => 'officemaker', 'language' => 'de']],
+            ['id' => 'fastpath_on_wins_over_an_again_override', 'text' => 'Hello, how are you today?', 'language' => 'en', 'config' => ['CLASSIFIER' => ['FAST_PATH_ENABLED' => '1']], 'meta' => ['MODEL_ID' => '77'], 'modelTag' => 'text2pic'],
+            // Again: a prompt with a model, and the sorter's own prompt id.
+            ['id' => 'again_prompt_and_model_override', 'text' => 'redo that', 'language' => 'en', 'fastPath' => false, 'meta' => ['PROMPTID' => 'legal-review', 'MODEL_ID' => '42'], 'modelTag' => 'chat'],
+            ['id' => 'again_sort_prompt_is_no_override', 'text' => 'redo that', 'language' => 'en', 'fastPath' => false, 'meta' => ['PROMPTID' => 'tools:sort'], 'sorter' => ['topic' => 'general', 'language' => 'en']],
+            // Attachments: each kind, and a slash command on an attachment.
+            ['id' => 'attach_video', 'text' => 'What happens here?', 'language' => 'en', 'files' => [['type' => 'mp4', 'name' => 'clip.mp4']]],
+            ['id' => 'attach_image_goes_to_the_sorter', 'text' => 'What is on this photo?', 'language' => 'en', 'fastPath' => false, 'files' => [['type' => 'jpg', 'name' => 'photo.jpg']], 'sorter' => ['topic' => 'general', 'language' => 'en']],
+            ['id' => 'attach_legacy_pdf', 'text' => 'Summarize this', 'language' => 'en', 'legacyFile' => ['type' => 'pdf', 'path' => '7/report.pdf']],
+            ['id' => 'attach_office_edit', 'text' => 'change the title to Q3 report', 'language' => 'en', 'documentTools' => true, 'config' => ['DOCUMENT_TOOLS' => ['ENABLED' => '1', 'ALLOW_UPLOAD_EDIT' => '1']], 'files' => [['type' => 'docx', 'name' => 'report.docx']]],
+            ['id' => 'attach_image_code_execution_forces_the_planner', 'text' => 'run python to count the red pixels', 'language' => 'en', 'fastPath' => false, 'files' => [['type' => 'png', 'name' => 'chart.png']], 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => false]],
+            ['id' => 'attach_with_a_slash_command', 'text' => '/pic a cat like this', 'language' => 'en', 'files' => [['type' => 'pdf', 'name' => 'report.pdf']]],
+            // A spoken answer needs the planner whatever the sorter votes.
+            ['id' => 'spoken_output_forces_the_planner', 'text' => 'Mach mir eine Audiodatei, in der du die Relativitätstheorie erklärst', 'language' => 'de', 'fastPath' => false, 'sorter' => ['topic' => 'general', 'language' => 'de', 'multi_step' => false]],
+            // The embedding router (Phase 8).
+            ['id' => 'embedding_match', 'text' => 'zeichne mir eine katze', 'language' => 'de', 'fastPath' => false, 'config' => ['EMBEDDING_ROUTER' => ['ENABLED' => '1']], 'embedding' => ['topic' => 'mediamaker', 'score' => 0.93]],
+            ['id' => 'embedding_match_declined_for_an_unknown_language', 'text' => 'katze bild', 'language' => 'NN', 'fastPath' => false, 'config' => ['EMBEDDING_ROUTER' => ['ENABLED' => '1'], 'NATIVE_TOOL_ROUTING' => ['ENABLED' => '1']], 'chatProvider' => 'anthropic', 'embedding' => ['topic' => 'mediamaker', 'score' => 0.93], 'sorter' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image']],
+            ['id' => 'embedding_below_the_threshold', 'text' => 'tell me about cats', 'language' => 'en', 'fastPath' => false, 'config' => ['EMBEDDING_ROUTER' => ['ENABLED' => '1']], 'embedding' => ['topic' => 'mediamaker', 'score' => 0.5], 'sorter' => ['topic' => 'general', 'language' => 'en']],
+            ['id' => 'self_aware_question_skips_the_embedding_router', 'text' => 'what can you do for me?', 'language' => 'en', 'fastPath' => false, 'selfAware' => true, 'config' => ['EMBEDDING_ROUTER' => ['ENABLED' => '1']], 'embedding' => ['topic' => 'general', 'score' => 0.95], 'sorter' => ['topic' => 'synaplan', 'language' => 'en']],
+            // The deferral to the answering call (Phase 9).
+            ['id' => 'deferral_to_the_answering_call', 'text' => 'tell me about the history of Rome', 'language' => 'en', 'fastPath' => false, 'config' => ['NATIVE_TOOL_ROUTING' => ['ENABLED' => '1']], 'chatProvider' => 'anthropic'],
+            ['id' => 'deferral_needs_a_tool_calling_provider', 'text' => 'tell me about the history of Rome', 'language' => 'en', 'fastPath' => false, 'config' => ['NATIVE_TOOL_ROUTING' => ['ENABLED' => '1']], 'chatProvider' => 'not-a-tool-caller', 'sorter' => ['topic' => 'general', 'language' => 'en']],
+            ['id' => 'produce_a_file_skips_the_embedding_router_and_the_deferral', 'text' => 'Make a bar chart from this table, grouped by region.', 'language' => 'en', 'fastPath' => false, 'config' => ['EMBEDDING_ROUTER' => ['ENABLED' => '1'], 'NATIVE_TOOL_ROUTING' => ['ENABLED' => '1']], 'chatProvider' => 'anthropic', 'embedding' => ['topic' => 'general', 'score' => 0.95], 'files' => [['type' => 'csv', 'name' => 'sales.csv']], 'sorter' => ['topic' => 'general', 'language' => 'en', 'multi_step' => false]],
+
             ['id' => 'sort_custom_topic', 'text' => 'review this contract clause', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'legal-review', 'language' => 'en']],
         ];
     }
 
     /**
-     * @param array{
-     *     id: string, text: string, language?: string, topic?: string,
-     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string, text?: string}>, textSource?: string,
-     *     meta?: array<string, string>, modelTag?: string, sorter?: array<string, mixed>
-     * } $case
+     * @param RoutingCase $case
      *
      * @return array<string, mixed>
      */
     private function classifyCase(array $case): array
     {
         $fastPath = $case['fastPath'] ?? true;
+        $config = $case['config'] ?? [];
 
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(
-            static function (int $owner, string $group, string $setting) use ($fastPath): ?string {
+            static function (int $owner, string $group, string $setting) use ($fastPath, $config): ?string {
+                if (isset($config[$group][$setting])) {
+                    return $config[$group][$setting];
+                }
                 if ('QDRANT_SEARCH' === $group) {
                     return '0';
                 }
@@ -322,6 +365,9 @@ final class RoutingCharacterizationTest extends TestCase
         }
 
         $modelConfig = $this->createMock(ModelConfigService::class);
+        if (isset($case['chatProvider'])) {
+            $modelConfig->method('getDefaultProvider')->willReturn($case['chatProvider']);
+        }
         $em = $this->createMock(EntityManagerInterface::class);
         if (isset($case['modelTag'])) {
             $modelConfig->method('getModelTag')->willReturn($case['modelTag']);
@@ -355,47 +401,51 @@ final class RoutingCharacterizationTest extends TestCase
         $converter = $this->createMock(OfficeConverterClient::class);
         $converter->method('isEnabled')->willReturn(true);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $metaRepo,
-            $modelConfig,
-            $configRepo,
-            $em,
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-            officeConverter: $converter,
-            multitaskConfig: new MultitaskRoutingConfig($configRepo),
-        );
+        $agentPin = $this->createMock(AgentPinResolver::class);
+        if (isset($case['pin'])) {
+            $agentPin->method('resolve')->willReturn(new RuntimeProfile(7, 'support-desk', null, ['chat' => 11], [], ['tool_internet' => $case['pin']['internet']], null, null, [], 3, 4));
+        }
 
-        $message = $this->buildMessage($case);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        if (isset($case['embedding'])) {
+            $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch($case['embedding']['topic'], $case['embedding']['score'], [['topic' => 'general', 'score' => 0.41]]));
+        }
 
-        return $classifier->classify($message);
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $metaRepo,
+            'modelConfigService' => $modelConfig,
+            'configRepository' => $configRepo,
+            'em' => $em,
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $embeddingRouter,
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => new NativeToolRoutingConfig($configRepo),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $agentPin,
+            'selfAwareConfig' => isset($case['selfAware']) ? new SelfAwareConfig($configRepo) : null,
+            'officeConverter' => $converter,
+            'documentToolsConfig' => isset($case['documentTools']) ? new DocumentToolsConfig($configRepo) : null,
+            'multitaskConfig' => new MultitaskRoutingConfig($configRepo),
+        ]);
+
+        $history = array_map(function (array $turn): Message {
+            $earlier = $this->createMock(Message::class);
+            $earlier->method('getDirection')->willReturn($turn['direction']);
+            $earlier->method('getText')->willReturn($turn['text'] ?? '');
+            $earlier->method('getFilePath')->willReturn($turn['filePath'] ?? '');
+
+            return $earlier;
+        }, $case['history'] ?? []);
+
+        // A pinned turn carries its RuntimeProfile object; the snapshot compares
+        // plain arrays, so the classification is handed over as JSON data.
+        return json_decode(json_encode($classifier->classify($this->buildMessage($case), $history), \JSON_THROW_ON_ERROR), true, 512, \JSON_THROW_ON_ERROR);
     }
 
     /**
-     * The Phase 9 deferral switched off: this snapshot locks the routing
-     * contract of the SORTER-based cascade, and a deferred turn deliberately
-     * has no classification to lock (the answering call decides).
-     */
-    private function disabledNativeToolRouting(): NativeToolRoutingConfig
-    {
-        $configRepo = $this->createMock(ConfigRepository::class);
-        $configRepo->method('getValue')->willReturn(null);
-
-        return new NativeToolRoutingConfig($configRepo);
-    }
-
-    /**
-     * @param array{
-     *     id: string, text: string, language?: string, topic?: string,
-     *     fastPath?: bool, files?: list<array{type?: string, name?: string, mime?: string, text?: string}>, textSource?: string,
-     *     meta?: array<string, string>, modelTag?: string, sorter?: array<string, mixed>
-     * } $case
+     * @param RoutingCase $case
      */
     private function buildMessage(array $case): Message
     {
@@ -413,10 +463,11 @@ final class RoutingCharacterizationTest extends TestCase
         });
         $message->method('getLanguage')->willReturn($case['language'] ?? 'en');
         $message->method('getDateTime')->willReturn('20260607120000');
-        $message->method('getFilePath')->willReturn('');
+        $message->method('getFilePath')->willReturn($case['legacyFile']['path'] ?? '');
+        $message->method('getFileType')->willReturn($case['legacyFile']['type'] ?? '');
         $message->method('getTopic')->willReturn($case['topic'] ?? '');
         $message->method('getFileText')->willReturn('');
-        $message->method('getFile')->willReturn(0);
+        $message->method('getFile')->willReturn(isset($case['legacyFile']) ? 5 : 0);
         $textSource = $case['textSource'] ?? null;
         $message->method('getMeta')->willReturnCallback(
             static function (string $key, ?string $default = null) use ($textSource): ?string {
