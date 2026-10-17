@@ -6,9 +6,9 @@
         "methodLines": 50
     },
     "counts": {
-        "methodLines": 112,
+        "methodLines": 110,
         "entityManager": 18,
-        "aiFacade": 8
+        "aiFacade": 6
     },
     "methodLines": {
         "src/Controller/AI/HiggsfieldCredentialController.php::HiggsfieldCredentialController::test": 62,
@@ -75,7 +75,6 @@
         "src/Controller/PromptController.php::PromptController::getAvailableFiles": 111,
         "src/Controller/PromptController.php::PromptController::getFiles": 58,
         "src/Controller/PromptController.php::PromptController::linkFile": 75,
-        "src/Controller/PromptController.php::PromptController::summarizeFile": 123,
         "src/Controller/PromptController.php::PromptController::update": 147,
         "src/Controller/RagController.php::RagController::search": 76,
         "src/Controller/RealtimeTokenController.php::RealtimeTokenController::issueSubscriptionToken": 73,
@@ -94,7 +93,6 @@
         "src/Controller/SubscriptionController.php::SubscriptionController::createPortalSession": 61,
         "src/Controller/SubscriptionController.php::SubscriptionController::createTopupSession": 101,
         "src/Controller/SubscriptionController.php::SubscriptionController::syncFromStripe": 115,
-        "src/Controller/SummaryController.php::SummaryController::generate": 251,
         "src/Controller/TtsController.php::TtsController::streamAudio": 58,
         "src/Controller/UserMemoryController.php::UserMemoryController::parseActionData": 54,
         "src/Controller/UserMemoryController.php::UserMemoryController::parseMemory": 162,
@@ -147,8 +145,6 @@
     "aiFacade": [
         "src/Controller/MessageController.php",
         "src/Controller/OpenAICompatibleController.php",
-        "src/Controller/PromptController.php",
-        "src/Controller/SummaryController.php",
         "src/Controller/TestController.php",
         "src/Controller/TestMessageController.php",
         "src/Controller/TtsController.php",

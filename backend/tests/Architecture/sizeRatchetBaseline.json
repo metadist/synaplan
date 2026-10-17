@@ -10,7 +10,7 @@
     "counts": {
         "fileLines": 53,
         "constructorParams": 65,
-        "methodLines": 134
+        "methodLines": 132
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -38,7 +38,7 @@
         "src/Controller/MessageController.php": 1173,
         "src/Controller/MessagesGatewayController.php": 832,
         "src/Controller/OpenAICompatibleController.php": 862,
-        "src/Controller/PromptController.php": 1885,
+        "src/Controller/PromptController.php": 1869,
         "src/Controller/SubscriptionController.php": 1198,
         "src/Controller/UserMemoryController.php": 1011,
         "src/Controller/WidgetController.php": 1585,
@@ -87,7 +87,7 @@
         "src/Controller/MessageController.php::MessageController": 14,
         "src/Controller/MessagesGatewayController.php::MessagesGatewayController": 15,
         "src/Controller/OpenAICompatibleController.php::OpenAICompatibleController": 11,
-        "src/Controller/PromptController.php::PromptController": 18,
+        "src/Controller/PromptController.php::PromptController": 16,
         "src/Controller/SetupController.php::SetupController": 11,
         "src/Controller/SubscriptionController.php::SubscriptionController": 17,
         "src/Controller/WebhookController.php::WebhookController": 11,
@@ -181,13 +181,11 @@
         "src/Controller/ProfileController.php::ProfileController::updateProfile": 104,
         "src/Controller/PromptController.php::PromptController::create": 103,
         "src/Controller/PromptController.php::PromptController::getAvailableFiles": 111,
-        "src/Controller/PromptController.php::PromptController::summarizeFile": 123,
         "src/Controller/PromptController.php::PromptController::update": 147,
         "src/Controller/StaticUploadController.php::StaticUploadController::serve": 161,
         "src/Controller/SubscriptionController.php::SubscriptionController::createCheckoutSession": 169,
         "src/Controller/SubscriptionController.php::SubscriptionController::createTopupSession": 101,
         "src/Controller/SubscriptionController.php::SubscriptionController::syncFromStripe": 115,
-        "src/Controller/SummaryController.php::SummaryController::generate": 251,
         "src/Controller/UserMemoryController.php::UserMemoryController::parseMemory": 162,
         "src/Controller/WebhookController.php::WebhookController::generic": 130,
         "src/Controller/WidgetLegacyController.php::WidgetLegacyController::legacyWidget": 167,
