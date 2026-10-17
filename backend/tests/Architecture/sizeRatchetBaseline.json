@@ -10,7 +10,7 @@
     "counts": {
         "fileLines": 57,
         "constructorParams": 69,
-        "methodLines": 147
+        "methodLines": 145
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -43,7 +43,7 @@
         "src/Controller/UserMemoryController.php": 1011,
         "src/Controller/WebhookController.php": 1085,
         "src/Controller/WidgetController.php": 1585,
-        "src/Controller/WidgetPublicController.php": 2234,
+        "src/Controller/WidgetPublicController.php": 1110,
         "src/Controller/WidgetSessionController.php": 896,
         "src/Mcp/McpServerFactory.php": 1426,
         "src/Repository/MessageRepository.php": 1079,
@@ -96,7 +96,7 @@
         "src/Controller/SubscriptionController.php::SubscriptionController": 17,
         "src/Controller/WebhookController.php::WebhookController": 19,
         "src/Controller/WidgetController.php::WidgetController": 20,
-        "src/Controller/WidgetPublicController.php::WidgetPublicController": 27,
+        "src/Controller/WidgetPublicController.php::WidgetPublicController": 21,
         "src/Entity/UserMemory.php::UserMemory": 11,
         "src/Mcp/McpServerFactory.php::McpServerFactory": 21,
         "src/MessageHandler/AdvanceMediaJobCommandHandler.php::AdvanceMediaJobCommandHandler": 12,
@@ -200,9 +200,7 @@
         "src/Controller/WebhookController.php::WebhookController::email": 606,
         "src/Controller/WebhookController.php::WebhookController::generic": 130,
         "src/Controller/WidgetLegacyController.php::WidgetLegacyController::legacyWidget": 167,
-        "src/Controller/WidgetPublicController.php::WidgetPublicController::fetchApiContext": 116,
         "src/Controller/WidgetPublicController.php::WidgetPublicController::history": 155,
-        "src/Controller/WidgetPublicController.php::WidgetPublicController::message": 735,
         "src/Controller/WidgetPublicController.php::WidgetPublicController::processWidgetFile": 110,
         "src/Controller/WidgetPublicController.php::WidgetPublicController::upload": 136,
         "src/Controller/WidgetSessionController.php::WidgetSessionController::get": 126,

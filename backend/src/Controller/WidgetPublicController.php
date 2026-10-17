@@ -9,29 +9,21 @@ use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
-use App\Service\Billing\BillingService;
 use App\Service\Branding\BrandingService;
-use App\Service\Chat\ConversationSummaryRefreshDispatcher;
-use App\Service\Chat\Run\ChatRun;
-use App\Service\Chat\Run\ChatRunRecorder;
 use App\Service\Chat\Run\ChatRunService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
-use App\Service\Media\GeneratedFileMetadataNormalizer;
-use App\Service\Media\GeneratedFileRegistrar;
-use App\Service\Message\AiResponseSanitizer;
-use App\Service\Message\ChatErrorPresenter;
-use App\Service\Message\MessageProcessor;
-use App\Service\Notification\DiscordNotificationService;
-use App\Service\Notification\SlackNotificationService;
-use App\Service\Prompt\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
-use App\Service\Research\UrlContentService;
-use App\Service\Widget\WidgetAgentRuntime;
-use App\Service\Widget\WidgetRealtimeBroadcaster;
+use App\Service\Widget\Turn\WidgetConversation;
+use App\Service\Widget\Turn\WidgetReply;
+use App\Service\Widget\Turn\WidgetTurnGate;
+use App\Service\Widget\WidgetDomainGuard;
+use App\Service\Widget\WidgetHandoff;
+use App\Service\Widget\WidgetRequestRefused;
 use App\Service\Widget\WidgetService;
+use App\Service\Widget\WidgetSessionResolver;
 use App\Service\Widget\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -40,7 +32,6 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -55,95 +46,26 @@ class WidgetPublicController extends AbstractController
     public function __construct(
         private WidgetService $widgetService,
         private WidgetSessionService $sessionService,
-        private MessageProcessor $messageProcessor,
         private RateLimitService $rateLimitService,
         private FileStorageService $storageService,
         private FileProcessor $fileProcessor,
         private VectorizationService $vectorizationService,
-        private UrlContentService $urlContentService,
-        private PromptService $promptService,
-        private BillingService $billingService,
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
-        private WidgetRealtimeBroadcaster $broadcaster,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private DiscordNotificationService $discord,
-        private SlackNotificationService $slack,
-        private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
-        private GeneratedFileRegistrar $generatedFileRegistrar,
         private BrandingService $brandingService,
-        private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private ChatRunService $chatRunService,
         private string $uploadDir,
-        private ChatErrorPresenter $chatErrorPresenter,
         private VectorSearchService $vectorSearchService,
-        private ?WidgetAgentRuntime $widgetAgentRuntime = null,
+        private WidgetTurnGate $turnGate,
+        private WidgetConversation $conversation,
+        private WidgetReply $reply,
+        private WidgetDomainGuard $domainGuard,
+        private WidgetSessionResolver $sessionResolver,
+        private WidgetHandoff $handoff,
     ) {
-    }
-
-    /**
-     * Recorder for the turn currently being streamed by THIS request. Mirrors
-     * every SSE event into a replayable log so a visitor who reloads the host
-     * page mid-answer can re-attach instead of losing the turn. Set at the top
-     * of the stream callback, cleared in its `finally`.
-     */
-    private ?ChatRunRecorder $activeRun = null;
-
-    /**
-     * Resolve the URL operators land on when they click the "Take over"
-     * button in the Slack notification. Lives next to the controller (not in
-     * a service) because it's tied to the frontend route shape — same place
-     * that owns the public API surface.
-     *
-     * Matches the SPA route registered in `frontend/src/router/index.ts`
-     * (`/channels/widgets/:widgetId/chats`). The session id is passed via
-     * `?session=` so the dashboard can deep-link directly to the visitor's
-     * conversation instead of leaving the operator to scan the list.
-     */
-    private function buildHandoffTakeoverUrl(string $widgetId, string $sessionId): string
-    {
-        $frontendBase = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'https://app.synaplan.com';
-        $frontendBase = rtrim((string) $frontendBase, '/');
-
-        return sprintf(
-            '%s/channels/widgets/%s/chats?session=%s',
-            $frontendBase,
-            rawurlencode($widgetId),
-            rawurlencode($sessionId),
-        );
-    }
-
-    /**
-     * Match the visitor's latest message against the operator-configured
-     * trigger phrases (case-insensitive substring match). Returns the first
-     * matching trigger so we can include it in the Slack notification ("AI
-     * was paged because the visitor said: 'speak to a human'"), or null when
-     * no trigger fires.
-     *
-     * Trigger list is bounded to 20 entries by `WidgetService::sanitizeConfig`,
-     * so the linear scan stays cheap even on hot widget traffic.
-     *
-     * @param list<string> $triggers
-     */
-    private function detectHandoffTrigger(string $message, array $triggers): ?string
-    {
-        if ('' === $message || [] === $triggers) {
-            return null;
-        }
-        $haystack = mb_strtolower($message);
-        foreach ($triggers as $trigger) {
-            $needle = mb_strtolower(trim($trigger));
-            if ('' === $needle) {
-                continue;
-            }
-            if (str_contains($haystack, $needle)) {
-                return $trigger;
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -347,28 +269,7 @@ class WidgetPublicController extends AbstractController
             ? trim($data['lastMessage'])
             : ($session->getLastMessagePreview() ?? '');
 
-        // Flip-and-flush BEFORE the Slack call. Two reasons:
-        //   1. Race window — `notifyHumanHandoff()` does a synchronous HTTP
-        //      POST with a 5 s timeout. Two simultaneous button clicks would
-        //      both observe MODE_AI through the idempotence check above and
-        //      double-page Slack. Persisting WAITING first shrinks the race
-        //      window from "Slack timeout" to "one DB flush" — concurrent
-        //      requests now see the new mode and short-circuit.
-        //   2. Operator visibility — even on a transient Slack outage the
-        //      dashboard's waiting-sessions filter surfaces the request,
-        //      so the visitor's escalation is never silently dropped.
-        $session->setWaitingForHuman();
-        $this->em->flush();
-
-        $notified = $this->slack->notifyHumanHandoff(
-            widget: $widget,
-            session: $session,
-            webhookUrl: $webhookUrl,
-            takeoverUrl: $this->buildHandoffTakeoverUrl($widgetId, $sessionId),
-            lastUserMessage: '' !== $lastMessage ? $lastMessage : null,
-            triggerReason: 'manual button click',
-            customFieldValues: $session->getCustomFieldValues() ?? [],
-        );
+        $notified = $this->handoff->page($widget, $session, $webhookUrl, '' !== $lastMessage ? $lastMessage : null, 'manual button click');
 
         return $this->json([
             'success' => true,
@@ -425,7 +326,9 @@ class WidgetPublicController extends AbstractController
     }
 
     /**
-     * Send message to widget (synchronous response).
+     * One visitor message, as a widget turn in three stages: the gate admits
+     * or refuses it, the conversation stores it, and the reply streams the AI
+     * answer, unless a person runs the session.
      *
      * PUBLIC endpoint - no authentication required, session-based rate limiting
      */
@@ -449,737 +352,21 @@ class WidgetPublicController extends AbstractController
     )]
     public function message(string $widgetId, Request $request): Response
     {
-        $data = json_decode($request->getContent(), true);
-
-        // Immediate test to see if we reach here
-        if (null === $data) {
-            return $this->json([
-                'error' => 'Invalid JSON in request body',
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        if (empty($data['sessionId']) || empty($data['text'])) {
-            return $this->json([
-                'error' => 'Missing required fields: sessionId, text',
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Get widget
-        $widget = $this->widgetService->getWidgetById($widgetId);
-        if (!$widget) {
-            return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        // Check if widget is active
-        if (!$this->widgetService->isWidgetActive($widget)) {
-            return $this->json([
-                'error' => 'Widget is not active',
-                'reason' => 'owner_limits_exceeded',
-            ], Response::HTTP_SERVICE_UNAVAILABLE);
-        }
-
-        $config = $widget->getConfig();
-        if ($domainError = $this->ensureDomainAllowed($config, $request, $widget->getOwnerId())) {
-            return $domainError;
-        }
-
-        // Resolve session with test/internal mode handling
-        $session = $this->resolveSessionWithMode($request, $widget, $data['sessionId']);
-
-        // Capture country from Cloudflare geolocation header on first message
-        if (null === $session->getCountry()) {
-            $cfCountry = $request->headers->get('CF-IPCountry');
-            if (null !== $cfCountry && '' !== $cfCountry) {
-                $session->setCountry($cfCountry);
-                $this->em->flush();
-            }
-        }
-
-        // Check if session is in human takeover mode
-        $isHumanMode = 'human' === $session->getMode() || 'waiting' === $session->getMode();
-
-        // Internal mode = widget owner chatting with their own widget from the dashboard.
-        // Skip end-user limits (messageLimit, per-minute throttle) for these sessions —
-        // they would otherwise block legitimate internal usage.
-        $isInternalSession = $session->isInternalMode();
-
-        // Check session limits (skipped for internal owner sessions)
-        if (!$isInternalSession) {
-            $messageLimit = (int) ($config['messageLimit'] ?? WidgetSessionService::DEFAULT_MAX_MESSAGES);
-            $limitCheck = $this->sessionService->checkSessionLimit($session, $messageLimit);
-            if (!$limitCheck['allowed']) {
-                return $this->json([
-                    'error' => 'Rate limit exceeded',
-                    'reason' => $limitCheck['reason'],
-                    'remaining' => $limitCheck['remaining'],
-                    'retryAfter' => $limitCheck['retry_after'],
-                ], Response::HTTP_TOO_MANY_REQUESTS);
-            }
-        }
-
-        // Check owner's limits
-        $ownerId = $widget->getOwnerId();
-        if (!$ownerId) {
-            return $this->json(['error' => 'Widget owner not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        // Get owner entity (we need it for the user entity)
-        $owner = $this->em->getRepository(\App\Entity\User::class)->find($ownerId);
-        if (!$owner) {
-            return $this->json(['error' => 'Widget owner not found'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        try {
+            $turn = $this->turnGate->admit($widgetId, $request);
+        } catch (WidgetRequestRefused $refused) {
+            return $this->json($refused->payload, $refused->httpStatus);
         }
 
         try {
-            // Resolve chat for this session
-            $sessionChatId = $session->getChatId();
-            $chat = null;
-
-            if ($sessionChatId) {
-                $chat = $this->chatRepository->find($sessionChatId);
-                if (!$chat || $chat->getUserId() !== $owner->getId()) {
-                    $chat = null;
-                }
+            $stored = $this->conversation->store($turn);
+            if ($turn->heldForOperator) {
+                return $this->json($this->conversation->awaitOperator($turn, $stored));
             }
 
-            if (!$chat && !empty($data['chatId'])) {
-                $chat = $this->chatRepository->find((int) $data['chatId']);
-                if (!$chat || $chat->getUserId() !== $owner->getId()) {
-                    $chat = null;
-                }
-            }
-
-            if (!$chat) {
-                $now = new \DateTime();
-                $chat = new Chat();
-                $chat->setUserId($owner->getId());
-                $sessionSuffix = substr($session->getSessionId(), -6);
-                $chat->setTitle(sprintf('Widget: %s • %s', $widget->getName(), $sessionSuffix));
-                $chat->setSource('widget');
-                $chat->setCreatedAt($now);
-                $chat->setUpdatedAt($now);
-                $this->em->persist($chat);
-                $this->em->flush();
-
-                // Create welcome message if configured
-                $autoMessage = $config['autoMessage'] ?? '';
-                if (!empty($autoMessage)) {
-                    // Use timestamp 10 seconds before current time to ensure welcome message comes first.
-                    // This is combined with secondary sort by ID in MessageRepository for reliable ordering.
-                    $welcomeTimestamp = time() - 10;
-                    $welcomeMessage = new Message();
-                    $welcomeMessage->setUserId($owner->getId());
-                    $welcomeMessage->setChat($chat);
-                    $welcomeMessage->setText($autoMessage);
-                    $welcomeMessage->setDirection('OUT');
-                    $welcomeMessage->setStatus('complete');
-                    $welcomeMessage->setMessageType('WDGT');
-                    $welcomeMessage->setTrackingId($welcomeTimestamp);
-                    $welcomeMessage->setUnixTimestamp($welcomeTimestamp);
-                    $welcomeMessage->setDateTime(date('YmdHis', $welcomeTimestamp));
-                    $welcomeMessage->setProviderIndex('widget');
-                    $this->em->persist($welcomeMessage);
-                    $this->em->flush();
-
-                    // Welcome message counts toward the persisted total so the dashboard
-                    // and exports show the right conversation length from message #1.
-                    $session->incrementMessageCount();
-                    $this->em->flush();
-
-                    $this->logger->info('Widget welcome message created', [
-                        'widget_id' => $widget->getWidgetId(),
-                        'chat_id' => $chat->getId(),
-                    ]);
-                }
-
-                $this->logger->info('Widget chat created', [
-                    'widget_id' => $widget->getWidgetId(),
-                    'chat_id' => $chat->getId(),
-                    'session_id' => $session->getSessionId(),
-                ]);
-            } else {
-                $chat->updateTimestamp();
-                $this->em->flush();
-            }
-
-            // Create incoming message
-            $incomingMessage = new Message();
-            $incomingMessage->setUserId($owner->getId());
-            $incomingMessage->setChat($chat);
-            $incomingMessage->setText($data['text']);
-            $incomingMessage->setDirection('IN');
-            $incomingMessage->setStatus('processing');
-            $incomingMessage->setMessageType('WDGT');
-            $incomingMessage->setTrackingId(time());
-            $incomingMessage->setUnixTimestamp(time());
-            $incomingMessage->setDateTime(date('YmdHis'));
-            $incomingMessage->setProviderIndex('widget'); // Special provider index for widgets
-
-            $this->em->persist($incomingMessage);
-            $this->em->flush();
-
-            // Publish event for user message (so admin panel receives it in
-            // real-time). The broadcaster fans this out on the widget session
-            // channel via Centrifugo.
-            $this->broadcaster->publishSessionEvent($widgetId, $session->getSessionId(), 'message', [
-                'direction' => 'IN',
-                'text' => $data['text'],
-                'messageId' => $incomingMessage->getId(),
-                'timestamp' => $incomingMessage->getUnixTimestamp(),
-                'sender' => 'user',
-            ]);
-
-            // Auto-handoff: if the visitor's message matches any operator-
-            // defined trigger phrase, flip the session to WAITING and THEN
-            // page Slack. The visitor still gets an AI reply afterwards
-            // (we don't suppress it — better to keep the conversation moving
-            // while the operator picks up), but the dashboard immediately
-            // surfaces the session as "needs human" and Slack gets a
-            // clickable takeover button.
-            //
-            // Persisting WAITING before the 5 s Slack call shrinks the
-            // double-notify race window for concurrent visitor messages from
-            // "Slack HTTP timeout" to "one DB flush" — concurrent requests
-            // see the new mode through the idempotence check and skip the
-            // second ping. Same ordering rationale as the manual
-            // `humanHandoff` endpoint.
-            $handoffWebhookUrl = (string) ($config['slackWebhookUrl'] ?? '');
-            if ('' !== $handoffWebhookUrl && WidgetSession::MODE_AI === $session->getMode()) {
-                $triggers = is_array($config['humanHandoffTriggers'] ?? null)
-                    ? array_values(array_filter($config['humanHandoffTriggers'], 'is_string'))
-                    : [];
-                $matchedTrigger = $this->detectHandoffTrigger((string) $data['text'], $triggers);
-                if (null !== $matchedTrigger) {
-                    $session->setWaitingForHuman();
-                    $this->em->flush();
-                    $this->slack->notifyHumanHandoff(
-                        widget: $widget,
-                        session: $session,
-                        webhookUrl: $handoffWebhookUrl,
-                        takeoverUrl: $this->buildHandoffTakeoverUrl($widgetId, $session->getSessionId()),
-                        lastUserMessage: (string) $data['text'],
-                        triggerReason: sprintf('matched phrase: "%s"', $matchedTrigger),
-                        customFieldValues: $session->getCustomFieldValues() ?? [],
-                    );
-                }
-            }
-
-            // Attach uploaded files if provided
-            $fileIds = [];
-            if (!empty($data['files']) && is_array($data['files'])) {
-                foreach ($data['files'] as $fileId) {
-                    $fileId = (int) $fileId;
-                    if ($fileId <= 0) {
-                        continue;
-                    }
-
-                    $file = $this->fileRepository->find($fileId);
-                    if (!$file) {
-                        continue;
-                    }
-
-                    // Ensure file belongs to this session
-                    if ($file->getUserSessionId() !== $session->getId()) {
-                        continue;
-                    }
-
-                    $incomingMessage->addFile($file);
-                    $file->setStatus('attached');
-                    $fileIds[] = $fileId;
-                }
-
-                if (!empty($fileIds)) {
-                    $incomingMessage->setFile(count($fileIds));
-                    $this->em->flush();
-                }
-            }
-
-            // Always count the persisted visitor message and refresh the preview.
-            // The visitor quota is enforced separately by checkSessionLimit() above
-            // (live count of visitor messages within the quota window), so this counter
-            // is now safe to advance unconditionally — including for internal/human/
-            // waiting sessions that previously left BMESSAGECOUNT untouched and caused
-            // dashboard/export "messageCount = 0" reports for sessions with real history.
-            //
-            // All session-level mutations (counter, preview, chat link) are batched into
-            // a single flush below so this hot path issues one DB round-trip instead of
-            // three (counter flush + preview flush + attachChat flush).
-            $this->sessionService->incrementMessageCount($session, false);
-            $session->setLastMessagePreview($data['text']);
-            $this->sessionService->attachChat($session, $chat, false);
-            $this->em->flush();
-
-            // If in human takeover mode, just save the message and return success (no AI processing)
-            if ($isHumanMode) {
-                $incomingMessage->setStatus('complete');
-                $session->setLastMessage(time());
-                $session->setLastMessagePreview($data['text']);
-
-                // Set mode to 'waiting' when visitor sends a message (operator needs to respond)
-                if ('human' === $session->getMode()) {
-                    $session->setWaitingForHuman();
-                }
-
-                $this->em->flush();
-
-                // Ping every dashboard tab subscribed to widget:operators.{id}
-                // so the LiveSupportView session list refreshes in real time
-                // (this replaced the legacy 3-second polling loop). Envelope
-                // type is 'notification'; `kind` discriminates the payload.
-                $this->broadcaster->publishOperatorNotification($widgetId, [
-                    'kind' => 'new_message',
-                    'sessionId' => $session->getSessionId(),
-                    'preview' => mb_substr((string) $data['text'], 0, 100),
-                    'timestamp' => time(),
-                ]);
-
-                // Generate title if needed (also works in human mode)
-                $this->sessionService->generateTitleIfNeeded($session, $owner->getId());
-
-                $this->logger->info('Widget message saved in human mode (no AI processing)', [
-                    'widget_id' => $widgetId,
-                    'session_id' => $session->getSessionId(),
-                    'mode' => $session->getMode(),
-                ]);
-
-                return $this->json([
-                    'success' => true,
-                    'chatId' => $chat->getId(),
-                    'mode' => $session->getMode(),
-                    'text' => '', // No AI response
-                ]);
-            }
-
-            \set_time_limit(0);
-
-            // Read AI model directly from widget config (most reliable source)
-            $widgetModelId = isset($config['aiModelId']) && (int) $config['aiModelId'] > 0
-                ? (int) $config['aiModelId']
-                : null;
-
-            $this->logger->debug('Widget AI model resolution', [
-                'widget_id' => $widgetId,
-                'configured_model_id' => $widgetModelId,
-            ]);
-
-            $externalUserId = isset($data['externalUserId']) && \is_string($data['externalUserId'])
-                ? trim($data['externalUserId'])
-                : '';
-            $apiContext = $this->fetchApiContext($widget, $owner, $externalUserId);
-
-            $processingOptions = [
-                'fixed_task_prompt' => $widget->getTaskPromptTopic(),
-                'skipSorting' => true,
-                'channel' => 'WIDGET',
-                'rag_group_key' => sprintf('WIDGET:%s', $widget->getWidgetId()),
-                'rag_limit' => max(1, min(50, (int) ($config['ragResultLimit'] ?? 20))),
-                'rag_min_score' => isset($config['ragMinScore'])
-                    ? max(0.0, min(1.0, (float) $config['ragMinScore']))
-                    : 0.2,
-                'widget_id' => $widget->getWidgetId(),
-                'disable_memories' => true,
-                'is_widget_mode' => true,
-                'widget_model_id' => $widgetModelId,
-                'api_context' => $apiContext,
-            ];
-            if (null !== $this->widgetAgentRuntime) {
-                $processingOptions = $this->widgetAgentRuntime->apply($widget, $owner, $processingOptions);
-            }
-
-            $response = new StreamedResponse(function () use (
-                $incomingMessage,
-                $processingOptions,
-                $owner,
-                $chat,
-                $fileIds,
-                $widgetId,
-                $session
-            ) {
-                $responseText = '';
-                $reasoningBuffer = '';
-                $hasReasoningStarted = false;
-                $jsonBuffer = '';
-                $isBufferingJson = false;
-                $chunkCount = 0;
-                $finishReason = null;
-
-                // Detach-on-navigation, matching the app chat (#1142/#1223/#1225):
-                // a visitor reloading the host page or clicking away must not
-                // kill the answer they asked for. The turn finishes in the
-                // background, is persisted, and can be re-attached to.
-                ignore_user_abort(true);
-
-                $this->activeRun = $this->chatRunService->begin(
-                    ChatRunService::ownerKeyForWidget($session->getSessionId()),
-                    $chat->getId(),
-                    (string) $incomingMessage->getId(),
-                );
-                if (null !== $this->activeRun) {
-                    $this->sendSse('run_started', ['runId' => $this->activeRun->getRunId()]);
-                }
-
-                try {
-                    $result = $this->messageProcessor->processStream(
-                        $incomingMessage,
-                        function ($chunk) use (
-                            &$responseText,
-                            &$reasoningBuffer,
-                            &$hasReasoningStarted,
-                            &$jsonBuffer,
-                            &$isBufferingJson,
-                            &$chunkCount,
-                            &$finishReason
-                        ) {
-                            $sendChunk = function (string $content) use (&$responseText) {
-                                if ('' === $content) {
-                                    return;
-                                }
-
-                                $responseText .= $content;
-                                $this->sendSse('data', ['chunk' => $content]);
-                            };
-
-                            if (is_array($chunk)) {
-                                $type = $chunk['type'] ?? 'content';
-                                $content = $chunk['content'] ?? '';
-
-                                if ('finish' === $type) {
-                                    $finishReason = $chunk['finish_reason'] ?? null;
-
-                                    return;
-                                }
-
-                                if ('reasoning' === $type) {
-                                    if (!$hasReasoningStarted) {
-                                        $reasoningBuffer = '<think>';
-                                        $hasReasoningStarted = true;
-                                    }
-                                    $reasoningBuffer .= $content;
-
-                                    return;
-                                }
-
-                                if ($hasReasoningStarted) {
-                                    $reasoningBuffer .= '</think>';
-                                    $sendChunk($reasoningBuffer);
-                                    $reasoningBuffer = '';
-                                    $hasReasoningStarted = false;
-                                }
-
-                                $sendChunk($content);
-
-                                return;
-                            }
-
-                            if ($hasReasoningStarted) {
-                                $reasoningBuffer .= '</think>';
-                                $sendChunk($reasoningBuffer);
-                                $reasoningBuffer = '';
-                                $hasReasoningStarted = false;
-                            }
-
-                            $chunkStr = (string) $chunk;
-
-                            if (0 === $chunkCount && !$isBufferingJson) {
-                                $trimmed = trim($chunkStr);
-                                if ('' !== $trimmed && str_starts_with($trimmed, '{')) {
-                                    $isBufferingJson = true;
-                                    $jsonBuffer = $chunkStr;
-                                    ++$chunkCount;
-
-                                    return;
-                                }
-                            }
-
-                            if ($isBufferingJson) {
-                                $jsonBuffer .= $chunkStr;
-
-                                if (str_contains($jsonBuffer, '}')) {
-                                    $trimmed = trim($jsonBuffer);
-                                    $lastBrace = strrpos($trimmed, '}');
-                                    if (false !== $lastBrace) {
-                                        $potentialJson = substr($trimmed, 0, $lastBrace + 1);
-                                        $potentialJson = preg_replace('/"BFILE":\s*\n/', '"BFILE": 0'."\n", $potentialJson);
-                                        $potentialJson = preg_replace('/"BFILE":\s*\r\n/', '"BFILE": 0'."\r\n", $potentialJson);
-                                        $potentialJson = preg_replace('/"BFILE":\s*}/', '"BFILE": 0}', $potentialJson);
-
-                                        try {
-                                            $jsonData = json_decode($potentialJson, true, 512, JSON_THROW_ON_ERROR);
-                                            if (isset($jsonData['BTEXT'])) {
-                                                $extractedText = $jsonData['BTEXT'];
-                                                $sendChunk($extractedText);
-                                                $isBufferingJson = false;
-                                                $jsonBuffer = '';
-                                                ++$chunkCount;
-
-                                                return;
-                                            }
-                                        } catch (\JsonException $e) {
-                                            // Keep buffering until valid JSON
-                                        }
-                                    }
-                                }
-
-                                ++$chunkCount;
-
-                                return;
-                            }
-
-                            if ('' !== $chunkStr) {
-                                $sendChunk($chunkStr);
-                            }
-
-                            ++$chunkCount;
-                        },
-                        function ($statusUpdate) {
-                            if (!is_array($statusUpdate)) {
-                                return;
-                            }
-
-                            $status = $statusUpdate['status'] ?? 'status';
-                            $payload = [];
-                            if (isset($statusUpdate['message'])) {
-                                $payload['message'] = $statusUpdate['message'];
-                            }
-                            if (!empty($statusUpdate['metadata'])) {
-                                $payload['metadata'] = $statusUpdate['metadata'];
-                            }
-
-                            $this->sendSse($status, $payload);
-                        },
-                        $processingOptions
-                    );
-
-                    if (!($result['success'] ?? false)) {
-                        $errorLang = is_array($result['classification'] ?? null) && isset($result['classification']['language'])
-                            ? (string) $result['classification']['language']
-                            : 'en';
-                        $errorView = $this->chatErrorPresenter->presentFromResult($result, $errorLang, false);
-                        $incomingMessage->setStatus('failed');
-                        $this->em->flush();
-
-                        $this->sendSse('error', [
-                            'error' => $errorView->userText,
-                            'errorReason' => $errorView->reason->value,
-                            'canRetryModel' => $errorView->canRetryWithOtherModel,
-                        ]);
-
-                        return;
-                    }
-
-                    if ($hasReasoningStarted && '' !== $reasoningBuffer) {
-                        $reasoningBuffer .= '</think>';
-                        $responseText .= $reasoningBuffer;
-                        $this->sendSse('data', ['chunk' => $reasoningBuffer]);
-                    }
-
-                    $responseMetadata = $result['response']['metadata'] ?? [];
-                    $tokens = $responseMetadata['tokens'] ?? 0;
-                    if (is_array($tokens)) {
-                        $tokens = array_sum(array_map(static fn ($value) => is_numeric($value) ? (int) $value : 0, $tokens));
-                    }
-
-                    // Get classification data (topic, language) from result
-                    $classification = $result['classification'] ?? [];
-                    $topic = $classification['topic'] ?? 'WIDGET';
-                    $language = $classification['language'] ?? 'en';
-                    // 'auto' is only used for the system prompt directive; store a valid ISO code in DB
-                    if ('auto' === $language) {
-                        $language = 'en';
-                    }
-
-                    // Truncate topic to fit database column (max 64 chars)
-                    $topic = mb_substr($topic, 0, 64);
-
-                    // Update incoming message with classification
-                    $incomingMessage->setTopic($topic);
-                    $incomingMessage->setLanguage($language);
-                    $incomingMessage->setStatus('complete');
-
-                    // Persist generated media (image/video/audio) so widget admins and
-                    // the embedded chat history both render the player on reload
-                    // (issue #626 — mirrors the StreamController behaviour for the
-                    // authenticated web channel).
-                    $generatedFile = $this->generatedFileMetadataNormalizer->normalize($responseMetadata['file'] ?? null);
-
-                    $outgoingMessage = new Message();
-                    $outgoingMessage->setUserId($owner->getId());
-                    $outgoingMessage->setChat($chat);
-                    $outgoingMessage->setTrackingId($incomingMessage->getTrackingId());
-                    $outgoingMessage->setProviderIndex($responseMetadata['provider'] ?? 'AI_WIDGET');
-                    $outgoingMessage->setUnixTimestamp(time());
-                    $outgoingMessage->setDateTime(date('YmdHis'));
-                    $outgoingMessage->setMessageType('WDGT');
-                    $outgoingMessage->setFile(null !== $generatedFile ? 1 : 0);
-                    $outgoingMessage->setFilePath($generatedFile['path'] ?? '');
-                    $outgoingMessage->setFileType($generatedFile['type'] ?? '');
-                    $outgoingMessage->setTopic($topic);
-                    $outgoingMessage->setLanguage($language);
-                    $outgoingMessage->setText($responseText);
-                    $outgoingMessage->setDirection('OUT');
-                    $outgoingMessage->setStatus('complete');
-
-                    $ragSources = $responseMetadata['rag_sources'] ?? null;
-                    if (is_array($ragSources) && [] !== $ragSources) {
-                        $encodedSources = json_encode($ragSources, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
-                        if (is_string($encodedSources)) {
-                            $outgoingMessage->setMeta('rag_sources', $encodedSources);
-                        }
-                    }
-
-                    $this->em->persist($outgoingMessage);
-                    $this->em->flush();
-
-                    // Attach the generated file as a real Message<->File relation:
-                    // the history endpoint and the embedded client only surface
-                    // files via getFiles() + the /files/{id}/download route (which
-                    // requires the attachment), so the legacy BFILEPATH/BFILETYPE
-                    // columns alone leave generated media invisible after a reload
-                    // (mirrors StreamController for the authenticated web channel).
-                    if (null !== $generatedFile) {
-                        $localPath = $responseMetadata['local_path'] ?? null;
-                        $fileEntity = $this->generatedFileRegistrar->register(
-                            $owner->getId(),
-                            is_string($localPath) ? $localPath : null,
-                            $generatedFile['type'],
-                            $outgoingMessage->getId(),
-                        );
-                        if (null !== $fileEntity) {
-                            $outgoingMessage->addFile($fileEntity);
-                            $this->em->flush();
-                        }
-                    }
-
-                    // Update session's last message time and preview with AI response
-                    // Re-fetch session to ensure it's managed by the EntityManager
-                    $currentSession = $this->sessionService->getOrCreateSession($widgetId, $session->getSessionId());
-                    $currentSession->setLastMessage(time());
-                    $visibleAnswer = AiResponseSanitizer::stripForDisplay($responseText);
-                    $currentSession->setLastMessagePreview($visibleAnswer);
-                    $this->em->flush();
-
-                    // Publish AI response on the session channel so the admin
-                    // dashboard receives it in real time via Centrifugo.
-                    // The stored message keeps the scratchpad; this event does not.
-                    $this->broadcaster->publishSessionEvent($widgetId, $session->getSessionId(), 'message', [
-                        'direction' => 'OUT',
-                        'text' => $visibleAnswer,
-                        'messageId' => $outgoingMessage->getId(),
-                        'timestamp' => $outgoingMessage->getUnixTimestamp(),
-                        'sender' => 'ai',
-                    ]);
-
-                    // Rolling-summary refresh for the widget session's
-                    // persistent chat (channel parity). Memories stay disabled
-                    // for anonymous visitors; the per-session summary only
-                    // condenses this session's own thread.
-                    if (null !== $chat->getId()) {
-                        $this->summaryRefreshDispatcher->dispatch((int) $chat->getId(), (int) $owner->getId());
-                    }
-
-                    // Generate AI title after 5 user messages (async, non-blocking)
-                    $this->sessionService->generateTitleIfNeeded($currentSession, $owner->getId());
-
-                    $this->rateLimitService->recordUsage($owner, 'MESSAGES', [
-                        'provider' => $responseMetadata['provider'] ?? null,
-                        'model' => $responseMetadata['model'] ?? null,
-                        'model_id' => $responseMetadata['model_id'] ?? null,
-                        'usage' => $responseMetadata['usage'] ?? [],
-                        'channel' => 'WIDGET',
-                        'files' => $fileIds,
-                        'response_text' => $responseText,
-                        'input_text' => $incomingMessage->getText(),
-                    ]);
-
-                    $completePayload = [
-                        'messageId' => $incomingMessage->getId(),
-                        'chatId' => $chat->getId(),
-                        'ragSources' => is_array($ragSources) && [] !== $ragSources ? $ragSources : null,
-                        'metadata' => [
-                            'response' => $responseMetadata,
-                            'classification' => $result['classification'] ?? null,
-                            'preprocessed' => $result['preprocessed'] ?? null,
-                            'search_results' => $result['search_results'] ?? null,
-                            'files' => $fileIds,
-                        ],
-                    ];
-
-                    if ('length' === $finishReason) {
-                        $completePayload['truncated'] = true;
-                    }
-
-                    $this->sendSse('complete', $completePayload);
-                    $this->activeRun?->finish(ChatRun::STATUS_COMPLETE, $incomingMessage->getId());
-                } catch (\Throwable $e) {
-                    $this->logger->error('Widget message streaming failed', [
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                        'widget_id' => $widgetId,
-                        'file' => $e->getFile(),
-                        'line' => $e->getLine(),
-                    ]);
-
-                    try {
-                        // Mark the visitor message as failed and roll the cached counter
-                        // back in a single flush. Both the live quota window
-                        // (WidgetSessionService::countVisitorMessagesInQuotaWindow) and the
-                        // export's bulk count (MessageRepository::countByChatIds) exclude
-                        // status='failed', so the cached BMESSAGECOUNT must drop by 1 too —
-                        // otherwise the dashboard (cached) and the export (DB-derived) drift
-                        // apart for sessions that hit a stream error, which is exactly the
-                        // class of bug this PR is meant to eliminate.
-                        $incomingMessage->setStatus('failed');
-                        $this->sessionService->decrementMessageCount($session, false);
-                        $this->em->flush();
-                    } catch (\Throwable $flushException) {
-                        // EntityManager might be closed after database error
-                        $this->logger->warning('Could not update message status after error', [
-                            'error' => $flushException->getMessage(),
-                        ]);
-                    }
-
-                    $this->sendSse('error', [
-                        'error' => 'Failed to process message',
-                    ]);
-                } finally {
-                    // Safety net so a run can never stay `running` after the
-                    // worker is gone — a re-attaching visitor would otherwise
-                    // wait on a heartbeat that never ticks again.
-                    $this->activeRun?->finishFromRecordedOutcome();
-                    $this->activeRun = null;
-                }
-            });
-
-            $response->headers->set('Content-Type', 'text/event-stream; charset=utf-8');
-            $response->headers->set('Cache-Control', 'no-cache');
-            $response->headers->set('Connection', 'keep-alive');
-            $response->headers->set('X-Accel-Buffering', 'no');
-
-            return $response;
+            return $this->reply->stream($turn, $stored);
         } catch (\Exception $e) {
-            // Outer safety-net: catches anything thrown before the StreamedResponse takes
-            // over (validation, AI setup, persist failures, etc.). The cached counter
-            // rollback for stream-failures is handled inside the StreamedResponse closure
-            // (see inner catch above). Errors that throw before $incomingMessage is
-            // persisted leave nothing to clean up; errors that throw after persist but
-            // before streaming starts leave the row with status='processing' — rare
-            // enough that a follow-up sweep is preferable to a partial rollback here.
-            $this->logger->error('Widget message failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'widget_id' => $widgetId,
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-
-            $this->discord->notifyWidgetError($widgetId, $e->getMessage(), [
-                'session_id' => $session->getSessionId(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-
-            return $this->json([
-                'error' => 'Failed to process message',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return $this->json($this->reply->failure($turn, $e), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -1860,215 +1047,28 @@ class WidgetPublicController extends AbstractController
         return $response;
     }
 
+    /**
+     * @param array<string, mixed> $config
+     *
+     * @see WidgetDomainGuard
+     */
     private function ensureDomainAllowed(array $config, Request $request, ?int $widgetOwnerId = null): ?JsonResponse
     {
-        // Check for test mode or internal mode: if either header is set
-        // and the authenticated user is the widget owner, skip domain check
-        $isTestOrInternal = 'true' === $request->headers->get('X-Widget-Test-Mode')
-            || 'true' === $request->headers->get('X-Widget-Internal-Mode');
-
-        if ($isTestOrInternal && $widgetOwnerId) {
-            $user = $this->getUser();
-            if ($user && method_exists($user, 'getId') && $user->getId() === $widgetOwnerId) {
-                $this->logger->info('Widget domain check bypassed for owner in test/internal mode', [
-                    'user_id' => $user->getId(),
-                    'widget_owner_id' => $widgetOwnerId,
-                ]);
-
-                return null;
-            }
-        }
-
-        $allowedDomains = $config['allowedDomains'] ?? [];
-        if (empty($allowedDomains)) {
-            // An empty allowlist means the widget is embeddable everywhere —
-            // restricting domains is opt-in (same semantics as the legacy
-            // widget.js loader and WidgetOriginValidator).
-            return null;
-        }
-
-        $host = $this->extractHostFromRequest($request);
-        if (!$host) {
-            return $this->json([
-                'error' => 'Domain not allowed',
-                'reason' => 'missing_host',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        if (!$this->isHostAllowed($host, $allowedDomains)) {
-            $this->logger->warning('Widget request blocked by domain whitelist', [
-                'host' => $host,
-                'allowed_domains' => $allowedDomains,
-            ]);
-
-            return $this->json([
-                'error' => 'Domain not allowed',
-                'reason' => 'domain_not_whitelisted',
-            ], Response::HTTP_FORBIDDEN);
+        try {
+            $this->domainGuard->check($config, $request, $widgetOwnerId);
+        } catch (WidgetRequestRefused $refused) {
+            return $this->json($refused->payload, $refused->httpStatus);
         }
 
         return null;
     }
 
-    private function extractHostFromRequest(Request $request): ?string
-    {
-        $headerHost = $request->headers->get('x-widget-host');
-        if ($headerHost) {
-            $normalized = $this->normalizeHost($headerHost);
-            if ($normalized) {
-                return $normalized;
-            }
-        }
-
-        foreach (['origin', 'referer'] as $header) {
-            $value = $request->headers->get($header);
-            if (!$value) {
-                continue;
-            }
-
-            $parts = parse_url($value);
-            if (false === $parts || !isset($parts['host'])) {
-                continue;
-            }
-
-            $host = strtolower($parts['host']);
-            if (isset($parts['port'])) {
-                $host .= ':'.$parts['port'];
-            }
-
-            if ('' !== $host) {
-                return $host;
-            }
-        }
-
-        return null;
-    }
-
-    private function normalizeHost(string $value): ?string
-    {
-        $normalized = strtolower(trim($value));
-        if ('' === $normalized) {
-            return null;
-        }
-
-        $normalized = preg_replace('#^https?://#', '', $normalized);
-        $normalized = preg_replace('#^//#', '', $normalized);
-
-        if (null === $normalized) {
-            return null;
-        }
-
-        $parts = preg_split('~[/?#]~', $normalized);
-        $normalized = $parts[0] ?? '';
-
-        return '' !== $normalized ? $normalized : null;
-    }
-
     /**
-     * Check whether the provided host matches allowed domains (supports wildcards and optional ports).
-     *
-     * @param array<string> $allowedDomains
-     */
-    private function isHostAllowed(string $host, array $allowedDomains): bool
-    {
-        $host = strtolower($host);
-        $hostWithoutPort = $host;
-        $hostPort = null;
-
-        if (str_contains($host, ':')) {
-            [$hostWithoutPort, $hostPort] = explode(':', $host, 2);
-        }
-
-        foreach ($allowedDomains as $domain) {
-            if (!is_string($domain) || '' === $domain) {
-                continue;
-            }
-
-            $domain = strtolower($domain);
-            $domainHost = $domain;
-            $domainPort = null;
-
-            if (str_contains($domain, ':')) {
-                [$domainHost, $domainPort] = explode(':', $domain, 2);
-            }
-
-            if (null !== $domainPort && $hostPort !== $domainPort) {
-                continue;
-            }
-
-            if ($domainHost === $host || $domainHost === $hostWithoutPort) {
-                return true;
-            }
-
-            if (str_starts_with($domainHost, '*.') && $hostWithoutPort !== $domainHost) {
-                $suffix = substr($domainHost, 2);
-                if ($suffix && str_ends_with($hostWithoutPort, $suffix)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private function sendSse(string $status, array $data = []): void
-    {
-        $event = array_merge(['status' => $status], $this->sanitizeUtf8($data));
-
-        // Record BEFORE the abort guard — everything produced after the visitor
-        // disconnects is exactly what a re-attaching client needs to replay.
-        $this->activeRun?->record($event);
-
-        if (connection_aborted()) {
-            return;
-        }
-
-        echo 'data: '.json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
-
-        if (ob_get_level() > 0) {
-            ob_flush();
-        }
-
-        flush();
-    }
-
-    private function sanitizeUtf8($value)
-    {
-        if (is_array($value)) {
-            return array_map([$this, 'sanitizeUtf8'], $value);
-        }
-
-        if (is_string($value)) {
-            return mb_convert_encoding($value, 'UTF-8', 'UTF-8');
-        }
-
-        return $value;
-    }
-
-    /**
-     * Resolve a widget session, applying test/internal mode logic.
-     *
-     * Test mode adds a test_ prefix to the session ID.
-     * Internal mode creates a normal session but sets the mode to MODE_INTERNAL.
+     * @see WidgetSessionResolver
      */
     private function resolveSessionWithMode(Request $request, \App\Entity\Widget $widget, string $sessionId): WidgetSession
     {
-        $user = $this->getUser();
-        $ownerMatch = $user instanceof \App\Entity\User && $user->getId() === $widget->getOwnerId();
-
-        $isTestMode = $ownerMatch && 'true' === $request->headers->get('X-Widget-Test-Mode');
-        $isInternalMode = !$isTestMode && $ownerMatch && 'true' === $request->headers->get('X-Widget-Internal-Mode');
-
-        $session = $this->sessionService->getOrCreateSession($widget->getWidgetId(), $sessionId, $isTestMode);
-
-        if ($isInternalMode && $session->isAiMode()) {
-            $session->setMode(WidgetSession::MODE_INTERNAL);
-            // Persist immediately so the mode is durable even if the request aborts
-            // before the next flush (rate limit, owner lookup, file processing failure).
-            $this->em->flush();
-        }
-
-        return $session;
+        return $this->sessionResolver->resolve($request, $widget, $sessionId);
     }
 
     /**
@@ -2106,129 +1106,5 @@ class WidgetPublicController extends AbstractController
             'deprecated' => true,
             'replacement' => 'widgettyping channel via direct client-publish',
         ]);
-    }
-
-    /**
-     * Fetch live data from API-type flow responses and format as prompt context.
-     * Skipped for free users when billing is enabled.
-     *
-     * @param \App\Entity\Widget $widget
-     * @param \App\Entity\User   $owner
-     */
-    private function fetchApiContext($widget, $owner, string $externalUserId = ''): string
-    {
-        if ($this->billingService->isEnabled() && \in_array($owner->getUserLevel(), ['NEW', 'ANONYMOUS'], true)) {
-            return '';
-        }
-
-        $topic = $widget->getTaskPromptTopic();
-        if (!$topic) {
-            return '';
-        }
-
-        $promptData = $this->promptService->getPromptWithMetadata($topic, $owner->getId());
-        if (!$promptData) {
-            return '';
-        }
-
-        $flowRulesRaw = $promptData['metadata']['widgetFlowRules'] ?? null;
-        if (!\is_string($flowRulesRaw) || '' === $flowRulesRaw) {
-            return '';
-        }
-
-        try {
-            $flow = json_decode($flowRulesRaw, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return '';
-        }
-
-        $widgetConfig = $widget->getConfig();
-
-        $externalApiToken = \is_string($widgetConfig['externalApiToken'] ?? null)
-            ? $widgetConfig['externalApiToken']
-            : '';
-
-        $apiUrls = [];
-
-        $configApiUrl = \is_string($widgetConfig['externalApiUrl'] ?? null)
-            ? trim($widgetConfig['externalApiUrl'])
-            : '';
-        if ('' !== $configApiUrl) {
-            if (!str_starts_with($configApiUrl, 'http://') && !str_starts_with($configApiUrl, 'https://')) {
-                $configApiUrl = 'https://'.$configApiUrl;
-            }
-            $apiUrls[] = ['url' => $configApiUrl, 'method' => 'GET', 'label' => 'User Profile'];
-        }
-
-        foreach ($flow['responses'] ?? [] as $response) {
-            $type = $response['type'] ?? null;
-            $url = $response['meta']['url'] ?? null;
-            $method = $response['meta']['method'] ?? 'GET';
-            if ('api' === $type && \is_string($url) && '' !== trim($url)) {
-                $apiUrls[] = ['url' => trim($url), 'method' => $method, 'label' => $response['label'] ?? ''];
-            }
-        }
-
-        if (empty($apiUrls)) {
-            return '';
-        }
-
-        $maxTotalLength = 16000;
-        $sections = [];
-        $totalLength = 0;
-
-        foreach ($apiUrls as $api) {
-            if ($totalLength >= $maxTotalLength) {
-                break;
-            }
-
-            $originalUrl = $api['url'];
-            if (str_contains($originalUrl, '{externalUserId}')) {
-                if ('' === $externalUserId) {
-                    continue;
-                }
-                $url = str_replace('{externalUserId}', rawurlencode($externalUserId), $originalUrl);
-            } else {
-                $url = $originalUrl;
-            }
-
-            $apiHeaders = [];
-            if ('' !== $externalApiToken) {
-                $apiHeaders['Authorization'] = 'Bearer '.$externalApiToken;
-            }
-
-            try {
-                $result = $this->urlContentService->fetchApi($url, $api['method'], $apiHeaders);
-                if ($result->success && '' !== $result->extractedText) {
-                    $section = sprintf(
-                        "[%s %s] %s:\n%s",
-                        $api['method'],
-                        $api['url'],
-                        $api['label'],
-                        $result->extractedText,
-                    );
-
-                    $remaining = $maxTotalLength - $totalLength;
-                    if (\strlen($section) > $remaining) {
-                        $section = mb_substr($section, 0, $remaining).'... [truncated]';
-                    }
-
-                    $sections[] = $section;
-                    $totalLength += \strlen($section);
-                }
-            } catch (\Throwable $e) {
-                $this->logger->warning('Widget API fetch failed', [
-                    'url' => $api['url'],
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        if (empty($sections)) {
-            return '';
-        }
-
-        return "## Live API Data\nThe following data was fetched from configured API endpoints. Use this data to answer the user's question:\n\n"
-            .implode("\n\n", $sections);
     }
 }
