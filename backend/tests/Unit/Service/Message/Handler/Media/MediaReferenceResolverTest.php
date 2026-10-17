@@ -2,22 +2,43 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Service\Message\Handler;
+namespace App\Tests\Unit\Service\Message\Handler\Media;
 
+use App\Entity\File;
 use App\Entity\Message;
 use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\Message\Handler\Media\MediaReferenceResolver;
+use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * The bug this fixes: "make the car blue" right after an image was generated
  * carried no attachment, so the handler saw no reference image and produced a
- * brand new, completely different picture. The handler now resolves the newest
- * image of the conversation — but only when the request really is an edit.
+ * brand new, completely different picture. The reference resolver now takes the
+ * newest image of the conversation — but only when the request really is an edit.
  */
-final class MediaGenerationHandlerConversationEditTest extends TestCase
+final class MediaReferenceResolverTest extends TestCase
 {
+    private string $uploadDir = '';
+
+    protected function setUp(): void
+    {
+        $this->uploadDir = sys_get_temp_dir().'/media-references-'.bin2hex(random_bytes(4));
+        mkdir($this->uploadDir.'/a', 0o775, true);
+        foreach (['photo.png', 'other.png', 'notes.txt'] as $name) {
+            file_put_contents($this->uploadDir.'/a/'.$name, 'bytes');
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        array_map(unlink(...), glob($this->uploadDir.'/a/*') ?: []);
+        rmdir($this->uploadDir.'/a');
+        rmdir($this->uploadDir);
+    }
+
     public function testNewestConversationImageIsUsedWhenTheSorterVotedForAnEdit(): void
     {
         $newest = $this->image('file:6', 'car-sunset.png');
@@ -89,18 +110,79 @@ final class MediaGenerationHandlerConversationEditTest extends TestCase
         $this->assertNull($this->resolve($catalog, ['input_mode' => 'reference_images', 'media_type' => 'image']));
     }
 
+    public function testAttachedAndChainedImagesAreCollectedOnceEach(): void
+    {
+        $references = $this->resolver($this->untouchedCatalog())->resolve(
+            $this->message('Make the sky purple', ['a/photo.png', 'a/notes.txt', 'a/gone.png']),
+            [],
+            [],
+            ['reference_image_paths' => ['/api/v1/files/uploads/a/photo.png', 'a/other.png', 'a/missing.png', '']],
+        );
+
+        $this->assertSame([$this->uploadDir.'/a/photo.png', $this->uploadDir.'/a/other.png'], $references->attachedImagePaths);
+        $this->assertNull($references->editSource);
+    }
+
+    public function testTheLegacyMessageFileCountsOnlyWithoutNewerAttachments(): void
+    {
+        $references = $this->resolver($this->untouchedCatalog())->resolve($this->message('Edit this', [], 'a/other.png'), [], [], []);
+
+        $this->assertSame([$this->uploadDir.'/a/other.png'], $references->attachedImagePaths);
+    }
+
+    public function testImageUrlsComeFromTheTextAndTheChainOnceEach(): void
+    {
+        $references = $this->resolver($this->untouchedCatalog())->resolve(
+            $this->message('Animate https://images.example.com/a.jpg please', []),
+            [],
+            [],
+            ['reference_image_urls' => ['https://images.example.com/a.jpg', 'see https://images.example.com/b.png', 7]],
+        );
+
+        $this->assertSame(['https://images.example.com/a.jpg', 'https://images.example.com/b.png'], $references->imageUrlsInText);
+        $this->assertSame([], $references->attachedImagePaths);
+    }
+
     /**
      * @param array<string, mixed> $classification
      */
     private function resolve(ConversationFileCatalog $catalog, array $classification): ?ConversationFile
     {
-        $handler = (new \ReflectionClass(MediaReferenceResolver::class))->newInstanceWithoutConstructor();
-        (new \ReflectionProperty(MediaReferenceResolver::class, 'conversationFileCatalog'))
-            ->setValue($handler, $catalog);
+        return $this->resolver($catalog)->resolve(new Message(), [], $classification, [])->editSource;
+    }
 
-        $method = new \ReflectionMethod(MediaReferenceResolver::class, 'resolveConversationEditSource');
+    private function resolver(ConversationFileCatalog $catalog): MediaReferenceResolver
+    {
+        return new MediaReferenceResolver($catalog, new NullLogger(), $this->uploadDir);
+    }
 
-        return $method->invoke($handler, new Message(), [], $classification);
+    /**
+     * A message that brings its own picture never looks into the conversation.
+     */
+    private function untouchedCatalog(): ConversationFileCatalog
+    {
+        $catalog = $this->createMock(ConversationFileCatalog::class);
+        $catalog->expects($this->never())->method('build');
+
+        return $catalog;
+    }
+
+    /**
+     * @param list<string> $files
+     */
+    private function message(string $text, array $files, string $legacyPath = ''): Message
+    {
+        $message = $this->createStub(Message::class);
+        $message->method('getText')->willReturn($text);
+        $message->method('getFilePath')->willReturn($legacyPath);
+        $message->method('getFiles')->willReturn(new ArrayCollection(array_map(function (string $path): File {
+            $file = $this->createStub(File::class);
+            $file->method('getFilePath')->willReturn($path);
+
+            return $file;
+        }, $files)));
+
+        return $message;
     }
 
     /**
@@ -108,7 +190,7 @@ final class MediaGenerationHandlerConversationEditTest extends TestCase
      */
     private function catalogReturning(array $images): ConversationFileCatalog
     {
-        $catalog = $this->createMock(ConversationFileCatalog::class);
+        $catalog = $this->createStub(ConversationFileCatalog::class);
         $catalog->method('build')->willReturn($images);
         $catalog->method('latestImage')->willReturn($images[0] ?? null);
 
