@@ -450,7 +450,7 @@ backend/src/Prompt/PromptCatalog.php                + tools:research_* (catalog 
 | File / method | Frozen at | Consequence |
 | ------------- | --------- | ----------- |
 | `GatewayToolLoop.php` | 1,432 lines, constructor 14, `runComplete` 148, `runStream` 116, `executeOurs` 125, `collectStreamedTurn` 191 | RS1 edits constants and strings only; RS2 / RS3 add tools as classes reached through `GatewayToolCatalog` (502 lines) and a tagged native-tool registry, not new constructor parameters or branches |
-| `MessagesContextInjector::sessionBlock` | 109 lines | RS3 adds a tool; the injection stays as it is |
+| `MessagesContextInjector::sessionBlock` | 109 lines | RS3 moves its search call into the helper `knowledge_search` shares (the method shrinks); what the injection returns stays the same |
 | `UrlContentService.php`, `fetchForReading` | 1,258 lines, 122 | RS4 reads documents in `ResearchSourceReader`; `deepen` swaps one call, does not grow |
 | `WebResearchService::deepen` | 122 lines | Same |
 | `ModelConfigService.php` | 1,327 lines | RS5 resolution lives in `ResearchRoleResolver` |
@@ -502,6 +502,14 @@ the report file).
 | RS1 | `WRAP_UP_AFTER_SEARCH` becomes length-neutral: "Answer the user's question now from these results, as completely as the question needs, and cite the URLs you use. Do not search again." `WEB_SEARCH_WRAP_AFTER` reads `MESSAGES_GATEWAY.WEB_SEARCH_MAX_ROUNDS` (default 2, today's value). | Today's round count | UC-03 stays green; UC-04 answers keep the full content |
 | RS2 | For non-Anthropic upstreams, the `web_fetch` declaration is replaced by an executable `web_fetch` of the same name that Synaplan runs (`UrlContentService::fetchForReading`, condensed with the reader model when long) — the same move `WebSearchTool` made for `web_search`. Anthropic keeps its own server tool. `WEB_FETCH_MODE=off` still turns it off. | On with `WEB_FETCH_MODE=auto` after UC-04 is green on Groq, OpenAI and Gemini | UC-04 page facts on every route |
 | RS3 | When `x-synaplan-rag-group-key` (or an assistant with knowledge scopes) is present, the gateway offers `knowledge_search(query, limit)` and `read_document(file_id, around)`, executed by Synaplan inside the caller's scopes. The single injection stays for the first turn. | On for paired desktop keys; off for other keys until the coding-client walk | New UC-05e: a question that needs three files |
+
+**One knowledge search path.** MCP `rag_search` already serves paired keys
+over `/mcp`, but it searches only the caller's own documents
+(`VectorSearchService::semanticSearch`, no shared folders, no assistant
+scopes) and lives outside the gateway loop, so a model on a `/v1/messages` turn
+cannot call it. `knowledge_search` is the gateway-owned twin: it shares one
+search helper with `MessagesContextInjector` (`semanticSearchByVector` with the
+explicit scopes), and RS9 adds the keyword leg to that helper once.
 
 **Desktop contract for RS2 and RS3.** Desktop's agent loop treats `web_search`
 and `web_fetch` as server tools it must never run or answer

@@ -66,17 +66,20 @@ STATUS (U10). Copy in quotes is the English source string.
 
 ### J-RQ-1 — Ask with Web on gets a full, sourced answer (Ada, RD1 + RS1–RS2)
 
-1. Project *Lieferanten*, Chat, **Web** on, Research off.
+1. Project *Lieferanten* with **no skill enabled**, Chat, **Web** on, Research
+   off.
 2. Ada types: *"Was kostet ein Wartungsvertrag für Klimaanlagen in Bayern
    ungefähr?"* and presses Enter.
 3. Activity: "Searching the web" → "Reading 2 pages". The answer has several
    paragraphs, names price ranges and links each source.
-4. Ada types: *"Schreib die Quellen in quellen.md"*. The file is written (the
-   check is language-neutral now) and appears on the Out board.
+4. Ada types: *"Schreib die Quellen in quellen.md"*. Because the message names
+   a file, the turn gets the file tools by itself — no skill needed — and the
+   file is written and appears on the Out board.
 5. **Find:** the answer stays in the thread; the file is on the Out board.
    **Undo:** delete the file from the Out board.
 
-Exit: UC-03, UC-04 green, plus their German variants (UC-03-de, UC-04-de).
+Exit: UC-03, UC-04 green, plus their German variants (UC-03-de, UC-04-de); the
+walk done in a project without any enabled skill.
 
 ### J-RQ-2 — First research from an empty project (Ada, RD3 + RD5)
 

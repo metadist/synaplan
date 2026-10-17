@@ -14,7 +14,7 @@ chat message.
 | RS2 | planned | `web_fetch` run by Synaplan on non-Anthropic routes |
 | RS3 | planned | `knowledge_search` and `read_document` in the gateway |
 | RS4 | planned | PDFs and office files from web search — §0 #12 |
-| RD1 | planned | Desktop agent prompt, language-neutral checks, output budget, B1 (synaplan-desktop) |
+| RD1 | planned | File tools without a skill, Desktop agent prompt, language-neutral checks, output budget, B1; J-RQ-1 (synaplan-desktop) |
 | RS5 | planned | `READ` and `VERIFY` slots, role resolver, `meta.family` — §0 #4 |
 | RS6 | planned | Research runs v1 behind `RESEARCH.ENABLED` — §0 #1–#3, #7–#9, #19 |
 | RS7 | planned | Reflect loop, questions, plan review, resume — §0 #10 |
@@ -55,7 +55,9 @@ and RQ2.
 | How much knowledge does a Desktop turn see? | 5 passages, 8,000 characters including memories, one query per turn | `MessagesContextInjector::RAG_LIMIT`, `MAX_CHARS` |
 | Does web chat deep search read PDFs? | No — `pdf`, office and media extensions skipped; 3 pages, 28,000 characters, 25 s | `WebResearchService::SKIP_EXTENSIONS`, `PlugConfigService` defaults |
 | Does anything re-plan after seeing results? | No — `TaskPlanner` plans once, the DAG runs once | `TaskPlanner`, `DagExecutor` |
-| Desktop output budget and intent checks | Plain chat `max_tokens 1024`; agent loop 40 rounds × 8,192; file intent needs English verbs | `commands/mod.rs`, `agent.rs` |
+| Desktop output budget and intent checks | Plain chat `max_tokens 1024`; agent loop 40 rounds × 8,192; file intent needs English verbs in the loop, a five-language phrase list in plain chat | `commands/mod.rs`, `agent.rs`, `src/lib/classifyGeneration.ts` |
+| When does Desktop chat offer file tools? | Only when the project has at least one enabled skill; otherwise every turn is plain streaming chat without `list_files`, `read_file` or `write_file` | `src/views/ChatView.vue` (`agentMode = enabledSkillCount > 0`) |
+| Is there already a knowledge search a model could call? | MCP `rag_search` over `/mcp` — the caller's own documents only, outside the gateway loop | `McpServerFactory::ragSearchHandler` (`VectorSearchService::semanticSearch`) |
 | Gateway / messages settings on this stack | `MCP_MAX_ITERATIONS 8`, `MCP_TOOLS_ENABLED 0`, `WEB_SEARCH_MODE auto`, `WEB_FETCH_MODE auto`, `CONTEXT_INJECTION_ENABLED 0`, web search provider `brave`, rerank on (seeded off) | `BCONFIG` groups `MESSAGES_GATEWAY`, `PLUGS` |
 | Which frozen files do the quick wins touch? | `GatewayToolLoop.php` (1,432 lines, constructor 14), `MessagesContextInjector::sessionBlock` (109), `UrlContentService.php` (1,258), `WebResearchService::deepen` (122), `ModelConfigService.php` (1,327); `PromptCatalog.php` and `ModelCatalog.php` are exempt as catalog data | `backend/tests/Architecture/sizeRatchetBaseline.json`, `Support/SizeOffenders.php` |
 | Does Desktop already have OS notifications? | Yes — `tauri-plugin-notification` with `notification:default` | `src-tauri/Cargo.toml`, `capabilities/default.json` |
