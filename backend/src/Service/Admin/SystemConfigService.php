@@ -12,6 +12,7 @@ use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Seed\ModuleGateSeeder;
+use App\Service\Admin\SystemConfig\FieldDefinition;
 use App\Service\Agent\AgentConfig;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Branding\BrandingService;
@@ -54,10 +55,9 @@ use Psr\Log\LoggerInterface;
 final readonly class SystemConfigService
 {
     private const MASK = '••••••••';
-    private const DB_GROUP = 'QDRANT_SEARCH';
     private const DB_OWNER_ID = 0;
 
-    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}> */
+    /** @var array<string, FieldDefinition> */
     private array $schema;
 
     public function __construct(
@@ -75,7 +75,7 @@ final readonly class SystemConfigService
         private readonly ?ComputeClient $computeClient = null,
         private readonly ?ChatArtifactsConfig $chatArtifactsConfig = null,
     ) {
-        $this->schema = $this->markManagedFields($this->buildSchema());
+        $this->schema = $this->markManagedFields(array_map(FieldDefinition::fromArray(...), $this->buildSchema()));
     }
 
     /**
@@ -86,19 +86,17 @@ final readonly class SystemConfigService
      * flagged `managedBy` so the UI renders a pointer instead of an input and
      * {@see self::setValue()} refuses the write.
      *
-     * @param array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}> $schema
+     * @param array<string, FieldDefinition> $schema
      *
-     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}>
+     * @return array<string, FieldDefinition>
      */
     private function markManagedFields(array $schema): array
     {
         foreach (ProviderKeyCatalog::managedEnvVars() as $envVar) {
-            if (!isset($schema[$envVar])) {
-                continue;
+            if (isset($schema[$envVar])) {
+                // Stored encrypted in BCONFIG by the store and applied per call.
+                $schema[$envVar] = $schema[$envVar]->managedIn(ProviderKeyCatalog::MANAGED_BY);
             }
-            $schema[$envVar]['managedBy'] = ProviderKeyCatalog::MANAGED_BY;
-            // Stored encrypted in BCONFIG by the store and applied per call.
-            $schema[$envVar]['source'] = 'database';
         }
 
         return $schema;
@@ -377,7 +375,7 @@ final readonly class SystemConfigService
 
         return [
             'tabs' => $tabs,
-            'fields' => $this->schema,
+            'fields' => array_map(static fn (FieldDefinition $field): array => $field->toArray(), $this->schema),
         ];
     }
 
@@ -397,8 +395,6 @@ final readonly class SystemConfigService
             if (null !== $wanted && !isset($wanted[$key])) {
                 continue;
             }
-            $source = $field['source'] ?? 'env';
-
             // Instance provider keys live in the encrypted ProviderKeyStore
             // (BCONFIG), not in .env — report their status from there so this
             // legacy surface and Providers & keys agree. The secret half of a
@@ -416,7 +412,7 @@ final readonly class SystemConfigService
                     ? 'env'
                     : $status['source'];
                 $values[$key] = [
-                    'value' => $isSet ? self::MASK : $field['default'],
+                    'value' => $isSet ? self::MASK : $field->default,
                     'isSet' => $isSet,
                     'isMasked' => $isSet,
                     'keySource' => $keySource,
@@ -424,9 +420,9 @@ final readonly class SystemConfigService
                 continue;
             }
 
-            if ('database' === $source) {
-                $dbGroup = $field['dbGroup'] ?? self::DB_GROUP;
-                $dbKey = $field['dbKey'] ?? $key;
+            if ($field->isStoredInDatabase()) {
+                $dbGroup = $field->group();
+                $dbKey = $field->setting($key);
                 $rawValue = $this->configRepository->getValue(self::DB_OWNER_ID, $dbGroup, $dbKey);
                 $isSet = null !== $rawValue && '' !== $rawValue;
                 $locked = $this->configRepository
@@ -436,9 +432,9 @@ final readonly class SystemConfigService
                 // A database-backed secret (e.g. an OAuth client secret) is
                 // stored encrypted and must be masked here for the same reason
                 // an env secret is: this response reaches the admin UI.
-                if ($field['sensitive']) {
+                if ($field->sensitive) {
                     $values[$key] = [
-                        'value' => $isSet ? self::MASK : $field['default'],
+                        'value' => $isSet ? self::MASK : $field->default,
                         'isSet' => $isSet,
                         'isMasked' => $isSet,
                         'locked' => $locked,
@@ -447,7 +443,7 @@ final readonly class SystemConfigService
                 }
 
                 $values[$key] = [
-                    'value' => $this->normalizeStoredValue($field, $rawValue) ?? $field['default'],
+                    'value' => $this->normalizeStoredValue($field, $rawValue) ?? $field->default,
                     'isSet' => $isSet,
                     'isMasked' => false,
                     'locked' => $locked,
@@ -456,7 +452,7 @@ final readonly class SystemConfigService
                 $rawValue = $this->getEnvValue($key);
                 $isSet = '' !== $rawValue && null !== $rawValue;
 
-                if ($field['sensitive'] && $isSet) {
+                if ($field->sensitive && $isSet) {
                     $values[$key] = [
                         'value' => self::MASK,
                         'isSet' => true,
@@ -464,7 +460,7 @@ final readonly class SystemConfigService
                     ];
                 } else {
                     $values[$key] = [
-                        'value' => $rawValue ?? $field['default'],
+                        'value' => $rawValue ?? $field->default,
                         'isSet' => $isSet,
                         'isMasked' => false,
                     ];
@@ -493,10 +489,10 @@ final readonly class SystemConfigService
         // automated deployment pins it with FEATURE_<GROUP>_<SETTING>, and the
         // toggle must show that instead of pretending to be movable.
         foreach ($this->schema as $key => $field) {
-            if ('features' !== $field['tab'] || 'boolean' !== $field['type'] || !isset($values[$key], $field['dbGroup'], $field['dbKey'])) {
+            if ('features' !== $field->tab || 'boolean' !== $field->type || !isset($values[$key], $field->row->group, $field->row->key)) {
                 continue;
             }
-            $pinned = $this->featureFlagEnv->forced($field['dbGroup'], $field['dbKey']);
+            $pinned = $this->featureFlagEnv->forced($field->row->group, $field->row->key);
             if (null === $pinned) {
                 continue;
             }
@@ -542,16 +538,15 @@ final readonly class SystemConfigService
         }
 
         $field = $this->schema[$key];
-        $source = $field['source'] ?? 'env';
 
         // One editor per key: instance provider keys are saved, tested and
         // removed under AI infrastructure › Providers & keys. Writing them here
         // would bypass the live check and the key + secret pairing rule.
-        if (isset($field['managedBy'])) {
+        if (null !== $field->managedBy) {
             return [
                 'success' => false,
                 'requiresRestart' => false,
-                'managedBy' => $field['managedBy'],
+                'managedBy' => $field->managedBy,
                 'message' => sprintf('%s is managed under AI infrastructure › Providers & keys (/admin/setup). Save, test or remove the key there.', $key),
             ];
         }
@@ -560,7 +555,7 @@ final readonly class SystemConfigService
         // the form unchanged (or retries it) sends the mask back. Storing that
         // would silently destroy a working secret — refuse it server-side
         // instead of relying on the frontend to filter it out.
-        if ($field['sensitive'] && SecretValueGuard::isMasked($value)) {
+        if ($field->sensitive && SecretValueGuard::isMasked($value)) {
             return [
                 'success' => false,
                 'requiresRestart' => false,
@@ -571,17 +566,17 @@ final readonly class SystemConfigService
         // An empty value deletes the stored override. Booleans and selects
         // always have a choice, so blank is a mistake rather than a clear.
         if ('' === $value) {
-            if (\in_array($field['type'], ['boolean', 'select'], true)) {
+            if (\in_array($field->type, ['boolean', 'select'], true)) {
                 return ['success' => false, 'requiresRestart' => false, 'message' => 'This setting needs a value'];
             }
 
-            return 'database' === $source
+            return $field->isStoredInDatabase()
                 ? $this->clearDatabaseValue($key, $field, $actingUserId)
                 : $this->clearEnvValue($key);
         }
 
         // Database-backed fields: write to BCONFIG, no restart needed
-        if ('database' === $source) {
+        if ($field->isStoredInDatabase()) {
             $capRefuse = $this->refuseComputeAboveSidecarCap($key, $value)
                 ?? $this->refuseComputeFeatureSidecarLacks($key, $value)
                 ?? $this->refuseComputeBelowRequiredTier($key, $value)
@@ -678,19 +673,17 @@ final readonly class SystemConfigService
     /**
      * Drop a stored override so readers fall back to the field default.
      *
-     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string} $field
-     *
      * @return array{success: bool, requiresRestart: bool, message?: string}
      */
-    private function clearDatabaseValue(string $key, array $field, ?int $actingUserId): array
+    private function clearDatabaseValue(string $key, FieldDefinition $field, ?int $actingUserId): array
     {
-        $group = $field['dbGroup'] ?? self::DB_GROUP;
-        $setting = $field['dbKey'] ?? $key;
+        $group = $field->group();
+        $setting = $field->setting($key);
 
         try {
             $this->configRepository->deleteValue(self::DB_OWNER_ID, $group, $setting);
             $this->logChange($key, '');
-            $this->applyConfigSideEffects($group, $setting, $field['default'], $actingUserId);
+            $this->applyConfigSideEffects($group, $setting, $field->default, $actingUserId);
             $this->layeredConfigResolver?->reset();
 
             return ['success' => true, 'requiresRestart' => false];
@@ -752,14 +745,12 @@ final readonly class SystemConfigService
     /**
      * Save a database-backed configuration value with validation.
      *
-     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string, encrypted?: bool} $field
-     *
      * @return array{success: bool, requiresRestart: bool, message?: string}
      */
-    private function setDatabaseValue(string $key, string $value, array $field, ?int $actingUserId = null): array
+    private function setDatabaseValue(string $key, string $value, FieldDefinition $field, ?int $actingUserId = null): array
     {
         // Validate numeric fields
-        if ('number' === $field['type']) {
+        if ('number' === $field->type) {
             if (!is_numeric($value)) {
                 return ['success' => false, 'requiresRestart' => false, 'message' => 'Value must be numeric'];
             }
@@ -782,7 +773,7 @@ final readonly class SystemConfigService
             // tiers, seconds). ConversationSummaryConfigService discards a
             // non-positive value and uses its default, so reject it here
             // instead of storing a row that does nothing.
-            if (ConversationSummaryConstants::CONFIG_GROUP === ($field['dbGroup'] ?? null)
+            if (ConversationSummaryConstants::CONFIG_GROUP === $field->row?->group
                 && ($numericValue < 1 || floor($numericValue) !== $numericValue)
             ) {
                 return ['success' => false, 'requiresRestart' => false, 'message' => 'Value must be a positive whole number'];
@@ -792,7 +783,7 @@ final readonly class SystemConfigService
             // 0 (disables verbatim pulling); everything else is a positive
             // whole number. MessageDigestConfig clamps out-of-range values,
             // so a row that would be silently corrected is rejected here.
-            if (MessageDigestConfig::CONFIG_GROUP === ($field['dbGroup'] ?? null)) {
+            if (MessageDigestConfig::CONFIG_GROUP === $field->row?->group) {
                 if (str_contains($key, 'MIN_SCORE')) {
                     if ($numericValue < 0.0 || $numericValue > 1.0) {
                         return ['success' => false, 'requiresRestart' => false, 'message' => 'Score must be between 0.0 and 1.0'];
@@ -807,12 +798,12 @@ final readonly class SystemConfigService
             }
         }
 
-        $group = $field['dbGroup'] ?? self::DB_GROUP;
-        $setting = $field['dbKey'] ?? $key;
+        $group = $field->group();
+        $setting = $field->setting($key);
 
         // Encrypted fields hold a real credential; clearing one means storing
         // an empty row, not an empty ciphertext nobody can distinguish.
-        $stored = ($field['encrypted'] ?? false) && '' !== $value
+        $stored = $field->isEncrypted() && '' !== $value
             ? $this->encryption->encrypt($value)
             : $value;
 
@@ -1194,13 +1185,12 @@ final readonly class SystemConfigService
 
     private function logChange(string $key, string $value): void
     {
-        $field = $this->schema[$key] ?? null;
-        $logValue = ($field && $field['sensitive']) ? self::MASK : $value;
+        $sensitive = $this->schema[$key]->sensitive ?? false;
 
         $this->logger->info('System config changed', [
             'key' => $key,
-            'value' => $logValue,
-            'sensitive' => $field['sensitive'] ?? false,
+            'value' => $sensitive ? self::MASK : $value,
+            'sensitive' => $sensitive,
         ]);
     }
 
@@ -2943,15 +2933,13 @@ final readonly class SystemConfigService
      * The admin toggle only treats the strings "true" / "false" as on/off.
      * Seeders and SQL often store "1" / "0"; map those so the switch matches
      * what IamConfig (and the rest of the app) actually do.
-     *
-     * @param array{type?: string} $field
      */
-    private function normalizeStoredValue(array $field, ?string $rawValue): ?string
+    private function normalizeStoredValue(FieldDefinition $field, ?string $rawValue): ?string
     {
         if (null === $rawValue || '' === $rawValue) {
             return $rawValue;
         }
-        if ('boolean' !== ($field['type'] ?? '')) {
+        if ('boolean' !== $field->type) {
             return $rawValue;
         }
         $asBool = filter_var($rawValue, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
