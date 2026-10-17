@@ -101,7 +101,8 @@ walk done in a project without any enabled skill.
 8. **Find:** next day she opens the project — the thread is in the list with a
    *Report* marker, the report is on the Out board, the file is in the folder.
    **Undo:** **More → Delete report** ("The report file is deleted from this
-   project. The chat stays.").
+   project and from your Synaplan workspace. The chat stays."). The server
+   copy goes with it (`DELETE /v1/research/{id}`).
 
 ### J-RQ-3 — Research over my own documents (Ben, RD7, RD3, RD5)
 
@@ -266,12 +267,16 @@ Thorough — waits for Start
 │   + Add a point                                                      │
 │                                                                      │
 │ Sources: the web and 12 files in this project                        │
+│ Web search goes through Brave, hosted in the US.                     │
 │ Estimated cost {amount}. Nothing is sent or changed anywhere.        │
 │                                        [Cancel]  [Start research]    │
 └──────────────────────────────────────────────────────────────────────┘
 
 Standard — starts at once; the same card without Remove / Add, with [Stop]
 ```
+
+The disclosure line appears only when the server reports one (`plan.disclosures`,
+world rule §0 #29); a project whose world matches shows nothing there.
 
 ### 5.4 Progress card
 
@@ -296,6 +301,9 @@ Details (collapsed by default)
 
 **Write now** stops gathering and writes with what was found
 (`stop_gathering`). Status markers are text plus an icon, never colour alone.
+When the server sends `queued` for more than 20 s the "Now:" line reads
+"Waiting for a free worker on your Synaplan workspace." — the research is not
+stuck, it is in line.
 
 ### 5.5 Result card
 
@@ -488,6 +496,11 @@ Models and Details.)
 | Web search not configured | "the web — not set up on your Synaplan workspace" (disabled) | Same, plus a link to the admin page for administrators |
 | One Thorough run already running | Thorough disabled: "A thorough research is already running in project {name}." **Open it** | Same |
 | Plan limit reached (§0 #25) | "You have used today's research runs on your plan. Standard research is available again tomorrow." | Same |
+| No embedding model on the workspace (cloud install without one) | "this project's files — the workspace has no index model yet" (disabled); administrators get a link to AI infrastructure | Same |
+| Web search provider outside the project's world | Disclosure line on the plan card (default) or "the web — not available in this project's world" (strict mode) | Same |
+| Workspace cannot read PDFs (minimal install, no Tika) | Details: "PDF — this workspace cannot read this kind of file"; the report says which sources were skipped for that reason | Same |
+| Next unit waiting for a worker | Progress "Now:" line: "Waiting for a free worker on your Synaplan workspace." | Same; the admin status page names it after 5 min |
+| Research turned off by an admin while running | Stopped card: "Research was turned off on your Synaplan workspace. What was found so far is kept." | Same |
 | All outcomes of `03` §7.5 | Stopped / failed card with the sentence and one next step | Same |
 
 ---

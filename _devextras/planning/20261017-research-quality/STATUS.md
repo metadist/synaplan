@@ -33,6 +33,43 @@ chat message.
 | RW1 | planned | Research in the web chat; J-RQ-8 |
 | RW2 | planned | Admin research settings; J-RQ-10 |
 | RW3 | planned | Research as a Saved Task step |
+| RX1 | planned | User docs: quick wins (synaplan-docs) |
+| RX2 | planned | User docs: Desktop research, team, air-gapped (synaplan-docs) |
+| RX3 | planned | User docs: web research, administration (synaplan-docs) |
+
+---
+
+## 2026-10-17 — plan review (RQ0, second pass)
+
+Full review in [`08_review.md`](./08_review.md): 13 gaps, 10 forgotten
+items, 12 regression risks with their guards, 5 installation findings. Four
+findings would have shipped a broken run or install and changed the design:
+
+| Finding | Evidence | Change |
+| ------- | -------- | ------ |
+| One research run would have blocked the install's only worker process for up to 20 minutes | `docker-compose.yml` 665–667: one `messenger:consume` over three transports, `--memory-limit=512M`; Helm `worker.replicaCount: 1` | Runs execute as ≤ 120 s Messenger units that re-dispatch (§0 #8) |
+| Research could not be tested in CI | `SsrfGuard` has no test mode; no search or page stub; the only web-search E2E is `@noci` | Test doubles in the `test` environment (§0 #27); the SSRF guard untouched |
+| The world rule left four side channels open | US-hosted search providers (only SearXNG self-hosted), `pdf_vision` in the document chain, the condenser's own model order, the workspace index model | Five-leg world rule with disclosure or strict refusal (§0 #29) |
+| Decision #26 used attachments as a routing signal | `ChatView.vue`: attach and drop both call `knowledge.add` (upload to the knowledge folder) | Signals are named files and folder references only |
+
+Also added: a sweeper (§0 #28), context-window budgets (#31), prompt caching
+as a built feature with both cost numbers (#32), idempotency / list / delete
+(#33), documentation as part of every step with three `synaplan-docs` pull
+requests (#34), the mobile-policy rule for `config.ts` (#30), the two
+`docker-compose.minimal.yml` lines the module convention requires (#19), and
+three new files: [`08_review.md`](./08_review.md),
+[`09_installations.md`](./09_installations.md) (eight profiles, degradation
+copy, tests per profile, upgrade / rollback, docs matrix) and
+[`10_contracts.md`](./10_contracts.md) (schemas, endpoints, events, units,
+keys, PHP / Rust / Vue contracts, fixtures). Every step brief in
+[`07_sprints.md`](./07_sprints.md) now has Reads, Touches, Tests first, Brief,
+Docs and Exit.
+
+Checked on this pass and found safe: Desktop's catalog parser is a `BTreeMap`
+without `deny_unknown_fields` (additive server groups cannot break old
+clients); `PlugConfigService::extractionChain($family, false)` already exists
+for `audio_no_cloud` and serves the document case; `tauri-plugin-notification`
+is already shipped.
 
 ---
 
