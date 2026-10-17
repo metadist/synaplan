@@ -37,8 +37,9 @@ use Psr\Log\NullLogger;
  * What MessageProcessor does on both entry points, per kind of turn.
  *
  * For every case `process()` and `processStream()` each record the status
- * events, the classifier and prompt lookups, the web search, what reaches the
- * router (classification, options, history size) and the result. The two
+ * events, the classifier calls (and how many: each one is a paid sorter call),
+ * the prompt lookups, the web search, what reaches the router
+ * (classification, options, history size) and the result. The two
  * entries differ in several places today (fixed-prompt language, RAG keys,
  * where search results travel, who emits `complete`, cancellation); the
  * snapshot pins those differences until they are aligned on purpose.
@@ -102,6 +103,16 @@ final class MessageTurnCharacterizationTest extends TestCase
             'provider_error' => ['router_throws' => 'provider'],
             'generic_error' => ['router_throws' => 'generic'],
             'user_cancel' => ['router_throws' => 'cancel'],
+            'fixed_prompt_message_language' => ['message_language' => 'de', 'options' => ['fixed_task_prompt' => 'support']],
+            'fixed_prompt_caller_language' => ['message_language' => 'de', 'options' => ['fixed_task_prompt' => 'support', 'language' => 'fr']],
+            'again_message_language' => ['message_language' => 'de', 'options' => ['is_again' => true, 'model_id' => 42]],
+            'again_caller_language' => ['message_language' => 'de', 'options' => ['is_again' => true, 'model_id' => 42, 'language' => 'fr']],
+            'forced_image_message_language' => ['message_language' => 'de', 'options' => ['force_image_description' => true]],
+            'forced_image_caller_language' => ['message_language' => 'de', 'options' => ['force_image_description' => true, 'language' => 'fr']],
+            'classifier_carries_prompt_metadata' => [
+                'verdict' => ['web_search' => true, 'prompt_metadata' => ['aiModel' => 33, 'tool_internet' => false]],
+                'text' => 'What is the latest Synaplan release?',
+            ],
         ];
     }
 
@@ -136,7 +147,11 @@ final class MessageTurnCharacterizationTest extends TestCase
             $this->createMock(AgentConfig::class),
         );
 
-        $message = $this->message((string) ($case['text'] ?? 'Hello, how are you?'), array_key_exists('chat_id', $case) ? $case['chat_id'] : 5);
+        $message = $this->message(
+            (string) ($case['text'] ?? 'Hello, how are you?'),
+            array_key_exists('chat_id', $case) ? $case['chat_id'] : 5,
+            (string) ($case['message_language'] ?? 'en'),
+        );
         $options = $case['options'] ?? [];
         $status = static function (array $update) use (&$statuses): void {
             $statuses[] = ['status' => $update['status'], 'message' => $update['message'], 'metadata' => $update['metadata'] ?? null];
@@ -148,16 +163,21 @@ final class MessageTurnCharacterizationTest extends TestCase
             }, $status, $options)
             : $processor->process($message, $options, $status);
 
-        return ['statuses' => $statuses, 'calls' => $this->calls, 'result' => self::normalize($result)];
+        return [
+            'statuses' => $statuses,
+            'sorter_calls' => count($this->calls['classifier']),
+            'calls' => $this->calls,
+            'result' => self::normalize($result),
+        ];
     }
 
-    private function message(string $text, ?int $chatId): Message
+    private function message(string $text, ?int $chatId, string $language): Message
     {
         $message = $this->createMock(Message::class);
         $message->method('getId')->willReturn(101);
         $message->method('getUserId')->willReturn(7);
         $message->method('getText')->willReturn($text);
-        $message->method('getLanguage')->willReturn('en');
+        $message->method('getLanguage')->willReturn($language);
         $message->method('getTopic')->willReturn('general');
         $message->method('getChatId')->willReturn($chatId);
         $message->method('getTrackingId')->willReturn(555);
