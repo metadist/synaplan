@@ -616,7 +616,7 @@
                         "classification": {
                             "intent": "image_generation",
                             "language": "en",
-                            "model_id": 42,
+                            "model_id": null,
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
@@ -645,7 +645,7 @@
                 "classification": {
                     "intent": "image_generation",
                     "language": "en",
-                    "model_id": 42,
+                    "model_id": null,
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -681,7 +681,7 @@
                     "message": "Using previously selected model (skipped classification)",
                     "metadata": {
                         "language": "en",
-                        "model_id": 42,
+                        "model_id": null,
                         "source": "again",
                         "topic": "mediamaker"
                     },
@@ -720,7 +720,7 @@
                         "classification": {
                             "intent": "image_generation",
                             "language": "en",
-                            "model_id": 42,
+                            "model_id": null,
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
@@ -752,7 +752,7 @@
                 "classification": {
                     "intent": "image_generation",
                     "language": "en",
-                    "model_id": 42,
+                    "model_id": null,
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -1016,7 +1016,7 @@
                         "classification": {
                             "intent": "image_generation",
                             "language": "en",
-                            "model_id": 42,
+                            "model_id": null,
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
@@ -1045,7 +1045,7 @@
                 "classification": {
                     "intent": "image_generation",
                     "language": "en",
-                    "model_id": 42,
+                    "model_id": null,
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -1081,7 +1081,7 @@
                     "message": "Using previously selected model (skipped classification)",
                     "metadata": {
                         "language": "en",
-                        "model_id": 42,
+                        "model_id": null,
                         "source": "again",
                         "topic": "tools:pic"
                     },
@@ -1120,7 +1120,7 @@
                         "classification": {
                             "intent": "image_generation",
                             "language": "en",
-                            "model_id": 42,
+                            "model_id": null,
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
@@ -1152,7 +1152,7 @@
                 "classification": {
                     "intent": "image_generation",
                     "language": "en",
-                    "model_id": 42,
+                    "model_id": null,
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,

@@ -51,13 +51,16 @@ final readonly class TopicIntentRule
      * The tag names the kind of answer when it can: media, a chat answer for
      * vision and analysis, a document. Any other tag (a chat model, no tag)
      * keeps the topic the message has, so a custom prompt survives; without
-     * one the message goes to `general`.
+     * one the message goes to `general`. Media takes a media model: a model
+     * kept on a media topic leaves the choice to the media handler.
      */
     public function forModel(?string $modelTag, ?string $messageTopic): TopicIntent
     {
-        $topic = self::TOPIC_FOR_TAG[strtolower((string) $modelTag)] ?? self::topicOrGeneral($messageTopic);
+        $tagTopic = self::TOPIC_FOR_TAG[strtolower((string) $modelTag)] ?? null;
+        $topic = $tagTopic ?? self::topicOrGeneral($messageTopic);
+        $intent = $this->intentFor($topic);
 
-        return new TopicIntent($topic, $this->intentFor($topic));
+        return new TopicIntent($topic, $intent, Capability::ImageGeneration->value !== $intent || 'mediamaker' === $tagTopic);
     }
 
     /**

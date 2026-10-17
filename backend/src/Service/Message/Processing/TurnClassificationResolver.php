@@ -384,7 +384,7 @@ final readonly class TurnClassificationResolver
             'language' => $language,
             'source' => 'again',
             'intent' => $routed->intent,
-            'model_id' => $options['model_id'],
+            'model_id' => $routed->usesPickedModel ? $options['model_id'] : null,
         ];
     }
 

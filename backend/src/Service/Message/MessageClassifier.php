@@ -260,7 +260,7 @@ final readonly class MessageClassifier
                 'intent' => $routed->intent,
                 'source' => $modelOverrideDecision->toClassificationSource(),
                 'skip_sorting' => true,
-                'model_id' => $modelOverride,
+                'model_id' => $routed->usesPickedModel ? $modelOverride : null,
             ], $modelOverrideDecision->toClassificationFields());
         }
 

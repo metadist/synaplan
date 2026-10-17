@@ -21,51 +21,52 @@ final class TopicIntentRuleTest extends TestCase
 
     /**
      * One row per tag line of the D2 table (S03 §2): the tags, then the
-     * topic on the message => the [topic, intent] it routes to.
+     * topic on the message => the [topic, intent] it routes to and whether
+     * the picked model answers there (a media route takes a media model).
      *
-     * @return iterable<string, array{0: list<?string>, 1: array<string, array{0: string, 1: string}>}>
+     * @return iterable<string, array{0: list<?string>, 1: array<string, array{0: string, 1: string, 2: bool}>}>
      */
     public static function d2Rows(): iterable
     {
         yield 'text2pic / text2vid / text2sound: mediamaker' => [
             ['text2pic', 'text2vid', 'text2sound'],
-            ['' => ['mediamaker', 'image_generation'], 'legal-review' => ['mediamaker', 'image_generation']],
+            ['' => ['mediamaker', 'image_generation', true], 'legal-review' => ['mediamaker', 'image_generation', true]],
         ];
         yield 'pic2text / analyze / vision: general' => [
             ['pic2text', 'analyze', 'vision'],
-            ['' => ['general', 'chat'], 'mediamaker' => ['general', 'chat']],
+            ['' => ['general', 'chat', true], 'mediamaker' => ['general', 'chat', true]],
         ];
         yield 'document / officemaker / text2doc: officemaker' => [
             ['document', 'officemaker', 'text2doc'],
-            ['' => ['officemaker', 'document_generation'], 'mediamaker' => ['officemaker', 'document_generation']],
+            ['' => ['officemaker', 'document_generation', true], 'mediamaker' => ['officemaker', 'document_generation', true]],
         ];
         yield 'chat, vectorize, unknown: the topic it is given, else general' => [
             ['chat', 'vectorize', 'rerank', null],
             [
-                'legal-review' => ['legal-review', 'chat'],
-                'mediamaker' => ['mediamaker', 'image_generation'],
-                'tools:pic' => ['tools:pic', 'image_generation'],
-                '' => ['general', 'chat'],
-                'unknown' => ['general', 'chat'],
-                'UNKNOWN' => ['general', 'chat'],
-                'Unknown' => ['general', 'chat'],
-                'CHAT' => ['general', 'chat'],
-                'CONTINUE' => ['general', 'chat'],
+                'legal-review' => ['legal-review', 'chat', true],
+                'mediamaker' => ['mediamaker', 'image_generation', false],
+                'tools:pic' => ['tools:pic', 'image_generation', false],
+                '' => ['general', 'chat', true],
+                'unknown' => ['general', 'chat', true],
+                'UNKNOWN' => ['general', 'chat', true],
+                'Unknown' => ['general', 'chat', true],
+                'CHAT' => ['general', 'chat', true],
+                'CONTINUE' => ['general', 'chat', true],
             ],
         ];
     }
 
     /**
-     * @param list<?string>                              $tags
-     * @param array<string, array{0: string, 1: string}> $routes
+     * @param list<?string>                                       $tags
+     * @param array<string, array{0: string, 1: string, 2: bool}> $routes
      */
     #[DataProvider('d2Rows')]
     public function testAPickedModelRoutesByItsLineOfTheD2Table(array $tags, array $routes): void
     {
         foreach ($tags as $tag) {
-            foreach ($routes as $topic => [$expectedTopic, $expectedIntent]) {
+            foreach ($routes as $topic => [$expectedTopic, $expectedIntent, $usesPickedModel]) {
                 self::assertEquals(
-                    new TopicIntent($expectedTopic, $expectedIntent),
+                    new TopicIntent($expectedTopic, $expectedIntent, $usesPickedModel),
                     $this->rule->forModel($tag, (string) $topic),
                     sprintf('%s on "%s"', $tag ?? 'no tag', $topic),
                 );

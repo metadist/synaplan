@@ -410,7 +410,7 @@
     "override_chat_mediamaker": {
         "intent": "image_generation",
         "language": "en",
-        "model_id": 42,
+        "model_id": null,
         "routing_confidence": 1,
         "routing_discarded_alternatives": [],
         "routing_fallback_reason": null,
@@ -575,7 +575,7 @@
     "override_rerank_mediamaker": {
         "intent": "image_generation",
         "language": "en",
-        "model_id": 42,
+        "model_id": null,
         "routing_confidence": 1,
         "routing_discarded_alternatives": [],
         "routing_fallback_reason": null,
@@ -751,7 +751,7 @@
     "override_vectorize_mediamaker": {
         "intent": "image_generation",
         "language": "en",
-        "model_id": 42,
+        "model_id": null,
         "routing_confidence": 1,
         "routing_discarded_alternatives": [],
         "routing_fallback_reason": null,
