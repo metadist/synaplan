@@ -4,8 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit;
 
+use App\AI\Provider\OpenAI\OpenAIApiClient;
+use App\AI\Provider\OpenAI\OpenAIChat;
+use App\AI\Provider\OpenAI\OpenAICurlTransport;
+use App\AI\Provider\OpenAI\OpenAIResponses;
+use App\AI\Provider\OpenAI\OpenAIResponsesFormat;
 use App\AI\Provider\OpenAIProvider;
+use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -70,36 +77,33 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testExtractSystemMessageViaReflection(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'extractSystemMessage');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'extractSystemMessage');
 
         $messages = [
             ['role' => 'system', 'content' => 'You are helpful.'],
             ['role' => 'user', 'content' => 'Hello'],
         ];
 
-        $result = $method->invoke($provider, $messages);
+        $result = $method->invoke(null, $messages);
         $this->assertSame('You are helpful.', $result);
     }
 
     public function testExtractSystemMessageReturnsNullWhenMissing(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'extractSystemMessage');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'extractSystemMessage');
 
         $messages = [
             ['role' => 'user', 'content' => 'Hello'],
             ['role' => 'assistant', 'content' => 'Hi!'],
         ];
 
-        $result = $method->invoke($provider, $messages);
+        $result = $method->invoke(null, $messages);
         $this->assertNull($result);
     }
 
     public function testRemoveSystemMessagesViaReflection(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'removeSystemMessages');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'removeSystemMessages');
 
         $messages = [
             ['role' => 'system', 'content' => 'You are helpful.'],
@@ -107,7 +111,7 @@ class OpenAIProviderResponsesApiTest extends TestCase
             ['role' => 'assistant', 'content' => 'Hi!'],
         ];
 
-        $result = $method->invoke($provider, $messages);
+        $result = $method->invoke(null, $messages);
 
         $this->assertCount(2, $result);
         $this->assertSame('user', $result[0]['role']);
@@ -116,15 +120,14 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testRemoveSystemMessagesReindexesArray(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'removeSystemMessages');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'removeSystemMessages');
 
         $messages = [
             ['role' => 'system', 'content' => 'System prompt'],
             ['role' => 'user', 'content' => 'Q1'],
         ];
 
-        $result = $method->invoke($provider, $messages);
+        $result = $method->invoke(null, $messages);
 
         $this->assertSame([0], array_keys($result));
         $this->assertSame('user', $result[0]['role']);
@@ -132,8 +135,7 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testNormalizeResponsesUsageViaReflection(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'normalizeResponsesUsage');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'normalizeResponsesUsage');
 
         $responseData = [
             'usage' => [
@@ -146,7 +148,7 @@ class OpenAIProviderResponsesApiTest extends TestCase
             ],
         ];
 
-        $result = $method->invoke($provider, $responseData);
+        $result = $method->invoke(null, $responseData);
 
         $this->assertSame(150, $result['prompt_tokens']);
         $this->assertSame(80, $result['completion_tokens']);
@@ -157,10 +159,9 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testNormalizeResponsesUsageHandlesMissingData(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'normalizeResponsesUsage');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'normalizeResponsesUsage');
 
-        $result = $method->invoke($provider, []);
+        $result = $method->invoke(null, []);
 
         $this->assertSame(0, $result['prompt_tokens']);
         $this->assertSame(0, $result['completion_tokens']);
@@ -171,15 +172,15 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testBuildResponsesRequestViaReflection(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [
             ['role' => 'system', 'content' => 'Be helpful'],
             ['role' => 'user', 'content' => 'Hello'],
         ];
 
-        $result = $method->invoke($provider, $messages, 'gpt-4o', false, []);
+        $result = $method->invoke($chat, $messages, 'gpt-4o', false, []);
 
         $this->assertSame('gpt-4o', $result['model']);
         $this->assertSame('Be helpful', $result['instructions']);
@@ -193,14 +194,14 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testBuildResponsesRequestSystemOnlyMessagesFallback(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [
             ['role' => 'system', 'content' => 'You are a helpful assistant.'],
         ];
 
-        $result = $method->invoke($provider, $messages, 'gpt-4o', false, []);
+        $result = $method->invoke($chat, $messages, 'gpt-4o', false, []);
 
         $this->assertSame('You are a helpful assistant.', $result['instructions']);
         $this->assertNotEmpty($result['input']);
@@ -210,65 +211,65 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testBuildResponsesRequestWithPreviousResponseId(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [
             ['role' => 'user', 'content' => 'Follow up question'],
         ];
 
         $options = ['previous_response_id' => 'resp_abc123'];
-        $result = $method->invoke($provider, $messages, 'gpt-4o', false, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-4o', false, $options);
 
         $this->assertSame('resp_abc123', $result['previous_response_id']);
     }
 
     public function testBuildResponsesRequestReasoningModelSkipsTemperature(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hello']];
 
-        $result = $method->invoke($provider, $messages, 'o3-mini', true, []);
+        $result = $method->invoke($chat, $messages, 'o3-mini', true, []);
 
         $this->assertArrayNotHasKey('temperature', $result);
     }
 
     public function testBuildResponsesRequestStoreDisabled(): void
     {
-        $provider = $this->createProvider(storeResponses: false);
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat(storeResponses: false);
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hello']];
 
-        $result = $method->invoke($provider, $messages, 'gpt-4o', false, []);
+        $result = $method->invoke($chat, $messages, 'gpt-4o', false, []);
 
         $this->assertFalse($result['store']);
     }
 
     public function testBuildResponsesRequestPreviousResponseIdWithStoreDisabled(): void
     {
-        $provider = $this->createProvider(storeResponses: false);
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat(storeResponses: false);
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Follow up']];
         $options = ['previous_response_id' => 'resp_abc123'];
 
-        $result = $method->invoke($provider, $messages, 'gpt-4o', false, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-4o', false, $options);
 
         $this->assertSame('resp_abc123', $result['previous_response_id']);
     }
 
     public function testBuildResponsesRequestReasoningWithSummary(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Explain this']];
         $options = ['reasoning' => true];
 
-        $result = $method->invoke($provider, $messages, 'o3-mini', true, $options);
+        $result = $method->invoke($chat, $messages, 'o3-mini', true, $options);
 
         $this->assertArrayHasKey('reasoning', $result);
         $this->assertSame('auto', $result['reasoning']['summary']);
@@ -277,13 +278,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testBuildResponsesRequestNoReasoningForNonReasoningModel(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hello']];
         $options = ['reasoning' => true];
 
-        $result = $method->invoke($provider, $messages, 'gpt-4o', false, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-4o', false, $options);
 
         $this->assertArrayNotHasKey('reasoning', $result);
     }
@@ -297,13 +298,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testBuildResponsesRequestDefaultChatUsesNoneEffortOnGpt55(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hi']];
         $options = ['reasoning' => false];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-5.5', true, $options);
 
         $this->assertArrayHasKey('reasoning', $result);
         $this->assertSame('none', $result['reasoning']['effort']);
@@ -318,13 +319,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testBuildResponsesRequestDefaultChatUsesMinimalEffortOnOriginalGpt5(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hi']];
         $options = ['reasoning' => false];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-5', true, $options);
 
         $this->assertArrayHasKey('reasoning', $result);
         $this->assertSame('minimal', $result['reasoning']['effort']);
@@ -338,13 +339,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testBuildResponsesRequestDefaultChatFallsBackToLowOnOSeries(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hi']];
         $options = ['reasoning' => false];
 
-        $result = $method->invoke($provider, $messages, 'o3-mini', true, $options);
+        $result = $method->invoke($chat, $messages, 'o3-mini', true, $options);
 
         $this->assertArrayHasKey('reasoning', $result);
         $this->assertSame('low', $result['reasoning']['effort']);
@@ -358,13 +359,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testBuildResponsesRequestXHighEffortPassesThroughOnGpt55(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
         $options = ['reasoning_effort' => 'xhigh'];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-5.5', true, $options);
 
         $this->assertSame('xhigh', $result['reasoning']['effort']);
         $this->assertSame('auto', $result['reasoning']['summary']);
@@ -372,13 +373,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testBuildResponsesRequestXHighEffortClampsToHighOnGpt5(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
         $options = ['reasoning_effort' => 'xhigh'];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-5', true, $options);
 
         $this->assertSame('high', $result['reasoning']['effort']);
         $this->assertSame('auto', $result['reasoning']['summary']);
@@ -391,13 +392,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testBuildResponsesRequestMaxEffortPassesThroughOnGpt6Astra(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
         $options = ['reasoning_effort' => 'max'];
 
-        $result = $method->invoke($provider, $messages, 'gpt-6-astra', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-6-astra', true, $options);
 
         $this->assertSame('max', $result['reasoning']['effort']);
         $this->assertSame('auto', $result['reasoning']['summary']);
@@ -405,13 +406,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testBuildResponsesRequestXHighEffortPassesThroughOnGpt6Astra(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
         $options = ['reasoning_effort' => 'xhigh'];
 
-        $result = $method->invoke($provider, $messages, 'gpt-6-astra', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-6-astra', true, $options);
 
         $this->assertSame('xhigh', $result['reasoning']['effort']);
         $this->assertSame('auto', $result['reasoning']['summary']);
@@ -419,39 +420,39 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testBuildResponsesRequestMaxEffortClampsToXHighOnGpt55(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
         $options = ['reasoning_effort' => 'max'];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-5.5', true, $options);
 
         $this->assertSame('xhigh', $result['reasoning']['effort']);
     }
 
     public function testBuildResponsesRequestMaxEffortClampsToHighOnGpt5(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
         $options = ['reasoning_effort' => 'max'];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-5', true, $options);
 
         $this->assertSame('high', $result['reasoning']['effort']);
     }
 
     public function testBuildResponsesRequestDefaultChatUsesLowEffortOnGpt6Astra(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hi']];
         $options = ['reasoning' => false];
 
-        $result = $method->invoke($provider, $messages, 'gpt-6-astra', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-6-astra', true, $options);
 
         $this->assertSame('low', $result['reasoning']['effort']);
         $this->assertArrayNotHasKey('summary', $result['reasoning']);
@@ -470,10 +471,10 @@ class OpenAIProviderResponsesApiTest extends TestCase
     #[DataProvider('lowestEffortTierProvider')]
     public function testLowestEffortTierPerModelFamily(string $model, string $expected): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'lowestEffortTier');
+        $responses = $this->createResponses();
+        $method = new \ReflectionMethod($responses, 'lowestEffortTier');
 
-        $this->assertSame($expected, $method->invoke($provider, $model));
+        $this->assertSame($expected, $method->invoke($responses, $model));
     }
 
     /**
@@ -526,13 +527,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testGpt54DefaultChatSendsNoneNotMinimal(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hi']];
         $options = ['reasoning' => false];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5.4', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-5.4', true, $options);
 
         $this->assertSame('none', $result['reasoning']['effort']);
         $this->assertNotSame('minimal', $result['reasoning']['effort']);
@@ -546,11 +547,11 @@ class OpenAIProviderResponsesApiTest extends TestCase
     #[DataProvider('gpt56ModelProvider')]
     public function testGpt56DefaultChatSendsNone(string $model): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $result = $method->invoke(
-            $provider,
+            $chat,
             [['role' => 'user', 'content' => 'Hi']],
             $model,
             true,
@@ -567,11 +568,11 @@ class OpenAIProviderResponsesApiTest extends TestCase
     #[DataProvider('gpt56ModelProvider')]
     public function testGpt56MaxEffortPassesThrough(string $model): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $result = $method->invoke(
-            $provider,
+            $chat,
             [['role' => 'user', 'content' => 'Solve this']],
             $model,
             true,
@@ -601,12 +602,12 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testGpt55ProClampsCheapTiersUpToMedium(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         foreach ([['reasoning' => false], ['reasoning_effort' => 'low']] as $options) {
             $result = $method->invoke(
-                $provider,
+                $chat,
                 [['role' => 'user', 'content' => 'Hi']],
                 'gpt-5.5-pro',
                 true,
@@ -623,10 +624,10 @@ class OpenAIProviderResponsesApiTest extends TestCase
     #[DataProvider('reasoningRejectionErrorProvider')]
     public function testReasoningEffortRejectedErrorDetector(string $errorMessage, bool $expected): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'isReasoningEffortRejectedError');
+        $responses = $this->createResponses();
+        $method = new \ReflectionMethod($responses, 'isReasoningEffortRejectedError');
 
-        $this->assertSame($expected, $method->invoke($provider, new \Exception($errorMessage)));
+        $this->assertSame($expected, $method->invoke($responses, new \Exception($errorMessage)));
     }
 
     /**
@@ -673,14 +674,14 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testApplyReasoningRejectionCacheStripsReasoningWhenModelKnownToReject(): void
     {
-        $provider = $this->createProvider();
+        $responses = $this->createResponses();
 
-        $cacheProperty = new \ReflectionProperty($provider, 'reasoningRejectionCache');
-        $cacheProperty->setValue($provider, ['gpt-future' => true]);
+        $cacheProperty = new \ReflectionProperty($responses, 'reasoningRejectionCache');
+        $cacheProperty->setValue($responses, ['gpt-future' => true]);
 
-        $method = new \ReflectionMethod($provider, 'applyReasoningRejectionCache');
+        $method = new \ReflectionMethod($responses, 'applyReasoningRejectionCache');
 
-        $result = $method->invoke($provider, [
+        $result = $method->invoke($responses, [
             'model' => 'gpt-future',
             'reasoning' => ['effort' => 'minimal'],
             'input' => [],
@@ -691,10 +692,10 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testApplyReasoningRejectionCachePassesThroughForKnownGoodModel(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'applyReasoningRejectionCache');
+        $responses = $this->createResponses();
+        $method = new \ReflectionMethod($responses, 'applyReasoningRejectionCache');
 
-        $result = $method->invoke($provider, [
+        $result = $method->invoke($responses, [
             'model' => 'gpt-5.5',
             'reasoning' => ['effort' => 'none'],
             'input' => [],
@@ -711,12 +712,12 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testBuildResponsesRequestNoReasoningSignalSendsNoBlock(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hi']];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, []);
+        $result = $method->invoke($chat, $messages, 'gpt-5.5', true, []);
 
         $this->assertArrayNotHasKey('reasoning', $result);
     }
@@ -728,13 +729,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testBuildResponsesRequestExplicitEffortHigh(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Solve this carefully']];
         $options = ['reasoning' => true, 'reasoning_effort' => 'high'];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-5.5', true, $options);
 
         $this->assertSame('high', $result['reasoning']['effort']);
         $this->assertSame('auto', $result['reasoning']['summary']);
@@ -746,13 +747,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testBuildResponsesRequestArrayReasoningIsPassedThroughVerbatim(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hi']];
         $options = ['reasoning' => ['effort' => 'high', 'summary' => 'concise']];
 
-        $result = $method->invoke($provider, $messages, 'gpt-5.5', true, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-5.5', true, $options);
 
         $this->assertSame('high', $result['reasoning']['effort']);
         $this->assertSame('concise', $result['reasoning']['summary']);
@@ -765,14 +766,14 @@ class OpenAIProviderResponsesApiTest extends TestCase
      */
     public function testBuildResponsesRequestMergesStructuredOutputAsTextFormat(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Classify this']];
         $schema = new StructuredOutputSchema('sort_classification', ['type' => 'object']);
         $options = ['structured_output' => $schema];
 
-        $result = $method->invoke($provider, $messages, 'gpt-4o', false, $options);
+        $result = $method->invoke($chat, $messages, 'gpt-4o', false, $options);
 
         $this->assertSame('json_schema', $result['text']['format']['type']);
         $this->assertSame('sort_classification', $result['text']['format']['name']);
@@ -782,20 +783,19 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testBuildResponsesRequestWithoutStructuredOutputOmitsTextFormat(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->createChat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $messages = [['role' => 'user', 'content' => 'Hello']];
 
-        $result = $method->invoke($provider, $messages, 'gpt-4o', false, []);
+        $result = $method->invoke($chat, $messages, 'gpt-4o', false, []);
 
         $this->assertArrayNotHasKey('text', $result);
     }
 
     public function testReduceToLastUserMessageViaReflection(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'reduceToLastUserMessage');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'reduceToLastUserMessage');
 
         $input = [
             ['role' => 'user', 'content' => 'First question'],
@@ -803,7 +803,7 @@ class OpenAIProviderResponsesApiTest extends TestCase
             ['role' => 'user', 'content' => 'Follow up'],
         ];
 
-        $result = $method->invoke($provider, $input);
+        $result = $method->invoke(null, $input);
 
         $this->assertCount(1, $result);
         $this->assertSame('Follow up', $result[0]['content']);
@@ -811,14 +811,13 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testReduceToLastUserMessageFallsBackToFullInput(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'reduceToLastUserMessage');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'reduceToLastUserMessage');
 
         $input = [
             ['role' => 'assistant', 'content' => 'Only assistant messages'],
         ];
 
-        $result = $method->invoke($provider, $input);
+        $result = $method->invoke(null, $input);
 
         $this->assertCount(1, $result);
         $this->assertSame('Only assistant messages', $result[0]['content']);
@@ -826,15 +825,15 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testIsPreviousResponseErrorViaReflection(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'isPreviousResponseError');
+        $responses = $this->createResponses();
+        $method = new \ReflectionMethod($responses, 'isPreviousResponseError');
 
-        $this->assertTrue($method->invoke($provider, new \Exception('previous_response_id is invalid')));
-        $this->assertTrue($method->invoke($provider, new \Exception('invalid_response_id')));
-        $this->assertTrue($method->invoke($provider, new \Exception("Previous response with id 'resp_abc123' not found.")));
-        $this->assertTrue($method->invoke($provider, new \Exception('previous response expired')));
-        $this->assertFalse($method->invoke($provider, new \Exception('rate limit exceeded')));
-        $this->assertFalse($method->invoke($provider, new \Exception('model not found')));
+        $this->assertTrue($method->invoke($responses, new \Exception('previous_response_id is invalid')));
+        $this->assertTrue($method->invoke($responses, new \Exception('invalid_response_id')));
+        $this->assertTrue($method->invoke($responses, new \Exception("Previous response with id 'resp_abc123' not found.")));
+        $this->assertTrue($method->invoke($responses, new \Exception('previous response expired')));
+        $this->assertFalse($method->invoke($responses, new \Exception('rate limit exceeded')));
+        $this->assertFalse($method->invoke($responses, new \Exception('model not found')));
     }
 
     public function testProviderName(): void
@@ -941,6 +940,23 @@ class OpenAIProviderResponsesApiTest extends TestCase
             // DALL-E does NOT support the Responses API, so reference images still fall back to DALL-E
             'dall-e-3 with images' => ['dall-e-3',      ['/tmp/ref1.png'],   'dalle'],
         ];
+    }
+
+    private function api(): OpenAIApiClient
+    {
+        return new OpenAIApiClient($this->httpClient, new OpenAICurlTransport(), 'test-key');
+    }
+
+    private function createChat(bool $storeResponses = true): OpenAIChat
+    {
+        $api = $this->api();
+
+        return new OpenAIChat($api, new OpenAIResponses($api, $this->logger), $this->logger, new StructuredOutputTranslator(new StructuredOutputCapability()), $storeResponses);
+    }
+
+    private function createResponses(): OpenAIResponses
+    {
+        return new OpenAIResponses($this->api(), $this->logger);
     }
 
     private function createProvider(?string $apiKey = 'test-key', bool $storeResponses = true): OpenAIProvider
