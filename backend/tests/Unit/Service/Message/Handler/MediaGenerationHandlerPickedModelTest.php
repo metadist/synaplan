@@ -14,7 +14,6 @@ use App\Service\Billing\BillingService;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\ThumbnailService;
-use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobConfig;
@@ -26,8 +25,6 @@ use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\Handler\Media\MediaDownloader;
-use App\Service\Message\Handler\Media\MediaUploadStore;
-use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\MessageClassifier;
@@ -37,6 +34,7 @@ use App\Service\Message\Processing\TurnStatus;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
+use App\Tests\Support\MediaGenerationHandlerFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -82,32 +80,32 @@ final class MediaGenerationHandlerPickedModelTest extends TestCase
         $files = $this->createStub(GeneratedFileRegistrar::class);
         $files->method('register')->willReturn($file);
 
-        $this->handler = new MediaGenerationHandler(
-            $this->aiFacade,
-            $this->modelConfig,
-            $this->entityManager(),
-            new NullLogger(),
-            $prompts,
-            new MediaUploadStore(new UserUploadPathBuilder(), new MediaDownloader(), new NullLogger(), $this->uploadDir, 'https://app.example.test'),
-            $this->createStub(ThumbnailService::class),
-            $rateLimits,
-            new MediaErrorMessageBuilder(),
-            new PendingMemoryExtraction(
+        $this->handler = MediaGenerationHandlerFactory::build([
+            'ai' => $this->aiFacade,
+            'models' => $this->modelConfig,
+            'em' => $this->entityManager(),
+            'extractor' => $prompts,
+            'downloader' => new MediaDownloader(),
+            'thumbnails' => $this->createStub(ThumbnailService::class),
+            'limits' => $rateLimits,
+            'memory' => new PendingMemoryExtraction(
                 new MemoryExtractionDispatcher($this->createStub(MessageBusInterface::class), new NullLogger()),
                 $this->createStub(PerfPipelineFlag::class),
                 new NullLogger(),
             ),
-            $this->createStub(MediaCancellationStore::class),
-            $jobs,
-            $this->createStub(MediaJobService::class),
-            $this->createStub(MediaJobDispatcher::class),
-            $this->createStub(MediaJobMessageSync::class),
-            $files,
-            new PremiumFeatureGate(new BillingService('', '')),
-            $this->createStub(ConversationFileCatalog::class),
-            $this->uploadDir,
-            'https://app.example.test',
-        );
+            'cancellation' => $this->createStub(MediaCancellationStore::class),
+            'jobConfig' => $jobs,
+            'jobs' => $this->createStub(MediaJobService::class),
+            'jobDispatcher' => $this->createStub(MediaJobDispatcher::class),
+            'jobSync' => $this->createStub(MediaJobMessageSync::class),
+            'registrar' => $files,
+            'gate' => new PremiumFeatureGate(new BillingService('', '')),
+            'catalog' => $this->createStub(ConversationFileCatalog::class),
+            'uploadDir' => $this->uploadDir,
+            'publicBaseUrl' => 'https://app.example.test',
+            'folders' => null,
+            'chat' => null,
+        ]);
     }
 
     protected function tearDown(): void

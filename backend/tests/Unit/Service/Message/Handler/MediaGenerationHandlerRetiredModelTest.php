@@ -12,7 +12,6 @@ use App\Service\Billing\BillingService;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\ThumbnailService;
-use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobConfig;
@@ -22,13 +21,11 @@ use App\Service\Media\MediaJobService;
 use App\Service\Memory\MemoryExtractionDispatcher;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Handler\Media\MediaDownloader;
-use App\Service\Message\Handler\Media\MediaUploadStore;
-use App\Service\Message\Handler\MediaErrorMessageBuilder;
-use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\PerfPipelineFlag;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Tests\Support\MediaGenerationHandlerFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -126,32 +123,32 @@ final class MediaGenerationHandlerRetiredModelTest extends TestCase
         $mediaJobConfig = $this->createMock(MediaJobConfig::class);
         $mediaJobConfig->method('isAsyncJobsEnabled')->willReturn(false);
 
-        $handler = new MediaGenerationHandler(
-            $this->aiFacade,
-            $this->modelConfigService,
-            $this->em,
-            new NullLogger(),
-            $promptExtractor,
-            new MediaUploadStore(new UserUploadPathBuilder(), new MediaDownloader(), new NullLogger(), sys_get_temp_dir(), 'https://app.example.test'),
-            $this->createMock(ThumbnailService::class),
-            $rateLimitService,
-            new MediaErrorMessageBuilder(),
-            new PendingMemoryExtraction(
+        $handler = MediaGenerationHandlerFactory::build([
+            'ai' => $this->aiFacade,
+            'models' => $this->modelConfigService,
+            'em' => $this->em,
+            'extractor' => $promptExtractor,
+            'downloader' => new MediaDownloader(),
+            'thumbnails' => $this->createMock(ThumbnailService::class),
+            'limits' => $rateLimitService,
+            'memory' => new PendingMemoryExtraction(
                 new MemoryExtractionDispatcher($messageBus, new NullLogger()),
                 $this->createMock(PerfPipelineFlag::class),
                 new NullLogger(),
             ),
-            $this->createMock(MediaCancellationStore::class),
-            $mediaJobConfig,
-            $this->createMock(MediaJobService::class),
-            $this->createMock(MediaJobDispatcher::class),
-            $this->createMock(MediaJobMessageSync::class),
-            $this->createMock(GeneratedFileRegistrar::class),
-            new PremiumFeatureGate(new BillingService('', '')),
-            $this->createMock(ConversationFileCatalog::class),
-            sys_get_temp_dir(),
-            'https://app.example.test',
-        );
+            'cancellation' => $this->createMock(MediaCancellationStore::class),
+            'jobConfig' => $mediaJobConfig,
+            'jobs' => $this->createMock(MediaJobService::class),
+            'jobDispatcher' => $this->createMock(MediaJobDispatcher::class),
+            'jobSync' => $this->createMock(MediaJobMessageSync::class),
+            'registrar' => $this->createMock(GeneratedFileRegistrar::class),
+            'gate' => new PremiumFeatureGate(new BillingService('', '')),
+            'catalog' => $this->createMock(ConversationFileCatalog::class),
+            'uploadDir' => sys_get_temp_dir(),
+            'publicBaseUrl' => 'https://app.example.test',
+            'folders' => null,
+            'chat' => null,
+        ]);
 
         return $handler->handle(
             $this->messageStub('Lies mir bitte folgenden Text als Sprachnachricht vor: Guten Morgen zusammen.'),

@@ -12,7 +12,6 @@ use App\Service\Billing\BillingService;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\ThumbnailService;
-use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobConfig;
@@ -23,14 +22,13 @@ use App\Service\Memory\MemoryExtractionDispatcher;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\Media\MediaDownloader;
-use App\Service\Message\Handler\Media\MediaUploadStore;
-use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\PerfPipelineFlag;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Tests\Support\MediaGenerationHandlerFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -244,34 +242,32 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
         $mediaJobConfig = $this->createMock(MediaJobConfig::class);
         $mediaJobConfig->method('isAsyncJobsEnabled')->willReturn(false);
 
-        return new MediaGenerationHandler(
-            $this->aiFacade,
-            $this->modelConfigService,
-            $this->em,
-            new NullLogger(),
-            $this->promptExtractor,
-            new MediaUploadStore(new UserUploadPathBuilder(), new MediaDownloader(), new NullLogger(), sys_get_temp_dir(), 'https://app.example.test'),
-            $this->createMock(ThumbnailService::class),
-            $this->rateLimitService,
-            new MediaErrorMessageBuilder(),
-            new PendingMemoryExtraction(
+        return MediaGenerationHandlerFactory::build([
+            'ai' => $this->aiFacade,
+            'models' => $this->modelConfigService,
+            'em' => $this->em,
+            'extractor' => $this->promptExtractor,
+            'downloader' => new MediaDownloader(),
+            'thumbnails' => $this->createMock(ThumbnailService::class),
+            'limits' => $this->rateLimitService,
+            'memory' => new PendingMemoryExtraction(
                 new MemoryExtractionDispatcher($this->messageBus, new NullLogger()),
                 $this->perfPipelineFlag,
                 new NullLogger(),
             ),
-            $this->createMock(MediaCancellationStore::class),
-            $mediaJobConfig,
-            $this->createMock(MediaJobService::class),
-            $this->createMock(MediaJobDispatcher::class),
-            $this->createMock(MediaJobMessageSync::class),
-            $this->generatedFileRegistrar,
-            new PremiumFeatureGate(new BillingService('', '')),
-            $this->createMock(ConversationFileCatalog::class),
-            sys_get_temp_dir(),
-            'https://app.example.test',
-            null,
-            $chatHandler,
-        );
+            'cancellation' => $this->createMock(MediaCancellationStore::class),
+            'jobConfig' => $mediaJobConfig,
+            'jobs' => $this->createMock(MediaJobService::class),
+            'jobDispatcher' => $this->createMock(MediaJobDispatcher::class),
+            'jobSync' => $this->createMock(MediaJobMessageSync::class),
+            'registrar' => $this->generatedFileRegistrar,
+            'gate' => new PremiumFeatureGate(new BillingService('', '')),
+            'catalog' => $this->createMock(ConversationFileCatalog::class),
+            'uploadDir' => sys_get_temp_dir(),
+            'publicBaseUrl' => 'https://app.example.test',
+            'folders' => null,
+            'chat' => $chatHandler,
+        ]);
     }
 
     private function bootstrapAudioModel(): void
