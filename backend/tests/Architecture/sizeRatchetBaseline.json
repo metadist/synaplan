@@ -54,7 +54,7 @@
         "src/Service/Iam/ShareService.php": 853,
         "src/Service/Media/MediaGenerationService.php": 846,
         "src/Service/Memory/UserMemoryService.php": 1022,
-        "src/Service/Message/MessageClassifier.php": 1962,
+        "src/Service/Message/MessageClassifier.php": 1737,
         "src/Service/Message/MessageSorter.php": 921,
         "src/Service/ModelConfigService.php": 1327,
         "src/Service/Multitask/Execution/DagExecutor.php": 805,

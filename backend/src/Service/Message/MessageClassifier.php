@@ -18,11 +18,12 @@ use App\Service\Context\AttachmentDigest;
 use App\Service\Context\TokenEstimator;
 use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentToolsConfig;
-use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
 use App\Service\File\Office\DocumentThumbnailGenerator;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\TopicIntentRule;
+use App\Service\Message\Classification\ConfidentLanguage;
+use App\Service\Message\Classification\ThreadArtifacts;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
 use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\Message\Routing\NativeToolRoutingConfig;
@@ -193,7 +194,7 @@ final readonly class MessageClassifier
             // "wer bist du?" got an English answer: the directive built
             // downstream from this value told the chat model to reply in
             // English.
-            $confidentLanguage = $this->resolveConfidentLanguage($message, $text);
+            $confidentLanguage = ConfidentLanguage::of($message, $text);
 
             if (null !== $confidentLanguage) {
                 $this->logger->info('MessageClassifier: Fast-path classification (skipped AI sorter)', [
@@ -398,7 +399,7 @@ final readonly class MessageClassifier
             $embeddingMatch = $this->embeddingRouter->findClosestAnchor($text, $userId);
 
             if (null !== $embeddingMatch && $embeddingMatch->score >= $this->embeddingRouterConfig->getConfidenceThreshold()) {
-                $confidentLanguage = $this->resolveConfidentLanguage($message, $text);
+                $confidentLanguage = ConfidentLanguage::of($message, $text);
 
                 if (null !== $confidentLanguage) {
                     $this->logger->info('MessageClassifier: Embedding-router match (skipped AI sorter)', [
@@ -475,7 +476,7 @@ final readonly class MessageClassifier
             && !$this->isSelfAwareQuestion($text, $userId)
             && $this->accountChatModelCanRouteNatively($userId)
         ) {
-            $deferredLanguage = $this->resolveConfidentLanguage($message, $text) ?? 'en';
+            $deferredLanguage = ConfidentLanguage::of($message, $text) ?? 'en';
 
             $this->logger->info('MessageClassifier: Deferring routing to the answering call (native tool calling)', [
                 'message_id' => $messageId,
@@ -1534,12 +1535,12 @@ final readonly class MessageClassifier
         //     message references a document or its structure. This covers
         //     multi-message editing where normal chat is interleaved between
         //     edits ("...kannst du in der Datei den Titel ändern").
-        if ($this->lastAssistantTurnIs($conversationHistory, self::isGeneratedFileMessage(...))) {
+        if (ThreadArtifacts::lastAssistantTurnIs($conversationHistory, ThreadArtifacts::isGeneratedFileMessage(...))) {
             return false;
         }
 
-        if ($this->anyAssistantTurnIs($conversationHistory, self::isGeneratedFileMessage(...))
-            && $this->mentionsDocumentReference($trimmed)) {
+        if (ThreadArtifacts::anyAssistantTurnIs($conversationHistory, ThreadArtifacts::isGeneratedFileMessage(...))
+            && ThreadArtifacts::mentionsDocumentReference($trimmed)) {
             return false;
         }
 
@@ -1549,12 +1550,12 @@ final readonly class MessageClassifier
         // image generation missed every trigger below and was shortcut to
         // `general`, where the chat model can only talk about the picture
         // instead of editing it.
-        if ($this->lastAssistantTurnIs($conversationHistory, self::isGeneratedMediaMessage(...))) {
+        if (ThreadArtifacts::lastAssistantTurnIs($conversationHistory, ThreadArtifacts::isGeneratedMediaMessage(...))) {
             return false;
         }
 
-        if ($this->anyAssistantTurnIs($conversationHistory, self::isGeneratedMediaMessage(...))
-            && $this->mentionsMediaReference($trimmed)) {
+        if (ThreadArtifacts::anyAssistantTurnIs($conversationHistory, ThreadArtifacts::isGeneratedMediaMessage(...))
+            && ThreadArtifacts::mentionsMediaReference($trimmed)) {
             return false;
         }
 
@@ -1690,98 +1691,6 @@ final readonly class MessageClassifier
     }
 
     /**
-     * Whether the most recent assistant turn passes $check. Only the latest
-     * assistant message counts, so a deferral is limited to the turn directly
-     * following the generation.
-     *
-     * @param array<int, Message>     $conversationHistory oldest-first thread
-     * @param callable(Message): bool $check
-     */
-    private function lastAssistantTurnIs(array $conversationHistory, callable $check): bool
-    {
-        for ($i = count($conversationHistory) - 1; $i >= 0; --$i) {
-            if ('OUT' === $conversationHistory[$i]->getDirection()) {
-                return $check($conversationHistory[$i]);
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param array<int, Message>     $conversationHistory
-     * @param callable(Message): bool $check
-     */
-    private function anyAssistantTurnIs(array $conversationHistory, callable $check): bool
-    {
-        foreach ($conversationHistory as $msg) {
-            if ('OUT' === $msg->getDirection() && $check($msg)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /** An office document: its stored content is the "__FILE_GENERATED__:filename" marker. */
-    private static function isGeneratedFileMessage(Message $message): bool
-    {
-        return str_starts_with((string) $message->getText(), '__FILE_GENERATED__:');
-    }
-
-    /**
-     * A picture or a video. Generated media rides the message's own file path
-     * (BFILEPATH/BFILETYPE), not the `__FILE_GENERATED__:` marker.
-     */
-    private static function isGeneratedMediaMessage(Message $message): bool
-    {
-        $path = $message->getFilePath();
-        if ('' === $path) {
-            return false;
-        }
-
-        $category = ConversationFile::categoryForPath($path);
-
-        return ConversationFile::CATEGORY_IMAGE === $category
-            || ConversationFile::CATEGORY_VIDEO === $category;
-    }
-
-    /**
-     * Whether the message refers to a picture or one of its visual properties.
-     *
-     * The media sibling of {@see mentionsDocumentReference()}, used together
-     * with {@see isGeneratedMediaMessage()} earlier in the thread to catch edits that span several
-     * turns ("und jetzt die Farbe ändern"). Kept deliberately visual so normal
-     * chat rarely matches; a false positive costs one extra AI-sorter call.
-     */
-    private function mentionsMediaReference(string $text): bool
-    {
-        return 1 === preg_match(
-            '/\b(bild|bildes|bilder|foto|fotos|grafik|logo|image|picture|photo|imagen|imagem|immagine|resim|görsel|'
-            .'farbe|farben|color|colour|colore|renk|hintergrund|background|fondo|stil|style|estilo|'
-            .'auflösung|aufloesung|resolution|zuschneiden|crop|retusch\w*|retouch\w*)\b/iu',
-            $text
-        );
-    }
-
-    /**
-     * Whether the message refers to a document or one of its structural parts.
-     *
-     * Used together with {@see isGeneratedFileMessage()} earlier in the thread to detect document
-     * edits that span multiple turns. The noun list is intentionally
-     * document-specific to keep false positives in normal chat low; the worst
-     * case of a false positive is one extra AI-sorter call.
-     */
-    private function mentionsDocumentReference(string $text): bool
-    {
-        return 1 === preg_match(
-            '/\b(datei|dokument|file|document|doc|tabelle|sheet|spreadsheet|folie|slide|'
-            .'titel|title|überschrift|ueberschrift|heading|spalte|column|zeile|row|zelle|cell)\b/iu',
-            $text
-        );
-    }
-
-    /**
      * Is this a meta-question about the product that must reach the AI sorter?
      *
      * Self-awareness works by the sorter picking the `synaplan` topic, whose
@@ -1819,140 +1728,6 @@ final readonly class MessageClassifier
         $provider = $this->modelConfigService->getDefaultProvider($userId, 'chat');
 
         return '' !== $provider && $this->toolCallingCapability->supports($provider, null, false);
-    }
-
-    /**
-     * Resolve a confident 2-letter language code for a deterministic
-     * short-circuit (fast-path heuristic or embedding-router match) that
-     * skips the AI sorter entirely.
-     *
-     * Tries, in order:
-     *   1. {@see detectLanguageConfident()} — a local text heuristic.
-     *   2. A language already pinned on the message (frontend UI locale or a
-     *      previously detected turn; 'NN' is the entity default = unknown).
-     *
-     * Returns null when neither is available. Callers MUST treat null as "do
-     * not shortcut, fall through to the AI sorter" rather than defaulting to
-     * 'en' — see {@see detectLanguageConfident()}'s docblock for the
-     * incident this guards against (a German "wer bist du?" answered in
-     * English because an undetectable language silently defaulted).
-     */
-    private function resolveConfidentLanguage(Message $message, string $text): ?string
-    {
-        $confidentLanguage = $this->detectLanguageConfident($text);
-
-        if (null === $confidentLanguage) {
-            $existingLanguage = strtolower(trim($message->getLanguage()));
-            if ('nn' !== $existingLanguage && 1 === preg_match('/^[a-z]{2}$/', $existingLanguage)) {
-                $confidentLanguage = $existingLanguage;
-            }
-        }
-
-        return $confidentLanguage;
-    }
-
-    /**
-     * Cheap, confidence-aware language heuristic for the fast-path.
-     *
-     * The full AI sorter detects language too — we lose that signal when we
-     * skip it, so reproduce a "good enough" guess locally from distinctive
-     * stopwords / question words / greetings.
-     *
-     * Returns a 2-character ISO code when a distinctive anchor matched, or
-     * `null` when there is no signal — the fast-path caller treats `null` as
-     * "defer to the AI sorter" rather than guessing the wrong language.
-     *
-     * IMPORTANT: never returns `'auto'`. The `'auto'` sentinel is used
-     * elsewhere in the pipeline (fixed-prompt widget mode) for the
-     * system-prompt directive only and is NOT persistable to
-     * `BMESSAGES.BLANG` (varchar(2)); leaking it here would trigger
-     * SQLSTATE[22001] "Data too long for column 'BLANG'" on the outgoing
-     * message insert. Stick to ISO codes (or null).
-     */
-    private function detectLanguageConfident(string $text): ?string
-    {
-        // Normalize first: collapse every run of non-letters to a single
-        // space, then pad with spaces. Without this, punctuation-hugging
-        // tokens defeat the space-delimited anchors below — e.g.
-        // "wer bist du?" lowercases to " wer bist du? " and the " du " /
-        // "du?" mismatch meant the most common German phrase scored 0 and
-        // fell back to English. Letters (incl. umlauts) survive; everything
-        // else becomes a separator.
-        $normalized = preg_replace('/[^\p{L}]+/u', ' ', mb_strtolower($text)) ?? '';
-        $lower = ' '.trim($normalized).' ';
-
-        $hits = [
-            'de' => 0, 'en' => 0, 'fr' => 0, 'es' => 0, 'it' => 0,
-        ];
-
-        // German: stopwords, question words, pronouns, common verbs and
-        // greetings. These short function words are what carry the signal in
-        // a one-line chat ("wer bist du?", "wie geht es dir?", "danke").
-        foreach ([
-            ' ich ', ' der ', ' die ', ' das ', ' und ', ' nicht ', ' ist ', ' für ',
-            ' können ', ' kannst ', ' möchte ', ' über ', ' wäre ', ' mit ', ' auch ',
-            ' wer ', ' wie ', ' was ', ' warum ', ' wo ', ' wann ', ' welche ', ' welcher ',
-            ' du ', ' bist ', ' bin ', ' sind ', ' hast ', ' habe ', ' mir ', ' mich ',
-            ' dich ', ' dein ', ' deine ', ' machst ', ' heißt ', ' gibt ', ' soll ',
-            ' mein ', ' eine ', ' einen ', ' hallo ', ' danke ', ' bitte ', ' guten ',
-        ] as $w) {
-            if (str_contains($lower, $w)) {
-                $hits['de'] += 2;
-            }
-        }
-        // English: stopwords, question words, pronouns, common verbs and
-        // greetings.
-        foreach ([
-            ' the ', ' and ', ' you ', ' please ', ' what ', ' write ', ' dont ', ' im ', ' ill ',
-            ' who ', ' how ', ' why ', ' where ', ' when ', ' which ',
-            ' are ', ' is ', ' do ', ' does ', ' can ', ' your ', ' me ', ' my ', ' a ', ' an ',
-            ' hello ', ' hi ', ' hey ', ' thanks ', ' thank ',
-        ] as $w) {
-            if (str_contains($lower, $w)) {
-                $hits['en'] += 2;
-            }
-        }
-        // French.
-        foreach ([
-            ' le ', ' la ', ' les ', ' un ', ' une ', ' est ', ' pour ', ' avec ', ' écrire ',
-            ' qui ', ' quoi ', ' comment ', ' pourquoi ', ' es ', ' tu ', ' merci ', ' bonjour ',
-        ] as $w) {
-            if (str_contains($lower, $w)) {
-                $hits['fr'] += 2;
-            }
-        }
-        // Spanish.
-        foreach ([
-            ' el ', ' la ', ' los ', ' las ', ' por ', ' para ', ' escribir ',
-            ' quién ', ' qué ', ' cómo ', ' por qué ', ' eres ', ' gracias ', ' hola ',
-        ] as $w) {
-            if (str_contains($lower, $w)) {
-                $hits['es'] += 2;
-            }
-        }
-        // Italian.
-        foreach ([
-            ' il ', ' lo ', ' la ', ' gli ', ' una ', ' per ', ' scrivere ',
-            ' chi ', ' cosa ', ' come ', ' perché ', ' sei ', ' grazie ', ' ciao ',
-        ] as $w) {
-            if (str_contains($lower, $w)) {
-                $hits['it'] += 2;
-            }
-        }
-
-        arsort($hits);
-        $best = array_key_first($hits);
-        $bestScore = $hits[$best];
-
-        // A single distinctive anchor (score 2) is already a strong signal
-        // for a short chat one-liner, so we trust it; below that we have no
-        // signal and return null so the caller can decide (persist 'en', or
-        // defer to the AI sorter). The 2-char constraint matters elsewhere:
-        // BMESSAGES.BLANG is varchar(2), so even though the 'auto' sentinel
-        // works for in-memory routing, it'd break any downstream code that
-        // persists $classification['language'] to BLANG (email webhook reply,
-        // queue-mode chat persistence, ...).
-        return $bestScore >= 2 ? $best : null;
     }
 
     private function officePdfGenerationEnabled(): bool
