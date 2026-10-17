@@ -8,7 +8,6 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Service\Message\MessageVersionService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,7 +25,6 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 final class MessageVersionController extends AbstractController
 {
     public function __construct(
-        private EntityManagerInterface $em,
         private MessageRepository $messages,
         private MessageVersionService $versions,
     ) {
@@ -99,7 +97,7 @@ final class MessageVersionController extends AbstractController
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
-        $this->em->flush();
+        $this->messages->flush();
 
         return $this->json(['success' => true]);
     }
@@ -156,7 +154,7 @@ final class MessageVersionController extends AbstractController
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-        $this->em->flush();
+        $this->messages->flush();
 
         return $this->json(['success' => true]);
     }

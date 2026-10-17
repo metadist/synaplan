@@ -7,7 +7,7 @@
     },
     "counts": {
         "methodLines": 112,
-        "entityManager": 25,
+        "entityManager": 24,
         "aiFacade": 8
     },
     "methodLines": {
@@ -136,7 +136,6 @@
         "src/Controller/GuestChatController.php",
         "src/Controller/InboundEmailHandlerController.php",
         "src/Controller/MessageController.php",
-        "src/Controller/MessageVersionController.php",
         "src/Controller/MessagesGatewayController.php",
         "src/Controller/PhoneVerificationController.php",
         "src/Controller/ProfileController.php",
