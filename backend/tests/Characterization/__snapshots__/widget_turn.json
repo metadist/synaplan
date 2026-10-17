@@ -1,0 +1,2579 @@
+{
+    "allowed_domain": {
+        "discord": [],
+        "flushes": 6,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_allowed_domain",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_allowed_domain",
+                    "widget_model_id": 7
+                },
+                "text": "Hello, I need help"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 2>",
+                    "sender": "ai",
+                    "text": "Hello there.",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "Hello",
+                        "status": "data"
+                    },
+                    {
+                        "chunk": " there.",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Hello, I need help",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "Hello there.",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 1,
+                "mode": "ai",
+                "preview": "Hello there."
+            }
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "Hello, I need help",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hello there.",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "answer": {
+        "discord": [],
+        "flushes": 7,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_answer",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_answer",
+                    "widget_model_id": 7
+                },
+                "text": "Hello, I need help"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 2>",
+                    "sender": "ai",
+                    "text": "Hello there.",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "Hello",
+                        "status": "data"
+                    },
+                    {
+                        "chunk": " there.",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Hello, I need help",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "Hello there.",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": "DE",
+                "message_count": 1,
+                "mode": "ai",
+                "preview": "Hello there."
+            }
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "Hello, I need help",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hello there.",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "answer_as_json": {
+        "discord": [],
+        "flushes": 6,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_answer_as_json",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_answer_as_json",
+                    "widget_model_id": 7
+                },
+                "text": "Hello, I need help"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 2>",
+                    "sender": "ai",
+                    "text": "From JSON",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "From JSON",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Hello, I need help",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "From JSON",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 1,
+                "mode": "ai",
+                "preview": "From JSON"
+            }
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "Hello, I need help",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "From JSON",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "answer_with_reasoning_cut_at_length": {
+        "discord": [],
+        "flushes": 6,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_answer_with_reasoning_cut_at_length",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_answer_with_reasoning_cut_at_length",
+                    "widget_model_id": 7
+                },
+                "text": "Hello, I need help"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 2>",
+                    "sender": "ai",
+                    "text": "Short answer",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "<think>Weighing it.</think>",
+                        "status": "data"
+                    },
+                    {
+                        "chunk": "Short answer",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete",
+                        "truncated": true
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Hello, I need help",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "<think>Weighing it.</think>Short answer",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 1,
+                "mode": "ai",
+                "preview": "Short answer"
+            }
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "Hello, I need help",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "<think>Weighing it.</think>Short answer",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "attached_file": {
+        "discord": [],
+        "flushes": 6,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 1,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_attached_file",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_attached_file",
+                    "widget_model_id": 7
+                },
+                "text": "Hello, I need help"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 2>",
+                    "sender": "ai",
+                    "text": "Hello there.",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "Hello",
+                        "status": "data"
+                    },
+                    {
+                        "chunk": " there.",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [
+                                "<files 1>"
+                            ],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 1,
+                    "files": 1,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Hello, I need help",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "Hello there.",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 1,
+                "mode": "ai",
+                "preview": "Hello there."
+            }
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [
+                        "<files 1>"
+                    ],
+                    "input_text": "Hello, I need help",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hello there.",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "auto_handoff": {
+        "discord": [],
+        "flushes": 7,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_auto_handoff",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_auto_handoff",
+                    "widget_model_id": 7
+                },
+                "text": "Please let me talk to a human"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Please let me talk to a human",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 2>",
+                    "sender": "ai",
+                    "text": "Hello there.",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "Hello",
+                        "status": "data"
+                    },
+                    {
+                        "chunk": " there.",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [
+            {
+                "last_message": "Please let me talk to a human",
+                "reason": "matched phrase: \"talk to a human\"",
+                "session_mode": "waiting",
+                "takeover": true
+            }
+        ],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Please let me talk to a human",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "Hello there.",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 1,
+                "mode": "waiting",
+                "preview": "Hello there."
+            }
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "Please let me talk to a human",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hello there.",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "first_message_with_welcome": {
+        "discord": [],
+        "flushes": 8,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_first_message_with_welcome",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_first_message_with_welcome",
+                    "widget_model_id": 7
+                },
+                "text": "Hello, I need help"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 2>",
+                    "sender": "ai",
+                    "text": "Hello there.",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "Hello",
+                        "status": "data"
+                    },
+                    {
+                        "chunk": " there.",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "NN",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Welcome! How can I help?",
+                    "topic": "UNKNOWN",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Hello, I need help",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "Hello there.",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 2,
+                "mode": "ai",
+                "preview": "Hello there."
+            }
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "Hello, I need help",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hello there.",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "foreign_domain": {
+        "discord": [],
+        "flushes": 0,
+        "generated_files": [],
+        "processor": [],
+        "realtime": [],
+        "requests": [
+            {
+                "json": {
+                    "error": "Domain not allowed",
+                    "reason": "domain_not_whitelisted"
+                },
+                "status": 403
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [],
+            "session": null
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "generated_image": {
+        "discord": [],
+        "flushes": 7,
+        "generated_files": [
+            {
+                "for_the_answer": true,
+                "path": "generated/cat.png",
+                "type": "png"
+            }
+        ],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_generated_image",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_generated_image",
+                    "widget_model_id": 7
+                },
+                "text": "Hello, I need help"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 2>",
+                    "sender": "ai",
+                    "text": "Here is your image.",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "Here is your image.",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "file": {
+                                    "path": "generated/cat.png",
+                                    "type": "png"
+                                },
+                                "local_path": "generated/cat.png",
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Hello, I need help",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 1,
+                    "files": 1,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "Here is your image.",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 1,
+                "mode": "ai",
+                "preview": "Here is your image."
+            }
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "Hello, I need help",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Here is your image.",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "human_takeover": {
+        "discord": [],
+        "flushes": 4,
+        "generated_files": [],
+        "processor": [],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "operators",
+                "payload": {
+                    "kind": "new_message",
+                    "preview": "Hello, I need help",
+                    "sessionId": "sess_char_human_takeover",
+                    "timestamp": "<time>"
+                }
+            }
+        ],
+        "requests": [
+            {
+                "json": {
+                    "chatId": "<chatId 1>",
+                    "mode": "waiting",
+                    "success": true,
+                    "text": ""
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "NN",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Hello, I need help",
+                    "topic": "UNKNOWN",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 1,
+                "mode": "waiting",
+                "preview": "Hello, I need help"
+            }
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "inactive_widget": {
+        "discord": [],
+        "flushes": 0,
+        "generated_files": [],
+        "processor": [],
+        "realtime": [],
+        "requests": [
+            {
+                "json": {
+                    "error": "Widget is not active",
+                    "reason": "owner_limits_exceeded"
+                },
+                "status": 503
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [],
+            "session": null
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "internal_owner_session": {
+        "discord": [],
+        "flushes": 12,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_internal_owner_session",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_internal_owner_session",
+                    "widget_model_id": 7
+                },
+                "text": "First question"
+            },
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_internal_owner_session",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_internal_owner_session",
+                    "widget_model_id": 7
+                },
+                "text": "Second question"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "First question",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 3>",
+                    "sender": "ai",
+                    "text": "Hello there.",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 2>",
+                    "sender": "user",
+                    "text": "Second question",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 4>",
+                    "sender": "ai",
+                    "text": "Hello there.",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "Hello",
+                        "status": "data"
+                    },
+                    {
+                        "chunk": " there.",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            },
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 2>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "Hello",
+                        "status": "data"
+                    },
+                    {
+                        "chunk": " there.",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 2>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "First question",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "Hello there.",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "Second question",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "Hello there.",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 2,
+                "mode": "internal",
+                "preview": "Hello there."
+            }
+        },
+        "summary_refreshes": 2,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "First question",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hello there.",
+                    "usage": []
+                }
+            },
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "Second question",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hello there.",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "invalid_json": {
+        "discord": [],
+        "flushes": 0,
+        "generated_files": [],
+        "processor": [],
+        "realtime": [],
+        "requests": [
+            {
+                "json": {
+                    "error": "Invalid JSON in request body"
+                },
+                "status": 400
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [],
+            "session": null
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "missing_text": {
+        "discord": [],
+        "flushes": 0,
+        "generated_files": [],
+        "processor": [],
+        "realtime": [],
+        "requests": [
+            {
+                "json": {
+                    "error": "Missing required fields: sessionId, text"
+                },
+                "status": 400
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [],
+            "session": null
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "owner_limit": {
+        "discord": [],
+        "flushes": 0,
+        "generated_files": [],
+        "processor": [],
+        "realtime": [],
+        "requests": [
+            {
+                "json": {
+                    "error": "Widget is not active",
+                    "reason": "owner_limits_exceeded"
+                },
+                "status": 503
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [],
+            "session": null
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "processor_error": {
+        "discord": [],
+        "flushes": 5,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_processor_error",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_processor_error",
+                    "widget_model_id": 7
+                },
+                "text": "Hello, I need help"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "canRetryModel": true,
+                        "error": "Bei der Beantwortung dieser Anfrage ist etwas schiefgelaufen. Bitte versuche es erneut.\n\nDu kannst es mit einem anderen Modell erneut versuchen, das zu deiner Anfrage passt.",
+                        "errorReason": "unknown",
+                        "status": "error"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "generating",
+                        "error"
+                    ],
+                    "status": "error"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "NN",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "failed",
+                    "text": "Hello, I need help",
+                    "topic": "UNKNOWN",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 1,
+                "mode": "ai",
+                "preview": "Hello, I need help"
+            }
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "processor_exception": {
+        "discord": [],
+        "flushes": 5,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_processor_exception",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_processor_exception",
+                    "widget_model_id": 7
+                },
+                "text": "Hello, I need help"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "Hello, I need help",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "chunk": "partial",
+                        "status": "data"
+                    },
+                    {
+                        "error": "Failed to process message",
+                        "status": "error"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "data",
+                        "error"
+                    ],
+                    "status": "error"
+                },
+                "status": 200
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "NN",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "failed",
+                    "text": "Hello, I need help",
+                    "topic": "UNKNOWN",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 0,
+                "mode": "ai",
+                "preview": "Hello, I need help"
+            }
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "session_limit": {
+        "discord": [],
+        "flushes": 6,
+        "generated_files": [],
+        "processor": [
+            {
+                "detached_from_the_client": true,
+                "incoming": {
+                    "files": 0,
+                    "messageType": "WDGT",
+                    "status": "processing"
+                },
+                "options": {
+                    "api_context": "",
+                    "channel": "WIDGET",
+                    "disable_memories": true,
+                    "fixed_task_prompt": "tools:widget-default",
+                    "is_widget_mode": true,
+                    "rag_group_key": "WIDGET:wdg_char_session_limit",
+                    "rag_limit": 8,
+                    "rag_min_score": 0.4,
+                    "skipSorting": true,
+                    "widget_id": "wdg_char_session_limit",
+                    "widget_model_id": 7
+                },
+                "text": "First question"
+            }
+        ],
+        "realtime": [
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "IN",
+                    "messageId": "<messageId 1>",
+                    "sender": "user",
+                    "text": "First question",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            },
+            {
+                "channel": "session",
+                "payload": {
+                    "direction": "OUT",
+                    "messageId": "<messageId 2>",
+                    "sender": "ai",
+                    "text": "Hello there.",
+                    "timestamp": "<time>"
+                },
+                "type": "message"
+            }
+        ],
+        "requests": [
+            {
+                "frames": [
+                    {
+                        "runId": "<runId 1>",
+                        "status": "run_started"
+                    },
+                    {
+                        "message": "Step started",
+                        "metadata": {
+                            "stage": "started"
+                        },
+                        "status": "started"
+                    },
+                    {
+                        "message": "Step classified",
+                        "metadata": {
+                            "stage": "classified"
+                        },
+                        "status": "classified"
+                    },
+                    {
+                        "message": "Step generating",
+                        "metadata": {
+                            "stage": "generating"
+                        },
+                        "status": "generating"
+                    },
+                    {
+                        "chunk": "Hello",
+                        "status": "data"
+                    },
+                    {
+                        "chunk": " there.",
+                        "status": "data"
+                    },
+                    {
+                        "chatId": "<chatId 1>",
+                        "messageId": "<messageId 1>",
+                        "metadata": {
+                            "classification": {
+                                "language": "auto",
+                                "source": "widget",
+                                "topic": "tools:widget-default"
+                            },
+                            "files": [],
+                            "preprocessed": null,
+                            "response": {
+                                "model": "test-model",
+                                "model_id": 12,
+                                "provider": "test",
+                                "rag_sources": [
+                                    {
+                                        "chunkId": "c1",
+                                        "fileName": "faq.md",
+                                        "n": 1,
+                                        "score": 0.8
+                                    }
+                                ],
+                                "tokens": {
+                                    "completion": 4,
+                                    "prompt": 3
+                                }
+                            },
+                            "search_results": null
+                        },
+                        "ragSources": [
+                            {
+                                "chunkId": "c1",
+                                "fileName": "faq.md",
+                                "n": 1,
+                                "score": 0.8
+                            }
+                        ],
+                        "status": "complete"
+                    }
+                ],
+                "run": {
+                    "replays": [
+                        "run_started",
+                        "started",
+                        "classified",
+                        "generating",
+                        "data",
+                        "complete"
+                    ],
+                    "status": "complete"
+                },
+                "status": 200
+            },
+            {
+                "json": {
+                    "error": "Rate limit exceeded",
+                    "reason": "total_limit_reached",
+                    "remaining": 0,
+                    "retryAfter": null
+                },
+                "status": 429
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "widget",
+                    "rag_sources": null,
+                    "status": "complete",
+                    "text": "First question",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                },
+                {
+                    "direction": "OUT",
+                    "file": 0,
+                    "files": 0,
+                    "language": "en",
+                    "provider": "test",
+                    "rag_sources": "[{\"n\":1,\"chunkId\":\"c1\",\"fileName\":\"faq.md\",\"score\":0.8}]",
+                    "status": "complete",
+                    "text": "Hello there.",
+                    "topic": "tools:widget-default",
+                    "type": "WDGT"
+                }
+            ],
+            "session": {
+                "chat": true,
+                "country": null,
+                "message_count": 1,
+                "mode": "ai",
+                "preview": "Hello there."
+            }
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "channel": "WIDGET",
+                    "files": [],
+                    "input_text": "First question",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Hello there.",
+                    "usage": []
+                }
+            }
+        ]
+    },
+    "unknown_widget": {
+        "discord": [],
+        "flushes": 0,
+        "generated_files": [],
+        "processor": [],
+        "realtime": [],
+        "requests": [
+            {
+                "json": {
+                    "error": "Widget not found"
+                },
+                "status": 404
+            }
+        ],
+        "slack": [],
+        "stored": {
+            "messages": [],
+            "session": null
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    }
+}
