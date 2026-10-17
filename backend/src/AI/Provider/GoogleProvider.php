@@ -14,6 +14,7 @@ use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\Google\GoogleApiClient;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
@@ -23,6 +24,7 @@ use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Google AI Provider.
@@ -35,15 +37,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
 {
-    private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-
     /**
      * Smallest non-zero thinking budget for a chosen "low" level.
      * Zero disables thinking on Flash, so low has to stay above it and
      * below the medium budget (1024).
      */
     private const LOW_THINKING_BUDGET = 512;
-    private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
 
     /**
      * Last-resort default resolution used when neither the caller nor the
@@ -123,6 +122,8 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     private const TRANSCRIBE_AUDIO_TOKENS_PER_SECOND = 25;
 
+    private readonly GoogleApiClient $api;
+
     /**
      * $apiKey is an explicit override (tests, custom wiring) that wins over
      * the ProviderKeyStore. Production wiring passes only the store, so keys
@@ -132,31 +133,16 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     public function __construct(
         private LoggerInterface $logger,
-        private HttpClientInterface $httpClient,
-        private ?string $apiKey = null,
-        private ?string $projectId = null,
-        private string $region = 'us-central1',
+        HttpClientInterface $httpClient,
+        ?string $apiKey = null,
+        ?string $projectId = null,
+        string $region = 'us-central1',
         private string $uploadDir = '/var/www/backend/var/uploads',
-        private ?string $vertexAccessToken = null,
-        private ?ProviderKeyStore $keyStore = null,
+        ?string $vertexAccessToken = null,
+        ?ProviderKeyStore $keyStore = null,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
-        // Ensure projectId is null if empty string
-        if (empty($this->projectId)) {
-            $this->projectId = null;
-        }
-        if (empty($this->vertexAccessToken)) {
-            $this->vertexAccessToken = null;
-        }
-    }
-
-    private function resolveApiKey(): ?string
-    {
-        if (null !== $this->apiKey && '' !== $this->apiKey) {
-            return $this->apiKey;
-        }
-
-        return $this->keyStore?->getKey($this->getName());
+        $this->api = new GoogleApiClient($httpClient, $logger, $apiKey, $keyStore, $projectId, $region, $vertexAccessToken);
     }
 
     public function getName(): string
@@ -195,7 +181,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function getStatus(): array
     {
-        if (null === $this->resolveApiKey()) {
+        if (null === $this->api->key()) {
             return [
                 'healthy' => false,
                 'error' => 'API key not configured',
@@ -212,7 +198,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function isAvailable(): bool
     {
-        return null !== $this->resolveApiKey();
+        return null !== $this->api->key();
     }
 
     public function getRequiredEnvVars(): array
@@ -234,16 +220,13 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             throw new ProviderException('Model must be specified in options', 'google');
         }
 
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
         try {
             $model = $options['model'];
             $contents = $this->convertMessagesToGeminiFormat($messages);
 
-            $url = self::API_BASE."/models/{$model}:generateContent";
+            $url = $this->api->modelUrl($model, 'generateContent');
 
             $payload = [
                 'contents' => $contents,
@@ -263,18 +246,11 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'message_count' => count($messages),
             ]);
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $key,
-                ],
-                'json' => $payload,
-                'timeout' => 60,
-            ]);
+            $response = $this->api->postJson($url, $payload, $key, 60);
 
             $data = $response->toArray();
 
-            $this->checkGeminiFinishReason($data);
+            $this->api->checkFinishReason($data);
 
             $usageMetadata = $data['usageMetadata'] ?? [];
             $promptTokens = $usageMetadata['promptTokenCount'] ?? 0;
@@ -324,16 +300,13 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             throw new ProviderException('Model must be specified in options', 'google');
         }
 
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
         try {
             $model = $options['model'];
             $contents = $this->convertMessagesToGeminiFormat($messages);
 
-            $url = self::API_BASE."/models/{$model}:streamGenerateContent?alt=sse";
+            $url = $this->api->modelUrl($model, 'streamGenerateContent?alt=sse');
 
             $generationConfig = [
                 'temperature' => $options['temperature'] ?? 0.7,
@@ -379,19 +352,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             // surface to the user so they can switch models or wait.
             // Only the request/header phase is retried — once chunks start
             // flowing, we never restart mid-stream.
-            $response = $this->requestWithSingleRetryOn503(
-                'POST',
-                $url,
-                [
-                    'headers' => [
-                        'Content-Type' => 'application/json',
-                        'x-goog-api-key' => $key,
-                    ],
-                    'json' => $payload,
-                    'timeout' => 120,
-                ],
-                $model,
-            );
+            $response = $this->requestWithSingleRetryOn503($url, $payload, $key, $model);
 
             $usage = [
                 'prompt_tokens' => 0,
@@ -404,7 +365,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $sawFunctionCall = false;
             $toolIndex = 0;
 
-            foreach ($this->httpClient->stream($response) as $chunk) {
+            foreach ($this->api->stream($response) as $chunk) {
                 if ($chunk->isLast()) {
                     break;
                 }
@@ -417,7 +378,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                     $data = json_decode($jsonData, true);
 
                     if ($data) {
-                        $this->checkGeminiFinishReason($data);
+                        $this->api->checkFinishReason($data);
                     }
 
                     // Capture usage from each chunk (last chunk has final values)
@@ -561,16 +522,16 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * any further failure (or any non-503 error) propagates so the
      * higher-level catch can surface a friendly message.
      *
-     * @param array<string, mixed> $options
+     * @param array<string, mixed> $payload
      */
-    private function requestWithSingleRetryOn503(string $method, string $url, array $options, string $model): \Symfony\Contracts\HttpClient\ResponseInterface
+    private function requestWithSingleRetryOn503(string $url, array $payload, string $key, string $model): ResponseInterface
     {
         $maxAttempts = 2;
         $attempt = 0;
 
         while (true) {
             ++$attempt;
-            $response = $this->httpClient->request($method, $url, $options);
+            $response = $this->api->postJson($url, $payload, $key, 120);
 
             try {
                 $status = $response->getStatusCode();
@@ -690,9 +651,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         $model = $options['model'] ?? 'gemini-3.1-flash-image';
         $inputImages = $options['images'] ?? [];
 
-        if (null === $this->resolveApiKey()) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $this->api->requireKey();
 
         // Pic2pic: when input images are provided and model is a Gemini image model
         if (!empty($inputImages) && $this->isGeminiNativeImageModel($model)) {
@@ -735,10 +694,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     private function generateImageWithGemini(string $model, string $prompt, array $options): array
     {
-        $key = $this->resolveApiKey();
+        $key = $this->api->requireKey();
 
         try {
-            $url = self::API_BASE."/models/{$model}:generateContent";
+            $url = $this->api->modelUrl($model, 'generateContent');
 
             $payload = [
                 'contents' => [
@@ -760,18 +719,11 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 ];
             }
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $key,
-                ],
-                'json' => $payload,
-                'timeout' => 120,
-            ]);
+            $response = $this->api->postJson($url, $payload, $key, 120);
 
             $data = $response->toArray();
 
-            $this->checkGeminiFinishReason($data);
+            $this->api->checkFinishReason($data);
 
             $parts = $data['candidates'][0]['content']['parts'] ?? [];
 
@@ -810,10 +762,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     private function generateImageFromImagesWithGemini(string $model, string $prompt, array $imagePaths, array $options): array
     {
-        $key = $this->resolveApiKey();
+        $key = $this->api->requireKey();
 
         try {
-            $url = self::API_BASE."/models/{$model}:generateContent";
+            $url = $this->api->modelUrl($model, 'generateContent');
 
             $parts = [['text' => $prompt]];
             foreach ($imagePaths as $imgPath) {
@@ -849,18 +801,11 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'prompt_length' => \strlen($prompt),
             ]);
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $key,
-                ],
-                'json' => $payload,
-                'timeout' => 120,
-            ]);
+            $response = $this->api->postJson($url, $payload, $key, 120);
 
             $data = $response->toArray();
 
-            $this->checkGeminiFinishReason($data);
+            $this->api->checkFinishReason($data);
 
             $responseParts = $data['candidates'][0]['content']['parts'] ?? [];
 
@@ -918,54 +863,6 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     }
 
     /**
-     * Check Gemini generateContent response for blocked content.
-     *
-     * Gemini returns finishReason codes like SAFETY, RECITATION, PROHIBITED_CONTENT
-     * when it refuses to generate. The HTTP status is still 200, but the response
-     * contains no usable content parts.
-     *
-     * @throws ProviderException when content was blocked
-     */
-    private function checkGeminiFinishReason(array $data): void
-    {
-        $candidate = $data['candidates'][0] ?? null;
-
-        if (!$candidate) {
-            $blockReason = $data['promptFeedback']['blockReason'] ?? null;
-            if ($blockReason) {
-                $this->logger->warning('Google Gemini: Prompt blocked', [
-                    'block_reason' => $blockReason,
-                    'prompt_feedback' => $data['promptFeedback'] ?? null,
-                ]);
-                throw ProviderException::contentBlocked('google', $blockReason);
-            }
-
-            return;
-        }
-
-        $finishReason = $candidate['finishReason'] ?? null;
-
-        if ($finishReason && !\in_array($finishReason, ['STOP', 'MAX_TOKENS', 'END_TURN', 'FUNCTION_CALL'], true)) {
-            $textResponse = null;
-            $parts = $candidate['content']['parts'] ?? [];
-            foreach ($parts as $part) {
-                if (isset($part['text'])) {
-                    $textResponse = $part['text'];
-                    break;
-                }
-            }
-
-            $this->logger->warning('Google Gemini: Content blocked', [
-                'finish_reason' => $finishReason,
-                'safety_ratings' => $candidate['safetyRatings'] ?? null,
-                'text_response' => $textResponse ? substr($textResponse, 0, 300) : null,
-            ]);
-
-            throw ProviderException::contentBlocked('google', $finishReason, $textResponse);
-        }
-    }
-
-    /**
      * Generate image using Imagen via Gemini API (API key) or Vertex AI (project ID + OAuth).
      *
      * The catalog carries no Imagen row any more — Google shut the Imagen 4 ids
@@ -991,7 +888,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
             // Imagen 4+ is supported on the Gemini API with GOOGLE_GEMINI_API_KEY (see Google docs).
             // Vertex AI requires a separate OAuth access token — never send the API key as Bearer.
-            if ($this->projectId && $this->vertexAccessToken) {
+            if ($this->api->usesVertex()) {
                 return $this->generateImageWithImagenVertex($model, $payload);
             }
 
@@ -1008,22 +905,15 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     private function generateImageWithImagenGemini(string $model, array $payload): array
     {
-        $key = $this->resolveApiKey();
-        $url = self::API_BASE."/models/{$model}:predict";
+        $key = $this->api->requireKey();
+        $url = $this->api->modelUrl($model, 'predict');
 
         $this->logger->info('Google Imagen: Using Gemini API', [
             'model' => $model,
             'url' => $url,
         ]);
 
-        $response = $this->httpClient->request('POST', $url, [
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'x-goog-api-key' => $key,
-            ],
-            'json' => $payload,
-            'timeout' => 120,
-        ]);
+        $response = $this->api->postJson($url, $payload, $key, 120);
 
         return $this->parseImagenResponse($response->toArray(), $model);
     }
@@ -1033,27 +923,18 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     private function generateImageWithImagenVertex(string $model, array $payload): array
     {
-        if (!$this->vertexAccessToken) {
+        if (null === $this->api->vertexAccessToken()) {
             throw new ProviderException('Vertex Imagen requires GOOGLE_VERTEX_ACCESS_TOKEN (OAuth bearer), not the Gemini API key', 'google');
         }
 
-        $url = str_replace('{region}', $this->region, self::VERTEX_BASE)
-            ."/projects/{$this->projectId}/locations/{$this->region}"
-            ."/publishers/google/models/{$model}:predict";
+        $url = $this->api->vertexModelUrl($model, 'predict');
 
         $this->logger->info('Google Imagen: Using Vertex AI', [
             'model' => $model,
-            'project' => $this->projectId,
+            'project' => $this->api->projectId(),
         ]);
 
-        $response = $this->httpClient->request('POST', $url, [
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer '.$this->vertexAccessToken,
-            ],
-            'json' => $payload,
-            'timeout' => 120,
-        ]);
+        $response = $this->api->postVertexJson($url, $payload, 120);
 
         return $this->parseImagenResponse($response->toArray(), $model);
     }
@@ -1153,10 +1034,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     {
         $model = $options['model'] ?? 'veo-3.1-generate-preview';
 
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
         if ($this->isOmniVideoModel($model)) {
             return $this->startOmniVideoOperation($prompt, $options, $model, $key);
@@ -1188,7 +1066,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             'api_resolution' => $apiResolution,
         ]);
 
-        $url = self::API_BASE."/models/{$model}:predictLongRunning";
+        $url = $this->api->modelUrl($model, 'predictLongRunning');
 
         $payload = [
             'instances' => [
@@ -1201,14 +1079,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             ],
         ];
 
-        $response = $this->httpClient->request('POST', $url, [
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'x-goog-api-key' => $key,
-            ],
-            'json' => $payload,
-            'timeout' => 30,
-        ]);
+        $response = $this->api->postJson($url, $payload, $key, 30);
 
         $statusCode = $response->getStatusCode();
         if (200 !== $statusCode) {
@@ -1246,21 +1117,15 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     public function pollVideoOperationOnce(string $operationName, array $options = []): array
     {
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
         if ($this->isOmniOperation($operationName)) {
             return $this->pollOmniVideoOperationOnce($operationName, $key);
         }
 
-        $operationUrl = self::API_BASE.'/'.$operationName;
+        $operationUrl = $this->api->url($operationName);
 
-        $statusResponse = $this->httpClient->request('GET', $operationUrl, [
-            'headers' => ['x-goog-api-key' => $key],
-            'timeout' => 30,
-        ]);
+        $statusResponse = $this->api->send('GET', $operationUrl, $key, 30);
 
         $statusData = $statusResponse->toArray();
 
@@ -1358,15 +1223,9 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             return $decoded;
         }
 
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
-        $videoResponse = $this->httpClient->request('GET', $videoUri, [
-            'headers' => ['x-goog-api-key' => $key],
-            'timeout' => 120,
-        ]);
+        $videoResponse = $this->api->send('GET', $videoUri, $key, 120);
 
         return $videoResponse->getContent();
     }
@@ -1451,21 +1310,18 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     public function cancelVideoOperation(string $operationName, array $options = []): void
     {
-        $key = $this->resolveApiKey();
+        $key = $this->api->key();
         if (null === $key) {
             return;
         }
 
         $cancelUrl = $this->isOmniOperation($operationName)
-            ? self::API_BASE.'/interactions/'.$this->omniInteractionId($operationName)
-            : self::API_BASE.'/'.$operationName.':cancel';
+            ? $this->api->url('interactions/'.$this->omniInteractionId($operationName))
+            : $this->api->url($operationName.':cancel');
         $method = $this->isOmniOperation($operationName) ? 'DELETE' : 'POST';
 
         try {
-            $response = $this->httpClient->request($method, $cancelUrl, [
-                'headers' => ['x-goog-api-key' => $key],
-                'timeout' => 30,
-            ]);
+            $response = $this->api->send($method, $cancelUrl, $key, 30);
             $statusCode = $response->getStatusCode();
             if ($statusCode >= 200 && $statusCode < 300) {
                 $this->logger->info('Google video: cancel request sent to provider', [
@@ -1617,7 +1473,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             'resolution' => $resolution,
         ]);
 
-        $url = self::API_BASE.'/interactions';
+        $url = $this->api->url('interactions');
         $payload = [
             'model' => $model,
             'input' => $prompt,
@@ -1631,14 +1487,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             ],
         ];
 
-        $response = $this->httpClient->request('POST', $url, [
-            'headers' => [
-                'Content-Type' => 'application/json',
-                'x-goog-api-key' => $key,
-            ],
-            'json' => $payload,
-            'timeout' => 30,
-        ]);
+        $response = $this->api->postJson($url, $payload, $key, 30);
 
         $statusCode = $response->getStatusCode();
         if (200 !== $statusCode && 201 !== $statusCode) {
@@ -1675,10 +1524,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     private function pollOmniVideoOperationOnce(string $operationName, string $key): array
     {
         $interactionId = $this->omniInteractionId($operationName);
-        $statusResponse = $this->httpClient->request('GET', self::API_BASE.'/interactions/'.$interactionId, [
-            'headers' => ['x-goog-api-key' => $key],
-            'timeout' => 60,
-        ]);
+        $statusResponse = $this->api->send('GET', $this->api->url('interactions/'.$interactionId), $key, 60);
 
         $statusData = $statusResponse->toArray();
         $status = strtolower((string) ($statusData['status'] ?? ''));
@@ -1825,10 +1671,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         // Google Gemini 2.5 Flash Image supports editing
         $model = 'gemini-2.5-flash-image-preview';
 
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
         try {
             // Read the image
@@ -1841,7 +1684,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $base64Image = base64_encode($imageData);
             $mimeType = mime_content_type($fullPath);
 
-            $url = self::API_BASE."/models/{$model}:generateContent";
+            $url = $this->api->modelUrl($model, 'generateContent');
 
             $payload = [
                 'contents' => [
@@ -1862,14 +1705,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 ],
             ];
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $key,
-                ],
-                'json' => $payload,
-                'timeout' => 60,
-            ]);
+            $response = $this->api->postJson($url, $payload, $key, 60);
 
             $data = $response->toArray();
 
@@ -1902,10 +1738,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function compareImages(string $imageUrl1, string $imageUrl2): array
     {
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
         try {
             $fullPath1 = $this->uploadDir.'/'.ltrim($imageUrl1, '/');
@@ -1923,7 +1756,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $mimeType2 = mime_content_type($fullPath2);
 
             $model = 'gemini-2.5-pro';
-            $url = self::API_BASE."/models/{$model}:generateContent";
+            $url = $this->api->modelUrl($model, 'generateContent');
 
             $payload = [
                 'contents' => [
@@ -1950,14 +1783,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 ],
             ];
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $key,
-                ],
-                'json' => $payload,
-                'timeout' => 60,
-            ]);
+            $response = $this->api->postJson($url, $payload, $key, 60);
 
             $data = $response->toArray();
             $comparison = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
@@ -1974,10 +1800,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function analyzeImage(string $imagePath, string $prompt, array $options = []): string
     {
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
         try {
             $model = $options['model'] ?? 'gemini-2.5-pro';
@@ -1998,7 +1821,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'prompt_length' => strlen($prompt),
             ]);
 
-            $url = self::API_BASE."/models/{$model}:generateContent";
+            $url = $this->api->modelUrl($model, 'generateContent');
 
             $payload = [
                 'contents' => [
@@ -2024,14 +1847,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 ],
             ];
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $key,
-                ],
-                'json' => $payload,
-                'timeout' => 60,
-            ]);
+            $response = $this->api->postJson($url, $payload, $key, 60);
 
             $data = $response->toArray();
 
@@ -2045,10 +1861,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function transcribe(string $audioPath, array $options = []): array
     {
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
         $model = $options['model'] ?? 'gemini-3.5-transcribe';
         if (!is_string($model) || !$this->isGeminiTranscribeModelId($model)) {
@@ -2082,7 +1895,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             'size_mb' => round($fileSize / 1024 / 1024, 2),
         ]);
 
-        $url = self::API_BASE."/models/{$model}:generateContent";
+        $url = $this->api->modelUrl($model, 'generateContent');
         $payload = [
             'contents' => [
                 [
@@ -2100,14 +1913,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         ];
 
         try {
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $key,
-                ],
-                'json' => $payload,
-                'timeout' => 180,
-            ]);
+            $response = $this->api->postJson($url, $payload, $key, 180);
 
             $statusCode = $response->getStatusCode();
             if (200 !== $statusCode) {
@@ -2236,10 +2042,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function synthesize(string $text, array $options = []): string
     {
-        $key = $this->resolveApiKey();
-        if (null === $key) {
-            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
-        }
+        $key = $this->api->requireKey();
 
         try {
             // Accept any Gemini TTS variant Google ships so newer catalog rows
@@ -2261,7 +2064,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             ]);
 
             // Use Gemini 2.0 Flash with TTS capability (audio output modality)
-            $url = self::API_BASE."/models/{$model}:generateContent";
+            $url = $this->api->modelUrl($model, 'generateContent');
 
             // Gemini 2.0 Flash TTS via speech modality
             $payload = [
@@ -2287,15 +2090,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 ],
             ];
 
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                    'x-goog-api-key' => $key,
-                ],
-                'json' => $payload,
-                'timeout' => 240,
-                'max_duration' => 300,
-            ]);
+            $response = $this->api->postJson($url, $payload, $key, 240, ['max_duration' => 300]);
 
             $statusCode = $response->getStatusCode();
             if (200 !== $statusCode) {
