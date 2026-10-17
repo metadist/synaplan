@@ -1,0 +1,1621 @@
+{
+    "a_tts_script_that_repeats_the_request_is_answered_as_chat": {
+        "ai": [],
+        "chat": [
+            [
+                {
+                    "intent": "chat",
+                    "language": "en",
+                    "rerouted_from": "mediamaker:audio",
+                    "topic": "general"
+                },
+                []
+            ]
+        ],
+        "chunks": [
+            "Yek, do, se — here is a song to count along."
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [],
+        "memory": [],
+        "models": [
+            [
+                "default",
+                "TEXT2SOUND"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "effective_classification": {
+                    "intent": "chat",
+                    "media_type": null,
+                    "rerouted_from": "mediamaker:audio",
+                    "topic": "general"
+                },
+                "model": "llama-3.3-70b",
+                "provider": "groq",
+                "rerouted_from": "mediamaker:audio"
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "analyzing",
+                "Answering your request…",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "download_failure": {
+        "ai": [
+            [
+                "generateImage",
+                "A fox in the snow",
+                7,
+                {
+                    "model": "gpt-image-1",
+                    "modelConfig": [],
+                    "provider": "openai",
+                    "quality": "standard",
+                    "size": "1024x1024",
+                    "style": "vivid"
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [
+            "We couldn't open the image you linked. Please make sure the link points directly to a publicly accessible image file (ending in .jpg, .jpeg, .png, .webp or .gif) — not to a web page — and try again. You can also upload the image directly in the chat instead."
+        ],
+        "downloads": [
+            "https://cdn.provider.test/out/fox.png"
+        ],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "IMAGES"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "error": "Failed to download image from: https://cdn.provider.test/out/fox.png",
+                "model": "gpt-image-1",
+                "provider": "openai"
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your image with Openai gpt-image-1",
+                {
+                    "media_type": "image",
+                    "model_name": "gpt-image-1",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ],
+            [
+                "generating",
+                "Saving image...",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "edit_of_the_last_picture_in_the_conversation": {
+        "ai": [
+            [
+                "generateImage",
+                "Paint the car blue",
+                7,
+                {
+                    "images": [
+                        "<uploads>/attachments/car.png"
+                    ],
+                    "model": "gpt-image-1-edit",
+                    "modelConfig": [],
+                    "provider": "openai",
+                    "quality": "high",
+                    "size": "1024x1024",
+                    "style": "vivid"
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [
+            "__IMAGE_GENERATED__"
+        ],
+        "downloads": [],
+        "extractor": [
+            {
+                "media_edit_source_name": "car.png"
+            }
+        ],
+        "files": [
+            [
+                7,
+                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "image",
+                1001,
+                "openai",
+                false,
+                null
+            ]
+        ],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "IMAGES"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "PIC2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "edit_source_file_id": 91,
+                "edit_source_name": "car.png",
+                "file": {
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "type": "image"
+                },
+                "folder_delivery": null,
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "media_prompt": "Paint the car blue",
+                "media_recorded_usage": null,
+                "media_type": "image",
+                "media_usage": {
+                    "images": 1,
+                    "quality": "high",
+                    "size": "1024x1024"
+                },
+                "model": "gpt-image-1-edit",
+                "model_id": 42,
+                "provider": "openai",
+                "thumbnail_path": null,
+                "usage_recorded": false
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "editing",
+                "Editing car.png…",
+                {
+                    "edit_source_file_id": 91,
+                    "edit_source_name": "car.png"
+                }
+            ],
+            [
+                "generating",
+                "AI is crafting your image with Openai gpt-image-1-edit",
+                {
+                    "media_type": "image",
+                    "model_name": "gpt-image-1-edit",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ],
+            [
+                "generating",
+                "Saving image...",
+                []
+            ],
+            [
+                "generating",
+                "Image generated successfully.",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "image_as_a_data_url": {
+        "ai": [
+            [
+                "generateImage",
+                "A red bicycle",
+                7,
+                {
+                    "model": "gpt-image-1",
+                    "modelConfig": [],
+                    "provider": "openai",
+                    "quality": "standard",
+                    "size": "1024x1024",
+                    "style": "vivid"
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [
+            "__IMAGE_GENERATED__"
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [
+            [
+                7,
+                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "image",
+                1001,
+                "openai",
+                false,
+                null
+            ]
+        ],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "IMAGES"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "edit_source_file_id": null,
+                "edit_source_name": null,
+                "file": {
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "type": "image"
+                },
+                "folder_delivery": null,
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "media_prompt": "A red bicycle",
+                "media_recorded_usage": null,
+                "media_type": "image",
+                "media_usage": {
+                    "images": 1,
+                    "quality": "standard",
+                    "size": "1024x1024"
+                },
+                "model": "gpt-image-1",
+                "model_id": 41,
+                "provider": "openai",
+                "thumbnail_path": null,
+                "usage_recorded": false
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your image with Openai gpt-image-1",
+                {
+                    "media_type": "image",
+                    "model_name": "gpt-image-1",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ],
+            [
+                "generating",
+                "Saving image...",
+                []
+            ],
+            [
+                "generating",
+                "Image generated successfully.",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "image_edit_from_an_attachment": {
+        "ai": [
+            [
+                "generateImage",
+                "Make the sky purple",
+                7,
+                {
+                    "images": [
+                        "<uploads>/attachments/photo.png"
+                    ],
+                    "model": "gpt-image-1-edit",
+                    "modelConfig": [],
+                    "provider": "openai",
+                    "quality": "high",
+                    "size": "1024x1024",
+                    "style": "vivid"
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [
+            "__IMAGE_GENERATED__"
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [
+            [
+                7,
+                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "image",
+                1001,
+                "openai",
+                false,
+                null
+            ]
+        ],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "IMAGES"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "PIC2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "edit_source_file_id": null,
+                "edit_source_name": null,
+                "file": {
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "type": "image"
+                },
+                "folder_delivery": null,
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "media_prompt": "Make the sky purple",
+                "media_recorded_usage": "<RecordedUsage>",
+                "media_type": "image",
+                "media_usage": {
+                    "images": 1,
+                    "quality": "high",
+                    "size": "1536x1024"
+                },
+                "model": "gpt-image-1-edit",
+                "model_id": 42,
+                "provider": "openai",
+                "thumbnail_path": null,
+                "usage_recorded": true
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your image with Openai gpt-image-1-edit",
+                {
+                    "media_type": "image",
+                    "model_name": "gpt-image-1-edit",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ],
+            [
+                "generating",
+                "Saving image...",
+                []
+            ],
+            [
+                "generating",
+                "Image generated successfully.",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": [
+            [
+                "IMAGES",
+                {
+                    "media_usage": {
+                        "images": 1,
+                        "quality": "high",
+                        "size": "1536x1024"
+                    },
+                    "model": "gpt-image-1-edit",
+                    "model_id": 42,
+                    "provider": "openai"
+                }
+            ]
+        ]
+    },
+    "image_from_an_external_url": {
+        "ai": [
+            [
+                "generateImage",
+                "A lighthouse at dusk, oil painting",
+                7,
+                {
+                    "model": "gpt-image-1",
+                    "modelConfig": [],
+                    "provider": "openai",
+                    "quality": "standard",
+                    "size": "1024x1024",
+                    "style": "vivid"
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [
+            "__IMAGE_GENERATED__"
+        ],
+        "downloads": [
+            "https://cdn.provider.test/out/lighthouse.png"
+        ],
+        "extractor": [
+            []
+        ],
+        "files": [
+            [
+                7,
+                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "image",
+                1001,
+                "openai",
+                false,
+                null
+            ]
+        ],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "IMAGES"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "edit_source_file_id": null,
+                "edit_source_name": null,
+                "file": {
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "type": "image"
+                },
+                "folder_delivery": null,
+                "image_url": "https://cdn.provider.test/out/lighthouse.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "media_prompt": "A lighthouse at dusk, oil painting",
+                "media_recorded_usage": "<RecordedUsage>",
+                "media_type": "image",
+                "media_usage": {
+                    "images": 1,
+                    "quality": "standard",
+                    "size": "1024x1024"
+                },
+                "model": "gpt-image-1",
+                "model_id": 41,
+                "provider": "openai",
+                "thumbnail_path": null,
+                "usage_recorded": true
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your image with Openai gpt-image-1",
+                {
+                    "media_type": "image",
+                    "model_name": "gpt-image-1",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ],
+            [
+                "generating",
+                "Saving image...",
+                []
+            ],
+            [
+                "generating",
+                "Image generated successfully.",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": [
+            [
+                "IMAGES",
+                {
+                    "media_usage": {
+                        "images": 1,
+                        "quality": "standard",
+                        "size": "1024x1024"
+                    },
+                    "model": "gpt-image-1",
+                    "model_id": 41,
+                    "provider": "openai"
+                }
+            ]
+        ]
+    },
+    "image_to_video_while_app_url_is_private": {
+        "ai": [],
+        "chat": [],
+        "chunks": [
+            "Image-to-video has to send your image to the provider from a public URL, but this server's public address (APP_URL = \"http://localhost:8000\") is a local/private host the provider can't reach. Set APP_URL to an internet-reachable URL (e.g. a tunnel), or use a text-to-video model without an attached image."
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "IMG2VID"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "error": "i2v_requires_public_app_url",
+                "model": "dop-turbo",
+                "provider": "higgsfield"
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "image_url_in_the_text_becomes_a_video": {
+        "ai": [
+            [
+                "generateVideo",
+                "The sun sets over the beach",
+                7,
+                {
+                    "aspect_ratio": "16:9",
+                    "duration": 5,
+                    "image_url": "https://images.example.com/beach.jpg",
+                    "images": [
+                        "https://images.example.com/beach.jpg"
+                    ],
+                    "model": "dop-turbo",
+                    "modelConfig": {
+                        "default_duration": 5,
+                        "requires_reference_image": true
+                    },
+                    "progress_callback": "<callable>",
+                    "provider": "higgsfield",
+                    "resolution": null
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [
+            "__VIDEO_GENERATED__"
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [
+            [
+                7,
+                "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4",
+                "video",
+                1001,
+                "higgsfield",
+                false,
+                null
+            ]
+        ],
+        "flushes": 1,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "VIDEOS"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "IMG2VID"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "edit_source_file_id": null,
+                "edit_source_name": null,
+                "file": {
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4",
+                    "type": "video"
+                },
+                "folder_delivery": null,
+                "image_url": "data:video/mp4;base64,bm90IGEgcmVhbCB2aWRlbw==",
+                "local_path": "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4",
+                "media_prompt": "The sun sets over the beach",
+                "media_recorded_usage": "<RecordedUsage>",
+                "media_type": "video",
+                "media_usage": {
+                    "duration_seconds": 5,
+                    "resolution": "720p"
+                },
+                "model": "dop-turbo",
+                "model_id": 44,
+                "provider": "higgsfield",
+                "thumbnail_path": "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4.jpg",
+                "usage_recorded": true
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your video with Higgsfield dop-turbo",
+                {
+                    "media_type": "video",
+                    "model_name": "dop-turbo",
+                    "provider": "higgsfield",
+                    "stage": "request_sent"
+                }
+            ],
+            [
+                "generating",
+                "Preparing your image for animation...",
+                []
+            ],
+            [
+                "generating",
+                "Saving video...",
+                []
+            ],
+            [
+                "generating",
+                "Creating video thumbnail...",
+                []
+            ],
+            [
+                "generating",
+                "Video generated successfully.",
+                []
+            ]
+        ],
+        "thumbnails": [
+            "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4"
+        ],
+        "usage": [
+            [
+                "VIDEOS",
+                {
+                    "media_usage": {
+                        "duration_seconds": 5,
+                        "resolution": "720p"
+                    },
+                    "model": "dop-turbo",
+                    "model_id": 44,
+                    "provider": "higgsfield"
+                }
+            ]
+        ]
+    },
+    "no_default_model": {
+        "ai": [],
+        "chat": [],
+        "chunks": [
+            "No model is configured for media generation. Please set a default model (image, video, or audio) in Settings."
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "error": "no_media_model_configured",
+                "media_type": "image"
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "over_budget": {
+        "ai": [],
+        "chat": [],
+        "chunks": [
+            "Your monthly usage budget is used up. You can top up in EUR 100 steps to keep generating."
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "IMAGES"
+            ],
+            [
+                "budget"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "budget": "20.00",
+                "code": "COST_BUDGET_EXCEEDED",
+                "error": "cost_budget_exceeded",
+                "limit_type": "monthly",
+                "remaining": "0.00",
+                "topup_available": true,
+                "used": "20.40"
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your image with Openai gpt-image-1",
+                {
+                    "media_type": "image",
+                    "model_name": "gpt-image-1",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "provider_failure": {
+        "ai": [
+            [
+                "generateImage",
+                "A fox in the snow",
+                7,
+                {
+                    "model": "gpt-image-1",
+                    "modelConfig": [],
+                    "provider": "openai",
+                    "quality": "standard",
+                    "size": "1024x1024",
+                    "style": "vivid"
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [
+            "Sorry, the image could not be generated right now. Please try again or use a different model."
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "IMAGES"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "error": "The prompt was rejected by the safety system",
+                "model": "gpt-image-1",
+                "provider": "openai"
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your image with Openai gpt-image-1",
+                {
+                    "media_type": "image",
+                    "model_name": "gpt-image-1",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "rate_limited": {
+        "ai": [],
+        "chat": [],
+        "chunks": [
+            "Rate limit exceeded for IMAGES. Used: 5/5"
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "IMAGES"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "action": "IMAGES",
+                "error": "rate_limit_exceeded",
+                "limit": 5,
+                "used": 5
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your image with Openai gpt-image-1",
+                {
+                    "media_type": "image",
+                    "model_name": "gpt-image-1",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "retired_model_follows_its_successor": {
+        "ai": [
+            [
+                "generateImage",
+                "A fox in the snow",
+                7,
+                {
+                    "model": "gpt-image-1",
+                    "modelConfig": [],
+                    "provider": "openai",
+                    "quality": "standard",
+                    "size": "1024x1024",
+                    "style": "vivid"
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [
+            "__IMAGE_GENERATED__"
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [
+            [
+                7,
+                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "image",
+                1001,
+                "openai",
+                false,
+                null
+            ]
+        ],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "IMAGES"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "replacement",
+                46,
+                "TEXT2PIC"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "edit_source_file_id": null,
+                "edit_source_name": null,
+                "file": {
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "type": "image"
+                },
+                "folder_delivery": null,
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "media_prompt": "A fox in the snow",
+                "media_recorded_usage": null,
+                "media_type": "image",
+                "media_usage": {
+                    "images": 1,
+                    "quality": "standard",
+                    "size": "1024x1024"
+                },
+                "model": "gpt-image-1",
+                "model_id": 41,
+                "provider": "openai",
+                "thumbnail_path": null,
+                "usage_recorded": false
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your image with Openai gpt-image-1",
+                {
+                    "media_type": "image",
+                    "model_name": "gpt-image-1",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ],
+            [
+                "generating",
+                "Saving image...",
+                []
+            ],
+            [
+                "generating",
+                "Image generated successfully.",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "speech_from_a_tts_command": {
+        "ai": [
+            [
+                "synthesize",
+                "Welcome aboard the harbour tour",
+                "en",
+                7,
+                {
+                    "format": "mp3",
+                    "model": "tts-1",
+                    "provider": "openai"
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [
+            "__AUDIO_GENERATED__"
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [
+            [
+                7,
+                "07/000/00007/tts/welcome.mp3",
+                "audio",
+                1001,
+                "openai",
+                false,
+                "Welcome aboard the harbour tour"
+            ]
+        ],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "AUDIOS"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2SOUND"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "file": {
+                    "path": "/api/v1/files/uploads/07/000/00007/tts/welcome.mp3",
+                    "type": "audio"
+                },
+                "local_path": "07/000/00007/tts/welcome.mp3",
+                "media_prompt": "Welcome aboard the harbour tour",
+                "media_recorded_usage": "<RecordedUsage>",
+                "media_type": "audio",
+                "media_usage": {
+                    "characters": 31
+                },
+                "model": "tts-1",
+                "model_id": 45,
+                "provider": "openai",
+                "usage_recorded": true
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your audio with Openai tts-1",
+                {
+                    "media_type": "audio",
+                    "model_name": "tts-1",
+                    "provider": "openai",
+                    "stage": "request_sent"
+                }
+            ],
+            [
+                "generating",
+                "Audio generated successfully.",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": [
+            [
+                "AUDIOS",
+                {
+                    "media_usage": {
+                        "characters": 31
+                    },
+                    "model": "tts-1",
+                    "model_id": 45,
+                    "provider": "openai"
+                }
+            ]
+        ]
+    },
+    "stop_during_a_video": {
+        "ai": [
+            [
+                "generateVideo",
+                "A rocket launch at night",
+                7,
+                {
+                    "aspect_ratio": "16:9",
+                    "cancel_check": "<callable>",
+                    "duration": 6,
+                    "model": "veo-3",
+                    "modelConfig": {
+                        "default_duration": 8
+                    },
+                    "progress_callback": "<callable>",
+                    "provider": "google",
+                    "resolution": null
+                }
+            ]
+        ],
+        "chat": [],
+        "chunks": [],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [
+            [
+                "limit",
+                "VIDEOS"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2VID"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "cancelled": true,
+                "error": "cancelled",
+                "media_recorded_usage": "<RecordedUsage>",
+                "media_type": "video",
+                "media_usage": {
+                    "duration_seconds": 6
+                },
+                "model": "veo-3",
+                "model_id": 43,
+                "provider": "google",
+                "usage_recorded": true
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your video with Google veo-3",
+                {
+                    "media_type": "video",
+                    "model_name": "veo-3",
+                    "provider": "google",
+                    "stage": "request_sent"
+                }
+            ]
+        ],
+        "thumbnails": [],
+        "usage": [
+            [
+                "VIDEOS",
+                {
+                    "media_usage": {
+                        "duration_seconds": 6
+                    },
+                    "model": "veo-3",
+                    "model_id": 43,
+                    "provider": "google"
+                }
+            ]
+        ]
+    },
+    "text_to_video_on_an_image_to_video_model": {
+        "ai": [],
+        "chat": [],
+        "chunks": [
+            "„dop-turbo“ ist ein Bild-zu-Video-Modell und benötigt ein Referenzbild. Hänge ein Bild an, um es zu animieren, oder wähle in den Einstellungen ein Text-zu-Video-Modell (z. B. Veo) als Standard für Video."
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [],
+        "limits": [],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2VID"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "error": "text2vid_requires_reference_image",
+                "model": "dop-turbo",
+                "provider": "higgsfield"
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    },
+    "video_detached_to_a_background_job": {
+        "ai": [],
+        "chat": [],
+        "chunks": [
+            "__VIDEO_GENERATING__"
+        ],
+        "downloads": [],
+        "extractor": [
+            []
+        ],
+        "files": [],
+        "flushes": 0,
+        "jobs": [
+            [
+                "create",
+                {
+                    "chatId": null,
+                    "inputRef": null,
+                    "messageId": 1001,
+                    "model": "veo-3",
+                    "modelId": 43,
+                    "nodeId": "n2",
+                    "options": {
+                        "aspect_ratio": "16:9",
+                        "cancel_check": "<callable>",
+                        "duration": 8,
+                        "lang": "en",
+                        "media_usage": {
+                            "duration_seconds": 8
+                        },
+                        "model": "veo-3",
+                        "modelConfig": {
+                            "default_duration": 8
+                        },
+                        "progress_callback": "<callable>",
+                        "provider": "google",
+                        "resolution": null
+                    },
+                    "prompt": "A cat surfing a big wave",
+                    "provider": "google",
+                    "trackId": "track-9",
+                    "type": "video",
+                    "userId": 7
+                }
+            ],
+            [
+                "dispatch",
+                "media-job-1"
+            ]
+        ],
+        "limits": [
+            [
+                "limit",
+                "VIDEOS"
+            ]
+        ],
+        "memory": [
+            [
+                "build",
+                "",
+                false,
+                false,
+                false
+            ],
+            [
+                "dispatch"
+            ]
+        ],
+        "models": [
+            [
+                "default",
+                "TEXT2VID"
+            ]
+        ],
+        "result": {
+            "metadata": {
+                "media_job": {
+                    "job_id": "media-job-1",
+                    "state": "running",
+                    "type": "video"
+                },
+                "media_prompt": "A cat surfing a big wave",
+                "media_type": "video",
+                "model": "veo-3",
+                "model_id": 43,
+                "provider": "google"
+            }
+        },
+        "statuses": [
+            [
+                "analyzing",
+                "Understanding your request...",
+                []
+            ],
+            [
+                "generating",
+                "AI is crafting your video with Google veo-3",
+                {
+                    "media_type": "video",
+                    "model_name": "veo-3",
+                    "provider": "google",
+                    "stage": "request_sent"
+                }
+            ],
+            [
+                "generating",
+                "Media generation started in the background.",
+                {
+                    "media_job": {
+                        "job_id": "media-job-1",
+                        "state": "running",
+                        "type": "video"
+                    }
+                }
+            ]
+        ],
+        "thumbnails": [],
+        "usage": []
+    }
+}
