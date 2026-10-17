@@ -7,7 +7,7 @@
     },
     "counts": {
         "methodLines": 112,
-        "entityManager": 19,
+        "entityManager": 18,
         "aiFacade": 8
     },
     "methodLines": {
@@ -142,8 +142,7 @@
         "src/Controller/SubscriptionController.php",
         "src/Controller/WebhookController.php",
         "src/Controller/WidgetController.php",
-        "src/Controller/WidgetPublicController.php",
-        "src/Controller/WidgetSummaryController.php"
+        "src/Controller/WidgetPublicController.php"
     ],
     "aiFacade": [
         "src/Controller/MessageController.php",
