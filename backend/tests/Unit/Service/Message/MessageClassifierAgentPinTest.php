@@ -10,6 +10,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\Agent\AgentPinResolver;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
@@ -44,7 +45,7 @@ final class MessageClassifierAgentPinTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
-            new SystemCapabilityRegistry(),
+            new TopicIntentRule(new SystemCapabilityRegistry()),
             $this->createMock(EmbeddingRouterService::class),
             new EmbeddingRouterConfig($configRepo),
             new NativeToolRoutingConfig($configRepo),

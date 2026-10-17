@@ -10,7 +10,7 @@ namespace App\Service\Message\Capability;
  * A capability is what today lives split across four hand-maintained,
  * silently-driftable places: the topic seeded in `BPROMPTS`
  * ({@see \App\Prompt\PromptCatalog}), the topic→intent entry in
- * {@see \App\Service\Message\MessageClassifier::mapTopicToIntent()}, the
+ * {@see TopicIntentRule::intentFor()}, the
  * intent→handler entry in {@see \App\Service\Message\InferenceRouter}, and —
  * for `mediamaker` — the BMEDIA/BINPUTMODE/BRESOLUTION enums duplicated in
  * {@see \App\AI\StructuredOutput\Schema\SortClassificationSchema}. One of

@@ -178,6 +178,18 @@ A buffered turn's `classified` status also carries the verdict.
 makes; `TurnAlignmentTest` pins every aligned rule. The moved code keeps weak
 typing (no `strict_types`) until its boundaries are typed.
 
+A model the user picked routes by one rule. A model override in
+`MessageClassifier` and an Again in `TurnClassificationResolver` both ask
+`Capability\TopicIntentRule`: the model's tag names the kind of answer when
+it can (media tags `mediamaker`, vision and analysis tags `general`, document
+tags `officemaker`); any other tag, a chat model among them, keeps the
+message's topic, so a custom prompt survives, and a message without one goes
+to `general` (the placeholders `UNKNOWN`, `CHAT` and `CONTINUE` are no topic).
+The intent comes from `SystemCapabilityRegistry`, then the routing aliases,
+else chat. A media route takes a media model: a chat model kept on a media
+topic leaves the choice to the media handler's default.
+`OverrideAndAgainRoutingTest` pins both paths on one table.
+
 ## File analysis — `FileAnalysisHandler`
 
 `FileAnalysisHandler` answers about the files of a turn on one path for both

@@ -22,7 +22,7 @@ use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
 use App\Service\File\Office\DocumentThumbnailGenerator;
 use App\Service\File\Office\OfficeConverterClient;
-use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
 use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\Message\Routing\NativeToolRoutingConfig;
@@ -74,7 +74,7 @@ final readonly class MessageClassifier
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private SystemCapabilityRegistry $capabilityRegistry,
+        private TopicIntentRule $topicIntents,
         private EmbeddingRouterService $embeddingRouter,
         private EmbeddingRouterConfig $embeddingRouterConfig,
         private NativeToolRoutingConfig $nativeToolRoutingConfig,
@@ -242,26 +242,25 @@ final readonly class MessageClassifier
             // "Again" with model but no prompt override
             // Detect model type from model tag and set topic accordingly
             $modelTag = $this->modelConfigService->getModelTag($modelOverride) ?? 'chat';
-            $topic = $this->mapModelTagToTopic($modelTag, $message->getTopic());
-            $intent = $this->mapTopicToIntent($topic);
+            $routed = $this->topicIntents->forModel($modelTag, $message->getTopic());
 
             $this->logger->info('MessageClassifier: Using model override with auto-detected topic', [
                 'message_id' => $messageId,
                 'model_id' => $modelOverride,
                 'model_tag' => $modelTag,
-                'detected_topic' => $topic,
-                'intent' => $intent,
+                'detected_topic' => $routed->topic,
+                'intent' => $routed->intent,
             ]);
 
-            $modelOverrideDecision = RoutingDecision::deterministic(RoutingLayer::ModelOverride, $topic);
+            $modelOverrideDecision = RoutingDecision::deterministic(RoutingLayer::ModelOverride, $routed->topic);
 
             return array_merge([
-                'topic' => $topic,
+                'topic' => $routed->topic,
                 'language' => $message->getLanguage() ?: 'en',
-                'intent' => $intent,
+                'intent' => $routed->intent,
                 'source' => $modelOverrideDecision->toClassificationSource(),
                 'skip_sorting' => true,
-                'model_id' => $modelOverride,
+                'model_id' => $routed->usesPickedModel ? $modelOverride : null,
             ], $modelOverrideDecision->toClassificationFields());
         }
 
@@ -277,7 +276,7 @@ final readonly class MessageClassifier
             $result = array_merge([
                 'topic' => $promptOverride,
                 'language' => $message->getLanguage() ?: 'en',
-                'intent' => $this->mapTopicToIntent($promptOverride),
+                'intent' => $this->topicIntents->intentFor($promptOverride),
                 'source' => $promptOverrideDecision->toClassificationSource(),
                 'skip_sorting' => true,
             ], $promptOverrideDecision->toClassificationFields());
@@ -429,7 +428,7 @@ final readonly class MessageClassifier
                         'web_search' => null,
                         'source' => $embeddingDecision->toClassificationSource(),
                         'skip_sorting' => true,
-                        'intent' => $this->mapTopicToIntent($embeddingMatch->topic),
+                        'intent' => $this->topicIntents->intentFor($embeddingMatch->topic),
                         'model_id' => null,
                         'provider' => null,
                         'model_name' => null,
@@ -518,7 +517,7 @@ final readonly class MessageClassifier
         $source = $result['source'] ?? 'ai_sorting';
 
         // The AI sorter returns a canonical topic (general, mediamaker,
-        // officemaker, docsummary, …) that downstream code (mapTopicToIntent,
+        // officemaker, docsummary, …) that downstream code (TopicIntentRule,
         // handler resolution, BFILEPATH keys) understands directly.
         $canonicalTopic = (string) ($result['topic'] ?? 'general');
 
@@ -577,7 +576,7 @@ final readonly class MessageClassifier
             'multi_step' => $result['multi_step'] ?? null,
             'source' => $source,
             'skip_sorting' => false,
-            'intent' => $this->mapTopicToIntent($canonicalTopic),
+            'intent' => $this->topicIntents->intentFor($canonicalTopic),
             'model_id' => $result['sorting_model_id'] ?? null,
             'provider' => $result['sorting_provider'] ?? null,
             'model_name' => $result['sorting_model_name'] ?? null,
@@ -952,7 +951,7 @@ final readonly class MessageClassifier
                 'return' => array_merge([
                     'topic' => $toolTopic,
                     'language' => $language,
-                    'intent' => $this->mapTopicToIntent($toolTopic),
+                    'intent' => $this->topicIntents->intentFor($toolTopic),
                     'source' => $decision->toClassificationSource(),
                     'skip_sorting' => true,
                 ], $decision->toClassificationFields()),
@@ -1048,68 +1047,6 @@ final readonly class MessageClassifier
         }
 
         return $data;
-    }
-
-    /**
-     * Map topic to intent for handler routing.
-     *
-     * The four SYSTEM topics (general, mediamaker, officemaker, docsummary)
-     * are looked up from {@see SystemCapabilityRegistry} — the single source
-     * of truth shared with {@see InferenceRouter::getHandler()} and
-     * {@see \App\AI\StructuredOutput\Schema\SortClassificationSchema}.
-     * Everything else here is a deterministic ROUTING ALIAS (tool commands,
-     * "again" model-tag topics, legacy single-model topics): these are not
-     * product capabilities in their own right, just other spellings that
-     * resolve to the same {@see Capability}.
-     *
-     * An unknown topic stays `chat` on purpose: user task prompts are topics,
-     * not capabilities. An intent that is not a message-router capability
-     * fails later in {@see InferenceRouter} instead of being answered as chat.
-     */
-    private function mapTopicToIntent(string $topic): string
-    {
-        $systemIntent = $this->capabilityRegistry->topicToIntentMap()[$topic] ?? null;
-        if (null !== $systemIntent) {
-            return $systemIntent;
-        }
-
-        $aliasToIntent = [
-            // Media-generation aliases (tool commands, legacy single-model topics)
-            'text2pic' => Capability::ImageGeneration->value,
-            'text2vid' => Capability::ImageGeneration->value,
-            'text2sound' => Capability::ImageGeneration->value,
-            'tools:pic' => Capability::ImageGeneration->value, // /pic command
-            'tools:vid' => Capability::ImageGeneration->value, // /vid command
-            'tools:tts' => Capability::ImageGeneration->value, // /tts command (audio via MediaGenerationHandler)
-
-            // File-analysis aliases
-            'pic2text' => Capability::FileAnalysis->value,
-            'analyze' => Capability::FileAnalysis->value,
-            'analyzefile' => Capability::FileAnalysis->value,
-
-            // Chat alias
-            'chat' => Capability::Chat->value,
-        ];
-
-        return $aliasToIntent[$topic] ?? Capability::Chat->value;
-    }
-
-    /**
-     * Map model tag to appropriate topic.
-     */
-    private function mapModelTagToTopic(string $modelTag, ?string $fallbackTopic): string
-    {
-        $tagToTopicMap = [
-            'text2pic' => 'mediamaker',
-            'text2vid' => 'mediamaker',
-            'text2sound' => 'mediamaker',
-            'pic2text' => 'general', // Vision is handled by ChatHandler
-            'analyze' => 'general',
-            'chat' => 'general',
-            'vectorize' => 'general',
-        ];
-
-        return $tagToTopicMap[$modelTag] ?? ($fallbackTopic ?: 'general');
     }
 
     /**
@@ -1856,7 +1793,7 @@ final readonly class MessageClassifier
      * Applies to all three skipping layers (fast path, embedding router,
      * native tool-calling deferral) rather than just the fast path, because
      * none of them can produce the `synaplan` topic: the embedding anchors and
-     * the hand-off toolset both come from {@see SystemCapabilityRegistry},
+     * the hand-off toolset both come from {@see \App\Service\Message\Capability\SystemCapabilityRegistry},
      * which covers the four system capabilities only.
      */
     private function isSelfAwareQuestion(string $text, ?int $userId): bool

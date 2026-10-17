@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Service\Agent\AgentConfig;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\Exception\UnmappedIntentException;
 use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\Message\InferenceRouter;
@@ -533,7 +534,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
-            new TurnClassificationResolver($this->createStub(MessageClassifier::class), $this->createStub(ModelConfigService::class), $this->createStub(AgentConfig::class), $prompts, new NullLogger()),
+            new TurnClassificationResolver($this->createStub(MessageClassifier::class), $this->createStub(ModelConfigService::class), $this->createStub(AgentConfig::class), $prompts, new TopicIntentRule(new SystemCapabilityRegistry()), new NullLogger()),
         );
 
         $router->route(
@@ -562,6 +563,7 @@ final class InferenceRouterTest extends TestCase
             $this->createStub(ModelConfigService::class),
             $this->createStub(AgentConfig::class),
             $prompts,
+            new TopicIntentRule(new SystemCapabilityRegistry()),
             new NullLogger(),
         );
     }

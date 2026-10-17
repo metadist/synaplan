@@ -14,6 +14,7 @@ use App\Repository\MessageMetaRepository;
 use App\Service\Agent\AgentPinResolver;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
@@ -54,6 +55,12 @@ use Psr\Log\LoggerInterface;
 final class RoutingCharacterizationTest extends TestCase
 {
     private const SNAPSHOT_FILE = __DIR__.'/__snapshots__/routing_classification.json';
+
+    /** Model tags a user can pick for Again; `rerank` stands for a tag no rule names. */
+    private const OVERRIDE_TAGS = ['text2pic', 'text2vid', 'text2sound', 'pic2text', 'analyze', 'vision', 'document', 'officemaker', 'text2doc', 'chat', 'vectorize', 'rerank'];
+
+    /** The topic already on the message when the override arrives. */
+    private const OVERRIDE_TOPICS = ['no_topic' => '', 'custom_topic' => 'legal-review', 'mediamaker' => 'mediamaker'];
 
     public function testRoutingContractMatchesGoldenCorpus(): void
     {
@@ -111,6 +118,47 @@ final class RoutingCharacterizationTest extends TestCase
      * }>
      */
     private function corpus(): array
+    {
+        return [...self::fixedCorpus(), ...self::modelOverrideCorpus()];
+    }
+
+    /**
+     * A model override per tag, on a message without a topic, with a custom
+     * prompt topic and with `mediamaker`, plus the topics a new message may
+     * carry instead of none.
+     *
+     * @return list<array{id: string, text: string, language: string, topic: string, fastPath: bool, meta: array<string, string>, modelTag: string}>
+     */
+    private static function modelOverrideCorpus(): array
+    {
+        $cases = [];
+        foreach (self::OVERRIDE_TAGS as $tag) {
+            foreach (self::OVERRIDE_TOPICS as $topicId => $topic) {
+                $cases[] = ['id' => "override_{$tag}_{$topicId}", 'text' => 'redo that', 'language' => 'en', 'topic' => $topic, 'fastPath' => false, 'meta' => ['MODEL_ID' => '42'], 'modelTag' => $tag];
+            }
+        }
+        foreach (['unknown', 'UNKNOWN', 'CHAT', 'CONTINUE'] as $topic) {
+            $cases[] = ['id' => "override_rerank_{$topic}_topic", 'text' => 'redo that', 'language' => 'en', 'topic' => $topic, 'fastPath' => false, 'meta' => ['MODEL_ID' => '42'], 'modelTag' => 'rerank'];
+        }
+
+        return $cases;
+    }
+
+    /**
+     * @return list<array{
+     *     id: string,
+     *     text: string,
+     *     language?: string,
+     *     topic?: string,
+     *     fastPath?: bool,
+     *     files?: list<array{type?: string, name?: string, mime?: string, text?: string}>,
+     *     textSource?: string,
+     *     meta?: array<string, string>,
+     *     modelTag?: string,
+     *     sorter?: array<string, mixed>
+     * }>
+     */
+    private static function fixedCorpus(): array
     {
         return [
             // ---- Plain chat (fast-path heuristic, language detection) ----
@@ -314,7 +362,7 @@ final class RoutingCharacterizationTest extends TestCase
             $configRepo,
             $em,
             $this->createMock(LoggerInterface::class),
-            new SystemCapabilityRegistry(),
+            new TopicIntentRule(new SystemCapabilityRegistry()),
             $this->createMock(EmbeddingRouterService::class),
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
