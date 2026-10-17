@@ -7,6 +7,7 @@ namespace App\Tests\Unit;
 use App\AI\Provider\OpenAI\OpenAIApiClient;
 use App\AI\Provider\OpenAI\OpenAIChat;
 use App\AI\Provider\OpenAI\OpenAICurlTransport;
+use App\AI\Provider\OpenAI\OpenAIImageGeneration;
 use App\AI\Provider\OpenAI\OpenAIResponses;
 use App\AI\Provider\OpenAI\OpenAIResponsesFormat;
 use App\AI\Provider\OpenAIProvider;
@@ -856,14 +857,14 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
     public function testSupportsResponsesApiIncludesAllGptImageFamily(): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'supportsResponsesApi');
+        $images = $this->createImages();
+        $method = new \ReflectionMethod($images, 'supportsResponsesApi');
 
-        $this->assertTrue($method->invoke($provider, 'gpt-image-1'));
-        $this->assertTrue($method->invoke($provider, 'gpt-image-1.5'));
-        $this->assertTrue($method->invoke($provider, 'gpt-image-2'));
-        $this->assertTrue($method->invoke($provider, 'gpt-image-2.5-flare'));
-        $this->assertTrue($method->invoke($provider, 'gpt-image-2.5-sunburst'));
+        $this->assertTrue($method->invoke($images, 'gpt-image-1'));
+        $this->assertTrue($method->invoke($images, 'gpt-image-1.5'));
+        $this->assertTrue($method->invoke($images, 'gpt-image-2'));
+        $this->assertTrue($method->invoke($images, 'gpt-image-2.5-flare'));
+        $this->assertTrue($method->invoke($images, 'gpt-image-2.5-sunburst'));
     }
 
     /**
@@ -872,10 +873,10 @@ class OpenAIProviderResponsesApiTest extends TestCase
     #[DataProvider('gptImageQualityAllowListProvider')]
     public function testGptImageQualityAllowListIsGatedByFamily(string $model, array $expected): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'allowedGptImageQualities');
+        $images = $this->createImages();
+        $method = new \ReflectionMethod($images, 'allowedGptImageQualities');
 
-        $this->assertSame($expected, $method->invoke($provider, $model));
+        $this->assertSame($expected, $method->invoke($images, $model));
     }
 
     /**
@@ -906,12 +907,12 @@ class OpenAIProviderResponsesApiTest extends TestCase
     #[DataProvider('imageApiRoutingProvider')]
     public function testImageApiRoutingForAllSupportedModels(string $model, array $inputImages, string $expectedApi): void
     {
-        $provider = $this->createProvider();
-        $method = new \ReflectionMethod($provider, 'selectImageApi');
+        $images = $this->createImages();
+        $method = new \ReflectionMethod($images, 'selectImageApi');
 
         $this->assertSame(
             $expectedApi,
-            $method->invoke($provider, $model, $inputImages),
+            $method->invoke($images, $model, $inputImages),
             sprintf('Model "%s" with %d input image(s) must route to "%s" API', $model, \count($inputImages), $expectedApi)
         );
     }
@@ -957,6 +958,11 @@ class OpenAIProviderResponsesApiTest extends TestCase
     private function createResponses(): OpenAIResponses
     {
         return new OpenAIResponses($this->api(), $this->logger);
+    }
+
+    private function createImages(): OpenAIImageGeneration
+    {
+        return new OpenAIImageGeneration($this->api(), $this->logger);
     }
 
     private function createProvider(?string $apiKey = 'test-key', bool $storeResponses = true): OpenAIProvider
