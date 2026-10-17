@@ -157,11 +157,26 @@ in `App\Service\Message\Processing\`:
 | `TurnDispatcher` | the `generating` status, then the task plan executor or the inference router; the handler's effective classification |
 | `TurnStatus` | one turn's statuses, to the caller's callback and the log |
 
-Where the two turns still differ (fixed-prompt language, RAG scope keys, where
-search results travel, who emits `complete`, cancellation) the resolver has a
-buffered and a streamed method; `MessageTurnCharacterizationTest` pins both.
-The moved code keeps weak typing (no `strict_types`) until its boundaries are
-typed.
+Both turns decide alike. A turn is classified once, with its history; the
+caller's widget flag and knowledge-base scope go on the classification. When
+the sorter does not run, the caller's language wins, then the message's own,
+then English (`auto` for a fixed prompt). The prompt is looked up once in the
+turn's language: its metadata on the classification, the bundle in
+`resolved_prompt_data`. Web results travel in `options['search_results']`.
+
+Of the differences code cleanup V3 named, three stay, each because only one
+transport has what it needs:
+
+| Difference | `process()` (buffered) | `processStream()` (streamed) | Why |
+| ---------- | ---------------------- | ---------------------------- | --- |
+| `complete` / `error` status | reported by the turn | reported by the caller | the stream's caller owns its terminal events; a buffered caller has no stream |
+| A user's Stop | a generic failure | `cancelled: true` | only a stream has a Stop button |
+| Phase timings | none | a `PerfTimer` per phase | only the stream has a consumer for them |
+
+A buffered turn's `classified` status also carries the verdict.
+`MessageTurnCharacterizationTest` pins both turns and the sorter calls each
+makes; `TurnAlignmentTest` pins every aligned rule. The moved code keeps weak
+typing (no `strict_types`) until its boundaries are typed.
 
 ## File analysis — `FileAnalysisHandler`
 

@@ -20,8 +20,10 @@ use Psr\Log\LoggerInterface;
  *
  * process() is the buffered turn (email, MCP, Saved Tasks, webhooks, models
  * that cannot stream); processStream() the streamed one. Both run the same
- * stages; where they still differ, the stage names it (code cleanup V3,
- * master plan §3, nine differences).
+ * stages and decide alike. Three differences stay, each because only one
+ * transport has what it needs: the stream's caller reports `complete` and
+ * `error` itself, only a stream can be stopped by the user (`cancelled`),
+ * and only the stream has a consumer for its phase timings.
  */
 final readonly class MessageProcessor
 {
@@ -194,6 +196,7 @@ final readonly class MessageProcessor
 
             $this->dispatcher->announce($message, $status);
             $response = $this->dispatcher->dispatchBuffered($message, $conversationHistory, $classification, $statusCallback, $options);
+            // A buffered caller has no stream to end, so the turn reports its own end.
             $status->report('complete', 'Response generated', [
                 'provider' => $response['metadata']['provider'] ?? 'unknown',
                 'model' => $response['metadata']['model'] ?? 'unknown',
