@@ -2,24 +2,25 @@
 
 namespace App\Controller;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Service\Billing\PremiumFeatureGate;
+use App\Service\Exception\EnhancePromptMissingException;
 use App\Service\File\FileHelper;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
 use App\Service\Message\EnhanceChangeSummary;
-use App\Service\Message\EnhanceOutputGuard;
+use App\Service\Message\InputEnhancer;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Message\MessageEnqueueService;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
-use App\Service\Prompt\PromptService;
 use App\Service\RateLimitService;
 use App\Service\Stt\SpeechFailure;
 use App\Service\Usage\TranscriptionUsageRecorder;
@@ -40,7 +41,7 @@ class MessageController extends AbstractController
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
         private AgainHandler $againHandler,
-        private PromptService $promptService,
+        private InputEnhancer $enhancer,
         private ModelConfigService $modelConfigService,
         private MessageEnqueueService $enqueueService,
         private RateLimitService $rateLimitService,
@@ -547,65 +548,9 @@ class MessageController extends AbstractController
                 'text_length' => strlen($inputText),
             ]);
 
-            // Get enhance prompt
-            $promptData = $this->promptService->getPromptWithMetadata('tools:enhance', 0, 'en');
-            if (!$promptData) {
-                return $this->json([
-                    'error' => 'Enhancement prompt not found',
-                ], Response::HTTP_NOT_FOUND);
-            }
-            $systemPrompt = $promptData['prompt']->getPrompt();
-
-            $this->logger->info('Enhancement prompt loaded', [
-                'prompt_id' => $promptData['prompt']->getId(),
-                'prompt_length' => strlen($systemPrompt),
-            ]);
-
-            // Resolve model for user (wie im ChatHandler)
-            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-            $provider = null;
-            $modelName = null;
-
-            if ($modelId) {
-                $provider = $this->modelConfigService->getProviderForModel($modelId);
-                $modelName = $this->modelConfigService->getModelName($modelId);
-
-                $this->logger->info('Enhancement model resolved', [
-                    'model_id' => $modelId,
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ]);
-            }
-
-            $response = $this->aiFacade->chat(
-                [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $inputText],
-                ],
-                $user->getId(),
-                [
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'temperature' => 0.7,
-                ]
-            );
-
-            $this->logger->info('Enhancement response received', [
-                'response_length' => strlen($response['content'] ?? ''),
-            ]);
-
-            $enhancedText = trim($response['content'] ?? $inputText);
-
-            if (EnhanceOutputGuard::isRefusalOrNonEnhancement($inputText, $enhancedText)) {
-                $this->logger->info('Enhancement output treated as refusal or explanation', [
-                    'user_id' => $user->getId(),
-                    'input_length' => strlen($inputText),
-                    'output_length' => strlen($enhancedText),
-                ]);
-
-                return $this->json([
-                    'error' => 'enhance_rejected',
-                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            $enhancedText = $this->enhancer->enhance($user, $inputText);
+            if (null === $enhancedText) {
+                return $this->json(['error' => 'enhance_rejected'], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
             return $this->json([
@@ -614,7 +559,20 @@ class MessageController extends AbstractController
                 'enhanced' => $enhancedText,
                 'summary' => EnhanceChangeSummary::code($inputText, $enhancedText),
             ]);
-        } catch (\App\AI\Exception\ProviderException $e) {
+        } catch (EnhancePromptMissingException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        } catch (\Exception $e) {
+            return $this->enhanceFailure($e, $user);
+        }
+    }
+
+    /**
+     * A provider that could not answer is told with its details (503); any
+     * other failure is a 500.
+     */
+    private function enhanceFailure(\Exception $e, User $user): JsonResponse
+    {
+        if ($e instanceof ProviderException) {
             $this->logger->warning('Enhancement provider error', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
@@ -629,20 +587,20 @@ class MessageController extends AbstractController
                 'provider' => $e->getProviderName(),
                 'context' => $e->getContext(),
             ], Response::HTTP_SERVICE_UNAVAILABLE);
-        } catch (\Exception $e) {
-            $this->logger->error('Enhancement failed', [
-                'user_id' => $user->getId(),
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-
-            return $this->json([
-                'error' => 'Enhancement failed',
-                'message' => $e->getMessage(),
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+
+        $this->logger->error('Enhancement failed', [
+            'user_id' => $user->getId(),
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+        ]);
+
+        return $this->json([
+            'error' => 'Enhancement failed',
+            'message' => $e->getMessage(),
+        ], Response::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     /**

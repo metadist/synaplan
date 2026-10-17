@@ -6,7 +6,7 @@
         "methodLines": 50
     },
     "counts": {
-        "methodLines": 108,
+        "methodLines": 107,
         "entityManager": 18,
         "aiFacade": 5
     },
@@ -50,7 +50,6 @@
         "src/Controller/LegacyApiController.php::LegacyApiController::messageNew": 52,
         "src/Controller/LegacyApiController.php::LegacyApiController::promptUpdate": 71,
         "src/Controller/MediaController.php::MediaController::generateFromImages": 53,
-        "src/Controller/MessageController.php::MessageController::enhanceInput": 118,
         "src/Controller/MessageController.php::MessageController::getExtractedMemories": 71,
         "src/Controller/MessageController.php::MessageController::sendMessage": 252,
         "src/Controller/MessageController.php::MessageController::uploadFileForChat": 225,

@@ -10,7 +10,7 @@
     "counts": {
         "fileLines": 52,
         "constructorParams": 65,
-        "methodLines": 131
+        "methodLines": 130
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -35,7 +35,7 @@
         "src/Controller/FeedbackController.php": 837,
         "src/Controller/FileController.php": 1930,
         "src/Controller/InboundEmailHandlerController.php": 824,
-        "src/Controller/MessageController.php": 1173,
+        "src/Controller/MessageController.php": 1131,
         "src/Controller/MessagesGatewayController.php": 832,
         "src/Controller/OpenAICompatibleController.php": 862,
         "src/Controller/PromptController.php": 1869,
@@ -171,7 +171,6 @@
         "src/Controller/GitHubAuthController.php::GitHubAuthController::callback": 108,
         "src/Controller/GitHubAuthController.php::GitHubAuthController::findOrCreateUser": 109,
         "src/Controller/KeycloakAuthController.php::KeycloakAuthController::callback": 178,
-        "src/Controller/MessageController.php::MessageController::enhanceInput": 118,
         "src/Controller/MessageController.php::MessageController::sendMessage": 252,
         "src/Controller/MessageController.php::MessageController::uploadFileForChat": 225,
         "src/Controller/MessagesApiController.php::MessagesApiController::streamResponse": 182,
