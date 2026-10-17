@@ -190,6 +190,28 @@ else chat. A media route takes a media model: a chat model kept on a media
 topic leaves the choice to the media handler's default.
 `OverrideAndAgainRoutingTest` pins both paths on one table.
 
+`MessageClassifier::classify()` is a cascade of steps in
+`App\Service\Message\Classification\`, in the order it runs. The first step
+that decides returns, before the AI sorter's paid call:
+
+| Step | Decides |
+| ---- | ------- |
+| `SlashCommandRoute` | on every channel (#2280): a bare command answers with its usage hint, even for a pinned assistant; a tool command (`/pic`, `/vid`, …) routes to its tool; `/search` and `/docs` with an argument become overlays on whatever classifies the rest (`SlashOutcome`); `/docs <query>` without a pin searches the knowledge base |
+| `AgentPinRoute` | a pinned assistant answers with its own prompt and models, asking the sorter only whether the turn needs the web |
+| `FastPathClassifier` | an obviously plain chat message in a certain language skips the sorter (`CLASSIFIER.FAST_PATH_ENABLED`, off by default) |
+| `AgainOverride` | the prompt or the model a user picked for an Again (`BMESSAGEMETA`) |
+| `AttachmentIntent` | a document, audio or video goes to file analysis (#595, #722), unless it is an office edit, a merge or PDF export, or a demand for a new file (#2047) |
+| `EmbeddingRoute` | a confident anchor match for a system topic (Phase 8, `EMBEDDING_ROUTER`, off by default); a match declined for its language (`EmbeddingVerdict`) also keeps the deferral off |
+| `RoutingDeferral` | hands the decision to the answering call's hand-off tools when the account's chat provider can call tools (Phase 9, `NATIVE_TOOL_ROUTING`, off by default) |
+| `SorterVerdict` | the AI sorter (`DEFAULTMODEL.SORT`, reading `SorterInput`), then the overlays on its verdict: media type, the describe reroute (#1237), the planner for code on files and for a spoken answer, a forced search, duration, resolution, input mode |
+
+`ThreadArtifacts` (what the previous turns produced), `ConfidentLanguage`
+and `SelfAwareQuestion` (a question about Synaplan itself, which only the
+sorter routes) serve several steps. A turn that asks for a new file or a
+spoken answer skips the embedding router and the deferral, because only the
+sorter and the planner deliver it. `RoutingCharacterizationTest` pins the
+cascade, including the cases where two steps compete.
+
 ## Channel turns
 
 A channel's entry point reads as its stages, in order. Each stage is a
