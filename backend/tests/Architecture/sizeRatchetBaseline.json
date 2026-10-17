@@ -54,7 +54,7 @@
         "src/Service/Iam/ShareService.php": 853,
         "src/Service/Media/MediaGenerationService.php": 846,
         "src/Service/Memory/UserMemoryService.php": 1022,
-        "src/Service/Message/Handler/MediaGenerationHandler.php": 2245,
+        "src/Service/Message/Handler/MediaGenerationHandler.php": 1956,
         "src/Service/Message/MessageClassifier.php": 1962,
         "src/Service/Message/MessageSorter.php": 921,
         "src/Service/ModelConfigService.php": 1327,
@@ -66,7 +66,7 @@
         "src/Service/Research/UrlContentService.php": 1258,
         "src/Service/Usage/UsageStatsService.php": 960,
         "src/Service/VectorSearch/QdrantClientDirect.php": 2000,
-        "src/Service/WhatsApp/WhatsAppService.php": 1139,
+        "src/Service/WhatsApp/WhatsAppService.php": 1135,
         "src/Service/Widget/WidgetSetupService.php": 1000,
         "src/Service/Widget/WidgetSummaryService.php": 836
     },

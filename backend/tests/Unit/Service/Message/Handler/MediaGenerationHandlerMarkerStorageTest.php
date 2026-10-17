@@ -23,6 +23,8 @@ use App\Service\Media\MediaJobService;
 use App\Service\Memory\MemoryExtractionDispatcher;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\GeneratedMediaTextRenderer;
+use App\Service\Message\Handler\Media\MediaDownloader;
+use App\Service\Message\Handler\Media\MediaUploadStore;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\MediaPromptExtractor;
@@ -78,7 +80,7 @@ final class MediaGenerationHandlerMarkerStorageTest extends TestCase
             $this->em,
             new NullLogger(),
             $this->promptExtractor,
-            new UserUploadPathBuilder(),
+            new MediaUploadStore(new UserUploadPathBuilder(), new MediaDownloader(), new NullLogger(), $this->uploadDir, 'https://app.example.test'),
             $this->createMock(ThumbnailService::class),
             $this->rateLimitService,
             new MediaErrorMessageBuilder(),
