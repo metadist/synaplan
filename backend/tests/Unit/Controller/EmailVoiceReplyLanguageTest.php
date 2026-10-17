@@ -7,7 +7,6 @@ namespace App\Tests\Unit\Controller;
 use App\AI\Exception\NoSpeakableTextException;
 use App\AI\Provider\PiperProvider;
 use App\AI\Service\AiFacade;
-use App\Controller\WebhookController;
 use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
@@ -17,7 +16,6 @@ use App\Service\Email\EmailWebhookIdempotencyService;
 use App\Service\Email\InboundEmailAttachmentStore;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\RawMimeEmailParser;
-use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\ExternalReplyReferences;
 use App\Service\Message\MessageProcessor;
@@ -26,11 +24,11 @@ use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
 use App\Service\WhatsApp\WhatsAppService;
+use App\Tests\Support\EmailWebhookControllerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
-use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -185,26 +183,24 @@ final class EmailVoiceReplyLanguageTest extends TestCase
             static fn (string $text): string => $text,
         );
 
-        $controller = new WebhookController(
-            $em,
-            $processor,
-            $idempotency,
-            $limits,
-            $this->createStub(WhatsAppService::class),
-            $emailChats,
-            $mailer,
-            $discord,
-            new NullLogger(),
-            'verify-token',
-            $aiFacade,
-            $modelConfig,
-            new GeneratedFileMetadataNormalizer(),
-            $mime,
-            $attachmentStore,
-            $this->createStub(ConversationSummaryRefreshDispatcher::class),
-            $this->createStub(ChatErrorPresenter::class),
-            $references,
-        );
+        $controller = EmailWebhookControllerFactory::build([
+            'em' => $em,
+            'processor' => $processor,
+            'idempotency' => $idempotency,
+            'limits' => $limits,
+            'emailChats' => $emailChats,
+            'mailer' => $mailer,
+            'discord' => $discord,
+            'ai' => $aiFacade,
+            'models' => $modelConfig,
+            'mime' => $mime,
+            'attachments' => $attachmentStore,
+            'summaries' => $this->createStub(ConversationSummaryRefreshDispatcher::class),
+            'errors' => $this->createStub(ChatErrorPresenter::class),
+            'references' => $references,
+            'whatsApp' => $this->createStub(WhatsAppService::class),
+            'uploadDir' => '/tmp/var/uploads',
+        ]);
 
         $serializer = $this->createMock(SerializerInterface::class);
         $serializer->method('serialize')->willReturnCallback(
@@ -212,7 +208,6 @@ final class EmailVoiceReplyLanguageTest extends TestCase
         );
         $container = new Container();
         $container->set('serializer', $serializer);
-        $container->set('parameter_bag', new ParameterBag(['kernel.project_dir' => '/tmp']));
         $controller->setContainer($container);
 
         $request = Request::create('/api/v1/webhooks/email', 'POST', content: json_encode([

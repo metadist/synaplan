@@ -133,3 +133,32 @@ on #2539. Where the result differs from the plan:
   entries (V5: keep one). A processor failure marks the visitor's message
   failed but keeps the session's counter, while an exception rolls it back;
   the snapshot pins both, and the owner decides.
+
+## 10. As delivered — S4b (2026-10-17)
+
+`email()` is 14 lines, its ledger entry is gone, and `WebhookController`
+leaves the file ledger (1,085 → 383 lines, 19 → 11 parameters). The branch
+starts from S4a's head. Where the result differs from the plan:
+
+- **Fourteen cases instead of nine.** Added: invalid JSON, missing fields, a
+  duplicate by fingerprint beside the one by message id, a processor
+  exception, and a sender on the debug domain (its Discord reports). Mail
+  is read from the mailer's test transport after each delivery: the test
+  client clears that log between requests, and a redelivery must show that
+  it sent nothing.
+- **`EmailThread` beside `InboundEmail`.** The accepted email carries its
+  message id, the id it answers and the normalized id together; the debug
+  domain is a method of the sender, not a field. That keeps the value
+  object under the constructor limit instead of adding a ledger entry.
+- **The reply's helpers.** `EmailAnswerStore` records the usage and keeps
+  the answer, `EmailVoiceReply` makes the spoken reply (its file stays
+  attached even when its usage cannot be recorded, as before), and
+  `EmailReplyAttachments` holds the path-traversal guard, moved unchanged
+  with the upload directory injected.
+- **Two inputs answer differently.** A body sent as a list gets the
+  missing-fields answer (400) instead of an unhandled type error (500); a
+  subject or message id sent as a list counts as absent. The idempotency
+  check still reads the message id as sent (review round 1).
+- **The existing tests** (`EmailVoiceReplyLanguageTest`,
+  `EmailWebhookDocReferenceTest`) build the controller through
+  `EmailWebhookControllerFactory`; their assertions are unchanged.
