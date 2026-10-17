@@ -190,6 +190,24 @@ else chat. A media route takes a media model: a chat model kept on a media
 topic leaves the choice to the media handler's default.
 `OverrideAndAgainRoutingTest` pins both paths on one table.
 
+## Channel turns
+
+A channel's entry point reads as its stages, in order. Each stage is a
+service and hands the next one a typed value, never the request or a loose
+array.
+
+**Widget** — `WidgetPublicController::message()`, `App\Service\Widget\Turn\`:
+
+| Stage | Does |
+| ----- | ---- |
+| `WidgetTurnGate` | admits the visitor's message as a `WidgetTurn` or refuses it (`WidgetRequestRefused`): the body, the widget and its owner's limits, the domain (`WidgetDomainGuard`), the session (`WidgetSessionResolver`, the owner's test and internal mode), the session's message limit, the owner; records the visitor's country |
+| `WidgetConversation` | stores the message (`StoredVisitorMessage`): the session's chat or a new one with the welcome, the live dashboard event, the trigger-phrase page (`WidgetHandoff`), the session's own files, one flush for counter, preview and chat link; `awaitOperator()` when a person runs the session |
+| `WidgetReply` | streams the AI answer through `SseWriter`, detached from the connection and recorded as a resumable run; `WidgetAnswerChunks` turns chunks into frames, `WidgetAnswerStore` keeps the finished answer |
+
+`WidgetTurnCharacterizationTest` pins every way the turn's output leaves —
+frames, stored rows, realtime events, Slack, Discord, usage, generated
+media, the run and the flush count — over nineteen cases.
+
 ## File analysis — `FileAnalysisHandler`
 
 `FileAnalysisHandler` answers about the files of a turn on one path for both

@@ -102,3 +102,34 @@ cache).
 Telegram (it already runs through `TelegramConversation`). The rest of
 `WidgetPublicController` (`history()`, `upload()`, …) and `WhatsAppService`
 (media download, markdown conversion): V5. The MIME map: S8.
+
+## 9. As delivered — S4a (2026-10-17)
+
+The widget's exit lines hold: `message()` is 19 lines, its ledger entry is
+gone, and the class's entries shrank by more than the moved lines (2,234 →
+1,110 lines, 27 → 21 parameters). The branch starts from S3's head, stacked
+on #2539. Where the result differs from the plan:
+
+- **Nineteen cases instead of eleven.** Added: invalid JSON, a foreign and
+  an allowed domain, a JSON answer, reasoning cut at length, a generated
+  image and a processor exception. A CLI test cannot drop the connection,
+  so "client gone mid-stream" is what every streamed case records: the turn
+  runs detached from the client, and its replay log carries every frame.
+- **`SseWriter` without `open()`.** The frames are byte-identical, so the
+  reply sends them through `SseWriter` and the widget's `sendSse()` is gone.
+  `open()` drops every output buffer, which the widget never did; the reply
+  keeps its own stream preparation. Nothing to carry to V5 but the one
+  abort log line `SseWriter` writes.
+- **Shared code moved out unchanged.** `WidgetDomainGuard`,
+  `WidgetSessionResolver`, `WidgetHandoff` (now also behind the manual
+  handoff button) and `WidgetApiContext` (split under 100 lines); the
+  controller keeps one-line delegates for the actions S4 leaves alone.
+- **Two inputs answer differently.** A `sessionId` or `text` sent as a list
+  gets the missing-fields answer (400) instead of an unhandled type error
+  (500), and realtime events use the stored widget id, not the URL's
+  spelling (the lookup is case-insensitive).
+- **Found, carried.** `WidgetDomainGuard` and `WidgetOriginValidator` check
+  the same allowlist twice and differ for a `"0"` host and non-string
+  entries (V5: keep one). A processor failure marks the visitor's message
+  failed but keeps the session's counter, while an exception rolls it back;
+  the snapshot pins both, and the owner decides.
