@@ -2481,6 +2481,7 @@
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
+                            "rag_group_key": "kb",
                             "source": "widget",
                             "topic": "support"
                         },
@@ -2510,6 +2511,7 @@
                     "prompt_metadata": {
                         "aiModel": 0
                     },
+                    "rag_group_key": "kb",
                     "sorting_model_id": null,
                     "sorting_model_name": null,
                     "sorting_provider": null,
@@ -4693,6 +4695,9 @@
                             "prompt_metadata": {
                                 "aiModel": 0
                             },
+                            "rag_group_key": "kb",
+                            "rag_limit": 4,
+                            "rag_min_score": 0.4,
                             "source": "ai_sorting",
                             "topic": "general"
                         },
@@ -4720,6 +4725,9 @@
                     "prompt_metadata": {
                         "aiModel": 0
                     },
+                    "rag_group_key": "kb",
+                    "rag_limit": 4,
+                    "rag_min_score": 0.4,
                     "sorting_model_id": 5,
                     "sorting_model_name": "sorter-model",
                     "sorting_provider": "groq",

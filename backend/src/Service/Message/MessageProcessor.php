@@ -178,6 +178,7 @@ final readonly class MessageProcessor
             }
 
             $classification = TurnClassificationResolver::withWidgetMode($classification, $options);
+            $classification = TurnClassificationResolver::withRagScope($classification, $options);
             $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
             [$classification, $options, $promptMetadata] = $this->classifications->promptForBufferedTurn($message, $classification, $options);
 

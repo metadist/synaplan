@@ -57,6 +57,15 @@ final class TurnAlignmentTest extends TestCase
         self::assertTrue($this->buffered(['is_widget_mode' => true])['classification']['is_widget_mode'] ?? null);
     }
 
+    public function testBothTurnsCarryTheKnowledgeBaseScopeTheCallerPicked(): void
+    {
+        $scope = ['rag_group_key' => 'kb', 'rag_limit' => 4, 'rag_min_score' => 0.4];
+
+        foreach (['buffered' => $this->buffered($scope), 'streamed' => $this->streamed($scope)] as $turn => $routed) {
+            self::assertSame($scope, array_intersect_key($routed['classification'], $scope), $turn);
+        }
+    }
+
     /**
      * @param array<string, mixed> $options
      * @param array<string, mixed> $verdict

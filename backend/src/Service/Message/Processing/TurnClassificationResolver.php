@@ -160,8 +160,7 @@ final readonly class TurnClassificationResolver
 
     /**
      * Streamed: the language is the message's own (`auto` when unknown), so
-     * the answer follows whatever the user writes; RAG scope applies here and
-     * again for every turn ({@see withRagScope()}).
+     * the answer follows whatever the user writes.
      *
      * @param array<string, mixed> $options
      *
@@ -184,7 +183,7 @@ final readonly class TurnClassificationResolver
         ]);
         $status->report('classified', sprintf('%s: Using fixed prompt', ucfirst($source)));
 
-        return self::withRagScope($classification, $options);
+        return $classification;
     }
 
     /**
