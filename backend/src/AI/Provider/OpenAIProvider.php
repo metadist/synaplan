@@ -446,7 +446,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * Translate the cross-provider `reasoning_effort` knob into OpenAI's
      * Responses API `reasoning` config.
      *
-     * Mirrors the logic in {@see GoogleProvider::resolveThinkingConfig()} so the
+     * Mirrors the logic in {@see Google\GoogleChat::resolveThinkingConfig()} so the
      * "default chat = no thinking, near-instant TTFT" behaviour is identical
      * across providers. The headline Phase 1e win on Gemini Pro
      * (`thinkingBudget=0` for default chat) translates to OpenAI as the
