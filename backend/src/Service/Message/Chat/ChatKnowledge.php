@@ -13,7 +13,7 @@ final readonly class ChatKnowledge
     /**
      * @param string                     $context    the knowledge-base block for the system prompt
      * @param list<array<string, mixed>> $sources    the documents the block was cut from
-     * @param array<string, mixed>|null  $webResults web results the classifier fetched (buffered turns)
+     * @param array<string, mixed>|null  $webResults the turn's web results (buffered turns)
      */
     public function __construct(
         public string $context = '',

@@ -65,10 +65,8 @@ final readonly class ChatTurnContextLoader
         $topic = $classification['topic'] ?? 'general';
         $promptData = $this->promptService->getPromptWithMetadata($topic, $message->getUserId(), $classification['language'] ?? 'en');
 
-        $searchResults = $classification['search_results'] ?? null;
-        if (array_key_exists('search_results', $classification)) {
-            unset($classification['search_results']);
-        }
+        $searchResults = $options['search_results'] ?? null;
+        unset($options['search_results']);
 
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->knowledge->settings($profile, $classification, $options);
         $isRagQuery = Capability::RagQuery->value === ($classification['intent'] ?? '');

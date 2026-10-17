@@ -337,6 +337,7 @@ final class ChatPromptCharacterizationTest extends TestCase
             ]]),
             'with_web_and_quote' => $this->spec('Is that still true?', classification: [
                 'url_content' => "Page: https://example.com/php\nPHP 8.4 was released.",
+            ], options: [
                 'search_results' => [
                     'query' => 'php latest release',
                     'pages_read' => 1,
@@ -348,7 +349,6 @@ final class ChatPromptCharacterizationTest extends TestCase
                         'page_content' => 'PHP 8.4 is the current stable release.',
                     ]],
                 ],
-            ], options: [
                 'quoted_text' => 'We should wait for the next PHP release.',
                 'quoted_message_id' => 90,
                 'client_country' => 'DE',

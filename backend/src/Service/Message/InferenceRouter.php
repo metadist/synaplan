@@ -3,8 +3,10 @@
 namespace App\Service\Message;
 
 use App\Entity\Message;
+use App\Entity\Prompt;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Exception\UnmappedIntentException;
+use App\Service\Message\Processing\TurnClassificationResolver;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingDirective;
 use App\Service\Message\Routing\RoutingLayer;
@@ -33,6 +35,7 @@ final class InferenceRouter
         private LoggerInterface $logger,
         private SystemCapabilityRegistry $capabilityRegistry,
         private MessageClassifier $classifier,
+        private TurnClassificationResolver $classifications,
     ) {
         foreach ($handlers as $handler) {
             $this->handlers[$handler->getName()] = $handler;
@@ -57,6 +60,7 @@ final class InferenceRouter
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
+        [$classification, $options] = $this->withPromptOfTopic($message, $classification, $options);
         $intent = $classification['intent'] ?? 'chat';
 
         ProgressCallback::notify($progressCallback, 'processing', "Routing to handler: {$intent}");
@@ -69,10 +73,14 @@ final class InferenceRouter
 
             $directive = RoutingDirective::fromHandlerResult($result);
             if (null !== $directive) {
-                $rerouted = $this->applyDirective($directive, $message, $thread, $classification, $progressCallback);
+                [$rerouted, $reroutedOptions] = $this->withPromptOfTopic(
+                    $message,
+                    $this->applyDirective($directive, $message, $thread, $classification, $progressCallback),
+                    $options,
+                );
 
                 return $this->getHandler($rerouted['intent'] ?? 'chat')
-                    ->handle($message, $thread, $rerouted, $progressCallback, $options);
+                    ->handle($message, $thread, $rerouted, $progressCallback, $reroutedOptions);
             }
 
             ProgressCallback::notify($progressCallback, 'processing', "Handler complete: {$intent}");
@@ -102,6 +110,7 @@ final class InferenceRouter
         ?callable $progressCallback = null,
         array $options = [],
     ): array {
+        [$classification, $options] = $this->withPromptOfTopic($message, $classification, $options);
         $intent = $classification['intent'] ?? 'chat';
 
         $this->logger->info('InferenceRouter: Routing to handler', [
@@ -127,10 +136,14 @@ final class InferenceRouter
 
             $directive = RoutingDirective::fromHandlerResult($result);
             if (null !== $directive) {
-                $rerouted = $this->applyDirective($directive, $message, $thread, $classification, $progressCallback);
+                [$rerouted, $reroutedOptions] = $this->withPromptOfTopic(
+                    $message,
+                    $this->applyDirective($directive, $message, $thread, $classification, $progressCallback),
+                    $options,
+                );
 
                 return $this->getHandler($rerouted['intent'] ?? 'chat')
-                    ->handleStream($message, $thread, $rerouted, $streamCallback, $progressCallback, $options);
+                    ->handleStream($message, $thread, $rerouted, $streamCallback, $progressCallback, $reroutedOptions);
             }
 
             ProgressCallback::notify($progressCallback, 'processing', "Handler complete: {$intent}");
@@ -178,9 +191,10 @@ final class InferenceRouter
             ProgressCallback::notify($progressCallback, 'processing', 'Classifying request...');
 
             // Transient keys the pipeline attached earlier (search results,
-            // fetched URL content, prompt metadata, widget model override) are
-            // NOT part of a classification and would be lost by taking the
-            // fresh result wholesale — hence merge, fresh result winning.
+            // fetched URL content, widget model override) are NOT part of a
+            // classification and would be lost by taking the fresh result
+            // wholesale — hence merge, fresh result winning. The prompt
+            // settings follow the topic ({@see withPromptOfTopic()}).
             return array_merge(
                 $classification,
                 $this->classifier->classify($message, $thread, null, allowRoutingDeferral: false),
@@ -216,6 +230,31 @@ final class InferenceRouter
             $directive->fields,
             $decision->toClassificationFields(),
         );
+    }
+
+    /**
+     * A handler answers with the prompt of the topic it receives. When the
+     * topic changed after MessageProcessor resolved the prompt (a native tool
+     * hand-off, a reclassification, the planner's file fallback), the first
+     * topic's metadata and bundle no longer apply: a chat model pinned there
+     * would generate the image.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>}
+     */
+    private function withPromptOfTopic(Message $message, array $classification, array $options): array
+    {
+        $resolved = $options['resolved_prompt_data']['prompt'] ?? null;
+        if (!$resolved instanceof Prompt || $resolved->getTopic() === ($classification['topic'] ?? null)) {
+            return [$classification, $options];
+        }
+
+        unset($classification['prompt_metadata'], $options['resolved_prompt_data']);
+        [$classification, $options] = $this->classifications->prompt($message, $classification, $options);
+
+        return [$classification, $options];
     }
 
     /**

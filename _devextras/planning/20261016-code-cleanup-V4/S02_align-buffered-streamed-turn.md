@@ -96,3 +96,45 @@ language, caller language and a fixed prompt all exist. Any reader of
 
 The topic / intent rule (S3). Strict types (S11). Any change to
 `ChatHandler`'s two turns (V5).
+
+## 8. As delivered (2026-10-17)
+
+Every exit line holds. The branch starts from `origin/main`, because S1b
+had merged. Where the result differs from the plan:
+
+- **Seven cases instead of two.** S2.1 pins every language rule D1 aligns:
+  a fixed prompt, an Again and a forced image description, each with a
+  message language and with a caller language on top, plus the carried
+  prompt metadata.
+- **S2.4 covers Again and the forced image description.** One rule
+  decides for both turns: the caller's language, then the message's own,
+  then English. A buffered forced image description no longer ignores the
+  message language, and a streamed one no longer answers in `NN`.
+- **The pairs keep their status reports.** `fixedPrompt()`, `again()`,
+  `forcedImage()` and `prompt()` decide once. The per-transport methods
+  left around them only report the `classified` status, which carries the
+  verdict on a buffered turn. A streamed forced image description is
+  reported by `finish()`, as before.
+- **The prompt metadata reaches the streamed handlers.** It now sits on
+  the classification of both turns, so media generation and file analysis
+  honour a task prompt's `aiModel` in the web chat too. The verdict
+  returned to the caller leaves it out: a public widget passes that verdict
+  to its visitor, and the visitor gets no more than before.
+- **S2.7 touched one reader in `ChatHandler`'s buffered turn.**
+  `ChatTurnContextLoader` takes the web results from the options instead
+  of the classification; the two turns themselves stay as they are (V5).
+  The chat prompt characterization now passes its web results the same
+  way. `chat_prompt.json` is unchanged; in `chat_prompt_stream.json`,
+  `with_web_and_quote` gains the web block every streamed turn gets in
+  production. A buffered multi-step turn now reuses the processor's
+  search instead of searching again.
+- **`auto` is stored as an unknown language.** The sprint's E2E run found
+  it: a Saved Task without a language now answers `auto`, and the runner
+  stored that into the two-letter `BLANG` column, so Run now failed with a
+  500. Email and MCP store the turn's language the same way. Only the
+  public widget mapped `auto` before. `Message::setLanguage()` now stores
+  such a turn as `NN`, in S2.5 with `MessageLanguageTest`.
+- **Three structural differences outside V3's nine are carried to V5**
+  (STATUS): the forced image description runs through `finish()` only when
+  streamed, the result key is `preprocessed` versus `preprocessing`, and
+  only a buffered failure carries `details`.

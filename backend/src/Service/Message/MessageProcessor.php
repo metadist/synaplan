@@ -20,8 +20,10 @@ use Psr\Log\LoggerInterface;
  *
  * process() is the buffered turn (email, MCP, Saved Tasks, webhooks, models
  * that cannot stream); processStream() the streamed one. Both run the same
- * stages; where they still differ, the stage names it (code cleanup V3,
- * master plan §3, nine differences).
+ * stages and decide alike. Three differences stay, each because only one
+ * transport has what it needs: the stream's caller reports `complete` and
+ * `error` itself, only a stream can be stopped by the user (`cancelled`),
+ * and only the stream has a consumer for its phase timings.
  */
 final readonly class MessageProcessor
 {
@@ -65,13 +67,6 @@ final readonly class MessageProcessor
 
             if ($hasFixedPrompt) {
                 $classification = $this->classifications->fixedPromptForStreamedTurn($message, $options, $status);
-            } elseif (!empty($options['is_widget_mode'])) {
-                // Classified before the history is loaded; the turn is
-                // classified again below (a V4 alignment item).
-                $perfTimer->start('classify');
-                $classification = $this->classifications->afterClassify($this->classifications->classify($message, [], $options), $options);
-                $perfTimer->stop('classify');
-                $classification['is_widget_mode'] = true;
             } elseif ($isAgainRequest) {
                 $classification = $this->classifications->againForStreamedTurn($message, $options, $status);
             } else {
@@ -84,7 +79,7 @@ final readonly class MessageProcessor
 
             if (!$isAgainRequest && !$hasFixedPrompt) {
                 if (!empty($options['force_image_description'])) {
-                    $classification = $this->classifications->forcedImageForStreamedTurn($message);
+                    $classification = $this->classifications->forcedImage($message, $options);
                 } else {
                     $perfTimer->start('classify');
                     $classification = $this->classifications->classify($message, $conversationHistory, $options);
@@ -95,19 +90,20 @@ final readonly class MessageProcessor
                 $this->dispatcher->shadowPlan($message, $conversationHistory, $perfTimer, $classification);
             }
 
-            $classification = TurnClassificationResolver::withRagScope($classification ?? [], $options);
+            $classification = TurnClassificationResolver::withWidgetMode($classification ?? [], $options);
+            $classification = TurnClassificationResolver::withRagScope($classification, $options);
             $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
-            [$options, $promptMetadata] = $this->classifications->promptForStreamedTurn($message, $classification, $options, $perfTimer);
+            [$classification, $options, $promptMetadata] = $this->classifications->prompt($message, $classification, $options, $perfTimer);
 
             ['classification' => $classification, 'searchResults' => $searchResults]
                 = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status, $perfTimer);
+            if ($searchResults) {
+                $options['search_results'] = $searchResults;
+            }
 
             [$options, $conversationHistory] = $this->history->applyRollingSummary($message, $classification, $options, $conversationHistory, $perfTimer);
 
             $this->dispatcher->announce($message, $status);
-            if ($searchResults) {
-                $options['search_results'] = $searchResults;
-            }
 
             $perfTimer->start('handler_total');
             $response = $this->dispatcher->dispatchStreamed($message, $conversationHistory, $classification, $streamCallback, $statusCallback, $options);
@@ -115,7 +111,7 @@ final readonly class MessageProcessor
 
             return [
                 'success' => true,
-                'classification' => self::withSorting($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting),
+                'classification' => self::verdictForCaller($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting),
                 'response' => $response,
                 'preprocessed' => $preprocessed,
                 'search_results' => $searchResults,
@@ -172,9 +168,9 @@ final readonly class MessageProcessor
             $conversationHistory = $this->history->load($message, $options);
 
             if ($hasFixedPrompt) {
-                $classification = $this->classifications->fixedPromptForBufferedTurn($options, $status);
+                $classification = $this->classifications->fixedPromptForBufferedTurn($message, $options, $status);
             } elseif (!empty($options['force_image_description'])) {
-                $classification = $this->classifications->forcedImageForBufferedTurn($options, $status);
+                $classification = $this->classifications->forcedImageForBufferedTurn($message, $options, $status);
             } elseif ($isAgainRequest) {
                 $classification = $this->classifications->againForBufferedTurn($message, $options, $status);
             } else {
@@ -183,13 +179,15 @@ final readonly class MessageProcessor
                 $this->dispatcher->shadowPlan($message, $conversationHistory, null, $classification);
             }
 
+            $classification = TurnClassificationResolver::withWidgetMode($classification, $options);
+            $classification = TurnClassificationResolver::withRagScope($classification, $options);
             $classification = TurnDispatcher::tagSavedTaskRun($classification, $options);
-            [$classification, $options, $promptMetadata] = $this->classifications->promptForBufferedTurn($message, $classification, $options);
+            [$classification, $options, $promptMetadata] = $this->classifications->prompt($message, $classification, $options);
 
             ['classification' => $classification, 'searchResults' => $searchResults]
                 = $this->webSearch->run($message, $classification, $promptMetadata, $options, $conversationHistory, $status);
             if ($searchResults) {
-                $classification['search_results'] = $searchResults;
+                $options['search_results'] = $searchResults;
             }
 
             // The same read-only summary as the stream, so email, MCP and
@@ -198,13 +196,13 @@ final readonly class MessageProcessor
 
             $this->dispatcher->announce($message, $status);
             $response = $this->dispatcher->dispatchBuffered($message, $conversationHistory, $classification, $statusCallback, $options);
+            // A buffered caller has no stream to end, so the turn reports its own end.
             $status->report('complete', 'Response generated', [
                 'provider' => $response['metadata']['provider'] ?? 'unknown',
                 'model' => $response['metadata']['model'] ?? 'unknown',
             ]);
 
-            $classification = self::withSorting($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting);
-            unset($classification['search_results']);
+            $classification = self::verdictForCaller($this->dispatcher->applyEffectiveClassification($classification, $response), $sorting);
 
             return [
                 'success' => true,
@@ -284,16 +282,18 @@ final readonly class MessageProcessor
     }
 
     /**
-     * The sorting model goes back on the result (StreamController stores it),
-     * never to the handler.
+     * The verdict the caller gets back: with the sorting model, which
+     * StreamController stores and the handler never sees, and without the
+     * prompt settings, which a public widget would hand to its visitor.
      *
      * @param array<string, mixed>                $classification
      * @param array{0: mixed, 1: mixed, 2: mixed} $sorting
      *
      * @return array<string, mixed>
      */
-    private static function withSorting(array $classification, array $sorting): array
+    private static function verdictForCaller(array $classification, array $sorting): array
     {
+        unset($classification['prompt_metadata']);
         $classification['sorting_model_id'] = $sorting[0];
         $classification['sorting_provider'] = $sorting[1];
         $classification['sorting_model_name'] = $sorting[2];

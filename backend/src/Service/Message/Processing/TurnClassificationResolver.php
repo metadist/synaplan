@@ -15,14 +15,16 @@ use Psr\Log\LoggerInterface;
 /**
  * What a turn is about and which prompt answers it.
  *
- * Fixed-prompt turns (widget, API, Saved Task) and Again skip the AI sorter;
- * everything else is classified. The buffered and the streamed turn still
- * differ here — fixed-prompt language, RAG scope keys, prompt metadata, the
- * forced image description — so each difference has a buffered and a
- * streamed method of its own (code cleanup V3, master plan §3).
+ * Fixed-prompt turns (widget, API, Saved Task), Again and the forced image
+ * description skip the AI sorter; everything else is classified. Both
+ * transports decide alike: one language rule, one method per kind of turn,
+ * one prompt lookup. Per transport only the classified status differs: a
+ * buffered turn's carries the verdict.
  */
 final readonly class TurnClassificationResolver
 {
+    private const AGAIN_STATUS = 'Using previously selected model (skipped classification)';
+
     public function __construct(
         private MessageClassifier $classifier,
         private ModelConfigService $modelConfigService,
@@ -159,9 +161,7 @@ final readonly class TurnClassificationResolver
     }
 
     /**
-     * Streamed: the language is the message's own (`auto` when unknown), so
-     * the answer follows whatever the user writes; RAG scope applies here and
-     * again for every turn ({@see withRagScope()}).
+     * Streamed, the classified status names the source only.
      *
      * @param array<string, mixed> $options
      *
@@ -169,48 +169,29 @@ final readonly class TurnClassificationResolver
      */
     public function fixedPromptForStreamedTurn(Message $message, array $options, TurnStatus $status): array
     {
-        [$isWidget, $source] = self::fixedPromptSource($options);
-        $language = $message->getLanguage();
-        if (!$language || 'NN' === $language) {
-            $language = 'auto';
-        }
-
-        $classification = self::fixedPromptClassification($options, $language, $source, $isWidget);
-        $this->logger->info('MessageProcessor: Using fixed prompt (skipped AI classification)', [
-            'language' => $language,
-            'fixed_topic' => $options['fixed_task_prompt'],
-            'source' => $source,
-            'widget_model_id' => $options['widget_model_id'] ?? null,
-        ]);
-        $status->report('classified', sprintf('%s: Using fixed prompt', ucfirst($source)));
-
-        return self::withRagScope($classification, $options);
-    }
-
-    /**
-     * Buffered: the language override from the caller, else `en`.
-     *
-     * @param array<string, mixed> $options
-     *
-     * @return array<string, mixed>
-     */
-    public function fixedPromptForBufferedTurn(array $options, TurnStatus $status): array
-    {
-        [$isWidget, $source] = self::fixedPromptSource($options);
-        $classification = self::fixedPromptClassification($options, $options['language'] ?? 'en', $source, $isWidget);
-        $this->logger->info('MessageProcessor: Using fixed task prompt', ['task_prompt' => $options['fixed_task_prompt'], 'source' => $source]);
-        $status->report('classified', sprintf('Using %s task prompt (skipped classification)', $source), [
-            'topic' => $classification['topic'],
-            'language' => $classification['language'],
-            'source' => $classification['source'],
-        ]);
+        $classification = $this->fixedPrompt($message, $options);
+        $status->report('classified', sprintf('%s: Using fixed prompt', ucfirst($classification['source'])));
 
         return $classification;
     }
 
     /**
-     * Again skips the sorter: the stored topic and language route the turn;
-     * a model picked for the retry decides the topic when its tag says so.
+     * Buffered, the classified status carries the verdict.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    public function fixedPromptForBufferedTurn(Message $message, array $options, TurnStatus $status): array
+    {
+        $classification = $this->fixedPrompt($message, $options);
+        $status->report('classified', sprintf('Using %s task prompt (skipped classification)', $classification['source']), self::verdict($classification));
+
+        return $classification;
+    }
+
+    /**
+     * Streamed, the classified status names no verdict.
      *
      * @param array<string, mixed> $options
      *
@@ -218,43 +199,40 @@ final readonly class TurnClassificationResolver
      */
     public function againForStreamedTurn(Message $message, array $options, TurnStatus $status): array
     {
-        $language = $message->getLanguage();
-        $classification = $this->againClassification($message, $options, ($language && 'NN' !== $language) ? $language : 'en');
-        $status->report('classified', 'Using previously selected model (skipped classification)');
+        $classification = $this->again($message, $options);
+        $status->report('classified', self::AGAIN_STATUS);
 
         return $classification;
     }
 
     /**
+     * Buffered, the classified status carries the verdict.
+     *
      * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
      */
     public function againForBufferedTurn(Message $message, array $options, TurnStatus $status): array
     {
-        $language = $options['language'] ?? ($message->getLanguage() && 'NN' !== $message->getLanguage() ? $message->getLanguage() : 'en');
-        $classification = $this->againClassification($message, $options, $language);
-        $status->report('classified', 'Using previously selected model (skipped classification)', [
-            'topic' => $classification['topic'],
-            'language' => $classification['language'],
-            'source' => $classification['source'],
-            'model_id' => $classification['model_id'],
-        ]);
+        $classification = $this->again($message, $options);
+        $status->report('classified', self::AGAIN_STATUS, self::verdict($classification) + ['model_id' => $classification['model_id']]);
 
         return $classification;
     }
 
     /**
      * WhatsApp images: ChatHandler handles vision, so the topic is `general`.
-     * Streamed, the result still runs through {@see finish()}.
+     * A streamed turn reports it through {@see finish()}.
+     *
+     * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
      */
-    public function forcedImageForStreamedTurn(Message $message): array
+    public function forcedImage(Message $message, array $options): array
     {
         $this->logger->info('MessageProcessor: Forcing image description mode');
 
-        return self::forcedImageClassification($message->getLanguage() ?: 'en');
+        return ['topic' => 'general', 'language' => self::language($message, $options, 'en'), 'source' => 'forced_image_description', 'intent' => 'chat'];
     }
 
     /**
@@ -262,15 +240,28 @@ final readonly class TurnClassificationResolver
      *
      * @return array<string, mixed>
      */
-    public function forcedImageForBufferedTurn(array $options, TurnStatus $status): array
+    public function forcedImageForBufferedTurn(Message $message, array $options, TurnStatus $status): array
     {
-        $classification = self::forcedImageClassification($options['language'] ?? 'en');
-        $this->logger->info('MessageProcessor: Forcing image description mode (non-streaming)');
-        $status->report('classified', 'Forced image description mode', [
-            'topic' => $classification['topic'],
-            'language' => $classification['language'],
-            'source' => $classification['source'],
-        ]);
+        $classification = $this->forcedImage($message, $options);
+        $status->report('classified', 'Forced image description mode', self::verdict($classification));
+
+        return $classification;
+    }
+
+    /**
+     * A widget turn stays one, whichever path classified it: the handlers
+     * answer it without a task plan, memories or a web search.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    public static function withWidgetMode(array $classification, array $options): array
+    {
+        if (!empty($options['is_widget_mode'])) {
+            $classification['is_widget_mode'] = true;
+        }
 
         return $classification;
     }
@@ -300,81 +291,54 @@ final readonly class TurnClassificationResolver
     }
 
     /**
-     * Streamed: the prompt bundle is resolved once, in the turn's language,
-     * and handed to ChatHandler as `resolved_prompt_data`.
-     *
-     * @param array<string, mixed> $classification
-     * @param array<string, mixed> $options
-     *
-     * @return array{0: array<string, mixed>, 1: array<string, mixed>} [$options, $promptMetadata]
-     */
-    public function promptForStreamedTurn(Message $message, array $classification, array $options, PerfTimer $perfTimer): array
-    {
-        $perfTimer->start('prompt');
-        $promptData = $this->promptService->getPromptWithMetadata($classification['topic'] ?? 'general', $message->getUserId(), $classification['language'] ?? 'en');
-        $perfTimer->stop('prompt');
-
-        if (null !== $promptData) {
-            $options['resolved_prompt_data'] = $promptData;
-        }
-
-        return [$options, $promptData['metadata'] ?? []];
-    }
-
-    /**
-     * Buffered: the classifier's prompt metadata when it carries one, else a
-     * lookup by topic; handed on as `prompt_metadata`.
+     * The prompt that answers the turn, looked up once in the turn's language
+     * unless the classifier already carries its metadata. The metadata goes
+     * on the classification (media generation and file analysis read the
+     * prompt's `aiModel` there), the whole bundle into `resolved_prompt_data`,
+     * which ChatHandler reuses.
      *
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options
      *
      * @return array{0: array<string, mixed>, 1: array<string, mixed>, 2: array<string, mixed>} [$classification, $options, $promptMetadata]
      */
-    public function promptForBufferedTurn(Message $message, array $classification, array $options): array
+    public function prompt(Message $message, array $classification, array $options, ?PerfTimer $perfTimer = null): array
     {
-        $promptMetadata = is_array($classification['prompt_metadata'] ?? null) ? $classification['prompt_metadata'] : [];
-        if ([] === $promptMetadata && !empty($classification['topic'])) {
-            $promptData = $this->promptService->getPromptWithMetadata($classification['topic'], $message->getUserId());
-            if ($promptData) {
-                $promptMetadata = $promptData['metadata'] ?? [];
-                $classification['prompt_metadata'] = $promptMetadata;
-            }
+        $carried = $classification['prompt_metadata'] ?? null;
+        if (is_array($carried) && [] !== $carried) {
+            return [$classification, $options, $carried];
         }
 
-        if (!empty($promptMetadata)) {
-            $options['prompt_metadata'] = $promptMetadata;
+        $perfTimer?->start('prompt');
+        $promptData = $this->promptService->getPromptWithMetadata($classification['topic'] ?? 'general', $message->getUserId(), $classification['language'] ?? 'en');
+        $perfTimer?->stop('prompt');
+        if (null === $promptData) {
+            return [$classification, $options, []];
         }
 
-        return [$classification, $options, $promptMetadata];
+        $options['resolved_prompt_data'] = $promptData;
+        $classification['prompt_metadata'] = $promptData['metadata'] ?? [];
+
+        return [$classification, $options, $classification['prompt_metadata']];
     }
 
     /**
-     * Saved Task runs get their own source: they skip the sorter like widget
-     * and API turns, but the executor must still plan them, or a multi-step
-     * task silently degrades to a chat answer.
+     * A fixed prompt answers without the sorter. Without a caller or message
+     * language it answers `auto`, following whatever the user writes. Saved
+     * Task runs get a source of their own: the executor must still plan them,
+     * or a multi-step task silently degrades to a chat answer.
      *
-     * @param array<string, mixed> $options
-     *
-     * @return array{0: bool, 1: string}
-     */
-    private static function fixedPromptSource(array $options): array
-    {
-        $isWidget = !empty($options['is_widget_mode']);
-
-        return [$isWidget, $isWidget ? 'widget' : (!empty($options['saved_task']) ? 'saved_task' : 'api')];
-    }
-
-    /**
      * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
      */
-    private static function fixedPromptClassification(array $options, string $language, string $source, bool $isWidget): array
+    private function fixedPrompt(Message $message, array $options): array
     {
+        $isWidget = !empty($options['is_widget_mode']);
         $classification = [
             'topic' => $options['fixed_task_prompt'],
-            'language' => $language,
-            'source' => $source,
+            'language' => self::language($message, $options, 'auto'),
+            'source' => $isWidget ? 'widget' : (!empty($options['saved_task']) ? 'saved_task' : 'api'),
             'intent' => 'chat',
             'is_widget_mode' => $isWidget,
         ];
@@ -383,16 +347,27 @@ final readonly class TurnClassificationResolver
             $classification['override_model_id'] = (int) $options['widget_model_id'];
         }
 
+        $this->logger->info('MessageProcessor: Using fixed prompt (skipped AI classification)', [
+            'language' => $classification['language'],
+            'fixed_topic' => $classification['topic'],
+            'source' => $classification['source'],
+            'widget_model_id' => $options['widget_model_id'] ?? null,
+        ]);
+
         return $classification;
     }
 
     /**
+     * Again skips the sorter: the stored topic routes the turn, and a model
+     * picked for the retry decides the topic when its tag says so.
+     *
      * @param array<string, mixed> $options
      *
      * @return array<string, mixed>
      */
-    private function againClassification(Message $message, array $options, string $language): array
+    private function again(Message $message, array $options): array
     {
+        $language = self::language($message, $options, 'en');
         $topic = strtolower($message->getTopic() ?: '');
         if ('' === $topic || 'unknown' === $topic) {
             $topic = 'chat';
@@ -420,11 +395,32 @@ final readonly class TurnClassificationResolver
     }
 
     /**
+     * The answer language when the sorter does not run: an explicit caller
+     * language wins, then the message's own, then `$unknown`.
+     *
+     * @param array<string, mixed> $options
+     */
+    private static function language(Message $message, array $options, string $unknown): string
+    {
+        $caller = $options['language'] ?? null;
+        if (is_string($caller) && '' !== $caller) {
+            return $caller;
+        }
+        $own = $message->getLanguage();
+
+        return '' !== $own && Message::UNKNOWN_LANGUAGE !== $own ? $own : $unknown;
+    }
+
+    /**
+     * The verdict a buffered turn's classified status carries.
+     *
+     * @param array<string, mixed> $classification
+     *
      * @return array<string, mixed>
      */
-    private static function forcedImageClassification(string $language): array
+    private static function verdict(array $classification): array
     {
-        return ['topic' => 'general', 'language' => $language, 'source' => 'forced_image_description', 'intent' => 'chat'];
+        return ['topic' => $classification['topic'], 'language' => $classification['language'], 'source' => $classification['source']];
     }
 
     /**
