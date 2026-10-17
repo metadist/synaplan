@@ -37,6 +37,7 @@ A walk is a row here, not a chat message (planning README).
 | D1 | S2 — which buffered / streamed differences align | ticked 2026-10-16, as proposed |
 | D2 | S3 — one topic / intent rule | ticked 2026-10-16, as proposed |
 | D3 | S8 — one MIME-to-extension map | ticked 2026-10-16, as proposed |
+| S4c | How the WhatsApp turn splits (loop §12 stop, STATUS step log) | decided 2026-10-17: option A — the turn moves to `App\Service\WhatsApp\Turn\` with its turn-only helpers and the controller calls it; `WhatsAppService` keeps the transport and the media download unchanged; `WhatsAppServiceTest` reaches the moved helpers through the new classes, its assertions unchanged |
 | #2 | The branch chain | amended 2026-10-16: no WIP limit, no intermediate merges. Each pull request opens on its parent (Copilot reviews the sprint alone), is retargeted to `main` once answered (CI runs on the chain), and the last one carries every sprint |
 
 ## Sprint tests
