@@ -19,10 +19,13 @@ use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\Classification\AgainOverride;
 use App\Service\Message\Classification\AgentPinRoute;
 use App\Service\Message\Classification\AttachmentIntent;
+use App\Service\Message\Classification\EmbeddingRoute;
 use App\Service\Message\Classification\FastPathClassifier;
+use App\Service\Message\Classification\RoutingDeferral;
 use App\Service\Message\Classification\SelfAwareQuestion;
 use App\Service\Message\Classification\SlashCommandRoute;
 use App\Service\Message\Classification\SorterInput;
+use App\Service\Message\Classification\SorterVerdict;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
@@ -69,25 +72,22 @@ final class MessageClassifierFactory
     {
         $logger = $doubles['logger'];
         $topicIntents = $doubles['topicIntents'];
+        $officeConverter = $doubles['officeConverter'] ?? null;
         $sorterInput = new SorterInput($doubles['attachmentDigest'] ?? null);
         $selfAware = new SelfAwareQuestion($doubles['selfAwareConfig'] ?? null);
+        $attachments = new AttachmentIntent($doubles['em'], $logger, $officeConverter, $doubles['documentToolsConfig'] ?? null, $doubles['multitaskConfig'] ?? null);
+        $agentPinRoute = new AgentPinRoute($doubles['agentPin'], $doubles['messageSorter'], $sorterInput, $logger, $doubles['agentConfig'] ?? null, $doubles['agentService'] ?? null, $doubles['agentRuntimeResolver'] ?? null, $doubles['users'] ?? null);
 
         return new MessageClassifier(
-            $doubles['messageSorter'],
             new SlashCommandRoute($topicIntents, $logger),
-            $doubles['modelConfigService'],
-            new FastPathClassifier($doubles['configRepository'], $selfAware, $logger, $doubles['officeConverter'] ?? null),
-            new AttachmentIntent($doubles['em'], $logger, $doubles['officeConverter'] ?? null, $doubles['documentToolsConfig'] ?? null, $doubles['multitaskConfig'] ?? null),
-            $logger,
-            $topicIntents,
-            $doubles['embeddingRouter'],
-            $doubles['embeddingRouterConfig'],
-            $doubles['nativeToolRoutingConfig'],
-            $doubles['toolCallingCapability'],
-            new AgentPinRoute($doubles['agentPin'], $doubles['messageSorter'], $sorterInput, $logger, $doubles['agentConfig'] ?? null, $doubles['agentService'] ?? null, $doubles['agentRuntimeResolver'] ?? null, $doubles['users'] ?? null),
+            $agentPinRoute,
+            new FastPathClassifier($doubles['configRepository'], $selfAware, $logger, $officeConverter),
             new AgainOverride($doubles['messageMetaRepository'], $doubles['modelConfigService'], $topicIntents, $logger),
-            $sorterInput,
-            $selfAware,
+            $attachments,
+            new EmbeddingRoute($doubles['embeddingRouter'], $doubles['embeddingRouterConfig'], $topicIntents, $selfAware, $logger),
+            new RoutingDeferral($doubles['nativeToolRoutingConfig'], $doubles['modelConfigService'], $doubles['toolCallingCapability'], $selfAware, $logger),
+            new SorterVerdict($doubles['messageSorter'], $sorterInput, $topicIntents, $agentPinRoute, $attachments, $logger),
+            $logger,
         );
     }
 }

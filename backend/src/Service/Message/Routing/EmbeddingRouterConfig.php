@@ -12,7 +12,7 @@ use App\Repository\ConfigRepository;
  *
  * Flags live in BCONFIG group {@see self::CONFIG_GROUP}:
  *   - ENABLED — master switch. Default OFF, mirroring
- *     {@see \App\Service\Message\MessageClassifier::isClassifierFastPathEnabled()}:
+ *     {@see \App\Service\Message\Classification\FastPathClassifier::isClassifierFastPathEnabled()}:
  *     a semantic-similarity shortcut that mis-routes is worse than the extra
  *     100-800 ms of an AI-sorter round-trip, so this only goes on after
  *     `app:sort-eval --cascade` shows the embedding layer matches or beats

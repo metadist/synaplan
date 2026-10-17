@@ -1707,7 +1707,7 @@ class MessageClassifierTest extends TestCase
 
         // Deliberately gibberish text: no local-language heuristic anchor
         // fires for any of the five supported languages, so
-        // resolveConfidentLanguage() falls back to the 'de' already pinned
+        // ConfidentLanguage::of() falls back to the 'de' already pinned
         // on the message by plainMessage() rather than guessing.
         $result = $classifier->classify($this->plainMessage(401, 'zzzqx foobar wibble 12345'));
 
