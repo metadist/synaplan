@@ -1,6 +1,6 @@
 # Synaplan roadmap
 
-**Status:** Live, 2026-10-16. **This is the only roadmap file.** It is
+**Status:** Live, 2026-10-17. **This is the only roadmap file.** It is
 edited in place; a change of order is a dated row in §6, not a new dated
 file. Earlier roadmaps are frozen under
 [`2026-archive/`](./2026-archive/readme.txt) (2026-09-03, 09-10, 09-17,
@@ -82,6 +82,7 @@ Still finishing from before the window:
 | 14 | **App accounts** — apps like SISmass create Synaplan accounts for their customers (AA1–AA8) | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | Plan only. |
 | 15 | **Config pyramid** | [`20260907-config-pyramid/`](./20260907-config-pyramid/STATUS.md) | §0 checklist unticked. |
 | 18 | **Out-of-process plugins** — tools and plugins in Python, Node.js and Go: MCP servers administrators add for everyone (organisation network, signed identity), then plugins that are a manifest plus a service, then isolated views (OP0–OP14, three phases) | [`20261016-out-of-process-plugins/`](./20261016-out-of-process-plugins/00_master_plan.md) | Plan only (2026-10-16); §0 unticked. The OP0 spike proved Synaplan's `McpClient` works unchanged with the official Python, Node.js and Go SDKs; what blocks a developer is the SSRF policy and packaging ([`STATUS.md`](./20261016-out-of-process-plugins/STATUS.md)). |
+| 21 | **Research quality** — agentic research with a model team, Desktop first: measure (desktop use cases, eval corpus), quick wins on today's paths (full web answers, page reading on every model, knowledge search as a tool, PDFs), a server-side research run (plan → gather → read → reflect → write → fact-check) with reading and fact-checking model slots, the Desktop research surface, then the web chat (RQ0–RW3, five phases) | [`20261017-research-quality/`](./20261017-research-quality/00_master_plan.md) | Plan only (2026-10-17); §0 unticked. Phase B (quick wins) can run beside other tracks. |
 
 Also open and tracked in [`20260913-use-case-research/README.md`](./20260913-use-case-research/README.md) §5,
 not as separate tracks: Q2 calendar reminders, Q3 honest "into Outlook"
@@ -143,6 +144,7 @@ mirrors this table.
 | [`20261004-app-accounts/`](./20261004-app-accounts/00_master_plan.md) | App accounts AA1–AA8 | not started (row 14) |
 | [`20260907-config-pyramid/`](./20260907-config-pyramid/00_master_plan.md) | Config pyramid | not started (row 15) |
 | [`20261016-out-of-process-plugins/`](./20261016-out-of-process-plugins/00_master_plan.md) | Tools and plugins in Python, Node.js and Go, out of process | not started (row 18) |
+| [`20261017-research-quality/`](./20261017-research-quality/00_master_plan.md) | Agentic research with a model team: quick wins on today's paths, a server-side research run, the Desktop research surface, then the web chat | not started (row 21) |
 
 ---
 
@@ -223,3 +225,4 @@ This file is the overview. It does not replace track STATUS files.
 | 2026-10-16 | **Out-of-process plugins registered as row 18** (not started) from the research question "could a Python developer add a tool, written in Python, Node.js or Go?". Answer: as an MCP tool yes — the OP0 spike ran Synaplan's real `McpClient` unchanged against servers built with the official Python, Node.js and Go SDKs — but not as a plugin: the SSRF guard refuses internal addresses, MCP connections are per person, and a manifest cannot declare a service. The plan keeps PHP plugins as they are and adds an out-of-process path (MCP for tools, a manifest plus a service for plugins, isolated views); it replaces the open-plugin-platform trust model (curation only) for code in other languages. Position among rows 8–15 is the owner's call. |
 | 2026-10-16 | **Code cleanup V3 archived; code cleanup V4 added as row 19.** #2512–#2514 merged in order the same morning. At the owner's request the twelve V3 §7 findings become one plan of twelve sprints (S0–S11), in V3's order, on one branch chain that merges one pull request at a time. Each sprint ends with a sprint test (proof, regression, journey) and a chore that answers the Copilot review and turns CI green. S0 (account deletion leaves 12 tables behind) is privacy work and goes first. Row 18 is out-of-process plugins ([#2518](https://github.com/metadist/synaplan/pull/2518)), so V4 is row 19. |
 | 2026-10-16 | **Six-issue sprint added as row 20.** The six newest product issues get one plan (`20261016_6-issues/`, the owner's folder name). #2459 and #2461 are confirm-and-close against `main` at `9ca56ccb1`; #2460 stays open until a CI-image repeat names a cause. #2519, #2504 and #2515 are a stacked branch chain. Row 18 stays with out-of-process plugins ([#2518](https://github.com/metadist/synaplan/pull/2518)) and row 19 with code cleanup V4 ([#2521](https://github.com/metadist/synaplan/pull/2521)). Other rows were not re-verified. |
+| 2026-10-17 | **Research quality registered as row 21** (not started) from the owner's question whether Synaplan Desktop can reach the research quality of an IDE agent with agentic looping, better prompting and a combination of models. Finding: yes for research — the gap is the harness, not the models: the gateway caps web research at two searches and a two-sentence answer, reads pages only on Anthropic routes, Desktop sees five knowledge passages per turn, and nothing re-plans. The plan measures first, removes those ceilings, then builds one server-side research run for Desktop and later the web chat, with cheap fast models for reading and sorting and frontier models for thinking, writing and a second-provider fact-check. Position among rows 8–20 is the owner's call; with row 8 (prompting flow) it shares the result pane and per-folder instructions instead of building them twice. Other rows were not re-verified. |
