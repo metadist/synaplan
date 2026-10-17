@@ -12,7 +12,6 @@ use App\Service\Billing\PremiumFeatureGate;
 use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\ThumbnailService;
-use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJob;
@@ -22,12 +21,13 @@ use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Memory\MemoryExtractionDispatcher;
 use App\Service\Memory\PendingMemoryExtraction;
-use App\Service\Message\Handler\MediaErrorMessageBuilder;
+use App\Service\Message\Handler\Media\MediaDownloader;
 use App\Service\Message\Handler\MediaGenerationHandler;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\PerfPipelineFlag;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
+use App\Tests\Support\MediaGenerationHandlerFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -74,32 +74,32 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         // int default (0) for existing detach paths; the limit test overrides it.
         $this->mediaJobConfig->method('maxActiveJobsPerUser')->willReturn(16);
 
-        $this->handler = new MediaGenerationHandler(
-            $this->aiFacade,
-            $this->modelConfigService,
-            $this->em,
-            new NullLogger(),
-            $this->promptExtractor,
-            new UserUploadPathBuilder(),
-            $this->createMock(ThumbnailService::class),
-            $this->rateLimitService,
-            new MediaErrorMessageBuilder(),
-            new PendingMemoryExtraction(
+        $this->handler = MediaGenerationHandlerFactory::build([
+            'ai' => $this->aiFacade,
+            'models' => $this->modelConfigService,
+            'em' => $this->em,
+            'extractor' => $this->promptExtractor,
+            'downloader' => new MediaDownloader(),
+            'thumbnails' => $this->createMock(ThumbnailService::class),
+            'limits' => $this->rateLimitService,
+            'memory' => new PendingMemoryExtraction(
                 new MemoryExtractionDispatcher($this->createMock(MessageBusInterface::class), new NullLogger()),
                 $this->createMock(PerfPipelineFlag::class),
                 new NullLogger(),
             ),
-            $this->createMock(MediaCancellationStore::class),
-            $this->mediaJobConfig,
-            $this->mediaJobService,
-            $this->mediaJobDispatcher,
-            $this->mediaJobMessageSync,
-            $this->createMock(GeneratedFileRegistrar::class),
-            new PremiumFeatureGate(new BillingService('', '')),
-            $this->conversationFileCatalog,
-            sys_get_temp_dir(),
-            'https://app.example.test',
-        );
+            'cancellation' => $this->createMock(MediaCancellationStore::class),
+            'jobConfig' => $this->mediaJobConfig,
+            'jobs' => $this->mediaJobService,
+            'jobDispatcher' => $this->mediaJobDispatcher,
+            'jobSync' => $this->mediaJobMessageSync,
+            'registrar' => $this->createMock(GeneratedFileRegistrar::class),
+            'gate' => new PremiumFeatureGate(new BillingService('', '')),
+            'catalog' => $this->conversationFileCatalog,
+            'uploadDir' => sys_get_temp_dir(),
+            'publicBaseUrl' => 'https://app.example.test',
+            'folders' => null,
+            'chat' => null,
+        ]);
     }
 
     public function testAsyncFlagOnDetachesVideoWithoutBlockingProvider(): void

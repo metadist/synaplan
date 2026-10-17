@@ -162,3 +162,31 @@ starts from S4a's head. Where the result differs from the plan:
 - **The existing tests** (`EmailVoiceReplyLanguageTest`,
   `EmailWebhookDocReferenceTest`) build the controller through
   `EmailWebhookControllerFactory`; their assertions are unchanged.
+
+## 11. As delivered — S4c (2026-10-17)
+
+The turn left `WhatsAppService` (owner decision S4c, option A): the webhook
+controller calls `WhatsAppTurn::handle()` (10 lines), and the service keeps
+the transport and the media download. It leaves the constructor ledger (25
+→ 9 parameters) and shrinks from 2,563 to 1,139 lines; `handleIncomingMessage()`
+(601) and `storeOutgoingMessage()` (102) leave the method ledger. The branch
+starts from S4b's head. Where the result differs from the plan:
+
+- **No `handleIncomingMessage()` of ≤ 60 lines.** The stages need the
+  service's transport, so a turn inside the service would inject its own
+  class. The turn lives beside it, and the line limit applies to
+  `WhatsAppTurn::handle()`.
+- **Twelve cases instead of eleven.** Added: a generated image. The
+  snapshot pins two oddities as found: an answered inbound message stays
+  `processing`, and a generated image reports `response_type` `audio` (V5).
+- **The reply in two parts.** `WhatsAppReply` composes the answer once
+  (`WhatsAppAnswer`); `WhatsAppReplyDelivery` tries the generated media,
+  then speech, then text, as before. `WhatsAppAnswerStore` keeps the reply
+  that reached the phone, its model metadata in a method of its own.
+- **Weak typing kept.** `WhatsAppService` declares no `strict_types`, and the
+  moved code keeps it that way (as V3 did for the processor's code), so no
+  value is coerced differently.
+- **The tests.** `WhatsAppServiceTest` builds the stages from its doubles
+  and reaches the seven moved helpers through their new classes; its
+  assertions are unchanged. The two email tests stub `WhatsAppTurn` in place
+  of the service.

@@ -25,7 +25,7 @@ use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
-use App\Service\WhatsApp\WhatsAppService;
+use App\Service\WhatsApp\Turn\WhatsAppTurn;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\NullLogger;
 
@@ -51,7 +51,7 @@ final class EmailWebhookControllerFactory
      *     summaries: ConversationSummaryRefreshDispatcher,
      *     errors: ChatErrorPresenter,
      *     references: ExternalReplyReferences,
-     *     whatsApp: WhatsAppService,
+     *     whatsApp: WhatsAppTurn,
      *     uploadDir: string,
      * } $doubles
      */

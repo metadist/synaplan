@@ -8,9 +8,9 @@
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 56,
-        "constructorParams": 69,
-        "methodLines": 144
+        "fileLines": 55,
+        "constructorParams": 67,
+        "methodLines": 140
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -54,7 +54,6 @@
         "src/Service/Iam/ShareService.php": 853,
         "src/Service/Media/MediaGenerationService.php": 846,
         "src/Service/Memory/UserMemoryService.php": 1022,
-        "src/Service/Message/Handler/MediaGenerationHandler.php": 2245,
         "src/Service/Message/MessageClassifier.php": 1962,
         "src/Service/Message/MessageSorter.php": 921,
         "src/Service/ModelConfigService.php": 1327,
@@ -66,7 +65,7 @@
         "src/Service/Research/UrlContentService.php": 1258,
         "src/Service/Usage/UsageStatsService.php": 960,
         "src/Service/VectorSearch/QdrantClientDirect.php": 2000,
-        "src/Service/WhatsApp/WhatsAppService.php": 2563,
+        "src/Service/WhatsApp/WhatsAppService.php": 1135,
         "src/Service/Widget/WidgetSetupService.php": 1000,
         "src/Service/Widget/WidgetSummaryService.php": 836
     },
@@ -114,7 +113,6 @@
         "src/Service/File/FileProcessor.php::FileProcessor": 17,
         "src/Service/File/FileUploadService.php::FileUploadService": 12,
         "src/Service/Mcp/McpOAuthState.php::McpOAuthState": 11,
-        "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler": 22,
         "src/Service/Message/MessageClassifier.php::MessageClassifier": 21,
         "src/Service/Message/MessageSorter.php::MessageSorter": 18,
         "src/Service/Multitask/Execution/Runner/CodeRunRunner.php::CodeRunRunner": 13,
@@ -137,7 +135,6 @@
         "src/Service/Telegram/TelegramMediaJobDelivery.php::TelegramMediaJobDelivery": 13,
         "src/Service/Tool/ApprovalService.php::ApprovalService": 11,
         "src/Service/Voice/VoiceLiveSessionService.php::VoiceLiveSessionService": 21,
-        "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService": 25,
         "src/Service/Widget/WidgetSummaryService.php::WidgetSummaryService": 12,
         "src/Service/Widget/WordPressIntegrationService.php::WordPressIntegrationService": 11
     },
@@ -238,8 +235,6 @@
         "src/Service/Memory/MemoryExtractionService.php::MemoryExtractionService::extractMemoriesViaAi": 185,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::searchRelevantMemories": 142,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::storeInQdrant": 101,
-        "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler::detachMediaToAsyncJob": 166,
-        "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler::handleStream": 1010,
         "src/Service/Message/MediaPromptExtractor.php::MediaPromptExtractor::extract": 107,
         "src/Service/Message/MessageApiFormatter.php::MessageApiFormatter::format": 212,
         "src/Service/Message/MessageClassifier.php::MessageClassifier::canFastPathClassify": 208,
@@ -274,9 +269,7 @@
         "src/Service/VectorSearch/LegacyPointIdMigrator.php::LegacyPointIdMigrator::migrateCollection": 139,
         "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::convertToWhatsAppMarkdown": 106,
         "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::downloadMedia": 118,
-        "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::handleIncomingMessage": 601,
         "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::handleMediaDownload": 194,
-        "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::storeOutgoingMessage": 102,
         "src/Service/Widget/HumanTakeoverService.php::HumanTakeoverService::sendHumanMessage": 114,
         "src/Service/Widget/WidgetExportService.php::WidgetExportService::exportToJson": 113,
         "src/Service/Widget/WidgetService.php::WidgetService::sanitizeConfig": 187,
