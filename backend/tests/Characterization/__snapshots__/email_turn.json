@@ -1,0 +1,1485 @@
+{
+    "debug_sender": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": null,
+                        "references": null,
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-debug-sender@metadist.onmicrosoft.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [
+            "notifyEmailSuccess"
+        ],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-debug-sender@metadist.onmicrosoft.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            }
+        ]
+    },
+    "duplicate_by_fingerprint": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": null,
+                        "references": null,
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-duplicate-by-fingerprint@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            },
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "duplicate": true,
+                    "message_id": "<message_id 1>",
+                    "success": true
+                },
+                "mails": [],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [
+            "notifyDuplicateEmailWebhook"
+        ],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-duplicate-by-fingerprint@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            }
+        ]
+    },
+    "duplicate_by_message_id": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": "<twice@example.com>",
+                        "references": "<twice@example.com>",
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-duplicate-by-message-id@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            },
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "duplicate": true,
+                    "message_id": "<message_id 1>",
+                    "success": true
+                },
+                "mails": [],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [
+            "notifyDuplicateEmailWebhook"
+        ],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "external_id": "<twice@example.com>",
+                        "from_email": "person-duplicate-by-message-id@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            }
+        ]
+    },
+    "generated_image": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "file": {
+                                "path": "/api/v1/files/uploads/characterization-email/cat.png",
+                                "type": "image"
+                            },
+                            "local_path": "characterization-email/cat.png",
+                            "media_type": "image",
+                            "media_usage": {
+                                "images": 1
+                            },
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "Here is your cat."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [
+                            "generated-image image/png"
+                        ],
+                        "in_reply_to": null,
+                        "references": null,
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "Here is your cat.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-generated-image@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-generated-image@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        1,
+                        "/api/v1/files/uploads/characterization-email/cat.png",
+                        "image"
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Here is your cat.",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "Here is your cat.",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            },
+            {
+                "action": "IMAGES",
+                "metadata": {
+                    "media_usage": {
+                        "images": 1
+                    },
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "source": "EMAIL"
+                }
+            }
+        ]
+    },
+    "invalid_json": {
+        "answers": [
+            {
+                "json": {
+                    "error": "Invalid JSON payload",
+                    "success": false
+                },
+                "mails": [],
+                "status": 400
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [],
+        "speech": [],
+        "stored": {
+            "account": null,
+            "chats": 0,
+            "messages": []
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "keyword_address": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": null,
+                        "references": null,
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-keyword-address@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_keyword": "support",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-keyword-address@example.com",
+                        "to_email": "smart+support@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            }
+        ]
+    },
+    "missing_fields": {
+        "answers": [
+            {
+                "json": {
+                    "error": "Missing required fields: from, to, body",
+                    "success": false
+                },
+                "mails": [],
+                "status": 400
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [],
+        "speech": [],
+        "stored": {
+            "account": null,
+            "chats": 0,
+            "messages": []
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "new_sender": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": true,
+                        "rate_limit_level": "ANONYMOUS"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": null,
+                        "references": null,
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-new-sender@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": {
+                    "anonymous_email": "person-new-sender@example.com",
+                    "created_via": "email",
+                    "firstName": "Email User",
+                    "lastName": "",
+                    "original_email": "person-new-sender@example.com"
+                },
+                "level": "ANONYMOUS",
+                "type": "MAIL"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-new-sender@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            }
+        ]
+    },
+    "plain_mail": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": "<m1@example.com>",
+                        "references": "<m1@example.com>",
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-plain-mail@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "external_id": "<m1@example.com>",
+                        "from_email": "person-plain-mail@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            }
+        ]
+    },
+    "processor_exception": {
+        "answers": [
+            {
+                "json": {
+                    "details": null,
+                    "error": "Internal error processing email",
+                    "success": false
+                },
+                "mails": [],
+                "status": 500
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-processor-exception@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "processing",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "CHAT",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "processor_failure": {
+        "answers": [
+            {
+                "json": {
+                    "error": "Message processing failed",
+                    "success": false
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": null,
+                        "references": null,
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "Something went wrong while answering this request. Please try again.\n\nYou can try again with a different model that fits this request.\n\n---\nService: test | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-processor-failure@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-processor-failure@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "processing",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "CHAT",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "rate_limited": {
+        "answers": [
+            {
+                "json": {
+                    "error": "Rate limit exceeded",
+                    "limit": 10,
+                    "reset_at": "2026-10-18 00:00:00",
+                    "success": false,
+                    "used": 10
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": null,
+                        "references": null,
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "Rate limit exceeded. Please try again later.\n\nYour limit will reset at: 2026-10-18 00:00:00",
+                        "to": [
+                            "person-rate-limited@example.com"
+                        ]
+                    }
+                ],
+                "status": 429
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [],
+        "speech": [],
+        "stored": {
+            "account": null,
+            "chats": 0,
+            "messages": []
+        },
+        "summary_refreshes": 0,
+        "usage": []
+    },
+    "raw_mime_body": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": null,
+                        "references": null,
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-raw-mime-body@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-raw-mime-body@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            }
+        ]
+    },
+    "voice_attachment": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [
+                            "voice.mp3 audio/mpeg"
+                        ],
+                        "in_reply_to": null,
+                        "references": null,
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-voice-attachment@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            }
+        ],
+        "attachment_store": [
+            [
+                "note.ogg audio/ogg"
+            ]
+        ],
+        "discord": [],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": "1"
+            }
+        ],
+        "speech": [
+            {
+                "format": "mp3",
+                "language": "en",
+                "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+            }
+        ],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-voice-attachment@example.com",
+                        "has_attachments": "true",
+                        "to_email": "smart@synaplan.net",
+                        "voice_reply": "1"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 1,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            },
+            {
+                "action": "AUDIOS",
+                "metadata": {
+                    "media_usage": {
+                        "characters": 51
+                    },
+                    "model": "tts",
+                    "model_id": 3,
+                    "provider": "test",
+                    "source": "EMAIL"
+                }
+            }
+        ]
+    }
+}
