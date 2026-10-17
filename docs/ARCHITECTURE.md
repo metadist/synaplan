@@ -46,6 +46,17 @@ on a new violation. The baseline (`deptrac.baseline.yaml`) only lists what
 predates the gate and may only shrink: fix the import (move a value object to
 `App\Model\`, pass a value instead of a service), never add an entry.
 
+Controllers are thin, and a gate says so beside deptrac and the size ratchet
+below: `tests/Architecture/ThinControllerTest.php` allows a controller method
+at most 50 lines and no `EntityManagerInterface` or `AiFacade` in a
+constructor or action — queries go to a repository, writes to a repository
+or service, an AI call behind its domain service (`DocumentSummarizer`,
+`MemoryInputParser`, `InputEnhancer`). `thinControllerBaseline.json` freezes
+the offenders that predate the gate; they may only shrink or leave, and
+`UPDATE_THIN_CONTROLLER=1` regenerates it. `make -C backend metrics` prints
+the three counts. Those two names are an exact reflection check rather than
+a deptrac layer: `AiFacade` is application code the entry layer may use.
+
 ## Size limits
 
 A file has at most 800 lines, a constructor at most 10 parameters, a method
