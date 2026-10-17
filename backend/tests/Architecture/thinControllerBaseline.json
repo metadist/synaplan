@@ -7,7 +7,7 @@
     },
     "counts": {
         "methodLines": 112,
-        "entityManager": 22,
+        "entityManager": 21,
         "aiFacade": 8
     },
     "methodLines": {
@@ -110,7 +110,7 @@
         "src/Controller/WidgetExportController.php::WidgetExportController::export": 88,
         "src/Controller/WidgetLegacyController.php::WidgetLegacyController::legacyWidget": 167,
         "src/Controller/WidgetLiveSupportController.php::WidgetLiveSupportController::reply": 72,
-        "src/Controller/WidgetLiveSupportController.php::WidgetLiveSupportController::upload": 80,
+        "src/Controller/WidgetLiveSupportController.php::WidgetLiveSupportController::upload": 79,
         "src/Controller/WidgetPublicController.php::WidgetPublicController::config": 54,
         "src/Controller/WidgetPublicController.php::WidgetPublicController::downloadWidgetFile": 91,
         "src/Controller/WidgetPublicController.php::WidgetPublicController::history": 155,
@@ -143,7 +143,6 @@
         "src/Controller/SubscriptionController.php",
         "src/Controller/WebhookController.php",
         "src/Controller/WidgetController.php",
-        "src/Controller/WidgetLiveSupportController.php",
         "src/Controller/WidgetPublicController.php",
         "src/Controller/WidgetSessionController.php",
         "src/Controller/WidgetSummaryController.php"
