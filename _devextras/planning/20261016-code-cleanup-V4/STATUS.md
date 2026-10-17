@@ -60,3 +60,4 @@ One row per Copilot round (loop §8).
 | ---- | ------------ | ------------ | ------------ |
 | 2026-10-16 | [#2534](https://github.com/metadist/synaplan/pull/2534) (S0) | `6e380716f` (squash) | 57 / 69 / 147 |
 | 2026-10-16 | [#2535](https://github.com/metadist/synaplan/pull/2535) (S1a) | `31e459c7f` (squash) | 57 / 69 / 147; frontend 29 / 84 |
+| 2026-10-16 | [#2536](https://github.com/metadist/synaplan/pull/2536) (S1b) | `fea290ec0` (squash) | 57 / 69 / 147; frontend 29 / 80 |
