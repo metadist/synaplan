@@ -67,6 +67,7 @@ final class MediaTurnCharacterizationTest extends TestCase
         44 => ['Higgsfield', 'dop-turbo', 'DoP Turbo', 'img2vid', ['requires_reference_image' => true, 'default_duration' => 5], false],
         45 => ['OpenAI', 'tts-1', 'TTS 1', 'text2sound', [], false],
         46 => ['OpenAI', 'dall-e-2', 'DALL-E 2', 'text2pic', [], true],
+        47 => ['xAI', 'grok-video', 'Grok Video', 'img2vid', ['default_duration' => 6], false],
     ];
 
     /** The defaults of this install, by capability. */
@@ -248,6 +249,135 @@ final class MediaTurnCharacterizationTest extends TestCase
                 'replacement' => 41,
                 'ai' => ['generateImage' => $image($png)],
             ],
+            'media_type_not_determined' => [
+                'text' => 'Etwas mit meinem Urlaub',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'de'],
+                'prompt' => ['prompt' => 'Something with my holiday', 'media_type' => null],
+            ],
+            'image_detached_to_a_background_job' => [
+                'text' => 'Make the sky purple',
+                'attachments' => ['attachments/photo.png'],
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image'],
+                'options' => ['track_id' => 'track-4'],
+                'prompt' => ['prompt' => 'Make the sky purple', 'media_type' => 'image'],
+                'async' => true,
+            ],
+            'speech_detached_to_a_background_job' => [
+                'text' => '/tts Welcome aboard',
+                'classification' => ['topic' => 'tools:tts', 'language' => 'en'],
+                'prompt' => ['prompt' => 'Welcome aboard', 'media_type' => 'audio'],
+                'async' => true,
+            ],
+            'background_jobs_at_the_ceiling' => [
+                'text' => 'Draw a fox',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image'],
+                'prompt' => ['prompt' => 'A fox in the snow', 'media_type' => 'image'],
+                'async' => true,
+                'active_jobs' => 16,
+            ],
+            'background_queue_unreachable' => [
+                'text' => 'Draw a fox',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image'],
+                'prompt' => ['prompt' => 'A fox in the snow', 'media_type' => 'image'],
+                'async' => true,
+                'dispatch_fails' => true,
+            ],
+            'conversation_edit_without_a_pic2pic_default' => [
+                'text' => 'Mach das Auto blau',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image', 'input_mode' => 'reference_images'],
+                'edit_source' => 'attachments/car.png',
+                'prompt' => ['prompt' => 'Paint the car blue', 'media_type' => 'image'],
+                'defaults' => ['PIC2PIC' => null] + self::DEFAULTS,
+                'ai' => ['generateImage' => $image($png)],
+            ],
+            'edit_source_dropped_for_a_video_request' => [
+                'text' => 'Mach daraus ein Video',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'de', 'input_mode' => 'reference_images'],
+                'edit_source' => 'attachments/car.png',
+                'prompt' => ['prompt' => 'The car drives away', 'media_type' => 'video'],
+                'ai' => ['generateVideo' => ['videos' => [['url' => 'data:video/mp4;base64,'.base64_encode('veo')]], 'provider' => 'google', 'model' => 'veo-3', 'duration_seconds' => 8.0]],
+            ],
+            'task_prompt_pins_a_video_model' => [
+                'text' => 'Our harbour at sunrise',
+                'classification' => ['topic' => 'harbour-clips', 'language' => 'en', 'prompt_metadata' => ['aiModel' => '43']],
+                'prompt' => ['prompt' => 'The harbour at sunrise', 'media_type' => 'image'],
+                'ai' => ['generateVideo' => ['videos' => [['url' => 'data:video/mp4;base64,'.base64_encode('veo')]], 'provider' => 'google', 'model' => 'veo-3', 'duration_seconds' => 8.0]],
+            ],
+            'multitask_chain_hands_in_its_references' => [
+                'text' => 'Animate the poster',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'video'],
+                'options' => [
+                    'reference_image_paths' => ['/api/v1/files/uploads/attachments/photo.png', 'attachments/missing.png', ''],
+                    'reference_image_urls' => ['See https://images.example.com/poster.webp now', 42],
+                    'node_id' => 'n3',
+                    'force_inline_media' => true,
+                ],
+                'prompt' => ['prompt' => 'The poster comes alive', 'media_type' => 'video'],
+                'async' => true,
+                'ai' => ['generateVideo' => $video],
+            ],
+            'image_to_video_on_an_inline_provider' => [
+                'text' => 'Animate this photo',
+                'attachments' => ['attachments/photo.png'],
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'video'],
+                'prompt' => ['prompt' => 'The photo comes alive', 'media_type' => 'video'],
+                'defaults' => ['IMG2VID' => 47] + self::DEFAULTS,
+                'inline_providers' => ['xai'],
+                'ai' => ['generateVideo' => ['videos' => [['url' => 'data:video/mp4;base64,'.base64_encode('grok')]], 'provider' => 'xai', 'model' => 'grok-video', 'duration_seconds' => 6.0]],
+            ],
+            'incognito_image_is_ephemeral' => [
+                'text' => 'Draw a fox',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image'],
+                'options' => ['incognito' => true],
+                'prompt' => ['prompt' => 'A fox in the snow', 'media_type' => 'image'],
+                'ai' => ['generateImage' => $image($png)],
+            ],
+            'widget_turn_keeps_no_memory' => [
+                'text' => 'Draw a fox',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image'],
+                'options' => ['channel' => 'WIDGET'],
+                'prompt' => ['prompt' => 'A fox in the snow', 'media_type' => 'image'],
+                'ai' => ['generateImage' => $image($png)],
+            ],
+            'video_without_a_duration_from_the_provider' => [
+                'text' => '/vid A paper boat',
+                'classification' => ['topic' => 'tools:vid', 'language' => 'en'],
+                'options' => ['record_media_usage' => true, 'duration' => 4, 'resolution' => '1080p'],
+                'prompt' => ['prompt' => 'A paper boat on a river', 'media_type' => 'video'],
+                'ai' => ['generateVideo' => ['videos' => [['url' => 'data:video/mp4;base64,'.base64_encode('veo'), 'resolution' => '1080p']], 'provider' => 'google', 'model' => 'veo-3']],
+            ],
+            'provider_returned_no_media' => [
+                'text' => 'Draw a fox',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image'],
+                'prompt' => ['prompt' => 'A fox in the snow', 'media_type' => 'image'],
+                'ai' => ['generateImage' => ['images' => [], 'provider' => 'openai', 'model' => 'gpt-image-1']],
+            ],
+            'media_without_a_url' => [
+                'text' => 'Draw a fox',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image'],
+                'prompt' => ['prompt' => 'A fox in the snow', 'media_type' => 'image'],
+                'ai' => ['generateImage' => ['images' => [['b64_json' => 'abc']], 'provider' => 'openai', 'model' => 'gpt-image-1']],
+            ],
+            'empty_prompt_falls_back_to_the_message' => [
+                'text' => '/pic a quiet harbour',
+                'classification' => ['topic' => 'tools:pic', 'language' => 'en'],
+                'prompt' => ['prompt' => '  ', 'media_type' => 'image'],
+                'ai' => ['generateImage' => $image($png)],
+            ],
+            'an_admin_sees_the_provider_cause' => [
+                'text' => 'Draw a fox',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image'],
+                'prompt' => ['prompt' => 'A fox in the snow', 'media_type' => 'image'],
+                'ai' => ['generateImage' => new ProviderException('The prompt was rejected by the safety system', 'openai')],
+                'admin' => true,
+            ],
+            'delivered_to_a_folder' => [
+                'text' => 'Draw a fox and save it to Nextcloud',
+                'classification' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image'],
+                'prompt' => ['prompt' => 'A fox in the snow', 'media_type' => 'image'],
+                'ai' => ['generateImage' => $image($png)],
+                'folder' => 'Saved to Nextcloud: /Synaplan/fox.png',
+            ],
         ];
     }
 
@@ -260,7 +390,7 @@ final class MediaTurnCharacterizationTest extends TestCase
     {
         $this->log = [
             'statuses' => [], 'chunks' => [], 'extractor' => [], 'models' => [], 'ai' => [], 'jobs' => [],
-            'downloads' => [], 'files' => [], 'thumbnails' => [], 'limits' => [], 'usage' => [], 'memory' => [], 'chat' => [], 'flushes' => 0,
+            'downloads' => [], 'files' => [], 'thumbnails' => [], 'folders' => [], 'limits' => [], 'usage' => [], 'memory' => [], 'chat' => [], 'flushes' => 0,
         ];
         $handler = $this->handler($case);
         $message = $this->message($case);
@@ -287,7 +417,7 @@ final class MediaTurnCharacterizationTest extends TestCase
         return MediaGenerationHandlerFactory::build([
             'ai' => $this->ai($case),
             'models' => $this->models($case),
-            'em' => $this->entityManager(),
+            'em' => $this->entityManager($case),
             'extractor' => $this->extractor($case),
             'downloader' => $this->downloader($case),
             'thumbnails' => $this->thumbnails($case),
@@ -295,15 +425,15 @@ final class MediaTurnCharacterizationTest extends TestCase
             'memory' => $this->memory(),
             'cancellation' => $this->createStub(MediaCancellationStore::class),
             'jobConfig' => $this->jobConfig($case),
-            'jobs' => $this->jobs(),
-            'jobDispatcher' => $this->jobDispatcher(),
-            'jobSync' => $this->createStub(MediaJobMessageSync::class),
+            'jobs' => $this->jobs($case),
+            'jobDispatcher' => $this->jobDispatcher($case),
+            'jobSync' => $this->jobSync(),
             'registrar' => $this->registrar(),
             'gate' => $this->gate($case),
             'catalog' => $this->catalog($case),
             'uploadDir' => $this->uploadDir,
             'publicBaseUrl' => self::PUBLIC_BASE_URL,
-            'folders' => $this->createStub(RequestedFolderDelivery::class),
+            'folders' => $this->folders($case),
             'chat' => $this->chat(),
         ]);
     }
@@ -314,7 +444,7 @@ final class MediaTurnCharacterizationTest extends TestCase
     private function ai(array $case): AiFacade
     {
         $ai = $this->createStub(AiFacade::class);
-        $ai->method('supportsInlineReferenceImage')->willReturn(false);
+        $ai->method('supportsInlineReferenceImage')->willReturnCallback(static fn (string $provider): bool => in_array($provider, $case['inline_providers'] ?? [], true));
         $ai->method('supportsAsyncVideo')->willReturn(true);
         foreach (['generateImage', 'generateVideo', 'synthesize'] as $method) {
             $ai->method($method)->willReturnCallback(function (mixed ...$arguments) use ($method, $case): array {
@@ -353,10 +483,14 @@ final class MediaTurnCharacterizationTest extends TestCase
         return $models;
     }
 
-    private function entityManager(): EntityManagerInterface
+    /**
+     * @param array<string, mixed> $case
+     */
+    private function entityManager(array $case): EntityManagerInterface
     {
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(self::USER_ID);
+        $user->method('isAdmin')->willReturn(!empty($case['admin']));
         $user->method('isMemoriesEnabled')->willReturn(true);
         $users = $this->createStub(EntityRepository::class);
         $users->method('find')->willReturn($user);
@@ -487,10 +621,18 @@ final class MediaTurnCharacterizationTest extends TestCase
         return $config;
     }
 
-    private function jobs(): MediaJobService
+    /**
+     * @param array<string, mixed> $case
+     */
+    private function jobs(array $case): MediaJobService
     {
         $jobs = $this->createStub(MediaJobService::class);
-        $jobs->method('countActiveForUser')->willReturn(0);
+        $jobs->method('countActiveForUser')->willReturn($case['active_jobs'] ?? 0);
+        $jobs->method('markFailed')->willReturnCallback(function (MediaJob $job, string $error): bool {
+            $this->log['jobs'][] = ['failed', $job->getJobKey(), $error];
+
+            return true;
+        });
         $jobs->method('create')->willReturnCallback(function (array $params): MediaJob {
             $this->log['jobs'][] = ['create', $params];
 
@@ -500,16 +642,45 @@ final class MediaTurnCharacterizationTest extends TestCase
         return $jobs;
     }
 
-    private function jobDispatcher(): MediaJobDispatcher
+    /**
+     * @param array<string, mixed> $case
+     */
+    private function jobDispatcher(array $case): MediaJobDispatcher
     {
         $dispatcher = $this->createStub(MediaJobDispatcher::class);
-        $dispatcher->method('dispatch')->willReturnCallback(function (MediaJob $job): bool {
+        $dispatcher->method('dispatch')->willReturnCallback(function (MediaJob $job) use ($case): bool {
             $this->log['jobs'][] = ['dispatch', $job->getJobKey()];
 
-            return true;
+            return empty($case['dispatch_fails']);
         });
 
         return $dispatcher;
+    }
+
+    private function jobSync(): MediaJobMessageSync
+    {
+        $sync = $this->createStub(MediaJobMessageSync::class);
+        $sync->method('syncTerminalState')->willReturnCallback(function (MediaJob $job): void {
+            $this->log['jobs'][] = ['sync', $job->getJobKey()];
+        });
+
+        return $sync;
+    }
+
+    /**
+     * @param array<string, mixed> $case
+     */
+    private function folders(array $case): RequestedFolderDelivery
+    {
+        $folders = $this->createStub(RequestedFolderDelivery::class);
+        $folders->method('userAskedToSaveToFolder')->willReturn(isset($case['folder']));
+        $folders->method('send')->willReturnCallback(function (int $ownerId, array $files) use ($case): array {
+            $this->log['folders'][] = [$ownerId, array_column($files, 'name')];
+
+            return ['message' => $case['folder']];
+        });
+
+        return $folders;
     }
 
     private function registrar(): GeneratedFileRegistrar
