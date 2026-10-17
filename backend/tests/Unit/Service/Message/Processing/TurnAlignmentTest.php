@@ -214,6 +214,8 @@ final class TurnAlignmentTest extends TestCase
      */
     private function processor(array $verdict): MessageProcessor
     {
+        $this->routed = [];
+
         $classifier = $this->createStub(MessageClassifier::class);
         $classifier->method('classify')->willReturnCallback(function (Message $message, array $history) use ($verdict): array {
             $this->classifierCalls[] = count($history);
