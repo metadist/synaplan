@@ -537,7 +537,7 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "UNKNOWN"
+        "topic": "general"
     },
     "override_rerank_custom_topic": {
         "intent": "chat",
@@ -581,7 +581,7 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "unknown"
+        "topic": "general"
     },
     "override_text2doc_custom_topic": {
         "intent": "document_generation",

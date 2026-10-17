@@ -61,13 +61,13 @@ final readonly class TopicIntentRule
     }
 
     /**
-     * A model override in the classifier: media tags make media, vision and
-     * chat tags a chat answer; any other tag keeps the message's topic, else
-     * `general`.
+     * A model override in the classifier: media tags make media, analysis and
+     * chat tags a chat answer, document tags a document; any other tag keeps
+     * the message's topic, else `general`.
      */
     public function forModelOverride(string $modelTag, ?string $messageTopic): TopicIntent
     {
-        $topic = self::MODEL_OVERRIDE_TOPICS[$modelTag] ?? ($messageTopic ?: 'general');
+        $topic = self::MODEL_OVERRIDE_TOPICS[$modelTag] ?? self::topicOrGeneral($messageTopic);
 
         return new TopicIntent($topic, $this->intentFor($topic));
     }

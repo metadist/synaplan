@@ -73,8 +73,8 @@ final class OverrideAndAgainRoutingTest extends TestCase
             ['vectorize', 'mediamaker', ['general', 'chat'], ['mediamaker', 'image_generation']],
             ['vectorize', 'tools:pic', ['general', 'chat'], ['tools:pic', 'image_generation']],
             ['rerank', '', ['general', 'chat'], ['general', 'chat']],
-            ['rerank', 'unknown', ['unknown', 'chat'], ['general', 'chat']],
-            ['rerank', 'UNKNOWN', ['UNKNOWN', 'chat'], ['general', 'chat']],
+            ['rerank', 'unknown', ['general', 'chat'], ['general', 'chat']],
+            ['rerank', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
             ['rerank', 'legal-review', ['legal-review', 'chat'], ['legal-review', 'chat']],
             ['rerank', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
             ['rerank', 'tools:pic', ['tools:pic', 'image_generation'], ['tools:pic', 'image_generation']],
@@ -113,6 +113,13 @@ final class OverrideAndAgainRoutingTest extends TestCase
         $byOverride = $this->classifier('document')->classify($this->message(''));
 
         self::assertSame(['officemaker', 'document_generation'], [$byOverride['topic'], $byOverride['intent']]);
+    }
+
+    public function testAnUnmappedModelOverrideOnANewMessageGoesToGeneral(): void
+    {
+        $byOverride = $this->classifier('rerank')->classify($this->message('UNKNOWN'));
+
+        self::assertSame(['general', 'chat'], [$byOverride['topic'], $byOverride['intent']]);
     }
 
     private function classifier(?string $tag): MessageClassifier
