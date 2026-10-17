@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Controller;
 
 use App\AI\Service\AiFacade;
-use App\Controller\WebhookController;
 use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
@@ -15,7 +14,6 @@ use App\Service\Email\EmailWebhookIdempotencyService;
 use App\Service\Email\InboundEmailAttachmentStore;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\RawMimeEmailParser;
-use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\ExternalReplyReferences;
 use App\Service\Message\MessageProcessor;
@@ -24,9 +22,9 @@ use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
 use App\Service\WhatsApp\WhatsAppService;
+use App\Tests\Support\EmailWebhookControllerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Serializer\SerializerInterface;
@@ -104,26 +102,24 @@ final class EmailWebhookDocReferenceTest extends TestCase
         $mime = $this->createMock(RawMimeEmailParser::class);
         $mime->method('looksLikeRawMime')->willReturn(false);
 
-        $controller = new WebhookController(
-            $em,
-            $processor,
-            $idempotency,
-            $limits,
-            $this->createStub(WhatsAppService::class),
-            $emailChats,
-            $mailer,
-            $this->createStub(DiscordNotificationService::class),
-            new NullLogger(),
-            'verify-token',
-            $this->createStub(AiFacade::class),
-            $this->createStub(ModelConfigService::class),
-            new GeneratedFileMetadataNormalizer(),
-            $mime,
-            $this->createStub(InboundEmailAttachmentStore::class),
-            $this->createStub(ConversationSummaryRefreshDispatcher::class),
-            $this->createStub(ChatErrorPresenter::class),
-            $references,
-        );
+        $controller = EmailWebhookControllerFactory::build([
+            'em' => $em,
+            'processor' => $processor,
+            'idempotency' => $idempotency,
+            'limits' => $limits,
+            'emailChats' => $emailChats,
+            'mailer' => $mailer,
+            'discord' => $this->createStub(DiscordNotificationService::class),
+            'ai' => $this->createStub(AiFacade::class),
+            'models' => $this->createStub(ModelConfigService::class),
+            'mime' => $mime,
+            'attachments' => $this->createStub(InboundEmailAttachmentStore::class),
+            'summaries' => $this->createStub(ConversationSummaryRefreshDispatcher::class),
+            'errors' => $this->createStub(ChatErrorPresenter::class),
+            'references' => $references,
+            'whatsApp' => $this->createStub(WhatsAppService::class),
+            'uploadDir' => sys_get_temp_dir(),
+        ]);
 
         $serializer = $this->createMock(SerializerInterface::class);
         $serializer->method('serialize')->willReturnCallback(
