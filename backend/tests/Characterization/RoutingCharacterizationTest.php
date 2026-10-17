@@ -23,6 +23,7 @@ use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Tests\Characterization\Support\RoutingSnapshot;
+use App\Tests\Support\MessageClassifierFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -355,22 +356,22 @@ final class RoutingCharacterizationTest extends TestCase
         $converter = $this->createMock(OfficeConverterClient::class);
         $converter->method('isEnabled')->willReturn(true);
 
-        $classifier = new MessageClassifier(
-            $sorter,
-            $metaRepo,
-            $modelConfig,
-            $configRepo,
-            $em,
-            $this->createMock(LoggerInterface::class),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createMock(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($configRepo),
-            $this->disabledNativeToolRouting(),
-            new ToolCallingCapability(),
-            $this->createMock(AgentPinResolver::class),
-            officeConverter: $converter,
-            multitaskConfig: new MultitaskRoutingConfig($configRepo),
-        );
+        $classifier = MessageClassifierFactory::build([
+            'messageSorter' => $sorter,
+            'messageMetaRepository' => $metaRepo,
+            'modelConfigService' => $modelConfig,
+            'configRepository' => $configRepo,
+            'em' => $em,
+            'logger' => $this->createMock(LoggerInterface::class),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createMock(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($configRepo),
+            'nativeToolRoutingConfig' => $this->disabledNativeToolRouting(),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createMock(AgentPinResolver::class),
+            'officeConverter' => $converter,
+            'multitaskConfig' => new MultitaskRoutingConfig($configRepo),
+        ]);
 
         $message = $this->buildMessage($case);
 
