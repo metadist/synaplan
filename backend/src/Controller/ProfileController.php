@@ -9,7 +9,6 @@ use App\Service\Email\EmailChatService;
 use App\Service\Iam\UserDeletionService;
 use App\Service\Profile\ToursSeen;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -25,7 +24,6 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 class ProfileController extends AbstractController
 {
     public function __construct(
-        private EntityManagerInterface $em,
         private UserPasswordHasherInterface $passwordHasher,
         private EmailChatService $emailChatService,
         private UserDeletionService $userDeletionService,
@@ -279,7 +277,7 @@ class ProfileController extends AbstractController
 
         $user->setUserDetails($details);
         try {
-            $this->em->flush();
+            $this->userRepository->save($user);
         } catch (UniqueConstraintViolationException) {
             // The pre-check above is not atomic. UNIQ_BUSER_BMAIL rejects the
             // second writer when two accounts take the same address together.
@@ -535,7 +533,7 @@ class ProfileController extends AbstractController
         // Update password
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
         $user->setMustChangePassword(false);
-        $this->em->flush();
+        $this->userRepository->save($user);
 
         $this->logger->info('Password changed', ['user_id' => $user->getId()]);
 
@@ -640,7 +638,7 @@ class ProfileController extends AbstractController
             $details = $user->getUserDetails();
             unset($details['email_keyword']);
             $user->setUserDetails($details);
-            $this->em->flush();
+            $this->userRepository->save($user);
 
             return $this->json([
                 'success' => true,

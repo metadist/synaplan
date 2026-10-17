@@ -23,6 +23,7 @@ use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
 use App\Service\Prompt\PromptService;
+use App\Tests\Support\MessageClassifierFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -186,20 +187,20 @@ final class OverrideAndAgainRoutingTest extends TestCase
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getRepository')->willReturn($models);
 
-        return new MessageClassifier(
-            $this->createStub(MessageSorter::class),
-            $meta,
-            $this->modelConfig($tag),
-            $config,
-            $em,
-            new NullLogger(),
-            new TopicIntentRule(new SystemCapabilityRegistry()),
-            $this->createStub(EmbeddingRouterService::class),
-            new EmbeddingRouterConfig($config),
-            new NativeToolRoutingConfig($config),
-            new ToolCallingCapability(),
-            $this->createStub(AgentPinResolver::class),
-        );
+        return MessageClassifierFactory::build([
+            'messageSorter' => $this->createStub(MessageSorter::class),
+            'messageMetaRepository' => $meta,
+            'modelConfigService' => $this->modelConfig($tag),
+            'configRepository' => $config,
+            'em' => $em,
+            'logger' => new NullLogger(),
+            'topicIntents' => new TopicIntentRule(new SystemCapabilityRegistry()),
+            'embeddingRouter' => $this->createStub(EmbeddingRouterService::class),
+            'embeddingRouterConfig' => new EmbeddingRouterConfig($config),
+            'nativeToolRoutingConfig' => new NativeToolRoutingConfig($config),
+            'toolCallingCapability' => new ToolCallingCapability(),
+            'agentPin' => $this->createStub(AgentPinResolver::class),
+        ]);
     }
 
     private function resolver(?string $tag): TurnClassificationResolver

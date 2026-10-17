@@ -2,7 +2,6 @@
 
 namespace App\Controller;
 
-use App\AI\Service\AiFacade;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
@@ -20,11 +19,11 @@ use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\AssistantKind;
 use App\Service\Model\Exception\InvalidPromptModelException;
 use App\Service\Model\PromptModelEligibilityValidator;
-use App\Service\ModelConfigService;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Prompt\PromptService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
-use App\Service\RateLimitService;
+use App\Service\Summary\DocumentSummarizer;
+use App\Service\Summary\SummaryCall;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -49,17 +48,27 @@ class PromptController extends AbstractController
      */
     private const SUPPORTED_LANGUAGES = ['de', 'en', 'it', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'tr'];
 
+    private const FILE_SUMMARY_INSTRUCTIONS = <<<'PROMPT'
+You are a document summarizer. Your task is to create a brief, informative summary of the provided document.
+
+Rules:
+- Write 2-3 sentences maximum
+- Focus on what the document IS and what information it CONTAINS
+- Be specific about the type of content (prices, FAQs, product info, etc.)
+- Write in the same language as the document
+- Do NOT include any metadata or formatting
+- Just output the plain summary text
+PROMPT;
+
     public function __construct(
         private PromptRepository $promptRepository,
         private PromptMetaRepository $promptMetaRepository,
         private PromptService $promptService,
-        private RateLimitService $rateLimitService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private AiFacade $aiFacade,
+        private DocumentSummarizer $summarizer,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
-        private ModelConfigService $modelConfigService,
         private VectorStorageFacade $vectorStorageFacade,
         private PromptModelEligibilityValidator $modelEligibilityValidator,
         private TaskPlanner $taskPlanner,
@@ -1687,6 +1696,50 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
+        $document = $this->summaryDocument($messageId, $user);
+        if ($document instanceof JsonResponse) {
+            return $document;
+        }
+        [$fileText, $fileName] = $document;
+
+        try {
+            $message = "Summarize this document:\n\n{$fileText}";
+            $summary = $this->summarizer->summarize($user, new SummaryCall(self::FILE_SUMMARY_INSTRUCTIONS, $message, 0.3, 'FILE_SUMMARY', $message))['summary'];
+
+            $this->logger->info('File summary generated', [
+                'user_id' => $user->getId(),
+                'topic' => $topic,
+                'message_id' => $messageId,
+                'file_name' => $fileName,
+                'summary_length' => strlen($summary),
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'summary' => $summary,
+                'fileName' => $fileName,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('File summary generation failed', [
+                'user_id' => $user->getId(),
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->json([
+                'error' => 'Failed to generate summary',
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * The text to summarize — of a file, else of a message attachment, of the
+     * user — and its name, or the answer when there is none.
+     *
+     * @return array{string, string}|JsonResponse
+     */
+    private function summaryDocument(int $messageId, User $user): array|JsonResponse
+    {
         $fileText = '';
         $fileName = 'Document';
 
@@ -1730,76 +1783,7 @@ class PromptController extends AbstractController
             $fileText = substr($fileText, 0, $maxLength).'... [truncated]';
         }
 
-        try {
-            // Document summaries use Text Analytics (ANALYZE → CHAT), never
-            // the leftover hidden SUMMARIZE slot.
-            $summaryConfig = $this->modelConfigService->getSummaryModelConfig($user->getId());
-            $summaryModelId = $summaryConfig['model_id'];
-            $provider = $summaryConfig['provider'];
-            $modelName = $summaryConfig['model'];
-
-            // Build prompt for concise summary
-            $systemPrompt = <<<'PROMPT'
-You are a document summarizer. Your task is to create a brief, informative summary of the provided document.
-
-Rules:
-- Write 2-3 sentences maximum
-- Focus on what the document IS and what information it CONTAINS
-- Be specific about the type of content (prices, FAQs, product info, etc.)
-- Write in the same language as the document
-- Do NOT include any metadata or formatting
-- Just output the plain summary text
-PROMPT;
-
-            $messages = [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => "Summarize this document:\n\n{$fileText}"],
-            ];
-
-            $aiOptions = ['temperature' => 0.3];
-            if ($provider) {
-                $aiOptions['provider'] = $provider;
-            }
-            if ($modelName) {
-                $aiOptions['model'] = $modelName;
-            }
-
-            $response = $this->aiFacade->chat($messages, $user->getId(), $aiOptions);
-            $summary = trim($response['content'] ?? '');
-
-            $this->rateLimitService->recordUsage($user, 'FILE_SUMMARY', [
-                'provider' => $response['provider'] ?? 'unknown',
-                'model' => $response['model'] ?? 'unknown',
-                'model_id' => $summaryModelId,
-                'usage' => $response['usage'] ?? [],
-                'response_text' => $summary,
-                'input_text' => "Summarize this document:\n\n{$fileText}",
-            ]);
-
-            $this->logger->info('File summary generated', [
-                'user_id' => $user->getId(),
-                'topic' => $topic,
-                'message_id' => $messageId,
-                'file_name' => $fileName,
-                'summary_length' => strlen($summary),
-            ]);
-
-            return $this->json([
-                'success' => true,
-                'summary' => $summary,
-                'fileName' => $fileName,
-            ]);
-        } catch (\Throwable $e) {
-            $this->logger->error('File summary generation failed', [
-                'user_id' => $user->getId(),
-                'message_id' => $messageId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return $this->json([
-                'error' => 'Failed to generate summary',
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
+        return [$fileText, $fileName];
     }
 
     /**

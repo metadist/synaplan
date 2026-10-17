@@ -99,3 +99,52 @@ budget: a refused request must not be billed or counted.
 ## 8. Not in S5
 
 `MediaGenerationService` and the provider calls (S10). The MIME map (S8).
+
+## 9. As delivered (2026-10-17)
+
+`MediaGenerationHandler` leaves all three size ledgers: 2,245 → 170 lines,
+22 → 8 constructor parameters, `handleStream()` 1,010 → 45 lines, and
+`detachMediaToAsyncJob()` (166) is split inside `MediaJobDetach`. The branch
+starts from S4c's head. Where the result differs from the plan:
+
+- **The downloader seam brought its writers.** The ratchet freezes the
+  handler's 22 constructor parameters, so a new dependency could not be
+  added. The three methods that write into the upload tree (a data URL, a
+  download, the public copy of an image-to-video input) and the APP_URL check
+  were the only users of `UserUploadPathBuilder`; they moved verbatim into
+  `MediaUploadStore`, which owns `MediaDownloader` and took that slot.
+  `curl_close()` (deprecated in PHP 8.5, a no-op since 8.0) went in a commit
+  of its own.
+- **Thirty-five cases instead of seventeen.** The planned cases left branches
+  the split moves unrecorded: the clarification, image and speech jobs, the
+  job ceiling, an unreachable queue, both edit fallbacks, a task prompt's
+  model, a multitask chain, an inline reference frame, incognito and widget
+  turns, a missing duration, no media or none with a URL, an empty prompt, the
+  admin diagnostics, a folder delivery. They were recorded additively before
+  any stage moved.
+- **More stages than planned, one reason to change each.** The chat hand-off
+  (`MediaChatHandOff`) sits beside the guard, the memory job is
+  `MediaTurnMemory`, and the background jobs are `MediaJobDetach`.
+  `MediaTurnRequest` carries the turn from the model on; `MediaReferences`,
+  `MediaPrompt`, `MediaModelChoice`, `MediaModel`, `MediaRefusal` and
+  `StoredMedia` are the other typed values.
+- **The handler ran its stages one commit early.** Each step had to keep the
+  constructor at 22, so S5.5 already left the handler with its eight stages.
+  S5.6 moved the conversation-edit test to `MediaReferenceResolverTest` and
+  added a unit test per stage; the seven other handler tests stay turn-level,
+  built through `MediaGenerationHandlerFactory`.
+- **The upload directory is configured once.** `services.yaml` gave the
+  handler `%kernel.project_dir%/var/uploads`; every stage that reads or
+  writes uploads now takes it the same way (the store and the reference
+  resolver had first copied the handler's fallback, the same path in the
+  images).
+- **Found, carried; the snapshot pins all three.** (1) A provider download
+  that fails, or a result without a URL, is told as "We couldn't open the
+  image you linked": the error classifier reads "image" with "download" or
+  "url" as a failed reference image (U8, V5). (2) For a WhatsApp sender
+  without a verified phone the turn has no account of its own, and the
+  background-job check takes an integer: the turn fails on a type error
+  unless the media limit refused first. Whether such a sender may render
+  media is the owner's decision. (3) `/pic` with an attached picture renders
+  with the text-to-picture default, not the edit default, while it still
+  hands the picture to the provider.

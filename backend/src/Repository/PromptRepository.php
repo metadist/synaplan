@@ -409,4 +409,16 @@ class PromptRepository extends ServiceEntityRepository
 
         return $rows;
     }
+
+    public function save(Prompt $prompt): void
+    {
+        $this->getEntityManager()->persist($prompt);
+        $this->getEntityManager()->flush();
+    }
+
+    public function remove(Prompt $prompt): void
+    {
+        $this->getEntityManager()->remove($prompt);
+        $this->getEntityManager()->flush();
+    }
 }
