@@ -360,8 +360,8 @@ final readonly class TurnClassificationResolver
     }
 
     /**
-     * Again skips the sorter: the stored topic routes the turn, and a model
-     * picked for the retry decides the topic when its tag says so.
+     * Again skips the sorter: the picked model's tag and the stored topic
+     * route the retry ({@see TopicIntentRule::forModel()}).
      *
      * @param array<string, mixed> $options
      *
@@ -371,7 +371,7 @@ final readonly class TurnClassificationResolver
     {
         $language = self::language($message, $options, 'en');
         $modelTag = !empty($options['model_id']) ? $this->modelConfigService->getModelTag((int) $options['model_id']) : null;
-        $routed = $this->topicIntents->forAgain($modelTag, $message->getTopic());
+        $routed = $this->topicIntents->forModel($modelTag, $message->getTopic());
 
         $this->logger->info('MessageProcessor: Skipping classification (Again request)', [
             'specified_model_id' => $options['model_id'],

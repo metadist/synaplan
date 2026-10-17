@@ -8,11 +8,25 @@ use App\Service\Multitask\Plan\Capability;
 
 /**
  * Which topic and intent a message gets when the user picked a model: a
- * model override in MessageClassifier and an Again both ask. Their answers
- * still differ, so each keeps its own method until they agree.
+ * model override in MessageClassifier and an Again both ask. An Again
+ * follows forModel(); the model override keeps its own tag table until it
+ * agrees.
  */
 final readonly class TopicIntentRule
 {
+    /** The kind of answer a model tag names; any other tag keeps the message's topic. */
+    private const TOPIC_FOR_TAG = [
+        'text2pic' => 'mediamaker',
+        'text2vid' => 'mediamaker',
+        'text2sound' => 'mediamaker',
+        'pic2text' => 'general', // Vision is handled by ChatHandler
+        'analyze' => 'general',
+        'vision' => 'general',
+        'document' => 'officemaker',
+        'officemaker' => 'officemaker',
+        'text2doc' => 'officemaker',
+    ];
+
     /** The model override's tag table; any other tag keeps the message's topic. */
     private const MODEL_OVERRIDE_TOPICS = [
         'text2pic' => 'mediamaker',
@@ -56,32 +70,16 @@ final readonly class TopicIntentRule
     }
 
     /**
-     * Again: the stored topic routes the retry (`chat` when it has none), and
-     * the picked model's tag re-aims it when the tag names a kind of answer.
+     * The tag names the kind of answer when it can: media, a chat answer for
+     * vision, a document. Any other tag (a chat model, no tag) keeps the
+     * topic the message has, so a custom prompt survives; without one the
+     * message goes to `general`.
      */
-    public function forAgain(?string $modelTag, string $messageTopic): TopicIntent
+    public function forModel(?string $modelTag, ?string $messageTopic): TopicIntent
     {
-        $topic = strtolower($messageTopic);
-        if ('' === $topic || 'unknown' === $topic) {
-            $topic = 'chat';
-        }
-        if (null !== $modelTag && '' !== $modelTag) {
-            $topic = match (strtolower($modelTag)) {
-                'text2pic', 'text2vid', 'text2sound' => 'mediamaker',
-                'pic2text', 'analyze', 'vision' => 'general',
-                'document', 'officemaker', 'text2doc' => 'officemaker',
-                default => $topic,
-            };
-        }
+        $topic = self::TOPIC_FOR_TAG[strtolower((string) $modelTag)] ?? self::topicOrGeneral($messageTopic);
 
-        $intent = match ($topic) {
-            'mediamaker', 'text2pic', 'text2vid', 'text2sound' => Capability::ImageGeneration->value,
-            'pic2text', 'analyze', 'analyzefile' => Capability::FileAnalysis->value,
-            'officemaker' => Capability::DocumentGeneration->value,
-            default => Capability::Chat->value,
-        };
-
-        return new TopicIntent($topic, $intent);
+        return new TopicIntent($topic, $this->intentFor($topic));
     }
 
     /**
@@ -95,5 +93,11 @@ final readonly class TopicIntentRule
         return $this->capabilities->topicToIntentMap()[$topic]
             ?? self::INTENT_ALIASES[$topic]
             ?? Capability::Chat->value;
+    }
+
+    /** A new message carries `UNKNOWN`; it, `unknown` and an empty topic count as none. */
+    private static function topicOrGeneral(?string $topic): string
+    {
+        return null === $topic || '' === $topic || 'unknown' === strtolower($topic) ? 'general' : $topic;
     }
 }

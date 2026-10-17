@@ -608,7 +608,7 @@
                 "prompt": [
                     {
                         "language": "en",
-                        "topic": "chat"
+                        "topic": "general"
                     }
                 ],
                 "router": [
@@ -621,7 +621,7 @@
                                 "aiModel": 0
                             },
                             "source": "again",
-                            "topic": "chat"
+                            "topic": "general"
                         },
                         "history": 1,
                         "method": "route",
@@ -650,7 +650,7 @@
                     "sorting_model_name": null,
                     "sorting_provider": null,
                     "source": "again",
-                    "topic": "chat"
+                    "topic": "general"
                 },
                 "preprocessing": {
                     "hasFiles": false
@@ -683,7 +683,7 @@
                         "language": "en",
                         "model_id": 42,
                         "source": "again",
-                        "topic": "chat"
+                        "topic": "general"
                     },
                     "status": "classified"
                 },
@@ -712,7 +712,7 @@
                 "prompt": [
                     {
                         "language": "en",
-                        "topic": "chat"
+                        "topic": "general"
                     }
                 ],
                 "router": [
@@ -725,7 +725,7 @@
                                 "aiModel": 0
                             },
                             "source": "again",
-                            "topic": "chat"
+                            "topic": "general"
                         },
                         "history": 1,
                         "method": "routeStream",
@@ -757,7 +757,7 @@
                     "sorting_model_name": null,
                     "sorting_provider": null,
                     "source": "again",
-                    "topic": "chat"
+                    "topic": "general"
                 },
                 "preprocessed": {
                     "hasFiles": false
@@ -814,7 +814,7 @@
                 "router": [
                     {
                         "classification": {
-                            "intent": "chat",
+                            "intent": "image_generation",
                             "language": "en",
                             "model_id": 42,
                             "prompt_metadata": {
@@ -843,7 +843,7 @@
             },
             "result": {
                 "classification": {
-                    "intent": "chat",
+                    "intent": "image_generation",
                     "language": "en",
                     "model_id": 42,
                     "sorting_model_id": null,
@@ -918,7 +918,7 @@
                 "router": [
                     {
                         "classification": {
-                            "intent": "chat",
+                            "intent": "image_generation",
                             "language": "en",
                             "model_id": 42,
                             "prompt_metadata": {
@@ -950,7 +950,7 @@
             },
             "result": {
                 "classification": {
-                    "intent": "chat",
+                    "intent": "image_generation",
                     "language": "en",
                     "model_id": 42,
                     "sorting_model_id": null,
@@ -1008,7 +1008,7 @@
                 "prompt": [
                     {
                         "language": "en",
-                        "topic": "chat"
+                        "topic": "general"
                     }
                 ],
                 "router": [
@@ -1021,7 +1021,7 @@
                                 "aiModel": 0
                             },
                             "source": "again",
-                            "topic": "chat"
+                            "topic": "general"
                         },
                         "history": 1,
                         "method": "route",
@@ -1050,7 +1050,7 @@
                     "sorting_model_name": null,
                     "sorting_provider": null,
                     "source": "again",
-                    "topic": "chat"
+                    "topic": "general"
                 },
                 "preprocessing": {
                     "hasFiles": false
@@ -1083,7 +1083,7 @@
                         "language": "en",
                         "model_id": 42,
                         "source": "again",
-                        "topic": "chat"
+                        "topic": "general"
                     },
                     "status": "classified"
                 },
@@ -1112,7 +1112,7 @@
                 "prompt": [
                     {
                         "language": "en",
-                        "topic": "chat"
+                        "topic": "general"
                     }
                 ],
                 "router": [
@@ -1125,7 +1125,7 @@
                                 "aiModel": 0
                             },
                             "source": "again",
-                            "topic": "chat"
+                            "topic": "general"
                         },
                         "history": 1,
                         "method": "routeStream",
@@ -1157,7 +1157,7 @@
                     "sorting_model_name": null,
                     "sorting_provider": null,
                     "source": "again",
-                    "topic": "chat"
+                    "topic": "general"
                 },
                 "preprocessed": {
                     "hasFiles": false

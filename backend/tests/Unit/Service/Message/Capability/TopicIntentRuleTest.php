@@ -51,11 +51,25 @@ final class TopicIntentRuleTest extends TestCase
         self::assertEquals(new TopicIntent('legal-review', 'chat'), $this->rule->forModelOverride('rerank', 'legal-review'));
     }
 
-    public function testAnAgainKeepsTheStoredTopicForAChatModel(): void
+    public function testAPickedModelsTagNamesTheKindOfAnswer(): void
     {
-        self::assertEquals(new TopicIntent('officemaker', 'document_generation'), $this->rule->forAgain('document', 'general'));
-        self::assertEquals(new TopicIntent('legal-review', 'chat'), $this->rule->forAgain('chat', 'legal-review'));
-        self::assertEquals(new TopicIntent('chat', 'chat'), $this->rule->forAgain(null, 'UNKNOWN'));
+        self::assertEquals(new TopicIntent('mediamaker', 'image_generation'), $this->rule->forModel('text2pic', 'legal-review'));
+        self::assertEquals(new TopicIntent('general', 'chat'), $this->rule->forModel('vision', 'mediamaker'));
+        self::assertEquals(new TopicIntent('officemaker', 'document_generation'), $this->rule->forModel('document', 'general'));
+    }
+
+    public function testAChatModelKeepsTheTopicTheMessageHas(): void
+    {
+        self::assertEquals(new TopicIntent('legal-review', 'chat'), $this->rule->forModel('chat', 'legal-review'));
+        self::assertEquals(new TopicIntent('tools:pic', 'image_generation'), $this->rule->forModel('chat', 'tools:pic'));
+    }
+
+    public function testAMessageWithoutATopicGoesToGeneral(): void
+    {
+        foreach (['', 'unknown', 'UNKNOWN'] as $topic) {
+            self::assertEquals(new TopicIntent('general', 'chat'), $this->rule->forModel('chat', $topic), "\"{$topic}\"");
+            self::assertEquals(new TopicIntent('general', 'chat'), $this->rule->forModel(null, $topic), "no tag, \"{$topic}\"");
+        }
     }
 
     /**

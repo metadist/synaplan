@@ -62,23 +62,23 @@ final class OverrideAndAgainRoutingTest extends TestCase
             ['officemaker', 'mediamaker', ['mediamaker', 'image_generation'], ['officemaker', 'document_generation']],
             ['text2doc', '', ['general', 'chat'], ['officemaker', 'document_generation']],
             ['text2doc', 'mediamaker', ['mediamaker', 'image_generation'], ['officemaker', 'document_generation']],
-            ['chat', '', ['general', 'chat'], ['chat', 'chat']],
-            ['chat', 'UNKNOWN', ['general', 'chat'], ['chat', 'chat']],
+            ['chat', '', ['general', 'chat'], ['general', 'chat']],
+            ['chat', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
             ['chat', 'legal-review', ['general', 'chat'], ['legal-review', 'chat']],
             ['chat', 'mediamaker', ['general', 'chat'], ['mediamaker', 'image_generation']],
-            ['chat', 'tools:pic', ['general', 'chat'], ['tools:pic', 'chat']],
-            ['vectorize', '', ['general', 'chat'], ['chat', 'chat']],
-            ['vectorize', 'UNKNOWN', ['general', 'chat'], ['chat', 'chat']],
+            ['chat', 'tools:pic', ['general', 'chat'], ['tools:pic', 'image_generation']],
+            ['vectorize', '', ['general', 'chat'], ['general', 'chat']],
+            ['vectorize', 'UNKNOWN', ['general', 'chat'], ['general', 'chat']],
             ['vectorize', 'legal-review', ['general', 'chat'], ['legal-review', 'chat']],
             ['vectorize', 'mediamaker', ['general', 'chat'], ['mediamaker', 'image_generation']],
-            ['vectorize', 'tools:pic', ['general', 'chat'], ['tools:pic', 'chat']],
-            ['rerank', '', ['general', 'chat'], ['chat', 'chat']],
-            ['rerank', 'unknown', ['unknown', 'chat'], ['chat', 'chat']],
-            ['rerank', 'UNKNOWN', ['UNKNOWN', 'chat'], ['chat', 'chat']],
+            ['vectorize', 'tools:pic', ['general', 'chat'], ['tools:pic', 'image_generation']],
+            ['rerank', '', ['general', 'chat'], ['general', 'chat']],
+            ['rerank', 'unknown', ['unknown', 'chat'], ['general', 'chat']],
+            ['rerank', 'UNKNOWN', ['UNKNOWN', 'chat'], ['general', 'chat']],
             ['rerank', 'legal-review', ['legal-review', 'chat'], ['legal-review', 'chat']],
             ['rerank', 'mediamaker', ['mediamaker', 'image_generation'], ['mediamaker', 'image_generation']],
-            ['rerank', 'tools:pic', ['tools:pic', 'image_generation'], ['tools:pic', 'chat']],
-            [null, '', ['general', 'chat'], ['chat', 'chat']],
+            ['rerank', 'tools:pic', ['tools:pic', 'image_generation'], ['tools:pic', 'image_generation']],
+            [null, '', ['general', 'chat'], ['general', 'chat']],
             [null, 'legal-review', ['general', 'chat'], ['legal-review', 'chat']],
         ];
 
@@ -99,6 +99,13 @@ final class OverrideAndAgainRoutingTest extends TestCase
 
         $byAgain = $this->resolver($tag)->againForBufferedTurn($this->message($topic), ['is_again' => true, 'model_id' => 42], new TurnStatus(null, new NullLogger()));
         self::assertSame($again, [$byAgain['topic'], $byAgain['intent']], 'Again');
+    }
+
+    public function testAnAgainOfAPicMessageRegeneratesTheImage(): void
+    {
+        $byAgain = $this->resolver('chat')->againForBufferedTurn($this->message('tools:pic'), ['is_again' => true, 'model_id' => 42], new TurnStatus(null, new NullLogger()));
+
+        self::assertSame(['tools:pic', 'image_generation'], [$byAgain['topic'], $byAgain['intent']]);
     }
 
     private function classifier(?string $tag): MessageClassifier
