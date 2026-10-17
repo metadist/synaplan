@@ -7,13 +7,13 @@ namespace App\AI\StructuredOutput\Schema;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 
 /**
- * JSON schema for {@see \App\Controller\UserMemoryController}'s
- * "Parse into memory" endpoint.
+ * JSON schema for the "Parse into memory" endpoint
+ * ({@see \App\Service\Memory\MemoryInputParser}).
  *
  * Replaces the dead `'json_mode' => true` option, which no provider ever
  * read — the endpoint has always relied purely on prompt instructions plus
  * a tolerant, three-format fallback parser
- * ({@see \App\Controller\UserMemoryController::parseAiResponse()}).
+ * ({@see \App\Service\Memory\MemoryInputParser::parseAiResponse()}).
  *
  * The schema mirrors {@see MemoryExtractionSchema} in shape (a `create` /
  * `update` / `delete` action list wrapped under a root object, since a bare

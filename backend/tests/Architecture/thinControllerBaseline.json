@@ -6,9 +6,9 @@
         "methodLines": 50
     },
     "counts": {
-        "methodLines": 110,
+        "methodLines": 108,
         "entityManager": 18,
-        "aiFacade": 6
+        "aiFacade": 5
     },
     "methodLines": {
         "src/Controller/AI/HiggsfieldCredentialController.php::HiggsfieldCredentialController::test": 62,
@@ -94,8 +94,6 @@
         "src/Controller/SubscriptionController.php::SubscriptionController::createTopupSession": 101,
         "src/Controller/SubscriptionController.php::SubscriptionController::syncFromStripe": 115,
         "src/Controller/TtsController.php::TtsController::streamAudio": 58,
-        "src/Controller/UserMemoryController.php::UserMemoryController::parseActionData": 54,
-        "src/Controller/UserMemoryController.php::UserMemoryController::parseMemory": 162,
         "src/Controller/UserMemoryController.php::UserMemoryController::updateMemory": 58,
         "src/Controller/VectorStatsController.php::VectorStatsController::admin": 51,
         "src/Controller/WebhookController.php::WebhookController::generic": 130,
@@ -147,7 +145,6 @@
         "src/Controller/OpenAICompatibleController.php",
         "src/Controller/TestController.php",
         "src/Controller/TestMessageController.php",
-        "src/Controller/TtsController.php",
-        "src/Controller/UserMemoryController.php"
+        "src/Controller/TtsController.php"
     ]
 }
