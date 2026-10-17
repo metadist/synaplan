@@ -7,7 +7,7 @@
     },
     "counts": {
         "methodLines": 106,
-        "entityManager": 18,
+        "entityManager": 17,
         "aiFacade": 5
     },
     "methodLines": {
@@ -122,7 +122,6 @@
         "src/Controller/AdminController.php",
         "src/Controller/AppleAuthController.php",
         "src/Controller/AuthController.php",
-        "src/Controller/ChatController.php",
         "src/Controller/GitHubAuthController.php",
         "src/Controller/GoogleAuthController.php",
         "src/Controller/GuestChatController.php",

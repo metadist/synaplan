@@ -24,7 +24,6 @@ use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
 use App\Service\RAG\VectorSearchService;
 use App\Service\Widget\WidgetSessionService;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -38,7 +37,6 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 class ChatController extends AbstractController
 {
     public function __construct(
-        private EntityManagerInterface $em,
         private ChatRepository $chatRepository,
         private ChatDeletionService $chatDeletionService,
         private MessageRepository $messageRepository,
@@ -300,8 +298,7 @@ class ChatController extends AbstractController
             $chat->setTitle($title);
         }
 
-        $this->em->persist($chat);
-        $this->em->flush();
+        $this->chatRepository->save($chat);
 
         $this->logger->info('Chat created', [
             'chat_id' => $chat->getId(),
@@ -570,7 +567,7 @@ class ChatController extends AbstractController
             }
         }
 
-        $this->em->flush();
+        $this->chatRepository->save($chat);
 
         return $this->json([
             'success' => true,
@@ -692,7 +689,7 @@ class ChatController extends AbstractController
             $chat->setOgImagePath(null);
         }
 
-        $this->em->flush();
+        $this->chatRepository->save($chat);
 
         return $this->json([
             'success' => true,
