@@ -105,9 +105,11 @@ verified quote. `flags` ⊂ outdated | opinion_or_advertising | contradicts_itse
 }
 ```
 
-`status` ∈ answered | thin | conflicting | open; `finish` ∈ null | covered |
-budget | no_progress; actions ≤ `MAX_ACTIONS` (6 Standard, 10 Thorough) — the
-engine drops the rest.
+`status` ∈ answered | thin | conflicting | open. `finish` ∈ null | covered |
+budget | no_progress is a **top-level field, not an action type** — the prompt
+says so in the same words (`04` §4.5); when it is set, `actions` must be `[]`
+and the engine ignores any present. Actions ≤ `MAX_ACTIONS` (6 Standard, 10
+Thorough) — the engine drops the rest.
 
 ### 1.6 `ResearchCheckSchema` (`tools:research_check`)
 
@@ -118,7 +120,9 @@ engine drops the rest.
 ] }
 ```
 
-`verdict` ∈ supported | partial | unsupported | contradicted.
+`verdict` ∈ supported | partial | unsupported | contradicted. The envelope is
+the object with the single key `verdicts` — the prompt asks for exactly that
+(`04` §4.7); a bare array is a schema violation.
 
 ---
 
@@ -126,17 +130,17 @@ engine drops the rest.
 
 ### 2.1 Endpoints
 
-| Method | Path (`/v1/…` for API keys, `/api/v1/…` for the session) | Body / query | Returns |
-| ------ | --------------------------------------------------------- | ------------ | ------- |
-| GET | `research/capabilities` | — | §2.2; **404** when the module is off |
-| POST | `research` | §2.3; header `Idempotency-Key` (≤ 64 chars, 24 h) | 202 `{ id, status, events, research_protocol: 1 }`; same key → same `id` |
-| GET | `research?active=1` | — | `{ runs: [ { id, status, depth, question, created_at } ] }` (last 48 h) |
-| GET | `research/{id}` | — | §2.5 |
-| GET | `research/{id}/events` | `Last-Event-ID` header or `?after=<seq>` | SSE, §2.6 |
-| POST | `research/{id}/input` | §2.4 | §2.5 |
-| POST | `research/{id}/cancel` | — | §2.5 (`stopped_by_user`) |
-| POST | `research/{id}/followups` | `{ type: question|revise|deeper|refresh, text?, section? }` | 202 new run with `parent` |
-| DELETE | `research/{id}` | — | 204; state, events and cached source texts removed |
+| Method | Path (`/v1/…` for API keys, `/api/v1/…` for the session) | Body / query | Returns | Module off |
+| ------ | --------------------------------------------------------- | ------------ | ------- | ---------- |
+| GET | `research/capabilities` | — | §2.2 | 404 |
+| POST | `research` | §2.3; header `Idempotency-Key` (≤ 64 chars, 24 h) | 202 `{ id, status, events, research_protocol: 1 }`; same key → same `id` | 404 |
+| GET | `research?active=1` | — | `{ runs: [ { id, status, depth, question, created_at } ] }` (last 48 h) | works (own runs) |
+| GET | `research/{id}` | — | §2.5 | works (own runs) |
+| GET | `research/{id}/events` | `Last-Event-ID` header or `?after=<seq>` | SSE, §2.6 | works (own runs) |
+| POST | `research/{id}/input` | §2.4 | §2.5 | 404 |
+| POST | `research/{id}/cancel` | — | §2.5 (`stopped_by_user`) | works |
+| POST | `research/{id}/followups` | `{ type: question|revise|deeper|refresh, text?, section? }` | 202 new run with `parent` | 404 |
+| DELETE | `research/{id}` | — | 204; state, events and cached source texts removed | works |
 
 Auth: an API key needs `desktop:messages` (paired keys have it); full keys
 pass; the session routes need the signed-in user. Every id belongs to the
@@ -171,6 +175,7 @@ caller or the answer is 404 (never 403, to avoid id probing).
   "output": "auto",
   "instructions": "Prefer official sources.",
   "context": { "turns": [ { "role": "user", "text": "…" } ] },
+  "chat_id": 4711,
   "assistant_id": null,
   "models": { "lead": "anthropic:claude-sonnet-5-5:chat", "reader": null, "writer": null, "checker": null },
   "world": { "providers": ["anthropic", "openai", "groq", "ollama"] },
@@ -183,7 +188,9 @@ Validation (400 with `{ error: { code, field, message } }`): `question`
 1–4,000 chars; `instructions` ≤ 4,000; `context.turns` ≤ 6 × 2,000;
 `knowledge` keys inside the caller's scopes; `models.*` active `chat` rows
 inside `world.providers`; `seed_sources` ≤ 50, URLs pass the SSRF guard;
-unknown fields rejected.
+`chat_id` required on `/api/v1/research` and must be the caller's chat (the
+`deliver` unit writes the report into it), rejected on `/v1/research`; unknown
+fields rejected.
 
 ### 2.4 Input
 
@@ -206,9 +213,18 @@ unknown fields rejected.
   "status": "gathering", "depth": "standard",
   "brief": { … §1.1 … },
   "plan": { "points": [ { "id": "p1", "title": "…", "status": "answered" } ], "outline": [ … ] },
-  "sources": [ { "id": "s3", "kind": "web", "title": "…", "host": "lieferant-a.example",
+  "sources": [ { "id": "s3", "kind": "web", "title": "…", "url": "https://lieferant-a.example/preise",
+                 "host": "lieferant-a.example", "file_id": null,
                  "published": "2026-03-01", "class": "vendor", "status": "read", "reason": null } ],
-  "report": null,
+  "evidence": [ { "id": "e12", "source": "s3", "point": "p2", "fact": "Base price 12.40 EUR per unit (net).",
+                  "quotes": [ { "text": "Grundpreis netto 12,40 € je Einheit", "location": "Tabelle 1", "verified": true } ] } ],
+  "report": {
+    "markdown": "… Der Grundpreis liegt bei 12,40 € netto je Einheit. [3] …",
+    "version": 1,
+    "citations": [ { "n": 1, "marker": "[3]", "source": "s3", "evidence": ["e12"],
+                     "sentence": "Der Grundpreis liegt bei 12,40 € netto je Einheit." } ],
+    "sources_order": ["s3", "s9"]
+  },
   "check": null,
   "outcome": null,
   "models": { "sorter": "…", "reader": "…", "lead": "…", "writer": "…", "checker": "…" },
@@ -220,9 +236,15 @@ unknown fields rejected.
 ```
 
 `status` ∈ briefing | waiting_answer | planning | waiting_plan | gathering |
-writing | checking | complete | stopped | failed. `report` is `{ markdown,
-version }` when written; `check` is `{ statements, supported, softened,
-removed }`; `outcome` is `{ code, params, text }` (`03` §7.5).
+writing | checking | complete | stopped | failed. `report` is null until
+written; its `citations` list every `[n]` occurrence in reading order (`n` is
+the occurrence index, `marker` the source number shown, `sentence` the text
+the marker closes) so a client renders chips and the source drawer from the
+state alone and can write `.sources.json` after a reconnect; `sources_order`
+is the numbering of the sources list. `evidence` carries only verified quotes.
+`check` is `{ statements, supported, softened, removed }`; `outcome` is
+`{ code, params, text }` (`03` §7.5). The `source` event (§2.6) carries `url`
+or `file_id` too, so a live client needs no extra request.
 
 ### 2.6 Events
 
@@ -238,7 +260,7 @@ SSE frames `id: <seq>\nevent: <name>\ndata: <json>`. The first frame after
 | `plan` | `{ points: [ { id, title } ], outline, estimate: { minutes, cost }, disclosures }` |
 | `plan_waiting` | `{}` |
 | `search` | `{ point, query, scope, results }` |
-| `source` | `{ id, kind, title, host?, file_id?, status, reason? }` |
+| `source` | `{ id, kind, title, url?, host?, file_id?, status, reason? }` |
 | `round` | `{ n, max }` |
 | `point` | `{ id, status }` |
 | `writing` | `{ section }` |
@@ -263,11 +285,20 @@ SSE frames `id: <seq>\nevent: <name>\ndata: <json>`. The first frame after
 | `check` | deterministic checks + checker batches; revision in Thorough | 120 s |
 | `deliver` | final state, usage totals, `complete` event, drop source texts | 10 s |
 
-The handler loads the state, verifies `seq` is the expected next unit
-(otherwise it is a duplicate and exits), runs the unit, checkpoints, dispatches
-the next unit, and returns. Cancel and budget are checked at every unit start
-and between sources. `RESEARCH.MAX_ACTIVE_RUNS` is enforced at start;
-`MAX_ACTIVE_THOROUGH_PER_USER` too.
+The handler: (1) loads the state and exits if `seq` is not the expected next
+unit; (2) takes the atomic claim `research:claim:{id}:{seq}` — `SET NX PX`
+with a random token and a lease of 2 × `UNIT_SECONDS` — and exits if another
+delivery holds it (two workers, a retry and a double dispatch all end here,
+before any paid call); (3) runs the unit, checking cancel before every paid
+call; (4) writes the checkpoint **fenced** with the token (compare-and-set in
+Lua: the write happens only while the token still holds the claim), advances
+`seq`, releases the claim; (5) dispatches the next unit with
+`DelayStamp(RESEARCH.UNIT_GAP_MS)` so the single consumer serves
+`async_extract` and `async_index` in between (`03` §6); (6) returns. The
+sweeper re-dispatches a `seq` whose lease expired without a checkpoint. In
+`test`, `RunResearchUnit` is routed to the `sync://` transport (`06` §8).
+`RESEARCH.MAX_ACTIVE_RUNS` and `MAX_ACTIVE_THOROUGH_PER_USER` are enforced at
+start.
 
 ---
 
@@ -292,6 +323,7 @@ insert-if-missing by `ResearchConfigSeeder`.
 | `BUDGET.<DEPTH>.MAX_ACTIONS` | 0 · 6 · 10 | 0–20 | `ReflectStage` |
 | `BUDGET.<DEPTH>.MAX_MODEL_CALLS` | 6 · 60 · 200 | ≥ 1 | `ResearchBudget` (hard stop, `complete_partial`) |
 | `UNIT_SECONDS` | 120 | 30–600 | handler |
+| `UNIT_GAP_MS` | 3000 | 0–30000 | `DelayStamp` between units (fairness, `03` §6) |
 | `MAX_ACTIVE_RUNS` | 5 | 1–100 | start |
 | `MAX_ACTIVE_THOROUGH_PER_USER` | 1 | 0–10 | start |
 | `STATE_TTL_HOURS` | 48 | 1–168 | state store |
@@ -329,10 +361,13 @@ final readonly class ResearchRunService
     public function state(User $user, string $runId): ResearchRunState;           // throws ResearchRunNotFound
     public function listActive(User $user): array;                                 // list<ResearchRunSummary>
     public function input(User $user, string $runId, ResearchInput $input): ResearchRunState;
-    public function cancel(User $user, string $runId): ResearchRunState;
+    public function cancel(User $user, string $runId): ResearchRunState;      // sets the cancel flag; the next paid call never starts
     public function followUp(User $user, string $runId, ResearchFollowUp $followUp): ResearchRunState;
     public function delete(User $user, string $runId): void;
 }
+
+/** Writes a finished web run into its chat (assistant message + report file with a DocumentRevision); no-op for API-key runs without chat_id. */
+final readonly class ResearchReportDelivery { public function deliver(ResearchRunState $state): void; }
 
 interface ResearchStage { public function run(StageContext $ctx): StageResult; }   // Brief, Plan, Gather, Read, Reflect, Write, Check, Deliver
 final class StageContext { /* run, ledger, budget, roles, emitter, clock, cancelFlag, world */ }
@@ -372,7 +407,11 @@ final readonly class ResearchStateStore
 {
     public function save(ResearchRunState $state): void;           // research:run:{id}, TTL from STATE_TTL_HOURS
     public function load(string $runId): ?ResearchRunState;
-    public function expectedSeq(string $runId): int; public function advance(string $runId, int $seq): bool;   // duplicate-unit guard
+    public function expectedSeq(string $runId): int;
+    public function claim(string $runId, int $seq, int $leaseMs): ?string;                     // SET NX PX → token, or null when held
+    public function checkpoint(ResearchRunState $state, string $token): bool;                  // fenced write; false when the lease was lost
+    public function release(string $runId, int $seq, string $token): void;
+    public function expiredClaims(): iterable;                                                 // for the sweeper
     public function activeCount(int $userId, ?ResearchDepth $depth = null): int; public function activeTotal(): int;
     public function sourceText(string $runId, string $sourceId): ?string; public function putSourceText(string $runId, string $sourceId, string $text): void;
     public function deleteUser(int $userId): int;                  // UserDeletionService

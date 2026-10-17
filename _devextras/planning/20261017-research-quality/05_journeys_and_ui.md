@@ -210,8 +210,9 @@ walk done in a project without any enabled skill.
    2 min 41 s · cost 0.21".
 4. **Find:** people now see **Research** in the web composer and the Research
    chip in Desktop (capabilities answer 200).
-   **Undo:** **Turn off** → "People can no longer start research. Research that
-   is running finishes; reports already made stay."
+   **Undo:** **Turn off** → "People can no longer start research. Research
+   that is running stops after its current step and keeps what it found;
+   reports already made stay and can still be opened and deleted."
 
 ---
 
@@ -268,7 +269,9 @@ Thorough — waits for Start
 │                                                                      │
 │ Sources: the web and 12 files in this project                        │
 │ Web search goes through Brave, hosted in the US.                     │
-│ Estimated cost {amount}. Nothing is sent or changed anywhere.        │
+│ Estimated cost {amount}. Nothing is emailed, saved or changed        │
+│ anywhere; the models of this project read your question and the      │
+│ sources it finds.                                                    │
 │                                        [Cancel]  [Start research]    │
 └──────────────────────────────────────────────────────────────────────┘
 
@@ -478,7 +481,7 @@ Models and Details.)
 
 | Surface | Who owns this? | Who else? | What will it touch? | How do I stop it? | Where did it come from? |
 | ------- | -------------- | --------- | ------------------- | ----------------- | ---------------------- |
-| Plan card | You, in this project (header) | No one | "Reads the web and 12 files in this project. Nothing is sent or changed anywhere." | **Cancel**, **Remove** a point | Your question; the brief |
+| Plan card | You, in this project (header) | No one | "Reads the web and 12 files in this project. Nothing is emailed, saved or changed anywhere; the models of this project read your question and the sources it finds." plus the world disclosure line when one applies | **Cancel**, **Remove** a point | Your question; the brief |
 | Progress card | You | No one | Live counters | **Stop**, **Write now** | **Details** log |
 | Result card and report | You, this project | No one unless you share the file | "Saved in this project: …" | **Delete report**, **Restore version** | Sources list with quotes, models, date |
 | Research team | This project | — | "uses only the providers this project already uses" | **Reset to recommended**, Customize | The workspace's model list |
@@ -490,7 +493,7 @@ Models and Details.)
 
 | State | Desktop | Web |
 | ----- | ------- | --- |
-| Server without research (capabilities 404, older server, flag off) | No chip, no tile, no team section, no rules field | No tool entry, routes 404 |
+| Server without research (capabilities 404, older server, flag off) | No chip, no tile, no team section, no rules field. A run that was active shows its `stopped_by_admin` card with what was found; saved reports stay, **Delete report** still works (the read and delete routes stay open for the owner's runs until their TTL, `03` §7.1) | No tool entry; start routes 404; existing report files and stopped cards stay readable |
 | No question yet | **Start research** disabled; hint "Type a question first." | Same |
 | No source possible | "Add files or turn on the web so there is something to research." **Add files** | "Turn on web search or pick a Library folder." |
 | Web search not configured | "the web — not set up on your Synaplan workspace" (disabled) | Same, plus a link to the admin page for administrators |

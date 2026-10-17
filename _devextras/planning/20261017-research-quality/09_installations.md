@@ -13,7 +13,7 @@ who runs them.
 | Id | Setup | Where it comes from | Models | Web search | Documents from the web | Knowledge (embeddings) | Worker |
 | -- | ----- | ------------------- | ------ | ---------- | ---------------------- | ---------------------- | ------ |
 | **P-DEV** | Developer stack | `docker-compose.yml` (`make up`) | Whatever keys are in `backend/.env` + Ollama (`local-ai` profile) | Brave if a key is set; SearXNG via profile | Tika (+ Docling profile) | Ollama `bge-m3`, Qdrant | One process, three transports, `--memory-limit=512M` |
-| **P-TEST** | CI | `docker-compose.test.yml` / `.test.ci.yml` | `TestProvider` only (`DEFAULTMODEL.* = -1…-7`) | `test` adapter (fixtures) | `FixtureSourceReader` | `test-vectorize` (-2), `qdrant_test` | One process |
+| **P-TEST** | CI | `docker-compose.test.yml` / `.test.ci.yml` | `TestProvider` only (`DEFAULTMODEL.* = -1…-7`) | `test` adapter (fixtures) | `FixtureSourceReader` | `test-vectorize` (-2), `qdrant_test` | **None** — `when@test` maps the transports to `in-memory://`; `RunResearchUnit` is routed to `sync://` like `ExtractMemoriesCommand`, so units run inside the request (`06` §8) |
 | **P-CLOUD** | Single-node production, cloud AI | `deploy/compose.yaml` (default profile), `deploy/quickstart/compose.yaml`, Umbrel, AWS Marketplace | Cloud providers the operator keyed; no Ollama | Brave / Tavily / Exa / Firecrawl / Perplexity with a key; none by default | Tika (in the compose) | Cloud embeddings (OpenAI / Cloudflare) or none until the operator binds one | One worker + one scheduler |
 | **P-LOCAL** | Air-gapped or local-first | `deploy/compose.yaml` with `local-ai`; `docs/air-gapped.md` | Ollama only (`gpt-oss:20b/120b`, `qwen3.5:35b`), Triton | SearXNG if deployed, else none | Tika; no cloud step | Ollama `bge-m3`; MariaDB VECTOR or Qdrant | One worker; one GPU |
 | **P-EU** | EU-only providers | Any of the above with Mistral + TrustedTokens keys and group allow-lists | Mistral, TrustedTokens (DE), Ollama | SearXNG self-hosted, or a US provider under disclosure | Tika / Docling | Ollama `bge-m3` or TEI | — |
@@ -69,8 +69,8 @@ the server is older, there is no chip at all.
 
 | Profile | Automated | Where it runs | Manual walk (STATUS entry) |
 | ------- | --------- | ------------- | --------------------------- |
-| P-TEST | PHPUnit replays (every stage, every outcome, injection, multilingual, erasure, reaper, idempotency); Playwright `@ci` journey J-RQ-8 with the doubles; contract fixtures | GitHub CI on every PR | — |
-| P-DEV | `app:research:eval --corpus=smoke` on real providers; Desktop quick set (UC-00…16) against the dev stack | Before every PR that touches the path | J-RQ-1…7, 9 on Windows + one other OS |
+| P-TEST | PHPUnit replays (every stage, every outcome, injection, multilingual, erasure, sweeper transitions, idempotency, the concurrent-claim race, flag-off read / delete); Playwright `@ci` journey J-RQ-8 with the doubles and the `sync` unit transport; contract fixtures | GitHub CI on every PR | — |
+| P-DEV | `app:research:eval --corpus=smoke` on real providers; Desktop quick set (UC-00…16) against the dev stack; the fairness check — a file uploaded during an active Thorough run reaches `Ready` within its normal time (RS6 exit) | Before every PR that touches the path | J-RQ-1…7, 9 on Windows + one other OS |
 | P-CLOUD | `app:research:eval --arm=preset:cloud.*` full set (RQ3); `deploy/compose.yaml` smoke: start a Standard run, close the browser, reopen → report present | RQ3; once before the flag is seeded on | J-RQ-10 (admin) |
 | P-LOCAL | `app:research:eval --arm=preset:local.standard` smoke on the `local-ai` profile with `gpt-oss:20b` + `bge-m3` pulled, `SEARXNG_BASE_URL` empty → files-only run must complete; strict world refuses a hosted provider | RQ3; and whenever a local preset changes | J-RQ-7 steps 4–5; `air-gapped.md` chapter followed from zero |
 | P-EU | `--arm=preset:eu.*` smoke with Mistral + TrustedTokens keys and a SearXNG; disclosure line present with Brave | RQ3 | J-RQ-7 steps 1–3 |
@@ -89,7 +89,7 @@ selects the local preset and expects the local degradations.
 | ---- | --------- |
 | New server, old Desktop | Desktop never calls `/v1/research`; nothing changes for it. RS3's gateway tools are gateway-owned, so an old Desktop sees no unpaired calls (`03` §12) |
 | Old server, new Desktop | `GET /v1/research/capabilities` → 404 → no chip, no tile, no team section (U11). Desktop shows the existing "update your Synaplan" hint only where it already does |
-| Flag turned off while runs exist | Running units finish their current unit and stop with `stopped_by_admin`; finished reports stay on the clients; routes 404 for new starts |
+| Flag turned off while runs exist | Running units finish their current unit and stop with `stopped_by_admin` after writing what was found; `capabilities`, start, `followups` and `input` answer 404; the owner's `GET`, events and `DELETE` keep working until the TTL (`03` §7.1); web reports already delivered stay in their chats; Desktop reports stay local |
 | Server rollback to a release without research | Redis keys expire by TTL; Desktop reports stay local; no schema to roll back in v1 (§0 #7) |
 | Seeded presets after a model retirement | `ModelRetirementSeeder` and the successor chain in `ModelConfigService` apply to `READ` / `VERIFY` like to every slot; `RetiredModelReferenceTest` fails a build that keeps a dead key in a preset constant |
 

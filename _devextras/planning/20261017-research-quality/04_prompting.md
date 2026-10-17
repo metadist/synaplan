@@ -226,18 +226,20 @@ First judge each point:
 - conflicting: sources disagree — name the difference and the dates;
 - open: nothing yet.
 
-Then choose at most [MAX_ACTIONS] actions:
+Then decide whether to stop: set "finish" to "covered" when every point is
+answered, "budget" when the budget is nearly used, "no_progress" when the last
+round found nothing new — and leave "actions" empty in that case. Otherwise set
+"finish" to null and choose at most [MAX_ACTIONS] actions:
 - search {point, query, language, scope}: never repeat a query already run;
   change the words, the language or the source kind instead.
 - read {source}: an unread source likely to settle a thin, conflicting or open
   point.
 - reread {source, question}: a read source with a sharper question.
 - ask_user {question, options}: only for a choice only the person can make.
-- finish {reason: covered | budget | no_progress}: when every point is answered,
-  when the budget is nearly used, or when the last round found nothing new.
 
 Prefer official and primary sources; prefer recent ones when the question is
-about the current state. Return JSON only.
+about the current state. Return JSON only, in the shape
+{points: [...], actions: [...], finish: null | "covered" | "budget" | "no_progress"}.
 ```
 
 ### 4.6 `tools:research_write`
@@ -285,7 +287,8 @@ For each statement:
 Use no outside knowledge. Do not rewrite anything.
 <statements>[STATEMENTS]</statements>   (id, sentence, cited ids with their quotes)
 
-Return JSON only: [{statement, verdict, unsupported_part, note}]
+Return JSON only, as an object with one key:
+{verdicts: [{statement, verdict, unsupported_part, note}]}
 ```
 
 ### 4.8 `tools:research_revise`
@@ -297,7 +300,11 @@ Revise the report with the fact-check verdicts:
 - unsupported → remove the statement; if it matters to the goal, list it under
   "[NOT_CONFIRMED_TITLE]" without an id;
 - partial → keep only the supported part, or say what is not confirmed;
-- contradicted → give both versions with their ids and dates.
+- contradicted → the statement says the opposite of its own source: remove it
+  and, if it matters to the goal, list the point under "[NOT_CONFIRMED_TITLE]"
+  without an id. Never keep a contradicted statement as an "alternative
+  version" — two versions are only for disagreements between two sources, and
+  those already stand in the report with their ids and dates.
 
 Add no new facts. Keep every id that still applies, the structure and the
 language. Return the full revised report in Markdown.

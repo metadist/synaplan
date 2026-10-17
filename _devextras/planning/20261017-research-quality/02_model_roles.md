@@ -244,8 +244,9 @@ the research resolver adds the order above and the two rules below.
   #29): only SearXNG is self-hosted; Brave, Tavily, Exa, Firecrawl and
   Perplexity are US-hosted. Outside the world the plan card discloses it or
   strict mode refuses the web source; documents from the web are extracted
-  with `extractionChain('document', allowCloud: false)` so no `pdf_vision`
-  call reaches a cloud vision model; the condenser runs on the reader model.
+  with the cloud-filtered document chain RS4 adds (today's
+  `extractionChain()` flag covers audio only) so no `pdf_vision` call reaches
+  a cloud vision model; the condenser runs on the reader model.
 - **Input budgets follow the model** (§0 #31): per call min(role cap, 60 % of
   `meta.context_window` − output cap). A 33k local model reads a page in its
   first 15k tokens and the Details say so; the lead's ledger summary is

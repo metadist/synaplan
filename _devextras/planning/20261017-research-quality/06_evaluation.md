@@ -196,7 +196,7 @@ recorded in the desktop use-case STATUS, quick set before every Desktop PR.
 | UC-11 | Standard research on the web | Terminal `complete`; ≥ 3 plan points; every `[n]` resolves to a source with a verified quote; ≤ 6 min | RD3 |
 | UC-12 | Research over the UC-06 corpus with Web off | ≥ 4 of 5 planted facts with file citations; no web source | RD3 |
 | UC-13 | Thorough with a question and plan approval; the event stream dropped and resumed | Answer and approval through `input`; after reattach with `Last-Event-ID` no sequence number is missing | RD4, RD9 |
-| UC-14 | Stop during gathering | `stopped_by_user` within 10 s; state readable; nothing charged after Stop | RD3 |
+| UC-14 | Stop during gathering | `stopped_by_user` within 10 s; state readable; no model call **starts** after Stop (usage records after the Stop timestamp belong only to a call that began before it); the outcome sentence says a step underway may still count | RD3 |
 | UC-15 | Report → Word | The docx skill writes a valid `.docx` with the report's headings and source list | RD6 |
 | UC-16 | World rule | A model outside `world.providers` → 400 naming the field; a role that cannot be filled → `failed_role_unavailable` | RD8 |
 
@@ -216,8 +216,22 @@ CI never reaches the live web or a provider (§0 #27). The doubles:
 | `FixtureSourceReader` | `ResearchSourceReader` | `test` env | `backend/tests/Fixtures/research/pages/<page>.html|.pdf` — served without a network call; any other host is "blocked: not a fixture" |
 | `TestProvider` mocks | the six `tools:research_*` prompts | always (it is the test provider) | schema-aware canned answers keyed by the prompt topic and by markers in the question (the `websearch:` prefix pattern of `multitask.spec.ts`) |
 
+**Execution in the test environment.** The test stack runs no Messenger
+worker: `when@test` in `backend/config/packages/messenger.yaml` maps every
+transport to `in-memory://` and routes the commands Playwright must see to a
+`sync://` transport (`ExtractMemoriesCommand`, the Telegram commands).
+`RunResearchUnit` gets the same treatment: in `test` it is routed to `sync`,
+so a start request executes the unit chain inline until the run completes or
+reaches a waiting state, and an `input` request continues it inline. The
+`DelayStamp` between units is ignored by the sync transport. PHPUnit tests
+that need a *pause* between units (resume after a killed worker, the claim
+race, the sweeper) use the in-memory transport and pull messages from it one
+by one with `InMemoryTransport::get()`, so both behaviours are covered without
+a worker process.
+
 With these, PHPUnit replays whole runs (every stage, every outcome, the
-injection page, five languages, erasure, the sweeper, idempotency) and
-Playwright walks J-RQ-8 as an `@ci` journey. The SSRF guard is never relaxed;
-a test that wants a real page or a real key is an eval or a desktop quick-set
-case, not a gate test.
+injection page, five languages, erasure, the sweeper, idempotency, the claim
+race) and Playwright walks J-RQ-8 as an `@ci` journey whose report appears in
+the chat because `deliver` writes it server-side (`03` §2.8). The SSRF guard is
+never relaxed; a test that wants a real page or a real key is an eval or a
+desktop quick-set case, not a gate test.

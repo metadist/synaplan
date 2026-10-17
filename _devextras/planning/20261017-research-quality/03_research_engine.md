@@ -38,7 +38,11 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
   marks the request as ambiguous (§0 #10). Each question has a **Skip** that
   means "use your best judgement".
 - Event `brief`; when questions exist, event `question` and the run waits for
-  `input` (§7.4), at most 10 minutes, then continues as if skipped.
+  `input` (§7.4). **Question timeout policy (one rule everywhere):** after
+  10 minutes without an answer the sweeper treats every open question as
+  skipped and dispatches the next unit — the person started this run and
+  Skip is the documented default. Only an unconfirmed **plan** (Thorough,
+  §2.2) ends the run, as `stopped_waiting` after 24 hours.
 
 ### 2.2 Plan (lead)
 
@@ -72,9 +76,14 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
 
 - Fetch: HTML through `UrlContentService::fetchForReading()` (SSRF guard,
   robots.txt, noindex, redirects, login walls, shortlink interstitials); PDF and
-  office files through the extraction chain (Tika) with a 20 MB, 15-second cap
-  (§0 #12); knowledge files as the matching chunks plus their neighbours, or the
-  whole document when it fits the reader's budget. Page fetches overlap like
+  office files through the document extraction chain with a 20 MB, 15-second
+  cap (§0 #12), **filtered by world**: today's `extractionChain($family,
+  $hasCloudStt)` flag selects the audio chain only, so RS4 adds a cloud marker
+  to the extractor contract and a filtered chain (`pdf_vision` and every other
+  cloud-backed adapter dropped) for local and EU worlds, with a test that a
+  local-world PDF never reaches a cloud vision model; knowledge files as the
+  matching chunks plus their neighbours, or the whole document when it fits the
+  reader's budget. Page fetches overlap like
   `WebResearchService::deepen()` does today (first hop started for all, then
   consumed).
 - Reader call (`ResearchEvidenceSchema`): one source, the plan's points as the
@@ -128,8 +137,10 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
 
 - Action types: `search`, `read` (a found, unread source), `reread` (a read
   source with a sharper question), `ask_user` (only for a choice only the person
-  can make; counts against the question budget), `finish` (`covered`, `budget`,
-  `no_progress`).
+  can make; counts against the question budget). `finish` is **not** an action:
+  it is the top-level field of the decision (`null`, `covered`, `budget` or
+  `no_progress`, `10` §1.5); when it is set, `actions` must be empty and the
+  engine ignores any that are present.
 - The engine executes the actions — searches first, then reads — validates
   them (unknown source ids, repeated queries and actions beyond the budget are
   dropped, never sent back as errors), and calls reflect again.
@@ -170,10 +181,16 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
 2. **Checker model** (`ResearchCheckSchema`), batched: each cited statement
    with its quotes → `supported`, `partial` (which part is not), `unsupported`,
    `contradicted`.
-3. **Revision:** Thorough runs one writer revision with the verdicts (soften
-   partial statements, remove unsupported ones, state contradictions). Standard
-   removes unsupported statements and moves them to Not confirmed without a
-   rewrite. A statement is never "fixed" with knowledge that has no source.
+3. **Revision:** a verdict other than `supported` never stays in the factual
+   text. Thorough runs one writer revision: `partial` → only the supported
+   part stays; `unsupported` and `contradicted` → removed, and listed under
+   Not confirmed when they matter to the goal. Standard, which has no revision
+   call, removes every `partial`, `unsupported` and `contradicted` statement
+   whole and lists it under Not confirmed. `contradicted` means the draft says
+   the opposite of its own cited quote — it is a writing error, not a
+   disagreement between sources; disagreements between sources arrive as
+   conflict cards from the readers and are shown as two versions with dates
+   (§2.6). A statement is never "fixed" with knowledge that has no source.
 4. **Result sentence** in the report and the run summary:
    "35 of 37 statements are backed by a source. 2 were removed because no source
    confirmed them."
@@ -181,12 +198,18 @@ Brief ─► Plan ─► ┌─ Gather ─► Read ─► Reflect ─┐ ─► 
 
 ### 2.8 Deliver
 
-- Final state: report, sources (with the quotes actually cited), run summary,
+- Final state: report with its citation map (`10` §2.5), sources (with
+  URL or file id and the verified quotes actually cited), run summary,
   outcome, models used, cost.
 - Event `complete` (or `stopped` / `failed` — §7.5).
-- The client persists it: Desktop as a card in the thread plus
-  `out/<slug>.md` and `out/<slug>.sources.json`; the web as the assistant
-  message with its report file.
+- **Delivery does not depend on a connected client.** A web run carries the
+  `chat_id` it was started from (§7.2); the `deliver` unit itself writes the
+  assistant message and the report file (with a `DocumentRevision`) into that
+  chat, so a person who closed the tab finds the report in the chat list and
+  the Library (U2). A Desktop run has no server-side chat; the state and its
+  report stay readable for the TTL, Desktop reattaches through
+  `GET /v1/research?active=1` and writes `out/<slug>.md` and
+  `out/<slug>.sources.json` from the final state when it next connects.
 
 ---
 
@@ -308,20 +331,40 @@ with the role and source `RESEARCH`; searches record `WEB_SEARCH`, rerank
   `round` (execute the previous decision's actions, then one reflect call),
   one `write` call or section, `check`, `deliver` — within `UNIT_SECONDS`
   (120), writes the checkpoint, advances `seq`, dispatches the next unit and
-  returns. The handler ignores a message whose `seq` is not the expected one
-  (a Messenger retry or a double dispatch), so a unit never runs twice. The
-  worker process every install runs today therefore serves other jobs between
-  units. Cancel and budget are checked at every unit start and between sources.
+  returns.
+- **Exactly one execution per unit, also with several workers:** before any
+  paid call the handler takes an atomic claim `research:claim:{id}:{seq}`
+  (`SET NX PX` with a lease of 2 × `UNIT_SECONDS` and a random token); a
+  delivery that does not get the claim exits — a Messenger retry, a double
+  dispatch and two workers racing all end the same way. Every checkpoint write
+  is fenced with the token (a Lua compare-and-set), so a worker whose lease
+  expired cannot overwrite a newer checkpoint. The sweeper (§0 #28) recovers an
+  expired lease by re-dispatching the same `seq`. A test delivers the same
+  unit twice concurrently and asserts one set of provider calls.
+- **Fairness on the single consumer:** `messenger:consume async_ai_high
+  async_extract async_index` serves the receivers in that order, so a queue
+  that is never empty starves the other two. The next unit is therefore
+  dispatched with a `DelayStamp` of `RESEARCH.UNIT_GAP_MS` (3,000): the Redis
+  transport holds it in its delayed set, `async_ai_high` is momentarily empty,
+  and extraction and indexing messages are served in between. `MAX_ACTIVE_RUNS`
+  bounds how many such chains exist at once. The dev-stack check for this
+  (an upload indexed while a Thorough run is active) is an RS6 exit item.
+- Cancel is checked at every unit start, between sources and **before each
+  paid model call**; a provider request already in flight when Stop arrives
+  finishes and may be billed — the outcome copy says so (§7.5), and the cost
+  line shows the real spend.
 - **Queue wait:** when the next unit has not started 20 s after dispatch, the
   state emits `queued { since_seconds }` every 20 s; after 5 minutes the module
   status says "No worker has picked up research units for 5 minutes."
 - **Waiting:** a run waiting for an answer or plan approval holds no worker;
   `input` dispatches the next unit.
 - **Sweeper (§0 #28):** `app:research:reap` runs in the scheduler's `tick`
-  lane: a run whose checkpoint is older than 3 × `UNIT_SECONDS` with no unit
-  queued ends as `failed_interrupted` with the report of what was found (the
-  `write` unit runs once on the ledger as it is); `waiting_answer` past
-  10 minutes and `waiting_plan` past 24 hours end as `stopped_waiting`.
+  lane. Three transitions, each tested: a claim whose lease expired with the
+  unit not checkpointed → re-dispatch the same `seq` once, then on a second
+  expiry `failed_interrupted` with the report of what was found (the `write`
+  unit runs once on the ledger as it is); `waiting_answer` past 10 minutes →
+  open questions marked skipped and the next unit dispatched (§2.1);
+  `waiting_plan` past 24 hours → `stopped_waiting`.
 - **Resume:** events carry `id: <seq>`; `GET …/events` with `Last-Event-ID`
   (or `?after=`) replays from there, then streams live — the `ChatRunBuffer`
   pattern.
@@ -359,6 +402,15 @@ An id that is not the caller's answers 404, never 403. Full API keys reach
 these routes like paired keys; the `RESEARCH` rate-limit action applies to
 every caller.
 
+**Module off (§0 #35).** `capabilities`, `POST /research`, `followups` and
+`input` answer 404 — nothing new starts and no UI shows (U11). `GET
+/research?active=1`, `GET /research/{id}`, `GET …/events` and `DELETE` keep
+working for the caller's own runs until their TTL, so a person can still read
+the `stopped_by_admin` outcome, the partial findings and delete them. A unit
+that starts while the module is off ends its run as `stopped_by_admin` after
+writing what was found. `ResearchModule::routeNames()` lists only the four
+gated routes.
+
 ### 7.2 Start request
 
 ```json
@@ -370,6 +422,7 @@ every caller.
   "output": "auto",
   "instructions": "Prefer manufacturer and official sources. Ignore forums.",
   "context": { "turns": [ { "role": "user", "text": "…" }, { "role": "assistant", "text": "…" } ] },
+  "chat_id": 4711,
   "models": { "lead": "anthropic:claude-sonnet-5-5:chat", "reader": "openai:gpt-6-luna:chat" },
   "world": { "providers": ["anthropic", "openai", "groq", "ollama"] },
   "seed_sources": [],
@@ -384,15 +437,22 @@ caller's scopes; model keys must be active `chat` rows inside `world`;
 rejected with the field named. An optional `assistant_id` (the web's pinned
 assistant or Desktop's bound one) sets the source defaults: web off when the
 assistant's `tools.internet` is off, its knowledge scopes added to `knowledge`.
+`chat_id` is required on the session route and must be a chat the caller owns:
+the run's `deliver` unit writes the report into it (§2.8). It is absent on
+`/v1/research` — Desktop and API callers persist the result themselves.
 
 ### 7.3 State
 
 `status` (`briefing`, `waiting_answer`, `planning`, `waiting_plan`,
 `gathering`, `writing`, `checking`, `complete`, `stopped`, `failed`), depth,
-brief, plan with point statuses, sources (id, kind, title, host or `file_id`,
-published, status, reason), report (Markdown, when written), check summary,
-outcome, models used, budget used, cost (`estimate`, `spent`), `created_at`,
-`expires_at`.
+brief, plan with point statuses, sources (id, kind, title, **`url`** or
+**`file_id`**, host, published, class, status, reason), **evidence** (id,
+source, point, fact, verified quotes with location), report (Markdown plus a
+**citation map**: for every `[n]` occurrence its sentence, source id and
+evidence ids — the shape is `10` §2.5), check summary, outcome, models used,
+budget used, cost (`estimate`, `spent`), `created_at`, `expires_at`. A client
+needs nothing beyond the state to render **Open page**, the quotes used for a
+sentence and the sources list, and to write `.sources.json` after a reconnect.
 
 ### 7.4 Input
 
@@ -434,9 +494,9 @@ English sentence is a fallback):
 | `complete` | All points covered | "Done: {statements} statements, {supported} backed by a source." |
 | `complete_partial` | Budget or no progress left points open | "Done with gaps: {open} of {points} points could not be confirmed. They are listed under Not confirmed." |
 | `complete_snippets_only` | No page could be read | "No page could be opened, so this report is based on search summaries only. It says so where it matters." |
-| `stopped_by_user` | Stop | "Stopped. Nothing was charged after you pressed Stop; what was found so far is kept." |
+| `stopped_by_user` | Stop | "Stopped. No new work was started after you pressed Stop; a step that was already underway may still count. What was found so far is kept." |
 | `stopped_budget` | Monthly budget reached | "Stopped because your monthly AI budget is used up. The report covers {covered} of {points} points." |
-| `stopped_waiting` | Plan or answer not given in time | "Stopped because the plan was not confirmed. Start it again when you are ready." |
+| `stopped_waiting` | The plan was not confirmed within 24 hours (questions never stop a run — §2.1) | "Stopped because the plan was not confirmed within a day. Start it again when you are ready." |
 | `failed_no_sources` | Web off or unavailable and no files | "There was nothing to research: turn on the web or add files to this project." |
 | `failed_role_unavailable` | A role cannot be filled in the world | "The {role} model of this project is not available, and no other model in this project can stand in. Nothing was charged." |
 | `failed_model_error` | A role kept failing after retries | "The {role} model stopped answering. Nothing else was charged; try again or pick another model." |
@@ -444,8 +504,9 @@ English sentence is a fallback):
 | `stopped_by_admin` | The module was turned off while the run was active | "Research was turned off on your Synaplan workspace. What was found so far is kept." |
 
 No outcome ever contains an HTTP code, a provider message or a stack trace.
-"Nothing was charged" is only said when no model call ran after the event in
-question; otherwise the sentence says "Nothing else was charged".
+"Nothing was charged" is only said when no model call ran at all in the run;
+after a Stop the copy says "no new work was started" because a provider
+request in flight may still be billed, and the cost line shows what was.
 
 ---
 
@@ -593,3 +654,13 @@ A `research` capability for the planner and Saved Tasks: `quick` or
 delivered as the step's text and file. Use case 3 (weekly regulation brief)
 becomes one step: research → email me. Approvals apply only to the steps that
 write (email, save to folder), as today.
+
+The node is a **waiting node**, not an inline run: `RunSavedTaskCommandHandler`
+calls `SavedTaskRunner::run()` synchronously, so executing the units inline
+would hold the worker for the whole budget — the problem §0 #8 removes. The
+runner starts the run (`chat_id` of the task's chat, no questions), records the
+run id on the node and returns a *waiting* result, exactly as `AskUserRunner`
+pauses a DAG; the `deliver` unit then resumes the Saved Task through the
+existing resume path (`SavedTaskResumeService`) with the report as the node's
+output. A run that ends `failed_*` fails the node with its outcome sentence;
+dependents skip as they do for any failed node.

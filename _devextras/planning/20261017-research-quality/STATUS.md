@@ -67,9 +67,25 @@ Docs and Exit.
 
 Checked on this pass and found safe: Desktop's catalog parser is a `BTreeMap`
 without `deny_unknown_fields` (additive server groups cannot break old
-clients); `PlugConfigService::extractionChain($family, false)` already exists
-for `audio_no_cloud` and serves the document case; `tauri-plugin-notification`
-is already shipped.
+clients); `tauri-plugin-notification` is already shipped. **Corrected in the
+Copilot round:** `PlugConfigService::extractionChain($family, $hasCloudStt)`
+filters cloud steps for the *audio* chain only — the document chain has no
+such switch, so RS4 adds the marker and the filter (`08` §2a C1).
+
+---
+
+## 2026-10-17 — Copilot review round on #2541
+
+Sixteen review comments, each verified against the code and applied
+(`08_review.md` §2a). Design changes: atomic unit claims with fenced
+checkpoints and a `DelayStamp` between units (§0 #36); server-side delivery of
+web reports into the run's `chat_id`; one question-timeout policy (skip and
+continue; only an unconfirmed plan stops a run); module-off split (new work
+404, own runs readable and deletable, §0 #35); `RunResearchUnit` routed to
+`sync://` in the test environment; the citation map and source URLs in the
+state; every non-supported verdict leaves the factual text; RW3 as a waiting
+Saved Task node. Copy fixes: the plan card's read-only promise, the admin
+turn-off confirmation, the Stop outcome.
 
 ---
 
