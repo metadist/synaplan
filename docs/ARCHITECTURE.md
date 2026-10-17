@@ -190,6 +190,28 @@ else chat. A media route takes a media model: a chat model kept on a media
 topic leaves the choice to the media handler's default.
 `OverrideAndAgainRoutingTest` pins both paths on one table.
 
+`MessageClassifier::classify()` is a cascade of steps in
+`App\Service\Message\Classification\`, in the order it runs. The first step
+that decides returns, before the AI sorter's paid call:
+
+| Step | Decides |
+| ---- | ------- |
+| `SlashCommandRoute` | on every channel (#2280): a bare command answers with its usage hint, even for a pinned assistant; a tool command (`/pic`, `/vid`, …) routes to its tool; `/search` and `/docs` with an argument become overlays on whatever classifies the rest (`SlashOutcome`); `/docs <query>` without a pin searches the knowledge base |
+| `AgentPinRoute` | a pinned assistant answers with its own prompt and models, asking the sorter only whether the turn needs the web |
+| `FastPathClassifier` | an obviously plain chat message in a certain language skips the sorter (`CLASSIFIER.FAST_PATH_ENABLED`, off by default) |
+| `AgainOverride` | the prompt or the model a user picked for an Again (`BMESSAGEMETA`) |
+| `AttachmentIntent` | a document, audio or video goes to file analysis (#595, #722), unless it is an office edit, a merge or PDF export, or a demand for a new file (#2047) |
+| `EmbeddingRoute` | a confident anchor match for a system topic (Phase 8, `EMBEDDING_ROUTER`, off by default); a match declined for its language (`EmbeddingVerdict`) also keeps the deferral off |
+| `RoutingDeferral` | hands the decision to the answering call's hand-off tools when the account's chat provider can call tools (Phase 9, `NATIVE_TOOL_ROUTING`, off by default) |
+| `SorterVerdict` | the AI sorter (`DEFAULTMODEL.SORT`, reading `SorterInput`), then the overlays on its verdict: media type, the describe reroute (#1237), the planner for code on files and for a spoken answer, a forced search, duration, resolution, input mode |
+
+`ThreadArtifacts` (what the previous turns produced), `ConfidentLanguage`
+and `SelfAwareQuestion` (a question about Synaplan itself, which only the
+sorter routes) serve several steps. A turn that asks for a new file or a
+spoken answer skips the embedding router and the deferral, because only the
+sorter and the planner deliver it. `RoutingCharacterizationTest` pins the
+cascade, including the cases where two steps compete.
+
 ## Channel turns
 
 A channel's entry point reads as its stages, in order. Each stage is a
@@ -219,6 +241,48 @@ media, the run and the flush count — over nineteen cases.
 `EmailTurnCharacterizationTest` pins the answer to the relay, the mail each
 delivery sends, the stored rows, the account, speech, usage, the summary
 refresh, the attachment store and Discord over fourteen cases.
+
+**WhatsApp** — `WebhookController::whatsapp()` calls `WhatsAppTurn::handle()`,
+`App\Service\WhatsApp\Turn\`:
+
+| Stage | Does |
+| ----- | ---- |
+| `WhatsAppIntake` | admits the message as an `InboundWhatsApp` or answers it early (`WhatsAppMessageAnswered`): a redelivery (lock and cache, so concurrent webhooks see it), an unsupported type (acknowledged silently, #633), a verification code from the website, the account's limit (told by message); names the account the turn runs under, whether a spoken reply is due and the bound assistant |
+| `WhatsAppConversation` | stores the message in the sender's WhatsApp chat (`StoredWhatsAppMessage`) with its metadata and media (`WhatsAppService::handleMediaDownload()`), moves the chat up and tells open browsers; media that cannot be fetched is told to the sender and ends the turn |
+| `WhatsAppReply` | runs the AI pipeline behind a typing indicator and composes the answer once (`WhatsAppAnswer`: doc tags as links, media tags rendered, the sources of a text reply, usage recorded); `WhatsAppReplyDelivery` sends the generated media, a spoken reply or text, and `WhatsAppAnswerStore` keeps what reached the phone |
+
+`WhatsAppService` stays the Meta Cloud API transport (messages, media, read
+receipts, the media download, the markdown conversion), and
+`WhatsAppInboundContent` reads what a webhook message says. The moved code
+keeps the service's weak typing (no `strict_types`) until its boundaries are
+typed. `WhatsAppTurnCharacterizationTest` pins the webhook's answer, every
+Graph API call in order, what reaches the processor, the stored rows, the
+account, speech, transcription, usage, realtime events, the summary refresh
+and Discord over twelve cases.
+
+## Media turn — `MediaGenerationHandler`
+
+`MediaGenerationHandler::handleStream()` runs a media turn (image, video,
+speech) as stages in `App\Service\Message\Handler\Media\`, each handing the
+next a typed value:
+
+| Stage | Does |
+| ----- | ---- |
+| `MediaReferenceResolver` | the pictures the turn starts from (`MediaReferences`): attached and chained reference images (#1144), image URLs in the text or forwarded by a multitask chain, the conversation's newest picture for an edit the sorter voted for |
+| `MediaPromptResolver` | the prompt (`MediaPrompt`): the mediamaker extraction, which drops the conversation's picture for a video or audio request and extracts again; the message stands in for an empty prompt |
+| `MediaModelResolver` | the model: a slash command, an Again pick, a task prompt's pinned model, else the install's default for the request (`MediaModelChoice`); then the model row, a retired model's successor (`MediaModel`) |
+| `MediaRequestGuard` | what stops the turn before a provider is asked (`MediaRefusal`): an audio script that only repeats the request goes to `MediaChatHandOff`; no media type, no model (#1320), text-to-video on an image-to-video model, image-to-video while APP_URL is private |
+| `MediaTurnBudget` | the media limit, then the monthly cost budget where billing enforces it |
+| `MediaGenerationRun` | the provider options, a background job (`MediaJobDetach`) or the provider call, the kept file (`GeneratedMediaStore`: the file, its gallery row, a video's poster, a folder delivery) and the usage (`MediaTurnBilling`, recorded the moment the provider billed, #1146); a Stop is billed, a failure is one sentence |
+
+`MediaTurnRequest` carries the turn from the model on. The memory job
+(`MediaTurnMemory`) is queued once the turn stays on the media path, before
+the guards. `MediaUploadStore` writes into the user's upload tree, and
+`MediaDownloader` is the only transport that fetches a provider's URL. The
+moved code keeps the handler's weak typing until its boundaries are typed.
+`MediaTurnCharacterizationTest` pins every way the turn's output leaves —
+status events, chunks, provider and job calls, downloads, file rows, limits,
+usage, the memory job and the chat hand-off — over 35 cases.
 
 ## File analysis — `FileAnalysisHandler`
 

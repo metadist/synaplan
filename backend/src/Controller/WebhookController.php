@@ -13,7 +13,7 @@ use App\Service\Email\Turn\InboundEmailIntake;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
-use App\Service\WhatsApp\WhatsAppService;
+use App\Service\WhatsApp\Turn\WhatsAppTurn;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -32,7 +32,7 @@ class WebhookController extends AbstractController
         private EntityManagerInterface $em,
         private MessageProcessor $messageProcessor,
         private RateLimitService $rateLimitService,
-        private WhatsAppService $whatsAppService,
+        private WhatsAppTurn $whatsAppTurn,
         private EmailChatService $emailChatService,
         private LoggerInterface $logger,
         private string $whatsappWebhookVerifyToken,
@@ -215,8 +215,8 @@ class WebhookController extends AbstractController
                         // 2. Wrap incoming message in a DTO to reduce arity/signature smells
                         $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
 
-                        // 3. Delegate business logic to WhatsAppService
-                        $responses[] = $this->whatsAppService->handleIncomingMessage(
+                        // 3. The WhatsApp turn answers the message
+                        $responses[] = $this->whatsAppTurn->handle(
                             $dto,
                             $userResult['user'],
                             $userResult['is_anonymous'] ?? false
