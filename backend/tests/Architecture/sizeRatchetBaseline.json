@@ -8,16 +8,15 @@
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 52,
+        "fileLines": 51,
         "constructorParams": 65,
-        "methodLines": 130
+        "methodLines": 127
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
         "src/AI/Messages/Tools/GatewayToolLoop.php": 1432,
         "src/AI/Messages/Translator/OpenAiMessagesTranslator.php": 1499,
         "src/AI/Provider/AnthropicProvider.php": 1735,
-        "src/AI/Provider/GoogleProvider.php": 2764,
         "src/AI/Provider/HiggsfieldProvider.php": 1100,
         "src/AI/Provider/HuggingFaceProvider.php": 1267,
         "src/AI/Provider/MistralProvider.php": 992,
@@ -31,7 +30,7 @@
         "src/Controller/AdminController.php": 1000,
         "src/Controller/AgentController.php": 921,
         "src/Controller/AuthController.php": 1257,
-        "src/Controller/ChatController.php": 1183,
+        "src/Controller/ChatController.php": 1178,
         "src/Controller/FeedbackController.php": 837,
         "src/Controller/FileController.php": 1930,
         "src/Controller/InboundEmailHandlerController.php": 824,
@@ -147,9 +146,6 @@
         "src/AI/Provider/AnthropicProvider.php::AnthropicProvider::chat": 184,
         "src/AI/Provider/AnthropicProvider.php::AnthropicProvider::chatStream": 169,
         "src/AI/Provider/AnthropicProvider.php::AnthropicProvider::parseSSEStream": 149,
-        "src/AI/Provider/GoogleProvider.php::GoogleProvider::chatStream": 202,
-        "src/AI/Provider/GoogleProvider.php::GoogleProvider::convertMessagesToGeminiFormat": 117,
-        "src/AI/Provider/GoogleProvider.php::GoogleProvider::synthesize": 156,
         "src/AI/Provider/GroqProvider.php::GroqProvider::chatStream": 110,
         "src/AI/Provider/OllamaProvider.php::OllamaProvider::chatStream": 201,
         "src/AI/Provider/OpenAIProvider.php::OpenAIProvider::chatStream": 119,
