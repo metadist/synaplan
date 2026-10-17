@@ -16,7 +16,11 @@ use App\Service\Context\AttachmentDigest;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\TopicIntentRule;
+use App\Service\Message\Classification\AgainOverride;
+use App\Service\Message\Classification\AgentPinRoute;
 use App\Service\Message\Classification\AttachmentIntent;
+use App\Service\Message\Classification\SlashCommandRoute;
+use App\Service\Message\Classification\SorterInput;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
@@ -61,26 +65,27 @@ final class MessageClassifierFactory
      */
     public static function build(array $doubles): MessageClassifier
     {
+        $logger = $doubles['logger'];
+        $topicIntents = $doubles['topicIntents'];
+        $sorterInput = new SorterInput($doubles['attachmentDigest'] ?? null);
+
         return new MessageClassifier(
             $doubles['messageSorter'],
-            $doubles['messageMetaRepository'],
+            new SlashCommandRoute($topicIntents, $logger),
             $doubles['modelConfigService'],
             $doubles['configRepository'],
-            new AttachmentIntent($doubles['em'], $doubles['logger'], $doubles['officeConverter'] ?? null, $doubles['documentToolsConfig'] ?? null, $doubles['multitaskConfig'] ?? null),
-            $doubles['logger'],
-            $doubles['topicIntents'],
+            new AttachmentIntent($doubles['em'], $logger, $doubles['officeConverter'] ?? null, $doubles['documentToolsConfig'] ?? null, $doubles['multitaskConfig'] ?? null),
+            $logger,
+            $topicIntents,
             $doubles['embeddingRouter'],
             $doubles['embeddingRouterConfig'],
             $doubles['nativeToolRoutingConfig'],
             $doubles['toolCallingCapability'],
-            $doubles['agentPin'],
+            new AgentPinRoute($doubles['agentPin'], $doubles['messageSorter'], $sorterInput, $logger, $doubles['agentConfig'] ?? null, $doubles['agentService'] ?? null, $doubles['agentRuntimeResolver'] ?? null, $doubles['users'] ?? null),
+            new AgainOverride($doubles['messageMetaRepository'], $doubles['modelConfigService'], $topicIntents, $logger),
+            $sorterInput,
             $doubles['selfAwareConfig'] ?? null,
             $doubles['officeConverter'] ?? null,
-            $doubles['agentConfig'] ?? null,
-            $doubles['agentService'] ?? null,
-            $doubles['agentRuntimeResolver'] ?? null,
-            $doubles['users'] ?? null,
-            $doubles['attachmentDigest'] ?? null,
         );
     }
 }

@@ -8,18 +8,14 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
-use App\Repository\MessageMetaRepository;
-use App\Repository\UserRepository;
-use App\Service\Agent\AgentConfig;
-use App\Service\Agent\AgentPinResolver;
-use App\Service\Agent\AgentRuntimeResolver;
-use App\Service\Agent\AgentService;
-use App\Service\Context\AttachmentDigest;
-use App\Service\Context\TokenEstimator;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\TopicIntentRule;
+use App\Service\Message\Classification\AgainOverride;
+use App\Service\Message\Classification\AgentPinRoute;
 use App\Service\Message\Classification\AttachmentIntent;
 use App\Service\Message\Classification\ConfidentLanguage;
+use App\Service\Message\Classification\SlashCommandRoute;
+use App\Service\Message\Classification\SorterInput;
 use App\Service\Message\Classification\ThreadArtifacts;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
 use App\Service\Message\Routing\EmbeddingRouterService;
@@ -27,8 +23,6 @@ use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
-use App\Service\Multitask\Plan\Capability;
-use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\SelfAwareConfig;
 use Psr\Log\LoggerInterface;
 
@@ -65,7 +59,7 @@ final readonly class MessageClassifier
 
     public function __construct(
         private MessageSorter $messageSorter,
-        private MessageMetaRepository $messageMetaRepository,
+        private SlashCommandRoute $slashCommands,
         private ModelConfigService $modelConfigService,
         private ConfigRepository $configRepository,
         private AttachmentIntent $attachments,
@@ -75,14 +69,11 @@ final readonly class MessageClassifier
         private EmbeddingRouterConfig $embeddingRouterConfig,
         private NativeToolRoutingConfig $nativeToolRoutingConfig,
         private ToolCallingCapability $toolCallingCapability,
-        private AgentPinResolver $agentPin,
+        private AgentPinRoute $agentPinRoute,
+        private AgainOverride $againOverride,
+        private SorterInput $sorterInput,
         private ?SelfAwareConfig $selfAwareConfig = null,
         private ?OfficeConverterClient $officeConverter = null,
-        private ?AgentConfig $agentConfig = null,
-        private ?AgentService $agentService = null,
-        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
-        private ?UserRepository $users = null,
-        private ?AttachmentDigest $attachmentDigest = null,
     ) {
     }
 
@@ -104,56 +95,31 @@ final readonly class MessageClassifier
     {
         $userId = $message->getUserId();
         $messageId = $message->getId();
-        $text = $message->getText();
-
         // Slash commands first (shared parser, every channel — issue #2280).
         // Must run BEFORE the agent-pin fast-return: WhatsApp/MCP often supply
         // agentId, and a bare /pic|/search|/docs must still return a usage hint
         // instead of reaching the chat model. /search and /docs with an argument
         // keep any pinned runtime profile and only overlay force_web_search /
         // rag_query.
-        $forceWebSearchFromSlash = false;
-        $slashDocsFromSlash = false;
-        if (!empty($text) && str_starts_with(ltrim($text), '/')) {
-            $slashResult = $this->resolveSlashCommand($message, $text);
-            if (null !== $slashResult['return']) {
-                return $slashResult['return'];
-            }
-            $forceWebSearchFromSlash = $slashResult['force_web_search'];
-            $slashDocsFromSlash = $slashResult['slash_docs'];
-            $text = $message->getText();
+        $slash = $this->slashCommands->resolve($message);
+        if (null !== $slash->answer) {
+            return $slash->answer;
         }
+        $forceWebSearchFromSlash = $slash->forceWebSearch;
+        $text = $message->getText();
 
-        $pinned = $this->tryPinAgent(
+        $pinned = $this->agentPinRoute->pin(
             $message,
             $options,
             $conversationHistory,
-            (bool) $forceWebSearchFromSlash || !empty($options['web_search_requested']),
+            $forceWebSearchFromSlash || !empty($options['web_search_requested']),
         );
         if (null !== $pinned) {
-            return $this->applySlashOverlaysToClassification(
-                $pinned,
-                $forceWebSearchFromSlash,
-                $slashDocsFromSlash,
-            );
+            return $this->slashCommands->withOverlays($pinned, $slash);
         }
 
-        // /docs <query> with no pin: route to rag_query without the AI sorter.
-        if ($slashDocsFromSlash) {
-            $language = $message->getLanguage() ?: 'en';
-            if ('NN' === $language) {
-                $language = 'en';
-            }
-            $docsDecision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, 'general');
-
-            return array_merge([
-                'topic' => 'general',
-                'language' => $language,
-                'intent' => Capability::RagQuery->value,
-                'source' => $docsDecision->toClassificationSource(),
-                'skip_sorting' => true,
-                'slash_docs' => true,
-            ], $docsDecision->toClassificationFields());
+        if ($slash->docs) {
+            return $this->slashCommands->docsRoute($message);
         }
 
         $this->logger->info('MessageClassifier: Starting classification', [
@@ -228,59 +194,10 @@ final readonly class MessageClassifier
             ]);
         }
 
-        // 1. Check for "Again" function - user-selected AI/prompt
-        $promptOverride = $this->checkPromptOverride($messageId);
-        $modelOverride = $this->checkModelOverride($messageId);
-
-        if ($modelOverride && !$promptOverride) {
-            // "Again" with model but no prompt override
-            // Detect model type from model tag and set topic accordingly
-            $modelTag = $this->modelConfigService->getModelTag($modelOverride) ?? 'chat';
-            $routed = $this->topicIntents->forModel($modelTag, $message->getTopic());
-
-            $this->logger->info('MessageClassifier: Using model override with auto-detected topic', [
-                'message_id' => $messageId,
-                'model_id' => $modelOverride,
-                'model_tag' => $modelTag,
-                'detected_topic' => $routed->topic,
-                'intent' => $routed->intent,
-            ]);
-
-            $modelOverrideDecision = RoutingDecision::deterministic(RoutingLayer::ModelOverride, $routed->topic);
-
-            return array_merge([
-                'topic' => $routed->topic,
-                'language' => $message->getLanguage() ?: 'en',
-                'intent' => $routed->intent,
-                'source' => $modelOverrideDecision->toClassificationSource(),
-                'skip_sorting' => true,
-                'model_id' => $routed->usesPickedModel ? $modelOverride : null,
-            ], $modelOverrideDecision->toClassificationFields());
-        }
-
-        if ($promptOverride) {
-            $this->logger->info('MessageClassifier: Using prompt override (Again function)', [
-                'message_id' => $messageId,
-                'prompt_id' => $promptOverride,
-                'model_id' => $modelOverride,
-            ]);
-
-            $promptOverrideDecision = RoutingDecision::deterministic(RoutingLayer::PromptOverride, $promptOverride);
-
-            $result = array_merge([
-                'topic' => $promptOverride,
-                'language' => $message->getLanguage() ?: 'en',
-                'intent' => $this->topicIntents->intentFor($promptOverride),
-                'source' => $promptOverrideDecision->toClassificationSource(),
-                'skip_sorting' => true,
-            ], $promptOverrideDecision->toClassificationFields());
-
-            // Add model_id if user explicitly selected a model (Again)
-            if ($modelOverride) {
-                $result['model_id'] = $modelOverride;
-            }
-
-            return $result;
+        // 1. Again: a prompt or a model the user picked
+        $again = $this->againOverride->route($message);
+        if (null !== $again) {
+            return $again;
         }
 
         // 2. Document / audio / video attachments → FileAnalysisHandler (ANALYZE model), before AI sorting (#595, #722)
@@ -361,7 +278,7 @@ final readonly class MessageClassifier
                     // reason as the fast-path: no AI-sorter round-trip means
                     // no BWEBSEARCH vote, and under the "trust the model"
                     // policy a missing vote means no search.
-                    return $this->withForceWebSearch(array_merge([
+                    return SlashCommandRoute::withForceWebSearch(array_merge([
                         'topic' => $embeddingMatch->topic,
                         'language' => $confidentLanguage,
                         'web_search' => null,
@@ -423,7 +340,7 @@ final readonly class MessageClassifier
 
             $deferredDecision = RoutingDecision::deterministic(RoutingLayer::NativeToolCalling, 'general');
 
-            return $this->withForceWebSearch(array_merge([
+            return SlashCommandRoute::withForceWebSearch(array_merge([
                 'topic' => 'general',
                 // Unlike the fast-path and the embedding router, an ambiguous
                 // language does NOT force an escalation here: those layers
@@ -450,7 +367,7 @@ final readonly class MessageClassifier
         }
 
         // 4. Classify with the LLM AI sorter (DEFAULTMODEL.SORT).
-        $messageData = $this->buildMessageData($message);
+        $messageData = $this->sorterInput->for($message);
         $result = $this->messageSorter->classify($messageData, $conversationHistory, $userId);
 
         $source = $result['source'] ?? 'ai_sorting';
@@ -500,7 +417,7 @@ final readonly class MessageClassifier
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
-        $classification = $this->attachRoutableAgent(array_merge([
+        $classification = $this->agentPinRoute->attachRoutableAgent(array_merge([
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
@@ -618,374 +535,6 @@ final readonly class MessageClassifier
         }
 
         return $classification;
-    }
-
-    /**
-     * Pin the turn to an assistant when `agentId` is present and the flag is on.
-     * Runs before the fast-path and before PROMPTID so a pinned chat never
-     * becomes `general`. MessageSorter never picks the topic on this path.
-     *
-     * The RuntimeProfile travels as `runtime_profile`; RAG scope, limit and
-     * score are read from it downstream and never copied into scalar keys.
-     *
-     * The topic stays pinned, but an assistant that may use the internet still
-     * needs the sorter's BWEBSEARCH vote: without it a pinned chat could never
-     * search for live data (weather, prices, news) on its own.
-     *
-     * @param array<string, mixed> $options
-     * @param array<int, mixed>    $conversationHistory
-     *
-     * @return array<string, mixed>|null
-     */
-    private function tryPinAgent(Message $message, array $options, array $conversationHistory = [], bool $searchAlreadyForced = false): ?array
-    {
-        $profile = $this->agentPin->resolve($message, $options);
-        if (null === $profile) {
-            return null;
-        }
-
-        $decision = RoutingDecision::deterministic(RoutingLayer::AgentPin, $profile->promptTopic);
-        $language = $message->getLanguage();
-        if (!$language || 'NN' === $language) {
-            $language = 'en';
-        }
-
-        $searchVote = $this->pinnedWebSearchVote($message, $profile, $conversationHistory, $searchAlreadyForced);
-
-        $this->logger->info('MessageClassifier: Using agent pin (topic not sorted)', [
-            'message_id' => $message->getId(),
-            'agent_id' => $profile->agentId,
-            'topic' => $profile->promptTopic,
-            'web_search_vote' => $searchVote['web_search'],
-        ]);
-
-        return array_merge([
-            'topic' => $profile->promptTopic,
-            'language' => $language,
-            'web_search' => $searchVote['web_search'],
-            'read_pages' => $searchVote['read_pages'],
-            'source' => $decision->toClassificationSource(),
-            'skip_sorting' => true,
-            'intent' => 'chat',
-            'prompt_id' => $profile->promptId,
-            'agent_id' => $profile->agentId,
-            'agent_version_id' => $profile->agentVersionId,
-            'model_id' => $profile->modelIds['chat'] ?? null,
-            'runtime_profile' => $profile,
-        ], $decision->toClassificationFields());
-    }
-
-    /**
-     * Ask the sorter only whether a pinned assistant turn needs the web.
-     *
-     * No vote (null) when the assistant may not use the internet, when the
-     * user already forced or asked for a search, or for small talk — the
-     * policy decides those without a model call.
-     *
-     * @param array<int, mixed> $conversationHistory
-     *
-     * @return array{web_search: ?bool, read_pages: ?int}
-     */
-    private function pinnedWebSearchVote(Message $message, RuntimeProfile $profile, array $conversationHistory, bool $searchAlreadyForced): array
-    {
-        $noVote = ['web_search' => null, 'read_pages' => null];
-        $text = $message->getText();
-
-        if (false === ($profile->toolFlags['tool_internet'] ?? null)
-            || $searchAlreadyForced
-            || WebSearchTopicPolicy::isExplicitSearchRequest($text)
-            || WebSearchTopicPolicy::isTrivialConversational($text)) {
-            return $noVote;
-        }
-
-        $result = $this->messageSorter->classify($this->buildMessageData($message), $conversationHistory, $message->getUserId());
-        $readPages = $result['read_pages'] ?? null;
-
-        return [
-            'web_search' => true === ($result['web_search'] ?? null),
-            'read_pages' => is_int($readPages) ? $readPages : null,
-        ];
-    }
-
-    /**
-     * When the sorter returns `agent:{slug}` and the routable flag is on,
-     * attach the published assistant's RuntimeProfile. Flag off ⇒ no-op.
-     *
-     * @param array<string, mixed> $classification
-     *
-     * @return array<string, mixed>
-     */
-    private function attachRoutableAgent(array $classification, Message $message): array
-    {
-        if (null === $this->agentConfig || null === $this->agentService || null === $this->agentRuntimeResolver || null === $this->users) {
-            return $classification;
-        }
-
-        $userId = $message->getUserId();
-        if (!$this->agentConfig->isEnabled($userId) || !$this->agentConfig->isRoutableEnabled($userId)) {
-            return $classification;
-        }
-
-        $topic = (string) ($classification['topic'] ?? '');
-        if (!str_starts_with($topic, Agent::TOPIC_PREFIX)) {
-            return $classification;
-        }
-
-        $user = $this->users->find($userId);
-        if (!$user instanceof User) {
-            return $classification;
-        }
-
-        $slug = substr($topic, strlen(Agent::TOPIC_PREFIX));
-        foreach ($this->agentService->routableForUser($user) as $agent) {
-            if ($agent->getSlug() !== $slug || null === $agent->getId()) {
-                continue;
-            }
-            $chatId = $message->getChatId();
-            try {
-                $profile = $this->agentRuntimeResolver->resolve(
-                    $agent->getId(),
-                    $user,
-                    false,
-                    null !== $chatId && $chatId > 0 ? $chatId : null,
-                );
-            } catch (\Throwable $e) {
-                $this->logger->warning('MessageClassifier: routable assistant could not be resolved, keeping sorter topic', [
-                    'message_id' => $message->getId(),
-                    'agent_id' => $agent->getId(),
-                    'topic' => $topic,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return $classification;
-            }
-            $classification['runtime_profile'] = $profile;
-            $classification['agent_id'] = $profile->agentId;
-            $classification['agent_version_id'] = $profile->agentVersionId;
-            $classification['prompt_id'] = $profile->promptId;
-            if (isset($profile->modelIds['chat']) && $profile->modelIds['chat']) {
-                $classification['model_id'] = $profile->modelIds['chat'];
-            }
-
-            return $classification;
-        }
-
-        return $classification;
-    }
-
-    /**
-     * Check for prompt override (Again function)
-     * Returns prompt ID if set, null otherwise.
-     */
-    private function checkPromptOverride(?int $messageId): ?string
-    {
-        $promptId = $this->againOverride($messageId, 'PROMPTID');
-
-        return 'tools:sort' === $promptId ? null : $promptId;
-    }
-
-    /**
-     * Check for model override (Again function with specific model)
-     * Returns model ID if set, null otherwise.
-     */
-    private function checkModelOverride(?int $messageId): ?int
-    {
-        $modelId = $this->againOverride($messageId, 'MODEL_ID');
-
-        return null === $modelId ? null : (int) $modelId;
-    }
-
-    /**
-     * The non-empty meta an Again request stored on the message. Transient
-     * (incognito) messages are never persisted, so they carry no override.
-     */
-    private function againOverride(?int $messageId, string $metaKey): ?string
-    {
-        if (null === $messageId) {
-            return null;
-        }
-
-        $value = $this->messageMetaRepository->findOneBy([
-            'messageId' => $messageId,
-            'metaKey' => $metaKey,
-        ])?->getMetaValue();
-
-        return empty($value) ? null : $value;
-    }
-
-    /**
-     * Resolve a leading slash command via {@see SlashCommandParser}.
-     *
-     * Bare argument-required commands and media tool topics return immediately.
-     * `/search` and `/docs` with an argument strip the prefix and continue so a
-     * pinned assistant profile can still be applied on top.
-     *
-     * @return array{return: array<string, mixed>|null, force_web_search: bool, slash_docs: bool}
-     */
-    private function resolveSlashCommand(Message $message, string $text): array
-    {
-        $parsed = (new SlashCommandParser())->parse($text);
-        if (null === $parsed) {
-            return ['return' => null, 'force_web_search' => false, 'slash_docs' => false];
-        }
-
-        $language = $message->getLanguage() ?: 'en';
-        if ('NN' === $language) {
-            $language = 'en';
-        }
-
-        if ($parsed->requiresArgument() && $parsed->isBare()) {
-            $this->logger->info('MessageClassifier: Bare slash command — usage hint', [
-                'message_id' => $message->getId(),
-                'command' => $parsed->name,
-            ]);
-
-            $decision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, 'general');
-
-            return [
-                'return' => array_merge([
-                    'topic' => 'general',
-                    'language' => $language,
-                    'intent' => Capability::Chat->value,
-                    'source' => $decision->toClassificationSource(),
-                    'skip_sorting' => true,
-                    'slash_hint' => true,
-                    'slash_command' => $parsed->name,
-                ], $decision->toClassificationFields()),
-                'force_web_search' => false,
-                'slash_docs' => false,
-            ];
-        }
-
-        if ('search' === $parsed->name) {
-            $message->setText($parsed->argument);
-            $this->logger->info('MessageClassifier: /search stripped — force web search', [
-                'message_id' => $message->getId(),
-                'query_length' => strlen($parsed->argument),
-            ]);
-
-            return ['return' => null, 'force_web_search' => true, 'slash_docs' => false];
-        }
-
-        if ('docs' === $parsed->name) {
-            $message->setText($parsed->argument);
-            $this->logger->info('MessageClassifier: /docs stripped — rag_query', [
-                'message_id' => $message->getId(),
-                'query_length' => strlen($parsed->argument),
-            ]);
-
-            return ['return' => null, 'force_web_search' => false, 'slash_docs' => true];
-        }
-
-        $toolTopic = $parsed->toolTopic();
-        if (null !== $toolTopic) {
-            $this->logger->info('MessageClassifier: Tool command detected', [
-                'message_id' => $message->getId(),
-                'tool' => $toolTopic,
-            ]);
-
-            $decision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, $toolTopic);
-
-            return [
-                'return' => array_merge([
-                    'topic' => $toolTopic,
-                    'language' => $language,
-                    'intent' => $this->topicIntents->intentFor($toolTopic),
-                    'source' => $decision->toClassificationSource(),
-                    'skip_sorting' => true,
-                ], $decision->toClassificationFields()),
-                'force_web_search' => false,
-                'slash_docs' => false,
-            ];
-        }
-
-        return ['return' => null, 'force_web_search' => false, 'slash_docs' => false];
-    }
-
-    /**
-     * @param array<string, mixed> $classification
-     *
-     * @return array<string, mixed>
-     */
-    private function applySlashOverlaysToClassification(
-        array $classification,
-        bool $forceWebSearch,
-        bool $slashDocs,
-    ): array {
-        if ($forceWebSearch) {
-            $classification['force_web_search'] = true;
-        }
-        if ($slashDocs) {
-            $classification['intent'] = Capability::RagQuery->value;
-            $classification['slash_docs'] = true;
-        }
-
-        return $classification;
-    }
-
-    /**
-     * @param array<string, mixed> $classification
-     *
-     * @return array<string, mixed>
-     */
-    private function withForceWebSearch(array $classification, bool $force): array
-    {
-        if ($force) {
-            $classification['force_web_search'] = true;
-        }
-
-        return $classification;
-    }
-
-    /**
-     * Build message data array for sorter.
-     *
-     * BFILETEXT is the ROUTING view of the attachment: verbatim for ordinary
-     * files, a structural digest for large ones. The sorter only decides
-     * what to do with the file; a 250 kB spreadsheet as JSON overflows the
-     * (small) routing model and turns every such upload into the fallback
-     * topic. The answering handler still receives the full text.
-     */
-    private function buildMessageData(Message $message): array
-    {
-        $fileText = $message->getFileText() ?: '';
-        if ('' !== $fileText) {
-            $digest = $this->attachmentDigest ?? new AttachmentDigest(new TokenEstimator());
-            $fileText = $digest->forRoutingWithConfig($fileText, $message->getUserId(), $message->getFileType());
-        }
-
-        $data = [
-            'BDATETIME' => $message->getDateTime(),
-            'BFILEPATH' => $message->getFilePath(),
-            'BTOPIC' => $message->getTopic() ?: '',
-            'BLANG' => $message->getLanguage() ?: 'en',
-            'BTEXT' => $message->getText(),
-            'BFILETEXT' => $fileText,
-            'BFILE' => $message->getFile(),
-            'BWEBSEARCH' => 0,
-            // Intentionally omit BMULTI. The sorter prompt asks the model to
-            // set it to 0|1, and TaskPlanExecutor only skips the planner on an
-            // *explicit* false. Seeding 0 here would make a lazy/truncated
-            // echo of the inbound JSON look like a single-step vote and skip
-            // planning — the unsafe fallback the vote was designed to avoid.
-        ];
-
-        $fileType = $message->getFileType();
-        if ('' !== $fileType) {
-            $data['BFILETYPE'] = $fileType;
-        }
-
-        $attachedFiles = $message->getFiles();
-        if ($attachedFiles->count() > 0) {
-            $types = [];
-            foreach ($attachedFiles as $file) {
-                $types[] = $file->getFileType() ?: $file->getFileMime();
-            }
-            $data['BATTACHED_FILES'] = implode(', ', $types);
-            $data['BATTACHED_COUNT'] = $attachedFiles->count();
-        }
-
-        return $data;
     }
 
     /**
