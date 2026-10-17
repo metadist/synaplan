@@ -101,3 +101,42 @@ user as the same `ProviderException` with the same context.
 
 `XaiProvider`, `AnthropicProvider` and the smaller providers (V5). Model
 catalog, pricing and the registry.
+
+## 9. As delivered — S10a, Google (2026-10-17)
+
+The size budget (master plan #6) splits the sprint: S10a is Google, S10b
+is OpenAI (the SDK and cURL seams of S10.1, its snapshot, its client and
+its classes). S10a starts from S9's head (`59b0c2882`). Where it differs
+from the plan:
+
+- **More classes than the target shape.** The planned `GoogleChat` also
+  held the message conversion and vision, and `GoogleVideoGeneration` the
+  Omni clips; each would have passed 800 lines. `GoogleMessageFormat`
+  (pure static translations, like `OpenAiToolShapes`), `GoogleVision` and
+  `GoogleOmniVideo` are classes of their own. The largest new class is
+  `GoogleVideoGeneration` (546 lines), the longest new method
+  `GoogleChat::readStream()` (91).
+- **Three methods were cut, not only moved:** `chatStream()` into the
+  payload, the reading of the stream and the failure mapping;
+  `synthesize()` into finding the audio part and saving it; the message
+  conversion into the turns, the tool result and the content parts. The
+  snapshot pins all three.
+- **No seam step for Google.** Google already sent every request through
+  the injected Symfony client, so S10.1 is OpenAI's alone (S10b).
+- **One cleanup on the way.** The TTS decode check loses its dead
+  `false ===` half (`base64_decode()` in non-strict mode never fails), and
+  with it a PHPStan baseline entry.
+- **The weak typing stays.** The new classes keep `GoogleProvider`'s weak
+  typing, as the media stages kept their handler's.
+- **Found, pinned, not fixed.** A streamed Gemini chat that Google answers
+  with an HTTP error other than a transient 503 ends with no text, no
+  finish event and zero usage instead of an error: Symfony's stream does
+  not throw on a status code (checked against the cURL client), so
+  `streamFailure()` and its "overloaded" message are unreachable. The fix
+  (check the status after the retry, map it through `streamFailure()`)
+  changes behaviour, so it is a pull request of its own for the owner.
+- **Journey.** With the dev stack's Google key, one chat, one stream, one
+  image (the default model) and one speech request ran through the
+  refactored provider on Symfony's real HTTP client, from a script in the
+  backend container rather than the browser; all four answered. Not a
+  gate.
