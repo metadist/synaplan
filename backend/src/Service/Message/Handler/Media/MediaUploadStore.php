@@ -19,7 +19,8 @@ final readonly class MediaUploadStore
         private UserUploadPathBuilder $userUploadPathBuilder,
         private MediaDownloader $mediaDownloader,
         private LoggerInterface $logger,
-        private string $uploadDir = '/var/www/backend/var/uploads',
+        #[Autowire('%kernel.project_dir%/var/uploads')]
+        private string $uploadDir,
         #[Autowire('%env(APP_URL)%')]
         private string $publicBaseUrl = '',
     ) {

@@ -7,6 +7,7 @@ use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Phase 1 of a media turn: the pictures it starts from. Attached images and
@@ -19,7 +20,8 @@ final readonly class MediaReferenceResolver
     public function __construct(
         private ConversationFileCatalog $conversationFileCatalog,
         private LoggerInterface $logger,
-        private string $uploadDir = '/var/www/backend/var/uploads',
+        #[Autowire('%kernel.project_dir%/var/uploads')]
+        private string $uploadDir,
     ) {
     }
 

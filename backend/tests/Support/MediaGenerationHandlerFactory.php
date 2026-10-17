@@ -18,12 +18,16 @@ use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Handler\Media\GeneratedMediaStore;
 use App\Service\Message\Handler\Media\MediaChatHandOff;
 use App\Service\Message\Handler\Media\MediaDownloader;
+use App\Service\Message\Handler\Media\MediaGenerationRun;
+use App\Service\Message\Handler\Media\MediaJobDetach;
 use App\Service\Message\Handler\Media\MediaModelResolver;
 use App\Service\Message\Handler\Media\MediaPromptResolver;
 use App\Service\Message\Handler\Media\MediaReferenceResolver;
 use App\Service\Message\Handler\Media\MediaRequestGuard;
+use App\Service\Message\Handler\Media\MediaTurnBilling;
 use App\Service\Message\Handler\Media\MediaTurnBudget;
 use App\Service\Message\Handler\Media\MediaTurnMemory;
 use App\Service\Message\Handler\Media\MediaUploadStore;
@@ -68,30 +72,26 @@ final class MediaGenerationHandlerFactory
     {
         $logger = new NullLogger();
         $uploads = new MediaUploadStore(new UserUploadPathBuilder(), $doubles['downloader'], $logger, $doubles['uploadDir'], $doubles['publicBaseUrl']);
+        $errors = new MediaErrorMessageBuilder();
 
         return new MediaGenerationHandler(
-            $doubles['ai'],
-            new MediaModelResolver($doubles['models'], $doubles['em'], $logger),
-            $doubles['em'],
-            $logger,
-            new MediaPromptResolver($doubles['extractor'], $logger),
-            $uploads,
-            $doubles['thumbnails'],
-            $doubles['limits'],
-            new MediaErrorMessageBuilder(),
-            new MediaTurnMemory($doubles['memory'], $doubles['em']),
-            $doubles['cancellation'],
-            $doubles['jobConfig'],
-            $doubles['jobs'],
-            $doubles['jobDispatcher'],
-            $doubles['jobSync'],
-            $doubles['registrar'],
-            new MediaTurnBudget($doubles['em'], $doubles['limits'], $doubles['gate'], $logger),
             new MediaReferenceResolver($doubles['catalog'], $logger, $doubles['uploadDir']),
+            new MediaPromptResolver($doubles['extractor'], $logger),
+            new MediaModelResolver($doubles['models'], $doubles['em'], $logger),
             new MediaRequestGuard($doubles['ai'], $uploads, $logger, $doubles['publicBaseUrl']),
             new MediaChatHandOff($logger, $doubles['chat']),
-            $doubles['uploadDir'],
-            $doubles['folders'],
+            new MediaTurnMemory($doubles['memory'], $doubles['em']),
+            new MediaTurnBudget($doubles['em'], $doubles['limits'], $doubles['gate'], $logger),
+            new MediaGenerationRun(
+                $doubles['ai'],
+                new MediaJobDetach($doubles['jobConfig'], $doubles['jobs'], $doubles['jobDispatcher'], $doubles['jobSync'], $errors, $logger),
+                new GeneratedMediaStore($uploads, $doubles['registrar'], $doubles['thumbnails'], $doubles['em'], $logger, $doubles['uploadDir'], $doubles['folders']),
+                new MediaTurnBilling($doubles['limits'], $logger),
+                $uploads,
+                $doubles['cancellation'],
+                $errors,
+                $logger,
+            ),
         );
     }
 }

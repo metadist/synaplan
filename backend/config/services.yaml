@@ -790,8 +790,6 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
     App\Service\Message\Handler\MediaGenerationHandler:
-        arguments:
-            $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
             - { name: 'app.message.handler' }
 
