@@ -157,7 +157,8 @@ starts from S4a's head. Where the result differs from the plan:
   with the upload directory injected.
 - **Two inputs answer differently.** A body sent as a list gets the
   missing-fields answer (400) instead of an unhandled type error (500); a
-  subject or message id that is not a string or number counts as absent.
+  subject or message id sent as a list counts as absent. The idempotency
+  check still reads the message id as sent (review round 1).
 - **The existing tests** (`EmailVoiceReplyLanguageTest`,
   `EmailWebhookDocReferenceTest`) build the controller through
   `EmailWebhookControllerFactory`; their assertions are unchanged.
