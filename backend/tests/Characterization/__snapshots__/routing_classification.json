@@ -528,6 +528,28 @@
         "source": "model_override_auto",
         "topic": "general"
     },
+    "override_rerank_CHAT_topic": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": 42,
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "source": "model_override_auto",
+        "topic": "general"
+    },
+    "override_rerank_CONTINUE_topic": {
+        "intent": "chat",
+        "language": "en",
+        "model_id": 42,
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "source": "model_override_auto",
+        "topic": "general"
+    },
     "override_rerank_UNKNOWN_topic": {
         "intent": "chat",
         "language": "en",

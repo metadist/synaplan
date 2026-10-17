@@ -201,6 +201,206 @@
             ]
         }
     },
+    "again_chat_tag_on_chat_placeholder": {
+        "buffered": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "general"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "model_id": 42,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "again",
+                            "topic": "general"
+                        },
+                        "history": 1,
+                        "method": "route",
+                        "options": {
+                            "is_again": true,
+                            "model_id": 42,
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": []
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "model_id": 42,
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "again",
+                    "topic": "general"
+                },
+                "preprocessing": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Using previously selected model (skipped classification)",
+                    "metadata": {
+                        "language": "en",
+                        "model_id": 42,
+                        "source": "again",
+                        "topic": "general"
+                    },
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                },
+                {
+                    "message": "Response generated",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    },
+                    "status": "complete"
+                }
+            ]
+        },
+        "streamed": {
+            "calls": {
+                "classifier": [],
+                "prompt": [
+                    {
+                        "language": "en",
+                        "topic": "general"
+                    }
+                ],
+                "router": [
+                    {
+                        "classification": {
+                            "intent": "chat",
+                            "language": "en",
+                            "model_id": 42,
+                            "prompt_metadata": {
+                                "aiModel": 0
+                            },
+                            "source": "again",
+                            "topic": "general"
+                        },
+                        "history": 1,
+                        "method": "routeStream",
+                        "options": {
+                            "is_again": true,
+                            "model_id": 42,
+                            "perf_timer": "App\\Service\\Infrastructure\\PerfTimer",
+                            "resolved_prompt_data": {
+                                "metadata": {
+                                    "aiModel": 0
+                                },
+                                "prompt": null
+                            }
+                        }
+                    }
+                ],
+                "saved_results": [],
+                "search": [],
+                "stream_chunks": [
+                    "Answer"
+                ]
+            },
+            "result": {
+                "classification": {
+                    "intent": "chat",
+                    "language": "en",
+                    "model_id": 42,
+                    "sorting_model_id": null,
+                    "sorting_model_name": null,
+                    "sorting_provider": null,
+                    "source": "again",
+                    "topic": "general"
+                },
+                "preprocessed": {
+                    "hasFiles": false
+                },
+                "response": {
+                    "content": "Answer",
+                    "metadata": {
+                        "model": "gpt-4",
+                        "provider": "openai"
+                    }
+                },
+                "search_results": null,
+                "success": true
+            },
+            "sorter_calls": 0,
+            "statuses": [
+                {
+                    "message": "Message processing started",
+                    "metadata": [],
+                    "status": "started"
+                },
+                {
+                    "message": "Downloading and parsing files...",
+                    "metadata": [],
+                    "status": "preprocessing"
+                },
+                {
+                    "message": "Using previously selected model (skipped classification)",
+                    "metadata": [],
+                    "status": "classified"
+                },
+                {
+                    "message": "Generating response...",
+                    "metadata": {
+                        "model_id": 12,
+                        "model_name": "model-12",
+                        "provider": "openai"
+                    },
+                    "status": "generating"
+                }
+            ]
+        }
+    },
     "again_chat_tag_on_custom_topic": {
         "buffered": {
             "calls": {

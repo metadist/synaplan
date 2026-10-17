@@ -130,7 +130,7 @@ final class MessageTurnCharacterizationTest extends TestCase
         foreach (['text2vid', 'text2sound', 'pic2text', 'analyze', 'vision', 'document', 'officemaker', 'text2doc', 'chat', 'vectorize', 'rerank'] as $tag) {
             $cases["again_tag_{$tag}"] = ['options' => $again, 'model_tag' => $tag];
         }
-        foreach (['tools_pic' => 'tools:pic', 'custom_topic' => 'legal-review', 'mediamaker' => 'mediamaker', 'unknown_topic' => 'UNKNOWN', 'no_topic' => ''] as $id => $topic) {
+        foreach (['tools_pic' => 'tools:pic', 'custom_topic' => 'legal-review', 'mediamaker' => 'mediamaker', 'unknown_topic' => 'UNKNOWN', 'chat_placeholder' => 'CHAT', 'no_topic' => ''] as $id => $topic) {
             $cases["again_chat_tag_on_{$id}"] = ['options' => $again, 'model_tag' => 'chat', 'message_topic' => $topic];
         }
 

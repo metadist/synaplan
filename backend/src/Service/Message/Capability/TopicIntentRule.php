@@ -26,6 +26,8 @@ final readonly class TopicIntentRule
         'text2doc' => 'officemaker',
     ];
 
+    private const PLACEHOLDER_TOPICS = ['CHAT', 'CONTINUE'];
+
     /** Spellings that route like a capability without being one (tool commands, model-tag topics). */
     private const INTENT_ALIASES = [
         'text2pic' => Capability::ImageGeneration->value,
@@ -71,9 +73,17 @@ final readonly class TopicIntentRule
             ?? Capability::Chat->value;
     }
 
-    /** A new message carries `UNKNOWN`; it, `unknown` and an empty topic count as none. */
+    /**
+     * A message that was not classified yet carries a placeholder: `UNKNOWN`
+     * (a new message), `CHAT` (most entry points) or `CONTINUE` (a continued
+     * answer). They and an empty topic count as none. `unknown` counts in any
+     * case; the other placeholders only as written, so a user's prompt named
+     * `chat` keeps its topic.
+     */
     private static function topicOrGeneral(?string $topic): string
     {
-        return null === $topic || '' === $topic || 'unknown' === strtolower($topic) ? 'general' : $topic;
+        $none = null === $topic || '' === $topic || 'unknown' === strtolower($topic) || in_array($topic, self::PLACEHOLDER_TOPICS, true);
+
+        return $none ? 'general' : $topic;
     }
 }

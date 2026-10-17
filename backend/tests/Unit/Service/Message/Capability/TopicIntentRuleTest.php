@@ -49,6 +49,8 @@ final class TopicIntentRuleTest extends TestCase
                 'unknown' => ['general', 'chat'],
                 'UNKNOWN' => ['general', 'chat'],
                 'Unknown' => ['general', 'chat'],
+                'CHAT' => ['general', 'chat'],
+                'CONTINUE' => ['general', 'chat'],
             ],
         ];
     }
@@ -69,6 +71,11 @@ final class TopicIntentRuleTest extends TestCase
                 );
             }
         }
+    }
+
+    public function testAUsersPromptNamedLikeAPlaceholderKeepsItsTopic(): void
+    {
+        self::assertEquals(new TopicIntent('chat', 'chat'), $this->rule->forModel('chat', 'chat'));
     }
 
     public function testATagMatchesInAnyCase(): void

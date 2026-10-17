@@ -137,7 +137,7 @@ final class RoutingCharacterizationTest extends TestCase
                 $cases[] = ['id' => "override_{$tag}_{$topicId}", 'text' => 'redo that', 'language' => 'en', 'topic' => $topic, 'fastPath' => false, 'meta' => ['MODEL_ID' => '42'], 'modelTag' => $tag];
             }
         }
-        foreach (['unknown', 'UNKNOWN'] as $topic) {
+        foreach (['unknown', 'UNKNOWN', 'CHAT', 'CONTINUE'] as $topic) {
             $cases[] = ['id' => "override_rerank_{$topic}_topic", 'text' => 'redo that', 'language' => 'en', 'topic' => $topic, 'fastPath' => false, 'meta' => ['MODEL_ID' => '42'], 'modelTag' => 'rerank'];
         }
 

@@ -64,6 +64,9 @@ final class OverrideAndAgainRoutingTest extends TestCase
             ['text2doc', 'mediamaker', ['officemaker', 'document_generation']],
             ['chat', '', ['general', 'chat']],
             ['chat', 'UNKNOWN', ['general', 'chat']],
+            ['chat', 'CHAT', ['general', 'chat']],
+            ['chat', 'CONTINUE', ['general', 'chat']],
+            ['chat', 'chat', ['chat', 'chat']],
             ['chat', 'legal-review', ['legal-review', 'chat']],
             ['chat', 'mediamaker', ['mediamaker', 'image_generation']],
             ['chat', 'tools:pic', ['tools:pic', 'image_generation']],
@@ -75,10 +78,12 @@ final class OverrideAndAgainRoutingTest extends TestCase
             ['rerank', '', ['general', 'chat']],
             ['rerank', 'unknown', ['general', 'chat']],
             ['rerank', 'UNKNOWN', ['general', 'chat']],
+            ['rerank', 'CHAT', ['general', 'chat']],
             ['rerank', 'legal-review', ['legal-review', 'chat']],
             ['rerank', 'mediamaker', ['mediamaker', 'image_generation']],
             ['rerank', 'tools:pic', ['tools:pic', 'image_generation']],
             [null, '', ['general', 'chat']],
+            [null, 'CHAT', ['general', 'chat']],
             [null, 'legal-review', ['legal-review', 'chat']],
         ];
 
@@ -133,6 +138,16 @@ final class OverrideAndAgainRoutingTest extends TestCase
         $byOverride = $this->classifier('vision')->classify($this->message('mediamaker'));
 
         self::assertSame(['general', 'chat'], [$byOverride['topic'], $byOverride['intent']]);
+    }
+
+    public function testAChatModelRetryOfAnUnclassifiedMessageAnswersOnGeneral(): void
+    {
+        foreach (['CHAT', 'CONTINUE'] as $placeholder) {
+            $byOverride = $this->classifier('chat')->classify($this->message($placeholder));
+            $byAgain = $this->resolver('chat')->againForBufferedTurn($this->message($placeholder), ['is_again' => true, 'model_id' => 42], new TurnStatus(null, new NullLogger()));
+
+            self::assertSame(['general', 'general'], [$byOverride['topic'], $byAgain['topic']], $placeholder);
+        }
     }
 
     private function classifier(?string $tag): MessageClassifier
