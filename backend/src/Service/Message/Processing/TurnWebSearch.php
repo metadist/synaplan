@@ -51,7 +51,7 @@ final readonly class TurnWebSearch
     {
         $topic = $classification['topic'] ?? 'general';
         $promptMetadata = $this->applyRuntimeToolFlags($promptMetadata, $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null);
-        $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
+        $promptToolInternet = PromptToolFlag::read($promptMetadata, 'tool_internet');
         $classifierVote = $classification['web_search'] ?? null;
         $messageText = $message->getText();
         $userRequestedSearch = $this->userRequestedSearch($options, $classification)
