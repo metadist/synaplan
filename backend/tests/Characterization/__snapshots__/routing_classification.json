@@ -757,10 +757,10 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "legal-review"
+        "topic": "general"
     },
     "override_vision_mediamaker": {
-        "intent": "image_generation",
+        "intent": "chat",
         "language": "en",
         "model_id": 42,
         "routing_confidence": 1,
@@ -768,7 +768,7 @@
         "routing_fallback_reason": null,
         "skip_sorting": true,
         "source": "model_override_auto",
-        "topic": "mediamaker"
+        "topic": "general"
     },
     "override_vision_no_topic": {
         "intent": "chat",

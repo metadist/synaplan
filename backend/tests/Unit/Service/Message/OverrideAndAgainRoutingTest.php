@@ -55,7 +55,7 @@ final class OverrideAndAgainRoutingTest extends TestCase
             ['analyze', '', ['general', 'chat'], ['general', 'chat']],
             ['analyze', 'mediamaker', ['general', 'chat'], ['general', 'chat']],
             ['vision', '', ['general', 'chat'], ['general', 'chat']],
-            ['vision', 'mediamaker', ['mediamaker', 'image_generation'], ['general', 'chat']],
+            ['vision', 'mediamaker', ['general', 'chat'], ['general', 'chat']],
             ['document', '', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
             ['document', 'mediamaker', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
             ['officemaker', '', ['officemaker', 'document_generation'], ['officemaker', 'document_generation']],
@@ -127,6 +127,13 @@ final class OverrideAndAgainRoutingTest extends TestCase
         $byOverride = $this->classifier('chat')->classify($this->message('legal-review'));
 
         self::assertSame(['legal-review', 'chat'], [$byOverride['topic'], $byOverride['intent']]);
+    }
+
+    public function testAVisionModelOverrideOnAMediaMessageAnswersAsChat(): void
+    {
+        $byOverride = $this->classifier('vision')->classify($this->message('mediamaker'));
+
+        self::assertSame(['general', 'chat'], [$byOverride['topic'], $byOverride['intent']]);
     }
 
     private function classifier(?string $tag): MessageClassifier

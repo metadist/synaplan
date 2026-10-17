@@ -34,6 +34,7 @@ final readonly class TopicIntentRule
         'text2sound' => 'mediamaker',
         'pic2text' => 'general', // Vision is handled by ChatHandler
         'analyze' => 'general',
+        'vision' => 'general',
         'document' => 'officemaker',
         'officemaker' => 'officemaker',
         'text2doc' => 'officemaker',
