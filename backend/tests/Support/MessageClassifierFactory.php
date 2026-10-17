@@ -19,6 +19,8 @@ use App\Service\Message\Capability\TopicIntentRule;
 use App\Service\Message\Classification\AgainOverride;
 use App\Service\Message\Classification\AgentPinRoute;
 use App\Service\Message\Classification\AttachmentIntent;
+use App\Service\Message\Classification\FastPathClassifier;
+use App\Service\Message\Classification\SelfAwareQuestion;
 use App\Service\Message\Classification\SlashCommandRoute;
 use App\Service\Message\Classification\SorterInput;
 use App\Service\Message\MessageClassifier;
@@ -68,12 +70,13 @@ final class MessageClassifierFactory
         $logger = $doubles['logger'];
         $topicIntents = $doubles['topicIntents'];
         $sorterInput = new SorterInput($doubles['attachmentDigest'] ?? null);
+        $selfAware = new SelfAwareQuestion($doubles['selfAwareConfig'] ?? null);
 
         return new MessageClassifier(
             $doubles['messageSorter'],
             new SlashCommandRoute($topicIntents, $logger),
             $doubles['modelConfigService'],
-            $doubles['configRepository'],
+            new FastPathClassifier($doubles['configRepository'], $selfAware, $logger, $doubles['officeConverter'] ?? null),
             new AttachmentIntent($doubles['em'], $logger, $doubles['officeConverter'] ?? null, $doubles['documentToolsConfig'] ?? null, $doubles['multitaskConfig'] ?? null),
             $logger,
             $topicIntents,
@@ -84,8 +87,7 @@ final class MessageClassifierFactory
             new AgentPinRoute($doubles['agentPin'], $doubles['messageSorter'], $sorterInput, $logger, $doubles['agentConfig'] ?? null, $doubles['agentService'] ?? null, $doubles['agentRuntimeResolver'] ?? null, $doubles['users'] ?? null),
             new AgainOverride($doubles['messageMetaRepository'], $doubles['modelConfigService'], $topicIntents, $logger),
             $sorterInput,
-            $doubles['selfAwareConfig'] ?? null,
-            $doubles['officeConverter'] ?? null,
+            $selfAware,
         );
     }
 }
