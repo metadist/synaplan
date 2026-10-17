@@ -68,6 +68,28 @@ final class InboundEmailIntakeTest extends TestCase
         );
     }
 
+    public function testTheIdempotencyCheckGetsTheMessageIdAsTheRelaySentIt(): void
+    {
+        $seen = [];
+        foreach ([true, 12345, '<m1@example.com>'] as $messageId) {
+            $idempotency = $this->createStub(EmailWebhookIdempotencyService::class);
+            $idempotency->method('findDuplicate')->willReturnCallback(static function (string $from, string $to, string $subject, string $body, mixed $id) use (&$seen): array {
+                $seen[] = $id;
+
+                return ['existing' => null, 'fingerprint' => 'fp', 'normalized_message_id' => null];
+            });
+            $chats = $this->createStub(EmailChatService::class);
+            $chats->method('findOrCreateUserFromEmail')->willReturn(['user' => $this->user()]);
+            $limits = $this->createStub(RateLimitService::class);
+            $limits->method('checkLimit')->willReturn(['allowed' => true]);
+
+            (new InboundEmailIntake($this->createStub(RawMimeEmailParser::class), $idempotency, $chats, $limits, $this->createStub(InternalEmailService::class), $this->createStub(DiscordNotificationService::class), new NullLogger()))
+                ->accept($this->request(['from' => 'ada@example.com', 'to' => 'smart@synaplan.net', 'body' => 'Hi', 'message_id' => $messageId]));
+        }
+
+        self::assertSame([true, 12345, '<m1@example.com>'], $seen);
+    }
+
     public function testARawMimeBodyIsReadAsItsText(): void
     {
         self::assertSame('Plain question', $this->accept($this->intake(mimeText: 'Plain question'))->body);

@@ -57,7 +57,8 @@ final readonly class InboundEmailIntake
         $messageId = self::text($data['message_id'] ?? null);
         $reportsToDiscord = str_ends_with($fromEmail, InboundEmail::DEBUG_DOMAIN);
 
-        $idempotency = $this->idempotency->findDuplicate($fromEmail, $toEmail, $subject, $body, $messageId);
+        // The idempotency check counts only a string id as one; the reply threads on any scalar.
+        $idempotency = $this->idempotency->findDuplicate($fromEmail, $toEmail, $subject, $body, $data['message_id'] ?? null);
         $keyword = $this->emailChats->parseEmailKeyword($toEmail);
         $this->logger->info('Email webhook received', [
             'from' => $fromEmail,

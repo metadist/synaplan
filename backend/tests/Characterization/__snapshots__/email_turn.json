@@ -133,6 +133,248 @@
             }
         ]
     },
+    "distinct_mails_with_a_boolean_message_id": {
+        "answers": [
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 1>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": "1",
+                        "references": "1",
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-distinct-mails-with-a-boolean-message-id@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            },
+            {
+                "json": {
+                    "chat_id": "<chat_id 1>",
+                    "message_id": "<message_id 2>",
+                    "response": {
+                        "metadata": {
+                            "docs": [
+                                {
+                                    "slug": "using-synaplan",
+                                    "title": "Using Synaplan",
+                                    "url": "https://docs.example/using-synaplan"
+                                }
+                            ],
+                            "model": "test-model",
+                            "model_id": 12,
+                            "provider": "test",
+                            "usage": {
+                                "completion_tokens": 4,
+                                "prompt_tokens": 3
+                            }
+                        },
+                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
+                    },
+                    "success": true,
+                    "user_info": {
+                        "is_anonymous": false,
+                        "rate_limit_level": "PRO"
+                    }
+                },
+                "mails": [
+                    {
+                        "attachments": [],
+                        "in_reply_to": "1",
+                        "references": "1",
+                        "reply_to": [
+                            "<relay recipient>"
+                        ],
+                        "subject": "Re: Opening hours",
+                        "text": "We open at 9 on Saturday. See.\n\n---\nService: test | Model: test-model | Processing time: <time> seconds\nhttps://www.synaplan.com/",
+                        "to": [
+                            "person-distinct-mails-with-a-boolean-message-id@example.com"
+                        ]
+                    }
+                ],
+                "status": 200
+            }
+        ],
+        "attachment_store": [],
+        "discord": [],
+        "processor": [
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                "voice_reply": null
+            },
+            {
+                "status": "processing",
+                "text": "Subject: Opening hours\n\nAnd on Sunday?",
+                "voice_reply": null
+            }
+        ],
+        "speech": [],
+        "stored": {
+            "account": {
+                "details": [],
+                "level": "PRO",
+                "type": "WEB"
+            },
+            "chats": 1,
+            "messages": [
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-distinct-mails-with-a-boolean-message-id@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "IN",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "channel": "email",
+                        "email_fingerprint": "<fingerprint>",
+                        "email_subject": "Opening hours",
+                        "from_email": "person-distinct-mails-with-a-boolean-message-id@example.com",
+                        "to_email": "smart@synaplan.net"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "Subject: Opening hours\n\nAnd on Sunday?",
+                    "topic": "general",
+                    "type": "MAIL"
+                },
+                {
+                    "direction": "OUT",
+                    "file": [
+                        0,
+                        "",
+                        ""
+                    ],
+                    "language": "en",
+                    "meta": {
+                        "ai_chat_cost": "0.001000",
+                        "ai_chat_model": "test-model",
+                        "ai_chat_model_id": "12",
+                        "ai_chat_provider": "test",
+                        "ai_chat_usage": "{\"prompt_tokens\":3,\"completion_tokens\":4}",
+                        "ai_usage_extra": "[{\"promptTokens\":5,\"completionTokens\":1,\"totalTokens\":0,\"cost\":\"0\",\"modelKey\":\"test:sorter\",\"kind\":\"SORT\",\"priceKnown\":true}]",
+                        "docs": "[{\"slug\":\"using-synaplan\",\"title\":\"Using Synaplan\",\"url\":\"https://docs.example/using-synaplan\"}]"
+                    },
+                    "provider": "EMAIL",
+                    "status": "complete",
+                    "text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "topic": "general",
+                    "type": "MAIL"
+                }
+            ]
+        },
+        "summary_refreshes": 2,
+        "usage": [
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nWhen do you open on Saturday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            },
+            {
+                "action": "MESSAGES",
+                "metadata": {
+                    "input_text": "Subject: Opening hours\n\nAnd on Sunday?",
+                    "model": "test-model",
+                    "model_id": 12,
+                    "provider": "test",
+                    "response_text": "We open at 9 on Saturday. See [Doc:using-synaplan].",
+                    "source": "EMAIL",
+                    "usage": {
+                        "completion_tokens": 4,
+                        "prompt_tokens": 3
+                    }
+                }
+            }
+        ]
+    },
     "duplicate_by_fingerprint": {
         "answers": [
             {

@@ -72,6 +72,7 @@ final class EmailTurnCharacterizationTest extends WebTestCase
         foreach (['duplicate_by_message_id', 'duplicate_by_fingerprint'] as $id) {
             self::assertCount(1, $actual[$id]['processor'], $id.': a redelivered mail reached the AI twice.');
         }
+        self::assertCount(2, $actual['distinct_mails_with_a_boolean_message_id']['processor'], 'A distinct mail was taken for a redelivery.');
 
         CleanupSnapshot::assertSame(self::SNAPSHOT, $actual, 'email turn');
     }
@@ -91,6 +92,7 @@ final class EmailTurnCharacterizationTest extends WebTestCase
             'keyword_address' => ['mail' => ['to' => 'smart+support@synaplan.net', 'in_reply_to' => '<earlier@example.com>']],
             'duplicate_by_message_id' => ['mail' => ['message_id' => '<twice@example.com>'], 'deliveries' => 2],
             'duplicate_by_fingerprint' => ['deliveries' => 2],
+            'distinct_mails_with_a_boolean_message_id' => ['mail' => ['message_id' => true], 'deliveries' => [[], ['body' => 'And on Sunday?']]],
             'new_sender' => ['registered' => false],
             'rate_limited' => ['limit' => ['allowed' => false, 'limit' => 10, 'used' => 10, 'reset_at' => '2026-10-18 00:00:00']],
             'voice_attachment' => ['mail' => ['attachments' => [['filename' => 'note.ogg', 'content_type' => 'audio/ogg', 'size' => 2048, 'url' => 'https://relay.example.com/files/note.ogg']]]],
@@ -163,8 +165,9 @@ final class EmailTurnCharacterizationTest extends WebTestCase
             'body' => 'When do you open on Saturday?',
         ];
         $answers = [];
-        for ($delivery = 0; $delivery < ($case['deliveries'] ?? 1); ++$delivery) {
-            $client->request('POST', '/api/v1/webhooks/email', [], [], ['CONTENT_TYPE' => 'application/json'], $case['raw'] ?? json_encode($mail, JSON_THROW_ON_ERROR));
+        $deliveries = $case['deliveries'] ?? 1;
+        foreach (is_int($deliveries) ? array_fill(0, $deliveries, []) : $deliveries as $override) {
+            $client->request('POST', '/api/v1/webhooks/email', [], [], ['CONTENT_TYPE' => 'application/json'], $case['raw'] ?? json_encode($override + $mail, JSON_THROW_ON_ERROR));
             $answers[] = $this->answerToTheRelay($client) + ['mails' => $this->mails((string) $mail['to'])];
         }
         $em->clear();
