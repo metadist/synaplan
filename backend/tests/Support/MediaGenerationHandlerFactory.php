@@ -18,10 +18,14 @@ use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Handler\Media\MediaChatHandOff;
 use App\Service\Message\Handler\Media\MediaDownloader;
 use App\Service\Message\Handler\Media\MediaModelResolver;
 use App\Service\Message\Handler\Media\MediaPromptResolver;
 use App\Service\Message\Handler\Media\MediaReferenceResolver;
+use App\Service\Message\Handler\Media\MediaRequestGuard;
+use App\Service\Message\Handler\Media\MediaTurnBudget;
+use App\Service\Message\Handler\Media\MediaTurnMemory;
 use App\Service\Message\Handler\Media\MediaUploadStore;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
@@ -63,6 +67,7 @@ final class MediaGenerationHandlerFactory
     public static function build(array $doubles): MediaGenerationHandler
     {
         $logger = new NullLogger();
+        $uploads = new MediaUploadStore(new UserUploadPathBuilder(), $doubles['downloader'], $logger, $doubles['uploadDir'], $doubles['publicBaseUrl']);
 
         return new MediaGenerationHandler(
             $doubles['ai'],
@@ -70,23 +75,23 @@ final class MediaGenerationHandlerFactory
             $doubles['em'],
             $logger,
             new MediaPromptResolver($doubles['extractor'], $logger),
-            new MediaUploadStore(new UserUploadPathBuilder(), $doubles['downloader'], $logger, $doubles['uploadDir'], $doubles['publicBaseUrl']),
+            $uploads,
             $doubles['thumbnails'],
             $doubles['limits'],
             new MediaErrorMessageBuilder(),
-            $doubles['memory'],
+            new MediaTurnMemory($doubles['memory'], $doubles['em']),
             $doubles['cancellation'],
             $doubles['jobConfig'],
             $doubles['jobs'],
             $doubles['jobDispatcher'],
             $doubles['jobSync'],
             $doubles['registrar'],
-            $doubles['gate'],
+            new MediaTurnBudget($doubles['em'], $doubles['limits'], $doubles['gate'], $logger),
             new MediaReferenceResolver($doubles['catalog'], $logger, $doubles['uploadDir']),
+            new MediaRequestGuard($doubles['ai'], $uploads, $logger, $doubles['publicBaseUrl']),
+            new MediaChatHandOff($logger, $doubles['chat']),
             $doubles['uploadDir'],
-            $doubles['publicBaseUrl'],
             $doubles['folders'],
-            $doubles['chat'],
         );
     }
 }

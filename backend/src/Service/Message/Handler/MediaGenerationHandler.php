@@ -9,7 +9,6 @@ use App\AI\Stream\StreamChunk;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
-use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Destination\RequestedFolderDelivery;
 use App\Service\File\ThumbnailService;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -20,11 +19,15 @@ use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Media\RenderedImageSize;
-use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\GeneratedMediaTextRenderer;
+use App\Service\Message\Handler\Media\MediaChatHandOff;
 use App\Service\Message\Handler\Media\MediaModelResolver;
 use App\Service\Message\Handler\Media\MediaPromptResolver;
 use App\Service\Message\Handler\Media\MediaReferenceResolver;
+use App\Service\Message\Handler\Media\MediaRequestGuard;
+use App\Service\Message\Handler\Media\MediaTurnBudget;
+use App\Service\Message\Handler\Media\MediaTurnMemory;
+use App\Service\Message\Handler\Media\MediaTurnRequest;
 use App\Service\Message\Handler\Media\MediaUploadStore;
 use App\Service\Message\ProgressCallback;
 use App\Service\Message\TtsScriptGuard;
@@ -33,7 +36,6 @@ use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Media Generation Handler.
@@ -45,9 +47,6 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 #[AutoconfigureTag('app.message.handler')]
 final readonly class MediaGenerationHandler implements MessageHandlerInterface
 {
-    /** Marker stored on a turn that TtsScriptGuard handed to the chat answer. */
-    public const REROUTED_FROM_AUDIO = 'mediamaker:audio';
-
     public function __construct(
         private AiFacade $aiFacade,
         private MediaModelResolver $modelResolver,
@@ -58,27 +57,19 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private ThumbnailService $thumbnailService,
         private RateLimitService $rateLimitService,
         private MediaErrorMessageBuilder $errorMessageBuilder,
-        private PendingMemoryExtraction $pendingMemoryExtraction,
+        private MediaTurnMemory $memory,
         private MediaCancellationStore $cancellationStore,
         private MediaJobConfig $mediaJobConfig,
         private MediaJobService $mediaJobService,
         private MediaJobDispatcher $mediaJobDispatcher,
         private MediaJobMessageSync $mediaJobMessageSync,
         private GeneratedFileRegistrar $generatedFileRegistrar,
-        private PremiumFeatureGate $premiumFeatureGate,
+        private MediaTurnBudget $budget,
         private MediaReferenceResolver $referenceResolver,
+        private MediaRequestGuard $guard,
+        private MediaChatHandOff $chatHandOff,
         private string $uploadDir = '/var/www/backend/var/uploads',
-        // Public base URL that serves /api/v1/files/uploads/* (same value used
-        // by OgImageService / shared chat pages). Needed for image-to-video:
-        // Higgsfield (and most i2v providers) fetch the source frame from a
-        // public http(s) URL, so the user's attached image must be exposed at
-        // an absolute, internet-reachable URL — not a local filesystem path.
-        #[Autowire('%env(APP_URL)%')]
-        private string $publicBaseUrl = '',
         private ?RequestedFolderDelivery $folderDelivery = null,
-        // Answers the turn as normal chat when a sorter-routed audio request
-        // turns out to carry nothing speakable (see TtsScriptGuard).
-        private ?ChatHandler $chatHandler = null,
     ) {
     }
 
@@ -161,228 +152,60 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $mediaPrompt = $this->promptResolver->resolve($message, $thread, $classification, $references, $progressCallback);
         $choice = $this->modelResolver->choose($message, $classification, $mediaPrompt);
         if (null === $choice) {
-            $lang = $classification['language'] ?? 'en';
-            $clarification = 'de' === $lang
-                ? 'Ich konnte nicht erkennen, welche Art von Medium du erstellen möchtest. '
-                    .'Bitte verwende einen der folgenden Befehle: `/pic` für Bilder, `/vid` für Videos, `/tts` für Audio.'
-                : 'I couldn\'t determine what type of media you want to generate. '
-                    .'Please use one of the following commands: `/pic` for images, `/vid` for videos, `/tts` for audio.';
+            $answer = $this->guard->undeterminedMediaType($classification)->answer($streamCallback);
+            $this->memory->dispatch($message, $thread, $classification, $options);
 
-            $streamCallback($clarification);
-            $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
-
-            return [
-                'metadata' => [
-                    'error' => 'media_type_not_determined',
-                ],
-            ];
+            return $answer;
         }
 
         $prompt = $mediaPrompt->text;
         $mediaType = $choice->mediaType;
-        $isSlashCommand = $choice->isSlashCommand;
         $attachedImagePaths = $choice->references->attachedImagePaths;
         $imageUrlsInText = $choice->references->imageUrlsInText;
         $editSource = $choice->references->editSource;
         $isPic2Pic = $choice->references->isPic2Pic();
-        $hasVideoReferenceImage = $choice->references->hasVideoReferenceImage();
 
-        // A sorter-routed audio turn whose "script" is just the user's request
-        // ("teach me the Persian numbers with a children's song") has nothing
-        // to read out: the sorter mistook a content request for TTS. Speaking
-        // it would play the user's own question back as an MP3, so answer the
-        // request as ordinary chat instead. `/tts` and "Again" re-runs are
-        // exempt — there the user explicitly chose to hear that exact text.
-        if ('audio' === $mediaType
-            && !$isSlashCommand
-            && null === $message->getMeta('media_prompt_override')
-            && TtsScriptGuard::echoesInstruction($prompt, $message->getText())
-        ) {
-            return $this->answerAsChatInstead($message, $thread, $classification, $streamCallback, $progressCallback, $options, $prompt);
+        if ($this->guard->answersAsChat($choice, $mediaPrompt, $message)) {
+            return $this->chatHandOff->answerAsChatInstead($message, $thread, $classification, $streamCallback, $progressCallback, $options, $prompt);
         }
 
         // The turn stays on the media path: queue memory extraction now (see
         // the note at the top of this method).
-        $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
+        $this->memory->dispatch($message, $thread, $classification, $options);
 
-        $resolved = $this->modelResolver->resolve($message, $choice);
-        $modelId = $resolved->id;
-        $provider = $resolved->provider;
-        $modelName = $resolved->name;
-        $modelConfig = $resolved->config;
-
-        // No model resolved: the operator has no default configured for this
-        // media capability (TEXT2PIC/TEXT2VID/TEXT2SOUND/…). Return an
-        // actionable error instead of silently routing to a hardcoded OpenAI
-        // model, which would bill an unconfigured vendor and break for installs
-        // that don't use OpenAI (#1320).
-        if (!$provider) {
-            $this->logger->warning('MediaGenerationHandler: No model configured for media generation', [
-                'media_type' => $mediaType,
-                'model_id' => $modelId,
-            ]);
-
-            $lang = $classification['language'] ?? 'en';
-            $noModelMessage = 'de' === $lang
-                ? 'Für die Medienerstellung ist kein Modell konfiguriert. Bitte lege in den Einstellungen ein Standardmodell fest (Bild, Video oder Audio).'
-                : 'No model is configured for media generation. Please set a default model (image, video, or audio) in Settings.';
-            $streamCallback($noModelMessage);
-
-            return [
-                'metadata' => [
-                    'error' => 'no_media_model_configured',
-                    'media_type' => $mediaType,
-                ],
-            ];
+        $request = new MediaTurnRequest(
+            $message,
+            $thread,
+            $classification,
+            $options,
+            $prompt,
+            $mediaType,
+            $choice->references,
+            $this->modelResolver->resolve($message, $choice),
+            $this->modelResolver->effectiveUserId($message),
+        );
+        $refusal = $this->guard->refusal($request);
+        if (null !== $refusal) {
+            return $refusal->answer($streamCallback);
         }
 
-        // Guard: a text-to-video request (no attached image) must never be sent
-        // to an image-to-video model. i2v models (Higgsfield DoP/Kling/etc.)
-        // require a reference frame and the provider rejects the request with
-        // "'image_url' is a required property". This happens when an i2v model is
-        // configured as the TEXT2VID default. Return an actionable message
-        // instead of leaking a raw provider 400 to the user.
-        if ('video' === $mediaType && !$hasVideoReferenceImage) {
-            $requiresReferenceImage = !empty($modelConfig['requires_reference_image'])
-                || (!empty($modelConfig['features']) && in_array('image2video', $modelConfig['features'], true));
-            if ($requiresReferenceImage) {
-                $this->logger->warning('MediaGenerationHandler: text-to-video routed to an image-to-video model without a reference image', [
-                    'model_id' => $modelId,
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ]);
-
-                $lang = $classification['language'] ?? 'en';
-                $guardMessage = 'de' === $lang
-                    ? sprintf('„%s“ ist ein Bild-zu-Video-Modell und benötigt ein Referenzbild. Hänge ein Bild an, um es zu animieren, oder wähle in den Einstellungen ein Text-zu-Video-Modell (z. B. Veo) als Standard für Video.', $modelName)
-                    : sprintf('"%s" is an image-to-video model and needs a reference image. Attach an image to animate it, or choose a text-to-video model (e.g. Veo) as your video default in Settings.', $modelName);
-                $streamCallback($guardMessage);
-
-                return [
-                    'metadata' => [
-                        'error' => 'text2vid_requires_reference_image',
-                        'provider' => $provider,
-                        'model' => $modelName,
-                    ],
-                ];
-            }
+        $this->announce($request, $progressCallback);
+        $user = $this->budget->user($message);
+        $refusal = $this->budget->refusal($request, $user);
+        if (null !== $refusal) {
+            return $refusal->answer($streamCallback);
         }
 
+        $modelId = $request->model->id;
+        $provider = (string) $request->model->provider;
+        $modelName = $request->model->name;
+        $modelConfig = $request->model->config;
+        $mediaAction = $request->mediaAction();
+        $mediaTypeLabel = $request->mediaTypeLabel();
         // Providers implementing SupportsInlineReferenceImage take the reference
         // frame as inline bytes, so they need neither a republished file nor a
         // publicly reachable APP_URL.
-        $inlineReferenceImage = 'video' === $mediaType
-            && $this->aiFacade->supportsInlineReferenceImage($provider);
-
-        // Guard: image-to-video requires the remote provider to FETCH the
-        // attached source frame from a public http(s) URL (we republish it at
-        // APP_URL/api/v1/files/uploads/...). When APP_URL points at a
-        // local/private host — the default in local dev (http://localhost:8000)
-        // — that URL is unreachable from the provider's servers and the request
-        // is rejected with a confusing raw "invalid_image_url" 400. Detect this
-        // up front and return an actionable message instead of burning a
-        // provider call (and credits) on a request that cannot succeed.
-        if ('video' === $mediaType && !$inlineReferenceImage && [] !== $attachedImagePaths && [] === $imageUrlsInText && !$this->uploadStore->isPublicBaseUrlReachable()) {
-            $base = rtrim($this->publicBaseUrl, '/');
-            $this->logger->warning('MediaGenerationHandler: image-to-video blocked — APP_URL is not internet-reachable so the provider cannot fetch the source image', [
-                'app_url' => $base,
-                'provider' => $provider,
-                'model' => $modelName,
-            ]);
-
-            $lang = $classification['language'] ?? 'en';
-            $guardMessage = 'de' === $lang
-                ? sprintf('Für Bild-zu-Video muss dein Bild über eine öffentliche URL an den Anbieter gesendet werden. Die öffentliche Adresse dieses Servers (APP_URL = „%s") ist jedoch ein lokaler/privater Host, den der Anbieter nicht erreichen kann. Setze APP_URL auf eine über das Internet erreichbare URL (z. B. einen Tunnel) oder verwende ein Text-zu-Video-Modell ohne angehängtes Bild.', $base)
-                : sprintf('Image-to-video has to send your image to the provider from a public URL, but this server\'s public address (APP_URL = "%s") is a local/private host the provider can\'t reach. Set APP_URL to an internet-reachable URL (e.g. a tunnel), or use a text-to-video model without an attached image.', $base);
-            $streamCallback($guardMessage);
-
-            return [
-                'metadata' => [
-                    'error' => 'i2v_requires_public_app_url',
-                    'provider' => $provider,
-                    'model' => $modelName,
-                ],
-            ];
-        }
-
-        // Send detailed status update with provider and media type
-        $providerName = ucfirst($provider);
-        $mediaTypeLabel = match ($mediaType) {
-            'video' => 'video',
-            'audio' => 'audio',
-            default => 'image',
-        };
-
-        $statusMessage = "AI is crafting your $mediaTypeLabel with $providerName $modelName";
-        // Structured fields let the client narrate this in the user's language
-        // ("Generating your image with …") instead of echoing the English text.
-        ProgressCallback::notify($progressCallback, 'generating', $statusMessage, [
-            'provider' => $provider,
-            'model_name' => $modelName,
-            'media_type' => $mediaTypeLabel,
-            'stage' => 'request_sent',
-        ]);
-
-        // Check rate limit for media type BEFORE generating (IMAGES, VIDEOS, AUDIOS)
-        $mediaAction = match ($mediaType) {
-            'image' => 'IMAGES',
-            'video' => 'VIDEOS',
-            'audio' => 'AUDIOS',
-            default => 'IMAGES',
-        };
-
-        $userId = $message->getUserId();
-        $user = $this->em->getRepository(User::class)->find($userId);
-
-        if ($user) {
-            $rateLimitCheck = $this->rateLimitService->checkLimit($user, $mediaAction);
-            if (!$rateLimitCheck['allowed']) {
-                $errorMessage = "Rate limit exceeded for {$mediaAction}. Used: {$rateLimitCheck['used']}/{$rateLimitCheck['limit']}";
-                $this->logger->warning('MediaGenerationHandler: Rate limit exceeded', [
-                    'user_id' => $userId,
-                    'action' => $mediaAction,
-                    'used' => $rateLimitCheck['used'],
-                    'limit' => $rateLimitCheck['limit'],
-                ]);
-
-                $streamCallback($errorMessage);
-
-                return [
-                    'metadata' => [
-                        'error' => 'rate_limit_exceeded',
-                        'action' => $mediaAction,
-                        'used' => $rateLimitCheck['used'],
-                        'limit' => $rateLimitCheck['limit'],
-                    ],
-                ];
-            }
-
-            // Cost-budget backstop: media spend (incl. the +markup) counts toward
-            // the user's monthly budget. Primary enforcement is at the chat entry
-            // (StreamController); this also covers worker/multitask media paths.
-            if ($this->premiumFeatureGate->isCostBudgetEnforced()) {
-                $budgetCheck = $this->rateLimitService->checkCostBudget($user);
-                if (!$budgetCheck['allowed']) {
-                    $lang = $classification['language'] ?? 'en';
-                    $budgetMessage = 'de' === $lang
-                        ? 'Dein monatliches Nutzungsbudget ist aufgebraucht. Du kannst zusätzliches Guthaben in 100-EUR-Schritten aufladen, um weiterzumachen.'
-                        : 'Your monthly usage budget is used up. You can top up in EUR 100 steps to keep generating.';
-                    $streamCallback($budgetMessage);
-
-                    return [
-                        'metadata' => [
-                            'error' => 'cost_budget_exceeded',
-                            'code' => 'COST_BUDGET_EXCEEDED',
-                            'limit_type' => 'monthly',
-                            'budget' => $budgetCheck['budget'],
-                            'used' => $budgetCheck['used_cost'],
-                            'remaining' => $budgetCheck['remaining'],
-                            'topup_available' => true,
-                        ],
-                    ];
-                }
-            }
-        }
+        $inlineReferenceImage = 'video' === $mediaType && $this->aiFacade->supportsInlineReferenceImage($provider);
 
         // Holds the provider result once generation succeeds. Initialised here so
         // the ProviderCancelledException catch can safely inspect it (issue #1146
@@ -915,120 +738,21 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
     }
 
     /**
-     * Route a misclassified "audio" turn to the general chat answer.
-     *
-     * The mediamaker classification (topic, BMEDIA, model override, the
-     * pre-resolved mediamaker prompt bundle) is replaced by a plain `general`
-     * chat classification so the reply is written by the chat model with the
-     * user's default prompt — the answer the sorter should have produced.
-     *
-     * @param array<string, mixed> $classification
-     * @param array<string, mixed> $options
-     *
-     * @return array<string, mixed>
+     * The status the client narrates in the user's language ("Generating your
+     * image with …"), sent before the limits are checked.
      */
-    private function answerAsChatInstead(
-        Message $message,
-        array $thread,
-        array $classification,
-        callable $streamCallback,
-        ?callable $progressCallback,
-        array $options,
-        string $rejectedScript,
-    ): array {
-        $this->logger->warning('MediaGenerationHandler: audio script only repeats the user request, answering as chat instead', [
-            'message_id' => $message->getId(),
-            'topic' => $classification['topic'] ?? null,
-            'script_preview' => mb_substr($rejectedScript, 0, 120),
+    private function announce(MediaTurnRequest $request, ?callable $progressCallback): void
+    {
+        $provider = (string) $request->model->provider;
+        $providerName = ucfirst($provider);
+        $modelName = $request->model->name;
+        $mediaTypeLabel = $request->mediaTypeLabel();
+        ProgressCallback::notify($progressCallback, 'generating', "AI is crafting your $mediaTypeLabel with $providerName $modelName", [
+            'provider' => $provider,
+            'model_name' => $modelName,
+            'media_type' => $mediaTypeLabel,
+            'stage' => 'request_sent',
         ]);
-
-        if (null === $this->chatHandler) {
-            $lang = $classification['language'] ?? 'en';
-            $streamCallback('de' === $lang
-                ? 'Ich habe in deiner Nachricht keinen Text gefunden, den ich vorlesen könnte. Formuliere die Anfrage bitte als normale Frage, oder gib den Text an, den ich sprechen soll (z. B. „Lies vor: …“).'
-                : 'I could not find any text in your message to read aloud. Please ask the question as a normal chat message, or tell me the exact text to speak (e.g. "Read aloud: …").');
-
-            // No `media_type` here on purpose: StreamController bills any
-            // response carrying one as generated media, and nothing was made.
-            return [
-                'metadata' => [
-                    'error' => 'tts_script_echoes_request',
-                ],
-            ];
-        }
-
-        $chatClassification = $classification;
-        $chatClassification['topic'] = 'general';
-        $chatClassification['intent'] = 'chat';
-        $chatClassification['rerouted_from'] = self::REROUTED_FROM_AUDIO;
-        unset(
-            $chatClassification['media_type'],
-            $chatClassification['input_mode'],
-            $chatClassification['duration'],
-            $chatClassification['resolution'],
-            $chatClassification['model_id'],
-            $chatClassification['prompt_metadata'],
-        );
-
-        $chatOptions = $options;
-        unset($chatOptions['resolved_prompt_data']);
-
-        ProgressCallback::notify($progressCallback, 'analyzing', 'Answering your request…');
-
-        $result = $this->chatHandler->handleStream($message, $thread, $chatClassification, $streamCallback, $progressCallback, $chatOptions);
-        $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];
-        $metadata['rerouted_from'] = self::REROUTED_FROM_AUDIO;
-        // MessageProcessor folds this into the classification it hands back,
-        // so the persisted topic / media meta and the voice-reply guard see
-        // the chat answer that was actually produced, not the audio vote.
-        $metadata[MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY] = [
-            'topic' => 'general',
-            'intent' => 'chat',
-            'media_type' => null,
-            'rerouted_from' => self::REROUTED_FROM_AUDIO,
-        ];
-        $result['metadata'] = $metadata;
-
-        return $result;
-    }
-
-    /**
-     * Queue the memory job for the user's prompt, gated like a chat turn
-     * (incognito, widget / `disable_memories`, the user's own setting, the
-     * PERF.V2_PIPELINE switch). A media turn's answer is the asset itself, so
-     * the extractor gets an empty answer and reads the user turns only.
-     */
-    private function maybeDispatchMemoryExtraction(
-        Message $message,
-        array $thread,
-        array $classification,
-        array $options,
-    ): void {
-        if ('' === trim($message->getText())) {
-            return;
-        }
-
-        $incognito = !empty($options['incognito']);
-        $disabledByRequest = !empty($options['disable_memories'])
-            || ('WIDGET' === ($options['channel'] ?? null))
-            || ('widget' === ($classification['source'] ?? null))
-            || !empty($classification['is_widget_mode']);
-
-        $disabledByUser = false;
-        if (!$incognito && !$disabledByRequest) {
-            $user = $this->em->getRepository(User::class)->find($message->getUserId());
-            $disabledByUser = !$user || !$user->isMemoriesEnabled();
-        }
-
-        $this->pendingMemoryExtraction->dispatch($this->pendingMemoryExtraction->build(
-            $message,
-            '',
-            $thread,
-            [],
-            $disabledByRequest,
-            $disabledByUser,
-            incognito: $incognito,
-        ));
     }
 
     /**
