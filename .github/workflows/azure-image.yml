@@ -1,0 +1,357 @@
+name: Azure Marketplace image
+
+# Builds the image that Azure Marketplace publishes, for both architectures, and
+# puts it into the Azure Compute Gallery that Partner Center ingests from.
+#
+# Not part of CI: it costs VM hours and it may only ever bake a release whose
+# container images are already published and verified. Release tags therefore
+# trigger it, and it waits for the images to exist before Packer starts. Run it
+# by hand to rebuild an older release, or to try a change without tagging.
+#
+# Authentication is GitHub OIDC against an app registration in the publishing
+# tenant. There are no long-lived Azure credentials in this repository, and there
+# must never be.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Released version to bake in, without a leading v (for example 4.0.16).'
+        required: true
+        type: string
+      architecture:
+        description: 'Which image to build.'
+        required: true
+        default: both
+        type: choice
+        options: [both, x86_64, arm64]
+      verify:
+        description: 'Deploy the x86_64 image through the ARM template and smoke-test it. Costs a few cents of VM time.'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Where the build VM runs and where the gallery lives. Which regions a customer
+  # can deploy in is decided by the replication list in the Packer template.
+  AZURE_LOCATION: westeurope
+  GALLERY_RESOURCE_GROUP: synaplan-images
+  GALLERY_NAME: synaplan
+  IMAGE_REPOSITORY: ghcr.io/metadist/synaplan
+
+jobs:
+  resolve:
+    name: Resolve the release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      matrix: ${{ steps.version.outputs.matrix }}
+      configured: ${{ steps.credentials.outputs.configured }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Resolve version and architectures
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_ARCHITECTURE: ${{ inputs.architecture || 'both' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="${INPUT_VERSION#v}"
+          fi
+
+          # A gallery image version is immutable once published and customers
+          # deploy it for years, so it may only ever bake an immutable tag.
+          # `latest` here would produce an image whose contents nobody can
+          # reconstruct. A gallery version is also plain major.minor.patch, so a
+          # pre-release tag has no valid version to publish under either.
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::notice::${GITHUB_REF_NAME} is not a plain release; no Azure image is built."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            echo 'matrix=[]' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          case "$INPUT_ARCHITECTURE" in
+            x86_64) matrix='["x86_64"]' ;;
+            arm64)  matrix='["arm64"]' ;;
+            *)      matrix='["x86_64","arm64"]' ;;
+          esac
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+          echo "Building the Azure image for ${version} (${matrix})." >> "$GITHUB_STEP_SUMMARY"
+
+      # The publishing tenant is the manager's to create, and until it exists
+      # this workflow has nothing to authenticate against. Reported as skipped
+      # rather than failed, so a release run stays green while the account is
+      # pending.
+      - name: Check the Azure credentials
+        id: credentials
+        env:
+          CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          if [ -n "${CLIENT_ID:-}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No \`AZURE_CLIENT_ID\` secret; the Azure image build is skipped." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Packer bakes these images into the marketplace image. A release tag
+      # reaches this workflow the moment it is pushed, while CI is still building
+      # and pushing them, so waiting is the difference between a correct image
+      # and a failed — or worse, a stale — build.
+      - name: Wait for the published container images
+        if: steps.version.outputs.version != '' && steps.credentials.outputs.configured == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if docker manifest inspect "${IMAGE_REPOSITORY}:${VERSION}" >/dev/null 2>&1; then
+              echo "${IMAGE_REPOSITORY}:${VERSION} is published."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: ${IMAGE_REPOSITORY}:${VERSION} is not published yet; waiting."
+            sleep 60
+          done
+          echo "::error::${IMAGE_REPOSITORY}:${VERSION} was never published; refusing to bake an image without it."
+          exit 1
+
+  build:
+    name: Build the image (${{ matrix.architecture }})
+    runs-on: ubuntu-latest
+    needs: [resolve]
+    if: needs.resolve.outputs.version != '' && needs.resolve.outputs.configured == 'true'
+    permissions:
+      contents: read
+      # Required for the OIDC token that the app registration's federated
+      # credential trusts. This is what replaces a stored client secret.
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: ${{ fromJSON(needs.resolve.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Sign in to Azure
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3
+        with:
+          version: 1.16.0
+
+      - name: Build
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          packer init deploy/azure/packer/synaplan.pkr.hcl
+          packer build \
+            -var "synaplan_version=${VERSION}" \
+            -var "architecture=${ARCHITECTURE}" \
+            -var "location=${AZURE_LOCATION}" \
+            -var "gallery_resource_group=${GALLERY_RESOURCE_GROUP}" \
+            -var "gallery_name=${GALLERY_NAME}" \
+            deploy/azure/packer/synaplan.pkr.hcl
+
+      - name: Report the gallery version
+        id: image
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          definition="$(jq -r '.builds[-1].custom_data.gallery_image_name' packer-manifest.json)"
+          [ -n "$definition" ] && [ "$definition" != null ] || {
+            echo "::error::The build produced no gallery image name"
+            exit 1
+          }
+          image_id="$(az sig image-version show \
+            --resource-group "$GALLERY_RESOURCE_GROUP" \
+            --gallery-name "$GALLERY_NAME" \
+            --gallery-image-definition "$definition" \
+            --gallery-image-version "$VERSION" \
+            --query id --output tsv)"
+          echo "image-id=${image_id}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Synaplan ${VERSION} — ${ARCHITECTURE}"
+            echo ""
+            echo "Gallery version: \`${image_id}\`"
+            echo ""
+            echo "Next: add the version to the offer's plan in Partner Center and let"
+            echo "certification run, then verify a deployment from"
+            echo "\`deploy/azure/arm/mainTemplate.json\` before submitting."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the build manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: azure-packer-manifest-${{ matrix.architecture }}
+          path: packer-manifest.json
+          retention-days: 30
+
+  verify:
+    name: Deploy and smoke-test the image
+    runs-on: ubuntu-latest
+    needs: [resolve, build]
+    # Only the x86_64 image is deployed. The two images come out of the same
+    # provisioner on the same base OS, so a second deployment would re-test the
+    # scripts rather than the architecture, for a second VM-hour.
+    if: >-
+      needs.resolve.outputs.version != '' &&
+      contains(fromJSON(needs.resolve.outputs.matrix), 'x86_64') &&
+      inputs.verify != false
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      RESOURCE_GROUP: synaplan-verify-${{ github.run_id }}
+      VM_NAME: synaplan
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Sign in to Azure
+        uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve the gallery version
+        id: image
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          image_id="$(az sig image-version show \
+            --resource-group "$GALLERY_RESOURCE_GROUP" \
+            --gallery-name "$GALLERY_NAME" \
+            --gallery-image-definition synaplan-x64 \
+            --gallery-image-version "$VERSION" \
+            --query id --output tsv)"
+          echo "image-id=${image_id}" >> "$GITHUB_OUTPUT"
+
+      # The same template a Marketplace buyer deploys, with the same defaults
+      # except the two that only cost money here: the smallest allowed data disk
+      # and no backup vault. Testing the image without the template would leave
+      # the delivery path — managed identity, tags, network security group, data
+      # disk — untested, and that is where a deployment actually breaks.
+      - name: Deploy the template
+        id: deployment
+        env:
+          IMAGE_ID: ${{ steps.image.outputs.image-id }}
+        run: |
+          set -euo pipefail
+          az group create --name "$RESOURCE_GROUP" --location "$AZURE_LOCATION" --output none
+
+          # A throwaway key pair: the template requires one, and nothing in this
+          # job connects over SSH. The private half never leaves the runner.
+          ssh-keygen -t ed25519 -N '' -C synaplan-verify -f "$RUNNER_TEMP/verify" >/dev/null
+
+          az deployment group create \
+            --resource-group "$RESOURCE_GROUP" \
+            --name verify \
+            --template-file deploy/azure/arm/mainTemplate.json \
+            --parameters \
+              vmName="$VM_NAME" \
+              imageResourceId="$IMAGE_ID" \
+              sshPublicKey="$(cat "$RUNNER_TEMP/verify.pub")" \
+              dataDiskSizeGb=20 \
+              enableDailyBackup=false \
+              adminEmail=verify@example.com \
+            --output none
+
+          web_url="$(az deployment group show \
+            --resource-group "$RESOURCE_GROUP" --name verify \
+            --query properties.outputs.webUrl.value --output tsv)"
+          echo "web-url=${web_url}" >> "$GITHUB_OUTPUT"
+
+      # firstboot.sh generates the configuration, starts the stack and waits for
+      # it to be healthy before it enables the service, so the VM is reachable
+      # well after the deployment reports success.
+      - name: Wait for the web interface
+        env:
+          WEB_URL: ${{ steps.deployment.outputs.web-url }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            # -k: without a domain the VM serves the self-signed certificate,
+            # which is the configuration under test.
+            if curl -ksSf --max-time 10 "${WEB_URL}/api/health" >/dev/null; then
+              echo "The VM answers on ${WEB_URL}/api/health."
+              exit 0
+            fi
+            echo "Attempt ${attempt}: no answer yet."
+            sleep 15
+          done
+          echo "::error::${WEB_URL} never became healthy."
+          exit 1
+
+      # The same smoke test a self-hosted installation runs, executed on the VM
+      # through Run Command — which also proves the shell path the Usage
+      # Instructions promise, with no SSH key and no open port 22.
+      - name: Run the smoke test on the VM
+        run: |
+          set -euo pipefail
+          output="$(az vm run-command invoke \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$VM_NAME" \
+            --command-id RunShellScript \
+            --scripts '/usr/local/bin/synaplan-smoke-test' \
+            --query 'value[].message' --output tsv)"
+          printf '%s\n' "$output"
+
+          # Run Command reports success for the invocation, not for the script,
+          # so the exit status has to be read out of the message it returns.
+          grep -Fq 'exit code: 0' <<<"$output" || {
+            echo "::error::The smoke test on ${VM_NAME} did not succeed."
+            exit 1
+          }
+
+      - name: Show why the deployment failed
+        if: failure()
+        run: |
+          az deployment operation group list \
+            --resource-group "$RESOURCE_GROUP" --name verify \
+            --query "[?properties.provisioningState!='Succeeded'].{resource:properties.targetResource.resourceName,state:properties.provisioningState,message:properties.statusMessage}" \
+            --output json || true
+          az vm boot-diagnostics get-boot-log \
+            --resource-group "$RESOURCE_GROUP" --name "$VM_NAME" || true
+
+      # Unconditional, including after a cancelled run: what is left behind here
+      # is a running VM that bills by the hour. Deleting the whole resource group
+      # takes the disks, the public IP, the Key Vault and the network with it,
+      # and a verification run has nothing worth keeping.
+      - name: Delete the resource group
+        if: always()
+        run: az group delete --name "$RESOURCE_GROUP" --yes --no-wait || true

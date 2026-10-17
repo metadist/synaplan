@@ -2,8 +2,8 @@
 
 // Writes a published release version into the files that decide which version a
 // NEW deployment installs: the Elestio manifest, the self-hosting example
-// configuration, the Umbrel App Store package, the AWS Packer build, and the
-// one-file quickstart compose.
+// configuration, the Umbrel App Store package, the AWS and Azure Packer
+// builds, and the one-file quickstart compose.
 //
 // Existing deployments are untouched by design. They keep the version their
 // operator pinned, and change it only by following docs/UPDATE_ELESTIO.md,
@@ -223,12 +223,18 @@ export const readUmbrelComposePin = (text) => {
   }
 }
 
-// The AMI carries its release in the Packer default, which is what a build with
-// no arguments bakes in — and what firstboot.sh then pins deploy/.env to. Only
-// the `synaplan_version` variable block: `default` appears in every other
-// variable in the file, so matching it alone would rewrite whichever one comes
-// first.
-export const applyPackerVersion = (text, version) => {
+// A marketplace image carries its release in the Packer default, which is what a
+// build with no arguments bakes in — and what firstboot.sh then pins deploy/.env
+// to. Only the `synaplan_version` variable block: `default` appears in every
+// other variable in the file, so matching it alone would rewrite whichever one
+// comes first.
+//
+// `label` only names the file in the error, so AWS and Azure can share this.
+export const applyPackerVersion = (
+  text,
+  version,
+  label = 'deploy/aws/packer/synaplan.pkr.hcl'
+) => {
   const lines = text.split('\n')
   let inVersionBlock = false
   let replaced = 0
@@ -255,7 +261,7 @@ export const applyPackerVersion = (text, version) => {
 
   if (replaced !== 1) {
     throw new Error(
-      `deploy/aws/packer/synaplan.pkr.hcl: expected exactly one synaplan_version default, found ${replaced}`
+      `${label}: expected exactly one synaplan_version default, found ${replaced}`
     )
   }
 
@@ -345,7 +351,13 @@ const TARGETS = [
   },
   {
     path: join('deploy', 'aws', 'packer', 'synaplan.pkr.hcl'),
-    apply: (text, version) => applyPackerVersion(text, version),
+    apply: (text, version) =>
+      applyPackerVersion(text, version, 'deploy/aws/packer/synaplan.pkr.hcl'),
+  },
+  {
+    path: join('deploy', 'azure', 'packer', 'synaplan.pkr.hcl'),
+    apply: (text, version) =>
+      applyPackerVersion(text, version, 'deploy/azure/packer/synaplan.pkr.hcl'),
   },
   {
     path: join('deploy', 'quickstart', 'compose.yaml'),

@@ -353,6 +353,9 @@ test('the shipped files name one and the same released version', () => {
   const packer = readPackerVersion(
     readFileSync(join(ROOT, 'deploy', 'aws', 'packer', 'synaplan.pkr.hcl'), 'utf8')
   )
+  const azurePacker = readPackerVersion(
+    readFileSync(join(ROOT, 'deploy', 'azure', 'packer', 'synaplan.pkr.hcl'), 'utf8')
+  )
   const quickstart = readQuickstartComposeVersion(
     readFileSync(join(ROOT, 'deploy', 'quickstart', 'compose.yaml'), 'utf8')
   )
@@ -393,12 +396,18 @@ test('the shipped files name one and the same released version', () => {
     packer,
     `the AWS Packer build must bake a released version, found ${JSON.stringify(packer)}`
   )
+  assert.equal(
+    parseReleaseVersion(azurePacker),
+    azurePacker,
+    `the Azure Packer build must bake a released version, found ${JSON.stringify(azurePacker)}`
+  )
 
   assert.equal(elestio, example, 'Elestio and self-host must install the same version')
   assert.equal(elestio, umbrelApp, 'Umbrel store version must match Elestio')
   assert.equal(elestio, umbrelCompose.appVersion, 'Umbrel APP_VERSION must match Elestio')
   assert.equal(elestio, umbrelCompose.version, 'Umbrel image tag must match Elestio')
   assert.equal(elestio, packer, 'The AWS AMI must bake the same version as Elestio')
+  assert.equal(elestio, azurePacker, 'The Azure image must bake the same version as Elestio')
   assert.equal(elestio, quickstart.image, 'The quickstart image default must match Elestio')
   assert.equal(elestio, quickstart.appVersion, 'The quickstart APP_VERSION must match Elestio')
 })

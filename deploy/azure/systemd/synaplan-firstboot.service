@@ -1,0 +1,27 @@
+[Unit]
+Description=Synaplan first-boot setup (data disk, configuration, TLS)
+Documentation=https://github.com/metadist/synaplan/blob/main/deploy/azure/README.md
+# The script reads instance metadata and may write to Key Vault, so it needs the
+# network; it also mounts the data disk every other unit uses.
+#
+# It must NOT order itself after cloud-init.target: that target sits after
+# multi-user.target, while this unit's WantedBy pulls it before it — a cycle
+# systemd resolves by silently never starting this unit, Caddy or the stack.
+# User data and tags come straight from IMDS as soon as the network is up.
+After=network-online.target walinuxagent.service docker.service
+Wants=network-online.target
+Requires=docker.service
+Before=synaplan.service caddy.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/synaplan/deploy/azure/scripts/firstboot.sh
+# Long enough for a cold data disk and the first `compose config`, short enough
+# that a hung boot is visible rather than silent.
+TimeoutStartSec=900
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
