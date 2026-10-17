@@ -30,7 +30,7 @@ final class OpenAIFixtures
      */
     public static function responseArray(array $output, array $override = []): array
     {
-        return CreateResponse::fake(['id' => 'resp_1', 'output' => $output, 'tools' => [], 'usage' => self::USAGE] + $override, null, OverrideStrategy::Replace)->toArray();
+        return CreateResponse::fake(array_replace(['id' => 'resp_1', 'output' => $output, 'tools' => [], 'usage' => self::USAGE], $override), null, OverrideStrategy::Replace)->toArray();
     }
 
     /**

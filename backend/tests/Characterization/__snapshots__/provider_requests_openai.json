@@ -427,7 +427,7 @@
     "chat.stored_structured_previous_response": {
         "result": {
             "content": "{\"topic\":\"weather\"}",
-            "response_id": "resp_1",
+            "response_id": "resp_stored_1",
             "usage": {
                 "cache_creation_tokens": 0,
                 "cached_tokens": 4,
