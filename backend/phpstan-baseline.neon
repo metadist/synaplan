@@ -79,12 +79,6 @@ parameters:
 			path: src/AI/Provider/AnthropicProvider.php
 
 		-
-			message: '#^Strict comparison using \=\=\= between false and string will always evaluate to false\.$#'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: src/AI/Provider/GoogleProvider.php
-
-		-
 			message: '#^Offset ''model'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 2
