@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Message;
 
 use App\Entity\Message;
+use App\Entity\Prompt;
+use App\Service\Agent\AgentConfig;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Exception\UnmappedIntentException;
 use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
+use App\Service\Message\Processing\TurnClassificationResolver;
 use App\Service\Message\Routing\RoutingDirective;
+use App\Service\ModelConfigService;
+use App\Service\Prompt\PromptService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final class InferenceRouterTest extends TestCase
 {
@@ -37,6 +43,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $result = $router->route(
@@ -63,6 +70,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $router->route(
@@ -94,6 +102,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $result = $router->route(
@@ -120,6 +129,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -147,6 +157,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -170,6 +181,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $this->expectException(UnmappedIntentException::class);
@@ -197,6 +209,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $this->expectException(UnmappedIntentException::class);
@@ -221,6 +234,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $result = $router->route(
@@ -247,6 +261,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $router->route(
@@ -266,6 +281,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $this->expectException(UnmappedIntentException::class);
@@ -311,6 +327,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $result = $router->route(
@@ -343,6 +360,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $classifier,
+            $this->resolver(),
         );
 
         $result = $router->route(
@@ -384,6 +402,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $classifier,
+            $this->resolver(),
         );
 
         $router->route(
@@ -414,6 +433,7 @@ final class InferenceRouterTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(MessageClassifier::class),
+            $this->resolver(),
         );
 
         $result = $router->routeStream(
@@ -424,6 +444,136 @@ final class InferenceRouterTest extends TestCase
         );
 
         self::assertSame('document', $result['content']);
+    }
+
+    public function testAStreamedHandOffAnswersWithThePromptOfTheTopicItLandsOn(): void
+    {
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->method('handleStream')
+            ->willReturn(RoutingDirective::handoff('mediamaker', ['media_type' => 'image'])->toHandlerResult());
+
+        $received = null;
+        $imageHandler = $this->createHandlerMock('image_generation');
+        $imageHandler->method('handleStream')->willReturnCallback(
+            static function (Message $m, array $t, array $classification, callable $s, ?callable $p, array $options) use (&$received): array {
+                $received = [$classification, $options];
+
+                return ['content' => 'image', 'metadata' => []];
+            }
+        );
+
+        $router = new InferenceRouter(
+            [$chatHandler, $imageHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+            $this->resolver(['mediamaker' => ['tool_internet' => false]]),
+        );
+
+        // The general prompt pins a chat model; the image must not be generated with it.
+        $router->routeStream(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'chat', 'topic' => 'general', 'language' => 'en', 'defer_routing_to_chat' => true, 'prompt_metadata' => ['aiModel' => 12]],
+            static function (): void {},
+            null,
+            ['resolved_prompt_data' => self::promptData('general', ['aiModel' => 12])],
+        );
+
+        self::assertIsArray($received);
+        [$classification, $options] = $received;
+        self::assertSame(['tool_internet' => false], $classification['prompt_metadata']);
+        self::assertSame('mediamaker', $options['resolved_prompt_data']['prompt']->getTopic());
+    }
+
+    public function testThePlannersFileFallbackAnswersWithTheFileAnalysisPrompt(): void
+    {
+        $received = null;
+        $fileHandler = $this->createHandlerMock('file_analysis');
+        $fileHandler->method('handle')->willReturnCallback(
+            static function (Message $m, array $t, array $classification) use (&$received): array {
+                $received = $classification;
+
+                return ['content' => 'analysis', 'metadata' => []];
+            }
+        );
+
+        $router = new InferenceRouter(
+            [$fileHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+            $this->resolver(['analyzefile' => ['aiModel' => 0]]),
+        );
+
+        $router->route(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'file_analysis', 'topic' => 'analyzefile', 'language' => 'en', 'prompt_metadata' => ['aiModel' => 12]],
+            null,
+            ['resolved_prompt_data' => self::promptData('general', ['aiModel' => 12])],
+        );
+
+        self::assertSame(['aiModel' => 0], $received['prompt_metadata'] ?? null);
+    }
+
+    public function testATurnOnTheTopicItsPromptWasResolvedForKeepsThatPrompt(): void
+    {
+        $prompts = $this->createMock(PromptService::class);
+        $prompts->expects(self::never())->method('getPromptWithMetadata');
+
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->expects(self::once())
+            ->method('handle')
+            ->with(self::anything(), self::anything(), self::callback(static fn (array $classification): bool => ['aiModel' => 12] === $classification['prompt_metadata']))
+            ->willReturn(['content' => 'ok', 'metadata' => []]);
+
+        $router = new InferenceRouter(
+            [$chatHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+            new TurnClassificationResolver($this->createStub(MessageClassifier::class), $this->createStub(ModelConfigService::class), $this->createStub(AgentConfig::class), $prompts, new NullLogger()),
+        );
+
+        $router->route(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'chat', 'topic' => 'general', 'prompt_metadata' => ['aiModel' => 12]],
+            null,
+            ['resolved_prompt_data' => self::promptData('general', ['aiModel' => 12])],
+        );
+    }
+
+    /**
+     * A resolver whose prompt lookup knows the given topics' metadata.
+     *
+     * @param array<string, array<string, mixed>> $metadataByTopic
+     */
+    private function resolver(array $metadataByTopic = []): TurnClassificationResolver
+    {
+        $prompts = $this->createStub(PromptService::class);
+        $prompts->method('getPromptWithMetadata')->willReturnCallback(
+            static fn (string $topic): ?array => isset($metadataByTopic[$topic]) ? self::promptData($topic, $metadataByTopic[$topic]) : null
+        );
+
+        return new TurnClassificationResolver(
+            $this->createStub(MessageClassifier::class),
+            $this->createStub(ModelConfigService::class),
+            $this->createStub(AgentConfig::class),
+            $prompts,
+            new NullLogger(),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     *
+     * @return array{prompt: Prompt, metadata: array<string, mixed>}
+     */
+    private static function promptData(string $topic, array $metadata): array
+    {
+        return ['prompt' => (new Prompt())->setTopic($topic), 'metadata' => $metadata];
     }
 
     private function createHandlerMock(string $name): MessageHandlerInterface&MockObject
