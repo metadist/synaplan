@@ -18,8 +18,9 @@ use Psr\Http\Message\ResponseInterface;
  *
  * It answers with the queued responses in order and records every request
  * the SDK sends: method, URL, headers (the key and the multipart boundary
- * masked, Guzzle's own User-Agent left out) and the body decoded, a
- * multipart body as its fields and a file as its name, size and hash. A
+ * masked, Guzzle's own User-Agent left out) and the body decoded and
+ * hashed, a multipart body as its fields and a file as its name, size and
+ * hash. A
  * request beyond the queue, or a queued response nobody asked for, fails the
  * test.
  */
@@ -94,6 +95,7 @@ final class OpenAISdkRecorder
                 \is_array($decoded) => $decoded,
                 default => $this->mask($body),
             },
+            'body_sha1' => '' === $body || str_starts_with($type, 'multipart/form-data') ? null : sha1($body),
         ], static fn (mixed $value): bool => null !== $value);
     }
 
