@@ -73,3 +73,27 @@ a newly mapped type must not slip past it.
 ## 7. Not in S8
 
 Content sniffing; the upload allow-lists.
+
+## 8. As delivered (2026-10-17)
+
+One map: `FileHelper::getExtensionFromMimeType()` holds the union of both
+(D3) and ignores a type's parameters; WhatsApp's private copy is gone, and
+`rg getExtensionFromMimeType backend/src` shows the owner and six calls
+in four classes. The branch starts from S7's head (`4da3c52c4`). Where the result
+differs from the plan:
+
+- **The callers moved before the sprint.** `MediaGenerationHandler`'s two
+  calls are in `MediaUploadStore` since S5, and WhatsApp's copy sat in the
+  transport `WhatsAppService` keeps since S4c. The regression test for a
+  generated `audio/mp4` runs through the store's data-URL path.
+- **Twenty-nine rows, not three.** Every type the map knows is tested with
+  and without a parameter, so dropping the stripping fails all 28
+  parameter rows and the voice-note test.
+- **What changed for WhatsApp.** Media sent as `image/jpg` or `audio/mp3`
+  is accepted like `image/jpeg` and `audio/mpeg`, whose extensions its
+  allow-list already holds. `image/heic` and `image/heif` are still
+  refused, now logged as `heic` instead of `unknown`.
+- **Carried, not changed.** Matching stays case-sensitive: RFC 2045 calls
+  MIME types case-insensitive, but neither map ever lowercased a type, and
+  D3 does not ask for it. A provider that sends `Audio/OGG` still gets the
+  caller's fallback.

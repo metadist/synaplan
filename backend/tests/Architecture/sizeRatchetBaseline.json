@@ -63,7 +63,7 @@
         "src/Service/Research/UrlContentService.php": 1258,
         "src/Service/Usage/UsageStatsService.php": 960,
         "src/Service/VectorSearch/QdrantClientDirect.php": 2000,
-        "src/Service/WhatsApp/WhatsAppService.php": 1135,
+        "src/Service/WhatsApp/WhatsAppService.php": 1095,
         "src/Service/Widget/WidgetSetupService.php": 1000,
         "src/Service/Widget/WidgetSummaryService.php": 836
     },
