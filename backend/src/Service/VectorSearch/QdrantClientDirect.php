@@ -170,13 +170,7 @@ final class QdrantClientDirect implements QdrantClientInterface
         $collection = $this->resolveMemoriesCollection($namespace);
 
         try {
-            // Scroll by payload filter on `_point_id` — works regardless of
-            // whether the underlying Qdrant primary ID is the derived UUIDv5
-            // (current scheme) or a legacy integer from the pre-v2.4.0 Rust
-            // microservice. HTTP 404 from this endpoint means the *collection*
-            // is missing (verified against Qdrant 1.x), which is an
-            // infrastructure problem rather than a missing memory, so we let
-            // the underlying \RuntimeException propagate for 503 mapping.
+            // Scroll by `_point_id` (legacy integer ids and current UUIDs). A 404 means the collection is missing and still throws.
             $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/scroll", [
                 'filter' => QdrantPointId::payloadFilterFor($pointId),
                 'limit' => 1,
@@ -305,9 +299,7 @@ final class QdrantClientDirect implements QdrantClientInterface
                 'with_vector' => false,
             ]);
 
-            // Dedup by `_point_id` — see searchMemories() for why this is
-            // needed until the legacy-point migration has run. First-seen
-            // wins; scrolls don't return a score to discriminate on.
+            // Dedup by `_point_id` (see searchMemories()); first-seen wins.
             $memoriesByLogical = [];
             foreach ($response['result']['points'] ?? [] as $point) {
                 $logical = $point['payload']['_point_id'] ?? (string) $point['id'];
@@ -321,6 +313,11 @@ final class QdrantClientDirect implements QdrantClientInterface
 
             return array_values($memoriesByLogical);
         } catch (\Throwable $e) {
+            if ($this->isMissingCollectionError($e)) {
+                $this->logger->notice('Memories not yet created', ['collection' => $collection]);
+
+                return [];
+            }
             $this->logger->error('Failed to scroll memories in Qdrant', [
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
@@ -345,8 +342,6 @@ final class QdrantClientDirect implements QdrantClientInterface
             do {
                 $remaining = $limit - count($memoriesByLogical);
                 $request = [
-                    // Only filter on `active`; system-wide maintenance must
-                    // walk every user's memories.
                     'filter' => [
                         'must' => [
                             ['key' => 'active', 'match' => ['value' => true]],
@@ -376,6 +371,11 @@ final class QdrantClientDirect implements QdrantClientInterface
 
             return array_values($memoriesByLogical);
         } catch (\Throwable $e) {
+            if ($this->isMissingCollectionError($e)) {
+                $this->logger->notice('Memories not yet created', ['collection' => $collection]);
+
+                return [];
+            }
             $this->logger->error('Failed to scroll all memories for reindex', [
                 'error' => $e->getMessage(),
             ]);
