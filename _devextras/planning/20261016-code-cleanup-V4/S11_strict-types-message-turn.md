@@ -72,3 +72,27 @@ loudly at the entry, not become `0`.
 
 Classification and prompt metadata as value objects across every handler
 (V5). Strict types outside the message turn.
+
+## 9. As delivered (2026-10-17)
+
+S11 starts from S10b's head (`63bbf907b`). Where it differs from the
+plan:
+
+- **The scratch run listed one TypeError.** With the eight caller-type
+  cases in the turn snapshot (model ids, the Saved Task id and RAG
+  options as strings, prompt flags as '0' / '1', the unknown language),
+  strict types failed in exactly one place: a prompt's `tool_internet`
+  flag as a string reaching `WebSearchTopicPolicy::shouldSearch()`'s
+  `?bool`. V3's tracking id is already cast where the history loader
+  reads it, and so are the model ids.
+- **No `TurnOptions` reader.** The planned reader would hold nothing: no
+  option the turn reads failed under strict types. `PromptToolFlag` is
+  the one conversion, a typed accessor for a prompt's tool flag at the
+  point where the flag enters the search decision.
+- **The flag reads as before.** A scalar becomes a boolean the way weak
+  mode converted it (`'0'` stays off), a missing flag stays no
+  preference, and a value that is no flag at all is refused at the entry
+  instead of deep in the policy. Only `tool_internet` is converted:
+  `tool_mcp` is checked with `===`, so a `'1'` string turns MCP off today.
+  Converting every tool flag would change that, which is a behavior
+  decision rather than a typing step.
