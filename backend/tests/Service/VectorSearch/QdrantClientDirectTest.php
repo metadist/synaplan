@@ -8,6 +8,7 @@ use App\Service\VectorSearch\QdrantClientDirect;
 use App\Service\VectorSearch\QdrantPointId;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\HttpClient\Exception\TimeoutException;
@@ -38,7 +39,7 @@ final class QdrantClientDirectTest extends TestCase
      * @param array<string, callable():MockResponse>                                  $routes Map of path-suffix => responder callback
      * @param list<array{method: string, path: string, query: string, body: ?string}> $calls
      */
-    private function buildClient(array $routes, array &$calls = []): QdrantClientDirect
+    private function buildClient(array $routes, array &$calls = [], ?LoggerInterface $logger = null): QdrantClientDirect
     {
         $factory = function (string $method, string $url, array $options) use ($routes, &$calls): MockResponse {
             $path = (string) (parse_url($url, \PHP_URL_PATH) ?? '');
@@ -58,7 +59,7 @@ final class QdrantClientDirectTest extends TestCase
         return new QdrantClientDirect(
             httpClient: new MockHttpClient($factory),
             qdrantUrl: self::QDRANT_URL,
-            logger: new NullLogger(),
+            logger: $logger ?? new NullLogger(),
         );
     }
 
@@ -843,5 +844,55 @@ final class QdrantClientDirectTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Failed to delete digest points');
         $client->deleteDigests(['dig_7_1']);
+    }
+
+    public function testScrollAllMemoriesForReindexNotesWhenCollectionIsMissing(): void
+    {
+        $logger = new RecordingLogger();
+        $client = $this->buildClient([
+            '/collections/user_memories/points/scroll' => fn () => new MockResponse(
+                (string) json_encode(['status' => ['error' => "Not found: Collection `user_memories` doesn't exist!"]]),
+                ['http_code' => 404],
+            ),
+        ], logger: $logger);
+
+        $this->assertSame([], $client->scrollAllMemoriesForReindex());
+        $this->assertSame([['notice', 'Memories not yet created']], $logger->records);
+    }
+
+    public function testScrollAllMemoriesForReindexStillLogsWhenQdrantFails(): void
+    {
+        $logger = new RecordingLogger();
+        $client = $this->buildClient([
+            '/collections/user_memories/points/scroll' => fn () => new MockResponse('nope', ['http_code' => 500]),
+        ], logger: $logger);
+
+        $this->assertSame([], $client->scrollAllMemoriesForReindex());
+        $this->assertSame([['error', 'Failed to scroll all memories for reindex']], $logger->records);
+    }
+
+    public function testScrollMemoriesNotesWhenCollectionIsMissing(): void
+    {
+        $logger = new RecordingLogger();
+        $client = $this->buildClient([
+            '/collections/user_memories/points/scroll' => fn () => new MockResponse(
+                (string) json_encode(['status' => ['error' => "Not found: Collection `user_memories` doesn't exist!"]]),
+                ['http_code' => 404],
+            ),
+        ], logger: $logger);
+
+        $this->assertSame([], $client->scrollMemories(1));
+        $this->assertSame([['notice', 'Memories not yet created']], $logger->records);
+    }
+}
+
+final class RecordingLogger extends AbstractLogger
+{
+    /** @var list<array{0: string, 1: string}> */
+    public array $records = [];
+
+    public function log($level, string|\Stringable $message, array $context = []): void
+    {
+        $this->records[] = [(string) $level, (string) $message];
     }
 }
