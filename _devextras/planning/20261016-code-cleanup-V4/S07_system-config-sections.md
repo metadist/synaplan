@@ -80,3 +80,49 @@ path must never return a secret it masked before.
 ## 8. Not in S7
 
 The admin UI. The config pyramid (row 15).
+
+## 9. As delivered (2026-10-17)
+
+`SystemConfigService` leaves all three size ledgers: 2,961 → 334 lines,
+13 → 6 constructor parameters, and `buildSchema()` (1,534), `getSchema()`
+(182), `getValues()` (138) and `setValue()` (103) leave the method ledger.
+The branch starts from S6's head (`6f34ed52c`). Where the result differs
+from the plan:
+
+- **Tabs by name.** §3 called the per-tab class `SystemConfigSection`
+  (`Section/FeaturesSection` …). The admin sees tab → section → field and
+  every field names both, so the classes are `SystemConfigTab`
+  (`Tab/FeaturesTab` …) and a tab returns its `ConfigSection`s.
+- **The fields map follows the screen.** The plan promised the schema byte
+  for byte. `buildSchema()` listed the 218 fields in the order they were
+  added, tabs interleaved (auth, features, sharing, routing, channels,
+  routing again …), and each field's attributes in no fixed order. Keeping
+  that would need a frozen list of every key beside the tabs, so adding a
+  setting would mean editing two places. `fields` now lists the fields in
+  the order the admin sees them, each with its attributes in one order;
+  JSON objects carry no order, and the UI and Smart Search look fields up
+  by key. The snapshot compares objects as maps and lists in order (the
+  tabs, each tab's sections, each section's fields, the select options),
+  as every cleanup snapshot does, and `SystemConfigSchemaTest` pins the new
+  order. The Smart Search settings catalog fingerprint changes once, which
+  queues one catalog rebuild on the next admin search, as a reworded
+  setting does.
+- **Storage is one value.** The ratchet allows `FieldDefinition` ten
+  parameters. `source` only ever said `database`, and `dbGroup`, `dbKey`
+  and `encrypted` travelled with it, so the four are one `DatabaseRow`;
+  none means the environment.
+- **Four classes for values and writes.** Reading and writing change for
+  different reasons, and the write path holds two seams of its own:
+  `SystemConfigValues`, `SystemConfigWriter`, `ComputeSettingGuard` (the
+  four file-work refusals) and `EnvSettings` (the running environment and
+  the `.env` file with its backups). The service stays the facade its
+  callers use, so the controller and Smart Search did not change.
+- **The tests build through a factory first.** Seven constructions in the
+  two service tests named up to thirteen arguments; a first `test:`
+  commit moved them to `SystemConfigServiceFactory`, so each step rewired
+  one place and no assertion changed.
+- **Found, carried; a test pins it.** An `.env` setting that already has a
+  line is rewritten with the value as a `preg_replace()` replacement, so a
+  `$1` or `\1` in it — a password, say — is dropped: `pa$1word` is stored as
+  `paword` (`EnvSettingsTest`). A new line is appended as typed. Fixing it
+  changes what gets stored, so it is the owner's call for V5.

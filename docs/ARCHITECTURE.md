@@ -299,9 +299,10 @@ pipelines.
 
 A list of collaborators is a tag, not a constructor: runtime config
 contributors (`app.runtime_config.contributor`), `app:seed` steps
-(`SeederInterface`, `app.seeder`) and account erasure
-(`UserDataEraserInterface`, `app.user_data_eraser`). The order is the tag
-priority and a test pins it.
+(`SeederInterface`, `app.seeder`), account erasure
+(`UserDataEraserInterface`, `app.user_data_eraser`) and the tabs of
+Admin → System settings (`SystemConfigTab`, `app.system_config.tab`). The
+order is the tag priority and a test pins it.
 
 ### Account erasure
 
@@ -351,6 +352,24 @@ travels on `async_index`, which retries it five times and then parks it in
 goes writes nothing back: its upsert checks the chat's owner in the same
 statement. A file-work workspace created meanwhile is either seen by
 `ComputeEraser`'s locking read or refused because its owner is gone.
+
+### System settings
+
+Each tab of Admin → System settings is a class in
+`App\Service\Admin\SystemConfig\Tab\` that declares its sections and
+their fields in the order the admin sees them. A `FieldDefinition` says how
+the field renders, its default, whether it is a secret, and where its value
+lives: a `DatabaseRow` (BCONFIG, no restart) or none (the environment, read
+at start). `SystemConfigSchema` collects the tabs, places every field in its
+tab and section, marks the provider keys as managed under Providers & keys
+and refuses a setting declared twice, so a new setting is one field in its
+tab. `SystemConfigValues` reads what the page shows with every secret
+masked; `SystemConfigWriter` writes one setting through its refusals, the
+`ComputeSettingGuard`, a BCONFIG row or an `.env` line (`EnvSettings`, with
+backups); `SystemConfigService` is the facade the controller and Smart
+Search call. `SystemConfigSchemaCharacterizationTest` pins the schema and
+the values, `SystemConfigTabOrderTest` the tab order and that every field
+sits in exactly one section.
 
 ## Where new code goes
 
