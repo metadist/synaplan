@@ -1,7 +1,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
-import { ApiError } from '@/services/api/httpClient'
+import { getNativePlatform } from '@/services/api/nativeRuntime'
 import {
   endLiveVoiceSession,
   fetchLiveVoiceOptions,
@@ -31,6 +31,7 @@ import {
 } from '@/services/liveVoice/preferences'
 import {
   liveEndReason,
+  liveErrorReason,
   liveTerminalAction,
   liveTerminalActionKey,
   liveTerminalMessageKey,
@@ -108,11 +109,14 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     activeModel.value = defaultModel() ?? null
   }
 
-  function fail(next: LiveEndReason) {
+  function fail(next: LiveEndReason, extraId: number | null = null) {
+    const id = sessionId ?? extraId
+    sessionId = null
     reason.value = next
     apply({ type: 'fail' })
     teardown()
     publishSpokenIds()
+    if (id !== null) void endLiveVoiceSession(id, 'provider_error').catch(() => undefined)
   }
 
   function publishSpokenIds(): void {
@@ -323,7 +327,7 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
         modelId: model?.id ?? null,
         voice: voice || undefined,
         language: String(locale.value || 'en'),
-        client: 'web',
+        client: getNativePlatform(),
         incognito: incognito.active,
         ...(incognito.active ? { useSavedContext: incognito.useSavedContext } : {}),
       })
@@ -436,30 +440,18 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
       audio = opened
     } catch (error) {
       if (!liveRunIs(run)) return
-      const hangUp = sessionId ?? openedSessionId
-      sessionId = null
       stopStream(mic)
       if (audioContext && audioContext.state !== 'closed') {
         audioContext.close().catch(() => undefined)
       }
-      if (
-        error instanceof DOMException &&
-        (error.name === 'NotAllowedError' || error.name === 'NotFoundError')
-      ) {
-        fail('mic_denied')
-      } else if (isBudgetError(error)) {
+      if (isBudgetError(error)) {
         const budget = liveCostBudget(options.value?.costBudget)
         phase.value = 'idle'
         teardown()
         if (budget) onBudget(budget)
-        else fail('limit_budget')
-      } else if (error instanceof ApiError && error.status === 503) {
-        fail('capacity')
+        else fail('limit_budget', openedSessionId)
       } else {
-        fail('provider_error')
-      }
-      if (hangUp !== null && phase.value === 'ended') {
-        void endLiveVoiceSession(hangUp, 'provider_error').catch(() => undefined)
+        fail(liveErrorReason(error), openedSessionId)
       }
     } finally {
       if (!liveRunIs(run)) {
@@ -475,11 +467,9 @@ export function useLiveVoice(onBudget: (budget: LiveVoiceCostBudget) => void) {
     clearTimeout(connectTimer)
     connectTimer = setTimeout(() => {
       if (!liveRunIs(run) || phase.value !== 'connecting') return
-      const id = sessionOf()
       liveRun += 1
       captureAbort?.abort()
-      fail('provider_error')
-      if (id !== null) void endLiveVoiceSession(id, 'provider_error').catch(() => undefined)
+      fail('provider_error', sessionOf())
     }, CONNECT_MS)
   }
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
+import { ApiError } from '@/services/api/httpClient'
 import { useLiveVoice } from '@/composables/useLiveVoice'
 
 /**
@@ -297,6 +298,51 @@ describe('useLiveVoice hang-up', () => {
     await wrapper.vm.end()
     expect(adoptSpokenIds).toHaveBeenCalledWith(7, ['bubble-1', 'bubble-2'])
     expect(wrapper.vm.phase).toBe('idle')
+  })
+
+  it('ends the backend session when the socket closes before the sidecar redeemed the ticket', async () => {
+    const track = fakeTrack()
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [track] }) },
+    })
+    startLiveVoiceSession.mockResolvedValue(session)
+    let handlers: { onSocketClosed: () => void }
+    openLiveVoiceAudio.mockImplementation(async (input: { handlers: typeof handlers }) => {
+      handlers = input.handlers
+      return { close: vi.fn(), sendEnd: vi.fn(), setMuted: vi.fn() }
+    })
+
+    const wrapper = mount(Harness)
+    await wrapper.vm.press()
+    await flushPromises()
+    expect(wrapper.vm.phase).toBe('connecting')
+
+    handlers!.onSocketClosed()
+    await flushPromises()
+
+    expect(wrapper.vm.phase).toBe('ended')
+    expect(wrapper.vm.reason).toBe('network_lost')
+    expect(endLiveVoiceSession).toHaveBeenCalledWith(31, 'provider_error')
+  })
+
+  it('maps a 409 VOICE_BUSY response to the busy terminal state instead of provider_error', async () => {
+    const track = fakeTrack()
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [track] }) },
+    })
+    startLiveVoiceSession.mockRejectedValue(
+      new ApiError(409, 'A live conversation is already open.', 'VOICE_BUSY')
+    )
+
+    const wrapper = mount(Harness)
+    await wrapper.vm.press()
+    await flushPromises()
+
+    expect(wrapper.vm.phase).toBe('ended')
+    expect(wrapper.vm.reason).toBe('busy')
+    expect(wrapper.vm.terminalAction).toBe('talk_again')
   })
 })
 

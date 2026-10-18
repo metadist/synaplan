@@ -12,8 +12,8 @@ final class VoiceLiveTransport
 {
     public static function choose(string $provider, string $model, bool $enabled, string $client = 'web'): string
     {
-        // CarPlay has no WebRTC stack. It always uses the relay socket.
-        if ('carplay' === $client) {
+        // CarPlay and mobile apps stay on the relay socket.
+        if (in_array($client, ['carplay', 'ios', 'android'], true)) {
             return 'relay';
         }
         if (!$enabled || 'openai' !== strtolower($provider)) {

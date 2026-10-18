@@ -352,6 +352,7 @@
         "max_durationIncognito": "Konuşma süre sınırına ulaştığı için bitti. Hiçbir şey kaydedilmedi.",
         "network_lostIncognito": "Bağlantınız koptu. Hiçbir şey kaydedilmedi.",
         "capacity": "Canlı konuşmalar şu anda dolu. Başka bir şey gönderilmedi.",
+        "busy": "Hesabınızda zaten başka bir canlı konuşma açık. Hiçbir şey gönderilmedi.",
         "mic_denied": "Mikrofon engelli. Hiçbir şey gönderilmedi.",
         "admin_disabled": "Canlı konuşmalar kapalı. Hiçbir şey gönderilmedi.",
         "actionTalkAgain": "Tekrar konuş",

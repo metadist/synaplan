@@ -361,6 +361,7 @@
         "max_durationIncognito": "Das Gespräch endete, weil die Zeitgrenze erreicht war. Es wurde nichts gespeichert.",
         "network_lostIncognito": "Die Verbindung ist abgebrochen. Es wurde nichts gespeichert.",
         "capacity": "Live-Gespräche sind gerade voll. Es wurde nichts weiter gesendet.",
+        "busy": "Auf deinem Konto ist bereits ein anderes Live-Gespräch offen. Es wurde nichts gesendet.",
         "mic_denied": "Das Mikrofon ist blockiert. Es wurde nichts gesendet.",
         "admin_disabled": "Live-Gespräche sind ausgeschaltet. Es wurde nichts gesendet.",
         "actionTalkAgain": "Nochmal sprechen",

@@ -361,6 +361,7 @@
         "max_durationIncognito": "La conversation s’est terminée parce que la durée maximale est atteinte. Rien n’a été enregistré.",
         "network_lostIncognito": "La connexion a été coupée. Rien n’a été enregistré.",
         "capacity": "Les conversations en direct sont complètes pour le moment. Rien de plus n’a été envoyé.",
+        "busy": "Une autre conversation en direct est déjà ouverte sur votre compte. Rien n’a été envoyé.",
         "mic_denied": "Le microphone est bloqué. Rien n’a été envoyé.",
         "admin_disabled": "Les conversations en direct sont désactivées. Rien n’a été envoyé.",
         "actionTalkAgain": "Parler à nouveau",

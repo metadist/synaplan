@@ -50,11 +50,15 @@ final readonly class VoiceLiveUsageService
     public function open(User $user, Model $model, ?int $chatId, string $client, bool $zeroCost = false, string $transport = 'relay'): VoiceSession
     {
         $userId = (int) $user->getId();
-        if (null !== $this->sessions->findOpenForUser($userId)) {
-            throw new VoiceLiveBusyException(sprintf('User %d already has a live conversation.', $userId));
+        $now = time();
+        $existing = $this->sessions->findOpenForUser($userId);
+        if (null !== $existing) {
+            if (($now - $this->lastActivityUnix($existing)) < VoiceLiveReaper::STALE_SECONDS) {
+                throw new VoiceLiveBusyException(sprintf('User %d already has a live conversation.', $userId));
+            }
+            $this->finalizeStored($existing, 'network_lost');
         }
 
-        $now = time();
         $session = (new VoiceSession())
             ->setUserId($userId)
             ->setChatId($chatId)
