@@ -306,6 +306,36 @@ streamed through the callback). `AnalysisFileResolver` finds the files
 used. `FileAnalysisCharacterizationTest` pins 25 attachment mixes on both
 pipelines.
 
+## Provider adapters
+
+A vendor's adapter in `App\AI\Provider\` is what the registry knows: its
+name, its capability interfaces and its `app.ai.<capability>` tags in
+`config/services.yaml`. A large adapter is a façade over a folder of its
+own, one class per capability over one API client:
+
+| Class (`App\AI\Provider\Google\`) | Holds |
+| --------------------------------- | ----- |
+| `GoogleApiClient` | the key (the explicit override, else the provider key store), the Gemini API and Vertex endpoints, the authenticated requests, the stream, the blocked-content check |
+| `GoogleChat`, `GoogleMessageFormat` | buffered and streamed chat with tools, structured output and the reasoning budget; the conversation and tool shapes |
+| `GoogleImageGeneration` | Gemini native images, Imagen on the Gemini API and on Vertex, edits |
+| `GoogleVideoGeneration`, `GoogleOmniVideo` | Veo operations; Omni clips on the Interactions API |
+| `GoogleSpeech` | transcription and synthesis |
+| `GoogleVision` | images in a prompt |
+
+`GoogleProvider` keeps its constructor, interfaces and tags, builds these
+and delegates every method, so nothing outside the folder changes. The
+recipe for the next adapter:
+
+1. Record a request snapshot first: `ProviderHttpRecorder` captures every
+   request the adapter sends, with the secrets masked, and fails on a
+   request beyond its queued answers. `GoogleProviderRequestCharacterizationTest`
+   pins 70 cases; every later step must leave it unchanged.
+2. Move the transport into an API client.
+3. Move one capability per commit, its methods as they were. A method over
+   100 lines is cut at its seams on the way.
+4. Keep the façade while other classes name it (`AiFacade`, the module
+   system); registering the capability classes directly comes after that.
+
 ## Lists are tagged collections
 
 A list of collaborators is a tag, not a constructor: runtime config
