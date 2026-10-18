@@ -238,6 +238,30 @@ Graph API call in order, what reaches the processor, the stored rows, the
 account, speech, transcription, usage, realtime events, the summary refresh
 and Discord over twelve cases.
 
+## Media turn — `MediaGenerationHandler`
+
+`MediaGenerationHandler::handleStream()` runs a media turn (image, video,
+speech) as stages in `App\Service\Message\Handler\Media\`, each handing the
+next a typed value:
+
+| Stage | Does |
+| ----- | ---- |
+| `MediaReferenceResolver` | the pictures the turn starts from (`MediaReferences`): attached and chained reference images (#1144), image URLs in the text or forwarded by a multitask chain, the conversation's newest picture for an edit the sorter voted for |
+| `MediaPromptResolver` | the prompt (`MediaPrompt`): the mediamaker extraction, which drops the conversation's picture for a video or audio request and extracts again; the message stands in for an empty prompt |
+| `MediaModelResolver` | the model: a slash command, an Again pick, a task prompt's pinned model, else the install's default for the request (`MediaModelChoice`); then the model row, a retired model's successor (`MediaModel`) |
+| `MediaRequestGuard` | what stops the turn before a provider is asked (`MediaRefusal`): an audio script that only repeats the request goes to `MediaChatHandOff`; no media type, no model (#1320), text-to-video on an image-to-video model, image-to-video while APP_URL is private |
+| `MediaTurnBudget` | the media limit, then the monthly cost budget where billing enforces it |
+| `MediaGenerationRun` | the provider options, a background job (`MediaJobDetach`) or the provider call, the kept file (`GeneratedMediaStore`: the file, its gallery row, a video's poster, a folder delivery) and the usage (`MediaTurnBilling`, recorded the moment the provider billed, #1146); a Stop is billed, a failure is one sentence |
+
+`MediaTurnRequest` carries the turn from the model on. The memory job
+(`MediaTurnMemory`) is queued once the turn stays on the media path, before
+the guards. `MediaUploadStore` writes into the user's upload tree, and
+`MediaDownloader` is the only transport that fetches a provider's URL. The
+moved code keeps the handler's weak typing until its boundaries are typed.
+`MediaTurnCharacterizationTest` pins every way the turn's output leaves —
+status events, chunks, provider and job calls, downloads, file rows, limits,
+usage, the memory job and the chat hand-off — over 35 cases.
+
 ## File analysis — `FileAnalysisHandler`
 
 `FileAnalysisHandler` answers about the files of a turn on one path for both

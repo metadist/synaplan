@@ -8,9 +8,9 @@
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 56,
-        "constructorParams": 68,
-        "methodLines": 142
+        "fileLines": 55,
+        "constructorParams": 67,
+        "methodLines": 140
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -54,7 +54,6 @@
         "src/Service/Iam/ShareService.php": 853,
         "src/Service/Media/MediaGenerationService.php": 846,
         "src/Service/Memory/UserMemoryService.php": 1022,
-        "src/Service/Message/Handler/MediaGenerationHandler.php": 2245,
         "src/Service/Message/MessageClassifier.php": 1962,
         "src/Service/Message/MessageSorter.php": 921,
         "src/Service/ModelConfigService.php": 1327,
@@ -66,7 +65,7 @@
         "src/Service/Research/UrlContentService.php": 1258,
         "src/Service/Usage/UsageStatsService.php": 960,
         "src/Service/VectorSearch/QdrantClientDirect.php": 2000,
-        "src/Service/WhatsApp/WhatsAppService.php": 1139,
+        "src/Service/WhatsApp/WhatsAppService.php": 1135,
         "src/Service/Widget/WidgetSetupService.php": 1000,
         "src/Service/Widget/WidgetSummaryService.php": 836
     },
@@ -114,7 +113,6 @@
         "src/Service/File/FileProcessor.php::FileProcessor": 17,
         "src/Service/File/FileUploadService.php::FileUploadService": 12,
         "src/Service/Mcp/McpOAuthState.php::McpOAuthState": 11,
-        "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler": 22,
         "src/Service/Message/MessageClassifier.php::MessageClassifier": 21,
         "src/Service/Message/MessageSorter.php::MessageSorter": 18,
         "src/Service/Multitask/Execution/Runner/CodeRunRunner.php::CodeRunRunner": 13,
@@ -237,8 +235,6 @@
         "src/Service/Memory/MemoryExtractionService.php::MemoryExtractionService::extractMemoriesViaAi": 185,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::searchRelevantMemories": 142,
         "src/Service/Memory/UserMemoryService.php::UserMemoryService::storeInQdrant": 101,
-        "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler::detachMediaToAsyncJob": 166,
-        "src/Service/Message/Handler/MediaGenerationHandler.php::MediaGenerationHandler::handleStream": 1010,
         "src/Service/Message/MediaPromptExtractor.php::MediaPromptExtractor::extract": 107,
         "src/Service/Message/MessageApiFormatter.php::MessageApiFormatter::format": 212,
         "src/Service/Message/MessageClassifier.php::MessageClassifier::canFastPathClassify": 208,
