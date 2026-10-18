@@ -323,13 +323,25 @@ own, one class per capability over one API client:
 | `GoogleVision` | images in a prompt |
 
 `GoogleProvider` keeps its constructor, interfaces and tags, builds these
-and delegates every method, so nothing outside the folder changes. The
-recipe for the next adapter:
+and delegates every method, so nothing outside the folder changes.
+`OpenAIProvider` has the same shape in `App\AI\Provider\OpenAI\`:
+`OpenAIApiClient` holds the key and OpenAI's three transports (the SDK
+client from an optional factory, Symfony's client, and the gpt-image cURL
+call behind `OpenAICurlTransport`); `OpenAIChat`, `OpenAIEmbedding`,
+`OpenAIImageGeneration`, `OpenAIVision` and `OpenAISpeech` hold the
+capabilities; `OpenAIResponses` is the Responses API call that chat and
+vision share, with its retries and reasoning tiers, and
+`OpenAIResponsesFormat` the pure translations. The recipe for the next
+adapter:
 
 1. Record a request snapshot first: `ProviderHttpRecorder` captures every
-   request the adapter sends, with the secrets masked, and fails on a
-   request beyond its queued answers. `GoogleProviderRequestCharacterizationTest`
-   pins 70 cases; every later step must leave it unchanged.
+   request the adapter sends through Symfony's client, with the secrets
+   masked, and fails on a request beyond its queued answers;
+   `OpenAISdkRecorder` does the same for an SDK on a Guzzle mock, and
+   `OfflineHttpGuard` records any request that would still reach the
+   network. `GoogleProviderRequestCharacterizationTest` (70 cases) and
+   `OpenAIProviderRequestCharacterizationTest` (56) pin both adapters;
+   every later step must leave them unchanged.
 2. Move the transport into an API client.
 3. Move one capability per commit, its methods as they were. A method over
    100 lines is cut at its seams on the way.

@@ -4,7 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Provider;
 
+use App\AI\Provider\OpenAI\OpenAIApiClient;
+use App\AI\Provider\OpenAI\OpenAIChat;
+use App\AI\Provider\OpenAI\OpenAICurlTransport;
+use App\AI\Provider\OpenAI\OpenAIResponses;
+use App\AI\Provider\OpenAI\OpenAIResponsesFormat;
 use App\AI\Provider\OpenAIProvider;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -21,11 +28,11 @@ final class OpenAIProviderToolsTest extends TestCase
 
     public function testBuildResponsesRequestAddsToolsAndNamedChoice(): void
     {
-        $provider = $this->provider();
-        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+        $chat = $this->chat();
+        $method = new \ReflectionMethod($chat, 'buildResponsesRequest');
 
         $result = $method->invoke(
-            $provider,
+            $chat,
             [['role' => 'user', 'content' => 'Weather?']],
             'gpt-4o',
             false,
@@ -52,10 +59,9 @@ final class OpenAIProviderToolsTest extends TestCase
 
     public function testConvertToResponsesFormatMapsToolHistory(): void
     {
-        $provider = $this->provider();
-        $method = new \ReflectionMethod($provider, 'convertToResponsesFormat');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'convertToResponsesFormat');
 
-        $items = $method->invoke($provider, [
+        $items = $method->invoke(null, [
             ['role' => 'user', 'content' => 'Weather in Berlin?'],
             [
                 'role' => 'assistant',
@@ -85,14 +91,13 @@ final class OpenAIProviderToolsTest extends TestCase
 
     public function testExtractResponsesToolCallsFromRecordedPayload(): void
     {
-        $provider = $this->provider();
-        $method = new \ReflectionMethod($provider, 'extractResponsesToolCalls');
+        $method = new \ReflectionMethod(OpenAIResponsesFormat::class, 'extractResponsesToolCalls');
         $payload = json_decode(
             (string) file_get_contents(dirname(__DIR__, 3).'/Fixtures/ai/tools/openai/chat_function_call.json'),
             true,
         );
 
-        $calls = $method->invoke($provider, $payload);
+        $calls = $method->invoke(null, $payload);
 
         self::assertSame('call_weather_1', $calls[0]['id']);
         self::assertSame('get_weather', $calls[0]['function']['name']);
@@ -101,9 +106,9 @@ final class OpenAIProviderToolsTest extends TestCase
 
     public function testStreamEventsEmitToolCallDeltasThenFinishToolCalls(): void
     {
-        $provider = $this->provider();
-        $start = new \ReflectionMethod($provider, 'emitResponsesFunctionCallStart');
-        $hasFn = new \ReflectionMethod($provider, 'responsesOutputHasFunctionCall');
+        $chat = $this->chat();
+        $start = new \ReflectionMethod($chat, 'emitResponsesFunctionCallStart');
+        $hasFn = new \ReflectionMethod(OpenAIResponsesFormat::class, 'responsesOutputHasFunctionCall');
         $events = json_decode(
             (string) file_get_contents(dirname(__DIR__, 3).'/Fixtures/ai/tools/openai/stream_function_call.events.json'),
             true,
@@ -117,7 +122,7 @@ final class OpenAIProviderToolsTest extends TestCase
             $type = $event['event'];
             $data = $event['data'];
             if ('response.output_item.added' === $type) {
-                if ($start->invoke($provider, $data, static function (array $chunk) use (&$chunks): void {
+                if ($start->invoke($chat, $data, static function (array $chunk) use (&$chunks): void {
                     $chunks[] = $chunk;
                 })) {
                     $sawFunctionCall = true;
@@ -132,7 +137,7 @@ final class OpenAIProviderToolsTest extends TestCase
                     'arguments' => $data['delta'],
                 ];
             } elseif ('response.completed' === $type) {
-                $finishReason = ($sawFunctionCall || $hasFn->invoke($provider, $data['response']['output'] ?? []))
+                $finishReason = ($sawFunctionCall || $hasFn->invoke(null, $data['response']['output'] ?? []))
                     ? 'tool_calls'
                     : 'stop';
             }
@@ -147,6 +152,13 @@ final class OpenAIProviderToolsTest extends TestCase
         self::assertSame('{"city":', $deltas[1]['arguments']);
         self::assertSame('"Berlin"}', $deltas[2]['arguments']);
         self::assertSame('tool_calls', $finishReason);
+    }
+
+    private function chat(): OpenAIChat
+    {
+        $api = new OpenAIApiClient($this->createMock(HttpClientInterface::class), new OpenAICurlTransport(), 'test-key');
+
+        return new OpenAIChat($api, new OpenAIResponses($api, new NullLogger()), new NullLogger(), new StructuredOutputTranslator(new StructuredOutputCapability()), false);
     }
 
     private function provider(): OpenAIProvider

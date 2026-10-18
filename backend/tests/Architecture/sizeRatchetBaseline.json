@@ -8,9 +8,9 @@
         "methodLines": 100
     },
     "counts": {
-        "fileLines": 51,
+        "fileLines": 50,
         "constructorParams": 65,
-        "methodLines": 127
+        "methodLines": 126
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -21,7 +21,6 @@
         "src/AI/Provider/HuggingFaceProvider.php": 1267,
         "src/AI/Provider/MistralProvider.php": 992,
         "src/AI/Provider/OpenAICompatibleProvider.php": 804,
-        "src/AI/Provider/OpenAIProvider.php": 2059,
         "src/AI/Provider/TestProvider.php": 1044,
         "src/AI/Provider/TritonProvider.php": 844,
         "src/AI/Provider/XaiProvider.php": 1791,
@@ -148,7 +147,6 @@
         "src/AI/Provider/AnthropicProvider.php::AnthropicProvider::parseSSEStream": 149,
         "src/AI/Provider/GroqProvider.php::GroqProvider::chatStream": 110,
         "src/AI/Provider/OllamaProvider.php::OllamaProvider::chatStream": 201,
-        "src/AI/Provider/OpenAIProvider.php::OpenAIProvider::chatStream": 119,
         "src/AI/Provider/TestProvider.php::TestProvider::generateContent": 106,
         "src/AI/Provider/TheHiveProvider.php::TheHiveProvider::generateImage": 103,
         "src/AI/Provider/TritonProvider.php::TritonProvider::chatStream": 167,
