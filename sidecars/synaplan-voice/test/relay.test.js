@@ -5,7 +5,7 @@ import { WebSocket } from 'ws'
 import { createMockAdapter } from '../src/adapters/mock.js'
 import { verify } from '../src/hmac.js'
 import { createServer } from '../src/server.js'
-import { shouldDropAudio, disconnectPlan, replyFrame, storedFrame, artifactFrame, postUntilStored, looksLikeTicket, CARPLAY_RECONNECT_MS } from '../src/session.js'
+import { shouldDropAudio, disconnectPlan, replyFrame, storedFrame, artifactFrame, postUntilStored, looksLikeTicket, originAllowed, CARPLAY_RECONNECT_MS } from '../src/session.js'
 
 const SECRET = 'test-secret'
 const TICKET = 'eyJhbGciOiJIUzI1NiJ9.eyJzaWQiOjd9.c2lnbmF0dXJl'
@@ -76,6 +76,20 @@ test('only a CarPlay client parks the provider after the socket drops', () => {
   assert.equal(disconnectPlan('web'), 'close')
   assert.equal(disconnectPlan(''), 'close')
   assert.equal(CARPLAY_RECONNECT_MS, 20_000)
+})
+
+test('native app WebView origins and CarPlay sockets pass the origin allow-list', () => {
+  const allowed = 'https://web.synaplan.com'
+  assert.equal(originAllowed('https://web.synaplan.com', allowed), true)
+  assert.equal(originAllowed('capacitor://localhost', allowed), true)
+  assert.equal(originAllowed('ionic://localhost', allowed), true)
+  assert.equal(originAllowed('https://localhost', allowed), true)
+  assert.equal(originAllowed('http://localhost', allowed), true)
+  assert.equal(originAllowed(undefined, allowed), true)
+  assert.equal(originAllowed('', allowed), true)
+  assert.equal(originAllowed('https://evil.example', allowed), false)
+  assert.equal(originAllowed('https://localhost:5173', allowed), false)
+  assert.equal(originAllowed('https://evil.example', ''), true)
 })
 
 for (const dialect of ['mock-openai', 'mock-google']) {

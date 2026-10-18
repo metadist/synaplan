@@ -14,6 +14,7 @@ const FAILURES = new Set([
   'provider_error',
   'network_lost',
   'capacity',
+  'busy',
   'mic_denied',
   'admin_disabled',
 ])

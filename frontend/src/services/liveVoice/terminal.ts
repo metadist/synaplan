@@ -6,6 +6,7 @@ export type LiveEndReason =
   | 'provider_error'
   | 'network_lost'
   | 'capacity'
+  | 'busy'
   | 'mic_denied'
   | 'admin_disabled'
 
@@ -17,6 +18,7 @@ const REASONS: readonly LiveEndReason[] = [
   'provider_error',
   'network_lost',
   'capacity',
+  'busy',
   'mic_denied',
   'admin_disabled',
 ]
@@ -46,4 +48,19 @@ export function liveTerminalActionKey(action: LiveTerminalAction): string {
   if (action === 'microphone') return 'chatInput.liveVoice.terminal.actionMicrophone'
   if (action === 'talk_again') return 'chatInput.liveVoice.terminal.actionTalkAgain'
   return 'chatInput.liveVoice.terminal.actionClose'
+}
+
+export function liveErrorReason(error: unknown): LiveEndReason {
+  if (
+    error instanceof DOMException &&
+    (error.name === 'NotAllowedError' || error.name === 'NotFoundError')
+  ) {
+    return 'mic_denied'
+  }
+  const api = error as { name?: string; status?: number; code?: string } | null
+  if (api && typeof api === 'object' && api.name === 'ApiError') {
+    if (api.status === 409 && api.code === 'VOICE_BUSY') return 'busy'
+    if (api.status === 503) return 'capacity'
+  }
+  return 'provider_error'
 }

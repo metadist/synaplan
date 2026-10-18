@@ -94,6 +94,47 @@ final class VoiceLiveUsageServiceTest extends TestCase
         $this->assertSame(1800, $service->allowedSeconds($this->user(), $this->perSecondModel()));
     }
 
+    public function testOpenReapsAStaleSessionInsteadOfThrowingBusy(): void
+    {
+        $stale = (new VoiceSession())
+            ->setUserId(7)
+            ->setModelId(389)
+            ->setProvider('OpenAI')
+            ->setUseLogId(99)
+            ->setStatus('live')
+            ->setStarted(time() - 120);
+
+        $connection = $this->createStub(Connection::class);
+        $connection->method('fetchOne')->willReturn(json_encode([
+            'voice_cost' => '0.000000',
+            'answer_cost' => '0.000000',
+            'last_tick' => time() - 120,
+        ], JSON_THROW_ON_ERROR));
+        $connection->method('lastInsertId')->willReturn('101');
+
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('getConnection')->willReturn($connection);
+
+        $repo = $this->createStub(VoiceSessionRepository::class);
+        $repo->method('findOpenForUser')->willReturn($stale);
+
+        $service = new VoiceLiveUsageService(
+            $em,
+            $repo,
+            $this->createStub(CostCalculationService::class),
+            $this->createStub(RateLimitService::class),
+            $this->createStub(PremiumFeatureGate::class),
+            $this->createStub(ConfigRepository::class),
+        );
+
+        $opened = $service->open($this->user(), $this->perSecondModel(), 42, 'ios');
+
+        $this->assertSame('ended', $stale->getStatus());
+        $this->assertSame('network_lost', $stale->getEndReason());
+        $this->assertSame('live', $opened->getStatus());
+        $this->assertSame('ios', $opened->getClient());
+    }
+
     private function service(string $remaining, string $budget, bool $enforced, ?string $maxSeconds = null): VoiceLiveUsageService
     {
         $connection = $this->createStub(Connection::class);

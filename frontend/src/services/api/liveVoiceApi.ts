@@ -54,7 +54,7 @@ export function startLiveVoiceSession(body: {
   modelId?: number | null
   voice?: string
   language?: string
-  client: 'web'
+  client: 'web' | 'ios' | 'android'
   incognito?: boolean
   /** Incognito only. Omitted or true keeps saved memories and knowledge. */
   useSavedContext?: boolean

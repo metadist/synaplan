@@ -352,6 +352,7 @@
         "max_durationIncognito": "La conversación terminó porque llegó al límite de tiempo. No se guardó nada.",
         "network_lostIncognito": "Se cortó la conexión. No se guardó nada.",
         "capacity": "Las conversaciones en vivo están llenas ahora. No se envió nada más.",
+        "busy": "Ya hay otra conversación en vivo abierta en tu cuenta. No se envió nada.",
         "mic_denied": "El micrófono está bloqueado. No se envió nada.",
         "admin_disabled": "Las conversaciones en vivo están desactivadas. No se envió nada.",
         "actionTalkAgain": "Hablar otra vez",

@@ -361,6 +361,7 @@
         "max_durationIncognito": "Conversation ended because it reached the time limit. Nothing was saved.",
         "network_lostIncognito": "Your connection dropped. Nothing was saved.",
         "capacity": "Live conversations are full right now. Nothing more was sent.",
+        "busy": "Another live conversation is already open on your account. Nothing was sent.",
         "mic_denied": "The microphone is blocked. Nothing was sent.",
         "admin_disabled": "Live conversations are turned off. Nothing was sent.",
         "actionTalkAgain": "Talk again",

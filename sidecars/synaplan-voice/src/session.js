@@ -465,8 +465,21 @@ export function handleConnection(socket, request, deps) {
   socket.on('close', () => onClose(socket))
 }
 
-function originAllowed(origin, allowed) {
-  if (!allowed) return true
+const NATIVE_ORIGINS = new Set([
+  'capacitor://localhost',
+  'ionic://localhost',
+  'https://localhost',
+  'http://localhost',
+])
+
+/**
+ * Browser tabs send Origin. Native URLSession sockets (CarPlay) send none, and
+ * Capacitor WebViews send their local shell origin. Every socket still needs a
+ * valid single-use ticket.
+ */
+export function originAllowed(origin, allowed) {
+  if (!allowed || !origin) return true
+  if (NATIVE_ORIGINS.has(origin)) return true
   const list = String(allowed).split(',').map((item) => item.trim()).filter(Boolean)
   if (list.length === 0) return true
   return list.includes(origin)

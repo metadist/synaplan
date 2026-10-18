@@ -289,6 +289,7 @@ describe('live voice terminal copy', () => {
     expect(liveTerminalAction('mic_denied')).toBe('close')
     expect(liveTerminalAction('admin_disabled')).toBe('close')
     expect(liveTerminalAction('provider_error')).toBe('microphone')
+    expect(liveTerminalAction('busy')).toBe('talk_again')
     expect(liveTerminalAction('idle')).toBe('talk_again')
     expect(liveTerminalActionKey('microphone')).toBe(
       'chatInput.liveVoice.terminal.actionMicrophone'
