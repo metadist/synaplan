@@ -21,6 +21,13 @@ use App\Service\Message\MessageProcessor;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
+use App\Service\WhatsApp\Turn\WhatsAppAnswerStore;
+use App\Service\WhatsApp\Turn\WhatsAppConversation;
+use App\Service\WhatsApp\Turn\WhatsAppInboundContent;
+use App\Service\WhatsApp\Turn\WhatsAppIntake;
+use App\Service\WhatsApp\Turn\WhatsAppReply;
+use App\Service\WhatsApp\Turn\WhatsAppReplyDelivery;
+use App\Service\WhatsApp\Turn\WhatsAppTurn;
 use App\Service\WhatsApp\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -130,28 +137,72 @@ class WhatsAppServiceTest extends TestCase
             new ChatFailureClassifier(),
         );
 
-        // Create service with test configuration (dynamic multi-number support)
+        // Transport with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
             $this->httpClient,
             $this->logger,
             $this->em,
-            $this->rateLimitService,
-            $this->messageProcessor,
             $this->fileProcessor,
             $this->pathBuilder,
-            $this->aiFacade,
-            $this->discord,
-            $this->cache,
-            $this->lockFactory,
-            $this->emailChatService,
-            $this->externalReplyReferences,
-            $this->summaryRefreshDispatcher,
-            $this->chatErrorPresenter,
             'test_token',
             true,
             '/tmp/test_uploads',
+        );
+    }
+
+    /**
+     * The WhatsApp turn over this test's doubles; a test swaps the duplicate
+     * guard's cache or lock.
+     */
+    private function turn(?CacheInterface $cache = null, ?LockFactory $lockFactory = null): WhatsAppTurn
+    {
+        return new WhatsAppTurn(
+            $this->intake($cache, $lockFactory),
+            $this->conversation(),
+            new WhatsAppReply(
+                $this->service,
+                $this->messageProcessor,
+                $this->chatErrorPresenter,
+                $this->externalReplyReferences,
+                $this->rateLimitService,
+                $this->delivery(),
+                $this->discord,
+                $this->em,
+                $this->logger,
+            ),
+        );
+    }
+
+    private function intake(?CacheInterface $cache = null, ?LockFactory $lockFactory = null): WhatsAppIntake
+    {
+        return new WhatsAppIntake(
+            $this->service,
+            $cache ?? $this->cache,
+            $lockFactory ?? $this->lockFactory,
+            $this->rateLimitService,
+            $this->em,
+            $this->logger,
             2,
-            'https://app.example.com' // APP_URL for TTS audio URLs
+        );
+    }
+
+    private function conversation(): WhatsAppConversation
+    {
+        return new WhatsAppConversation($this->service, $this->emailChatService, $this->em, $this->discord);
+    }
+
+    private function delivery(): WhatsAppReplyDelivery
+    {
+        return new WhatsAppReplyDelivery(
+            $this->service,
+            new WhatsAppAnswerStore($this->em, $this->summaryRefreshDispatcher),
+            $this->rateLimitService,
+            $this->discord,
+            $this->aiFacade,
+            $this->pathBuilder,
+            $this->logger,
+            'https://app.example.com', // APP_URL for TTS audio URLs
+            '/tmp/test_uploads',
         );
     }
 
@@ -166,22 +217,11 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             $this->em,
-            $this->rateLimitService,
-            $this->messageProcessor,
             $this->fileProcessor,
             $this->pathBuilder,
-            $this->aiFacade,
-            $this->discord,
-            $this->cache,
-            $this->lockFactory,
-            $this->emailChatService,
-            $this->externalReplyReferences,
-            $this->summaryRefreshDispatcher,
-            $this->chatErrorPresenter,
             'test_token',
-            false, // disabled
+            false,
             '/tmp/test_uploads',
-            2
         );
 
         $this->assertFalse($service->isAvailable());
@@ -193,22 +233,11 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             $this->em,
-            $this->rateLimitService,
-            $this->messageProcessor,
             $this->fileProcessor,
             $this->pathBuilder,
-            $this->aiFacade,
-            $this->discord,
-            $this->cache,
-            $this->lockFactory,
-            $this->emailChatService,
-            $this->externalReplyReferences,
-            $this->summaryRefreshDispatcher,
-            $this->chatErrorPresenter,
             'test_token',
             false,
             '/tmp/test_uploads',
-            2
         );
 
         $this->expectException(\RuntimeException::class);
@@ -411,22 +440,11 @@ class WhatsAppServiceTest extends TestCase
             $this->httpClient,
             $this->logger,
             $this->em,
-            $this->rateLimitService,
-            $this->messageProcessor,
             $this->fileProcessor,
             $this->pathBuilder,
-            $this->aiFacade,
-            $this->discord,
-            $this->cache,
-            $this->lockFactory,
-            $this->emailChatService,
-            $this->externalReplyReferences,
-            $this->summaryRefreshDispatcher,
-            $this->chatErrorPresenter,
             'test_token',
             false,
             '/tmp/test_uploads',
-            2
         );
 
         $this->expectException(\RuntimeException::class);
@@ -701,11 +719,11 @@ class WhatsAppServiceTest extends TestCase
         $dto = $this->createIncomingMessageDto('audio', [], 'media_audio_123');
 
         // Use reflection to test private method
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('shouldSendAudioResponse');
         $method->setAccessible(true);
 
-        $shouldSend = $method->invoke($this->service, $dto);
+        $shouldSend = $method->invoke(null, $dto);
 
         $this->assertTrue($shouldSend, 'Audio message without caption should trigger audio response');
     }
@@ -718,11 +736,11 @@ class WhatsAppServiceTest extends TestCase
         // Create DTO for video message
         $dto = $this->createIncomingMessageDto('video', [], 'media_video_123');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('shouldSendAudioResponse');
         $method->setAccessible(true);
 
-        $shouldSend = $method->invoke($this->service, $dto);
+        $shouldSend = $method->invoke(null, $dto);
 
         $this->assertTrue($shouldSend, 'Video message should trigger audio response');
     }
@@ -736,11 +754,11 @@ class WhatsAppServiceTest extends TestCase
         // Audio messages in WhatsApp typically don't have captions
         $dto = $this->createIncomingMessageDto('audio', ['caption' => 'Check this audio'], 'media_audio_123');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('shouldSendAudioResponse');
         $method->setAccessible(true);
 
-        $shouldSend = $method->invoke($this->service, $dto);
+        $shouldSend = $method->invoke(null, $dto);
 
         // With a caption, it's not voice-only
         $this->assertFalse($shouldSend);
@@ -753,11 +771,11 @@ class WhatsAppServiceTest extends TestCase
     {
         $dto = $this->createIncomingMessageDto('text', ['body' => 'Hello world']);
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('shouldSendAudioResponse');
         $method->setAccessible(true);
 
-        $shouldSend = $method->invoke($this->service, $dto);
+        $shouldSend = $method->invoke(null, $dto);
 
         $this->assertFalse($shouldSend, 'Text messages should not trigger audio response');
     }
@@ -769,11 +787,11 @@ class WhatsAppServiceTest extends TestCase
     {
         $dto = $this->createIncomingMessageDto('image', [], 'media_image_123');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('shouldSendAudioResponse');
         $method->setAccessible(true);
 
-        $shouldSend = $method->invoke($this->service, $dto);
+        $shouldSend = $method->invoke(null, $dto);
 
         $this->assertFalse($shouldSend, 'Image messages should not trigger audio response');
     }
@@ -800,11 +818,11 @@ class WhatsAppServiceTest extends TestCase
             ]);
 
         // Use reflection to test private method
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppReplyDelivery::class);
         $method = $reflection->getMethod('generateTtsResponse');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->service, 'AI response text', 2);
+        $result = $method->invoke($this->delivery(), 'AI response text', 2);
 
         $this->assertNotNull($result);
         $this->assertArrayHasKey('relativePath', $result);
@@ -822,11 +840,11 @@ class WhatsAppServiceTest extends TestCase
             ->method('synthesize')
             ->willThrowException(new \RuntimeException('TTS provider unavailable'));
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppReplyDelivery::class);
         $method = $reflection->getMethod('generateTtsResponse');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->service, 'Test text', 2);
+        $result = $method->invoke($this->delivery(), 'Test text', 2);
 
         $this->assertNull($result, 'TTS failure should return null, not throw exception');
     }
@@ -838,9 +856,9 @@ class WhatsAppServiceTest extends TestCase
             ->method('synthesize')
             ->willThrowException(new NoSpeakableTextException());
 
-        $method = new \ReflectionMethod($this->service, 'generateTtsResponse');
+        $method = new \ReflectionMethod(WhatsAppReplyDelivery::class, 'generateTtsResponse');
 
-        $this->assertNull($method->invoke($this->service, "```\ncode\n```", 2, 'de'));
+        $this->assertNull($method->invoke($this->delivery(), "```\ncode\n```", 2, 'de'));
     }
 
     /**
@@ -866,11 +884,11 @@ class WhatsAppServiceTest extends TestCase
                 'provider' => 'openai',
             ]);
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppReplyDelivery::class);
         $method = $reflection->getMethod('generateTtsResponse');
         $method->setAccessible(true);
 
-        $method->invoke($this->service, $longText, 2, 'de');
+        $method->invoke($this->delivery(), $longText, 2, 'de');
     }
 
     // ============================================
@@ -901,11 +919,11 @@ class WhatsAppServiceTest extends TestCase
 
         $dto = $this->createIncomingMessageDto('audio', [], 'test_media');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppConversation::class);
         $method = $reflection->getMethod('sendErrorMessage');
         $method->setAccessible(true);
 
-        $method->invoke($this->service, $dto, 'Whisper transcription failed');
+        $method->invoke($this->conversation(), $dto, 'Whisper transcription failed');
     }
 
     /**
@@ -931,11 +949,11 @@ class WhatsAppServiceTest extends TestCase
 
         $dto = $this->createIncomingMessageDto('image', [], 'test_media');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppConversation::class);
         $method = $reflection->getMethod('sendErrorMessage');
         $method->setAccessible(true);
 
-        $method->invoke($this->service, $dto, 'Image vision analysis failed');
+        $method->invoke($this->conversation(), $dto, 'Image vision analysis failed');
     }
 
     /**
@@ -962,11 +980,11 @@ class WhatsAppServiceTest extends TestCase
 
         $dto = $this->createIncomingMessageDto('video', [], 'test_media');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppConversation::class);
         $method = $reflection->getMethod('sendErrorMessage');
         $method->setAccessible(true);
 
-        $method->invoke($this->service, $dto, 'File too large: 256 MB');
+        $method->invoke($this->conversation(), $dto, 'File too large: 256 MB');
     }
 
     // ============================================
@@ -980,11 +998,11 @@ class WhatsAppServiceTest extends TestCase
     {
         $dto = $this->createIncomingMessageDto('text', ['body' => 'Hello, how are you?']);
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('extractMessageText');
         $method->setAccessible(true);
 
-        $text = $method->invoke($this->service, $dto);
+        $text = $method->invoke(null, $dto);
 
         $this->assertEquals('Hello, how are you?', $text);
     }
@@ -996,11 +1014,11 @@ class WhatsAppServiceTest extends TestCase
     {
         $dto = $this->createIncomingMessageDto('audio', [], 'media_123');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('extractMessageText');
         $method->setAccessible(true);
 
-        $text = $method->invoke($this->service, $dto);
+        $text = $method->invoke(null, $dto);
 
         $this->assertEquals('[Audio message]', $text);
     }
@@ -1012,11 +1030,11 @@ class WhatsAppServiceTest extends TestCase
     {
         $dto = $this->createIncomingMessageDto('image', ['caption' => 'What is this?'], 'media_123');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('extractMessageText');
         $method->setAccessible(true);
 
-        $text = $method->invoke($this->service, $dto);
+        $text = $method->invoke(null, $dto);
 
         $this->assertEquals('What is this?', $text);
     }
@@ -1028,11 +1046,11 @@ class WhatsAppServiceTest extends TestCase
     {
         $dto = $this->createIncomingMessageDto('image', [], 'media_123');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('extractMessageText');
         $method->setAccessible(true);
 
-        $text = $method->invoke($this->service, $dto);
+        $text = $method->invoke(null, $dto);
 
         $this->assertEquals('[Image]', $text);
     }
@@ -1044,11 +1062,11 @@ class WhatsAppServiceTest extends TestCase
     {
         $dto = $this->createIncomingMessageDto('video', ['caption' => 'Check this video'], 'media_123');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('extractMessageText');
         $method->setAccessible(true);
 
-        $text = $method->invoke($this->service, $dto);
+        $text = $method->invoke(null, $dto);
 
         $this->assertEquals('Check this video', $text);
     }
@@ -1060,11 +1078,11 @@ class WhatsAppServiceTest extends TestCase
     {
         $dto = $this->createIncomingMessageDto('video', [], 'media_123');
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('extractMessageText');
         $method->setAccessible(true);
 
-        $text = $method->invoke($this->service, $dto);
+        $text = $method->invoke(null, $dto);
 
         $this->assertEquals('[Video]', $text);
     }
@@ -1094,11 +1112,11 @@ class WhatsAppServiceTest extends TestCase
 
         $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('extractMessageText');
         $method->setAccessible(true);
 
-        $text = $method->invoke($this->service, $dto);
+        $text = $method->invoke(null, $dto);
 
         $this->assertStringContainsString('Unsupported message type', $text);
         $this->assertStringContainsString('reaction', $text);
@@ -1127,11 +1145,11 @@ class WhatsAppServiceTest extends TestCase
 
         $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
 
-        $reflection = new \ReflectionClass($this->service);
+        $reflection = new \ReflectionClass(WhatsAppInboundContent::class);
         $method = $reflection->getMethod('extractMessageText');
         $method->setAccessible(true);
 
-        $text = $method->invoke($this->service, $dto);
+        $text = $method->invoke(null, $dto);
 
         $this->assertEquals('[Sticker]', $text);
     }
@@ -1247,30 +1265,6 @@ class WhatsAppServiceTest extends TestCase
         // release() returns void
         $lockFactory->method('createLock')->willReturn($lock);
 
-        // Create service with the cache that has the message already
-        $service = new WhatsAppService(
-            $this->httpClient,
-            $this->logger,
-            $this->em,
-            $this->rateLimitService,
-            $this->messageProcessor,
-            $this->fileProcessor,
-            $this->pathBuilder,
-            $this->aiFacade,
-            $this->discord,
-            $cacheWithHit,
-            $lockFactory,
-            $this->emailChatService,
-            $this->externalReplyReferences,
-            $this->summaryRefreshDispatcher,
-            $this->chatErrorPresenter,
-            'test_token',
-            true,
-            '/tmp/test_uploads',
-            2,
-            'https://app.example.com'
-        );
-
         // Create a mock user
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
@@ -1299,7 +1293,7 @@ class WhatsAppServiceTest extends TestCase
         $this->messageProcessor->expects($this->never())->method('processStream');
 
         // Handle the duplicate message
-        $result = $service->handleIncomingMessage($dto, $user, false);
+        $result = $this->turn(cache: $cacheWithHit, lockFactory: $lockFactory)->handle($dto, $user, false);
 
         // Verify that it was detected as duplicate
         $this->assertTrue($result['success']);
@@ -1591,30 +1585,6 @@ class WhatsAppServiceTest extends TestCase
         $lock->method('acquire')->willReturn(false); // Lock acquisition fails
         $lockFactory->method('createLock')->willReturn($lock);
 
-        // Create service
-        $service = new WhatsAppService(
-            $this->httpClient,
-            $this->logger,
-            $this->em,
-            $this->rateLimitService,
-            $this->messageProcessor,
-            $this->fileProcessor,
-            $this->pathBuilder,
-            $this->aiFacade,
-            $this->discord,
-            $this->cache,
-            $lockFactory,
-            $this->emailChatService,
-            $this->externalReplyReferences,
-            $this->summaryRefreshDispatcher,
-            $this->chatErrorPresenter,
-            'test_token',
-            true,
-            '/tmp/test_uploads',
-            2,
-            'https://app.example.com'
-        );
-
         // Create a mock user
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
@@ -1643,7 +1613,7 @@ class WhatsAppServiceTest extends TestCase
         $this->messageProcessor->expects($this->never())->method('processStream');
 
         // Handle the message - should be treated as duplicate because lock couldn't be acquired
-        $result = $service->handleIncomingMessage($dto, $user, false);
+        $result = $this->turn(lockFactory: $lockFactory)->handle($dto, $user, false);
 
         // Verify that it was treated as duplicate
         $this->assertTrue($result['success']);
@@ -1722,7 +1692,7 @@ class WhatsAppServiceTest extends TestCase
         // crash on it. Letting the underlying httpClient mock no-op is
         // enough; failures would be swallowed by the helper anyway.
 
-        $result = $this->service->handleIncomingMessage($dto, $user, false);
+        $result = $this->turn()->handle($dto, $user, false);
 
         $this->assertTrue($result['success']);
         $this->assertTrue($result['skipped']);
@@ -1777,11 +1747,11 @@ class WhatsAppServiceTest extends TestCase
             ],
         );
 
-        $method = (new \ReflectionClass($this->service))->getMethod('handleUnsupportedTypeIfNeeded');
+        $method = (new \ReflectionClass(WhatsAppIntake::class))->getMethod('handleUnsupportedTypeIfNeeded');
 
         // null => continue, array => early-return as unsupported
         $this->assertNull(
-            $method->invoke($this->service, $dto),
+            $method->invoke($this->intake(), $dto),
             "Supported type '{$type}' must not be dropped by the unsupported-type filter",
         );
     }
@@ -1818,7 +1788,7 @@ class WhatsAppServiceTest extends TestCase
 
         $this->messageProcessor->expects($this->never())->method('processStream');
 
-        $result = $this->service->handleIncomingMessage($dto, $user, false);
+        $result = $this->turn()->handle($dto, $user, false);
 
         $this->assertTrue($result['skipped']);
         $this->assertSame('payment_authorization', $result['type']);
@@ -1837,7 +1807,7 @@ class WhatsAppServiceTest extends TestCase
      */
     public function testAppendWhatsAppSourcesRendersCompactCitationBlock(): void
     {
-        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+        $method = (new \ReflectionClass(WhatsAppReply::class))->getMethod('appendWhatsAppSources');
 
         $sources = [
             ['title' => 'Skyscanner – Bergen', 'url' => 'https://skyscanner.de/bergen'],
@@ -1845,7 +1815,7 @@ class WhatsAppServiceTest extends TestCase
             ['title' => 'DFDS Hirtshals → Bergen', 'url' => 'https://dfds.com/bergen'],
         ];
 
-        $result = $method->invoke($this->service, 'Camping in Bergen kostet ca. 15€/Nacht.', $sources);
+        $result = $method->invoke(null, 'Camping in Bergen kostet ca. 15€/Nacht.', $sources);
 
         $this->assertStringContainsString('Camping in Bergen kostet ca. 15€/Nacht.', $result);
         $this->assertStringContainsString('🔗 *Quellen:*', $result);
@@ -1867,15 +1837,15 @@ class WhatsAppServiceTest extends TestCase
 
     public function testAppendWhatsAppSourcesIsNoOpForEmptySources(): void
     {
-        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+        $method = (new \ReflectionClass(WhatsAppReply::class))->getMethod('appendWhatsAppSources');
 
         $original = 'Eine Antwort ohne Recherche.';
-        $this->assertSame($original, $method->invoke($this->service, $original, []));
+        $this->assertSame($original, $method->invoke(null, $original, []));
     }
 
     public function testAppendWhatsAppSourcesSkipsEntriesWithoutUrl(): void
     {
-        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+        $method = (new \ReflectionClass(WhatsAppReply::class))->getMethod('appendWhatsAppSources');
 
         $sources = [
             ['title' => 'Has URL', 'url' => 'https://example.com/1'],
@@ -1884,7 +1854,7 @@ class WhatsAppServiceTest extends TestCase
             ['title' => 'Second valid', 'url' => 'https://example.com/2'],
         ];
 
-        $result = $method->invoke($this->service, 'Answer.', $sources);
+        $result = $method->invoke(null, 'Answer.', $sources);
 
         $this->assertStringContainsString('*[1] Has URL*', $result);
         $this->assertStringContainsString('*[2] Second valid*', $result);
@@ -1894,13 +1864,13 @@ class WhatsAppServiceTest extends TestCase
 
     public function testAppendWhatsAppSourcesFallsBackToUrlWhenTitleMissing(): void
     {
-        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+        $method = (new \ReflectionClass(WhatsAppReply::class))->getMethod('appendWhatsAppSources');
 
         $sources = [
             ['url' => 'https://example.com/no-title'],
         ];
 
-        $result = $method->invoke($this->service, 'Answer.', $sources);
+        $result = $method->invoke(null, 'Answer.', $sources);
 
         $this->assertStringContainsString('*[1] https://example.com/no-title*', $result);
         $this->assertStringContainsString("\nhttps://example.com/no-title", $result);
@@ -1908,7 +1878,7 @@ class WhatsAppServiceTest extends TestCase
 
     public function testAppendWhatsAppSourcesCapsAtMaxLimit(): void
     {
-        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+        $method = (new \ReflectionClass(WhatsAppReply::class))->getMethod('appendWhatsAppSources');
 
         // Build twice the cap to prove we truncate, not crash.
         $sources = [];
@@ -1916,7 +1886,7 @@ class WhatsAppServiceTest extends TestCase
             $sources[] = ['title' => 'Source '.$i, 'url' => 'https://example.com/'.$i];
         }
 
-        $result = $method->invoke($this->service, 'Answer.', $sources);
+        $result = $method->invoke(null, 'Answer.', $sources);
 
         $this->assertStringContainsString('*[1] Source 1*', $result);
         $this->assertStringContainsString('*[5] Source 5*', $result);
@@ -1926,13 +1896,13 @@ class WhatsAppServiceTest extends TestCase
 
     public function testAppendWhatsAppSourcesCollapsesWhitespaceInTitle(): void
     {
-        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+        $method = (new \ReflectionClass(WhatsAppReply::class))->getMethod('appendWhatsAppSources');
 
         $sources = [
             ['title' => "Multi\nline\ttitle", 'url' => 'https://example.com'],
         ];
 
-        $result = $method->invoke($this->service, 'Answer.', $sources);
+        $result = $method->invoke(null, 'Answer.', $sources);
 
         // Newlines/tabs inside *…* would either break bold rendering or
         // split the title across the URL — both confuse WhatsApp's
@@ -1942,13 +1912,13 @@ class WhatsAppServiceTest extends TestCase
 
     public function testAppendWhatsAppSourcesOmitsLeadingSeparatorWhenAnswerIsBlank(): void
     {
-        $method = (new \ReflectionClass($this->service))->getMethod('appendWhatsAppSources');
+        $method = (new \ReflectionClass(WhatsAppReply::class))->getMethod('appendWhatsAppSources');
 
         $sources = [
             ['title' => 'Source', 'url' => 'https://example.com'],
         ];
 
-        $result = $method->invoke($this->service, '', $sources);
+        $result = $method->invoke(null, '', $sources);
 
         // No empty preamble — the citation block should be the entire reply.
         $this->assertStringStartsWith('🔗 *Quellen:*', $result);
@@ -1960,7 +1930,7 @@ class WhatsAppServiceTest extends TestCase
     // ============================================
 
     /**
-     * Run handleIncomingMessage for a plain text turn whose AI pipeline
+     * Run the WhatsApp turn for a plain text message whose AI pipeline
      * produced $aiResponse (content + metadata), capturing every outbound
      * Meta /messages send. markAsRead is excluded via the 'type' key filter
      * (its payload has 'status' => 'read' instead).
@@ -2030,7 +2000,7 @@ class WhatsAppServiceTest extends TestCase
             'messages' => [$incomingMsg],
         ];
 
-        $result = $this->service->handleIncomingMessage(IncomingMessageDto::fromPayload($incomingMsg, $value), $user, false);
+        $result = $this->turn()->handle(IncomingMessageDto::fromPayload($incomingMsg, $value), $user, false);
         $this->assertTrue($result['success']);
 
         return $sends;

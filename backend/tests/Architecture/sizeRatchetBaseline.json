@@ -9,8 +9,8 @@
     },
     "counts": {
         "fileLines": 56,
-        "constructorParams": 69,
-        "methodLines": 144
+        "constructorParams": 68,
+        "methodLines": 142
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1051,
@@ -66,7 +66,7 @@
         "src/Service/Research/UrlContentService.php": 1258,
         "src/Service/Usage/UsageStatsService.php": 960,
         "src/Service/VectorSearch/QdrantClientDirect.php": 2000,
-        "src/Service/WhatsApp/WhatsAppService.php": 2563,
+        "src/Service/WhatsApp/WhatsAppService.php": 1139,
         "src/Service/Widget/WidgetSetupService.php": 1000,
         "src/Service/Widget/WidgetSummaryService.php": 836
     },
@@ -137,7 +137,6 @@
         "src/Service/Telegram/TelegramMediaJobDelivery.php::TelegramMediaJobDelivery": 13,
         "src/Service/Tool/ApprovalService.php::ApprovalService": 11,
         "src/Service/Voice/VoiceLiveSessionService.php::VoiceLiveSessionService": 21,
-        "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService": 25,
         "src/Service/Widget/WidgetSummaryService.php::WidgetSummaryService": 12,
         "src/Service/Widget/WordPressIntegrationService.php::WordPressIntegrationService": 11
     },
@@ -274,9 +273,7 @@
         "src/Service/VectorSearch/LegacyPointIdMigrator.php::LegacyPointIdMigrator::migrateCollection": 139,
         "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::convertToWhatsAppMarkdown": 106,
         "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::downloadMedia": 118,
-        "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::handleIncomingMessage": 601,
         "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::handleMediaDownload": 194,
-        "src/Service/WhatsApp/WhatsAppService.php::WhatsAppService::storeOutgoingMessage": 102,
         "src/Service/Widget/HumanTakeoverService.php::HumanTakeoverService::sendHumanMessage": 114,
         "src/Service/Widget/WidgetExportService.php::WidgetExportService::exportToJson": 113,
         "src/Service/Widget/WidgetService.php::WidgetService::sanitizeConfig": 187,

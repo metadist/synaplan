@@ -220,6 +220,24 @@ media, the run and the flush count — over nineteen cases.
 delivery sends, the stored rows, the account, speech, usage, the summary
 refresh, the attachment store and Discord over fourteen cases.
 
+**WhatsApp** — `WebhookController::whatsapp()` calls `WhatsAppTurn::handle()`,
+`App\Service\WhatsApp\Turn\`:
+
+| Stage | Does |
+| ----- | ---- |
+| `WhatsAppIntake` | admits the message as an `InboundWhatsApp` or answers it early (`WhatsAppMessageAnswered`): a redelivery (lock and cache, so concurrent webhooks see it), an unsupported type (acknowledged silently, #633), a verification code from the website, the account's limit (told by message); names the account the turn runs under, whether a spoken reply is due and the bound assistant |
+| `WhatsAppConversation` | stores the message in the sender's WhatsApp chat (`StoredWhatsAppMessage`) with its metadata and media (`WhatsAppService::handleMediaDownload()`), moves the chat up and tells open browsers; media that cannot be fetched is told to the sender and ends the turn |
+| `WhatsAppReply` | runs the AI pipeline behind a typing indicator and composes the answer once (`WhatsAppAnswer`: doc tags as links, media tags rendered, the sources of a text reply, usage recorded); `WhatsAppReplyDelivery` sends the generated media, a spoken reply or text, and `WhatsAppAnswerStore` keeps what reached the phone |
+
+`WhatsAppService` stays the Meta Cloud API transport (messages, media, read
+receipts, the media download, the markdown conversion), and
+`WhatsAppInboundContent` reads what a webhook message says. The moved code
+keeps the service's weak typing (no `strict_types`) until its boundaries are
+typed. `WhatsAppTurnCharacterizationTest` pins the webhook's answer, every
+Graph API call in order, what reaches the processor, the stored rows, the
+account, speech, transcription, usage, realtime events, the summary refresh
+and Discord over twelve cases.
+
 ## File analysis — `FileAnalysisHandler`
 
 `FileAnalysisHandler` answers about the files of a turn on one path for both
