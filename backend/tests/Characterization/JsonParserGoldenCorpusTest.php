@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Characterization;
 
 use App\AI\StructuredOutput\JsonResponseDecoder;
-use App\Controller\UserMemoryController;
 use App\Service\Feedback\FeedbackContradictionService;
 use App\Service\File\FileGenerationEnvelope;
+use App\Service\Memory\MemoryInputParser;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\Message\MessageSorter;
 use App\Service\Multitask\TaskPlanner;
@@ -23,7 +23,7 @@ use Psr\Log\NullLogger;
  *  2. {@see TaskPlanner::decodeJson()}                  — tools:plan
  *  3. {@see MediaPromptExtractor::decodeJson()}         — media prompt refinement
  *  4. {@see FeedbackContradictionService::extractJson()} — tools:feedback_contradiction_check
- *  5. {@see UserMemoryController::parseAiResponse()}    — memory action extraction
+ *  5. {@see MemoryInputParser::parseAiResponse()}       — memory action extraction
  *  6. {@see FileGenerationEnvelope::extract()}           — officemaker envelope
  *
  * Each had independently re-invented fence-stripping, prose-extraction and
@@ -239,7 +239,7 @@ final class JsonParserGoldenCorpusTest extends TestCase
     /**
      * @return array<string, array{0: string, 1: bool}>
      */
-    public static function memoryControllerShapes(): array
+    public static function memoryParserShapes(): array
     {
         return [
             'clean' => ['clean', true],
@@ -253,18 +253,18 @@ final class JsonParserGoldenCorpusTest extends TestCase
         ];
     }
 
-    #[DataProvider('memoryControllerShapes')]
-    public function testUserMemoryControllerParseAiResponseActionsFormat(string $shapeName, bool $expectRecovered): void
+    #[DataProvider('memoryParserShapes')]
+    public function testMemoryInputParserParseAiResponseActionsFormat(string $shapeName, bool $expectRecovered): void
     {
         $json = '{"actions":[{"action":"create","memory":{"category":"preferences","key":"color","value":"blue"}}]}';
-        $controller = self::newBare(UserMemoryController::class);
+        $parser = self::newBare(MemoryInputParser::class);
 
         $input = self::shapes()[$shapeName]($json);
-        $result = self::invoke($controller, 'parseAiResponse', [$input, 'test input', []]);
+        $result = self::invoke($parser, 'parseAiResponse', [$input, 'test input', []]);
 
         $recovered = is_array($result) && [] !== $result && 'create' === ($result[0]['action'] ?? null);
 
-        self::assertSame($expectRecovered, $recovered, "UserMemoryController::parseAiResponse() [actions format] on shape '{$shapeName}' — recovery expectation changed, see class docblock");
+        self::assertSame($expectRecovered, $recovered, "MemoryInputParser::parseAiResponse() [actions format] on shape '{$shapeName}' — recovery expectation changed, see class docblock");
     }
 
     /**
@@ -274,18 +274,18 @@ final class JsonParserGoldenCorpusTest extends TestCase
      * only helps when the model actually emits newline-separated objects,
      * not when prose and JSON share one line.
      */
-    #[DataProvider('memoryControllerShapes')]
-    public function testUserMemoryControllerParseAiResponseSingleActionFormat(string $shapeName, bool $expectRecovered): void
+    #[DataProvider('memoryParserShapes')]
+    public function testMemoryInputParserParseAiResponseSingleActionFormat(string $shapeName, bool $expectRecovered): void
     {
         $json = '{"action":"create","memory":{"category":"preferences","key":"color","value":"blue"}}';
-        $controller = self::newBare(UserMemoryController::class);
+        $parser = self::newBare(MemoryInputParser::class);
 
         $input = self::shapes()[$shapeName]($json);
-        $result = self::invoke($controller, 'parseAiResponse', [$input, 'test input', []]);
+        $result = self::invoke($parser, 'parseAiResponse', [$input, 'test input', []]);
 
         $recovered = is_array($result) && [] !== $result && 'create' === ($result[0]['action'] ?? null);
 
-        self::assertSame($expectRecovered, $recovered, "UserMemoryController::parseAiResponse() [single-action format] on shape '{$shapeName}' — recovery expectation changed, see class docblock");
+        self::assertSame($expectRecovered, $recovered, "MemoryInputParser::parseAiResponse() [single-action format] on shape '{$shapeName}' — recovery expectation changed, see class docblock");
     }
 
     /**

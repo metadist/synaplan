@@ -86,3 +86,50 @@ filter it keeps.
 ## 8. Not in S9
 
 Routes, request validation, OpenAPI annotations: unchanged.
+
+## 9. As delivered (2026-10-17)
+
+The gate runs in `make -C backend test`: `ThinControllerTest` with
+`thinControllerBaseline.json`, and `make -C backend metrics` prints the
+three counts. Measured on S8's head (`ed4157f13`), they were 112 methods
+over 50 lines, 25 controllers with the entity manager and 8 with the AI
+facade (S4 had already removed three long actions, and one facade
+controller was gone). They are now 105, 17 and 5. The branch starts from
+S8's head. Where the result differs from the plan:
+
+- **Eight controllers lost the entity manager, not seven:** message
+  versions, the chat library, model health, live-support uploads, the
+  profile, widget sessions, widget summary prompts and chats. Every move
+  was a write (persist, flush, remove), and each went to the repository
+  that owns the entity (`ChatRepository::save()`,
+  `ModelHealthRepository::save()`, `PromptRepository::save()` / `remove()`
+  and `WidgetSessionRepository::removeAll()` are new). Each controller got a
+  functional test, recorded on the parent first; they share
+  `CreatesTestEntities`.
+- **No query moved, so every filter stayed where it was.** The ownership
+  checks (a message, chat, file or widget of the user; admin-only model
+  health) are unchanged in the controllers. The mutation check therefore
+  drops the owned-file filter in the file summary's lookup, which did move
+  (into `summaryDocument()`), and the foreign-file case fails.
+- **The AI calls went behind domain services:** `DocumentSummarizer` (the
+  two document summaries, one service), `MemoryInputParser` (the memory
+  parse with its three answer shapes) and `InputEnhancer` (the message
+  enhancer, beside `EnhanceChangeSummary`). Three controllers left the
+  facade list. `MessageController` keeps the facade for sending, and the
+  OpenAI-compatible controller keeps it for its plain-call branch, which
+  could move into `OpenAiGatewayToolLoop` later.
+- **Not the longest actions first.** S9.4 took the long actions whose work
+  had a home: the summary (251 → 47), the file summary (123 → 44), the
+  memory parse (162 → 32, its 54-line helper with it), the enhancer
+  (118 → 38), the memory edit (58 → 46, one failure mapper for create and
+  edit) and the chat edit (53 → 48, with the pin rule now on `Chat`). The
+  longest remain — sending a message (252), the chat file upload (225),
+  the message stream (182) and the Keycloak callback (178). Each is a whole
+  flow (chat send, file intake, streaming, sign-in) that needs a sprint of
+  its own with a characterization snapshot first: V5.
+- **One edge aligned.** A database failure while resolving the summary
+  model no longer aborts the file summary: both summaries now fall back to
+  the provider default, as `/summary/generate` always did.
+- **The test model cannot rewrite.** With the test provider, the enhancer
+  and the memory parse can only answer "no rewrite" and "not understood",
+  so their success paths are covered by the services' unit tests.
