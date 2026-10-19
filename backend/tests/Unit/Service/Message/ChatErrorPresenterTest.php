@@ -10,6 +10,7 @@ use App\AI\Exception\ProviderException;
 use App\Service\Message\ChatErrorPresenter;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Translation\IdentityTranslator;
+use Symfony\Component\Yaml\Yaml;
 
 final class ChatErrorPresenterTest extends TestCase
 {
@@ -78,5 +79,39 @@ final class ChatErrorPresenterTest extends TestCase
         ], 'en');
 
         self::assertSame(ChatFailureReason::UpstreamUnavailable, $view->reason);
+    }
+
+    public function testADemoRefusalSaysWhatDidNotHappenAndNamesTheRecoveryForTheCaller(): void
+    {
+        $refusal = new ProviderException('limit', 'openaicompatible', ['error_code' => 'freeapi_limit_reached', 'status_code' => 429], 429);
+
+        $user = $this->presenter->present($refusal, 'en', false);
+        $admin = $this->presenter->present($refusal, 'en', true);
+
+        self::assertSame('freeapi.limit_reached freeapi.recovery.user', $user->userText);
+        self::assertSame('freeapi.limit_reached freeapi.recovery.admin', $admin->userText);
+        self::assertFalse($user->canRetryWithOtherModel, 'another model of the same gateway is refused alike');
+        self::assertNull($user->adminDetail);
+        self::assertNotNull($admin->adminDetail);
+    }
+
+    public function testAnUnknownDemoCodeStillGetsADemoSentence(): void
+    {
+        $wrapped = new \RuntimeException('turn failed', 0, new ProviderException('nope', 'openaicompatible', ['error_code' => 'freeapi_invalid_key'], 401));
+
+        self::assertSame('freeapi.unavailable freeapi.recovery.user', $this->presenter->present($wrapped, 'en', false)->userText);
+    }
+
+    public function testEveryDemoSentenceExistsInEveryLocale(): void
+    {
+        $keys = ['throttled', 'limit_reached', 'full_today', 'expired', 'paused', 'blocked', 'upgrade_required', 'not_included', 'unavailable'];
+        foreach (['en', 'de', 'es', 'fr', 'tr'] as $locale) {
+            $catalog = Yaml::parseFile(\dirname(__DIR__, 4).'/translations/ai_errors.'.$locale.'.yaml');
+            foreach ($keys as $key) {
+                self::assertNotEmpty($catalog['freeapi'][$key] ?? null, "ai_errors.$locale freeapi.$key");
+            }
+            self::assertNotEmpty($catalog['freeapi']['recovery']['admin'] ?? null, "ai_errors.$locale freeapi.recovery.admin");
+            self::assertNotEmpty($catalog['freeapi']['recovery']['user'] ?? null, "ai_errors.$locale freeapi.recovery.user");
+        }
     }
 }

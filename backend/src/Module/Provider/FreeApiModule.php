@@ -16,6 +16,7 @@ use App\Service\FreeApi\FreeApiConfig;
 use App\Service\FreeApi\FreeApiModelBinder;
 use App\Service\FreeApi\FreeApiRequestHeaders;
 use App\Service\FreeApi\FreeApiState;
+use App\Service\FreeApi\FreeApiStatusReader;
 
 /**
  * Synaplan Demo: a free, limited AI key from synaplan.com so a fresh install
@@ -84,7 +85,7 @@ final class FreeApiModule implements FeatureModuleInterface
 
     public function routeNames(): array
     {
-        return [];
+        return ['api_freeapi_status', 'api_freeapi_activate', 'api_freeapi_leave'];
     }
 
     public function serviceIds(): array
@@ -98,6 +99,7 @@ final class FreeApiModule implements FeatureModuleInterface
             FreeApiModelBinder::class,
             FreeApiRequestHeaders::class,
             FreeApiCallContext::class,
+            FreeApiStatusReader::class,
         ];
     }
 

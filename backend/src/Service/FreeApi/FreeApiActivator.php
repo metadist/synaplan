@@ -45,12 +45,12 @@ final readonly class FreeApiActivator
     }
 
     /**
+     * @param bool     $force       also when chat already works with an own provider (the Demo then takes over the defaults)
+     * @param int|null $activatedBy the admin who started it; null from the console
+     *
      * @throws FreeApiException when the module is off or the server refused
      */
-    /**
-     * @param bool $force also when chat already works with an own provider (the Demo then takes over the defaults)
-     */
-    public function activate(string $locale = 'en', ?string $contactEmail = null, bool $force = false): FreeApiActivation
+    public function activate(string $locale = 'en', ?string $contactEmail = null, bool $force = false, ?int $activatedBy = null): FreeApiActivation
     {
         $baseUrl = $this->config->baseUrl();
         if (!$this->config->isConfigured() || null === $baseUrl) {
@@ -76,7 +76,7 @@ final readonly class FreeApiActivator
                 throw new FreeApiException('This Synaplan version is too old for the Demo. Update Synaplan, or add your own AI provider.', 'freeapi_upgrade_required');
             }
 
-            return $this->install($issued, $baseUrl, $installId);
+            return $this->install($issued, $baseUrl, $installId, $activatedBy);
         } finally {
             $lock->release();
         }
@@ -202,7 +202,7 @@ final readonly class FreeApiActivator
         throw new FreeApiException('The Synaplan Demo could not be started on this server right now. Try again in a minute.', FreeApiException::POW_REQUIRED);
     }
 
-    private function install(FreeApiIssuedKey $issued, string $baseUrl, string $installId): FreeApiActivation
+    private function install(FreeApiIssuedKey $issued, string $baseUrl, string $installId, ?int $activatedBy): FreeApiActivation
     {
         $snapshotTaken = null === $this->state->snapshot();
         try {
@@ -226,7 +226,7 @@ final readonly class FreeApiActivator
                 throw FreeApiException::invalidResponse('no chat alias');
             }
             $bound = $this->binder->bind($modelIds);
-            $this->state->markActive($issued->keyId, $issued->expiresAt, $issued->limits, time());
+            $this->state->markActive($issued->keyId, $issued->expiresAt, $issued->limits, time(), $activatedBy);
             if ($issued->key === $this->state->pendingRevoke()) {
                 $this->state->clearPendingRevoke();
             }

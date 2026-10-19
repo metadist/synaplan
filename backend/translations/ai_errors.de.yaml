@@ -23,3 +23,17 @@ file_analysis:
   audio_speech_off: 'Lokale Spracherkennung ist ausgeschaltet, deshalb wurde diese Aufnahme nicht transkribiert. Schalte lokale Sprache ein oder wähle unter Einstellungen ein Sprachmodell.'
   audio_binary_missing: 'Spracherkennung ist auf diesem Server nicht installiert, deshalb wurde diese Aufnahme nicht transkribiert. Installiere die Spracherkennung oder wähle unter Einstellungen ein Sprachmodell.'
   audio_model_missing: 'Die lokale Sprachmodell-Datei fehlt, deshalb wurde diese Aufnahme nicht transkribiert. Füge das Modell hinzu oder wähle unter Einstellungen ein Sprachmodell.'
+
+freeapi:
+  throttled: 'Die Synaplan Demo ist aus deinem Netzwerk gerade ausgelastet, deshalb wurde keine Antwort erzeugt. Deine Nachricht ist gespeichert; versuche es in ein paar Sekunden erneut.'
+  limit_reached: 'Du hast das heutige Kontingent der Synaplan Demo aufgebraucht, deshalb wurde keine Antwort erzeugt. Es wird um Mitternacht (deutsche Zeit) zurückgesetzt.'
+  full_today: 'Die Synaplan Demo ist für heute voll ausgelastet, deshalb wurde keine Antwort erzeugt. Sie öffnet wieder um Mitternacht (deutsche Zeit).'
+  expired: 'Der Zeitraum deiner Synaplan Demo ist abgelaufen, deshalb wurde keine Antwort erzeugt.'
+  paused: 'Die Synaplan Demo ist pausiert, deshalb wurde keine Antwort erzeugt. Deine Chats und Dateien sind auf diesem Server sicher; versuche es später erneut.'
+  blocked: 'Die Synaplan Demo wurde für diese Installation gestoppt, deshalb wurde keine Antwort erzeugt.'
+  upgrade_required: 'Diese Synaplan-Version ist zu alt für die Synaplan Demo, deshalb wurde keine Antwort erzeugt. Aktualisiere Synaplan.'
+  not_included: 'Gesprochene Antworten und Videos sind nicht Teil der Synaplan Demo, deshalb wurde nichts erzeugt.'
+  unavailable: 'Die Synaplan Demo konnte nicht antworten, deshalb wurde keine Antwort erzeugt. Deine Nachricht ist gespeichert; versuche es gleich noch einmal.'
+  recovery:
+    admin: 'Um jetzt weiterzuchatten, richte unter „KI-Anbieter einrichten“ deinen eigenen KI-Anbieter ein.'
+    user: 'Um jetzt weiterzuchatten, bitte deinen Administrator, einen KI-Anbieter einzurichten.'

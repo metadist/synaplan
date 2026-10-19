@@ -46,7 +46,7 @@ final class GettingStartedController extends AbstractController
                                 new OA\Property(property: 'file', type: 'boolean', example: false, description: 'The library has at least one file. Absent when the check failed.'),
                                 new OA\Property(property: 'assistant', type: 'boolean', example: false, description: 'The user has an assistant. Absent when assistants are switched off or the check failed.'),
                                 new OA\Property(property: 'app', type: 'boolean', example: false, description: 'At least one app the directory shows is connected. Absent when the check failed.'),
-                                new OA\Property(property: 'provider', type: 'boolean', example: true, description: 'A chat provider is ready. Present for admins only; absent when the check failed.'),
+                                new OA\Property(property: 'provider', type: 'boolean', example: true, description: 'A chat provider of this install is ready; the Synaplan Demo does not count. Present for admins only; absent when the check failed.'),
                             ],
                             type: 'object',
                         ),
