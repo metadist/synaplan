@@ -8,6 +8,9 @@
 #   KC_ORIGIN        - Allowed web origin (e.g., http://localhost:8000)
 #   KC_CLIENT_ID     - OIDC client ID (default: synaplan-app)
 #   KC_CLIENT_SECRET - OIDC client secret (default: test-oidc-secret)
+#   KC_OC_*, KC_EXCHANGE_* - OpenCloud clients (defaults below)
+#   KC_NC_CLIENT_ID, KC_NC_CLIENT_SECRET, KC_NC_ORIGIN - Nextcloud client
+#                      (defaults: nextcloud, nextcloud-dev-secret, http://localhost:8081)
 
 set -e
 
@@ -205,5 +208,63 @@ echo "Token exchange permission configured for ${EXCHANGE_CLIENT_ID} -> ${CLIENT
 echo "OpenCloud integration clients provisioned"
 echo "  OpenCloud client: ${OC_CLIENT_ID}"
 echo "  Token exchange client: ${EXCHANGE_CLIENT_ID}"
+
+# --- Cloud apps (cloud file sharing plan, E-3) ---
+# The people the cloud journeys use, the same in every cloud, and the client
+# Nextcloud's user_oidc app signs people in with. Each create checks first, so
+# this block can run against a realm that already has them.
+
+NC_CLIENT_ID="${KC_NC_CLIENT_ID:-nextcloud}"
+NC_CLIENT_SECRET="${KC_NC_CLIENT_SECRET:-nextcloud-dev-secret}"
+NC_ORIGIN="${KC_NC_ORIGIN:-http://localhost:8081}"
+
+ensure_user() {
+  local username="$1" email="$2" first="$3" last="$4" password="$5"
+  if [ -n "$($KCADM get users -r synaplan -q username="${username}" -q exact=true --fields id | json_field id)" ]; then
+    echo "User ${username} exists"
+    return
+  fi
+  $KCADM create users -r synaplan \
+    -s username="${username}" \
+    -s email="${email}" \
+    -s emailVerified=true \
+    -s enabled=true \
+    -s firstName="${first}" \
+    -s lastName="${last}"
+  $KCADM set-password -r synaplan --username "${username}" --new-password "${password}"
+}
+
+ensure_user ada ada@example.org Ada Example ada-dev-pass
+ensure_user bob bob@example.org Bob Example bob-dev-pass
+
+NC_CLIENT_UUID=$($KCADM get "clients?clientId=${NC_CLIENT_ID}" -r synaplan --fields id | json_field id)
+if [ -z "${NC_CLIENT_UUID}" ]; then
+  $KCADM create clients -r synaplan \
+    -s clientId="${NC_CLIENT_ID}" \
+    -s enabled=true \
+    -s publicClient=false \
+    -s secret="${NC_CLIENT_SECRET}" \
+    -s standardFlowEnabled=true \
+    -s directAccessGrantsEnabled=false \
+    -s "redirectUris=[\"${NC_ORIGIN}/apps/user_oidc/code\",\"${NC_ORIGIN}/index.php/apps/user_oidc/code\"]" \
+    -s "webOrigins=[\"${NC_ORIGIN}\"]" \
+    -s 'attributes={"post.logout.redirect.uris":"'"${NC_ORIGIN}"'/*"}'
+  NC_CLIENT_UUID=$($KCADM get "clients?clientId=${NC_CLIENT_ID}" -r synaplan --fields id | json_field id)
+  # Same rationale as the synaplan-app mapper: tokens carry aud=${NC_CLIENT_ID}.
+  $KCADM create "clients/${NC_CLIENT_UUID}/protocol-mappers/models" -r synaplan \
+    -s name=nextcloud-audience \
+    -s protocol=openid-connect \
+    -s protocolMapper=oidc-audience-mapper \
+    -s 'config."included.client.audience"='"${NC_CLIENT_ID}" \
+    -s 'config."access.token.claim"=true' \
+    -s 'config."id.token.claim"=false' \
+    -s 'config."introspection.token.claim"=true'
+else
+  echo "Client ${NC_CLIENT_ID} exists"
+fi
+
+echo "Cloud apps provisioned"
+echo "  Users: ada, bob"
+echo "  Nextcloud client: ${NC_CLIENT_ID} (redirect ${NC_ORIGIN}/apps/user_oidc/code)"
 
 echo "Keycloak provisioning complete"

@@ -172,6 +172,38 @@ The chat bubble for an async video shows `Auftrag läuft noch / Job still runnin
 5. **The reaper backstop** (`app:media:reap-jobs`) drives every stale / past-deadline job to `timed_out` with a localized error so no bubble hangs forever. The local `scheduler` service runs it every tick; `docker compose exec -T backend php bin/console app:media:reap-jobs` still works if you need it immediately.
 6. **Saved Task schedules** (`app:saved-tasks:tick`) claim due tasks with a compare-and-set and a cross-node Redis lock (`saved-tasks-tick`). The local `docker-compose.yml` `scheduler` service (`SYNAPLAN_ROLE=scheduler`) runs it every minute in its own lane, so a long task run never holds up the reapers — same loop as self-host and production (see [Background jobs](ADMIN.md#background-jobs-scheduler)). Fire a due task by hand with `docker compose exec -T backend php bin/console app:saved-tasks:tick` if you do not want to wait for the next cycle. It is a no-op while `SAVEDTASKS / ENABLED` is globally off. Overview UI: **Channels → Saved Tasks**.
 
+### Keycloak and the cloud apps (optional)
+
+Organisation login (OIDC) and the local Nextcloud and OpenCloud stacks use the
+**Keycloak** of the `oidc` profile. It is **off by default**:
+
+```bash
+docker compose --profile oidc up -d keycloak_certs keycloak keycloak_setup
+```
+
+`keycloak_setup` (`_docker/keycloak/setup.sh`) creates the realm `synaplan`
+once per Keycloak container: the clients `synaplan-app`, `opencloud`,
+`synaplan-opencloud` (token exchange) and `nextcloud`, and the users
+`testuser`, `admin`, `demo`, `ada` and `bob`. Synaplan accepts the realm's
+tokens with these lines in `backend/.env` — the values `docker-compose.test.yml`
+uses — followed by `docker compose up -d backend worker scheduler`:
+
+```bash
+OIDC_CLIENT_ID=synaplan-app
+OIDC_CLIENT_SECRET=test-oidc-secret
+OIDC_DISCOVERY_URL=http://host.docker.internal:8080/realms/synaplan
+```
+
+Browsers reach Keycloak at `https://host.docker.internal:8443`: accept its
+self-signed certificate once, and let `host.docker.internal` resolve to
+`127.0.0.1` on the host. The Nextcloud stack (`make dev-up` in
+`synaplan-nextcloud`) and the OpenCloud stack (`make docker-up` in
+`synaplan-opencloud`) sign in through this realm. Check both with:
+
+```bash
+_devextras/testing/cloud-apps/env-check.sh --cloud nextcloud,opencloud --oidc
+```
+
 ### Redis (cache, sessions, locks, messenger, realtime)
 
 The backend uses **Redis** (`redis` service in Compose) as the canonical cross-node platform store. One Redis instance, five concerns:
