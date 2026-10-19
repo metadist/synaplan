@@ -4,6 +4,7 @@ import { httpClient, getApiBaseUrl, refreshAccessToken } from './api/httpClient'
 import { saveOrDownloadBlob } from './api/nativeDownload'
 import { isNativeApp } from './api/nativeRuntime'
 import { getNativeAccessToken } from './api/nativeAuth'
+import { fileSourceSchema, type FileSource } from './fileSources'
 
 export type UploadCheckReason =
   | 'rate_limit_exceeded'
@@ -172,21 +173,7 @@ export interface UploadResponse {
 // each schema both validates the JSON at runtime (where we call `.parse()`)
 // and produces the static TypeScript type via `z.infer` — so the types can
 // never drift from the validation (AGENTS.md "Type Safety & Validation").
-export const fileSourceSchema = z.enum([
-  'web_upload',
-  'chat_attachment',
-  'outlook',
-  'nextcloud',
-  'opencloud',
-  'owncloud',
-  'whatsapp',
-  'telegram',
-  'widget',
-  'api',
-  'generated',
-  'compute',
-])
-export type FileSource = z.infer<typeof fileSourceSchema>
+export { fileSourceSchema, type FileSource }
 
 export const fileVectorStateSchema = z.enum([
   'none',
