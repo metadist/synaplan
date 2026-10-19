@@ -82,6 +82,7 @@
     "retry": "Erneut versuchen",
     "helpLine": "Dieses Fenster wurde von einer anderen App geöffnet. Es kann gefahrlos geschlossen werden.",
     "notYou": "Nicht du? Abmelden",
+    "signedInAs": "Bei Synaplan angemeldet als {email}",
     "errorMissingState": "Diese Verbindungsanfrage ist unvollständig. Starte erneut in der anderen App.",
     "errorOfficeNotReady": "Office.js ist nicht verfügbar. Diese Seite muss aus Outlook heraus geöffnet werden.",
     "errorNotSignedIn": "Du bist nicht angemeldet. Bitte das Fenster aktualisieren und erneut anmelden.",

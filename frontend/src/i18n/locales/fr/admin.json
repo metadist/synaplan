@@ -82,6 +82,7 @@
     "retry": "Réessayer",
     "helpLine": "Cette fenêtre a été ouverte par une autre application. Vous pouvez la fermer.",
     "notYou": "Ce n’est pas vous ? Se déconnecter",
+    "signedInAs": "Connecté à Synaplan en tant que {email}",
     "errorMissingState": "Cette demande de connexion est incomplète. Recommencez depuis l’autre application.",
     "errorOfficeNotReady": "Office.js n’est pas disponible. Cette page doit être ouverte depuis Outlook.",
     "errorNotSignedIn": "Vous n’êtes pas connecté. Actualisez la fenêtre et connectez-vous à nouveau.",

@@ -59,11 +59,19 @@
             }}
           </p>
           <div
-            class="surface-chip rounded-xl p-3 text-center mb-6 ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+            class="surface-chip rounded-xl p-3 text-center ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+            :class="signedInAs ? 'mb-3' : 'mb-6'"
           >
             <p class="txt-primary text-sm font-medium">{{ confirmUid }}</p>
             <p class="txt-secondary text-xs mt-1">{{ confirmHost }}</p>
           </div>
+          <p
+            v-if="signedInAs"
+            class="txt-secondary text-xs text-center mb-6"
+            data-testid="signed-in-as"
+          >
+            {{ signedInAs }}
+          </p>
 
           <button
             type="button"
@@ -220,6 +228,13 @@ const confirmUid = computed(() => {
   }
   return userEmail.value
 })
+
+// Outlook's card already shows the Synaplan email as its uid.
+const signedInAs = computed(() =>
+  clientPolicy.value?.delivery === 'link-code' && userEmail.value
+    ? t('platformConnect.signedInAs', { email: userEmail.value })
+    : ''
+)
 
 const targetBaseUrl = computed(() => {
   const fromQuery = route.query.baseUrl as string | undefined
