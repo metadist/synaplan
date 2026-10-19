@@ -19,6 +19,8 @@ use App\Service\Agent\AssistantAliasResolver;
 use App\Service\Api\OpenAiChatCompletionRequest;
 use App\Service\Api\OpenAiChatCompletionRequestException;
 use App\Service\Api\OpenAiChatCompletionResponder;
+use App\Service\Api\OpenAiGatewayAdmission;
+use App\Service\Api\OpenAiGatewayException;
 use App\Service\Api\OpenAiToolCallingGate;
 use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
@@ -165,7 +167,7 @@ class OpenAICompatibleController extends AbstractController
     #[OA\Response(response: 400, description: 'Invalid request or tools not supported on this model')]
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 404, description: 'Model not found')]
-    #[OA\Response(response: 429, description: 'Rate limit exceeded')]
+    #[OA\Response(response: 429, description: 'Rate limit or budget exceeded')]
     public function chatCompletions(Request $request, #[CurrentUser] ?User $user): Response
     {
         if (!$user) {
@@ -179,16 +181,14 @@ class OpenAICompatibleController extends AbstractController
 
         try {
             $parsed = OpenAiChatCompletionRequest::fromBody($body);
+            OpenAiGatewayAdmission::admit($this->rateLimitService, $request, $user, 'MESSAGES');
         } catch (OpenAiChatCompletionRequestException $e) {
             return $this->openAiError($e->getMessage(), 'invalid_request_error', $e->errorCode, 400);
+        } catch (OpenAiGatewayException $e) {
+            return $e->toResponse();
         }
 
-        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
-        if (!$rateLimitCheck['allowed']) {
-            return $this->openAiError('Rate limit exceeded', 'rate_limit_error', 'rate_limit_exceeded', 429);
-        }
-
-        return $this->dispatchChatCompletion($user, $parsed);
+        return $this->dispatchChatCompletion($user, $parsed, \App\Security\FreeApiGatewayGuard::isGated($request));
     }
 
     #[Route('/v1/models', name: 'openai_list_models', methods: ['GET'])]
@@ -258,7 +258,7 @@ class OpenAICompatibleController extends AbstractController
         ]);
     }
 
-    private function dispatchChatCompletion(User $user, OpenAiChatCompletionRequest $parsed): Response
+    private function dispatchChatCompletion(User $user, OpenAiChatCompletionRequest $parsed, bool $demoHourlyCapWaived = false): Response
     {
         $messages = $parsed->messages;
         $optionsProfile = null;
@@ -319,7 +319,7 @@ class OpenAICompatibleController extends AbstractController
             $options['runtime_profile'] = $optionsProfile;
         }
         if ($gateAllows && 'none' !== $parsed->toolChoice) {
-            $options['server_tool_loop'] = true;
+            $options = array_merge($options, ['server_tool_loop' => true, OpenAiGatewayToolLoop::DEMO_HOURLY_CAP_WAIVED => $demoHourlyCapWaived]);
         }
         if (null !== $parsed->temperature) {
             $options['temperature'] = $parsed->temperature;

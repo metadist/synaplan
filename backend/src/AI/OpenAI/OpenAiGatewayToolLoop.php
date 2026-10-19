@@ -48,6 +48,12 @@ final readonly class OpenAiGatewayToolLoop
     private const MAX_TOOLS_PER_TURN = 16;
     private const WALL_CLOCK_SECONDS = 240;
 
+    /**
+     * Chat option the controller sets when the Synaplan Demo gate already
+     * waived the shared hourly MESSAGES cap. Removed before a provider sees it.
+     */
+    public const DEMO_HOURLY_CAP_WAIVED = 'demo_hourly_cap_waived';
+
     public function __construct(
         private OpenAiGatewayToolCatalog $catalog,
         private AiFacade $aiFacade,
@@ -73,6 +79,7 @@ final readonly class OpenAiGatewayToolLoop
      */
     public function complete(User $user, array $messages, array $options): array
     {
+        $demoHourlyCapWaived = $this->pullDemoHourlyCapWaiver($options);
         if ('none' === ($options['tool_choice'] ?? null)) {
             return $this->aiFacade->chat($messages, $user->getId(), $options);
         }
@@ -113,7 +120,14 @@ final readonly class OpenAiGatewayToolLoop
             $partition = $this->partition($toolCalls, $snapshot['dispatch']);
             if ([] !== $partition['client']) {
                 if ([] !== $partition['ours']) {
-                    $executed = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes, $assistant);
+                    $executed = $this->executeOurs(
+                        $partition['ours'],
+                        $snapshot['dispatch'],
+                        $user,
+                        $notes,
+                        $assistant,
+                        $demoHourlyCapWaived,
+                    );
                     unset($executed);
                 }
                 $last['tool_calls'] = $partition['client'];
@@ -132,7 +146,14 @@ final readonly class OpenAiGatewayToolLoop
                 return $last;
             }
 
-            $results = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes, $assistant);
+            $results = $this->executeOurs(
+                $partition['ours'],
+                $snapshot['dispatch'],
+                $user,
+                $notes,
+                $assistant,
+                $demoHourlyCapWaived,
+            );
             $messages = $this->appendToolTurn($messages, $toolCalls, $results);
         }
 
@@ -153,6 +174,7 @@ final readonly class OpenAiGatewayToolLoop
      */
     public function stream(User $user, array $messages, callable $callback, array $options): array
     {
+        $demoHourlyCapWaived = $this->pullDemoHourlyCapWaiver($options);
         $forwardText = static function (mixed $chunk) use ($callback): void {
             if (!\is_string($chunk) && !\is_array($chunk)) {
                 return;
@@ -208,7 +230,14 @@ final readonly class OpenAiGatewayToolLoop
             $partition = $this->partition($toolCalls, $snapshot['dispatch']);
             if ([] !== $partition['client']) {
                 if ([] !== $partition['ours']) {
-                    $executed = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes, $assistant);
+                    $executed = $this->executeOurs(
+                        $partition['ours'],
+                        $snapshot['dispatch'],
+                        $user,
+                        $notes,
+                        $assistant,
+                        $demoHourlyCapWaived,
+                    );
                     unset($executed);
                 }
                 $this->emitClientToolDeltas($partition['client'], $callback);
@@ -223,7 +252,14 @@ final readonly class OpenAiGatewayToolLoop
                 return $this->streamMetadata($last, $options, $notes, $summedUsage);
             }
 
-            $results = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes, $assistant);
+            $results = $this->executeOurs(
+                $partition['ours'],
+                $snapshot['dispatch'],
+                $user,
+                $notes,
+                $assistant,
+                $demoHourlyCapWaived,
+            );
             $messages = $this->appendToolTurn($messages, $toolCalls, $results);
         }
 
@@ -316,8 +352,14 @@ final readonly class OpenAiGatewayToolLoop
      *
      * @return list<array<string, mixed>>
      */
-    private function executeOurs(array $toolCalls, array $dispatch, User $user, array &$notes, ?RuntimeProfile $assistant = null): array
-    {
+    private function executeOurs(
+        array $toolCalls,
+        array $dispatch,
+        User $user,
+        array &$notes,
+        ?RuntimeProfile $assistant = null,
+        bool $demoHourlyCapWaived = false,
+    ): array {
         if (count($toolCalls) > self::MAX_TOOLS_PER_TURN) {
             $toolCalls = array_slice($toolCalls, 0, self::MAX_TOOLS_PER_TURN);
         }
@@ -329,10 +371,12 @@ final readonly class OpenAiGatewayToolLoop
             $arguments = $this->decodeArguments($call['function']['arguments'] ?? '{}');
             $entry = $dispatch[$name] ?? null;
 
-            $rate = $this->rateLimitService->checkLimit($user, 'MESSAGES');
-            if (!$rate['allowed']) {
-                $results[] = $this->toolMessage($id, 'Rate limit exceeded; tool call skipped.');
-                continue;
+            if (!$demoHourlyCapWaived) {
+                $rate = $this->rateLimitService->checkLimit($user, 'MESSAGES');
+                if (!$rate['allowed']) {
+                    $results[] = $this->toolMessage($id, 'Rate limit exceeded; tool call skipped.');
+                    continue;
+                }
             }
 
             if (null === $entry) {
@@ -387,6 +431,17 @@ final readonly class OpenAiGatewayToolLoop
         }
 
         return $results;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function pullDemoHourlyCapWaiver(array &$options): bool
+    {
+        $waived = true === ($options[self::DEMO_HOURLY_CAP_WAIVED] ?? false);
+        unset($options[self::DEMO_HOURLY_CAP_WAIVED]);
+
+        return $waived;
     }
 
     /**
