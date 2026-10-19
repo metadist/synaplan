@@ -57,6 +57,29 @@ class File
     ];
 
     /**
+     * Cloud apps whose uploads name the knowledge folder the person picked.
+     * Such an upload is already filed, so it skips the Incoming inbox; without
+     * a folder, or with `DEFAULT`, it still lands there.
+     */
+    public const KNOWLEDGE_INTAKE_SOURCES = [
+        'nextcloud',
+        'opencloud',
+        'owncloud',
+    ];
+
+    public static function arrivesIncoming(string $source, ?string $groupKey): bool
+    {
+        return in_array($source, self::INCOMING_SOURCES, true)
+            && !self::namesKnowledgeFolder($source, $groupKey);
+    }
+
+    public static function namesKnowledgeFolder(string $source, ?string $groupKey): bool
+    {
+        return in_array($source, self::KNOWLEDGE_INTAKE_SOURCES, true)
+            && null !== $groupKey && '' !== $groupKey && 'DEFAULT' !== $groupKey;
+    }
+
+    /**
      * Kind of a generated artefact, for {@see self::$source} === 'generated'.
      * Null for non-generated files (03_file-management.md ?3.1, `BORIGINKIND`).
      */

@@ -207,7 +207,7 @@ class FileController extends AbstractController
                 schema: new OA\Schema(
                     properties: [
                         new OA\Property(property: 'files[]', type: 'array', items: new OA\Items(type: 'string', format: 'binary')),
-                        new OA\Property(property: 'group_key', type: 'string', example: 'customer-support'),
+                        new OA\Property(property: 'group_key', type: 'string', example: 'customer-support', description: 'Knowledge folder. An upload from nextcloud, opencloud or owncloud that names a folder other than DEFAULT skips the Incoming inbox; without one it lands there.'),
                         new OA\Property(property: 'process_level', type: 'string', enum: ['store', 'extract', 'vectorize', 'full'], example: 'vectorize'),
                         new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'whatsapp', 'telegram', 'widget', 'api', 'generated', 'compute'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/Outlook) should set this so the file is labelled by source. compute = result of a file-work run.'),
                         new OA\Property(property: 'original_name', type: 'string', example: '/Shared/Q3 Report.pdf', description: 'The file name at the source, preserved even when the stored name is normalised. Falls back to the uploaded filename.'),
