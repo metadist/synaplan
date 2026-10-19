@@ -7,6 +7,7 @@ namespace App\Tests\Controller;
 use App\AI\Credential\ChatReadinessService;
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\Entity\User;
+use App\Service\FreeApi\FreeApiConfig;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -49,6 +50,22 @@ final class AdminOpenAiEndpointsControllerTest extends WebTestCase
 
         self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
         self::assertFalse($this->availabilitySnapshotIsHit());
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertFalse($body['demoLeft']);
+    }
+
+    public function testTheDemoEndpointNameIsReserved(): void
+    {
+        $this->loginAdmin();
+
+        $this->postJson('/api/v1/admin/openai-endpoints', [
+            'name' => FreeApiConfig::ENDPOINT_NAME,
+            'base_url' => 'http://127.0.0.1:9/v1',
+        ]);
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+
+        $this->client->request('DELETE', '/api/v1/admin/openai-endpoints/'.FreeApiConfig::ENDPOINT_NAME);
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
     }
 
     public function testDeleteDropsTheProviderAvailabilitySnapshot(): void

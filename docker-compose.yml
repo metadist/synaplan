@@ -327,6 +327,10 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       CHAT_ARTIFACTS_ENABLED: ${CHAT_ARTIFACTS_ENABLED:-1}
+      # Synaplan Demo (module `freeapi`). Off unless both are set; with the
+      # `freeapi-fake` profile use FREEAPI_BASE_URL=http://freeapi-fake:8787.
+      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-}
+      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-}
       QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
@@ -533,6 +537,10 @@ services:
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       CHAT_ARTIFACTS_ENABLED: ${CHAT_ARTIFACTS_ENABLED:-1}
+      # Synaplan Demo (module `freeapi`). Off unless both are set; with the
+      # `freeapi-fake` profile use FREEAPI_BASE_URL=http://freeapi-fake:8787.
+      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-}
+      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-}
       QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
@@ -757,6 +765,8 @@ services:
       COMPUTE_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
       FEATURE_COMPUTE_ENABLED: ${FEATURE_COMPUTE_ENABLED:-true}
       FEATURE_COMPUTE_WORKSPACES_ENABLED: ${FEATURE_COMPUTE_WORKSPACES_ENABLED:-true}
+      FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-}
+      FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-}
     entrypoint: ["/bin/bash", "-ec"]
     command:
       - |
@@ -1010,6 +1020,35 @@ services:
     environment:
       SEARXNG_BASE_URL: http://searxng:8080/
       SEARXNG_SECRET: ${SEARXNG_SECRET:-synaplan-dev-searxng-secret-change-me}
+    networks:
+      - synaplan-network
+
+  # Fake Synaplan Demo server for offline development and tests (module `freeapi`).
+  # Enable with:  docker compose --profile freeapi-fake up -d
+  # then set FREEAPI_BASE_URL=http://freeapi-fake:8787 and FEATURE_FREEAPI_ENABLED=true.
+  # Canned answers, in-memory state; see _devextras/freeapi-fake/README.md.
+  freeapi-fake:
+    image: node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+    container_name: synaplan-freeapi-fake
+    profiles: [freeapi-fake]
+    restart: unless-stopped
+    user: node
+    working_dir: /app
+    command: ["node", "server.mjs"]
+    volumes:
+      - ./_devextras/freeapi-fake/server.mjs:/app/server.mjs:ro
+      - ./backend/tests/Fixtures/freeapi-contract/v1:/contract:ro
+    environment:
+      PORT: 8787
+      CONTRACT_DIR: /contract
+      FAKE_BASE_URL: http://freeapi-fake:8787
+      FAKE_POW_BITS: ${FAKE_POW_BITS:-}
+      FAKE_FORCE_ERROR: ${FAKE_FORCE_ERROR:-}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     networks:
       - synaplan-network
 

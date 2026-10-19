@@ -6,6 +6,7 @@ namespace App\Tests\Unit;
 
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\AI\Exception\ProviderException;
+use App\AI\Provider\OpenAiCompatibleClients;
 use App\AI\Provider\OpenAICompatibleProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use OpenAI\Contracts\ClientContract;
@@ -295,10 +296,11 @@ final class OpenAICompatibleProviderTest extends TestCase
         ]);
         $client = $this->createMock(ClientContract::class);
         $client->method('chat')->willReturn($chat);
-        $provider = new OpenAICompatibleProvider($registry, new NullLogger(), new MockHttpClient(), '/tmp');
-        (new \ReflectionClass($provider))->getProperty('clients')->setValue($provider, ['gateway' => $client]);
+        $clients = $this->createStub(OpenAiCompatibleClients::class);
+        $clients->method('withCallHeaders')->willReturnArgument(0);
+        $clients->method('clientFor')->willReturn($client);
 
-        return $provider;
+        return new OpenAICompatibleProvider($registry, new NullLogger(), new MockHttpClient(), '/tmp', clients: $clients);
     }
 
     private function imageProvider(MockHttpClient $client): OpenAICompatibleProvider

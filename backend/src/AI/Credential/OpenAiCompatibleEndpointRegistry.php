@@ -51,6 +51,9 @@ final class OpenAiCompatibleEndpointRegistry
 
     public const CONFIG_GROUP = 'openai_compatible';
 
+    /** Reserved for the Synaplan Demo (`App\Service\FreeApi`). */
+    public const DEMO_ENDPOINT = 'synaplan-demo';
+
     /** Env flag: refuse upstreams on private networks (hosted / multi-tenant installs). */
     public const ENV_PUBLIC_ONLY = 'OPENAI_COMPATIBLE_PUBLIC_UPSTREAMS_ONLY';
 
@@ -301,7 +304,8 @@ final class OpenAiCompatibleEndpointRegistry
      * Resolution order:
      *   1. Explicit endpoint name passed in options (advanced override).
      *   2. The endpoint named in the BMODELS row's BJSON for this providerId.
-     *   3. The single configured endpoint, when exactly one exists.
+     *   3. The single configured endpoint, when exactly one exists — never the
+     *      Synaplan Demo, which only answers for its own model rows.
      *
      * @return array{name: string, label: string, base_url: string, api_key: string, headers: array<string, string>, capabilities: string[]}|null
      */
@@ -327,9 +331,9 @@ final class OpenAiCompatibleEndpointRegistry
 
         $rows = $this->rawRows();
         if (1 === count($rows)) {
-            $only = array_key_first($rows);
+            $only = (string) array_key_first($rows);
 
-            return $this->getEndpoint((string) $only);
+            return self::DEMO_ENDPOINT === $only ? null : $this->getEndpoint($only);
         }
 
         return null;

@@ -1348,6 +1348,9 @@
     },
     "chat_artifacts": {
       "label": "HTML- und SVG-Vorschau"
+    },
+    "freeapi": {
+      "label": "Synaplan-Demo"
     }
   },
   "partners": {

@@ -1344,6 +1344,9 @@
     },
     "chat_artifacts": {
       "label": "Vista previa de HTML y SVG"
+    },
+    "freeapi": {
+      "label": "Demo de Synaplan"
     }
   },
   "partners": {
