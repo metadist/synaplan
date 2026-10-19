@@ -7,7 +7,7 @@
   "freeapi_limit_reached": {
     "http": 429,
     "type": "rate_limit_error",
-    "message": "You have used today's 40 Demo messages. More at midnight (German time), or add your own AI provider."
+    "message": "You have used today's Demo allowance. More at midnight (German time), or add your own AI provider."
   },
   "freeapi_full_today": {
     "http": 429,
@@ -17,7 +17,7 @@
   "freeapi_expired": {
     "http": 403,
     "type": "invalid_request_error",
-    "message": "Your 14-day Demo has ended. Add your own AI provider, or run Ollama locally."
+    "message": "Your Demo period has ended. Add your own AI provider, or run Ollama locally."
   },
   "freeapi_paused": {
     "http": 503,
