@@ -83,7 +83,7 @@ not a chat message.
 | CF5.9-oc Dialog file sets and trial — OpenCloud | `synaplan-opencloud` | P2 | planned |  |
 | CF5.9-oco Dialog file sets and trial — ownCloud.online | `synaplan-owncloud-online` | P3 | planned |  |
 | CF5.10 Contract v1 freeze | `synaplan`, `synaplan-nextcloud` | P1 (last) | planned | row 44; P1 exit |
-| M1 release: Synaplan + Nextcloud 1.7.0 | `synaplan`, `synaplan-nextcloud` | P1 | **ready** · version PR [synaplan-nextcloud#64](https://github.com/metadist/synaplan-nextcloud/pull/64), merged last | `11` §2, §6; the App Store offers 1.5.0 today (1.6.0 and 1.6.1 were never uploaded); then two secrets, the tag `v1.7.0` |
+| M1 release: Synaplan + Nextcloud 1.7.0 | `synaplan`, `synaplan-nextcloud` | P1 | **in progress** · the app PRs are green; the version PR [synaplan-nextcloud#64](https://github.com/metadist/synaplan-nextcloud/pull/64) merges last | `11` §2, §6. Gates before the tag `v1.7.0`: (1) a Synaplan release with CF0.1–CF0.4, CF0.8 and CF0.9, deployed — v5.5.0 has none of them, and without CF0.1 linked and provisioned keys get `insufficient_scope` on Summarize; (2) CF0.5 (`synaplan-docs` half) and CF0.6; (3) the CF0.7 walks green — `09` row 6 (J-NC-3) stays red until D29 is fixed in the core; (4) the two release secrets (A6). The App Store offers 1.5.0 today; 1.6.0 and 1.6.1 were never uploaded |
 | M2 release: Synaplan + Nextcloud 1.8.0 | `synaplan`, `synaplan-nextcloud` | P1 | planned |  |
 | M3 release: Synaplan + Nextcloud 1.9.0, chart `features.cloudFiles` | `synaplan`, `synaplan-nextcloud`, `synaplan-charts` | P1 | planned |  |
 | M4 release: Synaplan + Nextcloud 2.0.0, contract v1 — the Nextcloud release | `synaplan`, `synaplan-nextcloud` | P1 exit | planned | then row 46 flags |
@@ -529,7 +529,9 @@ branch with its own PR, CI green and every Copilot finding answered:
 - the version PR for 1.7.0 ([#64](https://github.com/metadist/synaplan-nextcloud/pull/64))
 
 Merge order: #57, #58, #60, #61; #59 and #62 in any order; #63 after #59
-and #60, because it describes them; #64 last.
+and #60, because it describes them; #64 last. Merging is not releasing: the
+tag waits for the M1 gates in the steps table, first of all a Synaplan
+release with CF0.1 (v5.5.0 predates it).
 
 The e2e journeys run in CI against the pinned Synaplan image on Nextcloud 33
 and 35. The CI job reads the image's source commit and checks out that
