@@ -368,7 +368,7 @@ class ChatController extends AbstractController
                                     type: 'array',
                                     description: 'Files this chat can still use on later turns, including uploads whose original message has scrolled out of the history window.',
                                     items: new OA\Items(
-                                        required: ['id', 'reference', 'name', 'category', 'origin', 'fileType', 'messageId', 'hasText'],
+                                        required: ['id', 'reference', 'name', 'category', 'origin', 'fileType', 'messageId', 'hasText', 'mime'],
                                         properties: [
                                             new OA\Property(property: 'id', type: 'integer', nullable: true, example: 77),
                                             new OA\Property(property: 'reference', type: 'string', example: 'file:77'),
@@ -377,7 +377,7 @@ class ChatController extends AbstractController
                                             new OA\Property(property: 'origin', type: 'string', enum: ['attached', 'uploaded', 'generated'], example: 'uploaded'),
                                             new OA\Property(property: 'fileType', type: 'string', example: 'pdf'),
                                             new OA\Property(property: 'messageId', type: 'integer', nullable: true, example: 100),
-                                            new OA\Property(property: 'hasText', type: 'boolean', example: true),
+                                            new OA\Property(property: 'hasText', type: 'boolean', example: true), new OA\Property(property: 'mime', type: 'string', example: 'video/webm'),
                                         ]
                                     )
                                 ),
@@ -459,7 +459,7 @@ class ChatController extends AbstractController
                             property: 'files',
                             type: 'array',
                             items: new OA\Items(
-                                required: ['id', 'reference', 'name', 'category', 'origin', 'fileType', 'messageId', 'hasText'],
+                                required: ['id', 'reference', 'name', 'category', 'origin', 'fileType', 'messageId', 'hasText', 'mime'],
                                 properties: [
                                     new OA\Property(property: 'id', type: 'integer', nullable: true, example: 77),
                                     new OA\Property(property: 'reference', type: 'string', example: 'file:77'),
@@ -468,7 +468,7 @@ class ChatController extends AbstractController
                                     new OA\Property(property: 'origin', type: 'string', enum: ['attached', 'uploaded', 'generated'], example: 'uploaded'),
                                     new OA\Property(property: 'fileType', type: 'string', example: 'pdf'),
                                     new OA\Property(property: 'messageId', type: 'integer', nullable: true, example: 100),
-                                    new OA\Property(property: 'hasText', type: 'boolean', example: true),
+                                    new OA\Property(property: 'hasText', type: 'boolean', example: true), new OA\Property(property: 'mime', type: 'string', example: 'video/webm'),
                                 ]
                             )
                         ),

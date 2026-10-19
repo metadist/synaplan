@@ -109,7 +109,34 @@ final class FeatureStatusResponse extends OA\Response
                             new OA\Property(property: 'failedLast24h', type: 'integer', example: 1),
                         ]
                     ),
+                    self::servicesProperty(),
                 ]
+            ),
+        );
+    }
+
+    private static function servicesProperty(): OA\Property
+    {
+        return new OA\Property(
+            property: 'services',
+            type: 'array',
+            description: 'Readiness of the stack, one row per service, cached 5 s. starting = has not answered yet (becomes failed after 10 minutes); downloading = fetching its model; off = not part of this install; unavailable = answered before, not reachable now; failed = did not come up or reported an error.',
+            items: new OA\Items(
+                required: ['id', 'name', 'state', 'unlocks', 'effect', 'recovery', 'since', 'percent', 'model', 'minutes_left', 'profile', 'docs_anchor'],
+                properties: [
+                    new OA\Property(property: 'id', type: 'string', enum: ['ollama', 'qdrant', 'whisper', 'tts', 'tika', 'docling', 'searxng', 'collabora', 'centrifugo'], example: 'ollama'),
+                    new OA\Property(property: 'name', type: 'string', example: 'Ollama (local AI)'),
+                    new OA\Property(property: 'state', type: 'string', enum: ['starting', 'downloading', 'ready', 'off', 'unavailable', 'failed'], example: 'downloading'),
+                    new OA\Property(property: 'unlocks', type: 'string', description: 'What the service unlocks, one sentence', example: 'Private chat and embeddings on this machine.'),
+                    new OA\Property(property: 'effect', type: 'string', nullable: true, description: 'What is waiting or stopped while the service is not ready; null when ready', example: 'Local AI models are not available.'),
+                    new OA\Property(property: 'recovery', type: 'string', nullable: true, description: 'One sentence the admin can act on, only on installs where it applies (never on Kubernetes)', example: 'Run `docker compose logs qdrant` to see why; `docker compose restart qdrant` brings it back.'),
+                    new OA\Property(property: 'since', type: 'string', format: 'date-time', nullable: true, description: 'When the current state began', example: '2026-10-19T12:00:00+00:00'),
+                    new OA\Property(property: 'percent', type: 'integer', nullable: true, description: 'Download progress, only while downloading', example: 42),
+                    new OA\Property(property: 'model', type: 'string', nullable: true, description: 'Model being downloaded, only while downloading', example: 'gpt-oss:20b'),
+                    new OA\Property(property: 'minutes_left', type: 'integer', nullable: true, description: 'Estimated minutes until the download finishes', example: 6),
+                    new OA\Property(property: 'profile', type: 'string', nullable: true, description: 'Compose profile that turns the service on, only while off', example: 'local-ai'),
+                    new OA\Property(property: 'docs_anchor', type: 'string', nullable: true, example: 'modules/local-ai'),
+                ],
             ),
         );
     }

@@ -12,6 +12,7 @@ use App\Service\Message\ChatErrorPresenter;
 use App\Service\ModelConfigService;
 use App\Tests\Characterization\Support\CleanupSnapshot;
 use App\Tests\Support\FileAnalysisHandlerFactory;
+use App\Tests\Support\FixedAuthorizationChecker;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
@@ -130,7 +131,7 @@ final class FileAnalysisCharacterizationTest extends TestCase
             null,
             null,
             new ChatFailureClassifier(),
-            new ChatErrorPresenter(new IdentityTranslator(), new ChatFailureClassifier()),
+            new ChatErrorPresenter(new IdentityTranslator(), new ChatFailureClassifier(), new FixedAuthorizationChecker(false)),
             new IdentityTranslator(),
         );
 

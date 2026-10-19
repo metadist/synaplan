@@ -13,6 +13,7 @@ use App\Attribute\OpenApi\Config\RuntimeConfigResponse;
 use App\Entity\User;
 use App\Service\Capability\CapabilityService;
 use App\Service\Config\FeatureStatusReporter;
+use App\Service\Config\Readiness\ServiceReadinessReporter;
 use App\Service\Config\Runtime\RuntimeConfigAssembler;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
@@ -730,7 +731,7 @@ final class ConfigController extends AbstractController
     #[FeatureStatusResponse]
     #[OA\Response(response: 401, description: 'Not authenticated')]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    public function getFeaturesStatus(#[CurrentUser] ?User $user): JsonResponse
+    public function getFeaturesStatus(#[CurrentUser] ?User $user, ServiceReadinessReporter $serviceReadiness): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -740,6 +741,6 @@ final class ConfigController extends AbstractController
             return $this->json(['error' => 'Admin access required'], Response::HTTP_FORBIDDEN);
         }
 
-        return $this->json($this->featureStatusReporter->build($user));
+        return $this->json($this->featureStatusReporter->build($user) + ['services' => $serviceReadiness->rows()]);
     }
 }

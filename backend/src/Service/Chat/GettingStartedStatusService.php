@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\AgentRepository;
 use App\Repository\FileRepository;
 use App\Service\Agent\AgentConfig;
+use App\Service\FreeApi\FreeApiState;
 
 /**
  * The four getting-started ticks, in one place.
@@ -25,6 +26,7 @@ final readonly class GettingStartedStatusService
         private AgentConfig $agentConfig,
         private ChatReadinessService $chatReadiness,
         private ConnectedAppProbe $apps,
+        private ?FreeApiState $freeApi = null,
     ) {
     }
 
@@ -58,7 +60,9 @@ final readonly class GettingStartedStatusService
 
         if ($user->isAdmin()) {
             try {
-                $items['provider'] = $this->chatReadiness->isChatReady(userId: $userId);
+                // The Demo makes chat work, but the step asks for a provider of the install's own.
+                $items['provider'] = $this->chatReadiness->isChatReady(userId: $userId)
+                    && !($this->freeApi?->isActive() ?? false);
             } catch (\Throwable) {
                 // Hide the step. The setup page stays reachable from the menu.
             }

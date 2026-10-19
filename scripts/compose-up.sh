@@ -78,5 +78,5 @@ echo "Starting the status page (http://localhost:${frontend_port})…"
 docker compose "$@" up -d frontend
 
 echo "Open http://localhost:${frontend_port} — other images may still be downloading."
-echo "Starting the rest of the stack…"
+echo "Starting the rest of the stack — chat first; local AI, memories and the other optional services follow once the backend is healthy…"
 docker compose "$@" up -d

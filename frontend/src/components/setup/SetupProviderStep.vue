@@ -18,6 +18,8 @@
     </p>
 
     <template v-else>
+      <SetupFreeApiCard v-if="offerDemo" @started="emit('next')" />
+
       <p
         v-if="anyConfigured"
         class="text-sm text-[var(--status-success-text)] bg-[var(--status-success-muted)] rounded-lg px-3 py-2"
@@ -72,9 +74,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import SetupFreeApiCard from '@/components/setup/SetupFreeApiCard.vue'
 import SetupProviderKeyForm from '@/components/setup/SetupProviderKeyForm.vue'
 import SetupProviderTile from '@/components/setup/SetupProviderTile.vue'
 import { listProviderKeys, type ProviderKeyStatus } from '@/services/api/providerKeysApi'
+import { useFreeApiStore } from '@/stores/freeApi'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 const emit = defineEmits<{
@@ -112,6 +116,10 @@ const selectedProvider = computed(
 )
 
 const anyConfigured = computed(() => chatProviders.value.some((p) => p.configured))
+
+const freeApi = useFreeApiStore()
+/** The Demo is for installs without a chat provider of their own; with one it would only take over. */
+const offerDemo = computed(() => freeApi.isAvailable() && !anyConfigured.value)
 
 /**
  * The grid shows every provider as a logo and a name; the key field belongs to

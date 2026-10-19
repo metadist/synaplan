@@ -29,6 +29,7 @@ use App\Service\WhatsApp\Turn\WhatsAppReply;
 use App\Service\WhatsApp\Turn\WhatsAppReplyDelivery;
 use App\Service\WhatsApp\Turn\WhatsAppTurn;
 use App\Service\WhatsApp\WhatsAppService;
+use App\Tests\Support\FixedAuthorizationChecker;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Constraint\IsType;
@@ -135,6 +136,7 @@ class WhatsAppServiceTest extends TestCase
         $this->chatErrorPresenter = new ChatErrorPresenter(
             new IdentityTranslator(),
             new ChatFailureClassifier(),
+            new FixedAuthorizationChecker(false),
         );
 
         // Transport with test configuration (dynamic multi-number support)

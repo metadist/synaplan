@@ -24,42 +24,16 @@
          offset (left-3 = 12px) so the composer aligns with the menu button and
          uses the full width; md+ keeps the roomier px-4. -->
     <div v-show="!liveActive" class="max-w-[70rem] mx-auto px-3 py-2 md:px-4 md:py-4">
-      <!-- File and Quote Display (above input) -->
-      <div
+      <ComposerAttachmentStrip
         v-if="uploadedFiles.length > 0 || quote || pastedBlocks.length > 0"
-        class="mb-3 flex flex-wrap gap-2 max-h-28 overflow-y-auto"
-      >
-        <!-- Quoted reference chip -->
-        <QuoteChip v-if="quote" :quote="quote" @remove="emit('clearQuote')" />
-
-        <PastedTextCard
-          v-for="block in pastedBlocks"
-          :key="block.id"
-          :content="block.content"
-          @open="openPastedBlock(block.id)"
-          @remove="removePastedBlock(block.id)"
-        />
-
-        <!-- Uploaded Files -->
-        <div
-          v-for="(file, index) in uploadedFiles"
-          :key="'file-' + index"
-          class="flex items-center gap-2 px-3 py-2 surface-chip rounded-lg"
-        >
-          <Icon :icon="getFileIcon(file.file_type || file.name || '')" class="w-4 h-4" />
-          <span class="text-sm txt-secondary">{{ file.filename || file.name }}</span>
-          <span v-if="file.processing" class="text-xs txt-muted">(processing...)</span>
-          <button
-            class="icon-ghost p-0 min-w-0 w-auto h-auto"
-            :aria-label="$t('files.removeFile')"
-            :disabled="file.processing"
-            data-testid="btn-remove-chat-file"
-            @click="removeFile(index)"
-          >
-            <XMarkIcon class="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+        :files="uploadedFiles"
+        :quote="quote ?? null"
+        :pasted-blocks="pastedBlocks"
+        @remove-file="removeFile"
+        @clear-quote="emit('clearQuote')"
+        @open-pasted="openPastedBlock"
+        @remove-pasted="removePastedBlock"
+      />
 
       <div
         v-if="pendingDesktopRun"
@@ -562,13 +536,7 @@ import {
   type Ref,
 } from 'vue'
 import { storeToRefs } from 'pinia'
-import {
-  ArrowUpIcon,
-  XMarkIcon,
-  SparklesIcon,
-  MicrophoneIcon,
-  PlusIcon,
-} from '@heroicons/vue/24/outline'
+import { ArrowUpIcon, SparklesIcon, MicrophoneIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import Textarea from './Textarea.vue'
 import CommandPalette from './CommandPalette.vue'
@@ -580,7 +548,7 @@ import ModelDropdown from './ModelDropdown.vue'
 import { toolsSummaryLabel } from '@/utils/toolsSummary'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
-import PastedTextCard from './chat/PastedTextCard.vue'
+import ComposerAttachmentStrip from './chat/ComposerAttachmentStrip.vue'
 import PastedTextModal from './chat/PastedTextModal.vue'
 import { parseCommand } from '../commands/parse'
 import {
@@ -631,7 +599,14 @@ import {
   RESTORED_JOB_LIMIT,
   shouldRestoreDesktopJob,
 } from '@/utils/desktopJobCard'
-import QuoteChip from './QuoteChip.vue'
+import {
+  existingUploadedFile,
+  readyUploadedFile,
+  stagedUploadPlaceholder,
+  useComposerPreviewUrls,
+  type ExistingAttachment,
+  type UploadedFile,
+} from './chat/composerAttachment'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
 import {
   createPastedBlockId,
@@ -639,16 +614,6 @@ import {
   wrapPastedBlocks,
   type PastedTextBlock,
 } from '@/utils/pastedContent'
-
-interface UploadedFile {
-  file_id: number
-  filename: string
-  file_type: string
-  name?: string
-  processing: boolean
-  /** Picked in the composer, not from the Files library — DELETE on remove. */
-  staged?: boolean
-}
 
 interface Props {
   isStreaming?: boolean
@@ -729,6 +694,7 @@ const message = ref('')
 const originalMessage = ref('')
 const enhancedMessage = ref('')
 const uploadedFiles = ref<UploadedFile[]>([])
+useComposerPreviewUrls(uploadedFiles)
 const pastedBlocks = ref<PastedTextBlock[]>([])
 const editingPastedBlockId = ref<string | null>(null)
 const uploading = ref(false)
@@ -1647,22 +1613,16 @@ const handleFilesSelected = async (selectedFiles: FileItem[]) => {
       file_id: file.id,
       filename: file.filename,
       file_type: file.file_type,
+      mime: file.mime || undefined,
       processing: false,
     })
   })
   success(`${selectedFiles.length} file(s) attached`)
 }
 
-const attachExistingFile = (file: { file_id: number; filename: string; file_type: string }) => {
-  if (uploadedFiles.value.some((f) => f.file_id === file.file_id)) {
-    return
-  }
-  uploadedFiles.value.push({
-    file_id: file.file_id,
-    filename: file.filename,
-    file_type: file.file_type,
-    processing: false,
-  })
+const attachExistingFile = (file: ExistingAttachment) => {
+  if (uploadedFiles.value.some((f) => f.file_id === file.file_id)) return
+  uploadedFiles.value.push(existingUploadedFile(file))
   success(t('chat.conversationFiles.attached', { name: file.filename }))
 }
 
@@ -1673,6 +1633,7 @@ const handleMentionSelect = (file: FileItem) => {
       file_id: file.id,
       filename: file.filename,
       file_type: file.file_type,
+      mime: file.mime || undefined,
       processing: false,
     })
     success(t('fileMention.fileAttached', { name: file.filename }))
@@ -1829,15 +1790,7 @@ const uploadFiles = async (files: File[]) => {
   for (const file of files) {
     if (controller.signal.aborted) break
 
-    const tempFile: UploadedFile = {
-      file_id: 0,
-      filename: file.name,
-      file_type: file.name.split('.').pop() || 'unknown',
-      name: file.name,
-      processing: true,
-      staged: true,
-    }
-    uploadedFiles.value.push(tempFile)
+    uploadedFiles.value.push(stagedUploadPlaceholder(file))
 
     try {
       // Incognito sessions mark the upload ephemeral (hidden from the file
@@ -1878,15 +1831,8 @@ const uploadFiles = async (files: File[]) => {
       }
 
       const index = uploadedFiles.value.findIndex((f) => f.name === file.name && f.processing)
-      if (index !== -1) {
-        uploadedFiles.value[index] = {
-          file_id: result.file_id,
-          filename: result.filename,
-          file_type: result.file_type,
-          processing: false,
-          staged: true,
-        }
-      }
+      const previous = index === -1 ? undefined : uploadedFiles.value[index]
+      if (previous) uploadedFiles.value[index] = readyUploadedFile(previous, result)
 
       if (result.text) {
         const preview = result.text.substring(0, 50) + (result.text.length > 50 ? '...' : '')
@@ -2379,19 +2325,6 @@ const transcribeAudio = async (audioBlob: Blob) => {
   }
 }
 
-const getFileIcon = (fileType: string): string => {
-  const ext = fileType.toLowerCase()
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'mdi:image'
-  if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) return 'mdi:video'
-  if (['mp3', 'wav', 'ogg', 'm4a', 'flac', 'opus'].includes(ext)) return 'mdi:microphone'
-  if (['pdf'].includes(ext)) return 'mdi:file-pdf'
-  if (['doc', 'docx'].includes(ext)) return 'mdi:file-word'
-  if (['xls', 'xlsx'].includes(ext)) return 'mdi:file-excel'
-  if (['ppt', 'pptx'].includes(ext)) return 'mdi:file-powerpoint'
-  if (['txt'].includes(ext)) return 'mdi:file-document'
-  return 'mdi:file'
-}
-
 const updateIsMobile = () => {
   isMobile.value = window.innerWidth < 768
 }
@@ -2494,7 +2427,7 @@ const startDictation = async (): Promise<boolean> => {
 defineExpose<{
   textareaRef: Ref<InstanceType<typeof Textarea> | null>
   uploadFiles: (files: File[]) => Promise<void>
-  attachExistingFile: (file: { file_id: number; filename: string; file_type: string }) => void
+  attachExistingFile: (file: ExistingAttachment) => void
   setInputText: (text: string) => void
   submitText: (text: string) => Promise<boolean>
   startDictation: () => Promise<boolean>

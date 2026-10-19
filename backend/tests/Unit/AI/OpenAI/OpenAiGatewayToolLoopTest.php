@@ -50,6 +50,62 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         self::assertSame('stop', $result['finish_reason'] ?? 'stop');
     }
 
+    public function testGatedDemoRequestStillRunsToolsWhenTheHourlyCapIsHit(): void
+    {
+        $search = $this->createMock(WebSearchTool::class);
+        $search->method('isAvailable')->willReturn(true);
+        $search->method('declaration')->willReturn((new WebSearchTool(
+            $this->createStub(\App\Plug\WebSearch\WebSearchGateway::class),
+            new NullLogger(),
+        ))->declaration());
+        $search->expects(self::once())->method('execute')->willReturn([
+            'text' => 'Berlin is 18C',
+            'isError' => false,
+            'query' => 'berlin weather',
+            'resultCount' => 1,
+        ]);
+        $rate = $this->createMock(RateLimitService::class);
+        $rate->expects(self::never())->method('checkLimit');
+
+        $loop = $this->loop($search, mcpEnabled: false, rateLimits: $rate);
+        $result = $loop->complete(
+            $this->user(),
+            [['role' => 'user', 'content' => 'TOOLTEST:web_search:{"query":"berlin weather"}']],
+            [
+                'model' => 'test-model',
+                'provider' => 'test',
+                OpenAiGatewayToolLoop::DEMO_HOURLY_CAP_WAIVED => true,
+            ],
+        );
+
+        self::assertSame('Tool result received: Berlin is 18C', $result['content']);
+    }
+
+    public function testUngatedRequestStillSkipsToolsWhenTheHourlyCapIsHit(): void
+    {
+        $search = $this->createMock(WebSearchTool::class);
+        $search->method('isAvailable')->willReturn(true);
+        $search->method('declaration')->willReturn((new WebSearchTool(
+            $this->createStub(\App\Plug\WebSearch\WebSearchGateway::class),
+            new NullLogger(),
+        ))->declaration());
+        $search->expects(self::never())->method('execute');
+        $rate = $this->createMock(RateLimitService::class);
+        $rate->expects(self::once())
+            ->method('checkLimit')
+            ->with(self::isInstanceOf(User::class), 'MESSAGES')
+            ->willReturn(['allowed' => false]);
+
+        $loop = $this->loop($search, mcpEnabled: false, rateLimits: $rate);
+        $result = $loop->complete(
+            $this->user(),
+            [['role' => 'user', 'content' => 'TOOLTEST:web_search:{"query":"berlin weather"}']],
+            ['model' => 'test-model', 'provider' => 'test'],
+        );
+
+        self::assertSame('Tool result received: Rate limit exceeded; tool call skipped.', $result['content']);
+    }
+
     public function testMcpToolIsExecuted(): void
     {
         $server = new McpServerConfig();
@@ -329,6 +385,7 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         WebSearchTool $search,
         bool $mcpEnabled,
         ?AiFacade $facade = null,
+        ?RateLimitService $rateLimits = null,
     ): OpenAiGatewayToolLoop {
         $mcpConfig = $this->createMock(McpClientConfig::class);
         $mcpConfig->method('isClientEnabled')->willReturn($mcpEnabled);
@@ -352,7 +409,7 @@ final class OpenAiGatewayToolLoopTest extends TestCase
             new McpToolCatalogAdapter($this->createMock(McpToolRegistry::class)),
             $this->createMock(McpServerConfigRepository::class),
             $gw,
-            $this->rateLimits(),
+            $rateLimits ?? $this->rateLimits(),
             new NullLogger(),
         );
     }

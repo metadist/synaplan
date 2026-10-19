@@ -1,0 +1,38 @@
+{
+    "jwks": {
+        "keys": [
+            {
+                "kty": "EC",
+                "crv": "P-256",
+                "x": "Tw5U03TSBx1-dDHlEWkt0S8FZTbCSYi0FshgoshX36c",
+                "y": "s3LwVMcgCX-YZ2yzRvZ4xQauUVCoh_zeKFSPsTifxjM",
+                "kid": "fZTJDpQY92cqiDSYBMVmZI6fEYGC-YZhfhK5o6RaFPg",
+                "alg": "ES256",
+                "use": "sig"
+            }
+        ]
+    },
+    "pseudonym": {
+        "key": "32560b53bf7bdecf001cf213f490be627bdcea7845acc16896b4cc15bc858923",
+        "scope": "mcp:12",
+        "userId": 2,
+        "sub": "u_dcb71f082ca0b370286788ccdd38cfa1"
+    },
+    "request": {
+        "method": "POST",
+        "url": "http://word-tools:8000/mcp",
+        "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"word_stats\",\"arguments\":{\"text\":\"hello world\"}}}"
+    },
+    "claims": {
+        "iss": "http://localhost:8000",
+        "aud": "http://word-tools:8000/mcp",
+        "sub": "u_dcb71f082ca0b370286788ccdd38cfa1",
+        "iat": 1792130000,
+        "exp": 1792130060,
+        "jti": "5d7c0f0e-2b8e-4c39-9a51-0d6f3c1e7a42",
+        "htm": "POST",
+        "htu": "http://word-tools:8000/mcp",
+        "bh": "jDXxL-J1r6QojJTigs38W010VQctxJsAvleRj3cfsW8"
+    },
+    "token": "eyJ0eXAiOiJzeW5hcGxhbi1jYWxsK2p3dCIsImFsZyI6IkVTMjU2Iiwia2lkIjoiZlpUSkRwUVk5MmNxaURTWUJNVm1aSTZmRVlHQy1ZWmhmaEs1bzZSYUZQZyJ9.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjgwMDAiLCJhdWQiOiJodHRwOi8vd29yZC10b29sczo4MDAwL21jcCIsInN1YiI6InVfZGNiNzFmMDgyY2EwYjM3MDI4Njc4OGNjZGQzOGNmYTEiLCJpYXQiOjE3OTIxMzAwMDAsImV4cCI6MTc5MjEzMDA2MCwianRpIjoiNWQ3YzBmMGUtMmI4ZS00YzM5LTlhNTEtMGQ2ZjNjMWU3YTQyIiwiaHRtIjoiUE9TVCIsImh0dSI6Imh0dHA6Ly93b3JkLXRvb2xzOjgwMDAvbWNwIiwiYmgiOiJqRFh4TC1KMXI2UW9qSlRpZ3MzOFcwMTBWUWN0eEpzQXZsZVJqM2Nmc1c4In0.1zsBWXrbRqSUiRRFYWpKtNWhw2CQl3KQH8m9uOsgPBHBZnLV6LvF8-NXSQPtqB3vK-kZNFh5L8V7j6C01NGXoQ"
+}

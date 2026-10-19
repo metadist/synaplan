@@ -282,6 +282,32 @@
             "mobile_class": "ota-candidate"
         },
         {
+            "id": "freeapi",
+            "label_key": "modules.freeapi.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "The Synaplan Demo is turned off",
+            "details": {
+                "missing": [
+                    "FREEAPI.ENABLED"
+                ]
+            },
+            "configured_by": {
+                "env": [
+                    "FREEAPI_BASE_URL"
+                ],
+                "bconfig": [
+                    "FREEAPI.ENABLED"
+                ],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/freeapi",
+            "mobile_class": "ota-candidate"
+        },
+        {
             "id": "google_ai",
             "label_key": "modules.google_ai.label",
             "state": "absent",

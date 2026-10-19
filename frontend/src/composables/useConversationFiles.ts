@@ -20,6 +20,8 @@ type HistoryAttachment = {
   fileName?: string
   fileType?: string
   file_type?: string
+  fileMime?: string
+  file_mime?: string
 }
 
 type HistoryMessageLike = {
@@ -68,8 +70,32 @@ const attachmentName = (file: HistoryAttachment): string => file.filename || fil
 
 const attachmentType = (file: HistoryAttachment): string => file.fileType || file.file_type || ''
 
+const attachmentMime = (file: HistoryAttachment): string => file.fileMime || file.file_mime || ''
+
 const historyMessageId = (message: HistoryMessageLike): number | null =>
   message.backendMessageId ?? message.backend_message_id ?? null
+
+/** API rows win; a message row fills in a MIME the catalog does not have yet. */
+export function mergeConversationFileRows(lists: ConversationFileRow[][]): ConversationFileRow[] {
+  const indexByKey = new Map<string, number>()
+  const merged: ConversationFileRow[] = []
+
+  for (const row of lists.flat()) {
+    const key = row.id !== null ? `id:${row.id}` : row.reference
+    const existingIndex = indexByKey.get(key)
+    if (existingIndex === undefined) {
+      indexByKey.set(key, merged.length)
+      merged.push(row)
+      continue
+    }
+    const existing = merged[existingIndex]
+    if (existing && !existing.mime && row.mime) {
+      merged[existingIndex] = { ...existing, mime: row.mime }
+    }
+  }
+
+  return merged
+}
 
 const historyFileSignature = (messages: HistoryMessageLike[]): string =>
   messages
@@ -101,6 +127,7 @@ export function useConversationFiles() {
         }
         seen.add(id)
         const fileType = attachmentType(file)
+        const mime = attachmentMime(file)
         rows.push({
           id,
           reference: `file:${id}`,
@@ -110,6 +137,7 @@ export function useConversationFiles() {
           fileType,
           messageId: historyMessageId(message),
           hasText: false,
+          ...(mime ? { mime } : {}),
         })
       }
     }
@@ -117,21 +145,7 @@ export function useConversationFiles() {
     return rows
   })
 
-  const files = computed((): ConversationFileRow[] => {
-    const seen = new Set<string>()
-    const merged: ConversationFileRow[] = []
-
-    for (const row of [...fromApi.value, ...fromMessages.value]) {
-      const key = row.id !== null ? `id:${row.id}` : row.reference
-      if (seen.has(key)) {
-        continue
-      }
-      seen.add(key)
-      merged.push(row)
-    }
-
-    return merged
-  })
+  const files = computed(() => mergeConversationFileRows([fromApi.value, fromMessages.value]))
 
   const refresh = async () => {
     const chatId = chatsStore.activeChatId

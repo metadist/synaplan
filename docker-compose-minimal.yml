@@ -33,6 +33,14 @@
 #
 services:
   # ----------------------------------------------------------------------------
+  # Two start waves. Wave 1 is what chat needs: db, redis, centrifugo, backend,
+  # worker, scheduler, tika, frontend. Every other service (TTS, Collabora,
+  # phpMyAdmin, MailHog) waits for a healthy backend, so a fresh stack chats
+  # while the heavy containers are still pulling. Nothing in
+  # wave 1 may depend on wave 2; the backend reports what is still starting on
+  # /admin/features. deploy/, the quickstarts and Helm do not stagger.
+  # ----------------------------------------------------------------------------
+  # ----------------------------------------------------------------------------
   # Startup notes (one-shot) - human-readable guidance for `docker compose up`.
   # See docker-compose.yml for the full rationale; follow it with:
   #   docker compose -f docker-compose-minimal.yml logs -f startup-notes
@@ -104,6 +112,7 @@ services:
           sleep 5
         done
         echo "[startup-notes] backend is up (after $$(elapsed)s)"
+        echo "[startup-notes] second wave starting: spoken answers, office files and the dev tools -- chat does not wait for them"
         echo "[startup-notes] waiting for the frontend dev server (npm ci + schema generation + Vite start)..."
         # Ready = port answers AND the boot-status feed is gone (Vite took
         # over). Vite answers /boot-status.json too (SPA html fallback, 200),
@@ -131,6 +140,7 @@ services:
 
            Open   http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
            Login  admin@synaplan.com / admin123
+           Status http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}/admin/features  (what is still starting)
         ============================================================
 
         EOF
@@ -237,6 +247,9 @@ services:
       # Note: No whisper_models volume - audio transcription disabled
     environment:
       APP_ENV: dev
+      # Piper is a profile on this file and a default service everywhere else.
+      # Readiness uses the platform to say "off" with COMPOSE_PROFILES=tts.
+      SYNAPLAN_PLATFORM: minimal
       # APP_SECRET loaded from backend/.env (env_file above)
       APP_URL: http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}
       PLUGINS_DIR: /plugins
@@ -584,7 +597,10 @@ services:
     ports:
       - "${SYNAPLAN_PHPMYADMIN_PORT:-8082}:80"
     depends_on:
-      - db
+      db:
+        condition: service_started
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -593,6 +609,9 @@ services:
   mailhog:
     image: mailhog/mailhog:latest@sha256:8d76a3d4ffa32a3661311944007a415332c4bb855657f4f6c57996405c009bea
     container_name: synaplan-mailhog
+    depends_on:
+      backend:
+        condition: service_healthy
     ports:
       - "${SYNAPLAN_MAILHOG_SMTP_PORT:-1025}:1025"  # SMTP
       - "${SYNAPLAN_MAILHOG_UI_PORT:-8025}:8025"  # Web UI
@@ -605,6 +624,9 @@ services:
   collabora:
     image: collabora/code:26.04.5.1.1@sha256:bb8f3c9c5c9016045f25fccb5f0649be94469ebc7c7cc379f3576e470cccf33d
     container_name: synaplan-collabora
+    depends_on:
+      backend:
+        condition: service_healthy
     profiles: [office]
     restart: unless-stopped
     mem_limit: 2g
@@ -628,6 +650,9 @@ services:
   tts:
     image: ghcr.io/metadist/synaplan-tts:latest@sha256:efa9f2188abca5603aa9c15dec59963cdf7070eb5a9e2564793a7ceba6c3642a
     container_name: synaplan-tts
+    depends_on:
+      backend:
+        condition: service_healthy
     profiles: [tts]
     restart: unless-stopped
     ports:

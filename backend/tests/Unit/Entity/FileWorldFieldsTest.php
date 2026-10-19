@@ -108,6 +108,37 @@ final class FileWorldFieldsTest extends TestCase
         }
     }
 
+    #[DataProvider('incomingCases')]
+    public function testArrivesIncoming(string $source, ?string $groupKey, bool $expected): void
+    {
+        self::assertSame($expected, File::arrivesIncoming($source, $groupKey));
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: ?string, 2: bool}>
+     */
+    public static function incomingCases(): iterable
+    {
+        foreach (['nextcloud', 'opencloud'] as $source) {
+            yield "$source into a knowledge folder" => [$source, 'Contracts', false];
+            yield "$source into DEFAULT" => [$source, 'DEFAULT', true];
+            yield "$source without a folder" => [$source, null, true];
+            yield "$source with an empty folder" => [$source, '', true];
+        }
+        yield 'outlook into a knowledge folder' => ['outlook', 'Contracts', true];
+        yield 'web upload into a knowledge folder' => ['web_upload', 'Contracts', false];
+        yield 'web upload without a folder' => ['web_upload', null, false];
+    }
+
+    public function testNamesKnowledgeFolderOnlyForCloudAppsWithARealFolder(): void
+    {
+        self::assertTrue(File::namesKnowledgeFolder('owncloud', 'Contracts'));
+        self::assertFalse(File::namesKnowledgeFolder('nextcloud', 'DEFAULT'));
+        self::assertFalse(File::namesKnowledgeFolder('opencloud', null));
+        self::assertFalse(File::namesKnowledgeFolder('outlook', 'Contracts'));
+        self::assertFalse(File::namesKnowledgeFolder('web_upload', 'Contracts'));
+    }
+
     public function testIsMediaForImageType(): void
     {
         $file = new File();
@@ -149,5 +180,16 @@ final class FileWorldFieldsTest extends TestCase
         $file->setStagePath(null);
         self::assertFalse($file->isIncoming());
         self::assertNull($file->getStagePath());
+    }
+
+    public function testMarkVectorizedMakesTheFileSearchableAtOnce(): void
+    {
+        $file = new File();
+        self::assertSame(File::VECTOR_STATE_NONE, $file->getVectorState());
+
+        $file->markVectorized();
+
+        self::assertSame('vectorized', $file->getStatus());
+        self::assertSame(File::VECTOR_STATE_VECTORIZED, $file->getVectorState());
     }
 }

@@ -100,6 +100,18 @@ Verdicts: **keep**, **update** (an E-brief in §4), **removed** (done in §2.1),
 | `/wwwroot/keycloak-nsc-config` | Helm config of another lab, private remote | out of scope |
 | Host Apache serves `/wwwroot` on `:80`, `:8082`, `:8088` | — | keep; it is why `:8082` is taken and ownCloud.online Docker gets `:8083` |
 
+### 1.4 Re-checked on 2026-10-19
+
+| Item | State | Consequence |
+| ---- | ----- | ----------- |
+| Synaplan core incl. `synaplan-scheduler` | all running, scheduler healthy since 2026-10-17 | E-1 done; the cause of the earlier exit 127 was not recorded, `env-check.sh` watches the scheduler |
+| Keycloak (`--profile oidc`) | no container in the morning; running since E-3 the same day | Synaplan's `backend/.env` got the OIDC values of §3.1 |
+| Nextcloud dev | no container in the morning (volume removed 2026-10-14); E-2 stack running the same day on 35.0.2, also checked on 33.0.10 | — |
+| OpenCloud dev | no container in the morning (config volume removed 2026-10-14); E-4 stack running the same day on 8.1.0 | the E2E suite runs with one worker (§6) |
+| Nextcloud upstream | 35.0.2, 34.0.5, 33.0.10 released 2026-10-15; `nextcloud:latest` = 35, `stable` = 34; 32's last release 32.0.15 on 2026-09-10 | dev default 35, matrix 33 and 35 (row 47, D21) |
+| OpenCloud upstream | rolling `8.1.0` (2026-10-05) is current; the stable channel is `7.2.4` | the 8.1.0 pin stands; the "P2 go" re-pins to what partner installations run (E-8) |
+| `user_oidc` | `v8.11.0` (2026-08-24) | CF-S2 tests this version or newer |
+
 ---
 
 ## 2. Cleanup
@@ -140,6 +152,7 @@ Still open, not part of this confirmation:
 | Test values | For CF3+ scripts: `CLOUD_DELIVERY_TTL_SEC` and `CLOUD_DELIVERY_UNCONFIRMED_SEC` (`08` §0.8) on `backend`, `worker` and `scheduler` — the sweeps run in the scheduler |
 | AI in L2 scripts | The scripts switch the default models to `TestProvider` like `frontend/tests/e2e/global-setup.ts` and restore them (`09` §0.4); walks use a real model |
 | Must be running | `backend`, `worker`, **`scheduler`**, `db`, `redis`, `centrifugo`, `qdrant`, `tika`, `mailhog`, `compute`; `frontend` on `:5173` |
+| OIDC | In `backend/.env`: `OIDC_CLIENT_ID=synaplan-app`, `OIDC_CLIENT_SECRET=test-oidc-secret`, `OIDC_DISCOVERY_URL=http://host.docker.internal:8080/realms/synaplan` — the values of `docker-compose.test.yml`; then `docker compose up -d backend worker scheduler`. Without them OpenCloud's organisation login and every bearer path of the `sso` profile answer 401 |
 | Flags | `PLATFORM_LINKS.ENABLED = 1` in `BCONFIG` (toggle: `enable_flag` / `disable_flag` in `_devextras/testing/platform-links/lib.sh`). From CF4.1: the `cloud_files` FeatureModule, decisive env `CLOUD_FILES_ENABLED` (name fixed by brief CF4.1, listed in `backend/.env.minimal` and `docker-compose.minimal.yml`) |
 | File work (J-CF-13, CF5.8) | `COMPUTE_URL=http://compute:8080` and `COMPUTE_TOKEN` matching `COMPUTE_AUTH_TOKEN` of the `compute` service in `backend/.env`; egress stays off |
 | Mail | MailHog receives everything; "Summarize and mail me" is checked at `http://localhost:8025` |
@@ -154,21 +167,22 @@ Today: one container, SQLite, no cron, no `user_oidc`. Target:
 
 | Service | Image | Notes |
 | ------- | ----- | ----- |
-| `nextcloud` | `${NC_IMAGE:-nextcloud:31-apache}` | 31 is the current dev version. The test matrix is the app's range from `appinfo/info.xml` (`min-version="30"`, `max-version="34"`): `nextcloud:30-apache` (floor) and `nextcloud:34-apache` (top) — both exist on Docker Hub (checked 2026-10-14); pin both by digest in E-2 |
-| `db` | `mariadb:11.4` | MariaDB; `MYSQL_DATABASE=nextcloud`, user `nextcloud` |
-| `cron` | same image as `nextcloud`, `entrypoint: /cron.sh`, same volumes | Makes "system cron" true for the dev stack — watches (CF5) and the admin warning depend on the mode |
+| `nextcloud` | `${NC_IMAGE:-nextcloud:35-apache}` | 35 is `nextcloud:latest` and the top of the range CF1.3a sets (`min-version="33"`, `max-version="35"`, row 47). The test matrix is `nextcloud:33-apache` (floor) and `nextcloud:35-apache` (top); pin both by digest in E-2, Renovate keeps them current |
+| `nextcloud-db` | `mariadb:11.4` by digest | Database `nextcloud`, user `nextcloud`; on the stack's private network only — the Synaplan network already has a service called `db` |
+| `nextcloud-cron` | same image as `nextcloud`, `entrypoint: /cron.sh`, same volumes | Makes "system cron" true for the dev stack — watches (CF5) and the admin warning depend on the mode |
 | (no `redis`) | — | Not needed for a one-person dev stack |
 
 | Setting | Value |
 | ------- | ----- |
 | Port | `8081:80` (unchanged) |
 | Network | `synaplan_synaplan-network` (external, unchanged) |
-| Env | `NEXTCLOUD_TRUSTED_DOMAINS="localhost nextcloud 127.0.0.1 host.docker.internal"`, `OVERWRITEHOST=localhost:8081`, `OVERWRITEPROTOCOL=http`, `OVERWRITECLIURL=http://localhost:8081`, `NEXTCLOUD_ADMIN_USER=admin`, `NEXTCLOUD_ADMIN_PASSWORD=admin`, `PHP_MEMORY_LIMIT=1G` |
-| Hooks | keep `docker/dev-hooks/before-starting/10-link-synaplan-app.sh`; add `docker/dev-hooks/post-installation/20-dev-setup.sh` (runs once, after the official image installed Nextcloud) |
-| `20-dev-setup.sh` does | `occ app:enable synaplan_integration`; `occ app:install user_oidc` (skip when `NC_OIDC=0`); `occ background:cron`; `occ config:system:set allow_local_remote_servers --value true --type boolean` (so the app may call `http://backend`); users `ada`, `bob` and `carol` (`OC_PASS` from `NC_TEST_PASSWORD`, default `ada-dev-pass` / `bob-dev-pass` / `carol-dev-pass`; emails `ada@example.org`, `bob@example.org`, `carol@example.org`); for J-NC-2 the helper creates and deletes a throwaway user `nc-temp`, display names "Ada" / "Bob" / "Carol", default language `en`; the eight folders for Ada: `Specs`, `Incoming-DE`, `Incoming-EN`, `Reports`, `Invoices`, `Exports`, `Projects/Q3`, `HR/Contracts`; `Incoming-DE` shared with Bob (edit), `Specs` shared with Bob (read) — through `occ files:scan` after copying fixtures and the OCS share API with Ada's credentials; from CF3.3 on: `occ config:app:set synaplan_integration delivery_url_override --value http://nextcloud/index.php/apps/synaplan_integration/api/v1/inbound` (the admin field "Address Synaplan uses to reach this Nextcloud") |
-| Organisation login (`NC_OIDC=1`, from CF-S2) | `occ user_oidc:provider keycloak --clientid=nextcloud --clientsecret="$NC_OIDC_SECRET" --discoveryuri=http://keycloak:8080/realms/synaplan/.well-known/openid-configuration --scope="openid email profile"`; the issuer in the discovery document is `https://host.docker.internal:8443/realms/synaplan` (Keycloak `KC_HOSTNAME_BACKCHANNEL_DYNAMIC` keeps backchannel calls on `http://keycloak:8080`). Redirect URI registered in Keycloak: `http://localhost:8081/apps/user_oidc/code` (E-3) |
-| Make targets | `dev-up`, `dev-down` (exist); add `dev-reset` (`down -v`), `dev-occ CMD="…"`, `dev-logs`, `dev-shell`; `NC_IMAGE=nextcloud:30-apache make dev-reset dev-up` and `NC_IMAGE=nextcloud:34-apache …` for the matrix (a different major version needs a fresh volume) |
-| Ready when | `occ status` installed = true · `occ app:list` lists `synaplan_integration` and `notifications` enabled · `occ config:app:get core backgroundjobs_mode` = `cron` · `docker compose -f docker-compose.dev.yml ps cron` running · `curl -s http://localhost:8081/status.php` has `"installed":true` · `docker exec synaplan-nextcloud-dev curl -s http://backend/api/v1/config/runtime` answers |
+| Env | `NEXTCLOUD_TRUSTED_DOMAINS="localhost localhost:8081 nextcloud 127.0.0.1 host.docker.internal"` (Nextcloud 33+ refuses a password login whose `Origin` host is not trusted, so `localhost:8081` is listed), `OVERWRITEHOST=localhost:8081`, `OVERWRITEPROTOCOL=http`, `OVERWRITECLIURL=http://localhost:8081`, `NEXTCLOUD_ADMIN_USER=admin`, `NEXTCLOUD_ADMIN_PASSWORD=admin`, `PHP_MEMORY_LIMIT=1G` |
+| Hooks | `docker/dev-hooks/before-starting/10-link-synaplan-app.sh` links the app on every start; `docker/dev-hooks/post-installation/20-dev-setup.sh` runs once after the official image installed Nextcloud, before Apache starts; `docker/dev-seed.sh` runs on every `make dev-up` for what needs HTTP |
+| `20-dev-setup.sh` does | `occ background:cron`; `allow_local_remote_servers` true (the app calls `http://backend`); no skeleton files; default language `en`; `firstrunwizard` disabled (its dialog covers the page for every new user); mail to MailHog (`mailhog:1025`); the app set to the local stack (`active_env=local`, `synaplan_url_local=http://backend`, `synaplan_public_url_local=http://localhost:5173`); users `ada`, `bob`, `carol` (password `<name>-dev-pass`; emails `ada@example.org`, `bob@example.org`, `carol@example.org`); organisation login (next row) |
+| `dev-seed.sh` does | enables the app (with `--force` while `info.xml` stops below the server version); Ada's eight folders `Specs`, `Incoming-DE`, `Incoming-EN`, `Reports`, `Invoices`, `Exports`, `Projects/Q3`, `HR/Contracts` over WebDAV; `Incoming-DE` (edit) and `Specs` (read) shared with Bob over the OCS API. Later, E-6's helper creates and deletes the throwaway user `nc-temp` for J-NC-2, and from CF3.3 on the stack sets `delivery_url_override` to `http://nextcloud/index.php/apps/synaplan_integration/api/v1/inbound` |
+| Organisation login (default; `NC_OIDC=0` skips it) | `user_oidc` from the App Store; `allow_multiple_user_backends=1` (the password login stays); `allow_insecure_http=1` (`user_oidc` refuses plain `http://localhost:8081` otherwise); `soft_auto_provision` (Keycloak's `ada` signs in as the local `ada`); `occ user_oidc:provider keycloak --clientid=nextcloud --clientsecret=nextcloud-dev-secret --discoveryuri=http://keycloak:8080/realms/synaplan/.well-known/openid-configuration --scope="openid email profile" --unique-uid=0 --mapping-uid=preferred_username`. The discovery document names the issuer `https://host.docker.internal:8443/realms/synaplan`; `KC_HOSTNAME_BACKCHANNEL_DYNAMIC` keeps server calls on `http://keycloak:8080`. Keycloak accepts both redirect URIs, `/apps/user_oidc/code` and `/index.php/apps/user_oidc/code` (E-3) |
+| Make targets | `dev-up`, `dev-down`, `dev-reset` (`down -v`), `dev-occ CMD="…"`, `dev-logs`, `dev-shell`; `NC_IMAGE=nextcloud:33-apache make dev-reset dev-up` for the floor (a different major version needs fresh volumes) |
+| Ready when | `env-check.sh --cloud nextcloud --oidc` (§5) has no `FAIL` |
 
 ### 3.3 OpenCloud — existing `docker-compose.yml` (E-4)
 
@@ -255,8 +269,8 @@ brief rules of [`08`](./08_agent_briefs.md) §0. Order per phase (`00` row 42):
 | Brief | Where | Steps | Acceptance |
 | ----- | ----- | ----- | ---------- |
 | **E-1 Cleanup and baseline** | workstation | §2.1 and §2.2 done. Bring `synaplan-scheduler` up and find why it exited with 127 (image rebuilt? entrypoint missing?) — fix in `synaplan` if it is a repo issue, record it. | `docker compose ps` shows every §3.1 service up; the §2.2 table has a dated answer per row in STATUS |
-| **E-2 Nextcloud stack v2** | `synaplan-nextcloud`: `docker-compose.dev.yml.example`, `docker/dev-hooks/post-installation/20-dev-setup.sh`, `Makefile`, `README.md` (dev section), `docs/HOSTING_GUIDE.md` (only the cron sentence if it changes) | Compose per §3.2 (`db`, `cron`, env, hook); new Make targets; `NC_IMAGE` and `NC_OIDC` variables; `make dev-reset` documented as destructive. Keep the hook that links the app. | Fresh `make dev-reset && make dev-up` reaches "Ready when" of §3.2 on `nextcloud:31-apache`, `nextcloud:30-apache` and `nextcloud:34-apache`; `ada` logs in, sees the eight folders and the share with Bob; `carol` exists |
-| **E-3 Keycloak clients and users for the clouds** | `synaplan`: `_docker/keycloak/setup.sh` (additive block "Cloud apps"), `docker-compose.yml` env defaults for the new variables, `docs/DEVELOPMENT.md` | Client `nextcloud` (confidential, `KC_NC_CLIENT_SECRET` default `nextcloud-dev-secret`, redirect `http://localhost:8081/apps/user_oidc/code`, audience mapper like `synaplan-app`); users `ada` / `bob` (`ada-dev-pass`, `bob-dev-pass`, emails `ada@example.org`, `bob@example.org`, given/family names). Idempotent like the existing blocks (re-running `keycloak_setup` must not fail). | `docker compose --profile oidc up -d` from scratch creates them; `kcadm get users -r synaplan` lists five users; the Synaplan login page still logs `testuser` in (no regression on the `oidc` E2E jobs) |
+| **E-2 Nextcloud stack v2** | `synaplan-nextcloud`: `docker-compose.dev.yml.example`, `docker/dev-hooks/post-installation/20-dev-setup.sh`, `Makefile`, `README.md` (dev section), `docs/HOSTING_GUIDE.md` (only the cron sentence if it changes) | Compose per §3.2 (`nextcloud-db`, `nextcloud-cron`, env, hooks, seed); new Make targets; `NC_IMAGE` and `NC_OIDC` variables; `make dev-reset` documented as destructive. Keep the hook that links the app. | Fresh `make dev-reset && make dev-up` reaches "Ready when" of §3.2 on `nextcloud:35-apache` and `nextcloud:33-apache` (on 35 one `WARN` until CF1.3a raises `max-version`); `ada` logs in, sees the eight folders and the share with Bob; `carol` exists; Keycloak's `ada` signs in as the local `ada` |
+| **E-3 Keycloak clients and users for the clouds** | `synaplan`: `_docker/keycloak/setup.sh` (additive block "Cloud apps", defaults inside the script like the OpenCloud block), `docs/DEVELOPMENT.md` | Client `nextcloud` (confidential, `KC_NC_CLIENT_SECRET` default `nextcloud-dev-secret`, redirects `http://localhost:8081/apps/user_oidc/code` and `…/index.php/apps/user_oidc/code`, audience mapper like `synaplan-app`); users `ada` / `bob` (`ada-dev-pass`, `bob-dev-pass`, emails `ada@example.org`, `bob@example.org`, given/family names). The new block checks before it creates; the older blocks run once per Keycloak container. Synaplan accepts the realm's tokens once `backend/.env` carries the OIDC values of §3.1. | `docker compose --profile oidc up -d` from scratch creates them; `kcadm get users -r synaplan` lists five users; the Synaplan login page still logs `testuser` in (no regression on the `oidc` E2E jobs) |
 | **E-4 OpenCloud refresh** | `synaplan-opencloud` (compose unchanged unless CF-S3 adds services), `README.md` | Config volume reset (§2.2); `make docker-up`; Go image rebuilt; walk the login; record the running OpenCloud version from the UI's about dialog in STATUS | "Ready when" of §3.3; `make frontend-test-e2e-dev` green on the refreshed stack |
 | **E-5 ownCloud.online Docker stack** | `synaplan-owncloud-online`: `docker-compose.dev.yml.example`, `docker/Dockerfile.dev`, `docker/dev-entrypoint.sh`, `Makefile`, `README.md`, `.gitignore` (`docker-compose.dev.yml`) | Per §3.4. The server checkout path (`OCO_SERVER_PATH`) and tag (`OCO_TAG`, default `v11.0.10`) are variables; the compose never assumes `/wwwroot`. Document how to fetch the BW-Tech repository and check out the tag. First brief of P3. | "Ready when" of §3.4; the four file actions work against `http://backend` in shared mode; `make dev-reset && make dev-up` is repeatable in under 10 minutes |
 | **E-6 `env-check.sh`, fixtures, cloud helpers** | `synaplan`: `_devextras/testing/cloud-apps/` (`env-check.sh`, `lib.sh`, `fixtures/`, `make-fixtures.sh`, `nextcloud.sh`, `opencloud.sh`, `owncloud.sh`, `use-test-provider.sh`) | §5 and `09` §0.3–§0.4. Reuse `_devextras/testing/platform-links/lib.sh` helpers (`login`, `http_json`, `assert_eq`, `summary`). `use-test-provider.sh on|off` switches the default models to `TestProvider` and back, with the same admin call as `frontend/tests/e2e/global-setup.ts`. Fixtures under 200 KB total committed; large files generated. | `env-check.sh --cloud nextcloud --oidc` prints one line per check and exits 0 on the maintainer workstation (P1); `make-fixtures.sh` is idempotent; the Nextcloud helper can upload a fixture into Ada's folder and wait for it to be visible; the OpenCloud and ownCloud helpers follow with their phases |
@@ -290,6 +304,15 @@ reason — then a summary; exit code 1 if any `FAIL`. Checks never change state.
 
 ## 6. Known constraints
 
+- **The dev backend keeps its compiled service container.** After a change to
+  service wiring (a new service, a new controller argument), restart it
+  (`docker compose restart backend worker`); until then the new route answers
+  500 "Could not resolve argument". Method bodies reload without a restart.
+- **Walk the integration of what will ship.** A feature branch cut before
+  another fix merged lacks that fix: the AI walk briefly ran on CF0.4's branch,
+  which predates CF0.1, and the linked key got `insufficient_scope` again. Walk
+  on `main` merged with the open branches.
+
 - **Cursor cloud sandbox** (`AGENTS.md`): `frontend-widgets` cannot start
   (cgroup), local Ollama chat segfaults — use a cloud provider key for chat
   steps; embeddings work, so Make-searchable and the bird can be tested there.
@@ -304,3 +327,26 @@ reason — then a summary; exit code 1 if any `FAIL`. Checks never change state.
   `ajax`.
 - **Host Apache** owns `:80`, `:8082`, `:8088`; nothing in the plan may bind
   them.
+- **Docker Desktop's Windows CLI on the maintainer workstation.** `docker` is a
+  wrapper around `docker.exe`. Compose translates bind-mount paths, a bare
+  `docker run -v /wwwroot/…` mounts an empty directory, and environment
+  variables reach Compose only when `WSLENV` names them — the Nextcloud
+  Makefile exports `NC_IMAGE` and `NC_OIDC` that way. Scripts use
+  `docker compose` or `docker exec`, never `docker run -v`.
+- **After a WSL restart, Docker Desktop starts containers before the WSL
+  paths are shared.** Bind mounts come up empty — Nextcloud then serves
+  without the app — and `/tmp` is gone. Restart the affected containers
+  (`docker compose restart nextcloud nextcloud-cron`); keep nothing needed
+  later in `/tmp`.
+- **OpenCloud 8.1.0 crashes under parallel load.** Several Playwright workers
+  at once end the `opencloud` container with `fatal error: concurrent map read
+  and map write` (web service, config merge), and the service has no restart
+  policy. Run the suite as CI does — `CI=1 pnpm test:e2e` (one worker) — and
+  bring a crashed stack back with `docker compose up -d`; Graph answers about
+  two minutes later. On a fresh install, the first run can fail once while the
+  test user's personal space is still being created.
+- **Logging out of Synaplan through Keycloak fails in the dev stack** with
+  "Invalid redirect uri": `synaplan-app` allows post-logout redirects to
+  `:8000`, the dev UI runs on `:5173`. The test stack serves both on `:8001`,
+  so `oidc-auth.spec.ts` › "should logout" passes there and fails against the
+  dev stack (the other OIDC specs pass on both, checked 2026-10-19).

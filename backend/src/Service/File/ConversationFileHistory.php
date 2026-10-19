@@ -27,7 +27,8 @@ final readonly class ConversationFileHistory
      *     origin: string,
      *     fileType: string,
      *     messageId: int|null,
-     *     hasText: bool
+     *     hasText: bool,
+     *     mime: string
      * }>
      */
     public function forChat(int $userId, int $chatId): array
@@ -47,7 +48,8 @@ final readonly class ConversationFileHistory
      *     origin: string,
      *     fileType: string,
      *     messageId: int|null,
-     *     hasText: bool
+     *     hasText: bool,
+     *     mime: string
      * }
      */
     public function toApi(ConversationFile $file): array
@@ -63,6 +65,7 @@ final readonly class ConversationFileHistory
             'fileType' => '' !== $extension ? $extension : $file->category,
             'messageId' => $file->messageId,
             'hasText' => '' !== trim($file->extractedText),
+            'mime' => $file->mime,
         ];
     }
 }

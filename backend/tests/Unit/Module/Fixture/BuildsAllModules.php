@@ -13,6 +13,7 @@ use App\Module\Commerce\MobileIapModule;
 use App\Module\Commerce\StripeBillingModule;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Federation\FederationModule;
+use App\Module\Provider\FreeApiModule;
 use App\Module\Provider\GoogleAiModule;
 use App\Module\Provider\HiggsfieldModule;
 use App\Module\Provider\TheHiveModule;
@@ -25,13 +26,18 @@ use App\Module\Sidecar\OpendeskSttModule;
 use App\Module\Sidecar\PiperTtsModule;
 use App\Module\Sidecar\SearxngModule;
 use App\Module\Sidecar\TikaModule;
+use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\Billing\BillingService;
 use App\Service\Chat\ChatArtifactsConfig;
 use App\Service\Compute\ComputeConfig;
+use App\Service\Feature\FeatureFlagEnv;
+use App\Service\FreeApi\FreeApiConfig;
+use App\Service\FreeApi\FreeApiState;
 use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
 use App\Service\Iap\IapPricingService;
+use App\Service\Security\EncryptionService;
 
 /**
  * Builds every v1 feature-module descriptor with stub collaborators, in the
@@ -79,6 +85,7 @@ trait BuildsAllModules
             new OpendeskSttModule($probe, '', '', '', ''),
             new LiveVoiceModule($probe, '', '', $this->createStub(ModelRepository::class), $keyStore),
             new ChatArtifactsModule($this->disabledArtifacts()),
+            $this->disabledFreeApi(),
         ];
 
         $byId = [];
@@ -87,6 +94,16 @@ trait BuildsAllModules
         }
 
         return $byId;
+    }
+
+    private function disabledFreeApi(): FreeApiModule
+    {
+        $config = $this->createStub(ConfigRepository::class);
+
+        return new FreeApiModule(
+            new FreeApiConfig($config, new FeatureFlagEnv([]), '', 'test', false, '', ''),
+            new FreeApiState($config, $this->createStub(EncryptionService::class)),
+        );
     }
 
     private function disabledArtifacts(): ChatArtifactsConfig

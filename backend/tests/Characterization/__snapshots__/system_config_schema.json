@@ -4387,6 +4387,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "FEATURE_MODULES_GATE_FREEAPI": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_GOOGLE_AI": {
                 "isMasked": false,
                 "isSet": false,
@@ -6125,6 +6131,17 @@
                 "tab": "features",
                 "type": "boolean"
             },
+            "FEATURE_MODULES_GATE_FREEAPI": {
+                "dbGroup": "MODULES",
+                "dbKey": "GATE_FREEAPI",
+                "default": "true",
+                "description": "Hide the \"freeapi\" module while it is not configured: its API routes answer 404 and the interface shows no card for it. On is the shipped default for new installs. Configure the module first — see Operate → System status.",
+                "section": "modules",
+                "sensitive": false,
+                "source": "database",
+                "tab": "features",
+                "type": "boolean"
+            },
             "FEATURE_MODULES_GATE_GOOGLE_AI": {
                 "dbGroup": "MODULES",
                 "dbKey": "GATE_GOOGLE_AI",
@@ -7763,6 +7780,7 @@
                             "FEATURE_MODULES_GATE_COMPUTE",
                             "FEATURE_MODULES_GATE_DOCLING",
                             "FEATURE_MODULES_GATE_FEDERATION",
+                            "FEATURE_MODULES_GATE_FREEAPI",
                             "FEATURE_MODULES_GATE_GOOGLE_AI",
                             "FEATURE_MODULES_GATE_HIGGSFIELD",
                             "FEATURE_MODULES_GATE_LIVE_VOICE",
@@ -8517,6 +8535,12 @@
                 "value": "true"
             },
             "FEATURE_MODULES_GATE_FEDERATION": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
+            "FEATURE_MODULES_GATE_FREEAPI": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,
@@ -12074,6 +12098,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "FEATURE_MODULES_GATE_FREEAPI": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_GOOGLE_AI": {
                 "isMasked": false,
                 "isSet": false,
@@ -13319,6 +13349,12 @@
                 "value": "true"
             },
             "FEATURE_MODULES_GATE_FEDERATION": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
+            "FEATURE_MODULES_GATE_FREEAPI": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,

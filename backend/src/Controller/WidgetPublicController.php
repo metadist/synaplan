@@ -677,7 +677,7 @@ class WidgetPublicController extends AbstractController
             );
 
             if ($vectorResult['success']) {
-                $file->setStatus('vectorized');
+                $file->markVectorized();
                 $this->em->flush();
 
                 $result['file']['chunks_created'] = $vectorResult['chunks_created'];

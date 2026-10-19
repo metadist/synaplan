@@ -1212,11 +1212,16 @@ import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { chatErrorReasonKey } from '@/utils/chatErrorDisplay'
 import { extractArtifacts, type ChatArtifact } from '@/utils/chatArtifacts'
 import { isModuleConfigured } from '@/composables/useModuleFeature'
+import {
+  messageFilePreview,
+  reattachFromPreview,
+  type MessageFilePreview,
+} from '@/components/chat/messageFilePreview'
 
 const { t, te, locale } = useI18n()
 const guestStore = useGuestStore()
 const guestSessionId = computed(() => guestStore.sessionId)
-const previewFile = ref<{ id: number; filename: string; fileSize?: number } | null>(null)
+const previewFile = ref<MessageFilePreview | null>(null)
 const fileReturnFocus = ref<HTMLElement | null>(null)
 const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
 const ArtifactPanel = defineAsyncComponent(() => import('@/components/chat/ArtifactPanel.vue'))
@@ -1229,7 +1234,7 @@ const showOfficeActions = (file: MessageFile): boolean => {
 }
 
 const openPreview = (file: MessageFile) => {
-  previewFile.value = { id: file.id, filename: file.filename, fileSize: file.fileSize }
+  previewFile.value = messageFilePreview(file)
 }
 
 const openFileChip = (file: MessageFile, event: MouseEvent) => {
@@ -1256,13 +1261,7 @@ const downloadPreview = () => {
 const reattachPreview = () => {
   const file = previewFile.value
   if (!file) return
-  emit('reattachFile', {
-    id: file.id,
-    filename: file.filename,
-    fileType: '',
-    filePath: '',
-    fileSize: file.fileSize,
-  })
+  emit('reattachFile', reattachFromPreview(file))
 }
 
 const officeSiblingIds = computed(() =>

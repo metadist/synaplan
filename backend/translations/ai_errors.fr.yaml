@@ -23,3 +23,17 @@ file_analysis:
   audio_speech_off: 'La reconnaissance vocale locale est désactivée, donc cet enregistrement n’a pas été transcrit. Active la voix locale, ou choisis un modèle de voix dans les Paramètres.'
   audio_binary_missing: 'La reconnaissance vocale n’est pas installée sur ce serveur, donc cet enregistrement n’a pas été transcrit. Installe la reconnaissance vocale, ou choisis un modèle de voix dans les Paramètres.'
   audio_model_missing: 'Le fichier du modèle vocal local est manquant, donc cet enregistrement n’a pas été transcrit. Ajoute ce modèle, ou choisis un modèle de voix dans les Paramètres.'
+
+freeapi:
+  throttled: 'La Synaplan Demo est saturée depuis ton réseau en ce moment, donc aucune réponse n’a été générée. Ton message est enregistré ; réessaie dans quelques secondes.'
+  limit_reached: 'Tu as utilisé le quota du jour de la Synaplan Demo, donc aucune réponse n’a été générée. Il se renouvelle à minuit (heure allemande).'
+  full_today: 'La Synaplan Demo est complète pour aujourd’hui, donc aucune réponse n’a été générée. Elle rouvre à minuit (heure allemande).'
+  expired: 'La période de ta Synaplan Demo est terminée, donc aucune réponse n’a été générée.'
+  paused: 'La Synaplan Demo est en pause, donc aucune réponse n’a été générée. Tes chats et fichiers sont en sécurité sur ce serveur ; réessaie plus tard.'
+  blocked: 'La Synaplan Demo a été arrêtée pour cette installation, donc aucune réponse n’a été générée.'
+  upgrade_required: 'Cette version de Synaplan est trop ancienne pour la Synaplan Demo, donc aucune réponse n’a été générée. Mets Synaplan à jour.'
+  not_included: 'Les réponses vocales et les vidéos ne font pas partie de la Synaplan Demo, donc rien n’a été généré.'
+  unavailable: 'La Synaplan Demo n’a pas pu répondre, donc aucune réponse n’a été générée. Ton message est enregistré ; réessaie dans un instant.'
+  recovery:
+    admin: 'Pour continuer à discuter maintenant, ajoute ton propre fournisseur IA dans la configuration des fournisseurs IA.'
+    user: 'Pour continuer à discuter maintenant, demande à ton administrateur d’ajouter un fournisseur IA.'

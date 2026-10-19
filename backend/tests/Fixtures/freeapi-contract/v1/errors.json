@@ -1,0 +1,52 @@
+{
+  "freeapi_throttled": {
+    "http": 429,
+    "type": "rate_limit_error",
+    "message": "The Demo is busy from your network right now. Try again in a few seconds, or add your own AI provider."
+  },
+  "freeapi_limit_reached": {
+    "http": 429,
+    "type": "rate_limit_error",
+    "message": "You have used today's Demo allowance. More at midnight (German time), or add your own AI provider."
+  },
+  "freeapi_full_today": {
+    "http": 429,
+    "type": "rate_limit_error",
+    "message": "The Synaplan Demo is fully used for today. It opens again at midnight (German time). To keep chatting now, add your own AI provider."
+  },
+  "freeapi_expired": {
+    "http": 403,
+    "type": "invalid_request_error",
+    "message": "Your Demo period has ended. Add your own AI provider, or run Ollama locally."
+  },
+  "freeapi_paused": {
+    "http": 503,
+    "type": "server_error",
+    "message": "The Synaplan Demo is paused. Your chats and files are safe on this server. Try again later, or add your own AI provider."
+  },
+  "freeapi_blocked": {
+    "http": 403,
+    "type": "invalid_request_error",
+    "message": "This install's Demo was stopped. Add your own AI provider to continue."
+  },
+  "freeapi_upgrade_required": {
+    "http": 403,
+    "type": "invalid_request_error",
+    "message": "This Synaplan version is too old for the Demo. Update Synaplan, or add your own AI provider."
+  },
+  "freeapi_not_included": {
+    "http": 403,
+    "type": "invalid_request_error",
+    "message": "Voice replies and videos are not part of the Demo. Add your own AI provider to use them."
+  },
+  "freeapi_edge_required": {
+    "http": 403,
+    "type": "invalid_request_error",
+    "message": "The Synaplan Demo only answers requests that arrive through its edge."
+  },
+  "freeapi_pow_required": {
+    "http": 400,
+    "type": "invalid_request_error",
+    "message": "A proof of work is required to start the Synaplan Demo."
+  }
+}

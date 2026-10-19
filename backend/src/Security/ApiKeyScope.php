@@ -91,6 +91,22 @@ final class ApiKeyScope
     public const PLATFORM_MEMORIES = 'memories';
 
     /**
+     * Routes outside the prefix map that the platform-link apps call with a
+     * person's key: summarize and translate, chat, media, and the memory
+     * check before a chat (provisioned keys never carry `memories`). Exact
+     * method and path, so a platform key never gains a whole prefix; the
+     * scopes are added to whatever the prefix map already grants there.
+     *
+     * @var array<string, list<string>> "METHOD /path" => scopes
+     */
+    private const PLATFORM_ROUTES = [
+        'POST /api/v1/summary/generate' => [self::PLATFORM_CHAT],
+        'POST /api/v1/media/generate' => [self::PLATFORM_CHAT],
+        'POST /v1/chat/completions' => [self::PLATFORM_CHAT],
+        'GET /api/v1/config/memory-service/check' => [self::PLATFORM_CHAT, self::PLATFORM_MEMORIES],
+    ];
+
+    /**
      * Tool grant for `code_execution` / `code_run`. Not a path scope: `/v1/*`
      * stays gated by {@see DESKTOP_MESSAGES}. Empty-scope and webhook-only
      * keys do not receive it; only an explicit `compute:run` or `*` does.
@@ -101,6 +117,22 @@ final class ApiKeyScope
      * `/v1/audio/transcriptions*` and Meeting notes. A meeting key cannot chat.
      */
     public const AUDIO_TRANSCRIBE = 'audio:transcribe';
+
+    /**
+     * Synaplan Demo key, minted by the private `synafreeapi_server` plugin with
+     * exactly this one scope. It reaches the four gateway routes in
+     * {@see FREEAPI_GATEWAY_PATHS} and `/v1/free/*`, nothing else, and only
+     * after that plugin's gate marked the request ({@see FreeApiGatewayGuard}).
+     */
+    public const FREEAPI = 'freeapi';
+
+    /** @var list<string> */
+    public const FREEAPI_GATEWAY_PATHS = [
+        '/v1/chat/completions',
+        '/v1/embeddings',
+        '/v1/images/generations',
+        '/v1/models',
+    ];
 
     /**
      * Paths any authenticated key may reach regardless of scopes: identity
@@ -213,6 +245,29 @@ final class ApiKeyScope
     }
 
     /**
+     * A Synaplan Demo key: the scope list is exactly `['freeapi']`. Only such a
+     * key is ever gated by the Demo plugin.
+     *
+     * @param list<string>|array<int|string, mixed> $scopes
+     */
+    public static function isFreeApiKey(array $scopes): bool
+    {
+        return [self::FREEAPI] === self::normalize($scopes);
+    }
+
+    /**
+     * Any restricted key that names `freeapi`, including a malformed mix such
+     * as `['freeapi', 'chat']`. Such a key must pass the Demo gate on every
+     * `/v1` route, or it is refused.
+     *
+     * @param list<string>|array<int|string, mixed> $scopes
+     */
+    public static function carriesFreeApi(array $scopes): bool
+    {
+        return self::isRestricted($scopes) && \in_array(self::FREEAPI, self::normalize($scopes), true);
+    }
+
+    /**
      * A key is restricted iff its scope list is non-empty, is not a
      * legacy-webhook-only list, and does not contain `*`.
      *
@@ -244,6 +299,9 @@ final class ApiKeyScope
      * {@see isRestricted()} first (an unrestricted key is always allowed).
      *
      * Prefix map (v1):
+     *   /v1/free/                → freeapi
+     *   /v1/chat/completions, /v1/embeddings, /v1/images/generations,
+     *   /v1/models               → freeapi OR desktop:messages
      *   /v1/                     → desktop:messages
      *   /mcp                     → desktop:mcp
      *   /api/v1/desktop/         → desktop:jobs
@@ -265,10 +323,13 @@ final class ApiKeyScope
      *   /api/v1/admin/audit      → iam:read
      *   /api/v1/admin/users/{id}/resources → iam:read
      *   /api/v1/agents           → agents:*
-     *   /api/v1/auth/me          → any key (self-service identity, see
-     *                              SELF_SERVICE_PATHS)
-     *   /api/health              → any key (public health probe; presenting a
-     *                              restricted key must not 403 it)
+     *   POST /api/v1/summary/generate, POST /api/v1/media/generate,
+     *   POST /v1/chat/completions → also chat (exact routes, PLATFORM_ROUTES)
+     *   GET /api/v1/config/memory-service/check → chat OR memories
+     *   /api/v1/auth/me          → any key except one naming `freeapi`
+     *                              (self-service identity, see SELF_SERVICE_PATHS)
+     *   /api/health              → any key except one naming `freeapi` (public
+     *                              health probe; a restricted key must not 403 it)
      *   everything else          → denied for a restricted key (a scoped key
      *                              must never administer the instance)
      *
@@ -276,11 +337,13 @@ final class ApiKeyScope
      */
     public static function allows(array $scopes, string $path, string $method = ''): bool
     {
-        if (\in_array($path, self::SELF_SERVICE_PATHS, true)) {
+        $normalized = self::normalize($scopes);
+
+        // A Demo key belongs to the shared Demo account; "who am I" would hand
+        // that account's identity to every install holding a key.
+        if (\in_array($path, self::SELF_SERVICE_PATHS, true) && !\in_array(self::FREEAPI, $normalized, true)) {
             return true;
         }
-
-        $normalized = self::normalize($scopes);
 
         if (\in_array(self::WILDCARD, $normalized, true)) {
             return true;
@@ -314,8 +377,28 @@ final class ApiKeyScope
      */
     public static function requiredScopesForPath(string $path, string $method = ''): array
     {
+        $scopes = self::prefixScopes($path, $method);
+        $route = self::PLATFORM_ROUTES[strtoupper($method).' '.$path] ?? [];
+
+        return [] === $route ? $scopes : array_values(array_unique([...$scopes, ...$route]));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function prefixScopes(string $path, string $method): array
+    {
         if (self::matchesPrefix($path, '/v1/audio/transcriptions')) {
             return [self::AUDIO_TRANSCRIBE, self::DESKTOP_MESSAGES];
+        }
+
+        if (self::matchesPrefix($path, '/v1/free')) {
+            return [self::FREEAPI];
+        }
+
+        // Both scopes: a list of only `freeapi` would lock desktop keys out.
+        if (\in_array($path, self::FREEAPI_GATEWAY_PATHS, true)) {
+            return [self::FREEAPI, self::DESKTOP_MESSAGES];
         }
 
         if ('/v1' === $path || str_starts_with($path, '/v1/')) {

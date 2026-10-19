@@ -20,15 +20,7 @@
 
     <div class="w-full max-w-sm relative z-10" data-testid="section-card">
       <div
-        class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-8"
-        :class="
-          isDark
-            ? 'ring-1 ring-white/[0.04] shadow-black/30'
-            : 'ring-1 ring-black/[0.05] shadow-black/[0.04]'
-        "
-        :style="{
-          backgroundColor: isDark ? 'rgba(15, 15, 16, 0.8)' : 'rgba(255, 255, 255, 0.95)',
-        }"
+        class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-8 bg-[var(--bg-card)] ring-1 ring-black/[0.05] shadow-black/[0.04] dark:ring-white/[0.04] dark:shadow-black/30"
       >
         <div class="text-center mb-6" data-testid="section-header">
           <div class="w-10 h-[3px] bg-brand rounded-full mx-auto mb-5"></div>
@@ -59,11 +51,19 @@
             }}
           </p>
           <div
-            class="surface-chip rounded-xl p-3 text-center mb-6 ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+            class="surface-chip rounded-xl p-3 text-center ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
+            :class="signedInAs ? 'mb-3' : 'mb-6'"
           >
             <p class="txt-primary text-sm font-medium">{{ confirmUid }}</p>
             <p class="txt-secondary text-xs mt-1">{{ confirmHost }}</p>
           </div>
+          <p
+            v-if="signedInAs"
+            class="txt-secondary text-xs text-center mb-6"
+            data-testid="signed-in-as"
+          >
+            {{ signedInAs }}
+          </p>
 
           <button
             type="button"
@@ -155,7 +155,6 @@ import { cycleLocale } from '@/i18n'
 import { CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
 import { authReady } from '@/stores/auth'
-import { useTheme } from '@/composables/useTheme'
 import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
 import { platformLinksApi, type OutlookSignInPayload } from '@/services/api/platformLinksApi'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
@@ -188,7 +187,6 @@ const route = useRoute()
 const router = useRouter()
 const { locale, t } = useI18n()
 const authStore = useAuthStore()
-const themeStore = useTheme()
 
 const viewState = ref<ViewState>('loading')
 const errorMessage = ref<string>('')
@@ -196,8 +194,6 @@ const errorMessage = ref<string>('')
 const officeChannelAvailable = ref(false)
 const publicHost = ref<string>('')
 const clientPolicy = ref<PlatformClientPolicy | null>(null)
-
-const isDark = themeStore.isDark
 
 const currentLanguage = computed(() => locale.value)
 const userEmail = computed(() => authStore.user?.email ?? '')
@@ -220,6 +216,13 @@ const confirmUid = computed(() => {
   }
   return userEmail.value
 })
+
+// Outlook's card already shows the Synaplan email as its uid.
+const signedInAs = computed(() =>
+  clientPolicy.value?.delivery === 'link-code' && userEmail.value
+    ? t('platformConnect.signedInAs', { email: userEmail.value })
+    : ''
+)
 
 const targetBaseUrl = computed(() => {
   const fromQuery = route.query.baseUrl as string | undefined

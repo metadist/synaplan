@@ -54,7 +54,8 @@
         data-testid="state-provider-setup"
       >
         <LocalAiDownloadCard class="mx-auto max-w-[70rem] w-full px-4 pt-4" />
-        <ProviderSetupBanner />
+        <FreeApiWelcome v-if="offerFreeApiWelcome" />
+        <ProviderSetupBanner v-else />
       </div>
 
       <div
@@ -384,15 +385,8 @@
         :guest-session-id="isGuestMode ? guestStore.sessionId : null"
         :can-reattach="canComposeSharedChat && !isGuestMode"
         @close="conversationPreview = null"
-        @download="conversationPreview && downloadConversationPreview()"
-        @reattach="
-          conversationPreview &&
-          attachConversationFile({
-            id: conversationPreview.id,
-            name: conversationPreview.filename,
-            fileType: '',
-          })
-        "
+        @download="downloadConversationPreview"
+        @reattach="attachOpenPreview"
       />
       <ChatAccessErrorBanner
         v-if="
@@ -403,6 +397,11 @@
         class="max-w-[70rem] mx-auto w-full px-4 mb-3"
         :retrying="retryingConversationAccess"
         @retry="retryConversationAccess"
+      />
+      <FreeApiChatBanner
+        v-if="!needsProviderSetup && canComposeSharedChat && !isGuestMode"
+        class="max-w-[70rem] mx-auto w-full px-4 mb-2"
+        :streaming="isStreaming"
       />
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
@@ -667,6 +666,9 @@ import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
+import FreeApiWelcome from '@/components/freeapi/FreeApiWelcome.vue'
+import FreeApiChatBanner from '@/components/freeapi/FreeApiChatBanner.vue'
+import { useFreeApiStore } from '@/stores/freeApi'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import { useExtractedMemoryPoll } from '@/composables/useExtractedMemoryPoll'
@@ -698,6 +700,7 @@ import { useRealtimeStore } from '@/stores/realtime'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import ConversationFilesBar from '@/components/chat/ConversationFilesBar.vue'
 import { useConversationFiles } from '@/composables/useConversationFiles'
+import { useConversationFilePreview } from '@/composables/useConversationFilePreview'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
@@ -836,29 +839,15 @@ const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
 const { files: conversationFiles, refresh: refreshConversationFiles } = useConversationFiles()
 const { confirm: confirmDialog } = useDialog()
-
-const conversationPreview = ref<{ id: number; filename: string } | null>(null)
+const {
+  conversationPreview,
+  previewConversationFile,
+  downloadConversationPreview,
+  attachConversationFile,
+  attachOpenPreview,
+  reattachMessageFile,
+} = useConversationFilePreview(() => chatInputRef.value)
 const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
-const previewConversationFile = (file: { id: number | null; name: string }) => {
-  if (file.id == null) return
-  conversationPreview.value = { id: file.id, filename: file.name }
-}
-const downloadConversationPreview = async () => {
-  const file = conversationPreview.value
-  if (!file) return
-  const { downloadFile } = await import('@/services/filesService')
-  await downloadFile(file.id, file.filename)
-}
-const attachConversationFile = (file: { id: number | null; name: string; fileType: string }) => {
-  if (file.id === null) {
-    return
-  }
-  chatInputRef.value?.attachExistingFile({
-    file_id: file.id,
-    filename: file.name,
-    file_type: file.fileType,
-  })
-}
 
 // Remove a file the chat can use, from the "Files in this chat" popover. This is
 // a permanent delete of the file (and its indexed knowledge), so it is gated
@@ -1274,6 +1263,12 @@ const liveStage = computed(() => chatInputRef.value?.liveStage ?? null)
 // produce the cryptic HTTP 500 the old banner still allowed.
 const needsProviderSetup = computed(
   () => authStore.isAuthenticated && configStore.setup.chatReady === false
+)
+
+// Only an admin can start the Synaplan Demo; everyone else keeps the tombstone.
+const freeApiStore = useFreeApiStore()
+const offerFreeApiWelcome = computed(
+  () => needsProviderSetup.value && authStore.isAdmin && freeApiStore.isAvailable()
 )
 
 // Empty start page: the self-aware question is the one suggested action in
@@ -3831,14 +3826,6 @@ async function editUserMessage(message: Message, text: string): Promise<void> {
   await streamAIResponse(text, {
     ...(fileIds.length > 0 ? { fileIds } : {}),
     linkVersion: previousId ? { kind: 'edit', previousId } : undefined,
-  })
-}
-
-function reattachMessageFile(file: { id: number; filename: string; fileType?: string }): void {
-  chatInputRef.value?.attachExistingFile({
-    file_id: file.id,
-    filename: file.filename,
-    file_type: file.fileType || '',
   })
 }
 

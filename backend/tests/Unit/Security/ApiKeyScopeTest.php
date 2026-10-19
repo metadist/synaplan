@@ -378,6 +378,95 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows(['rag'], '/api/v1/chats'));
     }
 
+    /**
+     * @param list<string> $scopes
+     */
+    #[DataProvider('cloudAppRoutes')]
+    public function testCloudAppRouteIsReachableWithEachOfItsScopes(string $method, string $path, array $scopes): void
+    {
+        foreach ($scopes as $scope) {
+            self::assertTrue(ApiKeyScope::allows([$scope], $path, $method), sprintf('%s %s with %s', $method, $path, $scope));
+        }
+    }
+
+    /**
+     * @param list<string> $scopes
+     */
+    #[DataProvider('cloudAppRoutes')]
+    public function testCloudAppRouteIsClosedToTheOtherPlatformScopes(string $method, string $path, array $scopes): void
+    {
+        $others = array_values(array_diff(ApiKeyScope::platformLinkScopes(true), $scopes));
+
+        self::assertFalse(ApiKeyScope::allows($others, $path, $method));
+    }
+
+    #[DataProvider('cloudAppAnyKeyRoutes')]
+    public function testCloudAppAnyKeyRouteIsOpenToAProvisionedKey(string $method, string $path): void
+    {
+        self::assertTrue(ApiKeyScope::allows(ApiKeyScope::provisionedPlatformScopes(), $path, $method));
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: string, 2: list<string>}>
+     */
+    public static function cloudAppRoutes(): iterable
+    {
+        foreach (self::cloudAppsContract()['paths'] as $route) {
+            $path = strtr($route['path'], ['{id}' => '42', '{path}' => '7/report.png']);
+            yield $route['method'].' '.$route['path'] => [$route['method'], $path, $route['scopes']];
+        }
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function cloudAppAnyKeyRoutes(): iterable
+    {
+        foreach (self::cloudAppsContract()['anyKey'] as $route) {
+            yield $route['method'].' '.$route['path'] => [$route['method'], $route['path']];
+        }
+    }
+
+    public function testPlatformRoutesMatchExactMethodAndPath(): void
+    {
+        $scopes = ApiKeyScope::platformLinkScopes(true);
+
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/summary/generate', 'GET'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/summary/generate'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/media/generate-from-images', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/media/video/start', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/messages', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/models', 'GET'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/embeddings', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/images/generations', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/users', 'GET'));
+    }
+
+    public function testPlatformRoutesKeepTheGatewayScopes(): void
+    {
+        self::assertTrue(ApiKeyScope::allows(['desktop:messages'], '/v1/chat/completions', 'POST'));
+        self::assertTrue(ApiKeyScope::allows(['freeapi'], '/v1/chat/completions', 'POST'));
+        self::assertSame(['freeapi', 'desktop:messages', 'chat'], ApiKeyScope::requiredScopesForPath('/v1/chat/completions', 'POST'));
+        self::assertSame(['freeapi', 'desktop:messages'], ApiKeyScope::requiredScopesForPath('/v1/chat/completions', 'GET'));
+        self::assertSame(['chat', 'memories'], ApiKeyScope::requiredScopesForPath('/api/v1/config/memory-service/check', 'GET'));
+    }
+
+    /**
+     * @return array{paths: list<array{method: string, path: string, scopes: list<string>}>, anyKey: list<array{method: string, path: string}>}
+     */
+    private static function cloudAppsContract(): array
+    {
+        $json = file_get_contents(__DIR__.'/../../Fixtures/cloud-apps-contract/paths.json');
+        if (false === $json) {
+            throw new \RuntimeException('Fixtures/cloud-apps-contract/paths.json is missing.');
+        }
+
+        /** @var array{paths: list<array{method: string, path: string, scopes: list<string>}>, anyKey: list<array{method: string, path: string}>} $contract */
+        $contract = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
+        return $contract;
+    }
+
     public function testGrandfatherUnchanged(): void
     {
         self::assertSame([
@@ -394,6 +483,95 @@ final class ApiKeyScopeTest extends TestCase
         ], ApiKeyScope::pairingScopes());
         self::assertFalse(ApiKeyScope::allows(ApiKeyScope::platformLinkScopes(), '/api/v1/admin/users'));
         self::assertTrue(ApiKeyScope::allows(ApiKeyScope::platformLinkScopes(), '/api/v1/auth/me'));
+    }
+
+    // -------------------------------------------------------------------------
+    // Synaplan Demo keys (`freeapi`) — minted by the private server plugin.
+    // -------------------------------------------------------------------------
+
+    public function testFreeApiKeyIsRestrictedAndExact(): void
+    {
+        self::assertTrue(ApiKeyScope::isRestricted(['freeapi']));
+        self::assertTrue(ApiKeyScope::isFreeApiKey(['freeapi']));
+        self::assertTrue(ApiKeyScope::isFreeApiKey([' freeapi ', 'freeapi']));
+        self::assertFalse(ApiKeyScope::isFreeApiKey([]));
+        self::assertFalse(ApiKeyScope::isFreeApiKey(['freeapi', 'desktop:messages']));
+        self::assertFalse(ApiKeyScope::isFreeApiKey(['*']));
+    }
+
+    public function testCarriesFreeApiCoversMixedListsButNotFullAccess(): void
+    {
+        self::assertTrue(ApiKeyScope::carriesFreeApi(['freeapi']));
+        self::assertTrue(ApiKeyScope::carriesFreeApi(['freeapi', 'chat']));
+        self::assertFalse(ApiKeyScope::carriesFreeApi(['freeapi', '*']));
+        self::assertFalse(ApiKeyScope::carriesFreeApi(['desktop:messages']));
+        self::assertFalse(ApiKeyScope::carriesFreeApi([]));
+    }
+
+    #[DataProvider('freeApiAllowedPaths')]
+    public function testFreeApiKeyReachesTheGatewayAndItsOwnRoutes(string $path): void
+    {
+        self::assertTrue(ApiKeyScope::allows(['freeapi'], $path));
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function freeApiAllowedPaths(): iterable
+    {
+        yield 'chat' => ['/v1/chat/completions'];
+        yield 'embeddings' => ['/v1/embeddings'];
+        yield 'images' => ['/v1/images/generations'];
+        yield 'models' => ['/v1/models'];
+        yield 'issuance' => ['/v1/free/keys'];
+        yield 'status' => ['/v1/free/status'];
+        yield 'self revoke' => ['/v1/free/keys/self'];
+    }
+
+    #[DataProvider('freeApiDeniedPaths')]
+    public function testFreeApiKeyIsDeniedEverywhereElse(string $path): void
+    {
+        self::assertFalse(ApiKeyScope::allows(['freeapi'], $path));
+    }
+
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function freeApiDeniedPaths(): iterable
+    {
+        yield 'anthropic messages' => ['/v1/messages'];
+        yield 'count tokens' => ['/v1/messages/count_tokens'];
+        yield 'media' => ['/v1/media/generate'];
+        yield 'speech' => ['/v1/audio/speech'];
+        yield 'transcriptions' => ['/v1/audio/transcriptions'];
+        yield 'assistants' => ['/v1/assistants'];
+        yield 'model catalog' => ['/v1/models/catalog'];
+        yield 'mcp' => ['/mcp'];
+        yield 'api messages' => ['/api/v1/messages'];
+        yield 'files' => ['/api/v1/files'];
+        yield 'admin' => ['/api/v1/admin/config/values'];
+        yield 'plugins' => ['/api/v1/user/1/plugins/synafreeapi_server/overview'];
+        yield 'who am i' => ['/api/v1/auth/me'];
+        yield 'free prefix lookalike' => ['/v1/freebies'];
+    }
+
+    public function testDesktopKeyKeepsTheGatewayButNotTheDemoRoutes(): void
+    {
+        $scopes = ['desktop:messages'];
+
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/chat/completions'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/embeddings'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/images/generations'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/models'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/free/keys'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/free/status'));
+        self::assertFalse(ApiKeyScope::allows(ApiKeyScope::pairingScopes(), '/v1/free/keys/self'));
+    }
+
+    public function testOtherScopesStillReachWhoAmI(): void
+    {
+        self::assertTrue(ApiKeyScope::allows(['desktop:messages'], '/api/v1/auth/me'));
+        self::assertTrue(ApiKeyScope::allows(['audio:transcribe'], '/api/health'));
     }
 
     public function testSelfRevokeMatchesOnlyOwnKeyViaDelete(): void

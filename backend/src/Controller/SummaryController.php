@@ -6,7 +6,7 @@ use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\PromptRepository;
 use App\Service\Summary\DocumentSummarizer;
-use App\Service\Summary\SummaryCall;
+use App\Service\Summary\IncompleteGenerationException;
 use App\Service\Summary\SummaryRequest;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -61,9 +61,9 @@ class SummaryController extends AbstractController
                 new OA\Property(
                     property: 'summaryType',
                     type: 'string',
-                    enum: ['abstractive', 'extractive', 'bullet-points'],
+                    enum: ['abstractive', 'extractive', 'bullet-points', 'translation'],
                     example: 'abstractive',
-                    description: 'Type of summary to generate'
+                    description: 'Type of summary to generate. translation returns the whole document in outputLanguage, nothing left out or added; length and focusAreas do not apply.'
                 ),
                 new OA\Property(
                     property: 'length',
@@ -124,7 +124,7 @@ class SummaryController extends AbstractController
     #[OA\Response(response: 401, description: 'Not authenticated')]
     #[OA\Response(response: 400, description: 'Invalid request parameters')]
     #[OA\Response(response: 404, description: 'File not found (fileId)')]
-    #[OA\Response(response: 422, description: 'File has no extracted text yet')]
+    #[OA\Response(response: 422, description: 'File has no extracted text yet, or a translation was cut off before the document ended')]
     #[OA\Response(response: 500, description: 'Summary generation failed')]
     public function generate(
         Request $request,
@@ -159,10 +159,11 @@ class SummaryController extends AbstractController
                 return $this->json(['success' => false, 'error' => 'Summary service not configured. Please load fixtures.'], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
-            // A lower temperature keeps summaries consistent.
-            $result = $this->summarizer->summarize($user, new SummaryCall($systemPrompt->getPrompt(), $summaryRequest->message($text), 0.5, 'DOC_SUMMARY', $text, $startTime));
+            $result = $this->summarizer->summarize($user, $summaryRequest->toCall($systemPrompt->getPrompt(), $text, $startTime));
 
             return $this->json($this->summaryPayload($summaryRequest, $text, $result, $startTime, (int) $user->getId()));
+        } catch (IncompleteGenerationException $e) {
+            return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (\Throwable $e) {
             $this->logger->error('Summary generation failed', [
                 'user_id' => $user->getId(),

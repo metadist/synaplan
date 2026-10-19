@@ -23,3 +23,17 @@ file_analysis:
   audio_speech_off: 'Local speech is turned off, so this recording was not transcribed. Turn on local speech, or choose a speech model in Settings.'
   audio_binary_missing: 'Speech recognition is not installed on this server, so this recording was not transcribed. Install speech recognition, or choose a speech model in Settings.'
   audio_model_missing: 'The local speech model file is missing, so this recording was not transcribed. Add that model, or choose a speech model in Settings.'
+
+freeapi:
+  throttled: 'The Synaplan Demo is busy from your network right now, so no answer was generated. Your message is saved; try again in a few seconds.'
+  limit_reached: 'You have used today''s Synaplan Demo allowance, so no answer was generated. It resets at midnight (German time).'
+  full_today: 'The Synaplan Demo is fully used for today, so no answer was generated. It opens again at midnight (German time).'
+  expired: 'Your Synaplan Demo period has ended, so no answer was generated.'
+  paused: 'The Synaplan Demo is paused, so no answer was generated. Your chats and files are safe on this server; try again later.'
+  blocked: 'The Synaplan Demo was stopped for this install, so no answer was generated.'
+  upgrade_required: 'This Synaplan version is too old for the Synaplan Demo, so no answer was generated. Update Synaplan.'
+  not_included: 'Voice replies and videos are not part of the Synaplan Demo, so nothing was generated.'
+  unavailable: 'The Synaplan Demo could not answer, so no answer was generated. Your message is saved; try again in a moment.'
+  recovery:
+    admin: 'To keep chatting now, add your own AI provider under AI provider setup.'
+    user: 'To keep chatting now, ask your administrator to add an AI provider.'

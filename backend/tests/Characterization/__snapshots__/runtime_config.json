@@ -115,6 +115,10 @@
                     "configured": "bool",
                     "gated": "bool"
                 },
+                "freeapi": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "google_ai": {
                     "configured": "bool",
                     "gated": "bool"
@@ -326,6 +330,10 @@
                     "configured": "bool",
                     "gated": "bool"
                 },
+                "freeapi": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "google_ai": {
                     "configured": "bool",
                     "gated": "bool"
@@ -534,6 +542,10 @@
                     "gated": "bool"
                 },
                 "federation": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "freeapi": {
                     "configured": "bool",
                     "gated": "bool"
                 },

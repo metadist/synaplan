@@ -21,6 +21,7 @@ use App\Service\WhatsApp\Turn\WhatsAppAnswer;
 use App\Service\WhatsApp\Turn\WhatsAppReply;
 use App\Service\WhatsApp\Turn\WhatsAppReplyDelivery;
 use App\Service\WhatsApp\WhatsAppService;
+use App\Tests\Support\FixedAuthorizationChecker;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -110,7 +111,7 @@ final class WhatsAppReplyTest extends TestCase
         $reply = new WhatsAppReply(
             $whatsApp,
             $processor,
-            new ChatErrorPresenter(new IdentityTranslator(), new ChatFailureClassifier()),
+            new ChatErrorPresenter(new IdentityTranslator(), new ChatFailureClassifier(), new FixedAuthorizationChecker(false)),
             $references,
             $limits,
             $delivery,

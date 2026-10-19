@@ -36,6 +36,7 @@ class File
         'outlook',
         'nextcloud',
         'opencloud',
+        'owncloud',
         'whatsapp',
         'telegram',
         'widget',
@@ -54,7 +55,31 @@ class File
         'outlook',
         'nextcloud',
         'opencloud',
+        'owncloud',
     ];
+
+    /**
+     * Cloud apps whose uploads name the knowledge folder the person picked.
+     * Such an upload is already filed, so it skips the Incoming inbox; without
+     * a folder, or with `DEFAULT`, it still lands there.
+     */
+    public const KNOWLEDGE_INTAKE_SOURCES = [
+        'nextcloud',
+        'opencloud',
+        'owncloud',
+    ];
+
+    public static function arrivesIncoming(string $source, ?string $groupKey): bool
+    {
+        return in_array($source, self::INCOMING_SOURCES, true)
+            && !self::namesKnowledgeFolder($source, $groupKey);
+    }
+
+    public static function namesKnowledgeFolder(string $source, ?string $groupKey): bool
+    {
+        return in_array($source, self::KNOWLEDGE_INTAKE_SOURCES, true)
+            && null !== $groupKey && '' !== $groupKey && 'DEFAULT' !== $groupKey;
+    }
 
     /**
      * Kind of a generated artefact, for {@see self::$source} === 'generated'.
@@ -554,6 +579,18 @@ class File
     public function setVectorState(string $vectorState): self
     {
         $this->vectorState = in_array($vectorState, self::VECTOR_STATES, true) ? $vectorState : self::VECTOR_STATE_NONE;
+
+        return $this;
+    }
+
+    /**
+     * Fresh vectors were stored: the file is searchable now, not only after
+     * the Library's next fix-on-read (FileListService::syncVectorState).
+     */
+    public function markVectorized(): self
+    {
+        $this->status = 'vectorized';
+        $this->vectorState = self::VECTOR_STATE_VECTORIZED;
 
         return $this;
     }

@@ -23,3 +23,17 @@ file_analysis:
   audio_speech_off: 'Yerel konuşma tanıma kapalı, bu yüzden bu kayıt yazıya dökülmedi. Yerel konuşmayı aç veya Ayarlar’dan bir konuşma modeli seç.'
   audio_binary_missing: 'Konuşma tanıma bu sunucuda yüklü değil, bu yüzden bu kayıt yazıya dökülmedi. Konuşma tanımayı yükle veya Ayarlar’dan bir konuşma modeli seç.'
   audio_model_missing: 'Yerel konuşma modeli dosyası eksik, bu yüzden bu kayıt yazıya dökülmedi. Modeli ekle veya Ayarlar’dan bir konuşma modeli seç.'
+
+freeapi:
+  throttled: 'Synaplan Demo şu anda ağından gelen isteklerle meşgul, bu yüzden yanıt oluşturulmadı. Mesajın kaydedildi; birkaç saniye sonra tekrar dene.'
+  limit_reached: 'Synaplan Demo için bugünkü kotanı kullandın, bu yüzden yanıt oluşturulmadı. Kota gece yarısı (Almanya saatiyle) yenilenir.'
+  full_today: 'Synaplan Demo bugün için tamamen dolu, bu yüzden yanıt oluşturulmadı. Gece yarısı (Almanya saatiyle) yeniden açılır.'
+  expired: 'Synaplan Demo süren doldu, bu yüzden yanıt oluşturulmadı.'
+  paused: 'Synaplan Demo duraklatıldı, bu yüzden yanıt oluşturulmadı. Sohbetlerin ve dosyaların bu sunucuda güvende; daha sonra tekrar dene.'
+  blocked: 'Synaplan Demo bu kurulum için durduruldu, bu yüzden yanıt oluşturulmadı.'
+  upgrade_required: 'Bu Synaplan sürümü Synaplan Demo için çok eski, bu yüzden yanıt oluşturulmadı. Synaplan’ı güncelle.'
+  not_included: 'Sesli yanıtlar ve videolar Synaplan Demo’ya dahil değil, bu yüzden hiçbir şey oluşturulmadı.'
+  unavailable: 'Synaplan Demo yanıt veremedi, bu yüzden yanıt oluşturulmadı. Mesajın kaydedildi; biraz sonra tekrar dene.'
+  recovery:
+    admin: 'Şimdi sohbete devam etmek için AI sağlayıcı kurulumundan kendi AI sağlayıcını ekle.'
+    user: 'Şimdi sohbete devam etmek için yöneticinden bir AI sağlayıcısı eklemesini iste.'

@@ -82,6 +82,7 @@
     "retry": "Yeniden dene",
     "helpLine": "Bu pencere başka bir uygulama tarafından açıldı. Kapatmak güvenlidir.",
     "notYou": "Siz değil misiniz? Çıkış yapın",
+    "signedInAs": "Synaplan'da {email} olarak oturum açıldı",
     "errorMissingState": "Bu bağlantı isteği eksik. Diğer uygulamadan yeniden başlayın.",
     "errorOfficeNotReady": "Office.js kullanılamıyor. Bu sayfa Outlook içinden açılmalıdır.",
     "errorNotSignedIn": "Oturum açmadınız. Pencereyi yenileyip yeniden oturum açın.",
@@ -1344,6 +1345,9 @@
     },
     "chat_artifacts": {
       "label": "HTML ve SVG önizlemesi"
+    },
+    "freeapi": {
+      "label": "Synaplan Demo"
     }
   },
   "partners": {

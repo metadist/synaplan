@@ -58,6 +58,7 @@ final class OpenAICompatibleControllerToolsTest extends TestCase
         $this->toolCallingGate = $this->createMock(OpenAiToolCallingGate::class);
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->rateLimitService->method('checkCostBudget')->willReturn(['allowed' => true]);
         $this->metered = null;
         $this->meteredAction = null;
         $this->rateLimitService->method('recordUsage')

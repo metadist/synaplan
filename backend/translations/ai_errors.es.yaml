@@ -23,3 +23,17 @@ file_analysis:
   audio_speech_off: 'El reconocimiento de voz local está desactivado, así que esta grabación no se transcribió. Activa la voz local o elige un modelo de voz en Ajustes.'
   audio_binary_missing: 'El reconocimiento de voz no está instalado en este servidor, así que esta grabación no se transcribió. Instala el reconocimiento de voz o elige un modelo de voz en Ajustes.'
   audio_model_missing: 'Falta el archivo del modelo de voz local, así que esta grabación no se transcribió. Añade ese modelo o elige un modelo de voz en Ajustes.'
+
+freeapi:
+  throttled: 'La Synaplan Demo está ocupada desde tu red ahora mismo, así que no se generó ninguna respuesta. Tu mensaje está guardado; vuelve a intentarlo en unos segundos.'
+  limit_reached: 'Has usado la cuota de hoy de la Synaplan Demo, así que no se generó ninguna respuesta. Se renueva a medianoche (hora alemana).'
+  full_today: 'La Synaplan Demo está completa por hoy, así que no se generó ninguna respuesta. Vuelve a abrir a medianoche (hora alemana).'
+  expired: 'El periodo de tu Synaplan Demo ha terminado, así que no se generó ninguna respuesta.'
+  paused: 'La Synaplan Demo está en pausa, así que no se generó ninguna respuesta. Tus chats y archivos están seguros en este servidor; vuelve a intentarlo más tarde.'
+  blocked: 'La Synaplan Demo se detuvo para esta instalación, así que no se generó ninguna respuesta.'
+  upgrade_required: 'Esta versión de Synaplan es demasiado antigua para la Synaplan Demo, así que no se generó ninguna respuesta. Actualiza Synaplan.'
+  not_included: 'Las respuestas habladas y los vídeos no forman parte de la Synaplan Demo, así que no se generó nada.'
+  unavailable: 'La Synaplan Demo no pudo responder, así que no se generó ninguna respuesta. Tu mensaje está guardado; vuelve a intentarlo en un momento.'
+  recovery:
+    admin: 'Para seguir chateando ahora, añade tu propio proveedor de IA en la configuración de IA.'
+    user: 'Para seguir chateando ahora, pide a tu administrador que añada un proveedor de IA.'

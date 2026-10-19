@@ -8,6 +8,7 @@ use App\AI\Exception\NoImageException;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\StructuredOutputViolationException;
+use App\AI\Exception\UpstreamRefusal;
 use App\Service\Exception\StreamCancelledException;
 
 /**
@@ -148,6 +149,12 @@ final readonly class FailureClassifier
         // recognised pattern and no HTTP status, so it would otherwise be
         // filed as transient and start counting against the model.
         if ($error instanceof NoImageException) {
+            return FailureKind::UserError;
+        }
+
+        // A gateway refusing on purpose (quota, expiry, pause) says nothing
+        // about the model; counting it could auto-disable the Demo models.
+        if (UpstreamRefusal::isRefusal($error)) {
             return FailureKind::UserError;
         }
 

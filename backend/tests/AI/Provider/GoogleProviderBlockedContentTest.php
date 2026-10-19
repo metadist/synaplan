@@ -141,6 +141,7 @@ class GoogleProviderBlockedContentTest extends TestCase
 
         $response = $provider->chat([['role' => 'user', 'content' => 'test']], ['model' => 'gemini-1.5-flash']);
         $this->assertSame('Truncated...', $response['content']);
+        $this->assertSame('length', $response['finish_reason']);
     }
 
     public function testNoCandidatesAndNoBlockReasonDoesNotThrow(): void

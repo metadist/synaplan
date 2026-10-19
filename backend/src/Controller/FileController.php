@@ -27,6 +27,7 @@ use App\Service\File\Office\DocumentExportService;
 use App\Service\File\Office\DocumentThumbnailGenerator;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\ProcessModelHints;
+use App\Service\File\SourceStaleCheck;
 use App\Service\File\UploadOptions;
 use App\Service\Iam\KnowledgeFolderShareCleanup;
 use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
@@ -207,9 +208,9 @@ class FileController extends AbstractController
                 schema: new OA\Schema(
                     properties: [
                         new OA\Property(property: 'files[]', type: 'array', items: new OA\Items(type: 'string', format: 'binary')),
-                        new OA\Property(property: 'group_key', type: 'string', example: 'customer-support'),
+                        new OA\Property(property: 'group_key', type: 'string', example: 'customer-support', description: 'Knowledge folder. An upload from nextcloud, opencloud or owncloud that names a folder other than DEFAULT skips the Incoming inbox; without one it lands there.'),
                         new OA\Property(property: 'process_level', type: 'string', enum: ['store', 'extract', 'vectorize', 'full'], example: 'vectorize'),
-                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'whatsapp', 'telegram', 'widget', 'api', 'generated', 'compute'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/Outlook) should set this so the file is labelled by source. compute = result of a file-work run.'),
+                        new OA\Property(property: 'source', type: 'string', enum: ['web_upload', 'chat_attachment', 'outlook', 'nextcloud', 'opencloud', 'owncloud', 'whatsapp', 'telegram', 'widget', 'api', 'generated', 'compute'], example: 'nextcloud', description: 'Origin of the file (provenance). Defaults to web_upload. Integrations (Nextcloud/OpenCloud/ownCloud.online/Outlook) should set this so the file is labelled by source. compute = result of a file-work run.'),
                         new OA\Property(property: 'original_name', type: 'string', example: '/Shared/Q3 Report.pdf', description: 'The file name at the source, preserved even when the stored name is normalised. Falls back to the uploaded filename.'),
                         new OA\Property(property: 'source_id', type: 'string', example: '12345', description: 'Stable external id of the file at its source (e.g. the Nextcloud file id). Enables overwrite-in-place and bulk stale checks. Sent with a single file per request.'),
                         new OA\Property(property: 'source_etag', type: 'string', example: 'a1b2c3', description: 'External version/etag captured at ingest; a differing value reported later marks the knowledge copy stale.'),
@@ -1626,6 +1627,7 @@ class FileController extends AbstractController
                                     new OA\Property(property: 'status', type: 'string', enum: ['current', 'stale', 'missing'], example: 'stale'),
                                     new OA\Property(property: 'file_id', type: 'integer', nullable: true, example: 42),
                                     new OA\Property(property: 'stored_etag', type: 'string', nullable: true, example: 'a1b2c3'),
+                                    new OA\Property(property: 'vector_state', type: 'string', enum: File::VECTOR_STATES, nullable: true, example: 'vectorized', description: 'Search index state of the stored file; null when Synaplan does not hold it.'),
                                 ],
                                 type: 'object',
                             ),
@@ -1638,7 +1640,7 @@ class FileController extends AbstractController
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
-    public function checkStale(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    public function checkStale(Request $request, #[CurrentUser] ?User $user, SourceStaleCheck $sourceStaleCheck): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -1658,54 +1660,9 @@ class FileController extends AbstractController
             return $this->json(['error' => 'items (array of {source_id, source_etag}) is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Preserve the caller's order and the first etag seen per id.
-        $requested = [];
-        foreach ($items as $item) {
-            if (!is_array($item) || !isset($item['source_id'])) {
-                continue;
-            }
-            $sid = trim((string) $item['source_id']);
-            if ('' === $sid || array_key_exists($sid, $requested)) {
-                continue;
-            }
-            $etag = isset($item['source_etag']) && '' !== trim((string) $item['source_etag'])
-                ? trim((string) $item['source_etag'])
-                : null;
-            $requested[$sid] = $etag;
-        }
+        $check = $sourceStaleCheck->check($user->getId(), $source, $items);
 
-        $found = $this->fileRepository->findByUserSourceIds($user->getId(), $source, array_keys($requested));
-
-        $results = [];
-        $counts = ['current' => 0, 'stale' => 0, 'missing' => 0];
-        foreach ($requested as $sid => $reportedEtag) {
-            $file = $found[$sid] ?? null;
-            if (null === $file) {
-                $status = 'missing';
-                $fileId = null;
-                $storedEtag = null;
-            } else {
-                $storedEtag = $file->getSourceEtag();
-                $drifted = $file->isStale()
-                    || (null !== $reportedEtag && null !== $storedEtag && $reportedEtag !== $storedEtag);
-                $status = $drifted ? 'stale' : 'current';
-                $fileId = (int) $file->getId();
-            }
-
-            ++$counts[$status];
-            $results[] = [
-                'source_id' => $sid,
-                'status' => $status,
-                'file_id' => $fileId,
-                'stored_etag' => $storedEtag,
-            ];
-        }
-
-        return $this->json([
-            'success' => true,
-            'results' => $results,
-            'counts' => $counts,
-        ]);
+        return $this->json(['success' => true, ...$check]);
     }
 
     #[Route('/{id}/mark-stale', name: 'mark_stale', methods: ['POST'])]

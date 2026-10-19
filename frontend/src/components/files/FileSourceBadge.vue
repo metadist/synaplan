@@ -39,6 +39,7 @@ const icon = computed(() => {
     outlook: 'mdi:microsoft-outlook',
     nextcloud: 'mdi:cloud-outline',
     opencloud: 'mdi:cloud-outline',
+    owncloud: 'mdi:cloud-outline',
     whatsapp: 'mdi:whatsapp',
     telegram: 'mdi:telegram',
     widget: 'mdi:puzzle-outline',

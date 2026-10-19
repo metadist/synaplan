@@ -4,6 +4,7 @@ namespace App\Service\Infrastructure;
 
 use App\AI\Exception\NoImageException;
 use App\AI\Exception\StructuredOutputViolationException;
+use App\AI\Exception\UpstreamRefusal;
 use App\Service\Exception\StreamCancelledException;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -103,7 +104,12 @@ final readonly class CircuitBreaker
             // for the next image request.
             throw $e;
         } catch (\Exception $e) {
-            // Failure
+            // A gateway that refuses on purpose (quota, expiry, pause) is up.
+            // Opening the circuit would fail every other endpoint of the provider.
+            if (UpstreamRefusal::isRefusal($e)) {
+                throw $e;
+            }
+
             $this->recordFailure($serviceName);
 
             $this->logger->error('Circuit breaker recorded failure', [

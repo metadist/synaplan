@@ -1,7 +1,7 @@
 {
   "_comment": "Frontend size ratchet ledger (tests/unit/architecture/sizeRatchet.spec.ts). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_SIZE_RATCHET=1 and review the diff.",
   "recorded": "2026-10-16",
-  "updated": "2026-10-16",
+  "updated": "2026-10-19",
   "limits": {
     "fileLines": 800,
     "functionLines": 100
@@ -12,7 +12,7 @@
   },
   "fileLines": {
     "src/components/ChatBrowser.vue": 999,
-    "src/components/ChatInput.vue": 2605,
+    "src/components/ChatInput.vue": 2543,
     "src/components/ChatMessage.vue": 2398,
     "src/components/FileSelectionModal.vue": 889,
     "src/components/MemoryGraphView.vue": 934,
@@ -29,12 +29,12 @@
     "src/services/api/chatApi.ts": 1074,
     "src/services/api/httpClient.ts": 865,
     "src/services/api/widgetsApi.ts": 826,
-    "src/services/filesService.ts": 1288,
+    "src/services/filesService.ts": 1276,
     "src/stores/chats.ts": 1513,
     "src/stores/history.ts": 1121,
     "src/utils/messageMapper.ts": 869,
     "src/views/ChatView.vue": 4470,
-    "src/views/FilesView.vue": 2998,
+    "src/views/FilesView.vue": 2989,
     "src/views/LoginView.vue": 812,
     "src/views/NeuroExplorerView.vue": 1434,
     "src/views/WidgetDetailView.vue": 2091,
@@ -61,7 +61,6 @@
     "src/composables/search/useSearchModels.ts::useSearchModels": 124,
     "src/composables/search/useSmartSearch.ts::useSmartSearch": 198,
     "src/composables/useChatHistory.ts::useChatHistory": 250,
-    "src/composables/useConversationFiles.ts::useConversationFiles": 103,
     "src/composables/useGoogleTag.ts::useGoogleTag": 196,
     "src/composables/useInputPersistence.ts::useAttachmentPersist": 124,
     "src/composables/useInputPersistence.ts::usePastedBlocksPersist": 119,

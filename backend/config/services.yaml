@@ -21,6 +21,10 @@ parameters:
     # passes it through; elestio.yml sets it to 'elestio'.
     env(SYNAPLAN_PLATFORM): 'selfhost'
 
+    # Set by Kubernetes in every pod. The service readiness list never names a
+    # docker compose command on such an install.
+    env(KUBERNETES_SERVICE_HOST): ''
+
     # OIDC admin role claim values (comma-separated, case-insensitive)
     env(OIDC_ADMIN_ROLES): 'admin,realm-admin,synaplan-admin,administrator'
 
@@ -182,6 +186,10 @@ parameters:
     env(SEARXNG_BASE_URL): ''
     # HTML/SVG chat preview. Empty = off. The dev compose defaults this to 1.
     env(CHAT_ARTIFACTS_ENABLED): ''
+    # Synaplan Demo server. Empty = module absent; the switch is FREEAPI.ENABLED.
+    env(FREEAPI_BASE_URL): ''
+    # Set by CI runners; keeps automated runs away from real third-party servers.
+    env(CI): 'false'
     # Office convert (Collabora CODE). Empty = disabled (OSS default).
     env(OFFICE_CONVERT_URL): ''
     env(OFFICE_CONVERT_TIMEOUT_MS): '60000'
@@ -1262,6 +1270,37 @@ services:
     App\Service\Chat\ChatArtifactsConfig:
         arguments:
             $envValue: '%env(CHAT_ARTIFACTS_ENABLED)%'
+
+    App\Service\FreeApi\FreeApiConfig:
+        arguments:
+            $baseUrl: '%env(FREEAPI_BASE_URL)%'
+            $environment: '%kernel.environment%'
+            $ci: '%env(bool:CI)%'
+            $appVersion: '%env(default:app_version_default:APP_VERSION)%'
+            $platform: '%env(string:SYNAPLAN_PLATFORM)%'
+
+    App\Service\FreeApi\FreeApiInstallFacts:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Service\Config\Readiness\ServiceReadinessProbes:
+        arguments:
+            $qdrantUrl: '%env(QDRANT_URL)%'
+            $realtimeEnabled: '%env(bool:REALTIME_ENABLED)%'
+            $realtimeApiUrl: '%env(REALTIME_API_URL)%'
+
+    App\Service\Config\Readiness\ServiceReadinessReporter:
+        arguments:
+            $environment: '%kernel.environment%'
+            $platform: '%env(string:SYNAPLAN_PLATFORM)%'
+            $kubernetesHost: '%env(string:KUBERNETES_SERVICE_HOST)%'
+
+    # Per-call headers for OpenAI-compatible endpoints; only the Demo endpoint gets any.
+    App\AI\Provider\OpenAiCompatibleRequestHeaders: '@App\Service\FreeApi\FreeApiRequestHeaders'
+
+    App\Service\FreeApi\FreeApiRequestHeaders:
+        arguments:
+            $appSecret: '%kernel.secret%'
 
     App\Module\Sidecar\PiperTtsModule:
         arguments:

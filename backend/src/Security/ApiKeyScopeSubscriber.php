@@ -79,7 +79,7 @@ final class ApiKeyScopeSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $required = ApiKeyScope::requiredScopesForPath($path);
+        $required = ApiKeyScope::requiredScopesForPath($path, $request->getMethod());
 
         $this->logger->warning('API key blocked by insufficient scope', [
             'key_id' => $apiKey->getId(),

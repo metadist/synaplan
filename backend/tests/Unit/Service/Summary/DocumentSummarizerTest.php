@@ -9,7 +9,9 @@ use App\Entity\User;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\Summary\DocumentSummarizer;
+use App\Service\Summary\IncompleteGenerationException;
 use App\Service\Summary\SummaryCall;
+use App\Service\Summary\SummaryRequest;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -46,6 +48,30 @@ final class DocumentSummarizerTest extends TestCase
             ->summarize($this->user(), new SummaryCall('Summarize.', 'Configuration: …', 0.5, 'DOC_SUMMARY', 'the document', microtime(true)));
 
         self::assertSame(['summary' => 'Done.', 'provider' => null, 'model' => null], $result);
+    }
+
+    public function testACutOffTranslationIsRefusedAndACutOffSummaryIsKept(): void
+    {
+        $cutOff = ['content' => 'Nur der Anfang.', 'finish_reason' => 'length', 'provider' => 'groq', 'model' => 'llama'];
+        $ai = $this->createMock(AiFacade::class);
+        $ai->expects(self::exactly(2))->method('chat')
+            ->with(self::anything(), 7, self::callback(
+                static fn (array $options): bool => SummaryRequest::TRANSLATION_MAX_TOKENS === ($options['max_tokens'] ?? null),
+            ))
+            ->willReturn($cutOff);
+
+        $translation = new SummaryCall('Translate.', 'Document to translate', 0.2, 'DOC_SUMMARY', 'source', null, true, SummaryRequest::TRANSLATION_MAX_TOKENS);
+        $summarizer = $this->summarizer($ai, $this->createStub(RateLimitService::class), ['model' => 'llama', 'provider' => 'groq', 'model_id' => 12]);
+
+        try {
+            $summarizer->summarize($this->user(), $translation);
+            self::fail('A cut-off translation must not be returned.');
+        } catch (IncompleteGenerationException $e) {
+            self::assertStringContainsString('too long', $e->getMessage());
+        }
+
+        $summary = new SummaryCall('Summarize.', 'Document to summarize', 0.5, 'DOC_SUMMARY', 'source', null, false, SummaryRequest::TRANSLATION_MAX_TOKENS);
+        self::assertSame('Nur der Anfang.', $summarizer->summarize($this->user(), $summary)['summary']);
     }
 
     /**

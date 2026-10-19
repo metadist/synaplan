@@ -113,6 +113,34 @@ class FileLifecycleControllerTest extends WebTestCase
         self::assertSame('etag-2', $rows[0]->getSourceEtag());
     }
 
+    public function testOverwriteLeavesIncomingOnlyWhenItNamesAKnowledgeFolder(): void
+    {
+        $upload = fn (string $groupKey): array => $this->upload('plan.txt', 'Plan '.$groupKey, [
+            'source' => 'nextcloud',
+            'source_id' => 'nc-plan',
+            'group_key' => $groupKey,
+            'process_level' => 'extract',
+            'overwrite' => '1',
+        ]);
+        $incoming = function (int $id): bool {
+            $this->em->clear();
+
+            return $this->em->getRepository(File::class)->find($id)->isIncoming();
+        };
+
+        $id = $upload('DEFAULT')['files'][0]['id'];
+        self::assertTrue($incoming($id), 'without a folder the upload waits in Incoming');
+
+        self::assertSame($id, $upload('DEFAULT')['files'][0]['id']);
+        self::assertTrue($incoming($id), 'an update without a folder keeps it there');
+
+        $upload('Contracts');
+        self::assertFalse($incoming($id), 'an update into a knowledge folder files it');
+
+        $upload('DEFAULT');
+        self::assertFalse($incoming($id), 'a later update without a folder does not bring it back');
+    }
+
     public function testMarkStaleSetsMarker(): void
     {
         $data = $this->upload('stale.txt', 'Some content.', [
@@ -180,6 +208,45 @@ class FileLifecycleControllerTest extends WebTestCase
         self::assertSame('stale', $byId['nc-B']['status']);
         self::assertSame('missing', $byId['nc-GONE']['status']);
         self::assertNull($byId['nc-GONE']['file_id']);
+
+        self::assertContains($byId['nc-A']['vector_state'], File::VECTOR_STATES);
+        self::assertContains($byId['nc-B']['vector_state'], File::VECTOR_STATES);
+        self::assertNull($byId['nc-GONE']['vector_state']);
+    }
+
+    public function testOwncloudUploadKeepsItsSourceAndIsFoundByCheckStale(): void
+    {
+        $data = $this->upload('oc.txt', 'From ownCloud.online.', [
+            'source' => 'owncloud',
+            'source_id' => 'oc-7',
+            'source_etag' => 'etag-oc',
+            'process_level' => 'extract',
+        ]);
+        $fileId = $data['files'][0]['id'];
+
+        $file = $this->em->getRepository(File::class)->find($fileId);
+        self::assertNotNull($file);
+        self::assertSame('owncloud', $file->getSource());
+        self::assertTrue($file->isIncoming());
+
+        $this->client->request('GET', '/api/v1/files', ['source' => 'owncloud'], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+        ]);
+        self::assertResponseIsSuccessful();
+        $listed = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertContains($fileId, array_column($listed['files'], 'id'));
+
+        $this->client->request('POST', '/api/v1/files/check-stale', [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->authToken,
+            'CONTENT_TYPE' => 'application/json',
+        ], json_encode([
+            'source' => 'owncloud',
+            'items' => [['source_id' => 'oc-7', 'source_etag' => 'etag-oc']],
+        ]));
+        self::assertResponseIsSuccessful();
+        $body = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame('current', $body['results'][0]['status']);
+        self::assertSame($fileId, $body['results'][0]['file_id']);
     }
 
     /**
