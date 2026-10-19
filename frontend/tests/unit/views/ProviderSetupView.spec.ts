@@ -156,12 +156,13 @@ describe('ProviderSetupView — AI infrastructure', () => {
     getConfigValues.mockResolvedValue(values)
   })
 
-  it('links to the Edit models tab on /ai/models', async () => {
+  it('links straight to the Model catalog tab its hint names', async () => {
     const { wrapper } = await mountView()
 
     const link = wrapper.get('[data-testid="setup-own-service"]')
     expect(link.text()).toContain('Add your own service')
-    expect(link.attributes('href')).toBe('/ai/models?tab=edit')
+    expect(link.attributes('href')).toBe('/admin/setup?tab=catalog')
+    expect(wrapper.text()).toContain('on the Model catalog tab')
   })
 
   it('groups everything AI into seven topic tabs', async () => {
