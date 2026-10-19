@@ -490,3 +490,24 @@ proved it catches a renamed field, a renamed route and an unknown enum value.
 Its enum message also shows D2 from the app's side: the pinned spec has no
 `owncloud` source until #2574 ships. CF0.3 gained the overwrite case from
 Copilot's review (#2572): an update into a knowledge folder leaves Incoming too.
+
+**2026-10-19 (AI walk with real models).** The Nextcloud app (link mode as
+`ada`, connected to `demo@synaplan.com`; provision mode as `carol`) against
+Synaplan `main` with CF0.2–CF0.4, Nextcloud 33. Models: Groq `gpt-oss-120b`
+for summaries (the demo account's own choice; the system default is
+Anthropic), Cerebras `qwen-3.8-27b` and `gpt-oss-120b` in the streaming chat,
+local Ollama `bge-m3` for embeddings, Cohere for reranking — each confirmed in
+`BUSELOG`. Images were not generated (OpenAI only).
+
+Works end to end: register the instance; Connect; Summarize; the streaming
+chat with a chosen model; knowledge add into a named folder (not Incoming,
+CF0.3), RAG answer from that folder, status, remove; memories in the chat;
+provisioning on consent with a `chat files rag` key and Summarize through it
+(CF0.1); Disconnect revokes the key. Fixed during the walk: a vectorized file
+reported `vector_state: none` until the Library ran its fix-on-read, so
+`check-stale` said "not searchable" right after an upload; #2573 now sets the
+state when the vectors are stored (`File::markVectorized()`). Recorded: D25
+(Translate returns an essay, not a translation), D26 (Chat about this file
+answers with a summary), D27 (deep link to the internal API host), D28 (the
+connect page does not name the signed-in Synaplan account); D24 widened to the
+streaming chat. Two dev-loop constraints went into `10` §6.
