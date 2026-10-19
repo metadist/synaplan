@@ -91,6 +91,22 @@ final class ApiKeyScope
     public const PLATFORM_MEMORIES = 'memories';
 
     /**
+     * Routes outside the prefix map that the platform-link apps call with a
+     * person's key: summarize and translate, chat, media, and the memory
+     * check before a chat (provisioned keys never carry `memories`). Exact
+     * method and path, so a platform key never gains a whole prefix; the
+     * scopes are added to whatever the prefix map already grants there.
+     *
+     * @var array<string, list<string>> "METHOD /path" => scopes
+     */
+    private const PLATFORM_ROUTES = [
+        'POST /api/v1/summary/generate' => [self::PLATFORM_CHAT],
+        'POST /api/v1/media/generate' => [self::PLATFORM_CHAT],
+        'POST /v1/chat/completions' => [self::PLATFORM_CHAT],
+        'GET /api/v1/config/memory-service/check' => [self::PLATFORM_CHAT, self::PLATFORM_MEMORIES],
+    ];
+
+    /**
      * Tool grant for `code_execution` / `code_run`. Not a path scope: `/v1/*`
      * stays gated by {@see DESKTOP_MESSAGES}. Empty-scope and webhook-only
      * keys do not receive it; only an explicit `compute:run` or `*` does.
@@ -307,6 +323,9 @@ final class ApiKeyScope
      *   /api/v1/admin/audit      → iam:read
      *   /api/v1/admin/users/{id}/resources → iam:read
      *   /api/v1/agents           → agents:*
+     *   POST /api/v1/summary/generate, POST /api/v1/media/generate,
+     *   POST /v1/chat/completions → also chat (exact routes, PLATFORM_ROUTES)
+     *   GET /api/v1/config/memory-service/check → chat OR memories
      *   /api/v1/auth/me          → any key except one naming `freeapi`
      *                              (self-service identity, see SELF_SERVICE_PATHS)
      *   /api/health              → any key except one naming `freeapi` (public
@@ -357,6 +376,17 @@ final class ApiKeyScope
      * @return list<string>
      */
     public static function requiredScopesForPath(string $path, string $method = ''): array
+    {
+        $scopes = self::prefixScopes($path, $method);
+        $route = self::PLATFORM_ROUTES[strtoupper($method).' '.$path] ?? [];
+
+        return [] === $route ? $scopes : array_values(array_unique([...$scopes, ...$route]));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function prefixScopes(string $path, string $method): array
     {
         if (self::matchesPrefix($path, '/v1/audio/transcriptions')) {
             return [self::AUDIO_TRANSCRIBE, self::DESKTOP_MESSAGES];

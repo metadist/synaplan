@@ -378,6 +378,95 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows(['rag'], '/api/v1/chats'));
     }
 
+    /**
+     * @param list<string> $scopes
+     */
+    #[DataProvider('cloudAppRoutes')]
+    public function testCloudAppRouteIsReachableWithEachOfItsScopes(string $method, string $path, array $scopes): void
+    {
+        foreach ($scopes as $scope) {
+            self::assertTrue(ApiKeyScope::allows([$scope], $path, $method), sprintf('%s %s with %s', $method, $path, $scope));
+        }
+    }
+
+    /**
+     * @param list<string> $scopes
+     */
+    #[DataProvider('cloudAppRoutes')]
+    public function testCloudAppRouteIsClosedToTheOtherPlatformScopes(string $method, string $path, array $scopes): void
+    {
+        $others = array_values(array_diff(ApiKeyScope::platformLinkScopes(true), $scopes));
+
+        self::assertFalse(ApiKeyScope::allows($others, $path, $method));
+    }
+
+    #[DataProvider('cloudAppAnyKeyRoutes')]
+    public function testCloudAppAnyKeyRouteIsOpenToAProvisionedKey(string $method, string $path): void
+    {
+        self::assertTrue(ApiKeyScope::allows(ApiKeyScope::provisionedPlatformScopes(), $path, $method));
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: string, 2: list<string>}>
+     */
+    public static function cloudAppRoutes(): iterable
+    {
+        foreach (self::cloudAppsContract()['paths'] as $route) {
+            $path = strtr($route['path'], ['{id}' => '42', '{path}' => '7/report.png']);
+            yield $route['method'].' '.$route['path'] => [$route['method'], $path, $route['scopes']];
+        }
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function cloudAppAnyKeyRoutes(): iterable
+    {
+        foreach (self::cloudAppsContract()['anyKey'] as $route) {
+            yield $route['method'].' '.$route['path'] => [$route['method'], $route['path']];
+        }
+    }
+
+    public function testPlatformRoutesMatchExactMethodAndPath(): void
+    {
+        $scopes = ApiKeyScope::platformLinkScopes(true);
+
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/summary/generate', 'GET'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/summary/generate'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/media/generate-from-images', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/media/video/start', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/messages', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/models', 'GET'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/embeddings', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/v1/images/generations', 'POST'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/users', 'GET'));
+    }
+
+    public function testPlatformRoutesKeepTheGatewayScopes(): void
+    {
+        self::assertTrue(ApiKeyScope::allows(['desktop:messages'], '/v1/chat/completions', 'POST'));
+        self::assertTrue(ApiKeyScope::allows(['freeapi'], '/v1/chat/completions', 'POST'));
+        self::assertSame(['freeapi', 'desktop:messages', 'chat'], ApiKeyScope::requiredScopesForPath('/v1/chat/completions', 'POST'));
+        self::assertSame(['freeapi', 'desktop:messages'], ApiKeyScope::requiredScopesForPath('/v1/chat/completions', 'GET'));
+        self::assertSame(['chat', 'memories'], ApiKeyScope::requiredScopesForPath('/api/v1/config/memory-service/check', 'GET'));
+    }
+
+    /**
+     * @return array{paths: list<array{method: string, path: string, scopes: list<string>}>, anyKey: list<array{method: string, path: string}>}
+     */
+    private static function cloudAppsContract(): array
+    {
+        $json = file_get_contents(__DIR__.'/../../Fixtures/cloud-apps-contract/paths.json');
+        if (false === $json) {
+            throw new \RuntimeException('Fixtures/cloud-apps-contract/paths.json is missing.');
+        }
+
+        /** @var array{paths: list<array{method: string, path: string, scopes: list<string>}>, anyKey: list<array{method: string, path: string}>} $contract */
+        $contract = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
+        return $contract;
+    }
+
     public function testGrandfatherUnchanged(): void
     {
         self::assertSame([
