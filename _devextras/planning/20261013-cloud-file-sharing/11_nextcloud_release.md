@@ -270,7 +270,7 @@ PR has one purpose. CF1.4-nc follows CF1.3c and CF1.3e.
 | | |
 | - | - |
 | Repo · type | `synaplan-nextcloud` (P1, M1) · `chore(ci)` and `test(e2e)`; no release of its own |
-| Branch | `chore/cf1-3b-engineering-baseline` |
+| Branch | three PRs, each under the size limit (§3.3): `chore/cf1-3b-ci-gate` (CI gate, PHPStan, vue-tsc, Vitest, `AGENTS.md`, Renovate), `chore/cf1-3b-contract-test` (pinned spec, contract test), `test/cf1-3b-e2e` (journeys on 33 and 35) |
 | Depends on | CF1.3a; **ask first (A2):** the dev dependencies `phpstan/phpstan`, `vitest`, `@vue/test-utils`, `happy-dom`, `vue-tsc` and `@playwright/test` (at the version `synaplan/frontend` pins) |
 | Touches | `.github/workflows/ci.yml`, `renovate.json5`, `AGENTS.md`, `Makefile`, `scripts/synaplan-openapi.sh`, `tests/Contract/`, `phpstan.neon`, `package.json` (scripts `check:types`, `test:unit`, `test:e2e`), `vitest.config.ts`, `tests/unit/`, `playwright.config.ts`, `tests/e2e/`, `docker-compose.ci.yml`, `README.md` (Development) |
 | Build | §3.1 row by row; the journeys of §5 item 1; Vitest specs for the pure helpers in `src/` (MIME filters, kind folders) — later briefs add specs for what they touch |

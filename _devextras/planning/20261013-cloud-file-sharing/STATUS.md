@@ -34,7 +34,7 @@ not a chat message.
 | CF1.1 ownCloud.online link mode, consent, MIME, key encryption | `synaplan-owncloud-online` | P3 | planned |  |
 | CF1.2 ownCloud.online tests, CI, AGENTS.md, local stack | `synaplan-owncloud-online` | P3 | planned | after CF-S4 |
 | CF1.3a Nextcloud 33–35, attributes, `ControllerAccessTest` | `synaplan-nextcloud` | P1 (M1 fast lane) | **in review** [synaplan-nextcloud#46](https://github.com/metadist/synaplan-nextcloud/pull/46) (stacked on #45) | D21; app release 1.6.1; row 47 agreed |
-| CF1.3b Engineering baseline (CI gate, pinned Synaplan, contract test, PHPStan, vue-tsc, Vitest, Playwright, Renovate, `AGENTS.md`) | `synaplan-nextcloud` | P1 (M1) | planned | `11` §3.1; dev dependencies ask first (A2) |
+| CF1.3b Engineering baseline (CI gate, pinned Synaplan, contract test, PHPStan, vue-tsc, Vitest, Playwright, Renovate, `AGENTS.md`) | `synaplan-nextcloud` | P1 (M1) | **in progress** · CI gate in review [synaplan-nextcloud#47](https://github.com/metadist/synaplan-nextcloud/pull/47), contract test [#48](https://github.com/metadist/synaplan-nextcloud/pull/48); e2e next | `11` §3.1; dev dependencies agreed 2026-10-19 (A2) |
 | CF1.3c Keys encrypted at rest (per-user, admin, shared) | `synaplan-nextcloud` | P1 (M1) | planned | D4; Nextcloud's sensitive config; app release 1.7.0 |
 | CF1.3d Release from CI | `synaplan-nextcloud` | P1 (M1) | planned | owner stores two repository secrets (A6) |
 | CF1.3e Honest app states (D23, D24) | `synaplan-nextcloud` | P1 (M1) | planned | app release 1.7.0; CF1.4-nc translates its sentences |
@@ -478,3 +478,15 @@ Findings, written into the plan:
 4. After a WSL restart, bind mounts came up empty and `/tmp` was gone; the
    backup of the old `backend/.env` named in the environments entry above was
    lost with it (its OIDC lines were empty). `10` §6.
+
+**2026-10-19 (CF1.3b, parts 1 and 2).** The Nextcloud app has the CI gate of
+`synaplan-opencloud` (#47): PHP against the Nextcloud 33 and 35 APIs, frontend,
+package, **All Checks Passed**. Adding the checks found a visible bug, fixed
+in the same PR: seventeen `NcButton type="primary"` rendered every primary
+action as secondary under `@nextcloud/vue` 9 (`variant` sets the look now).
+PHPStan runs at level 5 without a baseline. The contract test (#48) checks every
+call the app makes against the pinned Synaplan's spec and route table; it
+proved it catches a renamed field, a renamed route and an unknown enum value.
+Its enum message also shows D2 from the app's side: the pinned spec has no
+`owncloud` source until #2574 ships. CF0.3 gained the overwrite case from
+Copilot's review (#2572): an update into a knowledge folder leaves Incoming too.
