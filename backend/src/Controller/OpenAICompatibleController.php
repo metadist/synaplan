@@ -40,6 +40,7 @@ use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 
 /**
  * OpenAI-compatible API endpoints.
+ *
  * Allows any OpenAI SDK to use Synaplan as a drop-in replacement
  * by pointing the base_url to this server's /v1/ path.
  */
@@ -318,8 +319,7 @@ class OpenAICompatibleController extends AbstractController
             $options['runtime_profile'] = $optionsProfile;
         }
         if ($gateAllows && 'none' !== $parsed->toolChoice) {
-            $options['server_tool_loop'] = true;
-            $options[OpenAiGatewayToolLoop::DEMO_HOURLY_CAP_WAIVED] = $demoHourlyCapWaived;
+            $options = array_merge($options, ['server_tool_loop' => true, OpenAiGatewayToolLoop::DEMO_HOURLY_CAP_WAIVED => $demoHourlyCapWaived]);
         }
         if (null !== $parsed->temperature) {
             $options['temperature'] = $parsed->temperature;
