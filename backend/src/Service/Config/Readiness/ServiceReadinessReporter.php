@@ -65,6 +65,7 @@ final readonly class ServiceReadinessReporter
                 download: ServiceReadiness::DOWNLOADING === $state
                     ? new DownloadProgress($observation->percent, $observation->model, $tracked['minutes_left'])
                     : null,
+                profile: $this->profile($id),
             );
         }
 
@@ -79,16 +80,31 @@ final readonly class ServiceReadinessReporter
     private function withProfileOff(string $id, ReadinessObservation $observation): ReadinessObservation
     {
         $service = ServiceReadinessCatalog::SERVICES[$id];
-        if (ReadinessObservation::DOWN !== $observation->kind || null === $service['profile'] || 'dev' !== $this->environment) {
+        if (ReadinessObservation::DOWN !== $observation->kind || null === $this->profile($id) || 'dev' !== $this->environment) {
             return $observation;
         }
 
         return $this->composeLookup->exists($service['compose']) ? $observation : ReadinessObservation::off();
     }
 
+    /**
+     * Profile that starts this service on the running install. Piper starts
+     * by default on the standard file; only the minimal file gates it.
+     */
+    private function profile(string $id): ?string
+    {
+        $service = ServiceReadinessCatalog::SERVICES[$id];
+        if ('minimal' === strtolower(trim($this->platform)) && isset($service['minimal_profile'])) {
+            return $service['minimal_profile'];
+        }
+
+        return $service['profile'];
+    }
+
     private function recovery(string $id, string $state): ?string
     {
         $service = ServiceReadinessCatalog::SERVICES[$id];
+        $profile = $this->profile($id);
         $dev = 'dev' === $this->environment;
         if (!$dev && ($service['dev_only'] || !$this->isComposeInstall())) {
             return null;
@@ -97,8 +113,8 @@ final readonly class ServiceReadinessReporter
         $compose = $service['compose'];
 
         return match ($state) {
-            ServiceReadiness::OFF => $dev && null !== $service['profile']
-                ? sprintf('Turn it on with the "%1$s" Compose profile: COMPOSE_PROFILES=%1$s make up', $service['profile'])
+            ServiceReadiness::OFF => $dev && null !== $profile
+                ? sprintf('Turn it on with the "%1$s" Compose profile: COMPOSE_PROFILES=%1$s make up', $profile)
                 : null,
             ServiceReadiness::UNAVAILABLE => sprintf('Run `docker compose logs %1$s` to see why; `docker compose restart %1$s` brings it back.', $compose),
             ServiceReadiness::FAILED => 'ollama' === $id

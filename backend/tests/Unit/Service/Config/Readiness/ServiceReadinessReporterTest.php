@@ -134,6 +134,24 @@ final class ServiceReadinessReporterTest extends TestCase
         self::assertSame('starting', $this->row($this->reporter($down, containersExist: false)->rows(), 'docling')['state']);
     }
 
+    public function testMinimalStackTtsWithoutItsContainerIsOffWithTheProfileCommand(): void
+    {
+        $down = ['tts' => ReadinessObservation::down()];
+
+        $minimal = $this->row($this->reporter($down, 'dev', platform: 'minimal', containersExist: false)->rows(), 'tts');
+        self::assertSame('off', $minimal['state']);
+        self::assertSame('tts', $minimal['profile']);
+        self::assertSame('Turn it on with the "tts" Compose profile: COMPOSE_PROFILES=tts make up', $minimal['recovery']);
+
+        $running = $this->row($this->reporter($down, 'dev', platform: 'minimal')->rows(), 'tts');
+        self::assertSame('starting', $running['state'], 'a minimal stack with the tts container up is still starting');
+
+        $standard = $this->row($this->reporter($down, 'dev', containersExist: false)->rows(), 'tts');
+        self::assertSame('starting', $standard['state'], 'the standard file starts Piper by default, so a missing container is still wave 2');
+        self::assertNull($standard['profile']);
+        self::assertNull($standard['recovery']);
+    }
+
     public function testADevOnlyServiceGetsACommandOnlyOnTheDevStack(): void
     {
         $broken = ['ollama' => ReadinessObservation::broken()];

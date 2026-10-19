@@ -11,12 +11,13 @@ namespace App\Service\Config\Readiness;
  * `compose` is the compose service name; `dev_only` marks services that only
  * the dev compose files define, so a command naming them is wrong anywhere
  * else. `profile` is the dev compose profile that starts an optional service,
- * or null when it starts by default.
+ * or null when it starts by default. `minimal_profile` is set when only
+ * docker-compose-minimal.yml gates the service (`SYNAPLAN_PLATFORM=minimal`).
  */
 final class ServiceReadinessCatalog
 {
     /**
-     * @var array<string, array{name: string, compose: string, dev_only: bool, profile: ?string, unlocks: string, effect: string, docs: ?string}>
+     * @var array<string, array{name: string, compose: string, dev_only: bool, profile: ?string, minimal_profile?: string, unlocks: string, effect: string, docs: ?string}>
      */
     public const SERVICES = [
         'ollama' => [
@@ -51,6 +52,7 @@ final class ServiceReadinessCatalog
             'compose' => 'tts',
             'dev_only' => false,
             'profile' => null,
+            'minimal_profile' => 'tts',
             'unlocks' => 'Spoken answers.',
             'effect' => 'Spoken answers are off.',
             'docs' => 'modules/piper-tts',

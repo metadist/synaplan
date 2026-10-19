@@ -23,6 +23,7 @@ final readonly class ServiceReadiness
         public ?string $recovery,
         public ?string $since,
         public ?DownloadProgress $download = null,
+        public ?string $profile = null,
     ) {
     }
 
@@ -44,7 +45,7 @@ final readonly class ServiceReadiness
             'percent' => $this->download?->percent,
             'model' => $this->download?->model,
             'minutes_left' => $this->download?->minutesLeft,
-            'profile' => self::OFF === $this->state ? $service['profile'] : null,
+            'profile' => self::OFF === $this->state ? $this->profile : null,
             'docs_anchor' => $service['docs'],
         ];
     }

@@ -247,6 +247,9 @@ services:
       # Note: No whisper_models volume - audio transcription disabled
     environment:
       APP_ENV: dev
+      # Piper is a profile on this file and a default service everywhere else.
+      # Readiness uses the platform to say "off" with COMPOSE_PROFILES=tts.
+      SYNAPLAN_PLATFORM: minimal
       # APP_SECRET loaded from backend/.env (env_file above)
       APP_URL: http://localhost:${SYNAPLAN_BACKEND_PORT:-8000}
       PLUGINS_DIR: /plugins
