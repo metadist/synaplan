@@ -5,6 +5,7 @@ namespace App\AI\Provider\Google;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Provider\ChatStopReason;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use Psr\Log\LoggerInterface;
@@ -100,12 +101,7 @@ final class GoogleChat
                 'content' => $textContent,
                 'usage' => $usage,
             ];
-            if ([] !== $toolCalls) {
-                $result['tool_calls'] = $toolCalls;
-                $result['finish_reason'] = 'tool_calls';
-            } elseif ('MAX_TOKENS' === ($data['candidates'][0]['finishReason'] ?? null)) {
-                $result['finish_reason'] = 'length';
-            }
+            $result = ChatStopReason::apply($result, $toolCalls, $data['candidates'][0]['finishReason'] ?? null);
 
             return $result;
         } catch (ProviderException $e) {

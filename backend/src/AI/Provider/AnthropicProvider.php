@@ -435,14 +435,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             // into `content` above, and calling this turn a tool turn would
             // make the caller wait for a tool result that never comes.
             if (!$schemaForcedToolUse) {
-                if ([] !== $toolCalls) {
-                    $result['tool_calls'] = $toolCalls;
-                    $result['finish_reason'] = 'tool_calls';
-                } elseif ('tool_use' === ($data['stop_reason'] ?? null)) {
-                    $result['finish_reason'] = 'tool_calls';
-                } elseif ('max_tokens' === ($data['stop_reason'] ?? null)) {
-                    $result['finish_reason'] = 'length';
-                }
+                $result = ChatStopReason::apply($result, $toolCalls, $data['stop_reason'] ?? null);
             }
 
             return $result;

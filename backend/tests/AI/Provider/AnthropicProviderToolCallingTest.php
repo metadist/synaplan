@@ -92,6 +92,23 @@ class AnthropicProviderToolCallingTest extends TestCase
         $this->assertSame(['media_type' => 'image'], json_decode($calls[0]['function']['arguments'], true));
     }
 
+    public function testACutOffAnswerReportsFinishReasonLength(): void
+    {
+        $client = new MockHttpClient(static fn (): MockResponse => new MockResponse((string) json_encode([
+            'content' => [['type' => 'text', 'text' => 'Only the start.']],
+            'stop_reason' => 'max_tokens',
+            'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+        ])));
+
+        $result = $this->makeProvider($client)->chat(
+            [['role' => 'user', 'content' => 'Translate this long document']],
+            ['model' => 'claude-haiku-4-5'],
+        );
+
+        $this->assertSame('Only the start.', $result['content']);
+        $this->assertSame('length', $result['finish_reason']);
+    }
+
     public function testAnOrdinaryAnswerReportsNoToolCalls(): void
     {
         $client = new MockHttpClient(static fn (): MockResponse => new MockResponse((string) json_encode([
