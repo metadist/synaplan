@@ -10,6 +10,7 @@ import {
   groupNavChildren,
   hasNestedNavGroups,
   isNavChildActive,
+  setFeatureStatusCounts,
   setModelsNeedingAttention,
   useNavItems,
 } from '@/composables/useNavItems'
@@ -333,6 +334,33 @@ describe('useNavItems rail', () => {
       (refreshed?.children ?? []).find((child: { key: string }) => child.key === 'admin-setup')
         ?.badge
     ).toBeUndefined()
+  })
+
+  it('counts a stopped service once on the System status badge', async () => {
+    const wrapper = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
+    const badge = () =>
+      (
+        wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')?.children ?? []
+      ).find((child: { key: string }) => child.key === 'admin-features')?.badge
+    const feature = (id: string, enabled: boolean) => ({ id, enabled })
+    const service = (id: string, state: string) => ({ id, state })
+
+    setFeatureStatusCounts({
+      features: {
+        brave: feature('brave', false),
+        'memory-service': feature('memory-service', false),
+      },
+      services: [service('qdrant', 'unavailable'), service('docling', 'off')],
+    } as unknown as Parameters<typeof setFeatureStatusCounts>[0])
+    await flushPromises()
+    expect(badge()).toBe('2')
+
+    setFeatureStatusCounts({
+      features: { 'memory-service': feature('memory-service', true) },
+      services: [service('qdrant', 'ready')],
+    } as unknown as Parameters<typeof setFeatureStatusCounts>[0])
+    await flushPromises()
+    expect(badge()).toBeUndefined()
   })
 
   it('People always points at /admin/people', () => {

@@ -34,14 +34,21 @@ const SERVICE_ALIASES: Record<string, string[]> = {
   collabora: ['office_convert', 'office-convert'],
 }
 
-/** Feature/module ids already reported by a service that needs attention. */
+/**
+ * Feature/module ids the service list already speaks for: a service that needs
+ * attention has its own row, and a switched-off one is not a problem at all.
+ */
 export function idsCoveredByServices(services: ServiceReadiness[] | undefined): Set<string> {
-  const covered = new Set<string>()
-  for (const service of (services ?? []).filter(serviceNeedsAttention)) {
-    covered.add(service.id)
-    for (const alias of SERVICE_ALIASES[service.id] ?? []) covered.add(alias)
-  }
-  return covered
+  return idsOf((services ?? []).filter((s) => serviceNeedsAttention(s) || s.state === 'off'))
+}
+
+/** Feature/module ids whose outage already has its own service row. */
+export function idsReportedAsDown(services: ServiceReadiness[] | undefined): Set<string> {
+  return idsOf((services ?? []).filter(serviceNeedsAttention))
+}
+
+function idsOf(services: ServiceReadiness[]): Set<string> {
+  return new Set(services.flatMap((s) => [s.id, ...(SERVICE_ALIASES[s.id] ?? [])]))
 }
 
 export function recoveryCommands(recovery: string | null): string[] {

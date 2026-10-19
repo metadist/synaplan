@@ -153,12 +153,16 @@ test.describe('@ci System status', () => {
       .locator(selectors.featureStatus.attentionItem)
       .filter({ hasText: 'Qdrant' })
     await expect(attention).toHaveCount(1, { timeout: TIMEOUTS.EXTREME })
-    await expect(attention).toContainText('Qdrant (memories) is not reachable. Memories are paused.')
+    await expect(attention).toContainText(
+      'Qdrant (memories) is not reachable. Memories are paused.'
+    )
     await expect(
       page.locator(selectors.featureStatus.attentionItem).filter({ hasText: 'Ollama' })
     ).toHaveCount(0)
     await attention.getByRole('link').click()
     await expect(page).toHaveURL(/\/admin\/features/)
+    await expect(section).toBeVisible({ timeout: TIMEOUTS.EXTREME })
+    await page.unrouteAll({ behavior: 'ignoreErrors' })
   })
 
   test('shows a running sentence and no sidebar hint', async ({ page }) => {

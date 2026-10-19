@@ -6,12 +6,12 @@ import AdminAttentionPanel from '@/components/admin/AdminAttentionPanel.vue'
 const getFeaturesStatus = vi.hoisted(() => vi.fn())
 const getStatus = vi.hoisted(() => vi.fn())
 const setModelsNeedingAttention = vi.hoisted(() => vi.fn())
-const setServicesNeedingAttention = vi.hoisted(() => vi.fn())
+const setFeatureStatusCounts = vi.hoisted(() => vi.fn())
 vi.mock('@/services/featuresService', () => ({ getFeaturesStatus }))
 vi.mock('@/services/api/adminModelStatusApi', () => ({ modelStatusApi: { getStatus } }))
 vi.mock('@/composables/useNavItems', () => ({
   setModelsNeedingAttention,
-  setServicesNeedingAttention,
+  setFeatureStatusCounts,
 }))
 
 const feature = (id: string, enabled: boolean, status: string) => ({
@@ -121,7 +121,23 @@ describe('AdminAttentionPanel', () => {
       ),
     ])
     expect(items[0]!.get('a').attributes('href')).toBe('/admin/features')
-    expect(setServicesNeedingAttention).toHaveBeenCalledWith(2)
+    expect(setFeatureStatusCounts).toHaveBeenCalledWith(
+      expect.objectContaining({ services: expect.any(Array) })
+    )
+  })
+
+  it('does not report a sidecar as broken when its container is switched off', async () => {
+    getFeaturesStatus.mockResolvedValue({
+      features: { docling: feature('docling', true, 'unhealthy') },
+      modules: [{ id: 'office_convert', label_key: 'missing.key', state: 'needs_setup' }],
+      services: [
+        service('docling', 'off', 'Complex documents are read as plain text.'),
+        service('collabora', 'off', 'Office files open read-only.'),
+      ],
+    })
+    const wrapper = await mountPanel()
+
+    expect(wrapper.find('[data-testid="attention-all-good"]').exists()).toBe(true)
   })
 
   it('offers a retry when the status cannot be loaded', async () => {

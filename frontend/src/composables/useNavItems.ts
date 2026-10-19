@@ -21,11 +21,11 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { useApprovalsStore } from '../stores/approvals'
-import { getFeaturesStatus } from '../services/featuresService'
+import { getFeaturesStatus, type FeaturesStatus } from '../services/featuresService'
 import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { partnersApi } from '../services/api/partnersApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
-import { servicesNeedingAttention } from '../utils/serviceReadiness'
+import { idsReportedAsDown, servicesNeedingAttention } from '../utils/serviceReadiness'
 import { isApprovalsEnabled } from './useApprovalsFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
 
@@ -121,19 +121,21 @@ export function setModelsNeedingAttention(count: number): void {
 
 export const modelsNeedingAttention = readonly(offlineModelsCount)
 
-/** The admin overview reports unavailable/failed services so the features badge counts them too. */
-export function setServicesNeedingAttention(count: number): void {
-  servicesDownCount.value = count
+/**
+ * Switched-off features and stopped services share the System status badge;
+ * a feature that is off because its service stopped counts once.
+ */
+export function setFeatureStatusCounts(status: FeaturesStatus): void {
+  const reported = idsReportedAsDown(status.services)
+  disabledFeaturesCount.value = Object.values(status.features ?? {}).filter(
+    (f) => !f.enabled && !reported.has(f.id)
+  ).length
+  servicesDownCount.value = servicesNeedingAttention(status.services)
 }
 
-/** Switched-off features and stopped services share the System status badge. */
 async function loadFeatureCounts(): Promise<void> {
   try {
-    const status = await getFeaturesStatus()
-    disabledFeaturesCount.value = Object.values(status?.features ?? {}).filter(
-      (f) => !f.enabled
-    ).length
-    servicesDownCount.value = servicesNeedingAttention(status?.services)
+    setFeatureStatusCounts(await getFeaturesStatus())
   } catch {
     disabledFeaturesCount.value = 0
     servicesDownCount.value = 0

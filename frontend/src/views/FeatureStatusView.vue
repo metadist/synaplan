@@ -264,7 +264,7 @@ import SchedulerStatusCard from '@/components/admin/SchedulerStatusCard.vue'
 import ServiceReadinessSection from '@/components/admin/ServiceReadinessSection.vue'
 import { servicesNeedingAttention } from '@/utils/serviceReadiness'
 import { useAccordion } from '@/composables/useAccordion'
-import { setServicesNeedingAttention } from '@/composables/useNavItems'
+import { setFeatureStatusCounts } from '@/composables/useNavItems'
 import {
   getFeaturesStatus,
   FeatureStatusForbiddenError,
@@ -359,7 +359,7 @@ const loadFeatures = async () => {
   try {
     const data = await getFeaturesStatus()
     featuresStatus.value = data
-    setServicesNeedingAttention(servicesNeedingAttention(data.services))
+    setFeatureStatusCounts(data)
   } catch (error) {
     if (error instanceof FeatureStatusForbiddenError) {
       isDevOnly.value = true

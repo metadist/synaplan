@@ -90,7 +90,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { getFeaturesStatus, type FeaturesStatus } from '@/services/featuresService'
 import { modelStatusApi } from '@/services/api/adminModelStatusApi'
-import { setModelsNeedingAttention, setServicesNeedingAttention } from '@/composables/useNavItems'
+import { setFeatureStatusCounts, setModelsNeedingAttention } from '@/composables/useNavItems'
 import { idsCoveredByServices, serviceCopy, serviceNeedsAttention } from '@/utils/serviceReadiness'
 
 const props = defineProps<{
@@ -136,7 +136,7 @@ async function load(): Promise<void> {
     features.value = featureStatus
     modelsNeedingAttention.value = modelStatus.summary.needsAttention
     setModelsNeedingAttention(modelStatus.summary.needsAttention)
-    setServicesNeedingAttention((featureStatus.services ?? []).filter(serviceNeedsAttention).length)
+    setFeatureStatusCounts(featureStatus)
   } catch {
     loadFailed.value = true
   } finally {
