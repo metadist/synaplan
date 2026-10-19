@@ -13,6 +13,18 @@ namespace App\Service\Summary;
  */
 final readonly class SummaryRequest
 {
+    public const TRANSLATION_PROMPT = <<<'PROMPT'
+        You are a professional translator. Translate the document the user sends into the target language they name.
+        Translate all of it, in its order, and keep headings, lists, tables, numbers, dates, names and links.
+        Do not summarize, shorten, explain, judge or add anything. Reply with the translation only.
+        PROMPT;
+
+    /**
+     * Room for a full translation. Providers default to 4,096 output tokens,
+     * which cuts a long document off. A still-cut-off answer is refused.
+     */
+    public const TRANSLATION_MAX_TOKENS = 8192;
+
     private function __construct(
         public ?string $text,
         public ?int $fileId,
@@ -71,11 +83,47 @@ final readonly class SummaryRequest
         return null;
     }
 
+    public function isTranslation(): bool
+    {
+        return 'translation' === $this->summaryType;
+    }
+
+    public function systemPrompt(string $summaryPrompt): string
+    {
+        return $this->isTranslation() ? self::TRANSLATION_PROMPT : $summaryPrompt;
+    }
+
+    /**
+     * Low temperatures keep summaries consistent and translations literal.
+     */
+    public function temperature(): float
+    {
+        return $this->isTranslation() ? 0.2 : 0.5;
+    }
+
+    public function toCall(string $summaryPrompt, string $document, float $startedAt): SummaryCall
+    {
+        return new SummaryCall(
+            $this->systemPrompt($summaryPrompt),
+            $this->message($document),
+            $this->temperature(),
+            'DOC_SUMMARY',
+            $document,
+            $startedAt,
+            $this->isTranslation(),
+            $this->isTranslation() ? self::TRANSLATION_MAX_TOKENS : null,
+        );
+    }
+
     /**
      * The message that hands the model the options and the document.
      */
     public function message(string $document): string
     {
+        if ($this->isTranslation()) {
+            return "Target language: {$this->outputLanguage}\n\nDocument to translate:\n\n{$document}";
+        }
+
         $targetWordCount = match ($this->length) {
             'short' => '50-150',
             'long' => '500-1000',

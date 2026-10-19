@@ -19,6 +19,8 @@ final readonly class SummaryCall
         public string $usageKind,
         public string $usageInput,
         public ?float $startedAt = null,
+        public bool $requireComplete = false,
+        public ?int $maxTokens = null,
     ) {
     }
 }

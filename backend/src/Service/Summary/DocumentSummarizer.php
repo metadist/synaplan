@@ -40,6 +40,9 @@ final readonly class DocumentSummarizer
         if ($model['model']) {
             $options['model'] = $model['model'];
         }
+        if (null !== $call->maxTokens) {
+            $options['max_tokens'] = $call->maxTokens;
+        }
 
         $response = $this->aiFacade->chat([
             ['role' => 'system', 'content' => $call->instructions],
@@ -60,8 +63,21 @@ final readonly class DocumentSummarizer
             'response_text' => $summary,
             'input_text' => $call->usageInput,
         ]);
+        if ($call->requireComplete && self::wasCutOff($response)) {
+            throw IncompleteGenerationException::translationCutOff();
+        }
 
         return ['summary' => $summary, 'provider' => $response['provider'] ?? null, 'model' => $response['model'] ?? null];
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     */
+    private static function wasCutOff(array $response): bool
+    {
+        $finish = strtolower((string) ($response['finish_reason'] ?? ''));
+
+        return \in_array($finish, ['length', 'max_tokens'], true);
     }
 
     /**

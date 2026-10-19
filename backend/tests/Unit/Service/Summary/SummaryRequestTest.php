@@ -41,7 +41,7 @@ final class SummaryRequestTest extends TestCase
         $defaults = SummaryRequest::fromPayload(['text' => 'A document.']);
         self::assertSame(['A document.', 'abstractive', 'medium', 'en', ['main-ideas', 'key-facts'], null], [$defaults->text, $defaults->summaryType, $defaults->length, $defaults->outputLanguage, $defaults->focusAreas, $defaults->optionsError()]);
 
-        self::assertSame('Invalid summary type. Must be: abstractive, extractive, bullet-points', SummaryRequest::fromPayload(['text' => 'x', 'summaryType' => 'poem'])->optionsError());
+        self::assertSame('Invalid summary type. Must be: abstractive, extractive, bullet-points, translation', SummaryRequest::fromPayload(['text' => 'x', 'summaryType' => 'poem'])->optionsError());
         self::assertSame('Invalid length. Must be: short, medium, long, custom', SummaryRequest::fromPayload(['text' => 'x', 'length' => 7])->optionsError());
     }
 
@@ -52,5 +52,23 @@ final class SummaryRequestTest extends TestCase
         self::assertSame("Configuration:\n- Summary Type: abstractive\n- Target Length: 80 words\n- Output Language: de\n- Focus Areas: numbers-dates\n\nDocument to summarize:\n\nThe document.", $message);
         self::assertStringContainsString('- Target Length: 50-150 words', SummaryRequest::fromPayload(['text' => 'x', 'length' => 'short'])->message('d'));
         self::assertStringContainsString('- Target Length: 200-500 words', SummaryRequest::fromPayload(['text' => 'x'])->message('d'));
+    }
+
+    public function testATranslationAsksForTheWholeDocumentInTheTargetLanguage(): void
+    {
+        $request = SummaryRequest::fromPayload(['text' => 'x', 'summaryType' => 'translation', 'outputLanguage' => 'fr']);
+
+        self::assertNull($request->optionsError());
+        self::assertSame(SummaryRequest::TRANSLATION_PROMPT, $request->systemPrompt('summary prompt'));
+        self::assertSame(0.2, $request->temperature());
+        self::assertSame("Target language: fr\n\nDocument to translate:\n\nThe document.", $request->message('The document.'));
+    }
+
+    public function testASummaryKeepsItsPromptAndTemperature(): void
+    {
+        $request = SummaryRequest::fromPayload(['text' => 'x']);
+
+        self::assertSame('summary prompt', $request->systemPrompt('summary prompt'));
+        self::assertSame(0.5, $request->temperature());
     }
 }

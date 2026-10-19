@@ -13,11 +13,12 @@ namespace App\Service\Summary;
 final class SummaryOptions
 {
     /**
-     * Supported summary types.
+     * Supported summary types. `translation` returns the whole document in
+     * the output language instead of a summary.
      *
      * @var list<string>
      */
-    public const TYPES = ['abstractive', 'extractive', 'bullet-points'];
+    public const TYPES = ['abstractive', 'extractive', 'bullet-points', 'translation'];
 
     /**
      * Supported target lengths ("custom" pairs with an explicit word count).
