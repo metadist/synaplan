@@ -43,6 +43,14 @@
 #
 services:
   # ----------------------------------------------------------------------------
+  # Two start waves. Wave 1 is what chat needs: db, redis, centrifugo, backend,
+  # worker, scheduler, tika, frontend. Every other service (local AI, Qdrant,
+  # Whisper models, TTS, sidecars, dev tools) waits for a healthy backend, so a
+  # fresh stack chats while the heavy containers are still pulling. Nothing in
+  # wave 1 may depend on wave 2; the backend reports what is still starting on
+  # /admin/features. deploy/, the quickstarts and Helm do not stagger.
+  # ----------------------------------------------------------------------------
+  # ----------------------------------------------------------------------------
   # Startup notes (one-shot) - human-readable guidance for `docker compose up`.
   #
   # `docker compose up -d` detaches immediately and only prints container
@@ -123,6 +131,7 @@ services:
           sleep 5
         done
         echo "[startup-notes] backend is up (after $$(elapsed)s)"
+        echo "[startup-notes] second wave starting: local AI, memories (Qdrant), dictation, spoken answers and the dev tools -- chat does not wait for them"
         echo "[startup-notes] waiting for the frontend dev server (npm ci + schema generation + Vite start)..."
         # The boot-status onboarding page answers on :5173 long before Vite
         # does, so "port answers" is not enough: the app is only ready when
@@ -153,6 +162,7 @@ services:
 
            Open   http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}
            Login  admin@synaplan.com / admin123
+           Status http://localhost:${SYNAPLAN_FRONTEND_PORT:-5173}/admin/features  (what is still starting)
         ============================================================
 
         EOF
@@ -914,6 +924,9 @@ services:
     profiles: [local-ai]
     image: ollama/ollama:latest@sha256:265409e1d931028a8f7d5a32bcbafddd7bffbc6cc629d77efe9560adf692a5e7
     container_name: synaplan-ollama
+    depends_on:
+      backend:
+        condition: service_healthy
     ports:
       - "${SYNAPLAN_OLLAMA_PORT:-11435}:11434"
     volumes:
@@ -994,6 +1007,9 @@ services:
   docling:
     image: ghcr.io/docling-project/docling-serve-cpu:v1.37.0@sha256:6eda9c524992147c1b0b06a1a9be4894bd68b1f43c86d92c32f996c4c60d18a3
     container_name: synaplan-docling
+    depends_on:
+      backend:
+        condition: service_healthy
     profiles: [docling]
     restart: unless-stopped
     environment:
@@ -1013,6 +1029,9 @@ services:
   searxng:
     image: searxng/searxng:2026.8.22-9fea41204@sha256:11a9b34cdc0b1ec2b991470a2762ecb5a1a531898289fb51dcd015260450729e
     container_name: synaplan-searxng
+    depends_on:
+      backend:
+        condition: service_healthy
     profiles: [searxng]
     restart: unless-stopped
     volumes:
@@ -1056,6 +1075,9 @@ services:
   whisper-models:
     image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     container_name: synaplan-whisper-models
+    depends_on:
+      backend:
+        condition: service_healthy
     command: >
       sh -c '
         apk add --no-cache curl ca-certificates &&
@@ -1089,7 +1111,10 @@ services:
     ports:
       - "${SYNAPLAN_PHPMYADMIN_PORT:-8082}:80"
     depends_on:
-      - db
+      db:
+        condition: service_started
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -1119,6 +1144,9 @@ services:
   mailhog:
     image: mailhog/mailhog:latest@sha256:8d76a3d4ffa32a3661311944007a415332c4bb855657f4f6c57996405c009bea
     container_name: synaplan-mailhog
+    depends_on:
+      backend:
+        condition: service_healthy
     ports:
       - "${SYNAPLAN_MAILHOG_SMTP_PORT:-1025}:1025"  # SMTP
       - "${SYNAPLAN_MAILHOG_UI_PORT:-8025}:8025"  # Web UI
@@ -1130,6 +1158,9 @@ services:
   keycloak_certs:
     image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
     container_name: synaplan-keycloak-certs
+    depends_on:
+      backend:
+        condition: service_healthy
     command: sh -c 'if [ -f /certs/cert.pem ]; then echo "Keycloak TLS cert exists"; exit 0; fi && apk add --no-cache openssl && openssl req -x509 -newkey rsa:2048 -keyout /certs/key.pem -out /certs/cert.pem -days 3650 -nodes -subj "/CN=host.docker.internal" -addext "subjectAltName=DNS:host.docker.internal,DNS:keycloak,DNS:localhost" && chmod 644 /certs/*.pem && echo "Keycloak TLS cert generated"'
     volumes:
       - keycloak_certs:/certs
@@ -1145,6 +1176,8 @@ services:
     depends_on:
       keycloak_certs:
         condition: service_completed_successfully
+      backend:
+        condition: service_healthy
     command: start-dev
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
@@ -1200,6 +1233,9 @@ services:
   collabora:
     image: collabora/code:26.04.5.1.1@sha256:bb8f3c9c5c9016045f25fccb5f0649be94469ebc7c7cc379f3576e470cccf33d
     container_name: synaplan-collabora
+    depends_on:
+      backend:
+        condition: service_healthy
     profiles: [office]
     restart: unless-stopped
     mem_limit: 2g
@@ -1228,6 +1264,9 @@ services:
   tts:
     image: ghcr.io/metadist/synaplan-tts:latest@sha256:efa9f2188abca5603aa9c15dec59963cdf7070eb5a9e2564793a7ceba6c3642a
     container_name: synaplan-tts
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     ports:
       - "127.0.0.1:${SYNAPLAN_TTS_PORT:-10200}:10200"
@@ -1249,6 +1288,9 @@ services:
     build:
       context: ./sidecars/synaplan-compute/images/python
     container_name: synaplan-compute-python
+    depends_on:
+      backend:
+        condition: service_healthy
     command: ["python", "--version"]
     network_mode: none
     restart: "no"
@@ -1259,6 +1301,9 @@ services:
     build:
       context: ./sidecars/synaplan-compute/images/node
     container_name: synaplan-compute-node
+    depends_on:
+      backend:
+        condition: service_healthy
     command: ["node", "--version"]
     network_mode: none
     restart: "no"
@@ -1278,6 +1323,8 @@ services:
         condition: service_completed_successfully
       compute-node:
         condition: service_completed_successfully
+      backend:
+        condition: service_healthy
     environment:
       COMPUTE_AUTH_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
       COMPUTE_LISTEN: :8080
@@ -1330,7 +1377,8 @@ services:
       NEXTCLOUD_APP_PASSWORD: ${NEXTCLOUD_APP_PASSWORD:-}
       NOTES_NEXTCLOUD_FOLDER: ${NOTES_NEXTCLOUD_FOLDER:-/Meetings}
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - synaplan-network
 
@@ -1356,7 +1404,8 @@ services:
       PORT: "8096"
       SYNAPLAN_URL: http://backend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - synaplan-network
 
@@ -1364,6 +1413,9 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
     container_name: synaplan-qdrant
+    depends_on:
+      backend:
+        condition: service_healthy
     ports:
       - "${SYNAPLAN_QDRANT_PORT:-6333}:6333"
     volumes:

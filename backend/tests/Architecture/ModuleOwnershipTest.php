@@ -74,6 +74,8 @@ final class ModuleOwnershipTest extends TestCase
             'LOG_FORMAT',
             'REDIS_DSN',
             'SYNAPLAN_PLATFORM',
+            // Set by Kubernetes itself; tells the readiness list not to name compose commands.
+            'KUBERNETES_SERVICE_HOST',
             'BOOTSTRAP_ADMIN_EMAIL',
             'BOOTSTRAP_ADMIN_PASSWORD',
             'BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE',

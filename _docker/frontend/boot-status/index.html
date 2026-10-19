@@ -372,7 +372,7 @@
   // Compose profile and are off until asked for.
   const BLOCKS = [
     { id: 'qdrant', name: 'Qdrant', role: 'Vector database — AI memories, feedback analysis, large-scale RAG (document search itself runs on MariaDB VECTOR without it)',
-      defaultOn: true, stop: 'docker compose stop qdrant' },
+      defaultOn: true, secondWave: true, stop: 'docker compose stop qdrant' },
     { id: 'centrifugo', name: 'Centrifugo', role: 'Live support — human takeover of widget chats, typing indicators, operator notifications',
       defaultOn: true, stop: 'REALTIME_ENABLED=false docker compose up -d' },
     { id: 'tika', name: 'Apache Tika', role: 'Text extraction from PDF, Word, Excel and 1000+ formats for RAG',
@@ -443,6 +443,9 @@
         row.classList.add('on')
         state.append(document.createTextNode('Running'))
         if (b.stop) state.append(document.createTextNode(' — switch off: '), kbd(b.stop))
+      } else if (b.defaultOn && b.secondWave) {
+        row.classList.add('pending')
+        state.append(document.createTextNode('Starts once the backend is ready — chat does not wait for it. Or stopped by you (that is fine, the feature just stays hidden; start it again with '), kbd('make up'), document.createTextNode(').'))
       } else if (b.defaultOn) {
         row.classList.add('pending')
         state.append(document.createTextNode('Starting with the stack — Docker may still be downloading this image. Or stopped by you (that is fine, the feature just stays hidden; start it again with '), kbd('make up'), document.createTextNode(').'))
